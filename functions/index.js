@@ -41,5 +41,5 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Expose the express app as a Firebase Cloud Function in the specified region.
+// Expose the express app as a Firebase Cloud Function.
 exports.proxy = functions.region("europe-west3").https.onRequest(app);

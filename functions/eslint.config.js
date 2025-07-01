@@ -16,10 +16,11 @@ module.exports = [
     rules: {
       "no-restricted-globals": ["error", "name", "length"],
       "prefer-arrow-callback": "error",
-      "quotes": ["error", "double", { "allowTemplateLiterals": true }],
-      "require-jsdoc": "off", // Optional: Turn off JSDoc requirement
-      "valid-jsdoc": "off",   // Optional: Turn off JSDoc validation
-      "new-cap": "off",       // Optional: Allow capital letters for functions (like Express routers)
+      "quotes": ["error", "double", {"allowTemplateLiterals": true}],
+      "require-jsdoc": "off",
+      "valid-jsdoc": "off",
+      "new-cap": "off",
+      "max-len": ["error", {"code": 80}],
     },
   },
   {
