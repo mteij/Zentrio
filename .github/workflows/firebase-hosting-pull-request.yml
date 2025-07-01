@@ -14,8 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Replace Firebase Config
+        env:
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
         run: |
-          CONFIG_JSON=$(echo "${{ secrets.FIREBASE_CONFIG }}" | tr -d '\n\r')
+          CONFIG_JSON=$(echo "$FIREBASE_CONFIG" | jq -c .)
           sed -i "s|__FIREBASE_CONFIG__|${CONFIG_JSON}|g" public/app.js
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
