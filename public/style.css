@@ -10,6 +10,8 @@ body {
     transition: border-color 0.3s ease;
     width: 150px; /* Fixed width */
     height: 150px; /* Fixed height */
+    background-position: center; /* Center background image */
+    background-size: cover; /* Cover the entire area */
 }
 
 .profile-avatar:hover {
@@ -39,4 +41,14 @@ body {
 
 .notification.error {
     background-color: #dc3545; /* Red for error */
+}
+
+/* New: Edit button for profiles */
+.edit-profile-btn {
+    z-index: 10; /* Ensure it's above other elements */
+}
+
+/* New: Styles for profile picture preview in modal */
+#edit-profile-picture-preview {
+    border-color: #e50914; /* Match Stremio's red */
 }

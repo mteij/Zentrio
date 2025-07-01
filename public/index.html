@@ -45,6 +45,7 @@
                     </button>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <img id="header-profile-picture" src="" alt="Profile Picture" class="rounded-full w-8 h-8 object-cover hidden">
                     <span id="credentials-profile-name" class="font-bold text-white"></span>
                     </div>
             </header>
@@ -63,6 +64,30 @@
             <div class="flex justify-end space-x-4">
                 <button id="cancel-add-profile-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</button>
                 <button id="save-profile-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-profile-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 p-8 rounded-lg w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4">Edit Stremio Profile</h2>
+            <input type="text" id="edit-stremio-name" placeholder="Profile Name" class="w-full bg-gray-700 text-white p-3 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600">
+            <input type="password" id="edit-stremio-password" placeholder="Stremio Password" class="w-full bg-gray-700 text-white p-3 rounded mb-6 focus:outline-none focus:ring-2 focus:ring-red-600">
+
+            <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-bold mb-2">Profile Picture</label>
+                <div class="flex items-center space-x-4">
+                    <img id="edit-profile-picture-preview" src="https://placehold.co/60x60/random_color/white?text=?" alt="Profile Preview" class="rounded-full w-16 h-16 object-cover border-2 border-red-600">
+                    <button id="generate-profile-picture-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm">Generate Random Picture</button>
+                </div>
+            </div>
+
+            <div class="flex justify-between space-x-4">
+                <button id="delete-profile-btn" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded">Delete Profile</button>
+                <div class="flex space-x-4">
+                    <button id="cancel-edit-profile-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</button>
+                    <button id="save-edit-profile-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Save Changes</button>
+                </div>
             </div>
         </div>
     </div>

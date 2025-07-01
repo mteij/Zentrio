@@ -73,14 +73,19 @@ export async function performStreamlinedLoginAutomation(
         }
 
         console.log("Streamlined Login: Filling form and clicking login.");
-        emailField.value = profileData.email;
-        passwordField.value = profileData.password;
 
-        // Dispatch input, change, and blur events to ensure Stremio's internal state updates
+        // Explicitly clear, focus, then set value and dispatch events for email
+        emailField.value = ''; // Clear existing value
+        emailField.focus();
+        emailField.value = profileData.email;
         emailField.dispatchEvent(new Event('input', { bubbles: true }));
         emailField.dispatchEvent(new Event('change', { bubbles: true }));
         emailField.dispatchEvent(new Event('blur', { bubbles: true }));
 
+        // Explicitly clear, focus, then set value and dispatch events for password
+        passwordField.value = ''; // Clear existing value
+        passwordField.focus();
+        passwordField.value = profileData.password;
         passwordField.dispatchEvent(new Event('input', { bubbles: true }));
         passwordField.dispatchEvent(new Event('change', { bubbles: true }));
         passwordField.dispatchEvent(new Event('blur', { bubbles: true }));
