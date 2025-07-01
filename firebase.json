@@ -25,7 +25,7 @@
     "rewrites": [
       {
         "source": "/proxy",
-        "function": "proxy"
+        "function": "proxyV2"
       },
       {
         "source": "**",
