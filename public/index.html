@@ -10,13 +10,10 @@
 </head>
 <body class="text-white bg-gray-900 overflow-hidden h-screen">
 
-    <!-- Notification Container -->
     <div id="notification-container" class="fixed top-5 right-5 z-50"></div>
 
-    <!-- Main Application Container -->
     <div id="app" class="h-full flex flex-col">
 
-        <!-- Login Screen -->
         <div id="auth-screen" class="flex-grow flex flex-col items-center justify-center p-4">
             <div class="w-full max-w-md bg-black bg-opacity-75 p-8 rounded-lg">
                 <h1 class="text-3xl font-bold mb-6 text-center">Sign In to StremioHub</h1>
@@ -25,45 +22,38 @@
             </div>
         </div>
 
-        <!-- Profile Selection Screen -->
         <div id="profile-screen" class="hidden flex-grow flex-col items-center justify-center p-8">
             <h1 class="text-5xl font-bold mb-8">Who's watching?</h1>
             <div id="profiles-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 mb-8">
-                <!-- Profiles will be dynamically inserted here -->
-            </div>
+                </div>
             <div class="flex justify-center space-x-4">
                 <button id="add-profile-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg text-lg">Add Profile</button>
                 <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg text-lg">Logout</button>
             </div>
         </div>
         
-        <!-- Split Screen View -->
         <div id="split-screen-view" class="hidden flex-grow flex-col h-full">
-            <!-- Header with Credentials -->
             <header class="bg-gray-800 p-3 flex items-center justify-between shadow-lg z-10">
-                <button id="back-to-profiles-btn" class="flex items-center text-gray-300 hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-                    Back
-                </button>
+                <div class="flex items-center space-x-4">
+                    <button id="back-to-profiles-btn" class="flex items-center text-gray-300 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                        Back
+                    </button>
+                    <button id="try-again-btn" class="flex items-center text-gray-300 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11.128 1.968A8.001 8.001 0 0118 20.428M18 20.428L20.42 22M18 20.428L15.58 22" /></svg>
+                        Try Again
+                    </button>
+                </div>
                 <div class="flex items-center space-x-4">
                     <span id="credentials-profile-name" class="font-bold text-white"></span>
-                    <input type="text" id="stremio-login-email" readonly class="bg-gray-700 text-white p-2 rounded w-48 text-sm" placeholder="Email">
-                    <div class="relative">
-                        <input type="password" id="stremio-login-password" readonly class="bg-gray-700 text-white p-2 rounded w-48 text-sm pr-10" placeholder="Password">
-                        <button id="copy-password-btn" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-white">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                        </button>
                     </div>
-                </div>
             </header>
-            <!-- Iframe Content -->
             <main class="flex-grow bg-black">
                 <iframe id="stremio-iframe" src="about:blank" class="w-full h-full border-none"></iframe>
             </main>
         </div>
     </div>
 
-    <!-- Add Profile Modal -->
     <div id="add-profile-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-800 p-8 rounded-lg w-full max-w-md">
             <h2 class="text-2xl font-bold mb-4">Add Stremio Profile</h2>

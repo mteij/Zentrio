@@ -45,9 +45,10 @@ const addProfileBtn = document.getElementById('add-profile-btn');
 
 // Credentials Display in Header
 const credentialsProfileName = document.getElementById('credentials-profile-name');
-const stremioLoginEmail = document.getElementById('stremio-login-email');
-const stremioLoginPassword = document.getElementById('stremio-login-password');
-const copyPasswordBtn = document.getElementById('copy-password-btn');
+// Removed: const stremioLoginEmail = document.getElementById('stremio-login-email');
+// Removed: const stremioLoginPassword = document.getElementById('stremio-login-password');
+// Removed: const copyPasswordBtn = document.getElementById('copy-password-btn');
+const tryAgainBtn = document.getElementById('try-again-btn'); // ADDED
 
 // Add Profile Modal
 const addProfileModal = document.getElementById('add-profile-modal');
@@ -59,6 +60,7 @@ const stremioPasswordAddInput = document.getElementById('stremio-password-add');
 
 // --- State Variables ---
 let currentUserId = null;
+let currentProfileId = null; // Store the ID of the currently active profile
 // Global variable to track the current stage of the Stremio login automation
 let stremioLoginAutomationStage = 0;
 
@@ -195,14 +197,15 @@ function createProfileElement(id, name) {
 }
 
 async function showSplitScreen(profileId) {
+    currentProfileId = profileId; // Store the current profile ID
     try {
         const profileDocRef = doc(db, 'users', currentUserId, 'profiles', profileId);
         const profileDoc = await getDoc(profileDocRef);
         if (profileDoc.exists()) {
             const profileData = profileDoc.data();
             credentialsProfileName.textContent = profileData.name;
-            stremioLoginEmail.value = profileData.email;
-            stremioLoginPassword.value = profileData.password;
+            // Removed: stremioLoginEmail.value = profileData.email;
+            // Removed: stremioLoginPassword.value = profileData.password;
 
             // Use the new proxy path
             const proxyUrl = "/stremio/";
@@ -228,7 +231,7 @@ async function showSplitScreen(profileId) {
 
                         const profileMenuButton = await waitForElement(
                             iframeDocument,
-                            'div[class*="nav-menu-popup-label-"]'
+                            'div[class*="nav-menu-popup-label-"]' // Selector for the main profile icon
                         );
 
                         if (profileMenuButton) {
@@ -249,7 +252,7 @@ async function showSplitScreen(profileId) {
 
                         const loginSignupButton = await waitForElement(
                             iframeDocument,
-                            'a[title="Log in / Sign up"]'
+                            'a[title="Log in / Sign up"]' // Selector for "Log in / Sign up" link
                         );
 
                         if (loginSignupButton) {
@@ -271,10 +274,9 @@ async function showSplitScreen(profileId) {
                         await delay(1500); // Wait for new page to render
 
                         // Selector for the "Log in" button on the intermediate page
-                        // Assuming the provided div is clickable or its closest parent is
                         const loginButtonOnPage = await waitForElement(
                             iframeDocument,
-                            'div[class*="label-uHD7L"].uppercase-UbR3f' // Using the specific label div
+                            'div[class*="label-uHD7L"].uppercase-UbR3f' // Using the specific label div for the button
                         );
 
                         if (loginButtonOnPage) {
@@ -295,15 +297,15 @@ async function showSplitScreen(profileId) {
 
                         const emailField = await waitForElement(
                             iframeDocument,
-                            'input[placeholder="E-mail"]'
+                            'input[placeholder="E-mail"]' // Selector for email input
                         );
                         const passwordField = await waitForElement(
                             iframeDocument,
-                            'input[placeholder="Password"]'
+                            'input[placeholder="Password"]' // Selector for password input
                         );
                         const finalLoginButton = await waitForElement(
                             iframeDocument,
-                            'div[class*="submit-button-x3L8z"]'
+                            'div[class*="submit-button-x3L8z"]' // Selector for the final submit button
                         );
 
                         if (emailField && passwordField && finalLoginButton) {
@@ -311,6 +313,7 @@ async function showSplitScreen(profileId) {
                             emailField.value = profileData.email;
                             passwordField.value = profileData.password;
 
+                            // Dispatch events to ensure fields register changes
                             emailField.dispatchEvent(new Event('input', { bubbles: true }));
                             passwordField.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -328,7 +331,7 @@ async function showSplitScreen(profileId) {
 
                         const profileMenuButtonAfterLogin = await waitForElement(
                             iframeDocument,
-                            'div[class*="nav-menu-popup-label-"]'
+                            'div[class*="nav-menu-popup-label-"]' // Selector for the profile menu icon after login
                         );
 
                         if (profileMenuButtonAfterLogin) {
@@ -392,14 +395,22 @@ function closeAddProfileModal() {
 
 backToProfilesBtn.addEventListener('click', () => {
     stremioIframe.src = "about:blank";
-    stremioIframe.onload = null;
+    stremioIframe.onload = null; // Remove event listener to prevent re-triggering
     showView(profileScreen);
 });
 
-copyPasswordBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(stremioLoginPassword.value).then(() => {
-        showNotification('Password copied to clipboard!');
-    }).catch(err => {
-        showNotification('Failed to copy password.', 'error');
-    });
+// Removed: copyPasswordBtn.addEventListener('click', () => { ... });
+
+tryAgainBtn.addEventListener('click', () => {
+    if (currentProfileId) {
+        showNotification('Attempting to re-open Stremio and re-login.', 'success');
+        // Reset iframe src to about:blank first to force a full reload
+        stremioIframe.src = "about:blank";
+        // A small delay before re-setting src to allow browser to clear iframe content
+        setTimeout(() => {
+            showSplitScreen(currentProfileId); // Re-run the function for the current profile
+        }, 100); 
+    } else {
+        showNotification('No profile selected to try again.', 'error');
+    }
 });
