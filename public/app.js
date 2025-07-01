@@ -2,26 +2,26 @@
 
 // --- Firebase Imports ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { 
-    getAuth, 
-    onAuthStateChanged, 
+import {
+    getAuth,
+    onAuthStateChanged,
     signOut,
     sendSignInLinkToEmail,
     isSignInWithEmailLink,
     signInWithEmailLink
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { 
-    getFirestore, 
-    collection, 
-    doc, 
-    addDoc, 
-    getDocs, 
+import {
+    getFirestore,
+    collection,
+    doc,
+    addDoc,
+    getDocs,
     getDoc,
     deleteDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Firebase Configuration ---
-const firebaseConfig = __FIREBASE_CONFIG__; 
+const firebaseConfig = __FIREBASE_CONFIG__;
 
 // --- Initialize Firebase ---
 const app = initializeApp(firebaseConfig);
@@ -78,7 +78,7 @@ function showView(view) {
     authScreen.classList.add('hidden');
     profileScreen.classList.add('hidden');
     splitScreenView.classList.add('hidden');
-    
+
     view.classList.remove('hidden');
     view.classList.add('flex');
 }
@@ -88,7 +88,7 @@ const handleSignIn = async () => {
     if (isSignInWithEmailLink(auth, window.location.href)) {
         let email = window.localStorage.getItem('emailForSignIn');
         if (!email) email = window.prompt('Please provide your email for confirmation');
-        
+
         try {
             await signInWithEmailLink(auth, email, window.location.href);
             window.localStorage.removeItem('emailForSignIn');
@@ -109,7 +109,7 @@ onAuthStateChanged(auth, user => {
     } else {
         currentUserId = null;
         showView(authScreen);
-        profilesGrid.innerHTML = ''; 
+        profilesGrid.innerHTML = '';
     }
 });
 
@@ -141,7 +141,7 @@ async function loadProfiles() {
     profilesGrid.innerHTML = '';
     const profilesCollection = collection(db, 'users', currentUserId, 'profiles');
     const profileSnapshot = await getDocs(profilesCollection);
-    
+
     if (profileSnapshot.empty) {
         showNotification('No profiles found. Add one to get started!', 'error');
     } else {
@@ -165,10 +165,10 @@ function createProfileElement(id, name) {
     const nameEl = document.createElement('p');
     nameEl.className = 'text-gray-300 group-hover:text-white truncate w-full text-center text-lg';
     nameEl.textContent = name;
-    
+
     div.appendChild(avatar);
     div.appendChild(nameEl);
-    
+
     div.addEventListener('click', () => {
         showSplitScreen(id);
     });
@@ -185,10 +185,10 @@ async function showSplitScreen(profileId) {
             stremioLoginEmail.value = profileData.email;
             stremioLoginPassword.value = profileData.password;
 
-            const targetUrl = "https://web.stremio.com/#/intro";
-            const proxyUrl = `/proxy?url=${encodeURIComponent(targetUrl)}`;
+            // Use the new proxy path
+            const proxyUrl = "/stremio/"; 
             stremioIframe.src = proxyUrl;
-            
+
             showView(splitScreenView);
 
             stremioIframe.onload = () => {
@@ -201,7 +201,7 @@ async function showSplitScreen(profileId) {
 
                     if (emailField && passwordField && loginButton) {
                         console.log("Login form elements found!");
-                        
+
                         emailField.value = profileData.email;
                         passwordField.value = profileData.password;
 
@@ -210,7 +210,7 @@ async function showSplitScreen(profileId) {
 
                         console.log("Form filled. Attempting to click login button.");
                         loginButton.click();
-                        
+
                         showNotification("Attempting automatic login...", "success");
 
                     } else {
@@ -229,6 +229,7 @@ async function showSplitScreen(profileId) {
         showNotification('Failed to fetch profile credentials.', 'error');
     }
 }
+
 
 saveProfileBtn.addEventListener('click', async () => {
     const name = stremioNameInput.value;
@@ -261,7 +262,7 @@ function closeAddProfileModal() {
 }
 
 backToProfilesBtn.addEventListener('click', () => {
-    stremioIframe.src = "about:blank"; 
+    stremioIframe.src = "about:blank";
     stremioIframe.onload = null;
     showView(profileScreen);
 });
