@@ -1,6 +1,6 @@
-# Stremio Netflix-Style Profile Selector
+# StremioHub - Profile Selector Overlay
 
-![Stremio Overlay Banner](https://placehold.co/1200x400/141414/e50914?text=Stremio+Profile+Selector)
+![Stremio Overlay Banner](https://placehold.co/1200x400/141414/e50914?text=StremioHub)
 
 <p align="center">
   <a href="https://github.com/YOUR-USERNAME/YOUR-REPOSITORY/actions/workflows/firebase-hosting-merge.yml">
