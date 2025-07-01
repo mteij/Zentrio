@@ -18,7 +18,7 @@ app.get("/*", async (req, res) => {
       "Chrome/91.0.4472.124 Safari/537.36";
 
     const response = await axios.get(targetUrl, {
-      responseType: 'arraybuffer', // Fetch as a buffer to handle all file types
+      responseType: "arraybuffer", // Fetch as a buffer to handle all file types
       headers: {
         "User-Agent": userAgent,
       },
@@ -35,7 +35,6 @@ app.get("/*", async (req, res) => {
     }
 
     res.send(response.data);
-
   } catch (error) {
     console.error("Proxy error:", error.message, "for URL:", targetUrl);
     const status = error.response ? error.response.status : 500;
