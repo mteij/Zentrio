@@ -62,7 +62,7 @@ export async function performStreamlinedLoginAutomation(
     showAutomationFailModal
 ) {
     try {
-        await delay(2000); // Initial delay to ensure page loads
+        await delay(3000); // Increased initial delay for page to settle
 
         const emailField = await waitForElement(iframeDocument, 'input[placeholder="E-mail"]');
         const passwordField = await waitForElement(iframeDocument, 'input[placeholder="Password"]');
@@ -76,9 +76,16 @@ export async function performStreamlinedLoginAutomation(
         emailField.value = profileData.email;
         passwordField.value = profileData.password;
 
-        // Dispatch input events to ensure Stremio's internal state updates
+        // Dispatch input, change, and blur events to ensure Stremio's internal state updates
         emailField.dispatchEvent(new Event('input', { bubbles: true }));
+        emailField.dispatchEvent(new Event('change', { bubbles: true }));
+        emailField.dispatchEvent(new Event('blur', { bubbles: true }));
+
         passwordField.dispatchEvent(new Event('input', { bubbles: true }));
+        passwordField.dispatchEvent(new Event('change', { bubbles: true }));
+        passwordField.dispatchEvent(new Event('blur', { bubbles: true }));
+
+        await delay(500); // Small delay after filling fields before clicking
 
         finalLoginButton.click();
         showNotification("Automatic login attempted...", "success");
