@@ -15,9 +15,10 @@ app.get("/", async (req, res) => {
 
   try {
     // Define a standard User-Agent to avoid being blocked.
-    const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                      "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                      "Chrome/91.0.4472.124 Safari/537.36";
+    const userAgent =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+      "AppleWebKit/537.36 (KHTML, like Gecko) " +
+      "Chrome/91.0.4472.124 Safari/537.36";
 
     // Fetch the target URL using axios
     const response = await axios.get(targetUrl, {
@@ -40,5 +41,5 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Expose the express app as a Firebase Cloud Function.
+// Expose the express app as a Firebase Cloud Function in the specified region.
 exports.proxy = functions.region("europe-west3").https.onRequest(app);
