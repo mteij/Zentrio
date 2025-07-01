@@ -248,7 +248,7 @@ async function showSplitScreen(profileId) {
                         }
                     } else if (stremioLoginAutomationStage === 1) {
                         // Stage 1: Profile menu open, click "Log in / Sign up"
-                        await delay(500); // Wait for popup to animate
+                        await delay(1500); // Increased delay for popup content to render
 
                         const loginSignupButton = await waitForElement(
                             iframeDocument,
@@ -409,7 +409,7 @@ tryAgainBtn.addEventListener('click', () => {
         // A small delay before re-setting src to allow browser to clear iframe content
         setTimeout(() => {
             showSplitScreen(currentProfileId); // Re-run the function for the current profile
-        }, 100); 
+        }, 100);
     } else {
         showNotification('No profile selected to try again.', 'error');
     }
