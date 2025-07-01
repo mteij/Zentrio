@@ -213,12 +213,29 @@ async function showSplitScreen(profileId) {
 
                         showNotification("Attempting automatic login...", "success");
 
+                        // NEW: Attempt to open profile menu after a short delay
+                        setTimeout(() => {
+                            console.log("Attempting to open profile menu...");
+                            // Select the profile menu button using its class names
+                            const profileMenuButton = iframeDocument.querySelector(
+                                'div[class*="nav-menu-popup-label-"]'
+                            );
+                            
+                            if (profileMenuButton) {
+                                console.log("Profile menu button found, clicking it.");
+                                profileMenuButton.click();
+                                showNotification("Profile menu opened.", "success");
+                            } else {
+                                console.log("Profile menu button not found.");
+                            }
+                        }, 1000); // Wait 1 second for UI to render
+
                     } else {
                         console.log("Could not find all login form elements in the iframe.");
                     }
                 } catch (error) {
                     console.error("Error interacting with iframe:", error);
-                    showNotification("An error occurred during autofill.", "error");
+                    showNotification("An error occurred during autofill or menu click.", "error");
                 }
             };
 
