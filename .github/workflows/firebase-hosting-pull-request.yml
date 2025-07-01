@@ -33,3 +33,4 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STREMIOHUB_EE185 }}
           projectId: stremiohub-ee185
+          channelId: pr-${{ github.event.pull_request.number }}
