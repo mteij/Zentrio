@@ -33,23 +33,7 @@ async function waitForElement(doc, selector, interval = 500, retries = 10) {
     return null; // Return null if element is not found after all retries
 }
 
-/**
- * Simulates typing text into an input field character by character.
- * @param {HTMLInputElement} element - The input element.
- * @param {string} text - The text to type.
- * @param {number} delayMs - Delay in milliseconds between each character.
- */
-async function typeCharacterByCharacter(element, text, delayMs) {
-    element.value = ''; // Ensure it's clear before typing
-    for (const char of text) {
-        element.value += char;
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        await delay(delayMs);
-    }
-    // Dispatch change and blur events after all characters are typed
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-    element.dispatchEvent(new Event('blur', { bubbles: true }));
-}
+// Removed typeCharacterByCharacter function as per request.
 
 
 // --- Streamlined Stremio Login Automation Logic ---
@@ -79,20 +63,28 @@ export async function performStreamlinedLoginAutomation(
             return false;
         }
 
-        console.log("Streamlined Login: Simulating typing and clicking login.");
+        console.log("Streamlined Login: Filling form (without typing animation).");
 
-        // Simulate typing for email field
+        // Fill email field directly
+        emailField.value = ''; // Clear existing value
         emailField.focus();
-        await typeCharacterByCharacter(emailField, profileData.email.trim(), 50); // 50ms delay per character
+        emailField.value = profileData.email.trim();
+        emailField.dispatchEvent(new Event('input', { bubbles: true }));
+        emailField.dispatchEvent(new Event('change', { bubbles: true }));
+        emailField.dispatchEvent(new Event('blur', { bubbles: true }));
 
-        // Simulate typing for password field
+        // Fill password field directly
+        passwordField.value = ''; // Clear existing value
         passwordField.focus();
-        await typeCharacterByCharacter(passwordField, profileData.password.trim(), 50); // 50ms delay per character
+        passwordField.value = profileData.password.trim();
+        passwordField.dispatchEvent(new Event('input', { bubbles: true }));
+        passwordField.dispatchEvent(new Event('change', { bubbles: true }));
+        passwordField.dispatchEvent(new Event('blur', { bubbles: true }));
 
-        await delay(500); // Small delay after filling fields before clicking
+        await delay(500); // Small delay after filling fields
 
-        finalLoginButton.click();
-        showNotification("Automatic login attempted...", "success");
+        // finalLoginButton.click(); // Commented out as per request
+        showNotification("Automatic login attempted (button click skipped)...", "success");
         return true; // Automation initiated
     } catch (error) {
         console.error("Error during streamlined login automation:", error);
