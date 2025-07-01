@@ -20,6 +20,10 @@ import {
     deleteDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+// --- Import Iframe Automation Module ---
+import { executeStremioLoginAutomation } from "./iframe-automations/loginAutomation.js";
+
+
 // --- Firebase Configuration ---
 const firebaseConfig = __FIREBASE_CONFIG__;
 
@@ -69,25 +73,13 @@ let currentProfileId = null; // Store the ID of the currently active profile
 let stremioLoginAutomationStage = 0;
 let currentProfileData = null; // Store the profile data for retries
 
-// --- Utility Functions for Automation ---
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Modified waitForElement to return null on timeout instead of throwing an error
-async function waitForElement(doc, selector, interval = 500, retries = 10) { // Default retries changed to 10 for 5s max wait
-    let element = null;
-    for (let i = 0; i < retries; i++) {
-        element = doc.querySelector(selector);
-        if (element) {
-            return element;
-        }
-        await delay(interval);
-    }
-    return null; // Return null if element is not found
-}
 
 // --- Notification Logic ---
+/**
+ * Displays a temporary notification message to the user.
+ * @param {string} message - The message to display.
+ * @param {string} [type='success'] - The type of notification ('success' or 'error').
+ */
 function showNotification(message, type = 'success') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
@@ -101,6 +93,10 @@ function showNotification(message, type = 'success') {
 }
 
 // --- View Management ---
+/**
+ * Shows a specific view (screen) and hides others.
+ * @param {HTMLElement} view - The HTML element representing the view to show.
+ */
 function showView(view) {
     authScreen.classList.add('hidden');
     profileScreen.classList.add('hidden');
@@ -111,16 +107,24 @@ function showView(view) {
 }
 
 // --- Automation Failure Modal Logic ---
+/**
+ * Displays the automation failure modal with a specific message.
+ * @param {string} message - The message to display in the modal.
+ */
 function showAutomationFailModal(message) {
     automationFailMessage.textContent = message;
     automationFailModal.classList.remove('hidden');
 }
 
+/**
+ * Hides the automation failure modal.
+ */
 function hideAutomationFailModal() {
     automationFailModal.classList.add('hidden');
 }
 
 // --- Authentication Logic ---
+// Handles sign-in if the current URL is an email link.
 const handleSignIn = async () => {
     if (isSignInWithEmailLink(auth, window.location.href)) {
         let email = window.localStorage.getItem('emailForSignIn');
@@ -138,6 +142,7 @@ const handleSignIn = async () => {
 };
 handleSignIn();
 
+// Listens for Firebase authentication state changes.
 onAuthStateChanged(auth, user => {
     if (user) {
         currentUserId = user.uid;
@@ -146,10 +151,11 @@ onAuthStateChanged(auth, user => {
     } else {
         currentUserId = null;
         showView(authScreen);
-        profilesGrid.innerHTML = '';
+        profilesGrid.innerHTML = ''; // Clear profiles if logged out
     }
 });
 
+// Event listener for the email sign-in button.
 emailSigninBtn.addEventListener('click', async () => {
     const email = emailInput.value;
     if (!email) {
@@ -161,27 +167,31 @@ emailSigninBtn.addEventListener('click', async () => {
         await sendSignInLinkToEmail(auth, email, actionCodeSettings);
         window.localStorage.setItem('emailForSignIn', email);
         showNotification(`A sign-in link has been sent to ${email}.`);
-        emailInput.value = '';
+        emailInput.value = ''; // Clear email input
     }
      catch (error) {
         showNotification(error.message, 'error');
     }
 });
 
+// Event listener for the logout button.
 logoutBtn.addEventListener('click', async () => {
     await signOut(auth);
     showNotification('You have been logged out.');
 });
 
 // --- Profile Management Logic ---
+/**
+ * Loads user profiles from Firestore and displays them in the profiles grid.
+ */
 async function loadProfiles() {
     if (!currentUserId) return;
-    profilesGrid.innerHTML = '';
+    profilesGrid.innerHTML = ''; // Clear existing profiles
     const profilesCollection = collection(db, 'users', currentUserId, 'profiles');
     const profileSnapshot = await getDocs(profilesCollection);
 
     if (profileSnapshot.empty) {
-        showNotification('No profiles found. Add one to get started!', 'error');
+        showNotification('No profiles found. Add one to get started!', 'info');
     } else {
         profileSnapshot.forEach(doc => {
             const profile = doc.data();
@@ -191,14 +201,20 @@ async function loadProfiles() {
     }
 }
 
+/**
+ * Creates an HTML element for a user profile.
+ * @param {string} id - The Firestore document ID of the profile.
+ * @param {string} name - The name of the profile.
+ * @returns {HTMLElement} The created profile HTML element.
+ */
 function createProfileElement(id, name) {
     const div = document.createElement('div');
     div.className = 'flex flex-col items-center space-y-2 cursor-pointer group';
-    div.dataset.id = id;
+    div.dataset.id = id; // Store the profile ID
 
     const avatar = document.createElement('div');
     avatar.className = 'rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700';
-    avatar.textContent = name.charAt(0).toUpperCase();
+    avatar.textContent = name.charAt(0).toUpperCase(); // Display first letter of name
 
     const nameEl = document.createElement('p');
     nameEl.className = 'text-gray-300 group-hover:text-white truncate w-full text-center text-lg';
@@ -207,181 +223,48 @@ function createProfileElement(id, name) {
     div.appendChild(avatar);
     div.appendChild(nameEl);
 
+    // Event listener to show the split screen with the selected profile
     div.addEventListener('click', () => {
         showSplitScreen(id);
     });
     return div;
 }
 
-// This function now contains the core automation logic,
-// allowing it to be called sequentially or upon iframe reload
-async function executeStremioLoginAutomation(iframeDocument, profileData) {
-    console.log("Stremio automation started/continued. Stage:", stremioLoginAutomationStage);
-    try {
-        if (stremioLoginAutomationStage === 0) {
-            // Stage 0: Initial load, click profile icon
-            await delay(1500); // Initial delay for Stremio UI to settle
-
-            const profileMenuButton = await waitForElement(
-                iframeDocument,
-                'div[class*="nav-menu-popup-label-"]' // Selector for the main profile icon
-            ); // Using default 500ms interval, 10 retries (5 seconds)
-
-            if (!profileMenuButton) {
-                showAutomationFailModal("Couldn't find the profile menu button (Stage 0).");
-                return;
-            }
-
-            console.log("Stage 0: Profile menu button found, clicking it.");
-            profileMenuButton.click();
-            showNotification(
-                "Profile menu opened, waiting for login/signup button...",
-                "success"
-            );
-            stremioLoginAutomationStage = 1; // Advance stage
-            // Crucial: Immediately proceed to next stage within same onload execution
-            await executeStremioLoginAutomation(iframeDocument, profileData);
-
-        } else if (stremioLoginAutomationStage === 1) {
-            // Stage 1: Profile menu open, click "Log in / Sign up"
-            await delay(1500); // Delay for popup content to render
-
-            const loginSignupButton = await waitForElement(
-                iframeDocument,
-                'a[title="Log in / Sign up"]' // Selector for "Log in / Sign up" link
-            ); // Using default 500ms interval, 10 retries (5 seconds)
-
-            if (!loginSignupButton) {
-                showAutomationFailModal("Couldn't find the 'Log in / Sign up' button (Stage 1).");
-                return;
-            }
-
-            console.log("Stage 1: Login / Sign up button found, clicking it.");
-            loginSignupButton.click();
-            showNotification(
-                "Login/Sign up clicked, waiting for login page...",
-                "success"
-            );
-            stremioLoginAutomationStage = 2; // Advance stage
-            // This click is expected to cause a full page navigation in the iframe.
-            // The next iframe.onload will then start at Stage 2. No recursive call here.
-
-        } else if (stremioLoginAutomationStage === 2) {
-            // Stage 2: On the intermediate login page, click "Log in" button
-            await delay(1500); // Wait for new page to render
-
-            // Selector for the "Log in" button on the intermediate page
-            const loginButtonOnPage = await waitForElement(
-                iframeDocument,
-                'div[class*="login-form-button-DqJUV"]' // Selector for the clickable button
-            ); // Using default 500ms interval, 10 retries (5 seconds)
-
-            if (!loginButtonOnPage) {
-                showAutomationFailModal("Couldn't find the intermediate 'Log in' button (Stage 2).");
-                return;
-            }
-
-            console.log("Stage 2: 'Log in' button on intermediate page found, clicking it.");
-            loginButtonOnPage.click();
-            showNotification(
-                "Intermediate login button clicked, waiting for form...",
-                "success"
-            );
-            stremioLoginAutomationStage = 3; // Advance stage
-            // Proceed immediately to the next stage as form appears on same page
-            await executeStremioLoginAutomation(iframeDocument, profileData);
-
-        } else if (stremioLoginAutomationStage === 3) {
-            // Stage 3: Login form visible, autofill and submit
-            await delay(1500); // Wait for login form to appear
-
-            const emailField = await waitForElement(
-                iframeDocument,
-                'input[placeholder="E-mail"]' // Selector for email input
-            ); // Using default 500ms interval, 10 retries (5 seconds)
-            const passwordField = await waitForElement(
-                iframeDocument,
-                'input[placeholder="Password"]' // Selector for password input
-            ); // Using default 500ms interval, 10 retries (5 seconds)
-            const finalLoginButton = await waitForElement(
-                iframeDocument,
-                'div[class*="submit-button-x3L8z"]' // Selector for the final submit button
-            ); // Using default 500ms interval, 10 retries (5 seconds)
-
-            if (!emailField || !passwordField || !finalLoginButton) {
-                showAutomationFailModal("Couldn't find email, password, or final login button (Stage 3).");
-                return;
-            }
-
-            console.log("Stage 3: Login form elements found! Autofilling...");
-            emailField.value = profileData.email;
-            passwordField.value = profileData.password;
-
-            emailField.dispatchEvent(new Event('input', { bubbles: true }));
-            passwordField.dispatchEvent(new Event('input', { bubbles: true }));
-
-            console.log("Form filled. Attempting to click final login button.");
-            finalLoginButton.click();
-            showNotification("Automatic login attempted...", "success");
-            stremioLoginAutomationStage = 4; // Advance stage
-            // This click is expected to cause a full page navigation to the dashboard.
-            // The next iframe.onload will then start at Stage 4. No recursive call here.
-
-        } else if (stremioLoginAutomationStage === 4) {
-            // Stage 4: Post-login, open profile menu
-            await delay(2000); // Give time for post-login redirects/UI to settle
-
-            const profileMenuButtonAfterLogin = await waitForElement(
-                iframeDocument,
-                'div[class*="nav-menu-popup-label-"]' // Selector for the profile menu icon after login
-            ); // Using default 500ms interval, 10 retries (5 seconds)
-
-            if (!profileMenuButtonAfterLogin) {
-                showAutomationFailModal("Couldn't find profile menu button after login (Stage 4).");
-                return;
-            }
-
-            console.log("Stage 4: Profile menu button found after login, clicking it.");
-            profileMenuButtonAfterLogin.click();
-            showNotification("Profile menu opened automatically!", "success");
-
-            stremioLoginAutomationStage = 0; // Reset stage for next time
-        }
-    } catch (error) {
-        console.error("Error during automated login sequence:", error);
-        showAutomationFailModal("An unexpected error occurred: " + error.message);
-        stremioLoginAutomationStage = 0; // Reset stage on error
-    }
-}
-
-
+/**
+ * Displays the split-screen view with the Stremio iframe and initiates automation.
+ * @param {string} profileId - The ID of the selected profile.
+ */
 async function showSplitScreen(profileId) {
     currentProfileId = profileId; // Store the current profile ID
     try {
         const profileDocRef = doc(db, 'users', currentUserId, 'profiles', profileId);
         const profileDoc = await getDoc(profileDocRef);
         if (profileDoc.exists()) {
-            currentProfileData = profileDoc.data(); // Store profile data
-            credentialsProfileName.textContent = currentProfileData.name;
+            currentProfileData = profileDoc.data(); // Store profile data for automation retries
+            credentialsProfileName.textContent = currentProfileData.name; // Display profile name in header
 
-            const proxyUrl = "/stremio/";
-            stremioIframe.src = proxyUrl;
+            const proxyUrl = "/stremio/"; // URL for the Stremio proxy
+            stremioIframe.src = proxyUrl; // Load Stremio in the iframe
 
-            showView(splitScreenView);
+            showView(splitScreenView); // Show the split screen
 
             // Reset automation stage when a new profile is loaded from the UI.
-            // But if it's a try-again, we don't want to reset if it's already on stage 4.
-            // This ensures that after a full page navigation (like login/signup click),
-            // the automation continues from the next stage.
+            // If it's a "try again" initiated from stage 4, we don't reset.
             if (stremioLoginAutomationStage !== 4) {
                 stremioLoginAutomationStage = 0;
             }
 
-
+            // Set up the iframe's onload event to trigger automation
             stremioIframe.onload = async () => {
                 const iframeDocument = stremioIframe.contentWindow.document;
-                // Pass profileData to the automation logic
-                await executeStremioLoginAutomation(iframeDocument, currentProfileData);
+                // Execute the automation, passing necessary context and callbacks
+                stremioLoginAutomationStage = await executeStremioLoginAutomation(
+                    iframeDocument,
+                    currentProfileData,
+                    stremioLoginAutomationStage,
+                    showNotification,
+                    showAutomationFailModal
+                );
             };
 
         } else {
@@ -392,7 +275,7 @@ async function showSplitScreen(profileId) {
     }
 }
 
-
+// Event listener for saving a new profile.
 saveProfileBtn.addEventListener('click', async () => {
     const name = stremioNameInput.value;
     const email = stremioEmailAddInput.value;
@@ -414,8 +297,13 @@ saveProfileBtn.addEventListener('click', async () => {
 });
 
 // --- Modal & Button Listeners ---
+// Shows the add profile modal.
 addProfileBtn.addEventListener('click', () => addProfileModal.classList.remove('hidden'));
+// Hides the add profile modal.
 cancelAddProfileBtn.addEventListener('click', closeAddProfileModal);
+/**
+ * Closes the add profile modal and clears its input fields.
+ */
 function closeAddProfileModal() {
     addProfileModal.classList.add('hidden');
     stremioNameInput.value = '';
@@ -423,12 +311,14 @@ function closeAddProfileModal() {
     stremioPasswordAddInput.value = '';
 }
 
+// Event listener for the "Back to Profiles" button.
 backToProfilesBtn.addEventListener('click', () => {
-    stremioIframe.src = "about:blank";
+    stremioIframe.src = "about:blank"; // Clear iframe content
     stremioIframe.onload = null; // Remove event listener to prevent re-triggering
-    showView(profileScreen);
+    showView(profileScreen); // Show the profile selection screen
 });
 
+// Event listener for the "Try Again" button in the header.
 tryAgainBtn.addEventListener('click', () => {
     if (currentProfileId) {
         showNotification('Attempting to re-open Stremio and re-login.', 'success');
@@ -443,22 +333,24 @@ tryAgainBtn.addEventListener('click', () => {
     }
 });
 
+// Event listener for the "Retry Automation" button in the failure modal.
 retryAutomationBtn.addEventListener('click', () => {
-    hideAutomationFailModal();
+    hideAutomationFailModal(); // Hide the modal
     stremioLoginAutomationStage = 0; // Reset to stage 0 for a full retry
     if (currentProfileId && currentProfileData) {
         // Re-trigger the iframe load which will initiate automation from Stage 0
-        stremioIframe.src = "about:blank";
+        stremioIframe.src = "about:blank"; // Clear iframe
         setTimeout(() => {
-            showSplitScreen(currentProfileId);
+            showSplitScreen(currentProfileId); // Reload iframe and restart automation
         }, 100);
     } else {
         showNotification('Cannot retry automation, no profile data available.', 'error');
     }
 });
 
+// Event listener for the "Continue Manually" button in the failure modal.
 manualLoginBtn.addEventListener('click', () => {
-    hideAutomationFailModal();
+    hideAutomationFailModal(); // Hide the modal
     // User can now manually interact with the iframe
     showNotification('Continuing manually. Please log in within the Stremio iframe.', 'info');
     stremioLoginAutomationStage = 0; // Reset stage as automation is aborted.
