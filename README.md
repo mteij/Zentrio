@@ -1,6 +1,6 @@
 # StremioHub - Profile Selector Overlay
 
-![Stremio Overlay Banner](https://placehold.co/1200x400/141414/e50914?text=StremioHub)
+![Stremio Overlay Banner](https://placehold.co/1200x440/141414/e50914?text=StremioHub)
 
 <p align="center">
   <a href="https://github.com/MichielEijpe/StremioHub/actions/workflows/firebase-hosting-merge.yml">
