@@ -7,7 +7,7 @@ const app = express();
 const STREMIO_BASE_URL = "https://web.stremio.com/";
 
 app.get("/*", async (req, res) => {
-  console.log("Proxy function invoked for path:", req.path); // Added logging
+  console.log("Proxy function invoked for path:", req.path);
 
   if (!req.path) {
     console.warn("Received request with empty path.");
@@ -49,15 +49,15 @@ app.get("/*", async (req, res) => {
       console.error("Axios response error:", {
         status: error.response.status,
         headers: error.response.headers,
-         // Convert buffer to string for logging
-        data: error.response.data ? error.response.data.toString() : '[No data]',
+        data: error.response.data ?
+          error.response.data.toString() : '[No data]', 
       });
     }
-    console.error("Error stack:", error.stack); // Added stack trace
+    console.error("Error stack:", error.stack);
 
     const status = error.response ? error.response.status : 500;
     res.status(status).send(`Error fetching the URL: ${error.message}`);
   }
 });
 
-exports.proxy = onRequest({region: "europe-west3"}, app);
+exports.proxy = onRequest({region: "europe-west3
