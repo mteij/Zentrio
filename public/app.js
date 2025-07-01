@@ -184,8 +184,42 @@ async function showSplitScreen(profileId) {
             credentialsProfileName.textContent = profileData.name;
             stremioLoginEmail.value = profileData.email;
             stremioLoginPassword.value = profileData.password;
+            
+            // Set the iframe src and show the view
             stremioIframe.src = "https://web.stremio.com/";
             showView(splitScreenView);
+
+            // --- ATTEMPT TO CLICK BUTTON IN IFRAME ---
+            // We add an event listener to wait for the iframe to fully load.
+            stremioIframe.onload = () => {
+                console.log("Stremio iframe finished loading. Attempting to access its content...");
+                try {
+                    // This is the line that will fail due to the Same-Origin Policy.
+                    // We are trying to access the document of a different domain.
+                    const iframeDocument = stremioIframe.contentWindow.document;
+                    
+                    console.log("Successfully accessed iframe document. This should not happen on different domains.");
+
+                    const xpath = "//div[contains(@class, 'label-container-XOyzm')]";
+                    const profileButton = iframeDocument.evaluate(xpath, iframeDocument, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+
+                    if (profileButton) {
+                        console.log("Profile button found! Attempting to click.", profileButton);
+                        profileButton.click();
+                        showNotification("Successfully clicked the profile button!", "success");
+                    } else {
+                        console.log("Profile button not found with the given XPath.");
+                    }
+                } catch (error) {
+                    // This is the expected outcome. The browser will throw a security error.
+                    console.error("--- SECURITY ERROR ---");
+                    console.error("Failed to access iframe content. This is the Same-Origin Policy in action.");
+                    console.error("The error below is expected and demonstrates why this action is blocked by the browser:");
+                    console.error(error);
+                    showNotification("Could not access iframe due to browser security.", "error");
+                }
+            };
+
         } else {
             showNotification('Could not find profile data.', 'error');
         }
@@ -226,6 +260,7 @@ function closeAddProfileModal() {
 
 backToProfilesBtn.addEventListener('click', () => {
     stremioIframe.src = "about:blank"; // Unload the iframe to save resources
+    stremioIframe.onload = null; // Remove the event listener
     showView(profileScreen);
 });
 
