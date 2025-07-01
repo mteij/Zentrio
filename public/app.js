@@ -59,8 +59,8 @@ function generateRandomString(length) {
     return result;
 }
 
-function getDiceBearUrl(style, seed, radius = 15) { // Added radius parameter with default
-    return `https://api.dicebear.com/9.x/${style}/svg?seed=${seed}&radius=${radius}`; // Updated to 9.x and added radius
+function getDiceBearUrl(style, seed) { // Removed radius parameter
+    return `https://api.dicebear.com/9.x/${style}/svg?seed=${seed}`; // Removed radius from URL
 }
 
 
@@ -265,7 +265,7 @@ async function showEditProfileModal(profileId) {
 
         // Set up DiceBear defaults
         const defaultStyle = 'fun-emoji'; // Hardcode style
-        let initialDiceBearSeed = profile.name.charAt(0).toUpperCase() + generateRandomString(5); // Default random seed
+        let initialDiceBearSeed = profile.name.charAt(0).toUpperCase() + generateRandomString(5);
         
         if (profile.profilePictureUrl && profile.profilePictureUrl.includes('api.dicebear.com')) {
             try {
@@ -279,7 +279,7 @@ async function showEditProfileModal(profileId) {
             }
         }
 
-        dicebearStyleSelect.value = defaultStyle; // Set and keep it as fun-emoji
+        dicebearStyleSelect.value = defaultStyle;
         dicebearSeedInput.value = initialDiceBearSeed;
         editProfilePicturePreview.src = getDiceBearUrl(defaultStyle, initialDiceBearSeed);
 
@@ -348,7 +348,7 @@ function attachEventListeners() {
                     name,
                     email,
                     password,
-                    profilePictureUrl: getDiceBearUrl('fun-emoji', defaultDiceBearSeed) // Default to fun-emoji
+                    profilePictureUrl: getDiceBearUrl('fun-emoji', defaultDiceBearSeed)
                 });
                 closeAddProfileModal();
                 loadProfiles();
@@ -363,7 +363,7 @@ function attachEventListeners() {
     cancelEditProfileBtn.addEventListener('click', closeEditProfileModal);
 
     generateDicebearBtn.addEventListener('click', () => {
-        const style = 'fun-emoji'; // Always use fun-emoji
+        const style = 'fun-emoji';
         const seed = dicebearSeedInput.value.trim() || generateRandomString(10);
         dicebearSeedInput.value = seed;
         editProfilePicturePreview.src = getDiceBearUrl(style, seed);
@@ -372,7 +372,7 @@ function attachEventListeners() {
     randomizeDicebearSeedBtn.addEventListener('click', () => {
         const newSeed = generateRandomString(10);
         dicebearSeedInput.value = newSeed;
-        const style = 'fun-emoji'; // Always use fun-emoji
+        const style = 'fun-emoji';
         editProfilePicturePreview.src = getDiceBearUrl(style, newSeed);
     });
 
