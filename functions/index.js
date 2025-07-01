@@ -49,7 +49,8 @@ app.get("/*", async (req, res) => {
       console.error("Axios response error:", {
         status: error.response.status,
         headers: error.response.headers,
-        data: error.response.data ? error.response.data.toString() : '[No data]', // Convert buffer to string for logging
+         // Convert buffer to string for logging
+        data: error.response.data ? error.response.data.toString() : '[No data]',
       });
     }
     console.error("Error stack:", error.stack); // Added stack trace
