@@ -69,7 +69,7 @@ function showNotification(message, type = 'success') {
 /**
  * Shows a specific view (screen) and hides others.
  * @param {HTMLElement} view - The HTML element representing the view to show.
- */
+*/
 function showView(view) {
     authScreen.classList.add('hidden');
     profileScreen.classList.add('hidden');
@@ -83,7 +83,7 @@ function showView(view) {
 /**
  * Displays the automation failure modal with a specific message.
  * @param {string} message - The message to display in the modal.
- */
+*/
 function showAutomationFailModal(message) {
     console.log("Attempting to show automation fail modal. Message:", message);
     console.log("Modal element:", automationFailModal);
@@ -104,7 +104,7 @@ function showAutomationFailModal(message) {
 
 /**
  * Hides the automation failure modal.
- */
+*/
 function hideAutomationFailModal() {
     if (automationFailModal) {
         automationFailModal.classList.add('hidden');
@@ -133,7 +133,7 @@ const handleSignIn = async () => {
 // --- Profile Management Logic ---
 /**
  * Loads user profiles from Firestore and displays them in the profiles grid.
- */
+*/
 async function loadProfiles() {
     if (!currentUserId) return;
     profilesGrid.innerHTML = ''; // Clear existing profiles
@@ -156,7 +156,7 @@ async function loadProfiles() {
  * @param {string} id - The Firestore document ID of the profile.
  * @param {string} name - The name of the profile.
  * @returns {HTMLElement} The created profile HTML element.
- */
+*/
 function createProfileElement(id, name) {
     const div = document.createElement('div');
     div.className = 'flex flex-col items-center space-y-2 cursor-pointer group';
@@ -183,7 +183,7 @@ function createProfileElement(id, name) {
 /**
  * Displays the split-screen view with the Stremio iframe and initiates automation.
  * @param {string} profileId - The ID of the selected profile.
- */
+*/
 async function showSplitScreen(profileId) {
     currentProfileId = profileId; // Store the current profile ID
     try {
@@ -193,7 +193,7 @@ async function showSplitScreen(profileId) {
             currentProfileData = profileDoc.data(); // Store profile data for automation retries
             credentialsProfileName.textContent = currentProfileData.name; // Display profile name in header
 
-            const proxyUrl = "/stremio/#/intro"; // Directly load the intro page via proxy
+            const proxyUrl = "/stremio/#/intro?form=login"; // Directly load the intro page with login form via proxy
             stremioIframe.src = proxyUrl; // Load Stremio in the iframe
 
             showView(splitScreenView); // Show the split screen
@@ -231,7 +231,7 @@ async function showSplitScreen(profileId) {
 // --- Modal & Button Listeners ---
 /**
  * Closes the add profile modal and clears its input fields.
- */
+*/
 function closeAddProfileModal() {
     addProfileModal.classList.add('hidden');
     stremioNameInput.value = '';
@@ -242,7 +242,7 @@ function closeAddProfileModal() {
 /**
  * Attaches all necessary event listeners to DOM elements.
  * This function is called after DOMContentLoaded to ensure elements are available.
- */
+*/
 function attachEventListeners() {
     emailSigninBtn.addEventListener('click', async () => {
         const email = emailInput.value;
