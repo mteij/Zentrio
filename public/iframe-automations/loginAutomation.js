@@ -33,18 +33,6 @@ async function waitForElement(doc, selector, interval = 500, retries = 10) {
     return null; // Return null if element is not found after all retries
 }
 
-/**
- * Displays an automation failure message and indicates the failure.
- * This function centralizes the error handling for missing elements during automation steps.
- * @param {string} message - The specific error message for the failure modal.
- * @param {function(string): void} showAutomationFailModal - Callback to display the failure modal.
- * @returns {boolean} Returns false to indicate automation failure.
- */
-function handleAutomationFailure(message, showAutomationFailModal) {
-    showAutomationFailModal(message);
-    return false; // Indicate failure
-}
-
 // --- Streamlined Stremio Login Automation Logic ---
 /**
  * Attempts to perform the Stremio login sequence within the iframe.
@@ -52,24 +40,25 @@ function handleAutomationFailure(message, showAutomationFailModal) {
  * @param {Document} iframeDocument - The document object of the iframe.
  * @param {Object} profileData - The profile data containing email and password for login.
  * @param {function(string, string): void} showNotification - A callback function to display notifications to the user.
- * @param {function(string): void} showAutomationFailModal - A callback function to display the automation failure modal.
  * @returns {Promise<boolean>} A promise that resolves to true if login elements are found and processed, false otherwise.
  */
 export async function performStreamlinedLoginAutomation(
     iframeDocument,
     profileData,
-    showNotification,
-    showAutomationFailModal
+    showNotification
 ) {
     try {
-        await delay(3000); // Increased initial delay for page to settle
+        await delay(3000); // Initial delay for page to settle
 
         const emailField = await waitForElement(iframeDocument, 'input[placeholder="E-mail"]');
         const passwordField = await waitForElement(iframeDocument, 'input[placeholder="Password"]');
         const finalLoginButton = await waitForElement(iframeDocument, 'div[class*="submit-button-x3L8z"]');
 
         if (!emailField || !passwordField || !finalLoginButton) {
-            return handleAutomationFailure("Couldn't find email, password, or final login button to perform streamlined login.", showAutomationFailModal);
+            console.error("Automation failed: Could not find one or more login elements.");
+            // Replaced showAutomationFailModal with a regular notification
+            showNotification('Automated login failed: Could not find login elements.', 'error');
+            return false;
         }
 
         console.log("Streamlined Login: Filling form and clicking login.");
@@ -77,7 +66,7 @@ export async function performStreamlinedLoginAutomation(
         // Explicitly clear, focus, then set value and dispatch events for email
         emailField.value = ''; // Clear existing value
         emailField.focus();
-        emailField.value = profileData.email;
+        emailField.value = profileData.email.trim(); // Trim here as well
         emailField.dispatchEvent(new Event('input', { bubbles: true }));
         emailField.dispatchEvent(new Event('change', { bubbles: true }));
         emailField.dispatchEvent(new Event('blur', { bubbles: true }));
@@ -85,7 +74,7 @@ export async function performStreamlinedLoginAutomation(
         // Explicitly clear, focus, then set value and dispatch events for password
         passwordField.value = ''; // Clear existing value
         passwordField.focus();
-        passwordField.value = profileData.password;
+        passwordField.value = profileData.password.trim(); // Trim here as well
         passwordField.dispatchEvent(new Event('input', { bubbles: true }));
         passwordField.dispatchEvent(new Event('change', { bubbles: true }));
         passwordField.dispatchEvent(new Event('blur', { bubbles: true }));
@@ -97,6 +86,8 @@ export async function performStreamlinedLoginAutomation(
         return true; // Automation initiated
     } catch (error) {
         console.error("Error during streamlined login automation:", error);
-        return handleAutomationFailure("An unexpected error occurred during streamlined automation: " + error.message, showAutomationFailModal);
+        // Replaced showAutomationFailModal with a regular notification
+        showNotification('An unexpected error occurred during automated login: ' + error.message, 'error');
+        return false;
     }
 }

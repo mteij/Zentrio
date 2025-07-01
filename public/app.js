@@ -17,7 +17,7 @@ import {
     addDoc,
     getDocs,
     getDoc,
-    updateDoc, // Added for updating profile
+    updateDoc,
     deleteDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -37,17 +37,31 @@ const db = getFirestore(app);
 let authScreen, profileScreen, splitScreenView, backToProfilesBtn, stremioIframe;
 let logoutBtn, emailInput, emailSigninBtn, notificationContainer;
 let profilesGrid, addProfileBtn;
-let credentialsProfileName, headerProfilePicture, tryAgainBtn; // Added headerProfilePicture
+let credentialsProfileName, headerProfilePicture, tryAgainBtn;
 let addProfileModal, cancelAddProfileBtn, saveProfileBtn, stremioNameInput, stremioEmailAddInput, stremioPasswordAddInput;
-let editProfileModal, editStremioNameInput, editStremioPasswordInput, editProfilePicturePreview, generateProfilePictureBtn, cancelEditProfileBtn, saveEditProfileBtn, deleteProfileBtn; // New elements for editing
-let automationFailModal, automationFailMessage, retryAutomationBtn, manualLoginBtn;
+let editProfileModal, editStremioNameInput, editStremioEmailInput, editStremioPasswordInput, editProfilePicturePreview, dicebearStyleSelect, dicebearSeedInput, generateDicebearBtn, randomizeDicebearSeedBtn, cancelEditProfileBtn, saveEditProfileBtn, deleteProfileBtn;
 
 
 // --- State Variables ---
 let currentUserId = null;
-let currentProfileId = null; // Store the ID of the currently active profile
-let currentProfileData = null; // Store the profile data for retries
-let editingProfileId = null; // Store the ID of the profile currently being edited
+let currentProfileId = null;
+let currentProfileData = null;
+let editingProfileId = null;
+
+
+// --- Utility Functions ---
+function generateRandomString(length) {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0987654321';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
+
+function getDiceBearUrl(style, seed, radius = 15) { // Added radius parameter with default
+    return `https://api.dicebear.com/9.x/${style}/svg?seed=${seed}&radius=${radius}`; // Updated to 9.x and added radius
+}
 
 
 // --- Notification Logic ---
@@ -80,38 +94,6 @@ function showView(view) {
 
     view.classList.remove('hidden');
     view.classList.add('flex');
-}
-
-// --- Automation Failure Modal Logic ---
-/**
- * Displays the automation failure modal with a specific message.
- * @param {string} message - The message to display in the modal.
- */
-function showAutomationFailModal(message) {
-    console.log("Attempting to show automation fail modal. Message:", message);
-    console.log("Modal element:", automationFailModal);
-    console.log("Message element:", automationFailMessage);
-
-    // Ensure elements are not null before trying to set properties
-    if (automationFailMessage) {
-        automationFailMessage.textContent = message;
-    } else {
-        console.error("automationFailMessage element not found when trying to show modal.");
-    }
-    if (automationFailModal) {
-        automationFailModal.classList.remove('hidden');
-    } else {
-        console.error("automationFailModal element not found when trying to show modal.");
-    }
-}
-
-/**
- * Hides the automation failure modal.
- */
-function hideAutomationFailModal() {
-    if (automationFailModal) {
-        automationFailModal.classList.add('hidden');
-    }
 }
 
 // --- Authentication Logic ---
@@ -163,8 +145,8 @@ async function loadProfiles() {
  */
 function createProfileElement(id, name, profilePictureUrl) {
     const div = document.createElement('div');
-    div.className = 'flex flex-col items-center space-y-2 cursor-pointer group relative'; // Added relative for positioning edit button
-    div.dataset.id = id; // Store the profile ID
+    div.className = 'flex flex-col items-center space-y-2 cursor-pointer group relative';
+    div.dataset.id = id;
 
     const avatar = document.createElement('div');
     avatar.className = 'rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700';
@@ -173,9 +155,9 @@ function createProfileElement(id, name, profilePictureUrl) {
         avatar.style.backgroundImage = `url(${profilePictureUrl})`;
         avatar.style.backgroundSize = 'cover';
         avatar.style.backgroundPosition = 'center';
-        avatar.textContent = ''; // Clear text if image is present
+        avatar.textContent = '';
     } else {
-        avatar.textContent = name.charAt(0).toUpperCase(); // Display first letter of name
+        avatar.textContent = name.charAt(0).toUpperCase();
     }
 
     const nameEl = document.createElement('p');
@@ -189,8 +171,8 @@ function createProfileElement(id, name, profilePictureUrl) {
                             </svg>`;
     editButton.title = `Edit ${name}`;
     editButton.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent triggering the profile selection
-        showEditProfileModal(id, name, profilePictureUrl);
+        e.stopPropagation();
+        showEditProfileModal(id);
     });
 
 
@@ -210,13 +192,13 @@ function createProfileElement(id, name, profilePictureUrl) {
  * @param {string} profileId - The ID of the selected profile.
  */
 async function showSplitScreen(profileId) {
-    currentProfileId = profileId; // Store the current profile ID
+    currentProfileId = profileId;
     try {
         const profileDocRef = doc(db, 'users', currentUserId, 'profiles', profileId);
         const profileDoc = await getDoc(profileDocRef);
         if (profileDoc.exists()) {
-            currentProfileData = profileDoc.data(); // Store profile data for automation retries
-            credentialsProfileName.textContent = currentProfileData.name; // Display profile name in header
+            currentProfileData = profileDoc.data();
+            credentialsProfileName.textContent = currentProfileData.name;
 
             // Update header profile picture
             if (currentProfileData.profilePictureUrl) {
@@ -226,28 +208,23 @@ async function showSplitScreen(profileId) {
                 headerProfilePicture.classList.add('hidden');
             }
 
-            const proxyUrl = "/stremio/#/intro?form=login"; // Directly load the intro page with login form via proxy
-            stremioIframe.src = proxyUrl; // Load Stremio in the iframe
+            const proxyUrl = "/stremio/#/intro?form=login";
+            stremioIframe.src = proxyUrl;
 
-            showView(splitScreenView); // Show the split screen
+            showView(splitScreenView);
 
             // Set up the iframe's onload event to trigger automation
             stremioIframe.onload = async () => {
                 const iframeDocument = stremioIframe.contentWindow.document;
-                // Execute the streamlined automation
                 const automationSuccess = await performStreamlinedLoginAutomation(
                     iframeDocument,
                     currentProfileData,
-                    showNotification,
-                    showAutomationFailModal
+                    showNotification
                 );
 
-                // If automation was not successful, handle as needed
                 if (!automationSuccess) {
-                    // Automation already handled failure notification/modal.
-                    // No need for a forced reload as it implies the elements weren't found.
+                    showNotification('Automated login failed. Please try again or log in manually within the iframe.', 'error');
                 } else {
-                    // Automation successfully attempted. Now wait for navigation to dashboard or handle errors.
                     console.log("Streamlined login automation completed its attempt.");
                 }
             };
@@ -275,8 +252,6 @@ function closeAddProfileModal() {
 /**
  * Displays the edit profile modal with the current profile's data.
  * @param {string} profileId - The ID of the profile to edit.
- * @param {string} name - The current name of the profile.
- * @param {string} [profilePictureUrl] - The current profile picture URL.
  */
 async function showEditProfileModal(profileId) {
     editingProfileId = profileId;
@@ -285,8 +260,29 @@ async function showEditProfileModal(profileId) {
     if (profileDoc.exists()) {
         const profile = profileDoc.data();
         editStremioNameInput.value = profile.name;
-        editStremioPasswordInput.value = profile.password; // Populate password for convenience (consider security implications)
-        editProfilePicturePreview.src = profile.profilePictureUrl || "https://placehold.co/60x60/random_color/white?text=?";
+        editStremioEmailInput.value = profile.email;
+        editStremioPasswordInput.value = profile.password;
+
+        // Set up DiceBear defaults
+        const defaultStyle = 'fun-emoji'; // Hardcode style
+        let initialDiceBearSeed = profile.name.charAt(0).toUpperCase() + generateRandomString(5); // Default random seed
+        
+        if (profile.profilePictureUrl && profile.profilePictureUrl.includes('api.dicebear.com')) {
+            try {
+                const url = new URL(profile.profilePictureUrl);
+                const seedParam = url.searchParams.get('seed');
+                if (seedParam) {
+                    initialDiceBearSeed = seedParam;
+                }
+            } catch (e) {
+                console.warn("Could not parse existing DiceBear URL, using defaults:", e);
+            }
+        }
+
+        dicebearStyleSelect.value = defaultStyle; // Set and keep it as fun-emoji
+        dicebearSeedInput.value = initialDiceBearSeed;
+        editProfilePicturePreview.src = getDiceBearUrl(defaultStyle, initialDiceBearSeed);
+
         editProfileModal.classList.remove('hidden');
     } else {
         showNotification('Profile not found for editing.', 'error');
@@ -300,8 +296,10 @@ function closeEditProfileModal() {
     editProfileModal.classList.add('hidden');
     editingProfileId = null;
     editStremioNameInput.value = '';
+    editStremioEmailInput.value = '';
     editStremioPasswordInput.value = '';
-    editProfilePicturePreview.src = "https://placehold.co/60x60/random_color/white?text=?";
+    editProfilePicturePreview.src = "";
+    dicebearSeedInput.value = '';
 }
 
 
@@ -336,20 +334,21 @@ function attachEventListeners() {
     addProfileBtn.addEventListener('click', () => addProfileModal.classList.remove('hidden'));
     cancelAddProfileBtn.addEventListener('click', closeAddProfileModal);
     saveProfileBtn.addEventListener('click', async () => {
-        const name = stremioNameInput.value;
-        const email = stremioEmailAddInput.value;
-        const password = stremioPasswordAddInput.value;
+        const name = stremioNameInput.value.trim();
+        const email = stremioEmailAddInput.value.trim();
+        const password = stremioPasswordAddInput.value.trim();
         if (!name || !email || !password) {
             showNotification('All fields are required.', 'error');
             return;
         }
         if (currentUserId) {
             try {
+                const defaultDiceBearSeed = name.charAt(0).toUpperCase() + generateRandomString(5);
                 await addDoc(collection(db, 'users', currentUserId, 'profiles'), {
                     name,
                     email,
                     password,
-                    profilePictureUrl: `https://placehold.co/150x150/${Math.floor(Math.random()*16777215).toString(16)}/white?text=${name.charAt(0).toUpperCase()}` // Default random avatar
+                    profilePictureUrl: getDiceBearUrl('fun-emoji', defaultDiceBearSeed) // Default to fun-emoji
                 });
                 closeAddProfileModal();
                 loadProfiles();
@@ -362,19 +361,29 @@ function attachEventListeners() {
 
     // Edit Profile Listeners
     cancelEditProfileBtn.addEventListener('click', closeEditProfileModal);
-    generateProfilePictureBtn.addEventListener('click', () => {
-        const randomColor = Math.floor(Math.random()*16777215).toString(16);
-        const text = editStremioNameInput.value.charAt(0).toUpperCase() || '?';
-        editProfilePicturePreview.src = `https://placehold.co/60x60/${randomColor}/white?text=${text}`;
+
+    generateDicebearBtn.addEventListener('click', () => {
+        const style = 'fun-emoji'; // Always use fun-emoji
+        const seed = dicebearSeedInput.value.trim() || generateRandomString(10);
+        dicebearSeedInput.value = seed;
+        editProfilePicturePreview.src = getDiceBearUrl(style, seed);
+    });
+
+    randomizeDicebearSeedBtn.addEventListener('click', () => {
+        const newSeed = generateRandomString(10);
+        dicebearSeedInput.value = newSeed;
+        const style = 'fun-emoji'; // Always use fun-emoji
+        editProfilePicturePreview.src = getDiceBearUrl(style, newSeed);
     });
 
     saveEditProfileBtn.addEventListener('click', async () => {
-        const name = editStremioNameInput.value;
-        const password = editStremioPasswordInput.value;
+        const name = editStremioNameInput.value.trim();
+        const email = editStremioEmailInput.value.trim();
+        const password = editStremioPasswordInput.value.trim();
         const profilePictureUrl = editProfilePicturePreview.src;
 
-        if (!name || !password) {
-            showNotification('Profile name and password are required.', 'error');
+        if (!name || !email || !password) {
+            showNotification('Profile name, email, and password are required.', 'error');
             return;
         }
 
@@ -383,6 +392,7 @@ function attachEventListeners() {
                 const profileDocRef = doc(db, 'users', currentUserId, 'profiles', editingProfileId);
                 await updateDoc(profileDocRef, {
                     name,
+                    email,
                     password,
                     profilePictureUrl
                 });
@@ -396,7 +406,7 @@ function attachEventListeners() {
     });
 
     deleteProfileBtn.addEventListener('click', async () => {
-        if (!confirm('Are you sure you want to delete this profile?')) {
+        if (!confirm('Are you sure you want to delete this profile? This cannot be undone.')) {
             return;
         }
         if (editingProfileId && currentUserId) {
@@ -429,24 +439,6 @@ function attachEventListeners() {
             showNotification('No profile selected to try again.', 'error');
         }
     });
-
-    retryAutomationBtn.addEventListener('click', () => {
-        hideAutomationFailModal();
-        if (currentProfileId && currentProfileData) {
-            showNotification('Retrying automated login.', 'success');
-            stremioIframe.src = "about:blank";
-            setTimeout(() => {
-                showSplitScreen(currentProfileId);
-            }, 100);
-        } else {
-            showNotification('Cannot retry automation, no profile data available.', 'error');
-        }
-    });
-
-    manualLoginBtn.addEventListener('click', () => {
-        hideAutomationFailModal();
-        showNotification('Continuing manually. Please log in within the Stremio iframe.', 'info');
-    });
 }
 
 
@@ -468,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addProfileBtn = document.getElementById('add-profile-btn');
 
     credentialsProfileName = document.getElementById('credentials-profile-name');
-    headerProfilePicture = document.getElementById('header-profile-picture'); // New
+    headerProfilePicture = document.getElementById('header-profile-picture');
     tryAgainBtn = document.getElementById('try-again-btn');
 
     addProfileModal = document.getElementById('add-profile-modal');
@@ -478,20 +470,19 @@ document.addEventListener('DOMContentLoaded', () => {
     stremioEmailAddInput = document.getElementById('stremio-email-add');
     stremioPasswordAddInput = document.getElementById('stremio-password-add');
 
-    // New elements for editing
+    // Elements for editing
     editProfileModal = document.getElementById('edit-profile-modal');
     editStremioNameInput = document.getElementById('edit-stremio-name');
+    editStremioEmailInput = document.getElementById('edit-stremio-email');
     editStremioPasswordInput = document.getElementById('edit-stremio-password');
     editProfilePicturePreview = document.getElementById('edit-profile-picture-preview');
-    generateProfilePictureBtn = document.getElementById('generate-profile-picture-btn');
+    dicebearStyleSelect = document.getElementById('dicebear-style');
+    dicebearSeedInput = document.getElementById('dicebear-seed');
+    generateDicebearBtn = document.getElementById('generate-dicebear-btn');
+    randomizeDicebearSeedBtn = document.getElementById('randomize-dicebear-seed-btn');
     cancelEditProfileBtn = document.getElementById('cancel-edit-profile-btn');
     saveEditProfileBtn = document.getElementById('save-edit-profile-btn');
     deleteProfileBtn = document.getElementById('delete-profile-btn');
-
-    automationFailModal = document.getElementById('automation-fail-modal');
-    automationFailMessage = document.getElementById('automation-fail-message');
-    retryAutomationBtn = document.getElementById('retry-automation-btn');
-    manualLoginBtn = document.getElementById('manual-login-btn');
 
     // Attach event listeners
     attachEventListeners();

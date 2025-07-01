@@ -63,7 +63,7 @@
             <input type="password" id="stremio-password-add" placeholder="Stremio Password" class="w-full bg-gray-700 text-white p-3 rounded mb-6 focus:outline-none focus:ring-2 focus:ring-red-600">
             <div class="flex justify-end space-x-4">
                 <button id="cancel-add-profile-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</button>
-                <button id="save-profile-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Save</button>
+                <button id="save-profile-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded">Save</button>
             </div>
         </div>
     </div>
@@ -72,13 +72,25 @@
         <div class="bg-gray-800 p-8 rounded-lg w-full max-w-md">
             <h2 class="text-2xl font-bold mb-4">Edit Stremio Profile</h2>
             <input type="text" id="edit-stremio-name" placeholder="Profile Name" class="w-full bg-gray-700 text-white p-3 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600">
+            <input type="email" id="edit-stremio-email" placeholder="Stremio Email" class="w-full bg-gray-700 text-white p-3 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600">
             <input type="password" id="edit-stremio-password" placeholder="Stremio Password" class="w-full bg-gray-700 text-white p-3 rounded mb-6 focus:outline-none focus:ring-2 focus:ring-red-600">
 
             <div class="mb-4">
                 <label class="block text-gray-300 text-sm font-bold mb-2">Profile Picture</label>
-                <div class="flex items-center space-x-4">
-                    <img id="edit-profile-picture-preview" src="https://placehold.co/60x60/random_color/white?text=?" alt="Profile Preview" class="rounded-full w-16 h-16 object-cover border-2 border-red-600">
-                    <button id="generate-profile-picture-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm">Generate Random Picture</button>
+                <div class="flex items-center space-x-4 mb-2">
+                    <img id="edit-profile-picture-preview" src="" alt="Profile Preview" class="rounded-full w-16 h-16 object-cover border-2 border-red-600">
+                    <div class="flex flex-col space-y-2">
+                        <div class="dicebear-menu-row">
+                            <select id="dicebear-style" class="bg-gray-700 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 text-sm" disabled>
+                                <option value="fun-emoji">Fun Emoji</option>
+                            </select>
+                            <input type="text" id="dicebear-seed" placeholder="Seed" class="bg-gray-700 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 text-sm flex-grow">
+                        </div>
+                        <div class="dicebear-menu-row">
+                            <button id="generate-dicebear-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm flex-grow">Generate</button>
+                            <button id="randomize-dicebear-seed-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg text-sm flex-grow">Randomize</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -88,17 +100,6 @@
                     <button id="cancel-edit-profile-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</button>
                     <button id="save-edit-profile-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Save Changes</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="automation-fail-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden">
-        <div class="bg-gray-800 p-8 rounded-lg w-full max-w-md text-center">
-            <h2 class="text-2xl font-bold mb-4">Automation Failed</h2>
-            <p id="automation-fail-message" class="text-gray-300 mb-6">The automated login process could not find a required element within the expected time.</p>
-            <div class="flex justify-center space-x-4">
-                <button id="retry-automation-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Retry Automation</button>
-                <button id="manual-login-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Continue Manually</button>
             </div>
         </div>
     </div>
