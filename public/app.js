@@ -223,26 +223,6 @@ async function showSplitScreen(profileId) {
     }
 }
 
-// Event listener for saving a new profile.
-saveProfileBtn.addEventListener('click', async () => {
-    const name = stremioNameInput.value;
-    const email = stremioEmailAddInput.value;
-    const password = stremioPasswordAddInput.value;
-    if (!name || !email || !password) {
-        showNotification('All fields are required.', 'error');
-        return;
-    }
-    if (currentUserId) {
-        try {
-            await addDoc(collection(db, 'users', currentUserId, 'profiles'), { name, email, password });
-            closeAddProfileModal();
-            loadProfiles();
-            showNotification('Profile saved successfully!');
-        } catch (error) {
-            showNotification('Failed to save profile: ' + error.message, 'error');
-        }
-    }
-});
 
 // --- Modal & Button Listeners ---
 /**
