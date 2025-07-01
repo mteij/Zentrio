@@ -6,21 +6,14 @@ body {
 
 .profile-avatar {
     background-color: #333;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     transition: border-color 0.3s ease;
+    width: 150px; /* Fixed width */
+    height: 150px; /* Fixed height */
 }
 
 .profile-avatar:hover {
     border-color: #e50914;
-}
-
-.delete-icon {
-    display: none;
-    cursor: pointer;
-}
-
-.edit-mode .delete-icon {
-    display: block;
 }
 
 /* Notification Styles */
