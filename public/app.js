@@ -184,22 +184,17 @@ async function showSplitScreen(profileId) {
             credentialsProfileName.textContent = profileData.name;
             stremioLoginEmail.value = profileData.email;
             stremioLoginPassword.value = profileData.password;
-            
-            // Use the proxy to load the Stremio intro page
-            const proxyUrl = `/proxy?url=${encodeURIComponent("https://web.stremio.com/#/intro")}`;
+
+            const targetUrl = "https://web.stremio.com/#/intro";
+            const proxyUrl = `/proxy?url=${encodeURIComponent(targetUrl)}`;
             stremioIframe.src = proxyUrl;
             
             showView(splitScreenView);
 
-            // Add an event listener to run when the proxied content loads
             stremioIframe.onload = () => {
                 console.log("Proxied iframe content loaded. Attempting to autofill login...");
                 try {
-                    // Because the iframe src is now on our domain, we can access its content
                     const iframeDocument = stremioIframe.contentWindow.document;
-
-                    // Find the form fields and buttons inside the iframe
-                    // Note: These selectors may need to be updated if Stremio changes their HTML
                     const emailField = iframeDocument.querySelector('input[type="email"]');
                     const passwordField = iframeDocument.querySelector('input[type="password"]');
                     const loginButton = iframeDocument.querySelector('button[type="submit"]');
@@ -207,11 +202,9 @@ async function showSplitScreen(profileId) {
                     if (emailField && passwordField && loginButton) {
                         console.log("Login form elements found!");
                         
-                        // Fill the fields with the credentials from our app
                         emailField.value = profileData.email;
                         passwordField.value = profileData.password;
 
-                        // Trigger input events to make sure any framework listeners are fired
                         emailField.dispatchEvent(new Event('input', { bubbles: true }));
                         passwordField.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -222,7 +215,6 @@ async function showSplitScreen(profileId) {
 
                     } else {
                         console.log("Could not find all login form elements in the iframe.");
-                        // This might be normal if the user is already logged in inside the iframe
                     }
                 } catch (error) {
                     console.error("Error interacting with iframe:", error);
@@ -269,8 +261,8 @@ function closeAddProfileModal() {
 }
 
 backToProfilesBtn.addEventListener('click', () => {
-    stremioIframe.src = "about:blank"; // Unload the iframe to save resources
-    stremioIframe.onload = null; // Important: remove the onload listener
+    stremioIframe.src = "about:blank"; 
+    stremioIframe.onload = null;
     showView(profileScreen);
 });
 
