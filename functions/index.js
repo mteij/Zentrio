@@ -14,9 +14,12 @@ app.get("/*", async (req, res) => {
     return res.status(400).send("Bad Request: Path is empty.");
   }
 
-  // Construct the full target URL by combining the Stremio base URL
-  // with the path from the incoming request.
-  const targetUrl = new URL(req.path, STREMIO_BASE_URL).href;
+  // Extract the path for Stremio by removing the /stremio prefix
+  const stremioPath = req.path.substring('/stremio'.length);
+  // Ensure that if stremioPath is empty (e.g., for /stremio/), it defaults to '/'
+  const targetUrl = new URL(stremioPath || '/', STREMIO_BASE_URL).href;
+
+  console.log("Proxying request to target URL:", targetUrl); // Added for debugging
 
   try {
     const userAgent =
@@ -25,7 +28,7 @@ app.get("/*", async (req, res) => {
       "Chrome/91.0.4472.124 Safari/537.36";
 
     const response = await axios.get(targetUrl, {
-      responseType: "arraybuffer", // Fetch as a buffer to handle all file types
+      responseType: 'arraybuffer', // Fetch as a buffer to handle all file types
       headers: {
         "User-Agent": userAgent,
       },
@@ -42,14 +45,14 @@ app.get("/*", async (req, res) => {
     }
 
     res.send(response.data);
+
   } catch (error) {
     console.error("Proxy error:", error.message, "for URL:", targetUrl);
     if (error.response) {
       console.error("Axios response error:", {
         status: error.response.status,
         headers: error.response.headers,
-        data: error.response.data ?
-          error.response.data.toString() : "[No data]", // Line broken here
+        data: error.response.data ? error.response.data.toString() : '[No data]',
       });
     }
     console.error("Error stack:", error.stack);
