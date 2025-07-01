@@ -1,7 +1,6 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const express = require("express");
 const axios = require("axios");
-const cheerio = require("cheerio");
 
 const app = express();
 
