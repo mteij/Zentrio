@@ -33,7 +33,32 @@ async function waitForElement(doc, selector, interval = 500, retries = 10) {
     return null; // Return null if element is not found after all retries
 }
 
-// Removed typeCharacterByCharacter function as per request.
+/**
+ * Simulates typing text into an input field character by character, including keyboard events.
+ * @param {HTMLInputElement} element - The input element.
+ * @param {string} text - The text to type.
+ * @param {number} delayMs - Delay in milliseconds between each character.
+ */
+async function typeCharacterByCharacter(element, text, delayMs) {
+    element.focus(); // Ensure the element is focused
+    element.value = ''; // Clear existing value
+    for (const char of text) {
+        // Dispatch keydown event
+        element.dispatchEvent(new KeyboardEvent('keydown', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true, cancelable: true }));
+        element.dispatchEvent(new KeyboardEvent('keypress', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true, cancelable: true }));
+
+        element.value += char;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Dispatch keyup event
+        element.dispatchEvent(new KeyboardEvent('keyup', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true, cancelable: true }));
+
+        await delay(delayMs);
+    }
+    // Dispatch change and blur events after all characters are typed
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    element.dispatchEvent(new Event('blur', { bubbles: true }));
+}
 
 
 // --- Streamlined Stremio Login Automation Logic ---
@@ -63,28 +88,18 @@ export async function performStreamlinedLoginAutomation(
             return false;
         }
 
-        console.log("Streamlined Login: Filling form (without typing animation).");
+        console.log("Streamlined Login: Simulating typing and clicking login.");
 
-        // Fill email field directly
-        emailField.value = ''; // Clear existing value
-        emailField.focus();
-        emailField.value = profileData.email.trim();
-        emailField.dispatchEvent(new Event('input', { bubbles: true }));
-        emailField.dispatchEvent(new Event('change', { bubbles: true }));
-        emailField.dispatchEvent(new Event('blur', { bubbles: true }));
+        // Simulate typing for email field
+        await typeCharacterByCharacter(emailField, profileData.email.trim(), 50); // 50ms delay per character
 
-        // Fill password field directly
-        passwordField.value = ''; // Clear existing value
-        passwordField.focus();
-        passwordField.value = profileData.password.trim();
-        passwordField.dispatchEvent(new Event('input', { bubbles: true }));
-        passwordField.dispatchEvent(new Event('change', { bubbles: true }));
-        passwordField.dispatchEvent(new Event('blur', { bubbles: true }));
+        // Simulate typing for password field
+        await typeCharacterByCharacter(passwordField, profileData.password.trim(), 50); // 50ms delay per character
 
-        await delay(500); // Small delay after filling fields
+        await delay(500); // Small delay after filling fields before clicking
 
-        // finalLoginButton.click(); // Commented out as per request
-        showNotification("Automatic login attempted (button click skipped)...", "success");
+        finalLoginButton.click(); // Re-enabled click
+        showNotification("Automatic login attempted...", "success");
         return true; // Automation initiated
     } catch (error) {
         console.error("Error during streamlined login automation:", error);
