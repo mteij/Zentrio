@@ -13,14 +13,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Replace Firebase Config
+      - name: Replace Firebase Config in Hosting
         env:
           FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
         run: |
-          # 1. Remove newlines, 2. Extract the JSON object, 3. Remove any trailing semicolon
+          # Extracts the JSON object, even if it's inside a JS variable
           CONFIG_STRING=$(echo "$FIREBASE_CONFIG" | tr -d '\n\r' | grep -o '{.*}' | sed 's/;$//')
           sed -i "s|__FIREBASE_CONFIG__|${CONFIG_STRING}|g" public/app.js
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+
+      - name: Install Function Dependencies
+        run: npm --prefix functions install
+
+      - name: Lint Functions
+        run: npm --prefix functions run lint -- --fix
+
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STREMIOHUB_EE185 }}
