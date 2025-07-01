@@ -55,7 +55,7 @@ function handleAutomationFailure(message, showAutomationFailModal) {
  * @param {number} currentStage - The current stage of the automation sequence (0-4).
  * @param {function(string, string): void} showNotification - A callback function to display notifications to the user.
  * @param {function(string): void} showAutomationFailModal - A callback function to display the automation failure modal.
- * @returns {Promise<number>} The next automation stage after execution.
+ * @returns {Promise<number|string>} The next automation stage number, or 'NAVIGATE' if a full iframe navigation is expected.
  */
 export async function executeStremioLoginAutomation(
     iframeDocument,
@@ -117,8 +117,8 @@ export async function executeStremioLoginAutomation(
             );
             nextStage = 2; // Advance stage
             // This click is expected to cause a full page navigation in the iframe.
-            // The next iframe.onload event will then trigger the automation for Stage 2.
-            return nextStage;
+            // Signal to app.js to force a reload.
+            return 'NAVIGATE';
 
         } else if (nextStage === 2) {
             // Stage 2: On the intermediate login page, click "Log in" button
@@ -177,15 +177,15 @@ export async function executeStremioLoginAutomation(
 
             // Dispatch input events to ensure Stremio's internal state updates
             emailField.dispatchEvent(new Event('input', { bubbles: true }));
-            passwordField.dispatchEvent(new Event('input', { bubbles: true })); // Fixed typo here
+            passwordField.dispatchEvent(new Event('input', { bubbles: true }));
 
             console.log("Form filled. Attempting to click final login button.");
             finalLoginButton.click();
             showNotification("Automatic login attempted...", "success");
             nextStage = 4; // Advance stage
             // This click is expected to cause a full page navigation to the dashboard.
-            // The next iframe.onload event will then trigger the automation for Stage 4.
-            return nextStage;
+            // Signal to app.js to force a reload.
+            return 'NAVIGATE';
 
         } else if (nextStage === 4) {
             // Stage 4: Post-login, open profile menu

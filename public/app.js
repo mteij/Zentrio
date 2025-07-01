@@ -87,6 +87,10 @@ function showView(view) {
  * @param {string} message - The message to display in the modal.
  */
 function showAutomationFailModal(message) {
+    console.log("Attempting to show automation fail modal. Message:", message);
+    console.log("Modal element:", automationFailModal);
+    console.log("Message element:", automationFailMessage);
+
     // Ensure elements are not null before trying to set properties
     if (automationFailMessage) {
         automationFailMessage.textContent = message;
@@ -206,13 +210,25 @@ async function showSplitScreen(profileId) {
             stremioIframe.onload = async () => {
                 const iframeDocument = stremioIframe.contentWindow.document;
                 // Execute the automation, passing necessary context and callbacks
-                stremioLoginAutomationStage = await executeStremioLoginAutomation(
+                const automationResult = await executeStremioLoginAutomation(
                     iframeDocument,
                     currentProfileData,
                     stremioLoginAutomationStage,
                     showNotification,
                     showAutomationFailModal
                 );
+
+                if (automationResult === 'NAVIGATE') {
+                    // If automation signals a navigation, force a reload to trigger onload again
+                    console.log("Automation signaled navigation. Forcing iframe reload.");
+                    stremioIframe.src = "about:blank"; // Clear before reloading
+                    setTimeout(() => {
+                        stremioIframe.src = proxyUrl; // Reload the iframe
+                    }, 100); // Small delay before reloading
+                } else {
+                    // Otherwise, update the automation stage
+                    stremioLoginAutomationStage = automationResult;
+                }
             };
 
         } else {
