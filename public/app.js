@@ -32,38 +32,13 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- DOM Elements ---
-const authScreen = document.getElementById('auth-screen');
-const profileScreen = document.getElementById('profile-screen');
-const splitScreenView = document.getElementById('split-screen-view');
-const backToProfilesBtn = document.getElementById('back-to-profiles-btn');
-const stremioIframe = document.getElementById('stremio-iframe');
-
-const logoutBtn = document.getElementById('logout-btn');
-const emailInput = document.getElementById('email');
-const emailSigninBtn = document.getElementById('email-signin-btn');
-const notificationContainer = document.getElementById('notification-container');
-
-const profilesGrid = document.getElementById('profiles-grid');
-const addProfileBtn = document.getElementById('add-profile-btn');
-
-// Credentials Display in Header
-const credentialsProfileName = document.getElementById('credentials-profile-name');
-const tryAgainBtn = document.getElementById('try-again-btn');
-
-// Add Profile Modal
-const addProfileModal = document.getElementById('add-profile-modal');
-const cancelAddProfileBtn = document.getElementById('cancel-add-profile-btn');
-const saveProfileBtn = document.getElementById('save-profile-btn');
-const stremioNameInput = document.getElementById('stremio-name');
-const stremioEmailAddInput = document.getElementById('stremio-email-add');
-const stremioPasswordAddInput = document.getElementById('stremio-password-add');
-
-// Automation Failure Modal
-const automationFailModal = document.getElementById('automation-fail-modal');
-const automationFailMessage = document.getElementById('automation-fail-message');
-const retryAutomationBtn = document.getElementById('retry-automation-btn');
-const manualLoginBtn = document.getElementById('manual-login-btn');
+// --- Declare DOM Elements (will be initialized after DOMContentLoaded) ---
+let authScreen, profileScreen, splitScreenView, backToProfilesBtn, stremioIframe;
+let logoutBtn, emailInput, emailSigninBtn, notificationContainer;
+let profilesGrid, addProfileBtn;
+let credentialsProfileName, tryAgainBtn;
+let addProfileModal, cancelAddProfileBtn, saveProfileBtn, stremioNameInput, stremioEmailAddInput, stremioPasswordAddInput;
+let automationFailModal, automationFailMessage, retryAutomationBtn, manualLoginBtn;
 
 
 // --- State Variables ---
@@ -112,15 +87,26 @@ function showView(view) {
  * @param {string} message - The message to display in the modal.
  */
 function showAutomationFailModal(message) {
-    automationFailMessage.textContent = message;
-    automationFailModal.classList.remove('hidden');
+    // Ensure elements are not null before trying to set properties
+    if (automationFailMessage) {
+        automationFailMessage.textContent = message;
+    } else {
+        console.error("automationFailMessage element not found when trying to show modal.");
+    }
+    if (automationFailModal) {
+        automationFailModal.classList.remove('hidden');
+    } else {
+        console.error("automationFailModal element not found when trying to show modal.");
+    }
 }
 
 /**
  * Hides the automation failure modal.
  */
 function hideAutomationFailModal() {
-    automationFailModal.classList.add('hidden');
+    if (automationFailModal) {
+        automationFailModal.classList.add('hidden');
+    }
 }
 
 // --- Authentication Logic ---
@@ -140,45 +126,7 @@ const handleSignIn = async () => {
         }
     }
 };
-handleSignIn();
 
-// Listens for Firebase authentication state changes.
-onAuthStateChanged(auth, user => {
-    if (user) {
-        currentUserId = user.uid;
-        showView(profileScreen);
-        loadProfiles();
-    } else {
-        currentUserId = null;
-        showView(authScreen);
-        profilesGrid.innerHTML = ''; // Clear profiles if logged out
-    }
-});
-
-// Event listener for the email sign-in button.
-emailSigninBtn.addEventListener('click', async () => {
-    const email = emailInput.value;
-    if (!email) {
-        showNotification('Please enter your email address.', 'error');
-        return;
-    }
-    const actionCodeSettings = { url: window.location.href, handleCodeInApp: true };
-    try {
-        await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-        window.localStorage.setItem('emailForSignIn', email);
-        showNotification(`A sign-in link has been sent to ${email}.`);
-        emailInput.value = ''; // Clear email input
-    }
-     catch (error) {
-        showNotification(error.message, 'error');
-    }
-});
-
-// Event listener for the logout button.
-logoutBtn.addEventListener('click', async () => {
-    await signOut(auth);
-    showNotification('You have been logged out.');
-});
 
 // --- Profile Management Logic ---
 /**
@@ -297,10 +245,6 @@ saveProfileBtn.addEventListener('click', async () => {
 });
 
 // --- Modal & Button Listeners ---
-// Shows the add profile modal.
-addProfileBtn.addEventListener('click', () => addProfileModal.classList.remove('hidden'));
-// Hides the add profile modal.
-cancelAddProfileBtn.addEventListener('click', closeAddProfileModal);
 /**
  * Closes the add profile modal and clears its input fields.
  */
@@ -311,47 +255,143 @@ function closeAddProfileModal() {
     stremioPasswordAddInput.value = '';
 }
 
-// Event listener for the "Back to Profiles" button.
-backToProfilesBtn.addEventListener('click', () => {
-    stremioIframe.src = "about:blank"; // Clear iframe content
-    stremioIframe.onload = null; // Remove event listener to prevent re-triggering
-    showView(profileScreen); // Show the profile selection screen
-});
+/**
+ * Attaches all necessary event listeners to DOM elements.
+ * This function is called after DOMContentLoaded to ensure elements are available.
+ */
+function attachEventListeners() {
+    emailSigninBtn.addEventListener('click', async () => {
+        const email = emailInput.value;
+        if (!email) {
+            showNotification('Please enter your email address.', 'error');
+            return;
+        }
+        const actionCodeSettings = { url: window.location.href, handleCodeInApp: true };
+        try {
+            await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+            window.localStorage.setItem('emailForSignIn', email);
+            showNotification(`A sign-in link has been sent to ${email}.`);
+            emailInput.value = '';
+        }
+        catch (error) {
+            showNotification(error.message, 'error');
+        }
+    });
 
-// Event listener for the "Try Again" button in the header.
-tryAgainBtn.addEventListener('click', () => {
-    if (currentProfileId) {
-        showNotification('Attempting to re-open Stremio and re-login.', 'success');
-        // Reset iframe src to about:blank first to force a full reload
+    logoutBtn.addEventListener('click', async () => {
+        await signOut(auth);
+        showNotification('You have been logged out.');
+    });
+
+    addProfileBtn.addEventListener('click', () => addProfileModal.classList.remove('hidden'));
+    cancelAddProfileBtn.addEventListener('click', closeAddProfileModal);
+    saveProfileBtn.addEventListener('click', async () => {
+        const name = stremioNameInput.value;
+        const email = stremioEmailAddInput.value;
+        const password = stremioPasswordAddInput.value;
+        if (!name || !email || !password) {
+            showNotification('All fields are required.', 'error');
+            return;
+        }
+        if (currentUserId) {
+            try {
+                await addDoc(collection(db, 'users', currentUserId, 'profiles'), { name, email, password });
+                closeAddProfileModal();
+                loadProfiles();
+                showNotification('Profile saved successfully!');
+            } catch (error) {
+                showNotification('Failed to save profile: ' + error.message, 'error');
+            }
+        }
+    });
+
+    backToProfilesBtn.addEventListener('click', () => {
         stremioIframe.src = "about:blank";
-        // A small delay before re-setting src to allow browser to clear iframe content
-        setTimeout(() => {
-            showSplitScreen(currentProfileId); // Re-run the function for the current profile
-        }, 100);
-    } else {
-        showNotification('No profile selected to try again.', 'error');
-    }
-});
+        stremioIframe.onload = null;
+        showView(profileScreen);
+    });
 
-// Event listener for the "Retry Automation" button in the failure modal.
-retryAutomationBtn.addEventListener('click', () => {
-    hideAutomationFailModal(); // Hide the modal
-    stremioLoginAutomationStage = 0; // Reset to stage 0 for a full retry
-    if (currentProfileId && currentProfileData) {
-        // Re-trigger the iframe load which will initiate automation from Stage 0
-        stremioIframe.src = "about:blank"; // Clear iframe
-        setTimeout(() => {
-            showSplitScreen(currentProfileId); // Reload iframe and restart automation
-        }, 100);
-    } else {
-        showNotification('Cannot retry automation, no profile data available.', 'error');
-    }
-});
+    tryAgainBtn.addEventListener('click', () => {
+        if (currentProfileId) {
+            showNotification('Attempting to re-open Stremio and re-login.', 'success');
+            stremioIframe.src = "about:blank";
+            setTimeout(() => {
+                showSplitScreen(currentProfileId);
+            }, 100);
+        } else {
+            showNotification('No profile selected to try again.', 'error');
+        }
+    });
 
-// Event listener for the "Continue Manually" button in the failure modal.
-manualLoginBtn.addEventListener('click', () => {
-    hideAutomationFailModal(); // Hide the modal
-    // User can now manually interact with the iframe
-    showNotification('Continuing manually. Please log in within the Stremio iframe.', 'info');
-    stremioLoginAutomationStage = 0; // Reset stage as automation is aborted.
+    retryAutomationBtn.addEventListener('click', () => {
+        hideAutomationFailModal();
+        stremioLoginAutomationStage = 0;
+        if (currentProfileId && currentProfileData) {
+            stremioIframe.src = "about:blank";
+            setTimeout(() => {
+                showSplitScreen(currentProfileId);
+            }, 100);
+        } else {
+            showNotification('Cannot retry automation, no profile data available.', 'error');
+        }
+    });
+
+    manualLoginBtn.addEventListener('click', () => {
+        hideAutomationFailModal();
+        showNotification('Continuing manually. Please log in within the Stremio iframe.', 'info');
+        stremioLoginAutomationStage = 0;
+    });
+}
+
+
+// --- Initialize DOM elements and attach event listeners after the DOM is fully loaded ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Assign DOM elements
+    authScreen = document.getElementById('auth-screen');
+    profileScreen = document.getElementById('profile-screen');
+    splitScreenView = document.getElementById('split-screen-view');
+    backToProfilesBtn = document.getElementById('back-to-profiles-btn');
+    stremioIframe = document.getElementById('stremio-iframe');
+
+    logoutBtn = document.getElementById('logout-btn');
+    emailInput = document.getElementById('email');
+    emailSigninBtn = document.getElementById('email-signin-btn');
+    notificationContainer = document.getElementById('notification-container');
+
+    profilesGrid = document.getElementById('profiles-grid');
+    addProfileBtn = document.getElementById('add-profile-btn');
+
+    credentialsProfileName = document.getElementById('credentials-profile-name');
+    tryAgainBtn = document.getElementById('try-again-btn');
+
+    addProfileModal = document.getElementById('add-profile-modal');
+    cancelAddProfileBtn = document.getElementById('cancel-add-profile-btn');
+    saveProfileBtn = document.getElementById('save-profile-btn');
+    stremioNameInput = document.getElementById('stremio-name');
+    stremioEmailAddInput = document.getElementById('stremio-email-add');
+    stremioPasswordAddInput = document.getElementById('stremio-password-add');
+
+    automationFailModal = document.getElementById('automation-fail-modal');
+    automationFailMessage = document.getElementById('automation-fail-message');
+    retryAutomationBtn = document.getElementById('retry-automation-btn');
+    manualLoginBtn = document.getElementById('manual-login-btn');
+
+    // Attach event listeners
+    attachEventListeners();
+
+    // Handle initial sign-in (e.g., from email link)
+    handleSignIn();
+
+    // Listen for auth state changes
+    onAuthStateChanged(auth, user => {
+        if (user) {
+            currentUserId = user.uid;
+            showView(profileScreen);
+            loadProfiles();
+        } else {
+            currentUserId = null;
+            showView(authScreen);
+            profilesGrid.innerHTML = '';
+        }
+    });
 });
