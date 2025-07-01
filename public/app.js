@@ -21,7 +21,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Import Iframe Automation Module ---
-import { executeStremioLoginAutomation } from "./iframe-automations/loginAutomation.js";
+import { performStreamlinedLoginAutomation } from "./iframe-automations/loginAutomation.js";
 
 
 // --- Firebase Configuration ---
@@ -44,8 +44,6 @@ let automationFailModal, automationFailMessage, retryAutomationBtn, manualLoginB
 // --- State Variables ---
 let currentUserId = null;
 let currentProfileId = null; // Store the ID of the currently active profile
-// Global variable to track the current stage of the Stremio login automation
-let stremioLoginAutomationStage = 0;
 let currentProfileData = null; // Store the profile data for retries
 
 
@@ -195,39 +193,29 @@ async function showSplitScreen(profileId) {
             currentProfileData = profileDoc.data(); // Store profile data for automation retries
             credentialsProfileName.textContent = currentProfileData.name; // Display profile name in header
 
-            const proxyUrl = "/stremio/"; // URL for the Stremio proxy
+            const proxyUrl = "/stremio/#/intro"; // Directly load the intro page via proxy
             stremioIframe.src = proxyUrl; // Load Stremio in the iframe
 
             showView(splitScreenView); // Show the split screen
 
-            // Reset automation stage when a new profile is loaded from the UI.
-            // If it's a "try again" initiated from stage 4, we don't reset.
-            if (stremioLoginAutomationStage !== 4) {
-                stremioLoginAutomationStage = 0;
-            }
-
             // Set up the iframe's onload event to trigger automation
             stremioIframe.onload = async () => {
                 const iframeDocument = stremioIframe.contentWindow.document;
-                // Execute the automation, passing necessary context and callbacks
-                const automationResult = await executeStremioLoginAutomation(
+                // Execute the streamlined automation
+                const automationSuccess = await performStreamlinedLoginAutomation(
                     iframeDocument,
                     currentProfileData,
-                    stremioLoginAutomationStage,
                     showNotification,
                     showAutomationFailModal
                 );
 
-                if (automationResult === 'NAVIGATE') {
-                    // If automation signals a navigation, force a reload to trigger onload again
-                    console.log("Automation signaled navigation. Forcing iframe reload.");
-                    stremioIframe.src = "about:blank"; // Clear before reloading
-                    setTimeout(() => {
-                        stremioIframe.src = proxyUrl; // Reload the iframe
-                    }, 100); // Small delay before reloading
+                // If automation was not successful, handle as needed
+                if (!automationSuccess) {
+                    // Automation already handled failure notification/modal.
+                    // No need for a forced reload as it implies the elements weren't found.
                 } else {
-                    // Otherwise, update the automation stage
-                    stremioLoginAutomationStage = automationResult;
+                    // Automation successfully attempted. Now wait for navigation to dashboard or handle errors.
+                    console.log("Streamlined login automation completed its attempt.");
                 }
             };
 
@@ -321,8 +309,8 @@ function attachEventListeners() {
 
     retryAutomationBtn.addEventListener('click', () => {
         hideAutomationFailModal();
-        stremioLoginAutomationStage = 0;
         if (currentProfileId && currentProfileData) {
+            showNotification('Retrying automated login.', 'success');
             stremioIframe.src = "about:blank";
             setTimeout(() => {
                 showSplitScreen(currentProfileId);
@@ -335,7 +323,6 @@ function attachEventListeners() {
     manualLoginBtn.addEventListener('click', () => {
         hideAutomationFailModal();
         showNotification('Continuing manually. Please log in within the Stremio iframe.', 'info');
-        stremioLoginAutomationStage = 0;
     });
 }
 

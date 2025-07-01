@@ -34,183 +34,57 @@ async function waitForElement(doc, selector, interval = 500, retries = 10) {
 }
 
 /**
- * Displays an automation failure message and resets the automation stage.
+ * Displays an automation failure message and indicates the failure.
  * This function centralizes the error handling for missing elements during automation steps.
  * @param {string} message - The specific error message for the failure modal.
  * @param {function(string): void} showAutomationFailModal - Callback to display the failure modal.
- * @returns {number} The stage to reset to (0 for restarting the automation).
+ * @returns {boolean} Returns false to indicate automation failure.
  */
 function handleAutomationFailure(message, showAutomationFailModal) {
     showAutomationFailModal(message);
-    return 0; // Reset stage to 0 on failure
+    return false; // Indicate failure
 }
 
-// --- Stremio Login Automation Logic ---
+// --- Streamlined Stremio Login Automation Logic ---
 /**
- * Executes the Stremio login automation sequence within the iframe.
- * This function is designed to be called repeatedly on iframe load events,
- * progressing through stages until login is complete or an element is not found.
+ * Attempts to perform the Stremio login sequence within the iframe.
+ * This function assumes the iframe content is at the login form stage or can reach it quickly.
  * @param {Document} iframeDocument - The document object of the iframe.
  * @param {Object} profileData - The profile data containing email and password for login.
- * @param {number} currentStage - The current stage of the automation sequence (0-4).
  * @param {function(string, string): void} showNotification - A callback function to display notifications to the user.
  * @param {function(string): void} showAutomationFailModal - A callback function to display the automation failure modal.
- * @returns {Promise<number|string>} The next automation stage number, or 'NAVIGATE' if a full iframe navigation is expected.
+ * @returns {Promise<boolean>} A promise that resolves to true if login elements are found and processed, false otherwise.
  */
-export async function executeStremioLoginAutomation(
+export async function performStreamlinedLoginAutomation(
     iframeDocument,
     profileData,
-    currentStage,
     showNotification,
     showAutomationFailModal
 ) {
-    let nextStage = currentStage;
-
     try {
-        if (nextStage === 0) {
-            // Stage 0: Initial load, click profile icon
-            await delay(1500); // Initial delay for Stremio UI to settle
+        await delay(2000); // Initial delay to ensure page loads
 
-            const profileMenuButton = await waitForElement(
-                iframeDocument,
-                'div[class*="nav-menu-popup-label-"]' // Selector for the main profile icon
-            );
+        const emailField = await waitForElement(iframeDocument, 'input[placeholder="E-mail"]');
+        const passwordField = await waitForElement(iframeDocument, 'input[placeholder="Password"]');
+        const finalLoginButton = await waitForElement(iframeDocument, 'div[class*="submit-button-x3L8z"]');
 
-            if (!profileMenuButton) {
-                return handleAutomationFailure("Couldn't find the profile menu button (Stage 0).", showAutomationFailModal);
-            }
-
-            console.log("Stage 0: Profile menu button found, clicking it.");
-            profileMenuButton.click();
-            showNotification(
-                "Profile menu opened, waiting for login/signup button...",
-                "success"
-            );
-            nextStage = 1; // Advance stage
-            // Proceed immediately to next stage as this is likely a popup on the same page, no iframe reload expected.
-            return await executeStremioLoginAutomation(
-                iframeDocument,
-                profileData,
-                nextStage,
-                showNotification,
-                showAutomationFailModal
-            );
-
-        } else if (nextStage === 1) {
-            // Stage 1: Profile menu open, click "Log in / Sign up"
-            await delay(1500); // Delay for popup content to render
-
-            const loginSignupButton = await waitForElement(
-                iframeDocument,
-                'a[title="Log in / Sign up"]' // Selector for "Log in / Sign up" link
-            );
-
-            if (!loginSignupButton) {
-                return handleAutomationFailure("Couldn't find the 'Log in / Sign up' button (Stage 1).", showAutomationFailModal);
-            }
-
-            console.log("Stage 1: Login / Sign up button found, clicking it.");
-            loginSignupButton.click();
-            showNotification(
-                "Login/Sign up clicked, waiting for login page...",
-                "success"
-            );
-            nextStage = 2; // Advance stage
-            // This click is expected to cause a full page navigation in the iframe.
-            // Signal to app.js to force a reload.
-            return 'NAVIGATE';
-
-        } else if (nextStage === 2) {
-            // Stage 2: On the intermediate login page, click "Log in" button
-            await delay(1500); // Wait for new page to render
-
-            // Selector for the "Log in" button on the intermediate page
-            const loginButtonOnPage = await waitForElement(
-                iframeDocument,
-                'div[class*="login-form-button-DqJUV"]' // Selector for the clickable button
-            );
-
-            if (!loginButtonOnPage) {
-                return handleAutomationFailure("Couldn't find the intermediate 'Log in' button (Stage 2).", showAutomationFailModal);
-            }
-
-            console.log("Stage 2: 'Log in' button on intermediate page found, clicking it.");
-            loginButtonOnPage.click();
-            showNotification(
-                "Intermediate login button clicked, waiting for form...",
-                "success"
-            );
-            nextStage = 3; // Advance stage
-            // Proceed immediately to the next stage as form appears on same page, no iframe reload expected.
-            return await executeStremioLoginAutomation(
-                iframeDocument,
-                profileData,
-                nextStage,
-                showNotification,
-                showAutomationFailModal
-            );
-
-        } else if (nextStage === 3) {
-            // Stage 3: Login form visible, autofill and submit
-            await delay(1500); // Wait for login form to appear
-
-            const emailField = await waitForElement(
-                iframeDocument,
-                'input[placeholder="E-mail"]' // Selector for email input
-            );
-            const passwordField = await waitForElement(
-                iframeDocument,
-                'input[placeholder="Password"]' // Selector for password input
-            );
-            const finalLoginButton = await waitForElement(
-                iframeDocument,
-                'div[class*="submit-button-x3L8z"]' // Selector for the final submit button
-            );
-
-            if (!emailField || !passwordField || !finalLoginButton) {
-                return handleAutomationFailure("Couldn't find email, password, or final login button (Stage 3).", showAutomationFailModal);
-            }
-
-            console.log("Stage 3: Login form elements found! Autofilling...");
-            emailField.value = profileData.email;
-            passwordField.value = profileData.password;
-
-            // Dispatch input events to ensure Stremio's internal state updates
-            emailField.dispatchEvent(new Event('input', { bubbles: true }));
-            passwordField.dispatchEvent(new Event('input', { bubbles: true }));
-
-            console.log("Form filled. Attempting to click final login button.");
-            finalLoginButton.click();
-            showNotification("Automatic login attempted...", "success");
-            nextStage = 4; // Advance stage
-            // This click is expected to cause a full page navigation to the dashboard.
-            // Signal to app.js to force a reload.
-            return 'NAVIGATE';
-
-        } else if (nextStage === 4) {
-            // Stage 4: Post-login, open profile menu
-            await delay(2000); // Give time for post-login redirects/UI to settle
-
-            const profileMenuButtonAfterLogin = await waitForElement(
-                iframeDocument,
-                'div[class*="nav-menu-popup-label-"]' // Selector for the profile menu icon after login
-            );
-
-            if (!profileMenuButtonAfterLogin) {
-                return handleAutomationFailure("Couldn't find profile menu button after login (Stage 4).", showAutomationFailModal);
-            }
-
-            console.log("Stage 4: Profile menu button found after login, clicking it.");
-            profileMenuButtonAfterLogin.click();
-            showNotification("Profile menu opened automatically!", "success");
-
-            nextStage = 0; // Reset stage for next time, as automation is complete
-            return nextStage;
+        if (!emailField || !passwordField || !finalLoginButton) {
+            return handleAutomationFailure("Couldn't find email, password, or final login button to perform streamlined login.", showAutomationFailModal);
         }
+
+        console.log("Streamlined Login: Filling form and clicking login.");
+        emailField.value = profileData.email;
+        passwordField.value = profileData.password;
+
+        // Dispatch input events to ensure Stremio's internal state updates
+        emailField.dispatchEvent(new Event('input', { bubbles: true }));
+        passwordField.dispatchEvent(new Event('input', { bubbles: true }));
+
+        finalLoginButton.click();
+        showNotification("Automatic login attempted...", "success");
+        return true; // Automation initiated
     } catch (error) {
-        console.error("Error during automated login sequence:", error);
-        return handleAutomationFailure("An unexpected error occurred during automation: " + error.message, showAutomationFailModal);
+        console.error("Error during streamlined login automation:", error);
+        return handleAutomationFailure("An unexpected error occurred during streamlined automation: " + error.message, showAutomationFailModal);
     }
-    // This line should ideally not be reached if all stages explicitly return.
-    return nextStage;
 }
