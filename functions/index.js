@@ -1,4 +1,4 @@
-const functions = require("firebase-functions");
+const {onRequest} = require("firebase-functions/v2/https");
 const express = require("express");
 const axios = require("axios");
 
@@ -42,4 +42,5 @@ app.get("/", async (req, res) => {
 });
 
 // Expose the express app as a Firebase Cloud Function.
-exports.proxy = functions.region("europe-west3").https.onRequest(app);
+// Using v2 syntax and setting the region.
+exports.proxy = onRequest({region: "europe-west3"}, app);
