@@ -8,7 +8,7 @@ const app = express();
 
 // This function acts as a proxy to fetch content from another URL.
 // It bypasses browser CORS restrictions by fetching the content on the server.
-app.get("/", async (req, res) => {
+app.get("/*", async (req, res) => {
   const targetUrl = req.query.url;
 
   if (!targetUrl) {
