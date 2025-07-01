@@ -43,4 +43,4 @@ app.get("/", async (req, res) => {
 
 // Expose the express app as a Firebase Cloud Function.
 // Using v2 syntax and setting the region.
-exports.proxy = onRequest({region: "europe-west3"}, app);
+exports.proxyV2 = onRequest({region: "europe-west3"}, app);
