@@ -3,15 +3,15 @@
 ![Stremio Overlay Banner](https://placehold.co/1200x400/141414/e50914?text=StremioHub)
 
 <p align="center">
-  <a href="https://github.com/YOUR-USERNAME/YOUR-REPOSITORY/actions/workflows/firebase-hosting-merge.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/YOUR-USERNAME/YOUR-REPOSITORY/firebase-hosting-merge.yml?branch=main&style=for-the-badge&logo=github" alt="Build Status">
+  <a href="https://github.com/MichielEijpe/StremioHub/actions/workflows/firebase-hosting-merge.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/MichielEIjpe/StremioHub/firebase-hosting-merge.yml?branch=main&style=for-the-badge&logo=github" alt="Build Status">
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License: MIT">
   </a>
 </p>
 
-A secure, passwordless, Netflix-style user selection overlay for the Stremio Web UI. Built with Firebase for authentication and profile management, and deployed automatically with GitHub Actions.
+A secure, passwordless, Netflix-inspired user selection overlay for the Stremio Web UI. Built with Firebase for authentication and profile management, and deployed automatically with GitHub Actions.
 
 ---
 
@@ -50,9 +50,9 @@ A secure, passwordless, Netflix-style user selection overlay for the Stremio Web
 
 ## 🚀 Getting Started
 
-To get a local copy up and running, or to deploy your own version of this project, please follow the detailed instructions in our **[Self-Hosting Guide](https://github.com/YOUR-USERNAME/YOUR-REPOSITORY/wiki/Self-Hosting-Guide)**.
+To get a local copy up and running, or to deploy your own version of this project, please follow the detailed instructions in our **[Self-Hosting Guide](https://github.com/MichielEijpe/StremioHub/wiki/Self-Hosting-Guide)**.
 
-<a href="https://github.com/YOUR-USERNAME/YOUR-REPOSITORY/wiki/Self-Hosting-Guide" style="text-decoration: none;">
+<a href="https://github.com/MichielEijpe/StremioHub/wiki/Self-Hosting-Guide" style="text-decoration: none;">
   <div style="background-color: #e50914; color: white; padding: 14px 20px; margin: 8px 0; border: none; cursor: pointer; width: 100%; text-align: center; border-radius: 8px; font-size: 16px; font-weight: bold;">
     View Self-Hosting Guide
   </div>
@@ -62,7 +62,7 @@ To get a local copy up and running, or to deploy your own version of this projec
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/YOUR-USERNAME/YOUR-REPOSITORY/issues).
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/MichielEijpe/StremioHub/issues).
 
 ---
 
