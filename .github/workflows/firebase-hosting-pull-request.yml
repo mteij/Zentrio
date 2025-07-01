@@ -17,8 +17,9 @@ jobs:
         env:
           FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
         run: |
-          CONFIG_JSON=$(echo "$FIREBASE_CONFIG" | jq -c .)
-          sed -i "s|__FIREBASE_CONFIG__|${CONFIG_JSON}|g" public/app.js
+          # Extracts the JSON object, even if it's inside a JS variable
+          CONFIG_STRING=$(echo "$FIREBASE_CONFIG" | grep -o '{.*}' | tr -d '\n\r')
+          sed -i "s|__FIREBASE_CONFIG__|${CONFIG_STRING}|g" public/app.js
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
