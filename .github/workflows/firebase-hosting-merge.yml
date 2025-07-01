@@ -15,8 +15,8 @@ jobs:
         env:
           FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
         run: |
-          # Extracts the JSON object, even if it's inside a JS variable
-          CONFIG_STRING=$(echo "$FIREBASE_CONFIG" | grep -o '{.*}' | tr -d '\n\r')
+          # 1. Remove newlines, 2. Extract the JSON object, 3. Remove any trailing semicolon
+          CONFIG_STRING=$(echo "$FIREBASE_CONFIG" | tr -d '\n\r' | grep -o '{.*}' | sed 's/;$//')
           sed -i "s|__FIREBASE_CONFIG__|${CONFIG_STRING}|g" public/app.js
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
