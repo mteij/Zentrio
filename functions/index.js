@@ -7,6 +7,13 @@ const app = express();
 const STREMIO_BASE_URL = "https://web.stremio.com/";
 
 app.get("/*", async (req, res) => {
+  console.log("Proxy function invoked for path:", req.path); // Added logging
+
+  if (!req.path) {
+    console.warn("Received request with empty path.");
+    return res.status(400).send("Bad Request: Path is empty.");
+  }
+
   // Construct the full target URL by combining the Stremio base URL
   // with the path from the incoming request.
   const targetUrl = new URL(req.path, STREMIO_BASE_URL).href;
@@ -18,7 +25,7 @@ app.get("/*", async (req, res) => {
       "Chrome/91.0.4472.124 Safari/537.36";
 
     const response = await axios.get(targetUrl, {
-      responseType: "arraybuffer", // Fetch as a buffer to handle all file types
+      responseType: 'arraybuffer', // Fetch as a buffer to handle all file types
       headers: {
         "User-Agent": userAgent,
       },
@@ -35,8 +42,18 @@ app.get("/*", async (req, res) => {
     }
 
     res.send(response.data);
+
   } catch (error) {
     console.error("Proxy error:", error.message, "for URL:", targetUrl);
+    if (error.response) {
+      console.error("Axios response error:", {
+        status: error.response.status,
+        headers: error.response.headers,
+        data: error.response.data ? error.response.data.toString() : '[No data]', // Convert buffer to string for logging
+      });
+    }
+    console.error("Error stack:", error.stack); // Added stack trace
+
     const status = error.response ? error.response.status : 500;
     res.status(status).send(`Error fetching the URL: ${error.message}`);
   }
