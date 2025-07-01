@@ -35,4 +35,4 @@ jobs:
           credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_STREMIOHUB_EE185 }}'
 
       - name: Deploy to Firebase Preview Channel
-        run: firebase deploy --only functions,hosting --project stremiohub-ee185 --non-interactive --token "$GCLOUD_ACCESS_TOKEN"
+        run: firebase deploy --only functions,hosting --project stremiohub-ee185 --non-interactive --token "$GCLOUD_ACCESS_TOKEN" --force
