@@ -1,0 +1,24 @@
+/* style.css */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #141414;
+}
+
+.profile-avatar {
+    background-color: #333;
+    border: 2px solid transparent;
+    transition: border-color 0.3s ease;
+}
+
+.profile-avatar:hover {
+    border-color: #e50914;
+}
+
+.delete-icon {
+    display: none;
+    cursor: pointer;
+}
+
+.edit-mode .delete-icon {
+    display: block;
+}
