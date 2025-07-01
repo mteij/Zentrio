@@ -251,9 +251,10 @@ async function executeStremioLoginAutomation(iframeDocument, profileData) {
             // Stage 2: On the intermediate login page, click "Log in" button
             await delay(1500); // Wait for new page to render
 
+            // Selector for the "Log in" button on the intermediate page
             const loginButtonOnPage = await waitForElement(
                 iframeDocument,
-                'div[class*="label-uHD7L"].uppercase-UbR3f' // Selector for the "Log in" button on the intermediate page
+                'div[class*="login-form-button-DqJUV"]' // UPDATED Selector for the clickable button
             );
 
             if (loginButtonOnPage) {
@@ -276,15 +277,21 @@ async function executeStremioLoginAutomation(iframeDocument, profileData) {
 
             const emailField = await waitForElement(
                 iframeDocument,
-                'input[placeholder="E-mail"]' // Selector for email input
+                'input[placeholder="E-mail"]', // Selector for email input
+                500, // interval
+                60 // Increased retries to 60 (total wait 30 seconds)
             );
             const passwordField = await waitForElement(
                 iframeDocument,
-                'input[placeholder="Password"]' // Selector for password input
+                'input[placeholder="Password"]', // Selector for password input
+                500, // interval
+                60 // Increased retries to 60 (total wait 30 seconds)
             );
             const finalLoginButton = await waitForElement(
                 iframeDocument,
-                'div[class*="submit-button-x3L8z"]' // Selector for the final submit button
+                'div[class*="submit-button-x3L8z"]', // Selector for the final submit button
+                500, // interval
+                60 // Increased retries to 60 (total wait 30 seconds)
             );
 
             if (emailField && passwordField && finalLoginButton) {
