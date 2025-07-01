@@ -35,6 +35,7 @@ const logoutBtn = document.getElementById('logout-btn');
 const emailInput = document.getElementById('email');
 const authError = document.getElementById('auth-error');
 const authMessage = document.getElementById('auth-message');
+const notificationContainer = document.getElementById('notification-container');
 
 const profilesGrid = document.getElementById('profiles-grid');
 const addProfileBtn = document.getElementById('add-profile-btn');
@@ -57,6 +58,30 @@ let currentUserId = null;
 let isEditMode = false;
 let profileToDeleteId = null;
 
+// --- Notification Logic ---
+function showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    notificationContainer.appendChild(notification);
+
+    // Trigger the animation
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+
+    // Hide the notification after 3 seconds
+    setTimeout(() => {
+        notification.classList.remove('show');
+        // Remove the element from the DOM after the animation completes
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 3000);
+}
+
+
 // --- Authentication Logic ---
 
 // This function runs on page load to handle the sign-in process
@@ -65,20 +90,16 @@ const handleSignIn = async () => {
     if (isSignInWithEmailLink(auth, window.location.href)) {
         let email = window.localStorage.getItem('emailForSignIn');
         if (!email) {
-            // User opened the link on a different device. To prevent session fixation
-            // attacks, ask the user to provide the email again.
             email = window.prompt('Please provide your email for confirmation');
         }
         
         try {
-            // 2. Complete the sign-in process
             await signInWithEmailLink(auth, email, window.location.href);
-            // 3. Clean up the URL and local storage
             window.localStorage.removeItem('emailForSignIn');
             window.history.replaceState(null, "", window.location.pathname);
+            showNotification('Successfully signed in!');
         } catch (error) {
-            authError.textContent = `Error signing in: ${error.message}`;
-            authError.classList.remove('hidden');
+            showNotification(`Error signing in: ${error.message}`, 'error');
         }
     }
 };
@@ -87,7 +108,7 @@ const handleSignIn = async () => {
 handleSignIn();
 
 
-// Listen for authentication state changes (this now works for passwordless)
+// Listen for authentication state changes
 onAuthStateChanged(auth, user => {
     if (user) {
         currentUserId = user.uid;
@@ -98,7 +119,7 @@ onAuthStateChanged(auth, user => {
         currentUserId = null;
         authScreen.classList.remove('hidden');
         profileScreen.classList.add('hidden');
-        profilesGrid.innerHTML = ''; // Clear profiles on logout
+        profilesGrid.innerHTML = ''; 
     }
 });
 
@@ -106,45 +127,35 @@ onAuthStateChanged(auth, user => {
 emailSigninBtn.addEventListener('click', async () => {
     const email = emailInput.value;
     if (!email) {
-        authError.textContent = 'Please enter your email address.';
-        authError.classList.remove('hidden');
+        showNotification('Please enter your email address.', 'error');
         return;
     }
 
     const actionCodeSettings = {
-        // URL you want to redirect back to. The domain (www.example.com) must be
-        // authorized in the Firebase console.
         url: window.location.href,
-        handleCodeInApp: true, // This must be true.
+        handleCodeInApp: true,
     };
 
     try {
         await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-        // The link was successfully sent. Inform the user.
-        // Save the email locally so you don't have to ask for it again
-        // if they open the link on the same device.
         window.localStorage.setItem('emailForSignIn', email);
-        
-        authError.classList.add('hidden');
-        authMessage.textContent = `A sign-in link has been sent to ${email}. Please check your inbox.`;
-        emailInput.classList.add('hidden');
-        emailSigninBtn.classList.add('hidden');
+        showNotification(`A sign-in link has been sent to ${email}.`);
+        emailInput.value = '';
 
     } catch (error) {
-        authError.textContent = error.message;
-        authError.classList.remove('hidden');
+        showNotification(error.message, 'error');
     }
 });
 
 // Logout user
 logoutBtn.addEventListener('click', async () => {
     await signOut(auth);
-    // Reload to reset the auth UI state
+    showNotification('You have been logged out.');
     window.location.reload();
 });
 
 
-// --- Profile Management Logic (No changes needed here) ---
+// --- Profile Management Logic ---
 
 async function loadProfiles() {
     if (!currentUserId) return;
@@ -189,9 +200,11 @@ function createProfileElement(id, name) {
     div.appendChild(nameEl);
     div.addEventListener('click', () => {
         if (!isEditMode) {
-            console.log(`Selected profile: ${name} (ID: ${id})`);
-            alert(`Simulating login for ${name}. Redirecting to Stremio...`);
-            window.location.href = "https://web.stremio.com/";
+            showNotification(`Welcome back, ${name}!`);
+            setTimeout(() => {
+                 window.location.href = "https://web.stremio.com/";
+            }, 1000)
+           
         }
     });
     return div;
@@ -202,8 +215,7 @@ saveProfileBtn.addEventListener('click', async () => {
     const email = stremioEmailInput.value;
     const password = stremioPasswordInput.value;
     if (!name || !email || !password) {
-        addProfileError.textContent = 'All fields are required.';
-        addProfileError.classList.remove('hidden');
+        showNotification('All fields are required.', 'error');
         return;
     }
     if (currentUserId) {
@@ -215,9 +227,9 @@ saveProfileBtn.addEventListener('click', async () => {
             });
             closeAddProfileModal();
             loadProfiles();
+            showNotification('Profile saved successfully!');
         } catch (error) {
-            addProfileError.textContent = 'Failed to save profile: ' + error.message;
-            addProfileError.classList.remove('hidden');
+            showNotification('Failed to save profile: ' + error.message, 'error');
         }
     }
 });
@@ -228,8 +240,9 @@ confirmDeleteBtn.addEventListener('click', async () => {
             await deleteDoc(doc(db, 'users', currentUserId, 'profiles', profileToDeleteId));
             closeDeleteConfirmModal();
             loadProfiles();
+            showNotification('Profile deleted.', 'success');
         } catch (error) {
-            console.error("Error deleting profile: ", error);
+            showNotification("Error deleting profile: " + error.message, 'error');
         }
     }
 });
@@ -244,7 +257,6 @@ addProfileBtn.addEventListener('click', () => addProfileModal.classList.remove('
 cancelAddProfileBtn.addEventListener('click', closeAddProfileModal);
 function closeAddProfileModal() {
     addProfileModal.classList.add('hidden');
-    addProfileError.classList.add('hidden');
     stremioNameInput.value = '';
     stremioEmailInput.value = '';
     stremioPasswordInput.value = '';
