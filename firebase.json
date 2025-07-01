@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "source": "functions"
+  },
   "hosting": {
     "public": "public",
     "ignore": [
@@ -7,6 +10,10 @@
       "**/node_modules/**"
     ],
     "rewrites": [
+      {
+        "source": "/proxy",
+        "function": "proxy"
+      },
       {
         "source": "**",
         "destination": "/index.html"
