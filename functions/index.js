@@ -1,6 +1,7 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const express = require("express");
 const axios = require("axios");
+// Removed: const cheerio = require("cheerio"); // Was unused
 
 const app = express();
 
@@ -15,17 +16,22 @@ app.get("/*", async (req, res) => {
   }
 
   // Extract the path for Stremio by removing the /stremio prefix
+  // This resolves the 404 issue on the Stremio side.
   const stremioPath = req.path.substring('/stremio'.length);
-  // Ensure that if stremioPath is empty (e.g., for /stremio/), it defaults to '/'
-  const targetUrl = new URL(stremioPath || '/', STREMIO_BASE_URL).href;
+  // Ensure that if stremioPath is empty (e.g., for /stremio/),
+  // it defaults to '/' to avoid invalid URLs.
+  const targetUrl = new URL(
+    stremioPath || '/',
+    STREMIO_BASE_URL
+  ).href;
 
-  console.log("Proxying request to target URL:", targetUrl); // Added for debugging
+  console.log("Proxying URL:", targetUrl); // Shortened log message
 
   try {
     const userAgent =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
       "AppleWebKit/537.36 (KHTML, like Gecko) " +
-      "Chrome/91.0.4472.124 Safari/537.36";
+      "Chrome/91.0.4472.124 Safari/537.36"; // Formatted for max-len
 
     const response = await axios.get(targetUrl, {
       responseType: 'arraybuffer', // Fetch as a buffer to handle all file types
@@ -52,7 +58,9 @@ app.get("/*", async (req, res) => {
       console.error("Axios response error:", {
         status: error.response.status,
         headers: error.response.headers,
-        data: error.response.data ? error.response.data.toString() : '[No data]',
+        data: error.response.data ?
+          error.response.data.toString() :
+          '[No data]', // Split into multiple lines for max-len
       });
     }
     console.error("Error stack:", error.stack);
