@@ -1,16 +1,16 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const express = require("express");
 const axios = require("axios");
-const cheerio = require("cheerio"); // Import cheerio
+const cheerio = require("cheerio");
 
 const app = express();
 
-app.get("/*", async (req, res) => {
-  const targetUrl = req.query.url;
+const STREMIO_BASE_URL = "https://web.stremio.com/";
 
-  if (!targetUrl) {
-    return res.status(400).send("Error: Missing 'url' query parameter.");
-  }
+app.get("/*", async (req, res) => {
+  // Construct the full target URL by combining the Stremio base URL
+  // with the path from the incoming request.
+  const targetUrl = new URL(req.path, STREMIO_BASE_URL).href;
 
   try {
     const userAgent =
@@ -19,29 +19,29 @@ app.get("/*", async (req, res) => {
       "Chrome/91.0.4472.124 Safari/537.36";
 
     const response = await axios.get(targetUrl, {
+      responseType: 'arraybuffer', // Fetch as a buffer to handle all file types
       headers: {
         "User-Agent": userAgent,
       },
     });
 
-    // Load the HTML content into cheerio
-    const $ = cheerio.load(response.data);
+    const contentType = response.headers["content-type"];
 
-    // Add a <base> tag to the <head> to resolve relative paths
-    $("head").prepend(`<base href="${targetUrl}">`);
+    // Set CORS headers to allow everything
+    res.set("Access-Control-Allow-Origin", "*");
 
-    // We still don't forward security headers
-    res.set({
-      "Content-Type": response.headers["content-type"],
-    });
+    // Forward the content type from the original response
+    if (contentType) {
+      res.set("Content-Type", contentType);
+    }
 
-    // Send the modified HTML
-    res.send($.html());
+    res.send(response.data);
+
   } catch (error) {
-    console.error("Proxy error:", error.message);
-    return res.status(500).send(`Error fetching the URL: ${error.message}`);
+    console.error("Proxy error:", error.message, "for URL:", targetUrl);
+    const status = error.response ? error.response.status : 500;
+    res.status(status).send(`Error fetching the URL: ${error.message}`);
   }
 });
 
-// Expose the express app as a Firebase Cloud Function
 exports.proxy = onRequest({region: "europe-west3"}, app);

@@ -24,7 +24,7 @@
     ],
     "rewrites": [
       {
-        "source": "/proxy",
+        "source": "/stremio/**",
         "function": "proxy"
       },
       {
