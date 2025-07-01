@@ -45,10 +45,7 @@ const addProfileBtn = document.getElementById('add-profile-btn');
 
 // Credentials Display in Header
 const credentialsProfileName = document.getElementById('credentials-profile-name');
-// Removed: const stremioLoginEmail = document.getElementById('stremio-login-email');
-// Removed: const stremioLoginPassword = document.getElementById('stremio-login-password');
-// Removed: const copyPasswordBtn = document.getElementById('copy-password-btn');
-const tryAgainBtn = document.getElementById('try-again-btn'); // ADDED
+const tryAgainBtn = document.getElementById('try-again-btn');
 
 // Add Profile Modal
 const addProfileModal = document.getElementById('add-profile-modal');
@@ -146,7 +143,8 @@ emailSigninBtn.addEventListener('click', async () => {
         window.localStorage.setItem('emailForSignIn', email);
         showNotification(`A sign-in link has been sent to ${email}.`);
         emailInput.value = '';
-    } catch (error) {
+    }
+     catch (error) {
         showNotification(error.message, 'error');
     }
 });
@@ -196,6 +194,147 @@ function createProfileElement(id, name) {
     return div;
 }
 
+// This function now contains the core automation logic,
+// allowing it to be called sequentially or upon iframe reload
+async function executeStremioLoginAutomation(iframeDocument, profileData) {
+    console.log("Stremio automation started/continued. Stage:", stremioLoginAutomationStage);
+    try {
+        if (stremioLoginAutomationStage === 0) {
+            // Stage 0: Initial load, click profile icon
+            await delay(1500); // Initial delay for Stremio UI to settle
+
+            const profileMenuButton = await waitForElement(
+                iframeDocument,
+                'div[class*="nav-menu-popup-label-"]', // Selector for the main profile icon
+                500, 40 // Wait up to 20 seconds
+            );
+
+            if (profileMenuButton) {
+                console.log("Stage 0: Profile menu button found, clicking it.");
+                profileMenuButton.click();
+                showNotification(
+                    "Profile menu opened, waiting for login/signup button...",
+                    "success"
+                );
+                stremioLoginAutomationStage = 1; // Advance stage
+                // Crucial: Immediately proceed to next stage within same onload execution
+                await executeStremioLoginAutomation(iframeDocument, profileData);
+            } else {
+                console.log("Stage 0: Profile menu button not found.");
+                showNotification("Stremio UI not as expected (Profile button missing).", "error");
+            }
+        } else if (stremioLoginAutomationStage === 1) {
+            // Stage 1: Profile menu open, click "Log in / Sign up"
+            await delay(1500); // Delay for popup content to render
+
+            const loginSignupButton = await waitForElement(
+                iframeDocument,
+                'a[title="Log in / Sign up"]', // Selector for "Log in / Sign up" link
+                500, 120 // Wait up to 60 seconds
+            );
+
+            if (loginSignupButton) {
+                console.log("Stage 1: Login / Sign up button found by waitForElement, clicking it.");
+                loginSignupButton.click();
+                showNotification(
+                    "Login/Sign up clicked, waiting for login page...",
+                    "success"
+                );
+                stremioLoginAutomationStage = 2; // Advance stage
+                // This click is expected to cause a full page navigation in the iframe.
+                // The next iframe.onload will then start at Stage 2. No recursive call here.
+            } else {
+                console.log("Stage 1: Login / Sign up button not found in popup.");
+                showNotification("Stremio UI not as expected (Login/Signup button missing).", "error");
+            }
+        } else if (stremioLoginAutomationStage === 2) {
+            // Stage 2: On the intermediate login page, click "Log in" button
+            await delay(1500); // Wait for new page to render
+
+            const loginButtonOnPage = await waitForElement(
+                iframeDocument,
+                'div[class*="label-uHD7L"].uppercase-UbR3f' // Selector for the "Log in" button on the intermediate page
+            );
+
+            if (loginButtonOnPage) {
+                console.log("Stage 2: 'Log in' button on intermediate page found, clicking it.");
+                loginButtonOnPage.click();
+                showNotification(
+                    "Intermediate login button clicked, waiting for form...",
+                    "success"
+                );
+                stremioLoginAutomationStage = 3; // Advance stage
+                // Proceed immediately to the next stage as form appears on same page
+                await executeStremioLoginAutomation(iframeDocument, profileData);
+            } else {
+                console.log("Stage 2: 'Log in' button on intermediate page not found.");
+                showNotification("Stremio UI not as expected (Intermediate Login button missing).", "error");
+            }
+        } else if (stremioLoginAutomationStage === 3) {
+            // Stage 3: Login form visible, autofill and submit
+            await delay(1500); // Wait for login form to appear
+
+            const emailField = await waitForElement(
+                iframeDocument,
+                'input[placeholder="E-mail"]' // Selector for email input
+            );
+            const passwordField = await waitForElement(
+                iframeDocument,
+                'input[placeholder="Password"]' // Selector for password input
+            );
+            const finalLoginButton = await waitForElement(
+                iframeDocument,
+                'div[class*="submit-button-x3L8z"]' // Selector for the final submit button
+            );
+
+            if (emailField && passwordField && finalLoginButton) {
+                console.log("Stage 3: Login form elements found! Autofilling...");
+                emailField.value = profileData.email;
+                passwordField.value = profileData.password;
+
+                emailField.dispatchEvent(new Event('input', { bubbles: true }));
+                passwordField.dispatchEvent(new Event('input', { bubbles: true }));
+
+                console.log("Form filled. Attempting to click final login button.");
+                finalLoginButton.click();
+                showNotification("Automatic login attempted...", "success");
+                stremioLoginAutomationStage = 4; // Advance stage
+                // This click is expected to cause a full page navigation to the dashboard.
+                // The next iframe.onload will then start at Stage 4. No recursive call here.
+            } else {
+                console.log("Stage 3: Could not find all final login form elements.");
+                showNotification("Stremio UI not as expected (Login form elements missing).", "error");
+            }
+        } else if (stremioLoginAutomationStage === 4) {
+            // Stage 4: Post-login, open profile menu
+            await delay(2000); // Give time for post-login redirects/UI to settle
+
+            const profileMenuButtonAfterLogin = await waitForElement(
+                iframeDocument,
+                'div[class*="nav-menu-popup-label-"]' // Selector for the profile menu icon after login
+            );
+
+            if (profileMenuButtonAfterLogin) {
+                console.log("Stage 4: Profile menu button found after login, clicking it.");
+                profileMenuButtonAfterLogin.click();
+                showNotification("Profile menu opened automatically!", "success");
+            } else {
+                console.log("Stage 4: Profile menu button not found after login.");
+                showNotification("Stremio UI not as expected (Profile menu button after login missing).", "error");
+            }
+            stremioLoginAutomationStage = 0; // Reset stage for next time
+        }
+    } catch (error) {
+        console.error("Error during automated login sequence:", error);
+        showNotification(
+            "An error occurred during automated login: " + error.message,
+            "error"
+        );
+        stremioLoginAutomationStage = 0; // Reset stage on error
+    }
+}
+
+
 async function showSplitScreen(profileId) {
     currentProfileId = profileId; // Store the current profile ID
     try {
@@ -204,154 +343,25 @@ async function showSplitScreen(profileId) {
         if (profileDoc.exists()) {
             const profileData = profileDoc.data();
             credentialsProfileName.textContent = profileData.name;
-            // Removed: stremioLoginEmail.value = profileData.email;
-            // Removed: stremioLoginPassword.value = profileData.password;
 
-            // Use the new proxy path
             const proxyUrl = "/stremio/";
             stremioIframe.src = proxyUrl;
 
             showView(splitScreenView);
 
-            // Reset automation stage when a new profile is loaded
-            stremioLoginAutomationStage = 0;
+            // Reset automation stage when a new profile is loaded from the UI.
+            // But if it's a try-again, we don't want to reset if it's already on stage 4.
+            // This ensures that after a full page navigation (like login/signup click),
+            // the automation continues from the next stage.
+            if (stremioLoginAutomationStage !== 4) {
+                stremioLoginAutomationStage = 0;
+            }
+
 
             stremioIframe.onload = async () => {
-                console.log(
-                    "Proxied iframe content loaded. Current automation stage:",
-                    stremioLoginAutomationStage
-                );
-
                 const iframeDocument = stremioIframe.contentWindow.document;
-
-                try {
-                    if (stremioLoginAutomationStage === 0) {
-                        // Stage 0: Initial load, click profile icon
-                        await delay(1500); // Increased initial delay for page render
-
-                        const profileMenuButton = await waitForElement(
-                            iframeDocument,
-                            'div[class*="nav-menu-popup-label-"]' // Selector for the main profile icon
-                        );
-
-                        if (profileMenuButton) {
-                            console.log("Stage 0: Profile menu button found, clicking it.");
-                            profileMenuButton.click();
-                            stremioLoginAutomationStage = 1; // Move to next stage
-                            showNotification(
-                                "Profile menu opened, waiting for login/signup button...",
-                                "success"
-                            );
-                        } else {
-                            console.log("Stage 0: Profile menu button not found.");
-                            showNotification("Stremio UI not as expected (Profile button missing).", "error");
-                        }
-                    } else if (stremioLoginAutomationStage === 1) {
-                        // Stage 1: Profile menu open, click "Log in / Sign up"
-                        await delay(1500); // Increased delay for popup content to render
-
-                        const loginSignupButton = await waitForElement(
-                            iframeDocument,
-                            'a[title="Log in / Sign up"]' // Selector for "Log in / Sign up" link
-                        );
-
-                        if (loginSignupButton) {
-                            console.log("Stage 1: Login / Sign up button found, clicking it.");
-                            loginSignupButton.click();
-                            stremioLoginAutomationStage = 2; // Move to next stage
-                            showNotification(
-                                "Login/Sign up clicked, waiting for login page...",
-                                "success"
-                            );
-                            // This click is expected to cause a page navigation in the iframe,
-                            // which will re-trigger onload and move to Stage 2.
-                        } else {
-                            console.log("Stage 1: Login / Sign up button not found in popup.");
-                            showNotification("Stremio UI not as expected (Login/Signup button missing).", "error");
-                        }
-                    } else if (stremioLoginAutomationStage === 2) {
-                        // Stage 2: On the intermediate login page, click "Log in" button
-                        await delay(1500); // Wait for new page to render
-
-                        // Selector for the "Log in" button on the intermediate page
-                        const loginButtonOnPage = await waitForElement(
-                            iframeDocument,
-                            'div[class*="label-uHD7L"].uppercase-UbR3f' // Using the specific label div for the button
-                        );
-
-                        if (loginButtonOnPage) {
-                            console.log("Stage 2: 'Log in' button on intermediate page found, clicking it.");
-                            loginButtonOnPage.click();
-                            stremioLoginAutomationStage = 3; // Move to next stage
-                            showNotification(
-                                "Intermediate login button clicked, waiting for form...",
-                                "success"
-                            );
-                        } else {
-                            console.log("Stage 2: 'Log in' button on intermediate page not found.");
-                            showNotification("Stremio UI not as expected (Intermediate Login button missing).", "error");
-                        }
-                    } else if (stremioLoginAutomationStage === 3) {
-                        // Stage 3: Login form visible, autofill and submit
-                        await delay(1500); // Wait for login form to appear
-
-                        const emailField = await waitForElement(
-                            iframeDocument,
-                            'input[placeholder="E-mail"]' // Selector for email input
-                        );
-                        const passwordField = await waitForElement(
-                            iframeDocument,
-                            'input[placeholder="Password"]' // Selector for password input
-                        );
-                        const finalLoginButton = await waitForElement(
-                            iframeDocument,
-                            'div[class*="submit-button-x3L8z"]' // Selector for the final submit button
-                        );
-
-                        if (emailField && passwordField && finalLoginButton) {
-                            console.log("Stage 3: Login form elements found! Autofilling...");
-                            emailField.value = profileData.email;
-                            passwordField.value = profileData.password;
-
-                            // Dispatch events to ensure fields register changes
-                            emailField.dispatchEvent(new Event('input', { bubbles: true }));
-                            passwordField.dispatchEvent(new Event('input', { bubbles: true }));
-
-                            console.log("Form filled. Attempting to click final login button.");
-                            finalLoginButton.click();
-                            stremioLoginAutomationStage = 4; // Login attempted
-                            showNotification("Automatic login attempted...", "success");
-                        } else {
-                            console.log("Stage 3: Could not find all final login form elements.");
-                            showNotification("Stremio UI not as expected (Login form elements missing).", "error");
-                        }
-                    } else if (stremioLoginAutomationStage === 4) {
-                        // Stage 4: Post-login, open profile menu
-                        await delay(2000); // Give time for post-login redirects/UI to settle
-
-                        const profileMenuButtonAfterLogin = await waitForElement(
-                            iframeDocument,
-                            'div[class*="nav-menu-popup-label-"]' // Selector for the profile menu icon after login
-                        );
-
-                        if (profileMenuButtonAfterLogin) {
-                            console.log("Stage 4: Profile menu button found after login, clicking it.");
-                            profileMenuButtonAfterLogin.click();
-                            showNotification("Profile menu opened automatically!", "success");
-                        } else {
-                            console.log("Stage 4: Profile menu button not found after login.");
-                            showNotification("Stremio UI not as expected (Profile menu button after login missing).", "error");
-                        }
-                        stremioLoginAutomationStage = 0; // Reset stage for next time
-                    }
-                } catch (error) {
-                    console.error("Error during automated login sequence:", error);
-                    showNotification(
-                        "An error occurred during automated login: " + error.message,
-                        "error"
-                    );
-                    stremioLoginAutomationStage = 0; // Reset stage on error
-                }
+                // Pass profileData to the automation logic
+                await executeStremioLoginAutomation(iframeDocument, profileData);
             };
 
         } else {
@@ -398,8 +408,6 @@ backToProfilesBtn.addEventListener('click', () => {
     stremioIframe.onload = null; // Remove event listener to prevent re-triggering
     showView(profileScreen);
 });
-
-// Removed: copyPasswordBtn.addEventListener('click', () => { ... });
 
 tryAgainBtn.addEventListener('click', () => {
     if (currentProfileId) {
