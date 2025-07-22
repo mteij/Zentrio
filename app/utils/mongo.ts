@@ -1,23 +1,37 @@
 import mongoose from "mongoose";
 
-console.log("--- Executing mongo.ts ---");
+let conn: Promise<typeof mongoose> | null = null;
 
-const MONGO_URI = Deno.env.get("MONGO_URI");
+const connect = () => {
+  if (conn) {
+    return conn;
+  }
 
-if (!MONGO_URI) {
-  console.error("MONGO_URI environment variable is not defined.");
-  throw new Error("MONGO_URI environment variable is not defined.");
-} else {
-  console.log("MONGO_URI found.");
-}
+  const MONGO_URI = Deno.env.get("MONGO_URI");
+  if (!MONGO_URI) {
+    throw new Error("MONGO_URI environment variable is not defined.");
+  }
 
-try {
-  await mongoose.connect(MONGO_URI);
-  console.log("Mongoose connected successfully.");
-} catch (e) {
-  console.error(
-    "Failed to connect to MongoDB using Mongoose. Please double-check your connection string (MONGO_URI) and IP Whitelist settings in MongoDB Atlas.",
-  );
-  console.error("Mongoose connection error:", e);
-  throw e;
-}
+  conn = mongoose
+    .connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 10000, // Keep the timeout
+    })
+    .then((mongooseInstance) => {
+      console.log("Mongoose connected successfully.");
+      return mongooseInstance;
+    })
+    .catch((e) => {
+      console.error(
+        "Failed to connect to MongoDB. Please double-check your connection string (MONGO_URI) and IP Whitelist settings in MongoDB Atlas.",
+      );
+      console.error("Mongoose connection error:", e);
+      // Set conn to null so a retry can be attempted if the app logic allows for it.
+      conn = null;
+      throw e; // Re-throw the error to crash the app on startup if the connection fails.
+    });
+
+  return conn;
+};
+
+// Export the promise. Any file that imports this and awaits it will wait for the connection.
+export const db = connect();

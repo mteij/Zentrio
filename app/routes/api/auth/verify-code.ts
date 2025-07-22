@@ -1,5 +1,4 @@
 import { Handlers } from "$fresh/server.ts";
-import { setCookie } from "$std/http/cookie.ts";
 import {
   createSession,
   deleteVerificationToken,
@@ -24,7 +23,7 @@ export const handler: Handlers = {
       userId: user._id,
       code: code,
       expiresAt: { $gt: new Date() },
-    });
+    }) as { _id: { toHexString: () => string }, userId: string, code: string, expiresAt: Date } | null;
 
     if (!verificationToken) {
       return new Response("Invalid or expired code.", { status: 400 });
@@ -37,23 +36,17 @@ export const handler: Handlers = {
       sessionExpires,
     );
 
-    await deleteVerificationToken((verificationToken._id as { toHexString: () => string }).toHexString());
+    await deleteVerificationToken(verificationToken._id.toHexString());
 
-    const headers = new Headers();
-    setCookie(headers, {
-      name: "sessionId",
-      value: sessionId,
-      expires: sessionExpires,
-      path: "/",
-      httpOnly: true,
-      sameSite: "Lax",
-      secure: new URL(req.url).protocol === "https:",
-    });
-
-    headers.set("Location", "/profiles");
-    return new Response(null, {
-      status: 200,
-      headers,
-    });
+    return new Response(
+      JSON.stringify({
+        sessionId,
+        expiresAt: sessionExpires.toISOString(),
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   },
 };

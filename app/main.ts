@@ -6,11 +6,11 @@
 
 import { loadSync } from "$std/dotenv/mod.ts";
 
-console.log("--- Running main.ts ---");
 // Load environment variables from .env file in the parent directory
 loadSync({ envPath: "../.env", export: true });
 
-import "./utils/mongo.ts"; // Establish MongoDB connection
+// The database connection is now managed by db.ts and mongo.ts
+// and will be established on the first database operation.
 
 import { start } from "$fresh/server.ts";
 import manifest from "./fresh.gen.ts";

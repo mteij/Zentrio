@@ -58,7 +58,12 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
     });
 
     if (res.ok) {
-      globalThis.location.href = "/profiles";
+      const { sessionId, expiresAt } = await res.json();
+      // Set cookie client-side
+      document.cookie = `sessionId=${sessionId}; expires=${
+        new Date(expiresAt).toUTCString()
+      }; path=/; SameSite=Lax;`;
+      window.location.href = "/profiles";
     } else {
       const text = await res.text();
       error.value = text || "Verification failed.";

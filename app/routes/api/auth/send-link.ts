@@ -23,11 +23,18 @@ export const handler: Handlers = {
     try {
       const user = await findOrCreateUserByEmail(email);
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-      if (!user._id || (typeof user._id !== "string" && typeof user._id !== "number")) {
-        throw new Error("User _id is missing or of invalid type.");
+      // Ensure user._id is a string or can be converted to string
+      const userId =
+        typeof user._id === "string"
+          ? user._id
+          : user._id && typeof user._id.toString === "function"
+          ? user._id.toString()
+          : "";
+      if (!userId) {
+        throw new Error("User ID is invalid.");
       }
       const { token, code } = await createVerificationToken(
-        user._id.toString(),
+        userId,
         expiresAt,
       );
 

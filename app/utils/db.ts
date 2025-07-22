@@ -1,4 +1,8 @@
 import mongoose, { Document, Model, ObjectId } from "mongoose";
+import { db } from "./mongo.ts";
+
+// Ensure the database connection is established before defining models
+await db;
 
 // --- Interfaces ---
 export interface UserSchema extends Document {
