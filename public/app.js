@@ -208,7 +208,7 @@ async function showSplitScreen(profileId) {
                 headerProfilePicture.classList.add('hidden');
             }
 
-            const proxyUrl = "/stremio/#/intro?form=login";
+            const proxyUrl = "/stremio/"; // Let Stremio handle its own routing
             stremioIframe.src = proxyUrl;
 
             showView(splitScreenView);

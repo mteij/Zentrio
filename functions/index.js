@@ -1,65 +1,76 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const express = require("express");
 const axios = require("axios");
-// Removed: const cheerio = require("cheerio"); // Was unused
 
 const app = express();
+app.use(express.json()); // Middleware to parse JSON bodies
 
 const STREMIO_BASE_URL = "https://web.stremio.com/";
+const STREMIO_API_URL = "https://api.stremio.com/";
 
-app.get("/*", async (req, res) => {
-  console.log("Proxy function invoked for path:", req.path);
+// List of paths that should be proxied to the API
+const API_PATHS = ["/login", "/login/v2", "/logout", "/register"];
+
+const proxyRequest = async (req, res) => {
+  console.log(`Proxy function invoked for path: ${req.path}, method: ${req.method}`);
 
   if (!req.path) {
     console.warn("Received request with empty path.");
     return res.status(400).send("Bad Request: Path is empty.");
   }
 
-  // Extract the path for Stremio by removing the /stremio prefix
-  // This resolves the 404 issue on the Stremio side.
   const stremioPath = req.path.substring("/stremio".length);
-  // Ensure that if stremioPath is empty (e.g., for /stremio/),
-  // it defaults to '/' to avoid invalid URLs.
-  const targetUrl = new URL(
-      stremioPath || "/",
-      STREMIO_BASE_URL,
-  ).href;
 
-  console.log("Proxying URL:", targetUrl); // Shortened log message
+  const isApiCall = API_PATHS.some((apiPath) => stremioPath.startsWith(apiPath));
+  const baseUrl = isApiCall ? STREMIO_API_URL : STREMIO_BASE_URL;
+
+  const targetUrl = new URL(stremioPath || "/", baseUrl).href;
+
+  console.log("Proxying URL:", targetUrl);
 
   try {
     const userAgent =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
       "AppleWebKit/537.36 (KHTML, like Gecko) " +
-      "Chrome/91.0.4472.124 Safari/537.36"; // Formatted for max-len
+      "Chrome/91.0.4472.124 Safari/537.36";
 
-    const response = await axios.get(targetUrl, {
-      responseType: "arraybuffer", // Fetch as a buffer to handle all file types
-      headers: {
-        "User-Agent": userAgent,
-      },
+    const headers = {
+      "User-Agent": userAgent,
+      "Accept": req.headers.accept || "application/json, text/plain, */*",
+    };
+    if (req.headers["content-type"]) {
+      headers["Content-Type"] = req.headers["content-type"];
+    }
+    if (req.headers["authorization"]) {
+      headers["Authorization"] = req.headers["authorization"];
+    }
+
+    const response = await axios({
+      method: req.method,
+      url: targetUrl,
+      data: req.body,
+      responseType: "arraybuffer",
+      headers: headers,
     });
-
-    const contentType = response.headers["content-type"];
 
     // Set CORS headers to allow everything
     res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
     // Forward relevant headers from the original response
-    if (contentType) {
-      res.set("Content-Type", contentType);
-    }
-    if (response.headers["cache-control"]) {
-      res.set("Cache-Control", response.headers["cache-control"]);
-    }
-    if (response.headers["etag"]) {
-      res.set("ETag", response.headers["etag"]);
-    }
-    if (response.headers["last-modified"]) {
-      res.set("Last-Modified", response.headers["last-modified"]);
-    }
+    const headersToForward = [
+      "content-type",
+      "cache-control",
+      "etag",
+      "last-modified",
+    ];
+    headersToForward.forEach((header) => {
+      if (response.headers[header]) {
+        res.set(header, response.headers[header]);
+      }
+    });
 
-    res.send(response.data);
+    res.status(response.status).send(response.data);
   } catch (error) {
     console.error("Proxy error:", error.message, "for URL:", targetUrl);
     if (error.response) {
@@ -68,14 +79,25 @@ app.get("/*", async (req, res) => {
         headers: error.response.headers,
         data: error.response.data ?
           error.response.data.toString() :
-          "[No data]", // Split into multiple lines for max-len
+          "[No data]",
       });
+      res.status(error.response.status).send(error.response.data);
+    } else {
+      res.status(500).send(`Error fetching the URL: ${error.message}`);
     }
-    console.error("Error stack:", error.stack);
-
-    const status = error.response ? error.response.status : 500;
-    res.status(status).send(`Error fetching the URL: ${error.message}`);
   }
+};
+
+// Handle preflight OPTIONS requests for CORS
+app.options("/*", (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.status(204).send("");
 });
+
+// Handle both GET and POST requests to the proxy
+app.get("/*", proxyRequest);
+app.post("/*", proxyRequest);
 
 exports.proxy = onRequest({region: "europe-west3"}, app);

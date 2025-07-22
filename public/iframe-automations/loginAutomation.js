@@ -76,11 +76,12 @@ export async function performStreamlinedLoginAutomation(
     showNotification
 ) {
     try {
-        await delay(3000); // Initial delay for page to settle
+        // The initial delay is removed to speed up the process.
+        // The form submission is now handled by the proxy, so clicking is not needed.
 
         const emailField = await waitForElement(iframeDocument, 'input[placeholder="E-mail"]');
         const passwordField = await waitForElement(iframeDocument, 'input[placeholder="Password"]');
-        const finalLoginButton = await waitForElement(iframeDocument, 'div[class*="submit-button-x3L8z"]');
+        const finalLoginButton = await waitForElement(iframeDocument, 'button[type="submit"], div[class*="submit-button"]');
 
         if (!emailField || !passwordField || !finalLoginButton) {
             console.error("Automation failed: Could not find one or more login elements.");
@@ -88,7 +89,7 @@ export async function performStreamlinedLoginAutomation(
             return false;
         }
 
-        console.log("Streamlined Login: Simulating typing and clicking login.");
+        console.log("Streamlined Login: Simulating typing and submitting form.");
 
         // Simulate typing for email field
         await typeCharacterByCharacter(emailField, profileData.email.trim(), 50); // 50ms delay per character
@@ -96,10 +97,11 @@ export async function performStreamlinedLoginAutomation(
         // Simulate typing for password field
         await typeCharacterByCharacter(passwordField, profileData.password.trim(), 50); // 50ms delay per character
 
-        await delay(500); // Small delay after filling fields before clicking
+        await delay(500); // Small delay after filling fields
 
-        finalLoginButton.click(); // Re-enabled click
-        showNotification("Automatic login attempted...", "success");
+        // The form should submit automatically on enter/blur or via proxy.
+        // Clicking is no longer necessary and can be unreliable.
+        showNotification("Automatic login data entered...", "success");
         return true; // Automation initiated
     } catch (error) {
         console.error("Error during streamlined login automation:", error);
