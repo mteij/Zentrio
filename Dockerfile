@@ -10,11 +10,11 @@ COPY app/ .
 
 # Generate fresh.gen.ts. This requires --allow-read, --allow-write for file generation,
 # and --allow-env for loading .env in dev.ts.
-RUN deno run --allow-read --allow-write --allow-env --allow-net app/dev.ts build
+RUN deno run --allow-read --allow-write --allow-env --allow-net dev.ts build
 
 # Cache all dependencies for the application.
 # This will download and cache all modules specified in the import map and used by main.ts.
-RUN deno cache --config ./deno.jsonc app/main.ts
+RUN deno cache --config ./deno.jsonc main.ts
 
 # Expose the port the app runs on.
 EXPOSE 8000
