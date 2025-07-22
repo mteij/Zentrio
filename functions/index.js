@@ -12,7 +12,7 @@ const STREMIO_API_URL = "https://api.stremio.com/";
 const API_PATHS = ["/login", "/login/v2", "/logout", "/register"];
 
 const proxyRequest = async (req, res) => {
-  console.log(`Proxy function invoked for path: ${req.path}, method: ${req.method}`);
+  console.log(`Proxying ${req.method} for path: ${req.path}`);
 
   if (!req.path) {
     console.warn("Received request with empty path.");
@@ -21,7 +21,7 @@ const proxyRequest = async (req, res) => {
 
   const stremioPath = req.path.substring("/stremio".length);
 
-  const isApiCall = API_PATHS.some((apiPath) => stremioPath.startsWith(apiPath));
+  const isApiCall = API_PATHS.some((path) => stremioPath.startsWith(path));
   const baseUrl = isApiCall ? STREMIO_API_URL : STREMIO_BASE_URL;
 
   const targetUrl = new URL(stremioPath || "/", baseUrl).href;
