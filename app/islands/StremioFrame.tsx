@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { h as _h } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { ProfileSchema } from "../utils/db.ts";
 // We will add the automation logic here later

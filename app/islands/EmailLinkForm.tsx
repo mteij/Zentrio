@@ -23,7 +23,7 @@ export default function EmailLinkForm() {
     isLoading.value = false;
     if (res.ok) {
       const data = await res.json();
-      window.location.href = data.redirectUrl;
+      globalThis.location.href = data.redirectUrl;
     } else {
       const text = await res.text();
       error.value = text || "Failed to send link.";

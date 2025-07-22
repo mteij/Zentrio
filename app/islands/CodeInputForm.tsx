@@ -58,7 +58,7 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
     });
 
     if (res.ok) {
-      window.location.href = "/profiles";
+      globalThis.location.href = "/profiles";
     } else {
       const text = await res.text();
       error.value = text || "Verification failed.";
