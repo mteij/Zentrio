@@ -13,8 +13,8 @@ USER deno
 COPY . .
 
 # Cache dependencies using the copied files.
-# This is less efficient for layer caching but more robust.
-RUN deno cache app/main.ts --config deno.jsonc
+# Deno will automatically find deno.jsonc in the working directory.
+RUN deno cache app/main.ts
 
 # Run the main.ts file for production.
 # Note: The --unstable-kv flag is included as per your project's setup.
