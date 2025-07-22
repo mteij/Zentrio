@@ -9,13 +9,13 @@ WORKDIR /app
 # Prefer not to run as root.
 USER deno
 
-# Copy all application files from the build context to the current directory (/app)
-COPY . .
+# Copy the contents of the local 'app' directory into the container's working directory '/app'
+COPY ./app .
 
 # Cache dependencies using the copied files.
 # The --config flag is crucial for Deno to find the import_map.
-RUN deno cache --config ./deno.jsonc app/main.ts
+RUN deno cache --config ./deno.jsonc main.ts
 
 # Run the main.ts file for production.
 # Note: The --unstable-kv flag is included as per your project's setup.
-CMD ["run", "--allow-read", "--allow-env", "--allow-net", "--allow-sys", "--allow-write", "--allow-run", "--unstable-kv", "app/main.ts"]
+CMD ["run", "--allow-read", "--allow-env", "--allow-net", "--allow-sys", "--allow-write", "--allow-run", "--unstable-kv", "main.ts"]
