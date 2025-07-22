@@ -16,7 +16,7 @@ export async function handler(
   if (sessionId) {
     const session = await getSession(sessionId);
     if (session && new Date() < session.expiresAt) {
-      ctx.state.userId = session.userId.toHexString();
+      ctx.state.userId = session.userId.toString();
     }
   }
 

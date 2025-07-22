@@ -1,5 +1,5 @@
 import { Handlers } from "$fresh/server.ts";
-import { ObjectId } from "mongodb";
+import { Types } from "mongoose";
 import { AppState } from "../../_middleware.ts";
 import { createProfile, ProfileSchema } from "../../../utils/db.ts";
 
@@ -15,8 +15,8 @@ export const handler: Handlers<ProfileSchema | null, AppState> = {
       return new Response("Missing required fields", { status: 400 });
     }
 
-    const profileData: Omit<ProfileSchema, "_id"> = {
-      userId: new ObjectId(userId),
+    const profileData = {
+      userId: new Types.ObjectId(userId),
       name,
       email,
       password, // In a real app, this should be encrypted
@@ -27,6 +27,7 @@ export const handler: Handlers<ProfileSchema | null, AppState> = {
 
     const newProfile = await createProfile(profileData);
     return new Response(JSON.stringify(newProfile), {
+      status: 201,
       headers: { "Content-Type": "application/json" },
     });
   },

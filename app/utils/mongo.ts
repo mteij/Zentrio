@@ -1,32 +1,23 @@
-import { MongoClient } from "mongodb";
+import mongoose from "mongoose";
 
-const MONGO_USER = Deno.env.get("MONGO_USER");
-const MONGO_PASSWORD = Deno.env.get("MONGO_PASSWORD");
-const MONGO_CLUSTER_URL = Deno.env.get("MONGO_CLUSTER_URL");
-const MONGO_DB_NAME = Deno.env.get("MONGO_DB_NAME");
+console.log("--- Executing mongo.ts ---");
 
-if (!MONGO_USER || !MONGO_PASSWORD || !MONGO_CLUSTER_URL || !MONGO_DB_NAME) {
-  throw new Error(
-    "One or more MongoDB environment variables are not defined. " +
-      "Please check MONGO_USER, MONGO_PASSWORD, MONGO_CLUSTER_URL, and MONGO_DB_NAME.",
-  );
+const MONGO_URI = Deno.env.get("MONGO_URI");
+
+if (!MONGO_URI) {
+  console.error("MONGO_URI environment variable is not defined.");
+  throw new Error("MONGO_URI environment variable is not defined.");
+} else {
+  console.log("MONGO_URI found.");
 }
 
-// Build the connection string programmatically to handle special characters
-const MONGO_URI = `mongodb+srv://${encodeURIComponent(MONGO_USER)}:${
-  encodeURIComponent(MONGO_PASSWORD)
-}@${MONGO_CLUSTER_URL}/?authSource=${MONGO_DB_NAME}&retryWrites=true&w=majority`;
-
-const client = new MongoClient();
 try {
-  await client.connect(MONGO_URI);
+  await mongoose.connect(MONGO_URI);
+  console.log("Mongoose connected successfully.");
 } catch (e) {
   console.error(
-    "Failed to connect to MongoDB. Please double-check your credentials and IP Whitelist settings in MongoDB Atlas.",
+    "Failed to connect to MongoDB using Mongoose. Please double-check your connection string (MONGO_URI) and IP Whitelist settings in MongoDB Atlas.",
   );
+  console.error("Mongoose connection error:", e);
   throw e;
 }
-
-console.log("MongoDB connected successfully.");
-
-export const db = client.database(MONGO_DB_NAME);

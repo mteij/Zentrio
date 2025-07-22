@@ -23,7 +23,7 @@ export const handler: Handlers = {
     // Token is valid, create a session
     const sessionExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
     const sessionId = await createSession(
-      verificationToken.userId.toHexString(),
+      verificationToken.userId.toString(),
       sessionExpires,
     );
 

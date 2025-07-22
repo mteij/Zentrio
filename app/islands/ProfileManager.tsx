@@ -1,7 +1,7 @@
-import { h } from "preact";
+import { h as _h } from "preact";
 import { useSignal } from "@preact/signals";
 import { ProfileSchema } from "../utils/db.ts";
-import { ObjectId } from "mongodb";
+import { ObjectId } from "mongoose";
 
 interface ProfileManagerProps {
   initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[];
@@ -12,8 +12,8 @@ const toPlainObject = (
   p: ProfileSchema & { _id: ObjectId; userId: ObjectId },
 ) => ({
   ...p,
-  _id: p._id.toHexString(),
-  userId: p.userId.toHexString(),
+  _id: p._id.toString(),
+  userId: p.userId.toString(),
 });
 
 type PlainProfile = ReturnType<typeof toPlainObject>;

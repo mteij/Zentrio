@@ -1,6 +1,6 @@
 import { Handlers, PageProps } from "$fresh/server.ts";
 import { AppState } from "./_middleware.ts";
-import { getProfilesByUser, ProfileSchema } from "../utils/db.ts";
+import { getProfilesByUser, ProfileSchema, ObjectId } from "../utils/db.ts";
 import ProfileManager from "../islands/ProfileManager.tsx";
 
 interface ProfilePageData {
@@ -38,4 +38,3 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
     </div>
   );
 }
-

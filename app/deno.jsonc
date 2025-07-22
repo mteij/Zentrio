@@ -2,14 +2,14 @@
   "tasks": {
     "clean": "deno eval \"await Deno.remove('fresh.gen.ts').catch(() => {})\"",
     "cache": "deno cache --reload dev.ts",
-    "start": "deno run -A --unstable-kv --watch=static/,routes/ dev.ts",
+    "start": "deno run --allow-read --allow-env --allow-net --allow-sys --allow-write --allow-run --unstable-kv --watch=static/,routes/ dev.ts",
     "update": "deno run -A -r https://fresh.deno.dev/update .",
-    "build": "deno run -A dev.ts build",
-    "preview": "deno run -A --unstable-kv main.ts"
+    "build": "deno run --allow-read --allow-env --allow-net --allow-sys --allow-write --allow-run --unstable-kv dev.ts build",
+    "preview": "deno run --allow-read --allow-env --allow-net --allow-sys --allow-write --allow-run --unstable-kv main.ts"
   },
   "imports": {
     "$fresh/": "https://deno.land/x/fresh@1.6.8/",
-    "mongodb": "https://deno.land/x/mongo@v0.33.0/mod.ts",
+    "mongoose": "npm:mongoose@8.4.1",
     "preact": "https://esm.sh/preact@10.19.6",
     "preact/": "https://esm.sh/preact@10.19.6/",
     "@preact/signals": "https://esm.sh/*@preact/signals@1.2.2",

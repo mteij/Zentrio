@@ -4,6 +4,8 @@ import {
   createVerificationToken,
   findOrCreateUserByEmail,
 } from "../../../utils/db.ts";
+import { EmailTemplate } from "../../../components/EmailTemplate.tsx";
+import { render } from "https://esm.sh/preact-render-to-string@6.2.1";
 
 export const handler: Handlers = {
   async POST(req) {
@@ -21,8 +23,11 @@ export const handler: Handlers = {
     try {
       const user = await findOrCreateUserByEmail(email);
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-      const token = await createVerificationToken(
-        user._id.toHexString(),
+      if (!user._id || (typeof user._id !== "string" && typeof user._id !== "number")) {
+        throw new Error("User _id is missing or of invalid type.");
+      }
+      const { token, code } = await createVerificationToken(
+        user._id.toString(),
         expiresAt,
       );
 
@@ -33,11 +38,17 @@ export const handler: Handlers = {
       await resend.emails.send({
         from: "onboarding@resend.dev", // Must be a verified domain in Resend
         to: email,
-        subject: "Your StremioHub Sign-In Link",
-        html: `Click here to sign in: <a href="${verificationUrl}">${verificationUrl}</a>`,
+        subject: "Your StremioHub Sign-In Code",
+        html: render(
+          EmailTemplate({ code, verificationUrl }),
+        ),
       });
 
-      return new Response("Sign-in link sent.", { status: 200 });
+      const redirectUrl = `/auth/code?email=${encodeURIComponent(email)}`;
+      return new Response(JSON.stringify({ redirectUrl }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     } catch (error) {
       console.error("Failed to send email:", error);
       return new Response("Failed to send sign-in link.", { status: 500 });
