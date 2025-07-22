@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { h as _h } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { ProfileSchema } from "../utils/db.ts";
@@ -34,7 +34,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
             if (errorData && errorData.error) {
               errorMessage = errorData.error;
             }
-          } catch (e) {
+          } catch (_e) {
             // Ignore if JSON parsing fails
           }
           throw new Error(errorMessage);

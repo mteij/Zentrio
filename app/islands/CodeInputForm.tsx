@@ -63,7 +63,7 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
       document.cookie = `sessionId=${sessionId}; expires=${
         new Date(expiresAt).toUTCString()
       }; path=/; SameSite=Lax;`;
-      window.location.href = "/profiles";
+      globalThis.location.href = "/profiles";
     } else {
       const text = await res.text();
       error.value = text || "Verification failed.";
