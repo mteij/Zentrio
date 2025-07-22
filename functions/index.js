@@ -45,9 +45,18 @@ app.get("/*", async (req, res) => {
     // Set CORS headers to allow everything
     res.set("Access-Control-Allow-Origin", "*");
 
-    // Forward the content type from the original response
+    // Forward relevant headers from the original response
     if (contentType) {
       res.set("Content-Type", contentType);
+    }
+    if (response.headers["cache-control"]) {
+      res.set("Cache-Control", response.headers["cache-control"]);
+    }
+    if (response.headers["etag"]) {
+      res.set("ETag", response.headers["etag"]);
+    }
+    if (response.headers["last-modified"]) {
+      res.set("Last-Modified", response.headers["last-modified"]);
     }
 
     res.send(response.data);
