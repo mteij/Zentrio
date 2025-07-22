@@ -132,7 +132,7 @@ This is the easiest method for running the application locally.
 
     services:
       stremiohub:
-        image: ghcr.io/MichielEijpe/StremioHub:main
+        image: ghcr.io/MichielEijpe/StremioHub:latest
         container_name: stremiohub
         restart: unless-stopped
         ports:
@@ -154,7 +154,7 @@ If you prefer not to use `docker-compose`, you can run the image manually.
 
 1.  Pull the latest image:
     ```sh
-    docker pull ghcr.io/MichielEijpe/StremioHub:main
+    docker pull ghcr.io/michieleijpe/stremiohub:latest
     ```
 
 2.  Run the container:
@@ -163,7 +163,7 @@ If you prefer not to use `docker-compose`, you can run the image manually.
       -p 8000:8000 \
       --env-file .env \
       --name stremiohub \
-      ghcr.io/MichielEijpe/StremioHub:main
+      ghcr.io/michieleijpe/stremiohub:latest
     ```
 
 The application will be available at `http://localhost:8000`.
