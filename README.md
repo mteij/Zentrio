@@ -16,7 +16,7 @@
 
 A secure, modern, Netflix-inspired user selection overlay for the Stremio Web UI, rebuilt from the ground up with Deno and the Fresh web framework.
 
-This project is a complete migration from Node.js/Firebase to a pure Deno stack, using Deno KV for storage and a custom session-based authentication system.
+This project uses MongoDB for data storage and a custom session-based authentication system.
 
 ---
 
@@ -24,7 +24,7 @@ This project is a complete migration from Node.js/Firebase to a pure Deno stack,
 
 *   **🎬 Netflix-Inspired UI:** A familiar and intuitive profile selection screen.
 *   **🔒 Secure Authentication:** Custom-built, secure email magic-link authentication.
-*   **👤 Multi-Profile Support:** Manage multiple Stremio profiles, stored securely in Deno KV.
+*   **👤 Multi-Profile Support:** Manage multiple Stremio profiles, stored securely in MongoDB.
 *   **⚡️ Blazing Fast:** Built with Fresh, featuring server-side rendering and an islands architecture for optimal performance.
 *   **🦕 Deno Native:** Runs on the Deno runtime, offering a secure and simple development experience with no `node_modules`.
 *   **☁️ Edge-Ready:** Designed to be deployed globally on platforms like Deno Deploy.
@@ -39,6 +39,7 @@ This project is a complete migration from Node.js/Firebase to a pure Deno stack,
   <a href="https://preactjs.com/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/preact/preact-original.svg" alt="preact" width="40" height="40"/></a>
   <a href="https://www.typescriptlang.org/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg" alt="typescript" width="40" height="40"/></a>
   <a href="https://tailwindcss.com/" target="_blank" rel="noreferrer"><img src="https://www.vectorlogo.zone/logos/tailwindcss/tailwindcss-icon.svg" alt="tailwind" width="40" height="40"/></a>
+  <a href="https://www.mongodb.com/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/mongodb/mongodb-original-wordmark.svg" alt="mongodb" width="40" height="40"/></a>
 </p>
 
 ---
@@ -58,18 +59,23 @@ This project is a complete migration from Node.js/Firebase to a pure Deno stack,
     ```
 
 2.  **Create your environment file:**
-    Copy the `.env.example` to a new file named `.env` and add your Resend API key.
+    Copy the `.env.example` to a new file named `.env` and add your Resend API key and MongoDB connection string. **Ensure your connection string includes your database name.**
 
-3.  **Navigate into the app directory:**
+3.  **Configure MongoDB Atlas IP Access:**
+    In your MongoDB Atlas dashboard, navigate to **Network Access** and add your current IP address or allow access from anywhere (`0.0.0.0/0`) for development.
+
+4.  **Navigate into the app directory:**
     ```sh
     cd app
     ```
 
-4.  **Start the development server:**
+5.  **Start the development server:**
     ```sh
     deno task start
     ```
     This will start the server on `http://localhost:8000`. The app will automatically reload when you make changes.
+
+> **Troubleshooting:** If you encounter module errors after changing dependencies, run `deno task clean` before starting the server to ensure a clean build.
 
 ---
 
@@ -80,7 +86,8 @@ This project is optimized for deployment on [Deno Deploy](https://deno.com/deplo
 1.  Push your project to a GitHub repository.
 2.  Sign up for Deno Deploy and connect your GitHub account.
 3.  Create a new project, select your repository, and set the **Root** to `app`.
-4.  Deno Deploy will automatically detect the `main.ts` file and deploy your application. You will also need to enable the Deno KV beta for your Deno Deploy project.
+4.  Set your `MONGO_URI` and `RESEND_API_KEY` as environment variables in the Deno Deploy project settings.
+5.  Deno Deploy will automatically detect the `main.ts` file and deploy your application.
 
 ---
 

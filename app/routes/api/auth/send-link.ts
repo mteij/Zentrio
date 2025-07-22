@@ -1,5 +1,5 @@
 import { Handlers } from "$fresh/server.ts";
-import { Resend } from "resend";
+import { Resend } from "https://esm.sh/resend@3.2.0";
 import {
   createVerificationToken,
   findOrCreateUserByEmail,
@@ -20,10 +20,11 @@ export const handler: Handlers = {
 
     try {
       const user = await findOrCreateUserByEmail(email);
-      const token = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-      await createVerificationToken({ id: token, userId: user.id, expiresAt });
+      const token = await createVerificationToken(
+        user._id.toHexString(),
+        expiresAt,
+      );
 
       const url = new URL(req.url);
       const verificationUrl = `${url.origin}/auth/verify?token=${token}`;

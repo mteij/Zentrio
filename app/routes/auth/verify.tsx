@@ -21,14 +21,11 @@ export const handler: Handlers = {
     }
 
     // Token is valid, create a session
-    const sessionId = crypto.randomUUID();
     const sessionExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-
-    await createSession({
-      id: sessionId,
-      userId: verificationToken.userId,
-      expiresAt: sessionExpires,
-    });
+    const sessionId = await createSession(
+      verificationToken.userId.toHexString(),
+      sessionExpires,
+    );
 
     await deleteVerificationToken(token);
 

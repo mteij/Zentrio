@@ -1,6 +1,7 @@
 {
   "tasks": {
-    "cache": "deno cache dev.ts",
+    "clean": "deno eval \"await Deno.remove('fresh.gen.ts').catch(() => {})\"",
+    "cache": "deno cache --reload dev.ts",
     "start": "deno run -A --unstable-kv --watch=static/,routes/ dev.ts",
     "update": "deno run -A -r https://fresh.deno.dev/update .",
     "build": "deno run -A dev.ts build",
@@ -8,11 +9,11 @@
   },
   "imports": {
     "$fresh/": "https://deno.land/x/fresh@1.6.8/",
+    "mongodb": "https://deno.land/x/mongo@v0.33.0/mod.ts",
     "preact": "https://esm.sh/preact@10.19.6",
     "preact/": "https://esm.sh/preact@10.19.6/",
     "@preact/signals": "https://esm.sh/*@preact/signals@1.2.2",
     "@preact/signals-core": "https://esm.sh/*@preact/signals-core@1.5.1",
-    "resend": "https://esm.sh/resend@1.0.0?target=deno",
     "twind": "https://esm.sh/twind@0.16.19",
     "twind/": "https://esm.sh/twind@0.16.19/",
     "$std/": "https://deno.land/std@0.224.0/"
