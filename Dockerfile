@@ -1,5 +1,6 @@
 # Use the official Deno image for a secure and minimal base
-FROM denoland/deno:1.44.4
+# Updated to the user-specified version
+FROM denoland/deno:2.4.2
 
 # The port that your application listens to.
 EXPOSE 8000
