@@ -7,6 +7,13 @@ interface StremioFrameProps {
   profile: ProfileSchema;
 }
 
+// Generates a 20-character hex string, matching Stremio's installation_id format.
+const generateInstallationId = () => {
+  const randomBytes = crypto.getRandomValues(new Uint8Array(10));
+  return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
 export default function StremioFrame({ profile }: StremioFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const isLoading = useSignal(true);
@@ -41,17 +48,68 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
         }
 
         const loginData = await loginRes.json();
-        const authKey = loginData?.result?.authKey;
+        const result = loginData?.result;
 
-        if (!authKey) {
-          throw new Error("Login successful, but no authKey was returned.");
+        if (!result || !result.authKey || !result.user?._id) {
+          throw new Error("Login successful, but key data is missing.");
         }
 
-        // Set the cookie that Stremio's web app expects.
-        // The path MUST be `/stremio/` as you discovered.
-        document.cookie = `authKey=${authKey}; path=/stremio/`;
+        // Construct a comprehensive session object with all required keys and structures.
+        const sessionObject = {
+          profile: {
+            auth: {
+              key: result.authKey,
+              user: result.user,
+            },
+            addons: result.addons || [],
+            addonsLocked: false,
+            settings: result.settings || {
+              interfaceLanguage: "eng",
+              hideSpoilers: false,
+              streamingServerUrl: "http://127.0.0.1:11470/",
+              playerType: null,
+              bingeWatching: true,
+              playInBackground: true,
+              hardwareDecoding: true,
+              frameRateMatchingStrategy: "FrameRateOnly",
+              nextVideoNotificationDuration: 35000,
+              audioPassthrough: false,
+              audioLanguage: "eng",
+              secondaryAudioLanguage: null,
+              subtitlesLanguage: "eng",
+              secondarySubtitlesLanguage: null,
+              subtitlesSize: 100,
+              subtitlesFont: "Roboto",
+              subtitlesBold: false,
+              subtitlesOffset: 5,
+              subtitlesTextColor: "#FFFFFFFF",
+              subtitlesBackgroundColor: "#00000000",
+              subtitlesOutlineColor: "#000000",
+              subtitlesOpacity: 100,
+              escExitFullscreen: true,
+              seekTimeDuration: 10000,
+              seekShortTimeDuration: 3000,
+              pauseOnMinimize: false,
+              quitOnClose: true,
+              surroundSound: false,
+              streamingServerWarningDismissed: null,
+              serverInForeground: false,
+              sendCrashReports: true,
+            },
+          },
+          installation_id: result.installation_id || generateInstallationId(),
+          schema_version: result.schema_version || 18,
+          library: result.library || { uid: result.user._id, items: {} },
+          library_recent: result.library_recent || { uid: result.user._id, items: {} },
+          notifications: result.notifications || { uid: result.user._id, items: {}, lastUpdated: null, created: new Date().toISOString() },
+          search_history: result.search_history || { uid: result.user._id, items: {} },
+          streaming_server_urls: result.streaming_server_urls || { uid: result.user._id, items: { "http://127.0.0.1:11470/": new Date().toISOString() } },
+          streams: result.streams || { uid: result.user._id, items: [] },
+        };
 
-        // The cookie is now set. We can load the iframe.
+        // The cookie is set via HTTP headers from the proxy.
+        // Now, load the iframe, passing the entire stringified session object
+        // for the proxy to inject into localStorage.
         statusMessage.value = "Loading Stremio...";
         const iframe = iframeRef.current;
         if (iframe) {
@@ -59,7 +117,9 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
             isLoading.value = false;
             statusMessage.value = "Loaded!";
           };
-          iframe.src = "/stremio/";
+          // The proxy will intercept this URL, use the sessionData, and serve the final HTML.
+          const sessionData = encodeURIComponent(JSON.stringify(sessionObject));
+          iframe.src = `/stremio/?sessionData=${sessionData}`;
         }
       } catch (error) {
         console.error("Auto-login failed:", error);
