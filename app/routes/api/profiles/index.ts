@@ -20,7 +20,7 @@ export const handler: Handlers<ProfileSchema | null, AppState> = {
       name,
       email,
       password, // In a real app, this should be encrypted
-      profilePictureUrl: `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${
+      profilePictureUrl: `https://api.dicebear.com/9.x/initials/svg?seed=${
         encodeURIComponent(name)
       }`,
     };

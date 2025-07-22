@@ -37,7 +37,8 @@ const VerificationTokens = db.collection<VerificationTokenSchema>(
   "verification_tokens",
 );
 
-// Create TTL index for sessions and tokens to auto-expire
+// Create TTL index for sessions and tokens to auto-expire.
+// Using createIndexes is idempotent and safe to run on every start.
 await Sessions.createIndexes({ indexes: [{ key: { expiresAt: 1 }, name: "expiresAt_1", expireAfterSeconds: 0 }] });
 await VerificationTokens.createIndexes({ indexes: [{ key: { expiresAt: 1 }, name: "expiresAt_1", expireAfterSeconds: 0 }] });
 

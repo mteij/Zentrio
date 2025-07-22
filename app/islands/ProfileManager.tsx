@@ -171,6 +171,7 @@ export default function ProfileManager(
               {profile.name}
             </p>
             <button
+              type="button"
               onClick={() => editingProfile.value = profile}
               class="edit-profile-btn absolute top-2 right-2 bg-gray-600 hover:bg-gray-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
               title={`Edit ${profile.name}`}
@@ -188,6 +189,7 @@ export default function ProfileManager(
         ))}
       </div>
       <button
+        type="button"
         onClick={() => showAddModal.value = true}
         class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg text-lg"
       >

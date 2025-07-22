@@ -59,7 +59,7 @@ This project uses MongoDB for data storage and a custom session-based authentica
     ```
 
 2.  **Create your environment file:**
-    Copy the `.env.example` to a new file named `.env` and add your Resend API key and MongoDB connection string. **Ensure your connection string includes your database name.**
+    Copy the `.env.example` to a new file named `.env` and fill in your credentials for Resend and MongoDB.
 
 3.  **Configure MongoDB Atlas IP Access:**
     In your MongoDB Atlas dashboard, navigate to **Network Access** and add your current IP address or allow access from anywhere (`0.0.0.0/0`) for development.

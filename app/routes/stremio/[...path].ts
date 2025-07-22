@@ -13,14 +13,19 @@ const proxyRequestHandler = async (req: Request, path: string) => {
   const body = req.method === "POST" ? await req.blob() : null;
 
   try {
+    const requestHeaders = new Headers({
+      "User-Agent": "StremioHub-Deno-Proxy/1.0",
+      "Accept": req.headers.get("Accept") || "*/*",
+      "Content-Type": req.headers.get("Content-Type") || "application/json",
+    });
+
+    if (req.headers.has("Authorization")) {
+      requestHeaders.set("Authorization", req.headers.get("Authorization")!);
+    }
+
     const response = await fetch(targetUrl.href, {
       method: req.method,
-      headers: {
-        "User-Agent": "StremioHub-Deno-Proxy/1.0",
-        "Accept": req.headers.get("Accept") || "*/*",
-        "Content-Type": req.headers.get("Content-Type") || "application/json",
-        "Authorization": req.headers.get("Authorization") || "",
-      },
+      headers: requestHeaders,
       body: body,
     });
 
