@@ -1,0 +1,6 @@
+# Environment variables
+.env
+
+# Fresh generated files
+app/fresh.gen.ts
+_fresh_state.json
