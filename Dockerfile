@@ -8,7 +8,7 @@ WORKDIR /app
 COPY app/ .
 
 # Define empty environment variables.
-ENV MONGO_URI="verycooluri" \
+ENV MONGO_URI="mongodb://verycooluri" \
     RESEND_API_KEY="verycoolapikey"
 
 # Generate fresh.gen.ts. This requires --allow-read, --allow-write for file generation.
