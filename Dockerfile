@@ -1,22 +1,25 @@
-# Use the official Deno image for a secure and minimal base
-# Updated to the user-specified version
+# Use an official Deno image.
 FROM denoland/deno:2.4.2
 
-# The port that your application listens to.
-EXPOSE 8000
-
+# Set the working directory inside the container.
 WORKDIR /app
 
-# Prefer not to run as root.
-USER deno
+# Copy the dependency configuration and all application source code.
+# The source code is needed to generate the fresh manifest.
+COPY app/ .
 
-# Copy all project files from the build context to the current directory (/app)
-COPY . .
+# Generate fresh.gen.ts. This requires --allow-read, --allow-write for file generation,
+# and --allow-env for loading .env in dev.ts.
+RUN deno run --allow-read --allow-write --allow-env --allow-net app/dev.ts build
 
 # Cache all dependencies for the application.
-# The --config flag is crucial for Deno to find the import_map.
+# This will download and cache all modules specified in the import map and used by main.ts.
 RUN deno cache --config ./deno.jsonc app/main.ts
 
-# Run the main.ts file for production.
-# Note: The --unstable-kv flag is included as per your project's setup.
+# Expose the port the app runs on.
+EXPOSE 8000
+
+# Define the command to run the application.
+# This command will be executed when the container starts.
+# It includes all necessary permissions for the application to run.
 CMD ["run", "--allow-read", "--allow-env", "--allow-net", "--allow-sys", "--allow-write", "--allow-run", "--unstable-kv", "app/main.ts"]
