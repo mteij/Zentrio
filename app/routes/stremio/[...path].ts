@@ -10,19 +10,15 @@ const proxyRequestHandler = async (req: Request, path: string) => {
   const baseUrl = isApiCall ? STREMIO_API_URL : STREMIO_WEB_URL;
   const targetUrl = new URL(stremioPath, baseUrl);
 
-  const body = req.method === "POST" || req.method === "PUT" ? await req.blob() : null;
+  // A HEAD request cannot have a body.
+  const body = req.method === "HEAD" ? null : (req.method === "POST" || req.method === "PUT" ? await req.blob() : null);
 
   try {
+    // --- Unrestrictive Header Forwarding ---
+    // Clone all headers from the original request.
     const requestHeaders = new Headers(req.headers);
-    // Make the proxy more transparent by cleaning up headers
+    // The only header we MUST change is Host to match the target.
     requestHeaders.set("Host", new URL(baseUrl).host);
-    requestHeaders.set("Origin", baseUrl);
-    requestHeaders.set("Referer", baseUrl);
-    // Remove headers that might reveal the proxy or cause issues
-    requestHeaders.delete("if-none-match");
-    requestHeaders.delete("if-modified-since");
-
-    console.log(`[PROXY] -> ${req.method} ${targetUrl.href}`);
 
     const response = await fetch(targetUrl.href, {
       method: req.method,
@@ -30,8 +26,6 @@ const proxyRequestHandler = async (req: Request, path: string) => {
       body: body,
       redirect: "manual", // Handle redirects manually
     });
-
-    console.log(`[PROXY] <- ${response.status} ${response.statusText} from ${targetUrl.href}`);
 
     // Handle redirects by rewriting the Location header
     if (response.status >= 300 && response.status < 400 && response.headers.has("location")) {
@@ -42,11 +36,16 @@ const proxyRequestHandler = async (req: Request, path: string) => {
       return new Response(null, { status: response.status, headers });
     }
 
+    // --- Unrestrictive CORS Headers ---
+    // Clone all headers from the original response.
     const responseHeaders = new Headers(response.headers);
+    // Set the most permissive CORS headers possible.
     responseHeaders.set("Access-Control-Allow-Origin", "*");
-    // Dynamically allow requested headers, and always allow Range for video streaming
-    const requestHeadersHeader = req.headers.get("Access-Control-Request-Headers") || "";
-    responseHeaders.set("Access-Control-Allow-Headers", `${requestHeadersHeader}, Range`);
+    responseHeaders.set("Access-Control-Allow-Credentials", "true");
+    const requestHeadersHeader = req.headers.get("Access-Control-Request-Headers");
+    if (requestHeadersHeader) {
+      responseHeaders.set("Access-Control-Allow-Headers", requestHeadersHeader);
+    }
 
     // Rewrite Set-Cookie headers to remove the Domain attribute
     const setCookieHeader = response.headers.get("set-cookie");
@@ -64,6 +63,15 @@ const proxyRequestHandler = async (req: Request, path: string) => {
 
         responseHeaders.append("set-cookie", rewrittenCookie);
       }
+    }
+
+    // Do not attempt to read the body for HEAD requests.
+    if (req.method === "HEAD") {
+      return new Response(null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      });
     }
 
     // If the response is HTML, inject a <base> tag to fix relative paths
@@ -104,14 +112,23 @@ export const handler: Handlers = {
   async PUT(req, ctx) {
     return await proxyRequestHandler(req, ctx.params.path as string);
   },
+  async DELETE(req, ctx) {
+    return await proxyRequestHandler(req, ctx.params.path as string);
+  },
+  async HEAD(req, ctx) {
+    return await proxyRequestHandler(req, ctx.params.path as string);
+  },
   OPTIONS(req, _ctx) {
     const headers = new Headers({
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, HEAD, OPTIONS",
+      "Access-Control-Allow-Credentials": "true",
     });
-    // Allow whatever headers the client is asking for, and always include Range.
-    const requestedHeaders = req.headers.get("Access-Control-Request-Headers") || "";
-    headers.set("Access-Control-Allow-Headers", `${requestedHeaders}, Range`);
+    // Allow whatever headers the client is asking for.
+    const requestedHeaders = req.headers.get("Access-Control-Request-Headers");
+    if (requestedHeaders) {
+      headers.set("Access-Control-Allow-Headers", requestedHeaders);
+    }
     
     return new Response(null, {
       status: 204,

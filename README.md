@@ -100,3 +100,69 @@ Contributions, issues, and feature requests are welcome!
 ## 📜 License
 
 This project is licensed under the **MIT License**.
+
+---
+
+# StremioHub
+
+A multi-profile manager for Stremio.
+
+## Running with Docker
+
+You can run this application using Docker. First, build the image yourself or use a pre-built image from the GitHub Container Registry.
+
+### Prerequisites
+
+- Docker and Docker Compose installed.
+- A `.env` file with your credentials, or the environment variables ready.
+
+Create a `.env` file in the same directory where you will run the `docker-compose` command:
+
+```env
+# .env
+MONGO_URI="your_mongodb_connection_string"
+RESEND_API_KEY="your_resend_api_key"
+```
+
+### Using `docker run`
+
+```sh
+# Replace YOUR_GITHUB_USERNAME with your actual GitHub username
+docker run -d \
+  -p 8000:8000 \
+  -e MONGO_URI="your_mongodb_connection_string" \
+  -e RESEND_API_KEY="your_resend_api_key" \
+  --name stremiohub \
+  ghcr.io/YOUR_GITHUB_USERNAME/StremioHub:latest
+```
+
+### Using `docker-compose` (Recommended)
+
+This is the recommended method for running the application locally.
+
+1.  Create a `docker-compose.yml` file with the following content:
+
+    ```yaml
+    # docker-compose.yml
+    version: '3.8'
+
+    services:
+      stremiohub:
+        # Replace YOUR_GITHUB_USERNAME with your actual GitHub username
+        image: ghcr.io/YOUR_GITHUB_USERNAME/StremioHub:latest
+        container_name: stremiohub
+        restart: unless-stopped
+        ports:
+          - "8000:8000"
+        env_file:
+          - .env
+    ```
+
+2.  Make sure you have a `.env` file in the same directory (see above).
+
+3.  Run the application:
+    ```sh
+    docker-compose up -d
+    ```
+
+The application will be available at `http://localhost:8000`.
