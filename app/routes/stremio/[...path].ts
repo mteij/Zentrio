@@ -25,18 +25,12 @@ const proxyRequestHandler = async (req: Request, path: string) => {
     requestHeaders.delete("if-modified-since");
     requestHeaders.delete("if-none-match");
 
-    console.log(`[PROXY] Requesting ${req.method} ${targetUrl.href}`);
-    // console.log("[PROXY] Forwarding request headers:", Object.fromEntries(requestHeaders.entries()));
-
     const response = await fetch(targetUrl.href, {
       method: req.method,
       headers: requestHeaders,
       body: body,
       redirect: "manual", // Handle redirects manually
     });
-
-    console.log(`[PROXY] Received ${response.status} from ${targetUrl.href}`);
-    // console.log("[PROXY] Received response headers:", Object.fromEntries(response.headers.entries()));
 
     // Handle redirects by rewriting the Location header
     if (response.status >= 300 && response.status < 400 && response.headers.has("location")) {
