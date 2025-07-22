@@ -1,5 +1,8 @@
-name: Deploy to Firebase on PR
-'on': pull_request
+name: Deploy to Firebase on PR (v1)
+'on':
+  pull_request:
+    paths:
+      - 'v1/**'
 permissions:
   checks: write
   contents: read
@@ -8,6 +11,9 @@ jobs:
   build_and_preview:
     if: '${{ github.event.pull_request.head.repo.full_name == github.repository }}'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./v1
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js

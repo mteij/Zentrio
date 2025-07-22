@@ -1,13 +1,18 @@
-name: Deploy to Firebase on merge
+name: Deploy to Firebase on merge (v1)
 'on':
   push:
     branches:
       - main
+    paths:
+      - 'v1/**'
 permissions:
   contents: read
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./v1
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js

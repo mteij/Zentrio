@@ -1,4 +1,6 @@
-# StremioHub - Profile Selector Overlay
+# StremioHub - Profile Selector Overlay (v1 - Firebase)
+
+This is the original Firebase version of StremioHub.
 
 ![Stremio Overlay Banner](https://placehold.co/1200x440/141414/e50914?text=StremioHub)
 
