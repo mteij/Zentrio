@@ -13,11 +13,9 @@ USER deno
 COPY . .
 
 # Cache dependencies using the copied files.
-# Deno will automatically find deno.jsonc in the working directory.
-RUN deno cache app/main.ts
+# The --config flag is crucial for Deno to find the import_map.
+RUN deno cache --config ./deno.jsonc app/main.ts
 
 # Run the main.ts file for production.
-# Note: The --unstable-kv flag is included as per your project's setup.
-CMD ["run", "--allow-read", "--allow-env", "--allow-net", "--allow-sys", "--allow-write", "--allow-run", "--unstable-kv", "app/main.ts"]
 # Note: The --unstable-kv flag is included as per your project's setup.
 CMD ["run", "--allow-read", "--allow-env", "--allow-net", "--allow-sys", "--allow-write", "--allow-run", "--unstable-kv", "app/main.ts"]
