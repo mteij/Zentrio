@@ -22,6 +22,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: List files for debugging
+        run: |
+          echo "Workspace contents:"
+          ls -R
+
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:

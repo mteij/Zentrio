@@ -9,15 +9,15 @@ WORKDIR /app
 # Prefer not to run as root.
 USER deno
 
-# Cache dependencies before copying the rest of the source code.
-# This leverages Docker's layer caching to speed up subsequent builds.
-COPY deno.jsonc .
-COPY app/fresh.gen.ts ./app/
-RUN deno cache app/main.ts --config deno.jsonc
-
-# Copy the rest of the application code.
+# Copy all application files from the build context to the current directory (/app)
 COPY . .
 
+# Cache dependencies using the copied files.
+# This is less efficient for layer caching but more robust.
+RUN deno cache app/main.ts --config deno.jsonc
+
 # Run the main.ts file for production.
+# Note: The --unstable-kv flag is included as per your project's setup.
+CMD ["run", "--allow-read", "--allow-env", "--allow-net", "--allow-sys", "--allow-write", "--allow-run", "--unstable-kv", "app/main.ts"]
 # Note: The --unstable-kv flag is included as per your project's setup.
 CMD ["run", "--allow-read", "--allow-env", "--allow-net", "--allow-sys", "--allow-write", "--allow-run", "--unstable-kv", "app/main.ts"]
