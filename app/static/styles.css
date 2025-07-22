@@ -1,0 +1,40 @@
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #141414;
+}
+
+.profile-avatar {
+  background-color: #333;
+  border: 3px solid transparent;
+  transition: border-color 0.3s ease;
+  width: 150px;
+  height: 150px;
+  background-position: center;
+  background-size: cover;
+}
+
+.profile-avatar:hover {
+  border-color: #e50914;
+}
+
+.mouse-trail-particle {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  background-color: rgba(229, 9, 20, 0.5);
+  animation: fadeOut 1s forwards;
+  z-index: 9999;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0);
+  }
+}

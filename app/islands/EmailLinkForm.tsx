@@ -1,52 +1,87 @@
-import { h as _h } from "preact";
+import { h } from "preact";
 import { useSignal } from "@preact/signals";
 
-export default function EmailLinkForm() {
+interface EmailLinkFormProps {
+  // No props needed anymore as it's self-contained
+}
+
+export default function EmailLinkForm({}: EmailLinkFormProps) {
+  const email = useSignal("");
   const error = useSignal<string | null>(null);
   const isLoading = useSignal(false);
 
-  const onSubmit = async (e: Event) => {
+  const handleFormSubmit = async (e: h.JSX.TargetedEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // Client-side validation
+    if (!email.value.trim() || !/^\S+@\S+\.\S+$/.test(email.value)) {
+      error.value = "Please enter a valid email address.";
+      return;
+    }
+
     isLoading.value = true;
     error.value = null;
 
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
-    const email = formData.get("email") as string;
-
-    const res = await fetch("/api/auth/send-link", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-      headers: { "Content-Type": "application/json" },
-    });
-
-    isLoading.value = false;
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/auth/login-or-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.value }),
+      });
       const data = await res.json();
-      globalThis.location.href = data.redirectUrl;
-    } else {
-      const text = await res.text();
-      error.value = text || "Failed to send link.";
+      if (!res.ok) {
+        throw new Error(data.error || "An unknown error occurred.");
+      }
+      if (data.redirectUrl) {
+        globalThis.location.href = data.redirectUrl;
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : String(e);
+    } finally {
+      isLoading.value = false;
     }
   };
 
   return (
-    <form onSubmit={onSubmit} class="space-y-4">
-      {error.value && <div class="text-red-500 bg-red-100 p-3 rounded">{error.value}</div>}
-      <input
-        type="email"
-        name="email"
-        placeholder="Enter your email"
-        required
-        class="w-full bg-gray-700 text-white p-3 rounded focus:outline-none focus:ring-2 focus:ring-red-600"
-      />
-      <button
-        type="submit"
-        disabled={isLoading.value}
-        class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded disabled:bg-gray-500"
-      >
-        {isLoading.value ? "Sending..." : "Continue with Email"}
-      </button>
-    </form>
+    <section role="form" class="animate-fadein">
+      <form onSubmit={handleFormSubmit} class="space-y-4" autoComplete="on">
+        <div>
+          <label htmlFor="email" class="block text-sm font-medium text-gray-300 transition-all duration-200">
+            Email Address
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autoComplete="username"
+            value={email.value}
+            onInput={(e) => (email.value = e.currentTarget.value)}
+            required
+            class="mt-1 block w-full px-3 py-2 bg-stremio-gray-800 border border-stremio-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-stremio-red focus:border-stremio-red sm:text-sm transition-all duration-200"
+            placeholder="you@example.com"
+            disabled={isLoading.value}
+          />
+        </div>
+        {error.value && <p class="text-sm text-red-500 transition-all duration-200">{error.value}</p>}
+        <button
+          type="submit"
+          disabled={isLoading.value}
+          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-stremio-red hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stremio-red disabled:opacity-50 transition-all duration-200"
+        >
+          {isLoading.value ? "Checking..." : "Continue"}
+        </button>
+      </form>
+      <style>
+        {`
+          @keyframes fadein {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          .animate-fadein {
+            animation: fadein 0.5s cubic-bezier(.4,2,.6,1);
+          }
+        `}
+      </style>
+    </section>
   );
 }

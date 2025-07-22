@@ -34,10 +34,6 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
-
-    if (newCode.every(c => c)) {
-      handleSubmit();
-    }
   };
 
   const handleKeyDown = (e: KeyboardEvent, index: number) => {
@@ -46,10 +42,17 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: Event) => {
+    e.preventDefault();
     isLoading.value = true;
     error.value = null;
     const fullCode = code.value.join("");
+
+    if (fullCode.length !== 6) {
+      error.value = "Please enter the full 6-digit code.";
+      isLoading.value = false;
+      return;
+    }
 
     const res = await fetch("/api/auth/verify-code", {
       method: "POST",
@@ -58,15 +61,11 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
     });
 
     if (res.ok) {
-      const { sessionId, expiresAt } = await res.json();
-      // Set cookie client-side
-      document.cookie = `sessionId=${sessionId}; expires=${
-        new Date(expiresAt).toUTCString()
-      }; path=/; SameSite=Lax;`;
+      // The cookie is now set by the server. We just need to redirect.
       globalThis.location.href = "/profiles";
     } else {
-      const text = await res.text();
-      error.value = text || "Verification failed.";
+      const data = await res.json();
+      error.value = data.error || "Verification failed.";
       isLoading.value = false;
       code.value = new Array(6).fill("");
       inputRefs.current[0]?.focus();
@@ -74,7 +73,7 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
   };
 
   return (
-    <div>
+    <form onSubmit={handleSubmit} class="animate-fadein">
       <div class="flex justify-center gap-2 mb-6">
         {code.value.map((digit, index) => (
           <input
@@ -82,18 +81,40 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
             ref={(el) => inputRefs.current[index] = el}
             type="tel"
             maxLength={1}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="one-time-code"
             value={digit}
             onInput={(e) => handleInput(e, index)}
             onKeyDown={(e) => handleKeyDown(e, index)}
             disabled={isLoading.value}
-            class="w-12 h-14 text-center text-2xl font-bold bg-gray-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-red-600"
+            class="w-10 h-12 sm:w-12 sm:h-14 text-center text-2xl font-bold bg-gray-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200 focus:scale-110"
+            style="font-variant-numeric: tabular-nums;"
           />
         ))}
       </div>
-      {error.value && <div class="text-red-500 bg-red-100 p-3 rounded mb-4">{error.value}</div>}
-      <p class="text-sm text-gray-400">
+      {error.value && <div class="text-red-500 bg-red-100 p-3 rounded mb-4 transition-all duration-200">{error.value}</div>}
+      <button
+        type="submit"
+        disabled={isLoading.value || code.value.join("").length !== 6}
+        class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded disabled:bg-gray-500 disabled:cursor-not-allowed transition-all duration-200"
+      >
+        {isLoading.value ? "Verifying..." : "Verify"}
+      </button>
+      <p class="text-xs sm:text-sm text-gray-400 mt-4 transition-all duration-200">
         Can't find your code? Check your spam folder.
       </p>
-    </div>
+      <style>
+        {`
+          @keyframes fadein {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          .animate-fadein {
+            animation: fadein 0.5s cubic-bezier(.4,2,.6,1);
+          }
+        `}
+      </style>
+    </form>
   );
 }

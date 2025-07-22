@@ -1,28 +1,43 @@
-import { AppProps } from "$fresh/server.ts";
+import { PageProps } from "$fresh/server.ts";
+import Footer from "../components/Footer.tsx";
 
-export default function App({ Component }: AppProps) {
+export default function App({ Component, route }: PageProps) {
+  // Always show the footer on login/signup/reset/profile pages (not on /player, /stremio)
+  const showFooter =
+    !route.startsWith("/player") &&
+    !route.startsWith("/stremio");
+
   return (
     <html lang="en">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>StremioHub</title>
+        <link rel="stylesheet" href="/styles.css" />
+        <link rel="stylesheet" href="/css/background.css" />
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+      </head>
+      <body class="text-white min-h-screen flex flex-col bg-black">
+        <div id="app" class="flex flex-col min-h-screen">
+          <main class="flex-1 flex items-center justify-center animate-fadein">
+            <Component />
+          </main>
+          {showFooter && <Footer />}
+        </div>
         <style>
           {`
-            body { font-family: 'Inter', sans-serif; background-color: #141414; }
-            .profile-avatar { background-color: #333; border: 3px solid transparent; transition: border-color 0.3s ease; width: 150px; height: 150px; background-position: center; background-size: cover; }
-            .profile-avatar:hover { border-color: #e50914; }
+            @keyframes fadein {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            .animate-fadein {
+              animation: fadein 0.5s cubic-bezier(.4,2,.6,1);
+            }
           `}
         </style>
-      </head>
-      <body class="text-white bg-gray-900 overflow-hidden h-screen">
-        <div id="app" class="h-full flex flex-col">
-          <Component />
-        </div>
       </body>
     </html>
   );

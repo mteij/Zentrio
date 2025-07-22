@@ -1,11 +1,12 @@
-import { h as _h } from "preact";
+import { h as _h, ComponentChildren } from "preact";
 
 interface EmailTemplateProps {
-  code: string;
-  verificationUrl: string;
+  title: string;
+  header: string;
+  body: ComponentChildren;
 }
 
-export function EmailTemplate({ code, verificationUrl }: EmailTemplateProps) {
+export function EmailTemplate({ title, header, body }: EmailTemplateProps) {
   return (
     <div
       style={{
@@ -34,49 +35,11 @@ export function EmailTemplate({ code, verificationUrl }: EmailTemplateProps) {
         </div>
         <div style={{ padding: "30px" }}>
           <h2 style={{ fontSize: "20px", margin: "0 0 20px 0" }}>
-            Your sign-in code
+            {header}
           </h2>
-          <p>
-            Thanks for signing in to StremioHub. Please use the code below to
-            complete your sign-in process.
-          </p>
-          <div
-            style={{
-              fontSize: "36px",
-              fontWeight: "bold",
-              letterSpacing: "8px",
-              textAlign: "center",
-              margin: "30px 0",
-              padding: "15px",
-              backgroundColor: "#f0f0f0",
-              borderRadius: "4px",
-            }}
-          >
-            {code}
-          </div>
-          <p>
-            Alternatively, you can sign in instantly by clicking the button
-            below:
-          </p>
-          <a
-            href={verificationUrl}
-            target="_blank"
-            style={{
-              display: "inline-block",
-              backgroundColor: "#e50914",
-              color: "#ffffff",
-              padding: "12px 24px",
-              textDecoration: "none",
-              borderRadius: "4px",
-              fontWeight: "bold",
-              margin: "10px 0",
-            }}
-          >
-            Sign In Automatically
-          </a>
+          {body}
           <p style={{ fontSize: "14px", color: "#777" }}>
-            If you did not request this code, you can safely ignore this email.
-            This code will expire in 15 minutes.
+            If you did not request this email, you can safely ignore it.
           </p>
         </div>
         <div

@@ -4,11 +4,19 @@
 
 import * as $_app from "./routes/_app.tsx";
 import * as $_middleware from "./routes/_middleware.ts";
-import * as $api_auth_send_link from "./routes/api/auth/send-link.ts";
+import * as $api_auth_login_or_signup from "./routes/api/auth/login-or-signup.ts";
+import * as $api_auth_login_with_password from "./routes/api/auth/login-with-password.ts";
+import * as $api_auth_request_password_reset from "./routes/api/auth/request-password-reset.ts";
+import * as $api_auth_reset_password from "./routes/api/auth/reset-password.ts";
+import * as $api_auth_send_login_code from "./routes/api/auth/send-login-code.ts";
+import * as $api_auth_signup from "./routes/api/auth/signup.ts";
 import * as $api_auth_verify_code from "./routes/api/auth/verify-code.ts";
 import * as $api_profiles_id_ from "./routes/api/profiles/[id].ts";
 import * as $api_profiles_index from "./routes/api/profiles/index.ts";
 import * as $auth_code from "./routes/auth/code.tsx";
+import * as $auth_password from "./routes/auth/password.tsx";
+import * as $auth_reset from "./routes/auth/reset.tsx";
+import * as $auth_signup_success from "./routes/auth/signup-success.tsx";
 import * as $auth_verify from "./routes/auth/verify.tsx";
 import * as $index from "./routes/index.tsx";
 import * as $login from "./routes/login.tsx";
@@ -18,7 +26,9 @@ import * as $profiles from "./routes/profiles.tsx";
 import * as $stremio_path_ from "./routes/stremio/[...path].ts";
 import * as $CodeInputForm from "./islands/CodeInputForm.tsx";
 import * as $EmailLinkForm from "./islands/EmailLinkForm.tsx";
+import * as $PasswordLoginForm from "./islands/PasswordLoginForm.tsx";
 import * as $ProfileManager from "./islands/ProfileManager.tsx";
+import * as $ResetPasswordForm from "./islands/ResetPasswordForm.tsx";
 import * as $StremioFrame from "./islands/StremioFrame.tsx";
 import { type Manifest } from "$fresh/server.ts";
 
@@ -26,11 +36,20 @@ const manifest = {
   routes: {
     "./routes/_app.tsx": $_app,
     "./routes/_middleware.ts": $_middleware,
-    "./routes/api/auth/send-link.ts": $api_auth_send_link,
+    "./routes/api/auth/login-or-signup.ts": $api_auth_login_or_signup,
+    "./routes/api/auth/login-with-password.ts": $api_auth_login_with_password,
+    "./routes/api/auth/request-password-reset.ts":
+      $api_auth_request_password_reset,
+    "./routes/api/auth/reset-password.ts": $api_auth_reset_password,
+    "./routes/api/auth/send-login-code.ts": $api_auth_send_login_code,
+    "./routes/api/auth/signup.ts": $api_auth_signup,
     "./routes/api/auth/verify-code.ts": $api_auth_verify_code,
     "./routes/api/profiles/[id].ts": $api_profiles_id_,
     "./routes/api/profiles/index.ts": $api_profiles_index,
     "./routes/auth/code.tsx": $auth_code,
+    "./routes/auth/password.tsx": $auth_password,
+    "./routes/auth/reset.tsx": $auth_reset,
+    "./routes/auth/signup-success.tsx": $auth_signup_success,
     "./routes/auth/verify.tsx": $auth_verify,
     "./routes/index.tsx": $index,
     "./routes/login.tsx": $login,
@@ -42,7 +61,9 @@ const manifest = {
   islands: {
     "./islands/CodeInputForm.tsx": $CodeInputForm,
     "./islands/EmailLinkForm.tsx": $EmailLinkForm,
+    "./islands/PasswordLoginForm.tsx": $PasswordLoginForm,
     "./islands/ProfileManager.tsx": $ProfileManager,
+    "./islands/ResetPasswordForm.tsx": $ResetPasswordForm,
     "./islands/StremioFrame.tsx": $StremioFrame,
   },
   baseUrl: import.meta.url,

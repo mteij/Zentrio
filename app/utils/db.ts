@@ -1,12 +1,16 @@
 import mongoose, { Document, Model, ObjectId } from "mongoose";
-import { db } from "./mongo.ts";
+import { connect } from "./mongo.ts";
+import * as bcrypt from "$bcrypt/mod.ts";
 
 // Ensure the database connection is established before defining models
-await db;
+await connect();
 
 // --- Interfaces ---
 export interface UserSchema extends Document {
   email: string;
+  password?: string;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
   createdAt: Date;
 }
 
@@ -33,6 +37,9 @@ export interface VerificationTokenSchema extends Document {
 // --- Mongoose Schemas ---
 const userSchema = new mongoose.Schema<UserSchema>({
   email: { type: String, required: true, unique: true },
+  password: { type: String },
+  passwordResetToken: { type: String },
+  passwordResetExpires: { type: Date },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -62,18 +69,56 @@ const Sessions: Model<SessionSchema> = mongoose.models.Session || mongoose.model
 export const VerificationTokens: Model<VerificationTokenSchema> = mongoose.models.VerificationToken ||
   mongoose.model("VerificationToken", verificationTokenSchema);
 
+// --- Password Functions ---
+export const hashPassword = async (password: string) => {
+  return await bcrypt.hash(password);
+};
+
+export const comparePassword = async (password: string, hash: string) => {
+  return await bcrypt.compare(password, hash);
+};
+
 // --- User Functions ---
-export const findOrCreateUserByEmail = async (email: string): Promise<UserSchema> => {
-  let user = await Users.findOne({ email });
-  if (!user) {
-    user = await Users.create({ email });
-  }
-  return user;
+export const findUserByEmail = async (email: string): Promise<UserSchema | null> => {
+  return await Users.findOne({ email: email.toLowerCase() });
+};
+
+export const createUserWithGeneratedPassword = async (email: string): Promise<{ user: UserSchema; plainPassword: string }> => {
+  const plainPassword = Math.random().toString(36).slice(-8);
+  const hashedPassword = await hashPassword(plainPassword);
+  const user = await Users.create({ email: email.toLowerCase(), password: hashedPassword });
+  return { user, plainPassword };
+};
+
+/**
+ * @deprecated Use createUserWithGeneratedPassword instead for the new auth flow.
+ */
+export const createUserWithPassword = async (email: string): Promise<{ user: UserSchema; plainPassword: string }> => {
+  const plainPassword = Math.random().toString(36).slice(-8);
+  const hashedPassword = await hashPassword(plainPassword);
+  const user = await Users.create({ email: email.toLowerCase(), password: hashedPassword });
+  return { user, plainPassword };
 };
 
 export const getUserById = async (id: string): Promise<UserSchema | null> => {
   if (!mongoose.Types.ObjectId.isValid(id)) return null;
   return await Users.findById(id).lean();
+};
+
+export const updateUserPassword = async (userId: string, newPassword_plain: string) => {
+  const password = await hashPassword(newPassword_plain);
+  await Users.updateOne({ _id: userId }, { $set: { password }, $unset: { passwordResetToken: "", passwordResetExpires: "" } });
+};
+
+export const createPasswordResetTokenForUser = async (userId: string): Promise<string> => {
+  const resetToken = crypto.randomUUID();
+  const passwordResetExpires = new Date(Date.now() + 3600000); // 1 hour
+  await Users.updateOne({ _id: userId }, { $set: { passwordResetToken: resetToken, passwordResetExpires } });
+  return resetToken;
+};
+
+export const findUserByPasswordResetToken = async (token: string): Promise<UserSchema | null> => {
+  return await Users.findOne({ passwordResetToken: token, passwordResetExpires: { $gt: new Date() } });
 };
 
 // --- Session Functions ---

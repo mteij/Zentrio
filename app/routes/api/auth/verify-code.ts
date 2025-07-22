@@ -1,8 +1,9 @@
 import { Handlers } from "$fresh/server.ts";
+import { setCookie } from "$std/http/cookie.ts";
 import {
   createSession,
   deleteVerificationToken,
-  findOrCreateUserByEmail,
+  findUserByEmail,
   VerificationTokens,
 } from "../../../utils/db.ts";
 
@@ -11,12 +12,16 @@ export const handler: Handlers = {
     const { email, code } = await req.json();
 
     if (!email || !code || code.length !== 6) {
-      return new Response("Invalid email or code provided.", { status: 400 });
+      return new Response(JSON.stringify({ error: "Invalid email or code provided." }), { status: 400 });
     }
 
-    const user = await findOrCreateUserByEmail(email);
+    const normalizedEmail = email.toLowerCase();
+    const user = await findUserByEmail(normalizedEmail);
     if (!user) {
-      return new Response("User not found.", { status: 400 });
+      return new Response(JSON.stringify({ error: "User not found for this email." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const verificationToken = await VerificationTokens.findOne({
@@ -26,7 +31,10 @@ export const handler: Handlers = {
     }) as { _id: { toHexString: () => string }, userId: string, code: string, expiresAt: Date } | null;
 
     if (!verificationToken) {
-      return new Response("Invalid or expired code.", { status: 400 });
+      return new Response(JSON.stringify({ error: "Invalid or expired code." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Token is valid, create a session
@@ -38,14 +46,23 @@ export const handler: Handlers = {
 
     await deleteVerificationToken(verificationToken._id.toHexString());
 
+    const headers = new Headers();
+    setCookie(headers, {
+      name: "sessionId",
+      value: sessionId,
+      expires: sessionExpires,
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: new URL(req.url).protocol === "https:",
+    });
+
+    headers.set("Content-Type", "application/json");
     return new Response(
-      JSON.stringify({
-        sessionId,
-        expiresAt: sessionExpires.toISOString(),
-      }),
+      JSON.stringify({ message: "Verification successful" }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers,
       },
     );
   },

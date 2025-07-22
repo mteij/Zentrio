@@ -100,9 +100,10 @@ const proxyRequestHandler = async (req: Request, path: string) => {
         const decodedSessionData = decodeURIComponent(sessionData);
         const injectionScript = `
           <script>
+            let session; // Declare session in a wider scope
             // This script runs before Stremio's own scripts to set up the session.
             try {
-              const session = JSON.parse(\`${decodedSessionData.replace(/`/g, "\\`")}\`);
+              session = JSON.parse(\`${decodedSessionData.replace(/`/g, "\\`")}\`);
               // Iterate over the session object and set each key in localStorage.
               // Stremio expects some values to be JSON.stringified (like strings), and others not (like numbers).
               for (const key in session) {
@@ -110,7 +111,7 @@ const proxyRequestHandler = async (req: Request, path: string) => {
                 if (typeof value === 'object') {
                   localStorage.setItem(key, JSON.stringify(value));
                 } else if (typeof value === 'string') {
-                  // Strings like authKey and installation_id must be stored as JSON strings (i.e., with quotes).
+                  // Strings like installation_id must be stored as JSON strings (i.e., with quotes).
                   localStorage.setItem(key, JSON.stringify(value));
                 } else {
                   // Numbers like schema_version are stored as plain strings.
@@ -121,6 +122,40 @@ const proxyRequestHandler = async (req: Request, path: string) => {
               history.replaceState(null, '', '/stremio/');
             } catch (e) {
               console.error('StremioHub: Failed to inject session.', e);
+            }
+
+            // This observer removes the "Streaming server is not available" warning
+            // and replaces the Stremio logo with the user's profile picture.
+            const observer = new MutationObserver(() => {
+              // Check for the warning and remove it.
+              const warningLink = document.querySelector('a[href="https://www.stremio.com/download-service"]');
+              if (warningLink) {
+                const container = warningLink.closest('div[class*="board-warning-container"]');
+                if (container) container.remove();
+              }
+
+              // Check for the logo and replace it.
+              const logoImg = document.querySelector('img[src*="stremio_symbol.png"]');
+              if (logoImg && session && session.stremioHubProfilePicture) {
+                const logoContainer = logoImg.closest('div[class*="logo-container"]');
+                if (logoContainer && !logoContainer.querySelector('a[href="/profiles"]')) {
+                  const profilePicUrl = session.stremioHubProfilePicture;
+                  logoContainer.innerHTML = \`
+                    <a href="/profiles" title="Back to Profiles" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                      <img src="\${profilePicUrl}" alt="Profiles" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 0 2px #141414;" />
+                    </a>
+                  \`;
+                }
+              }
+            });
+
+            // Run the observer as soon as the body is available.
+            if (document.body) {
+                observer.observe(document.body, { childList: true, subtree: true });
+            } else {
+                document.addEventListener('DOMContentLoaded', () => {
+                    observer.observe(document.body, { childList: true, subtree: true });
+                });
             }
           </script>
         `;

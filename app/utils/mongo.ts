@@ -33,5 +33,6 @@ const connect = () => {
   return conn;
 };
 
-// Export the promise. Any file that imports this and awaits it will wait for the connection.
-export const db = connect();
+// Export the connect function itself, not the resulting promise.
+// This defers the connection until it's explicitly called.
+export { connect };
