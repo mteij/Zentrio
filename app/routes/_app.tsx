@@ -19,6 +19,21 @@ export default function App({ Component, route }: PageProps) {
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <link rel="manifest" href="/static/manifest.json" />
+        <meta name="theme-color" content="#e50914" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/static/service-worker.js');
+              });
+            }
+          `
+        }} />
       </head>
       <body class="text-white min-h-screen flex flex-col bg-black">
         <div id="app" class="flex flex-col min-h-screen">

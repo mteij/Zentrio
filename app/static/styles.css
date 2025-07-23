@@ -13,21 +13,6 @@ body {
   background-size: cover;
 }
 
-.profile-avatar:hover {
-  border-color: #e50914;
-}
-
-.mouse-trail-particle {
-  position: fixed;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-  border-radius: 50%;
-  background-color: rgba(229, 9, 20, 0.5);
-  animation: fadeOut 1s forwards;
-  z-index: 9999;
-}
-
 @keyframes fadeOut {
   from {
     opacity: 1;

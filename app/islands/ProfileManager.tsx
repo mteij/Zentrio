@@ -195,9 +195,7 @@ export default function ProfileManager(
 ) {
   const profiles = useSignal<PlainProfile[]>(initialProfiles.map(toPlainObject));
   const showAddModal = useSignal(false);
-  const editingProfile = useSignal<PlainProfile | null>(
-    null,
-  );
+  const editingProfile = useSignal<PlainProfile | null>(null);
 
   const handleCreate = async (data: Partial<ProfileSchema>) => {
     const res = await fetch("/api/profiles", {
@@ -236,31 +234,32 @@ export default function ProfileManager(
     }
   };
 
+  // --- FIX: Only block pointer events when modal is actually visible in the DOM ---
+  // Use a local variable to determine if a modal is open and visible
+  const modalOpen = showAddModal.value || editingProfile.value;
+
   return (
     <div>
-      {/* Prevent interaction with profiles when a modal is open */}
       <div
-        class={`flex flex-wrap justify-center gap-8 mb-10 transition-all duration-300${
-          showAddModal.value || editingProfile.value ? " pointer-events-none select-none opacity-60" : ""
-        }`}
-        // Remove pointer-events/opacity when modal is closed
+        class="flex flex-wrap justify-center gap-8 mb-10 transition-all duration-300"
         style={
-          showAddModal.value || editingProfile.value
-            ? undefined
-            : { pointerEvents: "auto", userSelect: "auto", opacity: 1 }
+          modalOpen
+            ? { pointerEvents: "none", userSelect: "none", opacity: 0.6 }
+            : undefined
         }
       >
-        {profiles.value.map((profile, idx) => (
+        {profiles.value.map((profile) => (
           <div
             key={profile._id}
             class="flex flex-col items-center space-y-2 cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
             style={{ width: "160px", transition: "all 0.2s cubic-bezier(.4,2,.6,1)" }}
           >
             <a
-              href={showAddModal.value || editingProfile.value ? undefined : `/player/${profile._id}`}
-              class={`w-full flex justify-center ${showAddModal.value || editingProfile.value ? "pointer-events-none" : ""}`}
-              tabIndex={showAddModal.value || editingProfile.value ? -1 : 0}
-              aria-disabled={showAddModal.value || editingProfile.value ? "true" : undefined}
+              href={`/player/${profile._id}`}
+              class="w-full flex justify-center"
+              tabIndex={modalOpen ? -1 : 0}
+              aria-disabled={modalOpen ? "true" : undefined}
+              style={modalOpen ? { pointerEvents: "none" } : undefined}
             >
               <div
                 class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 mb-3 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-stremio-red/30"
@@ -282,18 +281,45 @@ export default function ProfileManager(
             <button
               type="button"
               onClick={() => editingProfile.value = profile}
-              class="edit-profile-btn absolute top-2 right-2 bg-gray-600 hover:bg-gray-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+              class="edit-profile-btn absolute transition-opacity duration-300"
               title={`Edit ${profile.name}`}
+              style={{
+                top: "0px",
+                right: "0px",
+                width: "28px",
+                height: "28px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(34,34,34,0.85)",
+                border: "none",
+                borderRadius: "50%",
+                boxShadow: "0 1px 4px 0 #0008",
+                opacity: 0,
+                zIndex: 2,
+                cursor: "pointer",
+                transition: "opacity 0.3s",
+                padding: 0,
+              }}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5"
+                width="16"
+                height="16"
+                fill="none"
                 viewBox="0 0 20 20"
-                fill="currentColor"
+                style={{ color: "#fff" }}
               >
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-3.586 3.586l-2.828 2.828-7.793 7.793 2.828 2.828 7.793-7.793 2.828-2.828-2.828-2.828z" />
+                <path d="M4 15.5V16h.5l9.1-9.1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0L4 13.5z" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
+            <style>
+              {`
+                .group:hover .edit-profile-btn {
+                  opacity: 1 !important;
+                }
+              `}
+            </style>
           </div>
         ))}
         <div
@@ -306,6 +332,7 @@ export default function ProfileManager(
             class="flex flex-col items-center justify-center w-full h-full transition-all duration-300"
             style={{ minHeight: "140px" }}
             aria-label="Add Profile"
+            disabled={!!modalOpen}
           >
             <div
               class="rounded-lg flex items-center justify-center bg-gray-700 mb-3 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-stremio-red/30"
