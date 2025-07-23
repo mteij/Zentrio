@@ -2,7 +2,7 @@ import { Handlers } from "$fresh/server.ts";
 import { withErrorHandling, parseJsonBody, createJsonResponse } from "../../../shared/utils/api.ts";
 import { findUserByEmail, updateUserPassword, comparePassword } from "../../../utils/db.ts";
 import { rateLimiter } from "../../../shared/services/rateLimiter.ts";
-import { getCookie } from "$std/http/cookie.ts";
+import { getCookies } from "$std/http/cookie.ts";
 
 export const handler: Handlers = {
   POST: withErrorHandling(async (req) => {
@@ -13,7 +13,8 @@ export const handler: Handlers = {
     }
 
     // Get user from session cookie
-    const sessionCookie = getCookie(req.headers, "session");
+    const cookies = getCookies(req.headers);
+    const sessionCookie = cookies.session;
     if (!sessionCookie) {
       return createJsonResponse({ error: "Not authenticated" }, 401);
     }

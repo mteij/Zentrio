@@ -59,22 +59,30 @@ jobs:
         echo "Initializing Bubblewrap project..."
         cd ./build/android
         
-        # Create bubblewrap project with non-interactive init
-        echo "y" | bubblewrap init --manifest https://zentrio.eu/manifest.json || echo "Init completed"
+        # First, test if the manifest is accessible
+        echo "Testing manifest accessibility..."
+        curl -v https://zentrio.eu/manifest.json || echo "Manifest fetch failed"
+        
+        # Try Bubblewrap init with more verbose output
+        echo "Running Bubblewrap init..."
+        echo "y" | timeout 60 bubblewrap init --manifest https://zentrio.eu/manifest.json 2>&1 || echo "Bubblewrap init failed or timed out"
         
         # Show what was created
+        echo "=== Directory contents after init ==="
         ls -la
+        
+        # Check for any generated files
+        echo "=== All files in directory ==="
+        find . -type f
 
     - name: Configure TWA Settings
       run: |
         echo "Configuring Trusted Web Activity settings..."
         cd ./build/android
         
-        # Update the twa-manifest.json if it exists
-        if [ -f "twa-manifest.json" ]; then
-          echo "Found twa-manifest.json, updating configuration..."
-          # Create updated config
-          cat > twa-manifest.json << 'EOF'
+        # Always create our own twa-manifest.json regardless of init success
+        echo "Creating twa-manifest.json configuration..."
+        cat > twa-manifest.json << 'EOF'
         {
           "packageId": "eu.zentrio.app",
           "host": "zentrio.eu",
@@ -101,26 +109,93 @@ jobs:
           "shortcuts": []
         }
         EOF
-        else
-          echo "No twa-manifest.json found, creating from scratch..."
-        fi
+        
+        # Also create build instructions for manual APK generation
+        cat > BUILD_INSTRUCTIONS.md << 'EOF'
+        # Android APK Build Instructions
+        
+        This directory contains the configuration for building an Android APK from the Zentrio PWA.
+        
+        ## Prerequisites
+        - Android Studio or Android SDK
+        - Java JDK 17
+        - Bubblewrap CLI (`npm install -g @bubblewrap/cli`)
+        
+        ## Build Steps
+        
+        1. Install dependencies:
+           ```bash
+           npm install -g @bubblewrap/cli
+           ```
+        
+        2. Initialize project (if not already done):
+           ```bash
+           bubblewrap init --manifest https://zentrio.eu/manifest.json
+           ```
+        
+        3. Build the APK:
+           ```bash
+           bubblewrap build
+           ```
+        
+        ## Alternative: Direct PWA Installation
+        
+        For the easiest installation, visit https://zentrio.eu in any browser and use the "Add to Home Screen" or install button.
+        
+        ## Configuration
+        
+        The `twa-manifest.json` file contains all the configuration needed for the Trusted Web Activity.
+        EOF
+        
+        echo "Configuration files created successfully"
+        echo "Files in directory:"
+        ls -la
 
     - name: Build Android APK
       run: |
-        echo "Building Android APK..."
+        echo "Attempting Android APK build..."
         cd ./build/android
         
-        # Try to build the APK
+        # Show current directory contents
+        echo "=== Current directory contents ==="
+        ls -la
+        
+        # Verify manifest exists
         if [ -f "twa-manifest.json" ]; then
-          echo "Building with Bubblewrap..."
-          bubblewrap build --skipPwaValidation || echo "Build failed, but continuing..."
+          echo "✅ twa-manifest.json found"
+          cat twa-manifest.json
+          
+          echo "Attempting Bubblewrap build..."
+          bubblewrap build --skipPwaValidation 2>&1 || echo "⚠️  Bubblewrap build failed, but configuration is available"
         else
-          echo "No manifest found, skipping APK build"
+          echo "❌ No twa-manifest.json found - this shouldn't happen"
         fi
         
+        # Create a README for the build
+        cat > README.md << 'EOF'
+        # Zentrio Android Build Configuration
+        
+        This directory contains the complete configuration needed to build an Android APK for Zentrio.
+        
+        ## Quick Start (Recommended)
+        Visit https://zentrio.eu in any browser and install the PWA directly - no build required!
+        
+        ## Manual APK Build
+        If you want to create a custom APK:
+        1. Ensure you have Android SDK and Java 17 installed
+        2. Run: `bubblewrap build` in this directory
+        3. The APK will be generated in the `app/build/outputs/apk/` directory
+        
+        ## Files Included
+        - `twa-manifest.json` - Trusted Web Activity configuration
+        - `BUILD_INSTRUCTIONS.md` - Detailed build instructions
+        
+        For support, visit: https://github.com/MichielEijpe/Zentrio/issues
+        EOF
+        
         # List all files created
-        echo "Files in build directory:"
-        find . -type f -name "*.apk" -o -name "*.aab" -o -name "*.json" | head -10
+        echo "=== Final build directory contents ==="
+        find . -type f | sort
 
     - name: Alternative APK Build (fallback)
       if: failure()
