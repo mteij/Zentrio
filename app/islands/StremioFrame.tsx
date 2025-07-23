@@ -196,7 +196,6 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
         ref={iframeRef}
         class={`w-full h-full border-none absolute inset-0 ${isLoading.value ? "hidden" : ""} transition-all duration-300`}
         allow="autoplay; fullscreen; picture-in-picture"
-        allowFullScreen
       >
       </iframe>
       <style>

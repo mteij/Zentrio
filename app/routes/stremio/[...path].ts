@@ -52,8 +52,13 @@ const proxyRequestHandler = async (req: Request, path: string) => {
       responseHeaders.set("Access-Control-Allow-Headers", requestHeadersHeader);
     }
 
-    // Remove Content-Security-Policy to allow our script injection to work.
+    // Remove any restrictive security headers to allow embedding and script injection
     responseHeaders.delete("content-security-policy");
+    responseHeaders.delete("x-frame-options"); 
+    responseHeaders.delete("X-Frame-Options");
+    
+    // Set completely permissive CSP to allow embedding from anywhere
+    responseHeaders.set("Content-Security-Policy", "frame-ancestors *; default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline' data: blob:; img-src * data: blob:; font-src * data:; connect-src * data: blob:; media-src * data: blob:; object-src *; child-src *; frame-src *; worker-src * blob:; manifest-src *;");
 
     // Rewrite Set-Cookie headers to remove the Domain attribute
     const setCookieHeader = response.headers.get("set-cookie");
