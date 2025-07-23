@@ -29,16 +29,22 @@ export async function handler(
 
   const response = await ctx.next();
   
-  // Determine if this route should allow iframe embedding
+  // Determine security policy based on route
   const url = new URL(req.url);
-  const allowFraming = url.pathname.startsWith('/player') || 
-                      url.pathname.startsWith('/stremio') ||
-                      url.pathname === '/';
+  const isStremioProxyRoute = url.pathname.startsWith('/stremio/');
+  const isPlayerRoute = url.pathname.startsWith('/player');
+  const isRootRoute = url.pathname === '/';
   
-  // Add security headers to all responses
-  const securityHeaders = sessionSecurity.createSecurityHeaders(allowFraming);
-  for (const [key, value] of Object.entries(securityHeaders)) {
-    response.headers.set(key, value);
+  // Skip adding security headers for /stremio/ routes as they handle their own
+  if (!isStremioProxyRoute) {
+    const allowFraming = isPlayerRoute || isRootRoute;
+    const allowCORS = isPlayerRoute || isRootRoute;
+    
+    // Add security headers to all responses except Stremio proxy routes
+    const securityHeaders = sessionSecurity.createSecurityHeaders(allowFraming, allowCORS);
+    for (const [key, value] of Object.entries(securityHeaders)) {
+      response.headers.set(key, value);
+    }
   }
   
   return response;

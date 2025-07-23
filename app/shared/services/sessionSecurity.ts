@@ -123,18 +123,56 @@ class SessionSecurityService {
   /**
    * Create security headers for responses
    * @param allowFraming - Whether to allow iframe embedding (default: false for security)
+   * @param allowCORS - Whether to allow cross-origin requests (default: false for security)
    */
-  createSecurityHeaders(allowFraming: boolean = false): Record<string, string> {
-    return {
+  createSecurityHeaders(allowFraming: boolean = false, allowCORS: boolean = false): Record<string, string> {
+    const headers: Record<string, string> = {
       'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': allowFraming ? 'SAMEORIGIN' : 'DENY',
       'X-XSS-Protection': '1; mode=block',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
-      'Content-Security-Policy': allowFraming 
-        ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'self';"
-        : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com;",
       'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
     };
+
+    // Add CORS headers if needed
+    if (allowCORS) {
+      headers['Access-Control-Allow-Origin'] = '*';
+      headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, HEAD, OPTIONS';
+      headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With';
+      headers['Access-Control-Allow-Credentials'] = 'true';
+    }
+
+    if (allowFraming) {
+      // Allow framing from any origin for Stremio integration (omit X-Frame-Options to allow all)
+      // X-Frame-Options is omitted when frame-ancestors * is used in CSP
+      headers['Content-Security-Policy'] = [
+        "default-src 'self' *",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' *",
+        "style-src 'self' 'unsafe-inline' *",
+        "img-src 'self' data: blob: *", 
+        "font-src 'self' *",
+        "connect-src 'self' *",
+        "media-src 'self' blob: *",
+        "object-src 'none'",
+        "frame-src 'self' *",
+        "frame-ancestors *",
+        "worker-src 'self' blob:"
+      ].join('; ');
+    } else {
+      // Restrictive policy for non-Stremio pages
+      headers['X-Frame-Options'] = 'DENY';
+      headers['Content-Security-Policy'] = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'", 
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "img-src 'self' data: https:",
+        "font-src 'self' https://fonts.gstatic.com",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'"
+      ].join('; ');
+    }
+
+    return headers;
   }
 
   /**
