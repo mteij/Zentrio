@@ -23,12 +23,15 @@ import * as $login from "./routes/login.tsx";
 import * as $logout from "./routes/logout.ts";
 import * as $player_profileId_ from "./routes/player/[profileId].tsx";
 import * as $profiles from "./routes/profiles.tsx";
+import * as $settings from "./routes/settings.tsx";
 import * as $stremio_path_ from "./routes/stremio/[...path].ts";
-import * as $CodeInputForm from "./islands/CodeInputForm.tsx";
-import * as $EmailLinkForm from "./islands/EmailLinkForm.tsx";
-import * as $PasswordLoginForm from "./islands/PasswordLoginForm.tsx";
-import * as $ProfileManager from "./islands/ProfileManager.tsx";
-import * as $ResetPasswordForm from "./islands/ResetPasswordForm.tsx";
+import * as $Auth_CodeInputForm from "./islands/Auth/CodeInputForm.tsx";
+import * as $Auth_EmailLinkForm from "./islands/Auth/EmailLinkForm.tsx";
+import * as $Auth_PasswordLoginForm from "./islands/Auth/PasswordLoginForm.tsx";
+import * as $Auth_ResetPasswordForm from "./islands/Auth/ResetPasswordForm.tsx";
+import * as $ProfileManager_DesktopProfileManager from "./islands/ProfileManager/DesktopProfileManager.tsx";
+import * as $ProfileManager_MobileProfileManager from "./islands/ProfileManager/MobileProfileManager.tsx";
+import * as $ProfileManager_ProfileManager from "./islands/ProfileManager/ProfileManager.tsx";
 import * as $SettingsModal from "./islands/SettingsModal.tsx";
 import * as $StremioFrame from "./islands/StremioFrame.tsx";
 import { type Manifest } from "$fresh/server.ts";
@@ -57,14 +60,20 @@ const manifest = {
     "./routes/logout.ts": $logout,
     "./routes/player/[profileId].tsx": $player_profileId_,
     "./routes/profiles.tsx": $profiles,
+    "./routes/settings.tsx": $settings,
     "./routes/stremio/[...path].ts": $stremio_path_,
   },
   islands: {
-    "./islands/CodeInputForm.tsx": $CodeInputForm,
-    "./islands/EmailLinkForm.tsx": $EmailLinkForm,
-    "./islands/PasswordLoginForm.tsx": $PasswordLoginForm,
-    "./islands/ProfileManager.tsx": $ProfileManager,
-    "./islands/ResetPasswordForm.tsx": $ResetPasswordForm,
+    "./islands/Auth/CodeInputForm.tsx": $Auth_CodeInputForm,
+    "./islands/Auth/EmailLinkForm.tsx": $Auth_EmailLinkForm,
+    "./islands/Auth/PasswordLoginForm.tsx": $Auth_PasswordLoginForm,
+    "./islands/Auth/ResetPasswordForm.tsx": $Auth_ResetPasswordForm,
+    "./islands/ProfileManager/DesktopProfileManager.tsx":
+      $ProfileManager_DesktopProfileManager,
+    "./islands/ProfileManager/MobileProfileManager.tsx":
+      $ProfileManager_MobileProfileManager,
+    "./islands/ProfileManager/ProfileManager.tsx":
+      $ProfileManager_ProfileManager,
     "./islands/SettingsModal.tsx": $SettingsModal,
     "./islands/StremioFrame.tsx": $StremioFrame,
   },

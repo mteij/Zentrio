@@ -1,5 +1,5 @@
 import { PageProps } from "$fresh/server.ts";
-import PasswordLoginForm from "../../islands/PasswordLoginForm.tsx";
+import PasswordLoginForm from "../../islands/Auth/PasswordLoginForm.tsx";
 import ModernBackground from "../../components/ModernBackground.tsx";
 
 export default function PasswordLoginPage(props: PageProps) {

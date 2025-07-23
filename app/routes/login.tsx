@@ -1,5 +1,5 @@
 import { h as _h } from "preact";
-import EmailLinkForm from "../islands/EmailLinkForm.tsx";
+import EmailLinkForm from "../islands/Auth/EmailLinkForm.tsx";
 import ModernBackground from "../components/ModernBackground.tsx";
 
 export default function LoginPage() {

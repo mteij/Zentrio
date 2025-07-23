@@ -1,5 +1,5 @@
 import { PageProps } from "$fresh/server.ts";
-import CodeInputForm from "../../islands/CodeInputForm.tsx";
+import CodeInputForm from "../../islands/Auth/CodeInputForm.tsx";
 import ModernBackground from "../../components/ModernBackground.tsx";
 
 export default function CodeVerificationPage(props: PageProps) {

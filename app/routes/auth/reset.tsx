@@ -1,5 +1,5 @@
 import { PageProps } from "$fresh/server.ts";
-import ResetPasswordForm from "../../islands/ResetPasswordForm.tsx";
+import ResetPasswordForm from "../../islands/Auth/ResetPasswordForm.tsx";
 
 export default function ResetPasswordPage(props: PageProps) {
   const token = props.url.searchParams.get("token");

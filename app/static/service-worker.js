@@ -10,7 +10,25 @@ const ASSETS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Only add assets that exist and can be fetched successfully
+      await Promise.all(
+        ASSETS.map(async (url) => {
+          try {
+            const response = await fetch(url, { cache: "no-store" });
+            if (response.ok) {
+              await cache.put(url, response);
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn("Service worker: Skipped caching (not found):", url);
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn("Service worker: Failed to cache:", url, e);
+          }
+        })
+      );
+    })
   );
   self.skipWaiting();
 });

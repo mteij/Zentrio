@@ -1,11 +1,11 @@
 import { h as _h } from "preact";
 import { useSignal } from "@preact/signals";
-import { ProfileSchema } from "../utils/db.ts";
+import { useEffect } from "preact/hooks";
+import { ProfileSchema } from "../../utils/db.ts";
 import { ObjectId } from "mongoose";
-
-interface ProfileManagerProps {
-  initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[];
-}
+import * as DesktopProfileManager from "./DesktopProfileManager.tsx";
+import MobileProfileManager from "./MobileProfileManager.tsx";
+import ConfirmDialog from "../../components/ConfirmDialog.tsx";
 
 // Helper to convert MongoDB objects to plain objects for client-side use
 const toPlainObject = (
@@ -26,12 +26,12 @@ function getInitialsUrl(name: string) {
   return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(name)}`;
 }
 
-function ProfileModal(
-  { profile, onSave, onCancel, onDelete }: {
+export function ProfileModal(
+  { profile, onSave, onCancel, onRequestDelete }: {
     profile: PlainProfile | null;
     onSave: (data: Partial<Omit<ProfileSchema, "_id" | "userId">>) => void;
     onCancel: () => void;
-    onDelete?: (id: string) => void;
+    onRequestDelete?: (profile: PlainProfile) => void;
   },
 ) {
   const name = useSignal(profile?.name || "");
@@ -132,11 +132,10 @@ function ProfileModal(
           />
           <div class="flex justify-between">
             <div>
-              {isEditing && onDelete && (
+              {isEditing && onRequestDelete && (
                 <button
                   type="button"
-                  onClick={() =>
-                    confirm("Are you sure?") && onDelete(profile!._id)}
+                  onClick={() => onRequestDelete(profile!)}
                   class="bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors duration-200"
                 >
                   Delete
@@ -190,14 +189,13 @@ function ProfileModal(
   );
 }
 
-export default function ProfileManager(
-  { initialProfiles }: ProfileManagerProps,
-) {
+function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[]) {
   const profiles = useSignal<PlainProfile[]>(initialProfiles.map(toPlainObject));
   const showAddModal = useSignal(false);
   const editingProfile = useSignal<PlainProfile | null>(null);
+  const mobileEditMode = useSignal(false);
 
-  const handleCreate = async (data: Partial<ProfileSchema>) => {
+  const handleCreate = async (data: Partial<Omit<ProfileSchema, "_id" | "userId">>) => {
     const res = await fetch("/api/profiles", {
       method: "POST",
       body: JSON.stringify(data),
@@ -209,9 +207,7 @@ export default function ProfileManager(
     }
   };
 
-  const handleUpdate = async (
-    data: Partial<Omit<ProfileSchema, "_id" | "userId">>,
-  ) => {
+  const handleUpdate = async (data: Partial<Omit<ProfileSchema, "_id" | "userId">>) => {
     if (!editingProfile.value) return;
     const res = await fetch(`/api/profiles/${editingProfile.value._id}`, {
       method: "PATCH",
@@ -226,144 +222,129 @@ export default function ProfileManager(
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const res = await fetch(`/api/profiles/${id}`, { method: "DELETE" });
+  const handleDelete = async (profile: PlainProfile) => {
+    const res = await fetch(`/api/profiles/${profile._id}`, { method: "DELETE" });
     if (res.ok) {
-      profiles.value = profiles.value.filter((p) => p._id !== id);
+      profiles.value = profiles.value.filter((p) => p._id !== profile._id);
       editingProfile.value = null;
     }
   };
 
-  const modalOpen = showAddModal.value || editingProfile.value;
+  return {
+    profiles,
+    showAddModal,
+    editingProfile,
+    mobileEditMode,
+    handleCreate,
+    handleUpdate,
+    handleDelete,
+  };
+}
+
+export default function ProfileManager(
+  {
+    initialProfiles,
+    showSettings,
+    setShowSettings,
+    addonOrderEnabled,
+    setAddonOrderEnabled,
+  }: {
+    initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[],
+    showSettings: { value: boolean },
+    setShowSettings: { value: boolean },
+    addonOrderEnabled: { value: boolean },
+    setAddonOrderEnabled: { value: boolean },
+  }
+) {
+  const {
+    profiles,
+    showAddModal,
+    editingProfile,
+    mobileEditMode,
+    handleCreate,
+    handleUpdate,
+    handleDelete,
+  } = useProfileManagerState(initialProfiles);
+
+  // Detect mobile using a signal
+  const isMobile = useSignal(false);
+  useEffect(() => {
+    const check = () =>
+      (isMobile.value = globalThis.matchMedia("(max-width: 639px)").matches);
+    check();
+    globalThis.addEventListener("resize", check);
+    return () => globalThis.removeEventListener("resize", check);
+  }, []);
+
+  // Provide a reliable toggle function for mobile edit mode
+  const toggleMobileEditMode = () => {
+    mobileEditMode.value = !mobileEditMode.value;
+  };
+
+  // Add signals for delete confirmation modal
+  const showDeleteConfirm = useSignal(false);
+  const profileToDelete = useSignal<PlainProfile | null>(null);
+
+  // Handler for requesting delete (shows modal)
+  const handleRequestDelete = (profile: PlainProfile) => {
+    profileToDelete.value = profile;
+    showDeleteConfirm.value = true;
+  };
+
+  // Handler for confirming delete
+  const confirmDelete = async () => {
+    if (profileToDelete.value) {
+      await handleDelete(profileToDelete.value);
+    }
+    showDeleteConfirm.value = false;
+    profileToDelete.value = null;
+  };
+
+  // Handler for canceling delete
+  const cancelDelete = () => {
+    showDeleteConfirm.value = false;
+    profileToDelete.value = null;
+  };
+
+  const sharedProps = {
+    profiles,
+    showAddModal,
+    editingProfile,
+    mobileEditMode,
+    handleCreate,
+    handleUpdate,
+    handleDelete,
+    getRandomFunEmojiUrl,
+    getInitialsUrl,
+    ProfileModal: (props: any) =>
+      ProfileModal({ ...props, onRequestDelete: handleRequestDelete }),
+    toggleMobileEditMode, // pass to mobile
+    showSettings,
+    setShowSettings,
+    addonOrderEnabled,
+    setAddonOrderEnabled,
+  };
 
   return (
-    <div>
-      <div
-        class="flex flex-wrap justify-center gap-8 mb-10 transition-all duration-300"
-        style={
-          modalOpen
-            ? { pointerEvents: "none", userSelect: "none", opacity: 0.6 }
-            : undefined
+    <>
+      {isMobile.value ? (
+        <MobileProfileManager {...sharedProps} />
+      ) : (
+        <DesktopProfileManager.default {...sharedProps} />
+      )}
+      <ConfirmDialog
+        open={showDeleteConfirm.value}
+        title="Delete Profile?"
+        message={
+          profileToDelete.value
+            ? `Are you sure you want to delete "${profileToDelete.value.name}"? This cannot be undone.`
+            : ""
         }
-      >
-        {profiles.value.map((profile) => (
-          <div
-            key={profile._id}
-            class="flex flex-col items-center space-y-2 cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
-            style={{ width: "160px", transition: "all 0.2s cubic-bezier(.4,2,.6,1)" }}
-          >
-            <a
-              href={`/player/${profile._id}`}
-              class="w-full flex justify-center"
-              tabIndex={modalOpen ? -1 : 0}
-              aria-disabled={modalOpen ? "true" : undefined}
-              style={modalOpen ? { pointerEvents: "none" } : undefined}
-            >
-              <div
-                class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 mb-3 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-stremio-red/30"
-                style={{
-                  backgroundImage: `url(${profile.profilePictureUrl})`,
-                  width: "140px",
-                  height: "140px",
-                  aspectRatio: "1 / 1",
-                  backgroundPosition: "center",
-                  backgroundSize: "cover",
-                  transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
-                }}
-              >
-              </div>
-            </a>
-            <p class="text-gray-300 group-hover:text-white truncate w-full text-center text-lg transition-colors duration-200 group-hover:scale-105">
-              {profile.name}
-            </p>
-            <button
-              type="button"
-              onClick={() => editingProfile.value = profile}
-              class="edit-profile-btn absolute transition-opacity duration-300"
-              title={`Edit ${profile.name}`}
-              style={{
-                top: "0px",
-                right: "0px",
-                width: "28px",
-                height: "28px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "rgba(34,34,34,0.85)",
-                border: "none",
-                borderRadius: "50%",
-                boxShadow: "0 1px 4px 0 #0008",
-                opacity: 0,
-                zIndex: 2,
-                cursor: "pointer",
-                transition: "opacity 0.3s",
-                padding: 0,
-              }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                fill="none"
-                viewBox="0 0 20 20"
-                style={{ color: "#fff" }}
-              >
-                <path d="M4 15.5V16h.5l9.1-9.1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0L4 13.5z" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <style>
-              {`
-                .group:hover .edit-profile-btn {
-                  opacity: 1 !important;
-                }
-              `}
-            </style>
-          </div>
-        ))}
-        <div
-          class="flex flex-col items-center justify-center space-y-2 cursor-pointer group relative transition-all duration-300 hover:scale-105"
-          style={{ width: "160px", transition: "all 0.2s cubic-bezier(.4,2,.6,1)" }}
-        >
-          <button
-            type="button"
-            onClick={() => showAddModal.value = true}
-            class="flex flex-col items-center justify-center w-full h-full transition-all duration-300"
-            style={{ minHeight: "140px" }}
-            aria-label="Add Profile"
-            disabled={!!modalOpen}
-          >
-            <div
-              class="rounded-lg flex items-center justify-center bg-gray-700 mb-3 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-stremio-red/30"
-              style={{
-                width: "140px",
-                height: "140px",
-                aspectRatio: "1 / 1",
-                fontSize: "3rem",
-                color: "#fff",
-                transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
-              }}
-            >
-              +
-            </div>
-            <span class="text-gray-300 group-hover:text-white text-lg font-bold transition-colors duration-200">Add Profile</span>
-          </button>
-        </div>
-      </div>
-      {showAddModal.value && (
-        <ProfileModal
-          profile={null}
-          onSave={handleCreate}
-          onCancel={() => showAddModal.value = false}
-        />
-      )}
-      {editingProfile.value && (
-        <ProfileModal
-          profile={editingProfile.value}
-          onSave={handleUpdate}
-          onCancel={() => editingProfile.value = null}
-          onDelete={handleDelete}
-        />
-      )}
-    </div>
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
+    </>
   );
 }

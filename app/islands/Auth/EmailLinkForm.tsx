@@ -1,3 +1,4 @@
+// ...existing code from app/islands/EmailLinkForm.tsx...
 import { h } from "preact";
 import { useSignal } from "@preact/signals";
 

@@ -2,10 +2,11 @@ import { PageProps } from "$fresh/server.ts";
 import Footer from "../components/Footer.tsx";
 
 export default function App({ Component, route }: PageProps) {
-  // Always show the footer on login/signup/reset/profile pages (not on /player, /stremio)
+  // Always show the footer on login/signup/reset/profile pages (not on /player, /stremio, /settings)
   const showFooter =
     !route.startsWith("/player") &&
-    !route.startsWith("/stremio");
+    !route.startsWith("/stremio") &&
+    !route.startsWith("/settings");
 
   return (
     <html lang="en">
@@ -25,6 +26,9 @@ export default function App({ Component, route }: PageProps) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png" />
+        <link rel="shortcut icon" type="image/png" href="/static/icons/icon-192.png" />
         <script dangerouslySetInnerHTML={{
           __html: `
             if ('serviceWorker' in navigator) {

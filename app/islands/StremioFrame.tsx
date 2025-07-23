@@ -50,8 +50,12 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
         const loginData = await loginRes.json();
         const result = loginData?.result;
 
-        if (!result || !result.authKey || !result.user?._id) {
-          throw new Error("Login successful, but key data is missing.");
+        // If result is falsy, treat as login failure
+        if (!result) {
+          throw new Error("Login failed: No result returned from server.");
+        }
+        if (!result.authKey || !result.user?._id) {
+          throw new Error("Login failed: Missing authentication data. Please check your credentials.");
         }
 
         // Construct a comprehensive session object with all required keys and structures.
@@ -118,13 +122,25 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
             isLoading.value = false;
             statusMessage.value = "Loaded!";
           };
-          // The proxy will intercept this URL, use the sessionData, and serve the final HTML.
           const sessionData = encodeURIComponent(JSON.stringify(sessionObject));
           iframe.src = `/stremio/?sessionData=${sessionData}`;
         }
       } catch (error) {
         console.error("Auto-login failed:", error);
-        statusMessage.value = `Error: ${error instanceof Error ? error.message : String(error)}. Please check credentials.`;
+        statusMessage.value = (
+          <div class="flex flex-col items-center justify-center">
+            <span>
+              Error: {error instanceof Error ? error.message : String(error)}
+            </span>
+            <button
+              class="mt-6 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+              onClick={() => history.length > 1 ? history.back() : (window.location.href = "/profiles")}
+            >
+              Go Back
+            </button>
+          </div>
+        ) as unknown as string;
+        isLoading.value = true; // keep loader visible with error
       }
     };
 
@@ -136,7 +152,11 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
       {isLoading.value && (
         <div class="absolute inset-0 bg-black flex flex-col items-center justify-center z-10 animate-fadein">
           <div class="loader"></div>
-          <p class="mt-4 text-lg text-gray-300 transition-all duration-200">{statusMessage.value}</p>
+          <p class="mt-4 text-lg text-gray-300 transition-all duration-200 flex flex-col items-center justify-center">
+            {typeof statusMessage.value === "string"
+              ? statusMessage.value
+              : statusMessage.value}
+          </p>
           <style>
             {`
               .loader {
