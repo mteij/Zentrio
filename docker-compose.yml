@@ -23,11 +23,6 @@ services:
         condition: service_healthy
     networks:
       - zentrio-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.zentrio.rule=Host(`zentrio.eu`)"
-      - "traefik.http.routers.zentrio.tls=true"
-      - "traefik.http.routers.zentrio.tls.certresolver=letsencrypt"
 
   # Optional: Local MongoDB service (remove if using external MongoDB)
   mongo:
@@ -53,63 +48,8 @@ services:
       start_period: 30s
     command: ["mongod", "--auth"]
 
-  # Optional: Traefik reverse proxy (for production)
-  traefik:
-    image: traefik:v3.0
-    container_name: zentrio-traefik
-    restart: unless-stopped
-    command:
-      - --api.dashboard=true
-      - --api.insecure=false
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
-      - --certificatesresolvers.letsencrypt.acme.email=admin@zentrio.eu
-      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-      - --global.sendanonymoususage=false
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"  # Traefik dashboard
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./letsencrypt:/letsencrypt
-    networks:
-      - zentrio-network
-    profiles:
-      - production  # Only start with: docker-compose --profile production up
-
-  # Optional: MongoDB Express (for database management)
-  mongo-express:
-    image: mongo-express:1.0.2
-    container_name: zentrio-mongo-express
-    restart: unless-stopped
-    ports:
-      - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-changeme123}
-      ME_CONFIG_MONGODB_URL: mongodb://admin:${MONGO_ROOT_PASSWORD:-changeme123}@mongo:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin123}
-      ME_CONFIG_MONGODB_ENABLE_ADMIN: true
-    depends_on:
-      mongo:
-        condition: service_healthy
-    networks:
-      - zentrio-network
-    profiles:
-      - dev  # Only start with: docker-compose --profile dev up
-
 volumes:
   mongo_data:
-    driver: local
 
 networks:
   zentrio-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16

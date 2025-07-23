@@ -21,7 +21,8 @@
 **🛡️ Content Filtering** - Smart NSFW detection using TMDB API with per-profile parental controls  
 **🎨 Customization** - Custom accent colors, dark theme, responsive design with smooth animations  
 **🔧 Advanced Features** - Drag-and-drop addon manager, auto-login options, and real-time sync  
-**⚡ Performance** - Edge-ready architecture with islands-based fast loading and offline support
+**⚡ Performance** - Edge-ready architecture with islands-based fast loading and offline support  
+**📱 Native Apps** - Automatic APK and Windows package generation via PWABuilder integration
 
 ---
 
@@ -63,6 +64,22 @@ docker run -d -p 8000:8000 --env-file .env ghcr.io/michieleijpe/zentrio:latest
 ```
 
 Includes health checks, MongoDB service, and production-ready configuration.
+
+## 📱 **Native Apps**
+
+Zentrio automatically builds native apps using PWABuilder:
+
+**🤖 Android APK** - Installable Android app package  
+**🪟 Windows MSIX** - Microsoft Store compatible package  
+**🍎 iOS PWA** - Add to Home Screen from Safari
+
+### Automatic Builds
+- APKs and Windows packages are automatically built on every push/tag
+- Download from [GitHub Releases](https://github.com/MichielEijpe/Zentrio/releases)
+- Signed packages ready for distribution
+
+### Manual Install
+Visit **[zentrio.eu](https://zentrio.eu)** and use your browser's "Add to Home Screen" or install button.
 
 ## 🛠️ **Tech Stack**
 

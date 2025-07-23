@@ -1,0 +1,75 @@
+name: PWA Builder - Generate APK
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Build PWA
+      uses: pwa-builder/PWABuilder@v2
+      with:
+        site-url: https://zentrio.eu
+        app-name: Zentrio
+        app-short-name: Zentrio
+        app-description: A beautiful, secure, Netflix-inspired profile management system for Stremio Web
+        app-theme-color: '#e50914'
+        app-background-color: '#141414'
+        app-start-url: /
+        package-id: eu.zentrio.app
+        android-signing-key: ${{ secrets.ANDROID_SIGNING_KEY }}
+        android-signing-key-password: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        android-key-alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+        android-key-alias-password: ${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-apk
+        path: '*.apk'
+
+    - name: Upload Windows Package
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-package
+        path: '*.msix'
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          *.apk
+          *.msix
+        body: |
+          ## Zentrio ${{ github.ref_name }}
+          
+          ### Downloads
+          - 📱 **Android APK**: Install directly on Android devices
+          - 🪟 **Windows Package**: Install via Microsoft Store or sideload
+          - 🌐 **Web App**: Visit [zentrio.eu](https://zentrio.eu) and click "Add to Home Screen"
+          
+          ### Installation
+          **Android**: Enable "Unknown Sources" in Settings, then install the APK
+          **Windows**: Double-click the MSIX file to install
+          **iOS/All Browsers**: Visit [zentrio.eu](https://zentrio.eu) and use your browser's PWA install option
+          
+          ---
+          *Built automatically with PWABuilder*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
