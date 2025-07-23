@@ -13,34 +13,44 @@ export class EmailService {
       throw new Error("RESEND_API_KEY is not configured");
     }
     this.resend = new Resend(apiKey);
+    this.fromDomain = Deno.env.get("EMAIL_FROM_DOMAIN") || "noreply@zentrio.eu";
   }
+
+  private fromDomain: string;
 
   private async sendEmail(to: string, subject: string, html: string): Promise<void> {
     try {
-      await this.resend.emails.send({
-        from: "StremioHub <no-reply@yourdomain.com>",
+      console.log(`Attempting to send email to: ${to}`);
+      const result = await this.resend.emails.send({
+        from: `Zentrio <${this.fromDomain}>`,
         to,
         subject,
         html,
       });
+      console.log(`Email sent successfully:`, result);
     } catch (error) {
       console.error("Failed to send email:", error);
-      throw new Error("Failed to send email");
+      console.error("Email details:", { to, subject, fromDomain: "noreply@zentrio.deno.dev" });
+      throw new Error(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   async sendWelcomeEmail(email: string, password: string): Promise<void> {
-    const html = render(WelcomeEmail({ email, password }));
-    await this.sendEmail(email, "Welcome to StremioHub - Your Login Details", html);
+    const html = render(WelcomeEmail({ 
+      email, 
+      password, 
+      loginUrl: `${Deno.env.get("APP_URL") || "http://localhost:8000"}/login`
+    }));
+    await this.sendEmail(email, "Welcome to Zentrio - Your Login Details", html);
   }
 
   async sendLoginCode(email: string, code: string, verificationUrl: string): Promise<void> {
     const html = render(LoginCodeEmail({ code, verificationUrl }));
-    await this.sendEmail(email, "Your StremioHub Login Code", html);
+    await this.sendEmail(email, "Your Zentrio Login Code", html);
   }
 
   async sendPasswordReset(email: string, resetUrl: string): Promise<void> {
     const html = render(ResetPasswordEmail({ resetUrl }));
-    await this.sendEmail(email, "Reset Your StremioHub Password", html);
+    await this.sendEmail(email, "Reset Your Zentrio Password", html);
   }
 }

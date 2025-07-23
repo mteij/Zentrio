@@ -1,9 +1,6 @@
 <div align="center">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg" width="80" height="80" alt="TypeScript"/>
   
   # 🎬 **Zentrio** 
-  
-  ### *The Ultimate Stremio Web Experience*
   
   **A beautiful, secure, Netflix-inspired profile management system for Stremio Web**
   
@@ -13,212 +10,67 @@
   [![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
   [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
   
-  ---
-  
-  **[🚀 Live Demo](https://zentrio.deno.dev/)** • **[📚 Documentation](https://github.com/MichielEijpe/Zentrio/wiki)** • **[🐛 Report Issues](https://github.com/MichielEijpe/Zentrio/issues)**
+  **[🚀 Live Demo](https://zentrio.eu)** • **[🐛 Report Issues](https://github.com/MichielEijpe/Zentrio/issues)**
   
 </div>
 
----
+## ✨ **Features**
 
-## ✨ **What is Zentrio?**
-
-Zentrio transforms your Stremio Web experience with a gorgeous, Netflix-inspired interface that brings modern profile management, enhanced security, and powerful customization features to your favorite streaming platform.
-
-<div align="center">
-  <img src="https://via.placeholder.com/800x400/1f2937/ffffff?text=Beautiful+Netflix-Style+Interface" alt="Zentrio Interface" style="border-radius: 10px; margin: 20px 0;"/>
-</div>
-
----
-
-## 🌟 **Cool Features**
-
-### 🎭 **Profile Management**
-- **Netflix-Style Interface** - Familiar, intuitive profile selection with beautiful animations
-- **Multiple Profiles** - Create unlimited profiles for different family members or viewing preferences
-- **Custom Avatars** - Personalized profile pictures with randomization and initials generation
-- **Secure Profiles** - Each profile maintains separate Stremio credentials with enterprise-grade encryption
-
-### 🔐 **Enterprise Security**
-- **Military-Grade Encryption** - AES-256-GCM encryption for all sensitive data
-- **Zero-Trust Architecture** - Passwords and API keys encrypted at rest with unique salts
-- **Magic Link Authentication** - Passwordless login via secure email links
-- **Automatic Migration** - Seamless upgrade from legacy unencrypted data
-
-### 🛡️ **Content Filtering**
-- **NSFW Content Filter** - Intelligent adult content detection using TMDB API
-- **Per-Profile Settings** - Individual NSFW filtering for each family member
-- **Smart Detection** - Advanced algorithms identify inappropriate content accurately
-- **Parental Controls** - Safe viewing environment for all ages
-
-### 🎨 **Customization**
-- **Custom Accent Colors** - Personalize your interface with 9 beautiful preset colors
-- **Dark Theme** - Sleek, modern dark interface that's easy on the eyes
-- **Responsive Design** - Perfect experience on desktop, tablet, and mobile devices
-- **Smooth Animations** - Fluid transitions and micro-interactions
-
-### 🔧 **Advanced Features**
-- **Stremio Addon Manager** - Drag-and-drop addon reordering with integrated popup interface
-- **Auto-Login Options** - Smart login to last used profile or specific profile
-- **Real-Time Sync** - Instant updates across all your devices
-- **Export Functionality** - Backup and restore your profile configurations
-
-### ⚡ **Performance & Reliability**
-- **Edge-Ready Architecture** - Deploy globally with Deno Deploy
-- **Islands Architecture** - Fast loading with minimal JavaScript
-- **Offline Support** - Cached data for uninterrupted experience
-- **Auto-Refresh** - Seamless updates after configuration changes
-
-### 🌐 **Developer Experience**
-- **Modern Tech Stack** - Built with Deno, Fresh, TypeScript, and Tailwind CSS
-- **Clean Architecture** - Modular codebase with shared components and utilities
-- **Type Safety** - Full TypeScript coverage for reliable development
-- **Docker Support** - Easy deployment with containerization
+**🎭 Profile Management** - Netflix-style interface with unlimited profiles, custom avatars, and secure credential storage  
+**🔐 Enterprise Security** - AES-256-GCM encryption, session security, rate limiting, and magic link authentication  
+**🛡️ Content Filtering** - Smart NSFW detection using TMDB API with per-profile parental controls  
+**🎨 Customization** - Custom accent colors, dark theme, responsive design with smooth animations  
+**🔧 Advanced Features** - Drag-and-drop addon manager, auto-login options, and real-time sync  
+**⚡ Performance** - Edge-ready architecture with islands-based fast loading and offline support
 
 ---
 
 ## 🚀 **Quick Start**
 
-### Prerequisites
-- [Deno](https://deno.land/) v1.30.0+
-- MongoDB database
-- [Resend](https://resend.com/) API key for email authentication
-
-### Installation
-
 ```bash
-# Clone the repository
+# Clone and setup
 git clone https://github.com/MichielEijpe/Zentrio.git
 cd Zentrio
-
-# Set up environment variables
 cp .env.example .env
-# Edit .env with your MongoDB URI, Resend API key, and encryption master key
 
-# Start the development server
-cd app
-deno task start
+# Edit .env with your credentials (see below)
+
+# Start development server
+cd app && deno task start
 ```
 
-🎉 **That's it!** Visit [http://localhost:8000](http://localhost:8000) to see Zentrio in action.
-
----
-
-## 🔧 **Environment Setup**
-
-Create a `.env` file in the project root:
-
+**Environment Variables (`.env`):**
 ```env
-# Database
 MONGO_URI="your_mongodb_connection_string"
-
-# Email Authentication
-RESEND_API_KEY="your_resend_api_key"
-
-# Security (Generate with: deno run -A generate-key.js)
-ENCRYPTION_MASTER_KEY="your_64_character_hex_master_key"
+RESEND_API_KEY="your_resend_api_key" 
+EMAIL_FROM_DOMAIN="noreply@yourdomain.com"
+ENCRYPTION_MASTER_KEY="generated_64_char_hex_key"
 ```
 
-> 🔒 **Security Note:** The encryption master key is critical for data security. Generate a secure key using the built-in utility and store it safely.
+Generate the encryption key with: `python3 -c "import uuid; print((uuid.uuid4().hex + uuid.uuid4().hex))"`
 
 ---
 
 ## 🐳 **Docker Deployment**
 
-### Using Docker Compose (Recommended)
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-services:
-  zentrio:
-    image: ghcr.io/michieleijpe/zentrio:latest
-    container_name: zentrio
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
-
+**Quick Setup:**
 ```bash
+# With included MongoDB
 docker-compose up -d
+
+# Or standalone container
+docker run -d -p 8000:8000 --env-file .env ghcr.io/michieleijpe/zentrio:latest
 ```
 
-### Using Docker Run
-
-```bash
-docker run -d \
-  -p 8000:8000 \
-  --env-file .env \
-  --name zentrio \
-  --restart unless-stopped \
-  ghcr.io/michieleijpe/zentrio:latest
-```
-
----
-
-## 📱 **Screenshots**
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <img src="https://via.placeholder.com/350x200/1f2937/ffffff?text=Profile+Selection" alt="Profile Selection" style="border-radius: 8px;"/>
-        <br><strong>Profile Selection</strong>
-      </td>
-      <td align="center">
-        <img src="https://via.placeholder.com/350x200/1f2937/ffffff?text=Settings+Panel" alt="Settings Panel" style="border-radius: 8px;"/>
-        <br><strong>Settings Panel</strong>
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <img src="https://via.placeholder.com/350x200/1f2937/ffffff?text=Addon+Manager" alt="Addon Manager" style="border-radius: 8px;"/>
-        <br><strong>Addon Manager</strong>
-      </td>
-      <td align="center">
-        <img src="https://via.placeholder.com/350x200/1f2937/ffffff?text=Stremio+Interface" alt="Stremio Interface" style="border-radius: 8px;"/>
-        <br><strong>Enhanced Stremio</strong>
-      </td>
-    </tr>
-  </table>
-</div>
-
----
+Includes health checks, MongoDB service, and production-ready configuration.
 
 ## 🛠️ **Tech Stack**
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center"><img src="https://deno.land/logo.svg" width="40"/><br><strong>Deno</strong><br><em>Runtime</em></td>
-      <td align="center"><img src="https://fresh.deno.dev/logo.svg" width="40"/><br><strong>Fresh</strong><br><em>Framework</em></td>
-      <td align="center"><img src="https://preactjs.com/assets/app-icon.png" width="40"/><br><strong>Preact</strong><br><em>UI Library</em></td>
-      <td align="center"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg" width="40"/><br><strong>TypeScript</strong><br><em>Language</em></td>
-    </tr>
-    <tr>
-      <td align="center"><img src="https://tailwindcss.com/_next/static/media/tailwindcss-mark.3c5441fc7a190fb1800d4a5c7f07ba4b1345a9c8.svg" width="40"/><br><strong>Tailwind</strong><br><em>CSS</em></td>
-      <td align="center"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg" width="40"/><br><strong>MongoDB</strong><br><em>Database</em></td>
-      <td align="center"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg" width="40"/><br><strong>Docker</strong><br><em>Container</em></td>
-      <td align="center">🔐<br><strong>Encryption</strong><br><em>AES-256-GCM</em></td>
-    </tr>
-  </table>
-</div>
-
----
-
-## 📖 **Documentation**
-
-- **[Security Setup Guide](./SECURITY_SETUP.md)** - Complete security configuration
-- **[API Documentation](./docs/api.md)** - REST API reference
-- **[Development Guide](./docs/development.md)** - Contributing guidelines
-- **[Deployment Guide](./docs/deployment.md)** - Production deployment
+**Frontend:** Fresh (Preact) + TypeScript + Tailwind CSS  
+**Backend:** Deno runtime with Fresh framework  
+**Database:** MongoDB with Mongoose ODM  
+**Security:** AES-256-GCM encryption + session security  
+**Deployment:** Docker + health checks
 
 ---
 

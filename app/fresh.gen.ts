@@ -13,12 +13,15 @@ import * as $api_auth_signup from "./routes/api/auth/signup.ts";
 import * as $api_auth_verify_code from "./routes/api/auth/verify-code.ts";
 import * as $api_profiles_id_ from "./routes/api/profiles/[id].ts";
 import * as $api_profiles_index from "./routes/api/profiles/index.ts";
+import * as $api_sessions from "./routes/api/sessions.ts";
+import * as $api_test_email from "./routes/api/test-email.ts";
 import * as $api_tmdb_key from "./routes/api/tmdb-key.ts";
 import * as $auth_code from "./routes/auth/code.tsx";
 import * as $auth_password from "./routes/auth/password.tsx";
 import * as $auth_reset from "./routes/auth/reset.tsx";
 import * as $auth_signup_success from "./routes/auth/signup-success.tsx";
 import * as $auth_verify from "./routes/auth/verify.tsx";
+import * as $health from "./routes/health.ts";
 import * as $index from "./routes/index.tsx";
 import * as $login from "./routes/login.tsx";
 import * as $logout from "./routes/logout.ts";
@@ -51,12 +54,15 @@ const manifest = {
     "./routes/api/auth/verify-code.ts": $api_auth_verify_code,
     "./routes/api/profiles/[id].ts": $api_profiles_id_,
     "./routes/api/profiles/index.ts": $api_profiles_index,
+    "./routes/api/sessions.ts": $api_sessions,
+    "./routes/api/test-email.ts": $api_test_email,
     "./routes/api/tmdb-key.ts": $api_tmdb_key,
     "./routes/auth/code.tsx": $auth_code,
     "./routes/auth/password.tsx": $auth_password,
     "./routes/auth/reset.tsx": $auth_reset,
     "./routes/auth/signup-success.tsx": $auth_signup_success,
     "./routes/auth/verify.tsx": $auth_verify,
+    "./routes/health.ts": $health,
     "./routes/index.tsx": $index,
     "./routes/login.tsx": $login,
     "./routes/logout.ts": $logout,

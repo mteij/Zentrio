@@ -52,6 +52,27 @@ export ENCRYPTION_MASTER_KEY="your_64_character_hex_string_here"
 - Same encryption standards as passwords
 - Keys are decrypted only when needed for API calls
 
+### Session Security
+- **Session Binding**: Sessions are bound to IP address, User Agent, and browser fingerprint
+- **Activity Tracking**: All sessions track last activity and automatically expire after 2 hours of inactivity
+- **Security Validation**: Each request validates session security context to prevent hijacking
+- **Concurrent Session Limits**: Maximum 5 active sessions per user
+- **Suspicious Activity Detection**: Automatic detection of potential session hijacking attempts
+
+### Rate Limiting
+- **Login Protection**: 5 login attempts per 15 minutes, 30-minute lockout
+- **Signup Protection**: 3 signup attempts per hour, 1-hour lockout  
+- **API Protection**: 100 requests per minute per client, 5-minute lockout
+- **Password Reset**: 3 attempts per hour, 2-hour lockout
+- **IP-based Tracking**: Rate limits applied per IP address and user agent combination
+
+### Security Headers
+- **Content Security Policy**: Prevents XSS and injection attacks
+- **X-Frame-Options**: Prevents clickjacking attacks
+- **X-Content-Type-Options**: Prevents MIME type sniffing
+- **Strict-Transport-Security**: Enforces HTTPS connections
+- **X-XSS-Protection**: Enables browser XSS filtering
+
 ### Migration
 - Existing profiles with unencrypted passwords will be automatically migrated
 - Migration happens when the profile is next accessed

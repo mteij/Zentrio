@@ -31,6 +31,13 @@ export interface ProfileSchema extends Document {
 export interface SessionSchema extends Document {
   userId: ObjectId;
   expiresAt: Date;
+  // Enhanced security fields
+  ipAddress?: string;
+  userAgent?: string;
+  fingerprint?: string;
+  lastActivity: Date;
+  createdAt: Date;
+  isActive: boolean;
 }
 
 export interface VerificationTokenSchema extends Document {
@@ -74,6 +81,13 @@ const profileSchema = new mongoose.Schema<ProfileSchema>({
 const sessionSchema = new mongoose.Schema<SessionSchema>({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   expiresAt: { type: Date, required: true, expires: 0 }, // TTL index
+  // Enhanced security fields
+  ipAddress: { type: String },
+  userAgent: { type: String },
+  fingerprint: { type: String },
+  lastActivity: { type: Date, required: true, default: Date.now },
+  createdAt: { type: Date, required: true, default: Date.now },
+  isActive: { type: Boolean, required: true, default: true },
 });
 
 const verificationTokenSchema = new mongoose.Schema<VerificationTokenSchema>({
@@ -142,14 +156,154 @@ export const findUserByPasswordResetToken = async (token: string): Promise<UserS
 };
 
 // --- Session Functions ---
-export const createSession = async (userId: string, expiresAt: Date): Promise<string> => {
-  const session = await Sessions.create({ userId, expiresAt });
-  return (session as { _id: ObjectId })._id.toString();
+import { sessionSecurity } from "../shared/services/sessionSecurity.ts";
+
+export const createSession = async (
+  userId: string, 
+  expiresAt: Date, 
+  request?: Request
+): Promise<string> => {
+  // Generate secure session ID
+  const secureSessionId = sessionSecurity.generateSecureSessionId();
+  
+  // Extract security data from request if provided
+  let securityData = {};
+  if (request) {
+    const extracted = sessionSecurity.extractSecurityData(request);
+    securityData = {
+      ipAddress: extracted.ipAddress,
+      userAgent: extracted.userAgent,
+      fingerprint: extracted.fingerprint,
+    };
+  }
+
+  const session = await Sessions.create({ 
+    _id: new mongoose.Types.ObjectId(secureSessionId.slice(0, 24).padEnd(24, '0')),
+    userId, 
+    expiresAt,
+    ...securityData,
+    lastActivity: new Date(),
+    createdAt: new Date(),
+    isActive: true
+  });
+  
+  return session._id.toString();
 };
 
-export const getSession = async (sessionId: string): Promise<SessionSchema | null> => {
+export const getSession = async (sessionId: string, request?: Request): Promise<SessionSchema | null> => {
   if (!mongoose.Types.ObjectId.isValid(sessionId)) return null;
-  return await Sessions.findById(sessionId).lean();
+  
+  const session = await Sessions.findById(sessionId).lean();
+  if (!session) return null;
+
+  // Enhanced security validation
+  if (request) {
+    const currentSecurityData = sessionSecurity.extractSecurityData(request);
+    const storedSecurityData = {
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      fingerprint: session.fingerprint,
+    };
+
+    const validation = sessionSecurity.validateSessionSecurity(storedSecurityData, currentSecurityData);
+    if (!validation.isValid) {
+      console.warn(`Session security validation failed: ${validation.reason}`);
+      // Invalidate the session
+      await Sessions.updateOne({ _id: sessionId }, { $set: { isActive: false } });
+      return null;
+    }
+
+    // Update last activity
+    await Sessions.updateOne({ _id: sessionId }, { $set: { lastActivity: new Date() } });
+  }
+
+  // Check if session is still active
+  if (!session.isActive) {
+    return null;
+  }
+
+  // Check for inactivity timeout
+  if (sessionSecurity.isSessionExpiredByInactivity(session.lastActivity)) {
+    await Sessions.updateOne({ _id: sessionId }, { $set: { isActive: false } });
+    return null;
+  }
+
+  return session;
+};
+
+/**
+ * Invalidate all sessions for a user
+ */
+export const invalidateAllUserSessions = async (userId: string): Promise<void> => {
+  await Sessions.updateMany(
+    { userId: new mongoose.Types.ObjectId(userId) },
+    { $set: { isActive: false } }
+  );
+};
+
+/**
+ * Invalidate a specific session
+ */
+export const invalidateSession = async (sessionId: string): Promise<void> => {
+  await Sessions.updateOne(
+    { _id: sessionId },
+    { $set: { isActive: false } }
+  );
+};
+
+/**
+ * Get all active sessions for a user
+ */
+export const getUserActiveSessions = async (userId: string): Promise<SessionSchema[]> => {
+  return await Sessions.find({
+    userId: new mongoose.Types.ObjectId(userId),
+    isActive: true,
+    expiresAt: { $gt: new Date() }
+  }).lean();
+};
+
+/**
+ * Clean up inactive/expired sessions
+ */
+export const cleanupExpiredSessions = async (): Promise<number> => {
+  const result = await Sessions.deleteMany({
+    $or: [
+      { expiresAt: { $lt: new Date() } },
+      { isActive: false },
+      { lastActivity: { $lt: new Date(Date.now() - 2 * 60 * 60 * 1000) } } // 2 hours inactive
+    ]
+  });
+  return result.deletedCount || 0;
+};
+
+/**
+ * Detect and handle suspicious session activity
+ */
+export const detectSuspiciousActivity = async (userId: string): Promise<boolean> => {
+  const sessions = await getUserActiveSessions(userId);
+  const suspiciousActivity = sessionSecurity.detectSuspiciousActivity(
+    sessions.map(s => ({
+      userId: s.userId.toString(),
+      sessionId: s._id.toString(),
+      expiresAt: s.expiresAt,
+      lastActivity: s.lastActivity,
+      isActive: s.isActive,
+      securityData: {
+        ipAddress: s.ipAddress,
+        userAgent: s.userAgent,
+        fingerprint: s.fingerprint,
+      }
+    })),
+    { ipAddress: 'current', userAgent: 'current', fingerprint: 'current' }
+  );
+
+  if (suspiciousActivity.isSuspicious) {
+    console.warn(`Suspicious activity detected for user ${userId}: ${suspiciousActivity.reason}`);
+    // Optionally invalidate all sessions or send alert
+    return true;
+  }
+
+  return false;
 };
 
 // --- Verification Token Functions ---

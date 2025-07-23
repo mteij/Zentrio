@@ -73,6 +73,7 @@ export function useAuthForm() {
       }
 
       const result = await response.json();
+      setLoading(false);
       if (onSuccess) {
         onSuccess(result);
       }

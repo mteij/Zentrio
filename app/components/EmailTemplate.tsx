@@ -30,7 +30,7 @@ export function EmailTemplate({ title, header, body }: EmailTemplateProps) {
       >
         <div style={{ backgroundColor: "#141414", padding: "20px" }}>
           <h1 style={{ color: "#ffffff", margin: "0", fontSize: "24px" }}>
-            StremioHub
+            Zentrio
           </h1>
         </div>
         <div style={{ padding: "30px" }}>
@@ -51,7 +51,7 @@ export function EmailTemplate({ title, header, body }: EmailTemplateProps) {
             color: "#777",
           }}
         >
-          &copy; {new Date().getFullYear()} StremioHub. All rights reserved.
+          &copy; {new Date().getFullYear()} Zentrio. All rights reserved.
         </div>
       </div>
     </div>

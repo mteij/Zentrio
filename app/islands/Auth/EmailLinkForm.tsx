@@ -22,9 +22,16 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
       { email: email.value },
       {
         onSuccess: (data) => {
-          if (data.redirectUrl) {
+          console.log('API call successful, response:', data);
+          if (data?.redirectUrl) {
+            console.log('Redirecting to:', data.redirectUrl);
             globalThis.location.href = data.redirectUrl;
+          } else {
+            console.error('No redirectUrl in response:', data);
           }
+        },
+        onError: (error) => {
+          console.error('API call failed:', error);
         }
       }
     );

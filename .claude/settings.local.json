@@ -10,7 +10,8 @@
       "Bash(deno cache:*)",
       "Bash(deno check:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }

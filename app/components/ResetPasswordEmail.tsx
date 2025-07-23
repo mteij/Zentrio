@@ -9,7 +9,7 @@ interface ResetPasswordEmailProps {
 export function ResetPasswordEmail({ resetUrl }: ResetPasswordEmailProps) {
   return (
     <EmailTemplate
-      title="Reset Password - StremioHub"
+      title="Reset Password - Zentrio"
       header="Reset Your Password"
       body={
         <div>

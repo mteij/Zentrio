@@ -14,7 +14,7 @@ export function LoginCodeEmail({ code, verificationUrl }: LoginCodeEmailProps) {
       body={
         <>
           <p>
-            Thanks for signing in to StremioHub. Please use the code below to
+            Thanks for signing in to Zentrio. Please use the code below to
             complete your sign-in process.
           </p>
           <div

@@ -23,6 +23,8 @@ export * from "./utils/profileUtils.ts";
 export { EmailService } from "./services/email.ts";
 export { nsfwFilter } from "./services/nsfwFilter.ts";
 export { encryptionService } from "./services/encryption.ts";
+export { sessionSecurity } from "./services/sessionSecurity.ts";
+export { rateLimiter } from "./services/rateLimiter.ts";
 
 // Shared constants
 export * from "./constants/styles.ts";

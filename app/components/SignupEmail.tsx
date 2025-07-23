@@ -9,8 +9,8 @@ interface SignupEmailProps {
 export function SignupEmail({ email, password }: SignupEmailProps) {
   return (
     <EmailTemplate
-      title="Welcome to StremioHub!"
-      header="Welcome to StremioHub!"
+      title="Welcome to Zentrio!"
+      header="Welcome to Zentrio!"
       body={
         <>
           <p>

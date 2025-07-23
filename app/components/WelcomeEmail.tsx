@@ -10,7 +10,7 @@ export function WelcomeEmail({ email, password, loginUrl }: WelcomeEmailProps) {
   return (
     <div style={{ fontFamily: "sans-serif", padding: "20px", backgroundColor: "#f4f4f4" }}>
       <div style={{ maxWidth: "600px", margin: "auto", backgroundColor: "white", padding: "20px", borderRadius: "8px" }}>
-        <h1 style={{ color: "#e50914" }}>Welcome to StremioHub!</h1>
+        <h1 style={{ color: "#e50914" }}>Welcome to Zentrio!</h1>
         <p>Your account has been created. You can now log in using your email and the password below.</p>
         <p><strong>Email:</strong> {email}</p>
         <p><strong>Password:</strong> <code style={{ background: "#eee", padding: "4px 8px", borderRadius: "4px" }}>{password}</code></p>
@@ -19,7 +19,7 @@ export function WelcomeEmail({ email, password, loginUrl }: WelcomeEmailProps) {
           Log In Now
         </a>
         <p style={{ fontSize: "12px", color: "#777", marginTop: "20px" }}>
-          If you did not sign up for StremioHub, you can safely ignore this email.
+          If you did not sign up for Zentrio, you can safely ignore this email.
         </p>
       </div>
     </div>
