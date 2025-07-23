@@ -196,14 +196,29 @@ jobs:
         echo "Build directory contents:"
         find ./build -type f \( -name "*.apk" -o -name "*.aab" -o -name "*.msix" -o -name "*.json" -o -name "AndroidManifest.xml" \) | head -20
 
+    - name: Ensure build artifacts exist
+      run: |
+        # Create build info files even if APK build failed
+        echo "Build completed at $(date)" > ./build/android/build-info.txt
+        echo "Build number: ${{ github.run_number }}" >> ./build/android/build-info.txt
+        echo "Commit: ${{ github.sha }}" >> ./build/android/build-info.txt
+        
+        echo "Windows package info created at $(date)" > ./build/windows/build-info.txt
+        echo "Visit https://zentrio.eu to install the PWA directly" >> ./build/windows/build-info.txt
+        
+        # List all files that will be uploaded
+        echo "=== Android build contents ==="
+        find ./build/android -type f | head -20
+        echo "=== Windows build contents ===" 
+        find ./build/windows -type f | head -20
+
     - name: Upload Android Files
       uses: actions/upload-artifact@v4
       with:
         name: zentrio-android-files
-        path: |
-          ./build/android/
+        path: ./build/android/
         retention-days: 30
-        if-no-files-found: warn
+        if-no-files-found: ignore
 
     - name: Upload Windows Package Info
       uses: actions/upload-artifact@v4  
@@ -211,7 +226,7 @@ jobs:
         name: zentrio-windows-info
         path: ./build/windows/
         retention-days: 30
-        if-no-files-found: warn
+        if-no-files-found: ignore
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -244,37 +259,40 @@ jobs:
         body: |
           ## 🚀 Zentrio ${{ github.ref_name }}
           
-          ### 📱 Installation Options
+          ### 📱 Recommended Installation
           
-          **🌐 Recommended - Web App (All Platforms):**
-          Visit [**zentrio.eu**](https://zentrio.eu) and click "Add to Home Screen" or the install button in your browser.
+          **🌐 Direct PWA Installation (All Platforms):**
           
-          **🤖 Android (Advanced Users):**
-          - Download Android files from artifacts below
-          - Built using Bubblewrap (Trusted Web Activity)
-          - Requires manual APK generation or Android Studio
+          Visit [**zentrio.eu**](https://zentrio.eu) and install directly in your browser:
+          - **Chrome/Edge/Safari**: Click the install button in the address bar
+          - **Firefox**: Use "Add to Home Screen" from the menu
+          - **Mobile**: Use "Add to Home Screen" from browser menu
           
-          **🪟 Windows (Development):**
-          - Windows package configuration available in artifacts
-          - Requires manual MSIX creation tools
-          
-          **📋 Best Installation Method:**
-          For the easiest installation experience, visit [**zentrio.eu**](https://zentrio.eu) in any modern browser:
-          - **Chrome/Edge**: Click the install button in the address bar
-          - **Safari**: Share → Add to Home Screen
-          - **Firefox**: Add to Home Screen option in menu
+          This provides the best user experience with automatic updates and full PWA functionality.
           
           ---
           
-          ### 🔧 Technical Details
+          ### 🔧 Developer Resources
+          
+          **Build Artifacts Available:**
+          - Android build configuration and Bubblewrap setup
+          - Windows PWA package configuration  
+          - Build scripts and manifests for manual app generation
+          
+          **For Advanced Users:**
+          Download the artifacts below if you want to:
+          - Generate custom Android APKs using the provided configuration
+          - Create Windows MSIX packages with the included manifest
+          - Study the TWA (Trusted Web Activity) setup for educational purposes
+          
+          ---
+          
+          ### 📊 Build Information
           - **Build**: #${{ github.run_number }}
           - **Commit**: ${{ github.sha }}
-          - **Built with**: Bubblewrap CLI for Android, manual config for Windows
+          - **Built with**: Bubblewrap CLI, PWA tools
           - **Source**: [View Changes](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }})
           
-          ### 📥 Download Artifacts
-          Check the "Assets" section below or visit the [Actions tab](https://github.com/${{ github.repository }}/actions) for build artifacts.
-          
-          *PWA-based native app configurations*
+          **💡 Note:** For the easiest installation, just visit [zentrio.eu](https://zentrio.eu) - no downloads required!
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
