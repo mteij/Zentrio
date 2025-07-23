@@ -66,12 +66,29 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
       { email: email.value },
       {
         onSuccess: (data) => {
-          if (data.redirectUrl) {
+          console.log('Send login code success:', data);
+          // Handle both response structures: { redirectUrl } or { data: { redirectUrl } }
+          const redirectUrl = data.redirectUrl || data.data?.redirectUrl;
+          
+          if (redirectUrl) {
             successMessage.value = `Login code sent to ${email.value}. Check your email!`;
             setTimeout(() => {
-              globalThis.location.href = data.redirectUrl;
+              console.log('Redirecting to:', redirectUrl);
+              globalThis.location.href = redirectUrl;
+            }, 2000);
+          } else {
+            console.error('No redirectUrl in response:', data);
+            // Fallback - redirect manually
+            const fallbackUrl = `/auth/code?email=${encodeURIComponent(email.value)}`;
+            successMessage.value = `Login code sent to ${email.value}. Check your email!`;
+            setTimeout(() => {
+              console.log('Using fallback redirect to:', fallbackUrl);
+              globalThis.location.href = fallbackUrl;
             }, 2000);
           }
+        },
+        onError: (error) => {
+          console.error('Send login code error:', error);
         }
       }
     );

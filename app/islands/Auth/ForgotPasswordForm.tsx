@@ -49,7 +49,7 @@ export default function ForgotPasswordForm({ initialEmail = "" }: ForgotPassword
             Check your email for the reset link. It may take a few minutes to arrive.
           </p>
           <a 
-            href="/auth" 
+            href="/login" 
             class="text-red-500 hover:underline"
           >
             Back to login
@@ -81,7 +81,7 @@ export default function ForgotPasswordForm({ initialEmail = "" }: ForgotPassword
       </FormButton>
       <div class="text-center">
         <a 
-          href="/auth" 
+          href="/login" 
           class="text-gray-400 hover:text-white text-sm"
         >
           Back to login

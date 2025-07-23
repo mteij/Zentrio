@@ -142,20 +142,22 @@ class SessionSecurityService {
     }
 
     if (allowFraming) {
-      // Allow framing from any origin for Stremio integration (omit X-Frame-Options to allow all)
-      // X-Frame-Options is omitted when frame-ancestors * is used in CSP
+      // Allow framing from any origin - completely remove CSP restrictions for embeddable routes
+      delete headers['X-Frame-Options'];
       headers['Content-Security-Policy'] = [
-        "default-src 'self' *",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' *",
-        "style-src 'self' 'unsafe-inline' *",
-        "img-src 'self' data: blob: *", 
-        "font-src 'self' *",
-        "connect-src 'self' *",
-        "media-src 'self' blob: *",
-        "object-src 'none'",
-        "frame-src 'self' *",
+        "default-src *",
+        "script-src * 'unsafe-inline' 'unsafe-eval'",
+        "style-src * 'unsafe-inline'",
+        "img-src * data: blob:", 
+        "font-src *",
+        "connect-src *",
+        "media-src * blob:",
+        "object-src *",
+        "frame-src *",
         "frame-ancestors *",
-        "worker-src 'self' blob:"
+        "worker-src * blob:",
+        "child-src *",
+        "manifest-src *"
       ].join('; ');
     } else {
       // Restrictive policy for non-Stremio pages
