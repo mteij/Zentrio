@@ -54,11 +54,17 @@ const proxyRequestHandler = async (req: Request, path: string) => {
 
     // Remove any restrictive security headers to allow embedding and script injection
     responseHeaders.delete("content-security-policy");
-    responseHeaders.delete("x-frame-options"); 
+    responseHeaders.delete("Content-Security-Policy");
+    responseHeaders.delete("x-frame-options");
     responseHeaders.delete("X-Frame-Options");
     
     // Set completely permissive CSP to allow embedding from anywhere
     responseHeaders.set("Content-Security-Policy", "frame-ancestors *; default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline' data: blob:; img-src * data: blob:; font-src * data:; connect-src * data: blob:; media-src * data: blob:; object-src *; child-src *; frame-src *; worker-src * blob:; manifest-src *;");
+
+    // Set no-cache headers to prevent browser/proxy caching of CSP
+    responseHeaders.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    responseHeaders.set("Pragma", "no-cache");
+    responseHeaders.set("Expires", "0");
 
     // Rewrite Set-Cookie headers to remove the Domain attribute
     const setCookieHeader = response.headers.get("set-cookie");
@@ -145,11 +151,6 @@ const proxyRequestHandler = async (req: Request, path: string) => {
 
             // This observer removes the "Streaming server is not available" warning
             // and replaces the Stremio logo with the user's profile picture.
-            const observer = new MutationObserver(() => {
-              // Check for the warning and remove it.
-              const warningLink = document.querySelector('a[href="https://www.stremio.com/download-service"]');
-              if (warningLink) {
-                const container = warningLink.closest('div[class*="board-warning-container"]');
                 if (container) container.remove();
               }
 

@@ -90,12 +90,72 @@ jobs:
         mkdir -p app/src/main/java/eu/zentrio/app
         mkdir -p app/src/main/res/{values,drawable-hdpi,drawable-mdpi,drawable-xhdpi,drawable-xxhdpi,drawable-xxxhdpi,mipmap-hdpi,mipmap-mdpi,mipmap-xhdpi,mipmap-xxhdpi,mipmap-xxxhdpi}
         
-        echo "✅ Project structure created without interactive prompts"
+        # Download the app icon from the PWA and create Android icon resources
+        echo "Creating app icons..."
+        
+        # Download the 512x512 icon from the PWA
+        curl -s -o icon-512.png https://zentrio.eu/icons/icon-512.png || echo "Could not download icon, creating placeholder"
+        
+        # Create a simple red placeholder icon if download fails
+        if [ ! -f "icon-512.png" ]; then
+          # Create a simple SVG and convert to PNG (fallback approach)
+          echo '<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" fill="#e50914"/><text x="256" y="280" font-family="Arial" font-size="120" fill="white" text-anchor="middle">Z</text></svg>' > icon.svg
+          
+          # Try to convert with ImageMagick if available, otherwise create minimal PNG
+          convert icon.svg icon-512.png 2>/dev/null || {
+            # Create a minimal valid PNG if ImageMagick is not available
+            echo "Creating minimal placeholder icon"
+            # This creates a small red square PNG (fallback)
+            echo -e '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\x08\x02\x00\x00\x00\x90\x91h6\x00\x00\x00\x12IDATx\x9cc\xf8\x0f\x00\x00\x00\xff\xff\x03\x00\x00\x02\x00\x01\xe5\'\xde\xfc\x00\x00\x00\x00IEND\xaeB`\x82' > icon-16.png
+            # Scale up this small icon for larger sizes (crude but functional)
+            cp icon-16.png icon-512.png
+          }
+        fi
+        
+        # Create Android launcher icons in different sizes
+        # Using simple copy approach since we may not have image conversion tools
+        cp icon-512.png app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+        cp icon-512.png app/src/main/res/mipmap-xxhdpi/ic_launcher.png  
+        cp icon-512.png app/src/main/res/mipmap-xhdpi/ic_launcher.png
+        cp icon-512.png app/src/main/res/mipmap-hdpi/ic_launcher.png
+        cp icon-512.png app/src/main/res/mipmap-mdpi/ic_launcher.png
+        
+        # Also create drawable versions
+        cp icon-512.png app/src/main/res/drawable-xxxhdpi/ic_launcher.png
+        cp icon-512.png app/src/main/res/drawable-xxhdpi/ic_launcher.png
+        cp icon-512.png app/src/main/res/drawable-xhdpi/ic_launcher.png
+        cp icon-512.png app/src/main/res/drawable-hdpi/ic_launcher.png
+        cp icon-512.png app/src/main/res/drawable-mdpi/ic_launcher.png
+        
+        # Create adaptive icon XML (modern Android)
+        mkdir -p app/src/main/res/mipmap-anydpi-v26
+        cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@color/ic_launcher_background"/>
+            <foreground android:drawable="@mipmap/ic_launcher"/>
+        </adaptive-icon>
+        EOF
+        
+        # Create launcher background color
+        cat > app/src/main/res/values/ic_launcher_background.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <color name="ic_launcher_background">#141414</color>
+        </resources>
+        EOF
+        
+        echo "✅ Project structure and icons created successfully"
+        
+        # Verify icon files were created
+        echo "=== Verifying icon files ==="
+        ls -la app/src/main/res/mipmap-hdpi/ic_launcher.png 2>/dev/null && echo "✅ ic_launcher.png created" || echo "❌ ic_launcher.png missing"
         
         # Show what was created
         echo "=== Directory contents after setup ==="
         ls -la
-        find . -type d | head -10
+        echo "=== Resource directories ==="
+        find app/src/main/res -name "*ic_launcher*" | head -10
 
     - name: Configure TWA Settings
       run: |

@@ -13,7 +13,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(touch:*)",
       "Bash(deno task:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
