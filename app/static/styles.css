@@ -11,6 +11,35 @@ body {
   height: 150px;
   background-position: center;
   background-size: cover;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove default outline and box-shadow for profile avatars and their parent buttons */
+.profile-avatar,
+button:focus,
+button:active,
+button:focus-visible,
+button:focus .profile-avatar,
+button:active .profile-avatar,
+button:focus-visible .profile-avatar {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Remove the default outline for all elements inside .profile-avatar (for browsers that apply it to children) */
+.profile-avatar * {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove the default outline for divs inside buttons (for browsers that apply it to the div) */
+button > div:focus,
+button > div:active {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
 }
 
 @keyframes fadeOut {

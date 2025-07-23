@@ -321,11 +321,33 @@ export default function SettingsModal({
 
             {/* Accent Color Setting */}
             <div class="mb-6">
+              <div class="flex items-center mb-2">
+                <span class="text-xs text-gray-400 mr-2" style={{ minWidth: "90px" }}>
+                  Current accent
+                </span>
+                <div
+                  class="rounded-full border border-gray-700"
+                  style={{
+                    width: "28px",
+                    height: "28px",
+                    background: accentColor.value,
+                    display: "inline-block",
+                  }}
+                />
+              </div>
               <ColorPicker
                 label="Accent Color"
                 value={accentColor.value}
                 onChange={(color) => accentColor.value = color}
-                presets={["#dc2626", "#2563eb", "#059669", "#7c3aed", "#ea580c", "#0891b2", "#be123c", "#9333ea", "#c2410c"]}
+                presets={[
+                  "#dc2626",
+                  "#2563eb",
+                  "#059669",
+                  "#7c3aed",
+                  "#ea580c",
+                  "#0891b2",
+                  "#be123c"
+                ]}
               />
               <p class="text-xs text-gray-500 mt-2">
                 Choose your preferred accent color for the interface. This affects buttons, links, and highlights.

@@ -58,20 +58,19 @@ const proxyRequestHandler = async (req: Request, path: string) => {
     responseHeaders.delete("x-frame-options");
     responseHeaders.delete("X-Frame-Options");
     
-    // Set completely permissive CSP to allow embedding from anywhere with explicit addon domains
+    // Set completely permissive CSP to allow everything
     responseHeaders.set("Content-Security-Policy", 
-      "frame-ancestors *; " +
       "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
-      "script-src * 'unsafe-inline' 'unsafe-eval' data: blob: http://www.gstatic.com https://www.gstatic.com http://appleid.cdn-apple.com https://appleid.cdn-apple.com; " +
-      "script-src-elem * 'unsafe-inline' 'unsafe-eval' data: blob: http://www.gstatic.com https://www.gstatic.com http://appleid.cdn-apple.com https://appleid.cdn-apple.com; " +
+      "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
       "style-src * 'unsafe-inline' data: blob:; " +
       "img-src * data: blob:; " +
       "font-src * data:; " +
       "connect-src * data: blob:; " +
-      "media-src * data: blob:; " +
+      "media-src * blob:; " +
       "object-src *; " +
       "child-src *; " +
       "frame-src *; " +
+      "frame-ancestors *; " +
       "worker-src * blob:; " +
       "manifest-src *;"
     );

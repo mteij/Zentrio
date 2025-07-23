@@ -141,38 +141,22 @@ class SessionSecurityService {
       headers['Access-Control-Allow-Credentials'] = 'true';
     }
 
-    if (allowFraming) {
-      // Allow framing from any origin - completely remove CSP restrictions for embeddable routes
-      delete headers['X-Frame-Options'];
-      headers['Content-Security-Policy'] = [
-        "default-src *",
-        "script-src * 'unsafe-inline' 'unsafe-eval'",
-        "style-src * 'unsafe-inline'",
-        "img-src * data: blob:", 
-        "font-src *",
-        "connect-src *",
-        "media-src * blob:",
-        "object-src *",
-        "frame-src *",
-        "frame-ancestors *",
-        "worker-src * blob:",
-        "child-src *",
-        "manifest-src *"
-      ].join('; ');
-    } else {
-      // Less restrictive policy that allows local framing but maintains security
-      // Remove X-Frame-Options to let CSP handle framing
-      headers['Content-Security-Policy'] = [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'", 
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "img-src 'self' data: https:",
-        "font-src 'self' https://fonts.gstatic.com",
-        "connect-src 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'self' localhost:* 127.0.0.1:*"
-      ].join('; ');
-    }
+    // Fully permissive CSP for all cases
+    headers['Content-Security-Policy'] = [
+      "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;",
+      "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:;",
+      "style-src * 'unsafe-inline' data: blob:;",
+      "img-src * data: blob:;",
+      "font-src * data:;",
+      "connect-src * data: blob:;",
+      "media-src * blob:;",
+      "object-src *;",
+      "child-src *;",
+      "frame-src *;",
+      "frame-ancestors *;",
+      "worker-src * blob:;",
+      "manifest-src *;"
+    ].join(' ');
 
     return headers;
   }
