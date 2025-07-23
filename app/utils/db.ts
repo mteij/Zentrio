@@ -112,13 +112,31 @@ export const comparePassword = async (password: string, hash: string) => {
   return await bcrypt.compare(password, hash);
 };
 
+/**
+ * Generate a cryptographically secure random password
+ * @param length Password length (default: 12)
+ * @returns Secure random password
+ */
+const generateSecurePassword = (length: number = 12): string => {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += charset[array[i] % charset.length];
+  }
+  
+  return password;
+};
+
 // --- User Functions ---
 export const findUserByEmail = async (email: string): Promise<UserSchema | null> => {
   return await Users.findOne({ email: email.toLowerCase() });
 };
 
 export const createUserWithGeneratedPassword = async (email: string): Promise<{ user: UserSchema; plainPassword: string }> => {
-  const plainPassword = Math.random().toString(36).slice(-8);
+  const plainPassword = generateSecurePassword(12); // Generate 12-character secure password
   const hashedPassword = await hashPassword(plainPassword);
   const user = await Users.create({ email: email.toLowerCase(), password: hashedPassword });
   return { user, plainPassword };
@@ -128,7 +146,7 @@ export const createUserWithGeneratedPassword = async (email: string): Promise<{ 
  * @deprecated Use createUserWithGeneratedPassword instead for the new auth flow.
  */
 export const createUserWithPassword = async (email: string): Promise<{ user: UserSchema; plainPassword: string }> => {
-  const plainPassword = Math.random().toString(36).slice(-8);
+  const plainPassword = generateSecurePassword(12); // Generate 12-character secure password
   const hashedPassword = await hashPassword(plainPassword);
   const user = await Users.create({ email: email.toLowerCase(), password: hashedPassword });
   return { user, plainPassword };

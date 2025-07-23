@@ -98,12 +98,26 @@ const proxyRequestHandler = async (req: Request, path: string) => {
       if (sessionData) {
         // The data is a URL-encoded JSON string. We decode it and inject it.
         const decodedSessionData = decodeURIComponent(sessionData);
+        
+        // Properly escape the session data for safe JavaScript injection
+        const escapeForJS = (str: string): string => {
+          return str
+            .replace(/\\/g, "\\\\")  // Escape backslashes first
+            .replace(/`/g, "\\`")    // Escape backticks
+            .replace(/\$/g, "\\$")   // Escape dollar signs (template literals)
+            .replace(/\r?\n/g, "\\n") // Escape newlines
+            .replace(/\r/g, "\\r")   // Escape carriage returns
+            .replace(/\t/g, "\\t");  // Escape tabs
+        };
+        
+        const safeSessionData = escapeForJS(decodedSessionData);
+        
         const injectionScript = `
           <script>
             let session; // Declare session in a wider scope
             // This script runs before Stremio's own scripts to set up the session.
             try {
-              session = JSON.parse(\`${decodedSessionData.replace(/`/g, "\\`")}\`);
+              session = JSON.parse(\`${safeSessionData}\`);
               // Iterate over the session object and set each key in localStorage.
               // Stremio expects some values to be JSON.stringified (like strings), and others not (like numbers).
               for (const key in session) {

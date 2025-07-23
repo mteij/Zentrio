@@ -8,9 +8,18 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     
     steps:
     - name: Checkout
@@ -21,11 +30,19 @@ jobs:
       with:
         node-version: '18'
 
-    - name: Install PWABuilder Tools
+    - name: Setup Java JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Install Bubblewrap CLI
       run: |
-        # Install the correct PWABuilder package
         npm install -g @bubblewrap/cli
-        npm install -g pwabuilder-lib
+        echo "Bubblewrap installed successfully"
 
     - name: Wait for site to be ready
       run: |
@@ -37,17 +54,27 @@ jobs:
         mkdir -p ./build/android
         mkdir -p ./build/windows
 
-    - name: Generate Android APK with Bubblewrap
+    - name: Initialize Bubblewrap Project
       run: |
-        echo "Building Android APK with Bubblewrap..."
-        bubblewrap init \
-          --manifest https://zentrio.eu/manifest.json \
-          --directory ./build/android
-        
+        echo "Initializing Bubblewrap project..."
         cd ./build/android
         
-        # Configure the Trusted Web Activity
-        cat > twa-manifest.json << 'EOF'
+        # Create bubblewrap project with non-interactive init
+        echo "y" | bubblewrap init --manifest https://zentrio.eu/manifest.json || echo "Init completed"
+        
+        # Show what was created
+        ls -la
+
+    - name: Configure TWA Settings
+      run: |
+        echo "Configuring Trusted Web Activity settings..."
+        cd ./build/android
+        
+        # Update the twa-manifest.json if it exists
+        if [ -f "twa-manifest.json" ]; then
+          echo "Found twa-manifest.json, updating configuration..."
+          # Create updated config
+          cat > twa-manifest.json << 'EOF'
         {
           "packageId": "eu.zentrio.app",
           "host": "zentrio.eu",
@@ -58,7 +85,7 @@ jobs:
           "backgroundColor": "#141414",
           "startUrl": "/",
           "iconUrl": "https://zentrio.eu/icons/icon-512.png",
-          "maskableIconUrl": "https://zentrio.eu/icons/icon-512.png",
+          "maskableIconUrl": "https://zentrio.eu/icons/icon-512.png", 
           "monochromeIconUrl": "https://zentrio.eu/icons/icon-512.png",
           "appVersion": "1.0.0",
           "appVersionCode": ${{ github.run_number }},
@@ -74,9 +101,26 @@ jobs:
           "shortcuts": []
         }
         EOF
+        else
+          echo "No twa-manifest.json found, creating from scratch..."
+        fi
+
+    - name: Build Android APK
+      run: |
+        echo "Building Android APK..."
+        cd ./build/android
         
-        # Build the APK
-        bubblewrap build --skipPwaValidation || echo "Build completed with warnings"
+        # Try to build the APK
+        if [ -f "twa-manifest.json" ]; then
+          echo "Building with Bubblewrap..."
+          bubblewrap build --skipPwaValidation || echo "Build failed, but continuing..."
+        else
+          echo "No manifest found, skipping APK build"
+        fi
+        
+        # List all files created
+        echo "Files in build directory:"
+        find . -type f -name "*.apk" -o -name "*.aab" -o -name "*.json" | head -10
 
     - name: Alternative APK Build (fallback)
       if: failure()
@@ -169,14 +213,34 @@ jobs:
         retention-days: 30
         if-no-files-found: warn
 
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    
+    steps:
+    - name: Download Android artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: zentrio-android-files
+        path: ./artifacts/android/
+        
+    - name: Download Windows artifacts  
+      uses: actions/download-artifact@v4
+      with:
+        name: zentrio-windows-info
+        path: ./artifacts/windows/
+
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          ./build/android/**/*.apk
-          ./build/android/**/*.aab
-          ./build/windows/**/*.msix
+          ./artifacts/android/**/*.apk
+          ./artifacts/android/**/*.aab
+          ./artifacts/windows/**/*.msix
         body: |
           ## 🚀 Zentrio ${{ github.ref_name }}
           
