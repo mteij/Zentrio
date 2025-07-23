@@ -1,6 +1,9 @@
-// ...existing code from app/islands/EmailLinkForm.tsx...
 import { h } from "preact";
 import { useSignal } from "@preact/signals";
+import { useAuthForm } from "../../shared/hooks/useAuthForm.ts";
+import { FormInput } from "../../shared/components/forms/FormInput.tsx";
+import { FormButton } from "../../shared/components/forms/FormButton.tsx";
+import { ErrorMessage } from "../../shared/components/forms/ErrorMessage.tsx";
 
 interface EmailLinkFormProps {
   // No props needed anymore as it's self-contained
@@ -8,39 +11,23 @@ interface EmailLinkFormProps {
 
 export default function EmailLinkForm({}: EmailLinkFormProps) {
   const email = useSignal("");
-  const error = useSignal<string | null>(null);
-  const isLoading = useSignal(false);
+  const { error, isLoading, makeApiCall, validateEmailField } = useAuthForm();
 
   const handleFormSubmit = async (e: h.JSX.TargetedEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Client-side validation
-    if (!email.value.trim() || !/^\S+@\S+\.\S+$/.test(email.value)) {
-      error.value = "Please enter a valid email address.";
-      return;
-    }
+    if (!validateEmailField(email.value)) return;
 
-    isLoading.value = true;
-    error.value = null;
-
-    try {
-      const res = await fetch("/api/auth/login-or-signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.value }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "An unknown error occurred.");
+    await makeApiCall("/api/auth/login-or-signup", 
+      { email: email.value },
+      {
+        onSuccess: (data) => {
+          if (data.redirectUrl) {
+            globalThis.location.href = data.redirectUrl;
+          }
+        }
       }
-      if (data.redirectUrl) {
-        globalThis.location.href = data.redirectUrl;
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : String(e);
-    } finally {
-      isLoading.value = false;
-    }
+    );
   };
 
   return (
@@ -50,27 +37,26 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
           <label htmlFor="email" class="block text-sm font-medium text-gray-300 transition-all duration-200">
             Email Address
           </label>
-          <input
+          <FormInput
             type="email"
             id="email"
             name="email"
-            autoComplete="username"
             value={email.value}
             onInput={(e) => (email.value = e.currentTarget.value)}
-            required
-            class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
             placeholder="you@example.com"
             disabled={isLoading.value}
+            required
           />
         </div>
-        {error.value && <p class="text-sm text-red-500 transition-all duration-200">{error.value}</p>}
-        <button
+        <ErrorMessage message={error.value} />
+        <FormButton
           type="submit"
           disabled={isLoading.value}
-          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-600 disabled:opacity-50 transition-all duration-200"
+          isLoading={isLoading.value}
+          loadingText="Checking..."
         >
-          {isLoading.value ? "Checking..." : "Continue"}
-        </button>
+          Continue
+        </FormButton>
       </form>
       <style>
         {`

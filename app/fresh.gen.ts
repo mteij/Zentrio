@@ -13,6 +13,7 @@ import * as $api_auth_signup from "./routes/api/auth/signup.ts";
 import * as $api_auth_verify_code from "./routes/api/auth/verify-code.ts";
 import * as $api_profiles_id_ from "./routes/api/profiles/[id].ts";
 import * as $api_profiles_index from "./routes/api/profiles/index.ts";
+import * as $api_tmdb_key from "./routes/api/tmdb-key.ts";
 import * as $auth_code from "./routes/auth/code.tsx";
 import * as $auth_password from "./routes/auth/password.tsx";
 import * as $auth_reset from "./routes/auth/reset.tsx";
@@ -50,6 +51,7 @@ const manifest = {
     "./routes/api/auth/verify-code.ts": $api_auth_verify_code,
     "./routes/api/profiles/[id].ts": $api_profiles_id_,
     "./routes/api/profiles/index.ts": $api_profiles_index,
+    "./routes/api/tmdb-key.ts": $api_tmdb_key,
     "./routes/auth/code.tsx": $auth_code,
     "./routes/auth/password.tsx": $auth_password,
     "./routes/auth/reset.tsx": $auth_reset,

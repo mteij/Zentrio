@@ -14,9 +14,9 @@ self.addEventListener("install", (event) => {
       for (const asset of STATIC_ASSETS) {
         try {
           await cache.add(asset);
-        } catch (e) {
+        } catch (_e) {
           // Ignore individual asset failures to avoid breaking the install
-          // Optionally, log: console.warn("SW failed to cache:", asset, e);
+          // Optionally, log: console.warn("SW failed to cache:", asset, _e);
         }
       }
     })

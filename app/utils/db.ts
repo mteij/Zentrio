@@ -1,6 +1,7 @@
 import mongoose, { Document, Model, ObjectId } from "mongoose";
 import { connect } from "./mongo.ts";
 import * as bcrypt from "$bcrypt/mod.ts";
+import type { EncryptedData } from "../shared/services/encryption.ts";
 
 // Ensure the database connection is established before defining models
 await connect();
@@ -12,6 +13,8 @@ export interface UserSchema extends Document {
   passwordResetToken?: string;
   passwordResetExpires?: Date;
   createdAt: Date;
+  // Encrypted TMDB API key (user-level setting)
+  encryptedTmdbApiKey?: EncryptedData;
 }
 
 export interface ProfileSchema extends Document {
@@ -19,8 +22,10 @@ export interface ProfileSchema extends Document {
   userId: ObjectId;
   name: string;
   email: string; // Stremio email
-  password: string; // Stremio password, should be stored encrypted
+  password: string; // Stremio password (legacy - unencrypted)
+  encryptedPassword?: EncryptedData; // Stremio password (new - encrypted)
   profilePictureUrl: string;
+  nsfwMode?: boolean; // NSFW content filtering enabled
 }
 
 export interface SessionSchema extends Document {
@@ -41,13 +46,28 @@ const userSchema = new mongoose.Schema<UserSchema>({
   passwordResetToken: { type: String },
   passwordResetExpires: { type: Date },
   createdAt: { type: Date, default: Date.now },
+  // Encrypted TMDB API key
+  encryptedTmdbApiKey: {
+    encrypted: { type: String },
+    salt: { type: String },
+    iv: { type: String },
+    tag: { type: String }
+  }
 });
 
 const profileSchema = new mongoose.Schema<ProfileSchema>({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   name: { type: String, required: true },
   email: { type: String, required: true },
-  password: { type: String, required: true },
+  password: { type: String }, // Legacy field (backward compatibility)
+  // New encrypted password field
+  encryptedPassword: {
+    encrypted: { type: String },
+    salt: { type: String },
+    iv: { type: String },
+    tag: { type: String }
+  },
+  nsfwMode: { type: Boolean, default: false },
   profilePictureUrl: { type: String, required: true },
 });
 
@@ -194,4 +214,137 @@ export const deleteProfile = async (id: string, userId: string) => {
   await Profiles.deleteOne({ _id: new mongoose.Types.ObjectId(id), userId: new mongoose.Types.ObjectId(userId) });
 };
 
-export type { ObjectId };
+// --- Encryption Functions ---
+import { encryptionService } from "../shared/services/encryption.ts";
+
+/**
+ * Create a profile with encrypted password
+ */
+export const createEncryptedProfile = async (profileData: {
+  userId: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  password: string;
+  profilePictureUrl: string;
+  nsfwMode?: boolean;
+}): Promise<ProfileSchema> => {
+  const encryptedPassword = await encryptionService.encrypt(profileData.password);
+  
+  return await Profiles.create({
+    ...profileData,
+    password: undefined, // Don't store plain text
+    encryptedPassword,
+  });
+};
+
+/**
+ * Update a profile with encrypted password
+ */
+export const updateEncryptedProfile = async (
+  id: string,
+  userId: string,
+  data: Partial<Omit<ProfileSchema, "_id" | "userId">>,
+) => {
+  const updateData: any = { ...data };
+  
+  // If password is being updated, encrypt it
+  if (data.password) {
+    updateData.encryptedPassword = await encryptionService.encrypt(data.password);
+    updateData.password = undefined; // Remove plain text password
+  }
+
+  await Profiles.updateOne(
+    { _id: new mongoose.Types.ObjectId(id), userId: new mongoose.Types.ObjectId(userId) },
+    { $set: updateData },
+  );
+};
+
+/**
+ * Get decrypted password for a profile
+ */
+export const getDecryptedProfilePassword = async (profile: ProfileSchema): Promise<string> => {
+  // Try new encrypted field first
+  if (profile.encryptedPassword) {
+    return await encryptionService.decrypt(profile.encryptedPassword);
+  }
+  
+  // Fall back to legacy unencrypted field
+  if (profile.password) {
+    console.warn(`Profile ${profile._id} using legacy unencrypted password`);
+    return profile.password;
+  }
+  
+  throw new Error('No password found for profile');
+};
+
+/**
+ * Migrate profile from unencrypted to encrypted password
+ */
+export const migrateProfileToEncrypted = async (profileId: string): Promise<boolean> => {
+  const profile = await Profiles.findById(profileId);
+  if (!profile || !profile.password || profile.encryptedPassword) {
+    return false; // Already migrated or no password to migrate
+  }
+
+  try {
+    const encryptedPassword = await encryptionService.encrypt(profile.password);
+    await Profiles.updateOne(
+      { _id: profileId },
+      { 
+        $set: { encryptedPassword },
+        $unset: { password: 1 } // Remove plain text password
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error(`Failed to migrate profile ${profileId}:`, error);
+    return false;
+  }
+};
+
+/**
+ * Set encrypted TMDB API key for user
+ */
+export const setUserTmdbApiKey = async (userId: string, apiKey: string): Promise<void> => {
+  const encryptedApiKey = await encryptionService.encrypt(apiKey);
+  await Users.updateOne(
+    { _id: new mongoose.Types.ObjectId(userId) },
+    { $set: { encryptedTmdbApiKey: encryptedApiKey } }
+  );
+};
+
+/**
+ * Get decrypted TMDB API key for user
+ */
+export const getUserTmdbApiKey = async (userId: string): Promise<string | null> => {
+  const user = await Users.findById(userId).lean();
+  if (!user?.encryptedTmdbApiKey) {
+    return null;
+  }
+  
+  try {
+    return await encryptionService.decrypt(user.encryptedTmdbApiKey);
+  } catch (error) {
+    console.error(`Failed to decrypt TMDB API key for user ${userId}:`, error);
+    return null;
+  }
+};
+
+/**
+ * Remove TMDB API key for user
+ */
+export const removeUserTmdbApiKey = async (userId: string): Promise<void> => {
+  await Users.updateOne(
+    { _id: new mongoose.Types.ObjectId(userId) },
+    { $unset: { encryptedTmdbApiKey: 1 } }
+  );
+};
+
+/**
+ * Test encryption functionality
+ */
+export const testDatabaseEncryption = async (): Promise<boolean> => {
+  return await encryptionService.testEncryption();
+};
+
+export type { ObjectId, EncryptedData };

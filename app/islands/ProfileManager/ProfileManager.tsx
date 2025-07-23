@@ -37,6 +37,7 @@ export function ProfileModal(
   const name = useSignal(profile?.name || "");
   const email = useSignal(profile?.email || "");
   const password = useSignal(profile?.password || "");
+  const nsfwMode = useSignal(profile?.nsfwMode || false);
   const isEditing = !!profile?._id;
   const [initialPic] = profile
     ? [profile.profilePictureUrl]
@@ -66,6 +67,7 @@ export function ProfileModal(
       email: email.value,
       password: password.value,
       profilePictureUrl: profilePictureUrl.value,
+      nsfwMode: nsfwMode.value,
     });
   };
 
@@ -128,8 +130,39 @@ export function ProfileModal(
             required
             name="password"
             autoComplete="current-password"
-            class="w-full bg-gray-700 text-white px-3 py-2 rounded mb-6 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+            class="w-full bg-gray-700 text-white px-3 py-2 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
           />
+          
+          {/* NSFW Mode Toggle */}
+          <div class="mb-6 bg-gray-700 p-4 rounded">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-white font-medium">NSFW Content Filter</label>
+                <p class="text-xs text-gray-400 mt-1">
+                  Hide adult content from this profile (requires TMDB API key)
+                </p>
+              </div>
+              <div class="relative">
+                <input
+                  type="checkbox"
+                  id="nsfwMode"
+                  checked={nsfwMode.value}
+                  onChange={(e) => nsfwMode.value = e.currentTarget.checked}
+                  class="sr-only"
+                />
+                <div 
+                  class={`block w-14 h-8 rounded-full cursor-pointer transition-colors duration-200 ${
+                    nsfwMode.value ? 'bg-red-600' : 'bg-gray-600'
+                  }`}
+                  onClick={() => nsfwMode.value = !nsfwMode.value}
+                >
+                  <div class={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 ${
+                    nsfwMode.value ? 'transform translate-x-6' : ''
+                  }`}></div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="flex justify-between">
             <div>
               {isEditing && onRequestDelete && (

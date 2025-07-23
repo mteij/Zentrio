@@ -1,11 +1,11 @@
 import { Handlers, PageProps } from "$fresh/server.ts";
 import { h as _h } from "preact";
 import { AppState } from "../_middleware.ts";
-import { getProfile, ProfileSchema } from "../../utils/db.ts";
+import { getProfile, getDecryptedProfilePassword, getUserTmdbApiKey, ProfileSchema } from "../../utils/db.ts";
 import StremioFrame from "../../islands/StremioFrame.tsx";
 
 interface PlayerPageData {
-  profile: ProfileSchema;
+  profile: ProfileSchema & { tmdbApiKey?: string };
 }
 
 export const handler: Handlers<PlayerPageData, AppState> = {
@@ -28,7 +28,29 @@ export const handler: Handlers<PlayerPageData, AppState> = {
       });
     }
 
-    return ctx.render({ profile });
+    try {
+      // Decrypt the password on the server side before sending to client
+      const decryptedPassword = await getDecryptedProfilePassword(profile);
+      
+      // Get the user's TMDB API key
+      const tmdbApiKey = await getUserTmdbApiKey(userId);
+      
+      // Create a profile object with decrypted password and TMDB key for the client
+      const clientProfile = {
+        ...profile,
+        password: decryptedPassword,
+        tmdbApiKey: tmdbApiKey || undefined,
+        // Remove encrypted fields from client payload for security
+        encryptedPassword: undefined
+      };
+
+      return ctx.render({ profile: clientProfile });
+    } catch (error) {
+      console.error(`Failed to decrypt password for profile ${profile._id}:`, error);
+      return new Response("Failed to authenticate with profile.", {
+        status: 500,
+      });
+    }
   },
 };
 

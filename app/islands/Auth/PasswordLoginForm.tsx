@@ -1,83 +1,76 @@
 import { h } from "preact";
 import { useSignal } from "@preact/signals";
+import { useAuthForm } from "../../shared/hooks/useAuthForm.ts";
+import { FormInput } from "../../shared/components/forms/FormInput.tsx";
+import { FormButton } from "../../shared/components/forms/FormButton.tsx";
+import { ErrorMessage } from "../../shared/components/forms/ErrorMessage.tsx";
 
 interface PasswordLoginFormProps {
   email: string;
 }
 
+/**
+ * Password login form component that handles both password authentication
+ * and fallback to email code authentication
+ */
 export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
   const password = useSignal("");
-  const error = useSignal<string | null>(null);
-  const isLoading = useSignal(false);
-  const message = useSignal<string | null>(null);
+  const { error, isLoading, makeApiCall } = useAuthForm();
 
   const handlePasswordLogin = async (e: h.JSX.TargetedEvent<HTMLFormElement>) => {
     e.preventDefault();
-    isLoading.value = true;
-    error.value = null;
-    const res = await fetch("/api/auth/login-with-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: password.value }),
-    });
-    isLoading.value = false;
-    if (res.ok) {
-      globalThis.location.href = "/profiles";
-    } else {
-      const data = await res.json();
-      error.value = data.error || "Invalid credentials.";
-    }
+
+    await makeApiCall("/api/auth/login-with-password", 
+      { email, password: password.value },
+      {
+        onSuccess: () => {
+          globalThis.location.href = "/profiles";
+        }
+      }
+    );
   };
 
   const handleSendCode = async () => {
-    isLoading.value = true;
-    error.value = null;
-    const res = await fetch("/api/auth/send-login-code", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    isLoading.value = false;
-    if (res.ok) {
-      const data = await res.json();
-      globalThis.location.href = data.redirectUrl;
-    } else {
-      const data = await res.json();
-      error.value = data.error || "Failed to send code.";
-    }
+    await makeApiCall("/api/auth/send-login-code", 
+      { email },
+      {
+        onSuccess: (data) => {
+          if (data.redirectUrl) {
+            globalThis.location.href = data.redirectUrl;
+          }
+        }
+      }
+    );
   };
 
   return (
     <form onSubmit={handlePasswordLogin} class="space-y-4">
-      {error.value && <p class="text-sm text-red-500">{error.value}</p>}
-      <input
+      <ErrorMessage message={error.value} />
+      <FormInput
         type="email"
         name="email"
-        autoComplete="username"
         placeholder="Email"
-        required
-        class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
         value={email}
-        disabled={isLoading.value}
+        disabled
+        required
       />
-      <input
+      <FormInput
         type="password"
         name="password"
-        autoComplete="current-password"
         placeholder="Password"
-        required
-        class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
         value={password.value}
         onInput={(e) => password.value = e.currentTarget.value}
         disabled={isLoading.value}
+        required
       />
-      <button
+      <FormButton
         type="submit"
         disabled={isLoading.value}
-        class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded disabled:bg-gray-500"
+        isLoading={isLoading.value}
+        loadingText="Signing In..."
       >
-        {isLoading.value ? "Signing In..." : "Sign In"}
-      </button>
+        Sign In
+      </FormButton>
       <div class="text-center text-sm">
         <button
           type="button"

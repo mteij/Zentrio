@@ -1,68 +1,34 @@
 import { Handlers } from "$fresh/server.ts";
-import { Resend } from "https://esm.sh/resend@3.2.0";
-import { render } from "https://esm.sh/preact-render-to-string@6.2.1";
-import {
-  createUserWithGeneratedPassword,
-  findUserByEmail,
-} from "../../../utils/db.ts";
-import { SignupEmail } from "../../../components/SignupEmail.tsx";
+import { createUserWithGeneratedPassword, findUserByEmail } from "../../../utils/db.ts";
+import { withErrorHandling, parseJsonBody, createJsonResponse, validateEmail } from "../../../shared/utils/api.ts";
+import { EmailService } from "../../../shared/services/email.ts";
 
-const resendApiKey = Deno.env.get("RESEND_API_KEY");
-
-async function sendEmail(
-  to: string,
-  subject: string,
-  html: string,
-) {
-  if (!resendApiKey) {
-    console.error("RESEND_API_KEY is not set.");
-    throw new Error("Server configuration error: Missing email API key.");
-  }
-  const resend = new Resend(resendApiKey);
-  await resend.emails.send({
-    from: "onboarding@resend.dev", // Must be a verified domain in Resend
-    to,
-    subject,
-    html,
-  });
-}
-
+/**
+ * Handles login or signup flow based on whether user exists
+ * - If user exists: redirects to password login
+ * - If user doesn't exist: creates account with generated password and sends welcome email
+ */
 export const handler: Handlers = {
-  async POST(req) {
-    try {
-      const { email } = await req.json();
-      if (!email || typeof email !== "string") {
-        return new Response(JSON.stringify({ error: "Invalid email provided." }), { status: 400 });
-      }
-      const normalizedEmail = email.toLowerCase();
+  POST: withErrorHandling(async (req) => {
+    const { email } = await parseJsonBody<{ email: string }>(req);
+    const normalizedEmail = validateEmail(email);
 
-      const _url = new URL(req.url);
-      const user = await findUserByEmail(normalizedEmail);
-      let redirectUrl: string;
+    const user = await findUserByEmail(normalizedEmail);
+    let redirectUrl: string;
 
-      if (user) {
-        // --- Login Flow ---
-        redirectUrl = `/auth/password?email=${encodeURIComponent(normalizedEmail)}`;
-      } else {
-        // --- Signup Flow ---
-        const { plainPassword } = await createUserWithGeneratedPassword(normalizedEmail);
+    if (user) {
+      // Existing user - redirect to password login
+      redirectUrl = `/auth/password?email=${encodeURIComponent(normalizedEmail)}`;
+    } else {
+      // New user - create account and send welcome email
+      const { plainPassword } = await createUserWithGeneratedPassword(normalizedEmail);
 
-        await sendEmail(
-          normalizedEmail,
-          "Welcome to Zentrio!",
-          render(SignupEmail({ email: normalizedEmail, password: plainPassword })),
-        );
-        redirectUrl = `/auth/signup-success?email=${encodeURIComponent(normalizedEmail)}`;
-      }
-
-      return new Response(JSON.stringify({ redirectUrl }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (error: unknown) {
-      console.error("Login/Signup Error:", error);
-      const message = error instanceof Error ? error.message : "An internal server error occurred.";
-      return new Response(JSON.stringify({ error: message }), { status: 500 });
+      const emailService = new EmailService();
+      await emailService.sendWelcomeEmail(normalizedEmail, plainPassword);
+      
+      redirectUrl = `/auth/signup-success?email=${encodeURIComponent(normalizedEmail)}`;
     }
-  },
+
+    return createJsonResponse({ redirectUrl });
+  }),
 };

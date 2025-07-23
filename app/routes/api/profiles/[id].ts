@@ -1,6 +1,6 @@
 import { Handlers } from "$fresh/server.ts";
 import { AppState } from "../../_middleware.ts";
-import { deleteProfile, updateProfile } from "../../../utils/db.ts";
+import { deleteProfile, updateEncryptedProfile } from "../../../utils/db.ts";
 
 export const handler: Handlers<null, AppState> = {
   async PATCH(req, ctx) {
@@ -9,13 +9,14 @@ export const handler: Handlers<null, AppState> = {
       return new Response("Unauthorized", { status: 401 });
     }
     const { id } = ctx.params;
-    const { name, email, password, profilePictureUrl } = await req.json();
+    const { name, email, password, profilePictureUrl, nsfwMode } = await req.json();
 
-    await updateProfile(id, userId, {
+    await updateEncryptedProfile(id, userId, {
       name,
       email,
       password,
       profilePictureUrl,
+      nsfwMode,
     });
     return new Response(null, { status: 204 });
   },

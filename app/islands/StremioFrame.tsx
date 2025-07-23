@@ -102,6 +102,8 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
             },
           },
           stremioHubProfilePicture: profile.profilePictureUrl,
+          nsfwModeEnabled: profile.nsfwMode || false,
+          tmdbApiKey: (profile as any).tmdbApiKey || null,
           installation_id: result.installation_id || generateInstallationId(),
           schema_version: result.schema_version || 18,
           library: result.library || { uid: result.user._id, items: {} },

@@ -5,7 +5,12 @@
       "Bash(curl:*)",
       "Bash(taskkill:*)",
       "Bash(powershell:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(deno cache:*)",
+      "Bash(deno check:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": []
   }
