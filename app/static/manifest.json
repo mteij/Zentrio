@@ -1,7 +1,7 @@
 {
-  "name": "StremioHub",
-  "short_name": "StremioHub",
-  "description": "Unofficial Stremio web client with profiles.",
+  "name": "Zentrio",
+  "short_name": "Zentrio",
+  "description": "Unofficial Zentrio web client with profiles.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#141414",

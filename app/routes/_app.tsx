@@ -12,14 +12,14 @@ export default function App({ Component, route }: PageProps) {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>StremioHub</title>
+        <title>Zentrio</title>
         <link rel="stylesheet" href="/styles.css" />
         <link rel="stylesheet" href="/css/background.css" />
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        <link rel="manifest" href="/static/manifest.json" />
+        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#e50914" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -29,7 +29,7 @@ export default function App({ Component, route }: PageProps) {
           __html: `
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/static/service-worker.js');
+                navigator.serviceWorker.register('/service-worker.js');
               });
             }
           `

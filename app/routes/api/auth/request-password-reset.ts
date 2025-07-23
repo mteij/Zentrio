@@ -12,7 +12,7 @@ export const handler: Handlers = {
     }
 
     const user = await findUserByEmail(email);
-    if (!user || typeof user._id !== "string" && typeof user._id !== "number") {
+    if (!user) {
       // Don't reveal if user exists, just send success response
       return new Response(JSON.stringify({ message: "If a user with that email exists, a reset link has been sent." }));
     }
@@ -31,7 +31,7 @@ export const handler: Handlers = {
       await resend.emails.send({
         from: "onboarding@resend.dev",
         to: email,
-        subject: "Reset Your StremioHub Password",
+        subject: "Reset Your Zentrio Password",
         html: render(ResetPasswordEmail({ resetUrl })),
       });
 

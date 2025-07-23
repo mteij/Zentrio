@@ -5,8 +5,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        "stremio-red": "#e50914",
-        "stremio-gray": {
+        "zentrio-red": "#e50914",
+        "zentrio-gray": {
           "700": "#333",
           "800": "#1f2937",
           "900": "#141414",

@@ -36,7 +36,7 @@ export const handler: Handlers = {
       }
       const normalizedEmail = email.toLowerCase();
 
-      const url = new URL(req.url);
+      const _url = new URL(req.url);
       const user = await findUserByEmail(normalizedEmail);
       let redirectUrl: string;
 
@@ -49,7 +49,7 @@ export const handler: Handlers = {
 
         await sendEmail(
           normalizedEmail,
-          "Welcome to StremioHub!",
+          "Welcome to Zentrio!",
           render(SignupEmail({ email: normalizedEmail, password: plainPassword })),
         );
         redirectUrl = `/auth/signup-success?email=${encodeURIComponent(normalizedEmail)}`;

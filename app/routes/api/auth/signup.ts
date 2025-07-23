@@ -31,7 +31,7 @@ export const handler: Handlers = {
       await resend.emails.send({
         from: "onboarding@resend.dev",
         to: email,
-        subject: "Welcome to StremioHub!",
+        subject: "Welcome to Zentrio!",
         html: render(WelcomeEmail({ email, password: plainPassword, loginUrl })),
       });
 

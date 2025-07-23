@@ -234,8 +234,6 @@ export default function ProfileManager(
     }
   };
 
-  // --- FIX: Only block pointer events when modal is actually visible in the DOM ---
-  // Use a local variable to determine if a modal is open and visible
   const modalOpen = showAddModal.value || editingProfile.value;
 
   return (

@@ -1,6 +1,6 @@
-# StremioHub - Profile Selector Overlay
+# Zentrio - Profile Selector Overlay
 
-![StremioHub Banner](https://placehold.co/1200x440/141414/00D4B8?text=StremioHub)
+![Zentrio Banner](https://placehold.co/1200x440/141414/00D4B8?text=Zentrio)
 
 <p align="center">
   <a href="https://deno.land">
@@ -14,7 +14,7 @@
   </a>
 </p>
 
-A secure, modern, Netflix-inspired user selection overlay for the Stremio Web UI, rebuilt from the ground up with Deno and the Fresh web framework.
+A secure, modern, Netflix-inspired user selection overlay for the Zentrio Web UI, rebuilt from the ground up with Deno and the Fresh web framework.
 
 This project uses MongoDB for data storage and a custom session-based authentication system.
 
@@ -24,7 +24,7 @@ This project uses MongoDB for data storage and a custom session-based authentica
 
 *   **🎬 Netflix-Inspired UI:** A familiar and intuitive profile selection screen.
 *   **🔒 Secure Authentication:** Custom-built, secure email magic-link authentication.
-*   **👤 Multi-Profile Support:** Manage multiple Stremio profiles, stored securely in MongoDB.
+*   **👤 Multi-Profile Support:** Manage multiple Zentrio profiles, stored securely in MongoDB.
 *   **⚡️ Blazing Fast:** Built with Fresh, featuring server-side rendering and an islands architecture for optimal performance.
 *   **🦕 Deno Native:** Runs on the Deno runtime, offering a secure and simple development experience with no `node_modules`.
 *   **☁️ Edge-Ready:** Designed to be deployed globally on platforms like Deno Deploy.
@@ -54,8 +54,8 @@ This project uses MongoDB for data storage and a custom session-based authentica
 
 1.  **Clone the repository:**
     ```sh
-    git clone https://github.com/MichielEijpe/StremioHub.git
-    cd StremioHub
+    git clone https://github.com/MichielEijpe/Zentrio.git
+    cd Zentrio
     ```
 
 2.  **Create your environment file:**
@@ -131,9 +131,9 @@ This is the easiest method for running the application locally.
     version: '3.8'
 
     services:
-      stremiohub:
-        image: ghcr.io/MichielEijpe/StremioHub:latest
-        container_name: stremiohub
+      zentrio:
+        image: ghcr.io/MichielEijpe/Zentrio:latest
+        container_name: zentrio
         restart: unless-stopped
         ports:
           - "8000:8000"
@@ -154,7 +154,7 @@ If you prefer not to use `docker-compose`, you can run the image manually.
 
 1.  Pull the latest image:
     ```sh
-    docker pull ghcr.io/michieleijpe/stremiohub:latest
+    docker pull ghcr.io/michieleijpe/zentrio:latest
     ```
 
 2.  Run the container:
@@ -162,12 +162,16 @@ If you prefer not to use `docker-compose`, you can run the image manually.
     docker run -d \
       -p 8000:8000 \
       --env-file .env \
-      --name stremiohub \
-      ghcr.io/michieleijpe/stremiohub:latest
+      --name zentrio \
+      ghcr.io/michieleijpe/zentrio:latest
     ```
 
 The application will be available at `http://localhost:8000`.
-      stremiohub:latest
-    ```
 
-The application will be available at `http://localhost:8000`.
+---
+
+## ⚙️ Settings
+
+Visit `/settings` in your browser to access experimental features and toggle the addon order userscript.
+
+---

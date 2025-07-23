@@ -20,7 +20,7 @@ export default function Footer() {
         <div class="flex items-center justify-center space-x-4">
           <span>Made with ❤️ by Michiel</span>
           <a
-            href="https://github.com/MichielEijpe/StremioHub"
+            href="https://github.com/MichielEijpe/Zentrio"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub Repository"

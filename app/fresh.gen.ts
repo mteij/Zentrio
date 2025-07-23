@@ -29,6 +29,7 @@ import * as $EmailLinkForm from "./islands/EmailLinkForm.tsx";
 import * as $PasswordLoginForm from "./islands/PasswordLoginForm.tsx";
 import * as $ProfileManager from "./islands/ProfileManager.tsx";
 import * as $ResetPasswordForm from "./islands/ResetPasswordForm.tsx";
+import * as $SettingsModal from "./islands/SettingsModal.tsx";
 import * as $StremioFrame from "./islands/StremioFrame.tsx";
 import { type Manifest } from "$fresh/server.ts";
 
@@ -64,6 +65,7 @@ const manifest = {
     "./islands/PasswordLoginForm.tsx": $PasswordLoginForm,
     "./islands/ProfileManager.tsx": $ProfileManager,
     "./islands/ResetPasswordForm.tsx": $ResetPasswordForm,
+    "./islands/SettingsModal.tsx": $SettingsModal,
     "./islands/StremioFrame.tsx": $StremioFrame,
   },
   baseUrl: import.meta.url,
