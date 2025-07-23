@@ -16,11 +16,11 @@ self.addEventListener("install", (event) => {
         ASSETS.map(async (url) => {
           try {
             const response = await fetch(url, { cache: "no-store" });
-            if (response.ok) {
+            if (response.ok && response.type !== "opaqueredirect" && !response.redirected) {
               await cache.put(url, response);
             } else {
               // eslint-disable-next-line no-console
-              console.warn("Service worker: Skipped caching (not found):", url);
+              console.warn("Service worker: Skipped caching (not found or redirected):", url);
             }
           } catch (e) {
             // eslint-disable-next-line no-console
@@ -45,19 +45,26 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) =>
-      cached ||
-      fetch(event.request).then((response) => {
-        if (
-          response &&
-          response.status === 200 &&
-          response.type === "basic"
-        ) {
-          const respClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, respClone));
-        }
-        return response;
-      })
-    )
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request)
+        .then((response) => {
+          // Only cache successful, non-redirected, basic responses
+          if (
+            response &&
+            response.status === 200 &&
+            response.type === "basic" &&
+            !response.redirected
+          ) {
+            const respClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, respClone));
+          }
+          return response;
+        })
+        .catch(() => {
+          // Optionally, return a fallback page or asset here
+          return caches.match("/");
+        });
+    })
   );
 });

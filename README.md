@@ -1,108 +1,108 @@
 # Zentrio - Profile Selector Overlay
 
-![Zentrio Banner](https://placehold.co/1200x440/141414/00D4B8?text=Zentrio)
-
 <p align="center">
-  <a href="https://deno.land">
-    <img src="https://img.shields.io/badge/powered%20by-Deno-black?style=for-the-badge&logo=deno" alt="Powered by Deno">
-  </a>
-   <a href="https://fresh.deno.dev">
-    <img src="https://img.shields.io/badge/built%20with-Fresh-green?style=for-the-badge&logo=deno" alt="Built with Fresh">
-  </a>
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License: MIT">
-  </a>
+  <img src="app/static/icons/icon-192.png" alt="Zentrio Icon" width="96" height="96"/>
 </p>
 
-A secure, modern, Netflix-inspired user selection overlay for the Zentrio Web UI, rebuilt from the ground up with Deno and the Fresh web framework.
+A secure, modern, Netflix-inspired user selection overlay for the Zentrio Web UI, rebuilt with Deno and the Fresh web framework.
 
-This project uses MongoDB for data storage and a custom session-based authentication system.
-
----
-
-## ✨ Features
-
-*   **🎬 Netflix-Inspired UI:** A familiar and intuitive profile selection screen.
-*   **🔒 Secure Authentication:** Custom-built, secure email magic-link authentication.
-*   **👤 Multi-Profile Support:** Manage multiple Zentrio profiles, stored securely in MongoDB.
-*   **⚡️ Blazing Fast:** Built with Fresh, featuring server-side rendering and an islands architecture for optimal performance.
-*   **🦕 Deno Native:** Runs on the Deno runtime, offering a secure and simple development experience with no `node_modules`.
-*   **☁️ Edge-Ready:** Designed to be deployed globally on platforms like Deno Deploy.
+- **Netflix-Inspired UI:** Familiar, intuitive profile selection.
+- **Secure Authentication:** Magic-link email login.
+- **Multi-Profile Support:** Profiles stored in MongoDB.
+- **Fast & Modern:** Built with Fresh (Preact, Islands architecture), Deno native.
+- **Edge-Ready:** Deployable globally (Deno Deploy).
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-<p align="left">
-  <a href="https://deno.land/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/deno/deno-original-wordmark.svg" alt="deno" width="40" height="40"/></a>
-  <a href="https://fresh.deno.dev/" target="_blank" rel="noreferrer"><img src="https://fresh.deno.dev/logo.svg" alt="fresh" width="40" height="40"/></a>
-  <a href="https://preactjs.com/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/preact/preact-original.svg" alt="preact" width="40" height="40"/></a>
-  <a href="https://www.typescriptlang.org/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg" alt="typescript" width="40" height="40"/></a>
-  <a href="https://tailwindcss.com/" target="_blank" rel="noreferrer"><img src="https://www.vectorlogo.zone/logos/tailwindcss/tailwindcss-icon.svg" alt="tailwind" width="40" height="40"/></a>
-  <a href="https://www.mongodb.com/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/mongodb/mongodb-original-wordmark.svg" alt="mongodb" width="40" height="40"/></a>
-</p>
+- **Deno** (runtime)
+- **Fresh** (framework)
+- **Preact**
+- **TypeScript**
+- **Tailwind CSS**
+- **MongoDB**
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### Prerequisites
+**Prerequisites:**  
+- [Deno](https://deno.land/manual/getting_started/installation) v1.30.0+
 
-*   [Deno](https://deno.land/manual/getting_started/installation) version 1.30.0 or higher.
+**Quick Start:**
+```sh
+git clone https://github.com/MichielEijpe/Zentrio.git
+cd Zentrio/app
+cp ../.env.example ../.env   # Edit with your MongoDB/Resend credentials
+deno task start
+```
+App runs at [http://localhost:8000](http://localhost:8000).
 
-### Running Locally
-
-1.  **Clone the repository:**
-    ```sh
-    git clone https://github.com/MichielEijpe/Zentrio.git
-    cd Zentrio
-    ```
-
-2.  **Create your environment file:**
-    Copy the `.env.example` to a new file named `.env` and fill in your credentials for Resend and MongoDB.
-
-3.  **Configure MongoDB Atlas IP Access:**
-    In your MongoDB Atlas dashboard, navigate to **Network Access** and add your current IP address or allow access from anywhere (`0.0.0.0/0`) for development.
-
-4.  **Navigate into the app directory:**
-    ```sh
-    cd app
-    ```
-
-5.  **Start the development server:**
-    ```sh
-    deno task start
-    ```
-    This will start the server on `http://localhost:8000`. The app will automatically reload when you make changes.
-
-> **Troubleshooting:** If you encounter module errors after changing dependencies, run `deno task clean` before starting the server to ensure a clean build.
+> If you see module errors after changing dependencies, run `deno task clean` before restarting.
 
 ---
 
-## ☁️ Deployment
+## Deployment
 
-This project is optimized for deployment on [Deno Deploy](https://deno.com/deploy).
+Optimized for [Deno Deploy](https://deno.com/deploy):
 
-1.  Push your project to a GitHub repository.
-2.  Sign up for Deno Deploy and connect your GitHub account.
-3.  Create a new project, select your repository, and set the **Root** to `app`.
-4.  Set your `MONGO_URI` and `RESEND_API_KEY` as environment variables in the Deno Deploy project settings.
-5.  Deno Deploy will automatically detect the `main.ts` file and deploy your application.
+1. Push to GitHub.
+2. Connect repo in Deno Deploy, set root to `app`.
+3. Add `MONGO_URI` and `RESEND_API_KEY` as environment variables.
+4. Deploy.
 
 ---
 
-## 🤝 Contributing
+## Docker
+
+**.env file required** (see `.env.example`):
+
+```env
+MONGO_URI="your_mongodb_connection_string"
+RESEND_API_KEY="your_resend_api_key"
+```
+
+**docker-compose (recommended):**
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  zentrio:
+    image: ghcr.io/MichielEijpe/Zentrio:latest
+    container_name: zentrio
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+```
+```sh
+docker-compose up -d
+```
+
+**docker run:**
+```sh
+docker run -d -p 8000:8000 --env-file .env --name zentrio ghcr.io/michieleijpe/zentrio:latest
+```
+
+---
+
+## Settings
+
+Visit `/settings` in your browser for experimental features and userscript toggles.
+
+---
+
+## License
+
+MIT License
+
+---
+
+## Contributing
 
 Contributions, issues, and feature requests are welcome!
-
----
-
-## 📜 License
-
-This project is licensed under the **MIT License**.
-
----
-
 ## Running with Docker
 
 You can run this application using a pre-built Docker image from the GitHub Container Registry.
