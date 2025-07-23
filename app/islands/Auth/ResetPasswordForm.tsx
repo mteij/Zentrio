@@ -51,7 +51,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         required
         value={password.value}
         onInput={(e) => password.value = (e.target as HTMLInputElement).value}
-        class="w-full bg-gray-700 text-white p-3 rounded focus:outline-none focus:ring-2 focus:ring-red-600"
+        class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
       />
       <button
         type="submit"

@@ -58,7 +58,7 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
             value={email.value}
             onInput={(e) => (email.value = e.currentTarget.value)}
             required
-            class="w-full bg-gray-700 text-white p-3 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+            class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
             placeholder="you@example.com"
             disabled={isLoading.value}
           />

@@ -1,5 +1,6 @@
 import { h as _h } from "preact";
 import { Signal } from "@preact/signals";
+import SettingsModal from "../SettingsModal.tsx";
 
 // Props: signals and handlers from ProfileManager
 type Profile = {
@@ -97,15 +98,10 @@ export default function DesktopProfileManager({
               card.type === "profile" ? (
                 <div
                   key={card.profile._id}
-                  class="relative group flex flex-col items-center bg-zentrio-gray-800 rounded-xl shadow-lg p-6 transition-transform duration-200 hover:scale-105 h-full"
+                  class="relative group flex flex-col items-center rounded-xl shadow-lg p-6 transition-transform duration-200 hover:scale-105"
                   style={{
                     width: "220px",
-                    minHeight: "260px",
                     boxShadow: "0 4px 24px 0 #000a",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "flex-start",
                   }}
                 >
                   <button
@@ -155,15 +151,10 @@ export default function DesktopProfileManager({
               ) : (
                 <div
                   key="add-profile"
-                  class="relative group flex flex-col items-center bg-zentrio-gray-800 rounded-xl shadow-lg p-6 transition-transform duration-200 hover:scale-105 cursor-pointer h-full"
+                  class="relative group flex flex-col items-center rounded-xl shadow-lg p-6 transition-transform duration-200 hover:scale-105 cursor-pointer"
                   style={{
                     width: "220px",
-                    minHeight: "260px",
                     boxShadow: "0 4px 24px 0 #000a",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "flex-start",
                   }}
                 >
                   <button
@@ -203,8 +194,9 @@ export default function DesktopProfileManager({
         >
           Logout
         </a>
-        <a
-          href="/settings"
+        <button
+          type="button"
+          onClick={() => showSettings.value = true}
           class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
           aria-label="Settings"
           style={{ minWidth: "40px", minHeight: "40px" }}
@@ -215,7 +207,7 @@ export default function DesktopProfileManager({
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 8.6 15a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 15 8.6a1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 15z"/>
             </g>
           </svg>
-        </a>
+        </button>
       </div>
       {/* Modal overlays */}
       {showAddModal.value && (
@@ -236,6 +228,13 @@ export default function DesktopProfileManager({
             onDelete={handleDelete}
           />
         </div>
+      )}
+      {showSettings.value && (
+        <SettingsModal
+          onClose={() => showSettings.value = false}
+          addonOrderEnabled={addonOrderEnabled}
+          setAddonOrderEnabled={setAddonOrderEnabled}
+        />
       )}
     </div>
   );

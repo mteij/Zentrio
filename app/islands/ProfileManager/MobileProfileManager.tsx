@@ -1,6 +1,7 @@
 import { h as _h } from "preact";
 import { useEffect } from "preact/hooks";
 import { Signal } from "@preact/signals";
+import SettingsModal from "../SettingsModal.tsx";
 
 type Profile = {
   _id: string;
@@ -24,7 +25,7 @@ interface MobileProfileManagerProps {
   showSettings: { value: boolean };
   setShowSettings: (v: boolean) => void;
   addonOrderEnabled: { value: boolean };
-  setAddonOrderEnabled: (v: boolean) => void;
+  setAddonOrderEnabled: { value: boolean };
 }
 
 // Props: signals and handlers from ProfileManager
@@ -211,8 +212,9 @@ export default function MobileProfileManager({
             </svg>
           )}
         </button>
-        <a
-          href="/settings"
+        <button
+          type="button"
+          onClick={() => showSettings.value = true}
           class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
           aria-label="Settings"
           style={{ minWidth: "40px", minHeight: "40px" }}
@@ -223,8 +225,15 @@ export default function MobileProfileManager({
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 8.6 15a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 15 8.6a1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 15z"/>
             </g>
           </svg>
-        </a>
+        </button>
       </div>
+      {showSettings.value && (
+        <SettingsModal
+          onClose={() => showSettings.value = false}
+          addonOrderEnabled={addonOrderEnabled}
+          setAddonOrderEnabled={setAddonOrderEnabled}
+        />
+      )}
     </div>
   );
 }

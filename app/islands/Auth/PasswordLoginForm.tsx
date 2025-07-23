@@ -56,7 +56,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
         autoComplete="username"
         placeholder="Email"
         required
-        class="w-full bg-gray-700 text-white p-3 rounded focus:outline-none focus:ring-2 focus:ring-red-600"
+        class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
         value={email}
         disabled={isLoading.value}
       />
@@ -66,7 +66,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
         autoComplete="current-password"
         placeholder="Password"
         required
-        class="w-full bg-gray-700 text-white p-3 rounded focus:outline-none focus:ring-2 focus:ring-red-600"
+        class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
         value={password.value}
         onInput={(e) => password.value = e.currentTarget.value}
         disabled={isLoading.value}

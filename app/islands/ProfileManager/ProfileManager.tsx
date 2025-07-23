@@ -108,7 +108,7 @@ export function ProfileModal(
             value={name.value}
             onInput={handleNameChange}
             required
-            class="w-full bg-gray-700 text-white p-3 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+            class="w-full bg-gray-700 text-white px-3 py-2 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
           />
           <input
             type="email"
@@ -118,7 +118,7 @@ export function ProfileModal(
             required
             name="email"
             autoComplete="username"
-            class="w-full bg-gray-700 text-white p-3 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+            class="w-full bg-gray-700 text-white px-3 py-2 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
           />
           <input
             type="password"
@@ -128,7 +128,7 @@ export function ProfileModal(
             required
             name="password"
             autoComplete="current-password"
-            class="w-full bg-gray-700 text-white p-3 rounded mb-6 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+            class="w-full bg-gray-700 text-white px-3 py-2 rounded mb-6 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
           />
           <div class="flex justify-between">
             <div>
@@ -194,6 +194,14 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
   const showAddModal = useSignal(false);
   const editingProfile = useSignal<PlainProfile | null>(null);
   const mobileEditMode = useSignal(false);
+
+  // Store profiles in localStorage for auto-login functionality
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const profilesForStorage = profiles.value.map(p => ({ _id: p._id, name: p.name }));
+      localStorage.setItem("profiles", JSON.stringify(profilesForStorage));
+    }
+  }, [profiles.value]);
 
   const handleCreate = async (data: Partial<Omit<ProfileSchema, "_id" | "userId">>) => {
     const res = await fetch("/api/profiles", {

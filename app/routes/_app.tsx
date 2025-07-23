@@ -2,11 +2,11 @@ import { PageProps } from "$fresh/server.ts";
 import Footer from "../components/Footer.tsx";
 
 export default function App({ Component, route }: PageProps) {
-  // Always show the footer on login/signup/reset/profile pages (not on /player, /stremio, /settings)
+  // Only show the footer on login/signup/reset pages (not on profile, player, stremio, settings)
   const showFooter =
-    !route.startsWith("/player") &&
-    !route.startsWith("/stremio") &&
-    !route.startsWith("/settings");
+    route.startsWith("/login") ||
+    route.startsWith("/auth") ||
+    route === "/";
 
   return (
     <html lang="en">
