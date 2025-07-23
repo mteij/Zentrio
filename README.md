@@ -91,26 +91,6 @@ Visit **[zentrio.eu](https://zentrio.eu)** and use your browser's "Add to Home S
 
 ---
 
-## 🤝 **Contributing**
-
-We love contributions! Whether it's:
-
-- 🐛 **Bug Reports** - Found an issue? Let us know!
-- 💡 **Feature Requests** - Have an idea? We'd love to hear it!
-- 🔧 **Code Contributions** - Pull requests are always welcome!
-- 📖 **Documentation** - Help make our docs even better!
-
-### Getting Started
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and add tests
-4. Commit your changes: `git commit -m 'Add amazing feature'`
-5. Push to the branch: `git push origin feature/amazing-feature`
-6. Open a Pull Request
-
----
-
 ## 📊 **Project Stats**
 
 <div align="center">
@@ -165,6 +145,6 @@ This project is a personal endeavor and is not affiliated with, endorsed, or spo
   
   ---
   
-  **[🚀 Get Started](https://zentrio.deno.dev/)** • **[💬 Join Discussion](https://github.com/MichielEijpe/Zentrio/discussions)** • **[🐛 Report Bug](https://github.com/MichielEijpe/Zentrio/issues)**
+  **[🚀 Hosted Version](https:/zentrio.eu)** • **[💬 Join Discussion](https://github.com/MichielEijpe/Zentrio/discussions)** • **[🐛 Report Bug](https://github.com/MichielEijpe/Zentrio/issues)**
   
 </div>
