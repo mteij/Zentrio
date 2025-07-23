@@ -15,6 +15,15 @@ export interface UserSchema extends Document {
   createdAt: Date;
   // Encrypted TMDB API key (user-level setting)
   encryptedTmdbApiKey?: EncryptedData;
+  // Addon sync settings (experimental feature)
+  addonSyncSettings?: {
+    enabled: boolean;
+    mainProfileId?: ObjectId; // Profile to sync addons from
+    syncDirection: 'main_to_all' | 'all_to_main'; // Direction of sync
+    lastSyncAt?: Date;
+    autoSync: boolean; // Whether to sync automatically
+    syncInterval?: number; // Sync interval in minutes (default: 60)
+  };
 }
 
 export interface ProfileSchema extends Document {
@@ -59,6 +68,15 @@ const userSchema = new mongoose.Schema<UserSchema>({
     salt: { type: String },
     iv: { type: String },
     tag: { type: String }
+  },
+  // Addon sync settings (experimental feature)
+  addonSyncSettings: {
+    enabled: { type: Boolean, default: false },
+    mainProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile" },
+    syncDirection: { type: String, enum: ['main_to_all', 'all_to_main'], default: 'main_to_all' },
+    lastSyncAt: { type: Date },
+    autoSync: { type: Boolean, default: false },
+    syncInterval: { type: Number, default: 60 } // minutes
   }
 });
 
@@ -102,6 +120,11 @@ const Profiles: Model<ProfileSchema> = mongoose.models.Profile || mongoose.model
 const Sessions: Model<SessionSchema> = mongoose.models.Session || mongoose.model("Session", sessionSchema);
 export const VerificationTokens: Model<VerificationTokenSchema> = mongoose.models.VerificationToken ||
   mongoose.model("VerificationToken", verificationTokenSchema);
+
+// Export models for external use
+export const User = Users;
+export const Profile = Profiles;
+export const Session = Sessions;
 
 // --- Password Functions ---
 export const hashPassword = async (password: string) => {
@@ -517,6 +540,48 @@ export const removeUserTmdbApiKey = async (userId: string): Promise<void> => {
  */
 export const testDatabaseEncryption = async (): Promise<boolean> => {
   return await encryptionService.testEncryption();
+};
+
+/**
+ * Get addon sync settings for user
+ */
+export const getUserAddonSyncSettings = async (userId: string) => {
+  const user = await Users.findById(userId);
+  return user?.addonSyncSettings || {
+    enabled: false,
+    syncDirection: 'main_to_all',
+    autoSync: false,
+    syncInterval: 60
+  };
+};
+
+/**
+ * Update addon sync settings for user
+ */
+export const updateUserAddonSyncSettings = async (
+  userId: string, 
+  settings: Partial<UserSchema['addonSyncSettings']>
+): Promise<void> => {
+  const updateData: any = {};
+  
+  Object.entries(settings).forEach(([key, value]) => {
+    if (value !== undefined) {
+      updateData[`addonSyncSettings.${key}`] = value;
+    }
+  });
+
+  await Users.updateOne(
+    { _id: new mongoose.Types.ObjectId(userId) },
+    { $set: updateData }
+  );
+};
+
+/**
+ * Check if user can perform addon sync
+ */
+export const canUserPerformAddonSync = async (userId: string): Promise<boolean> => {
+  const user = await Users.findById(userId);
+  return !!(user?.addonSyncSettings?.enabled && user?.addonSyncSettings?.mainProfileId);
 };
 
 export type { ObjectId, EncryptedData };

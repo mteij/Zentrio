@@ -23,6 +23,15 @@ export default function SettingsModal({
   // New general settings
   const accentColor = useSignal<string>("#dc2626");
   const tmdbApiKey = useSignal<string>("");
+  
+  // Addon sync settings
+  const addonSyncEnabled = useSignal<boolean>(false);
+  const mainProfileId = useSignal<string>("");
+  const autoSync = useSignal<boolean>(false);
+  const syncInterval = useSignal<number>(60);
+  const lastSyncAt = useSignal<string>("");
+  const isSyncing = useSignal<boolean>(false);
+  const syncStatus = useSignal<string>("");
 
   // Load settings from localStorage and server
   useEffect(() => {
@@ -41,6 +50,9 @@ export default function SettingsModal({
 
       // Load TMDB API key from server
       loadTmdbApiKey();
+      
+      // Load addon sync settings
+      loadAddonSyncSettings();
     }
   }, []);
 
@@ -56,6 +68,27 @@ export default function SettingsModal({
       }
     } catch (error) {
       console.warn('Failed to load TMDB API key:', error);
+    }
+  };
+
+  // Load addon sync settings from server
+  const loadAddonSyncSettings = async () => {
+    try {
+      const response = await fetch('/api/addon-sync');
+      if (response.ok) {
+        const data = await response.json();
+        const { settings } = data;
+        
+        addonSyncEnabled.value = settings.enabled || false;
+        mainProfileId.value = settings.mainProfileId || "";
+        // Remove syncDirection, always main_to_all
+        // syncDirection.value = settings.syncDirection || "main_to_all";
+        autoSync.value = settings.autoSync || false;
+        syncInterval.value = settings.syncInterval || 60;
+        lastSyncAt.value = settings.lastSyncAt ? new Date(settings.lastSyncAt).toLocaleString() : "";
+      }
+    } catch (error) {
+      console.warn('Failed to load addon sync settings:', error);
     }
   };
 
@@ -123,6 +156,97 @@ export default function SettingsModal({
       localStorage.setItem("enableAddonOrderUserscript", addonOrderEnabled.value ? "true" : "false");
     }
   }, [addonOrderEnabled.value]);
+
+  // Save addon sync settings to server
+  const saveAddonSyncSettings = async () => {
+    try {
+      const response = await fetch('/api/addon-sync', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: addonSyncEnabled.value,
+          mainProfileId: mainProfileId.value || null,
+          // syncDirection: syncDirection.value, // REMOVE
+          autoSync: autoSync.value,
+          syncInterval: syncInterval.value
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save addon sync settings');
+      }
+      
+      console.log('Addon sync settings saved successfully');
+    } catch (error) {
+      console.error('Error saving addon sync settings:', error);
+      alert('Failed to save addon sync settings. Please try again.');
+    }
+  };
+
+  // Auto-save addon sync settings with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveAddonSyncSettings();
+    }, 1000); // Debounce for 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [addonSyncEnabled.value, mainProfileId.value, autoSync.value, syncInterval.value]);
+
+  // Manual sync function
+  const performManualSync = async () => {
+    if (isSyncing.value) return;
+
+    isSyncing.value = true;
+    syncStatus.value = "Syncing...";
+
+    try {
+      const response = await fetch('/api/addon-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync' }),
+      });
+
+      // Debugging: log the response status and body
+      let debugText = "";
+      if (!response.ok) {
+        try {
+          debugText = await response.text();
+        } catch {}
+        console.error("Addon sync failed, status:", response.status, "body:", debugText);
+      }
+
+      if (!response.ok) {
+        let msg = "Sync failed";
+        try {
+          // Try to parse JSON error
+          const data = JSON.parse(debugText);
+          msg = data?.message || msg;
+        } catch {
+          if (debugText) msg = debugText;
+        }
+        syncStatus.value = `Sync failed: ${msg}`;
+        isSyncing.value = false;
+        setTimeout(() => { syncStatus.value = ""; }, 5000);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        syncStatus.value = result.message;
+        setTimeout(() => loadAddonSyncSettings(), 1000);
+      } else {
+        syncStatus.value = `Sync failed: ${result.message}`;
+      }
+    } catch (error) {
+      syncStatus.value = `Sync error: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      isSyncing.value = false;
+      setTimeout(() => {
+        syncStatus.value = "";
+      }, 5000);
+    }
+  };
 
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
@@ -238,11 +362,149 @@ export default function SettingsModal({
         {tab.value === "experimental" && (
           <div>
             <h3 class="text-lg font-semibold mb-6 text-white">Experimental Features</h3>
-            
-            {/* Tweaks Section */}
+            {/* Addons Section */}
             <div class="mb-8">
-              <h4 class="text-md font-semibold mb-4 text-gray-300 border-b border-gray-700 pb-2">Tweaks</h4>
-              
+              <h4 class="text-md font-semibold mb-4 text-gray-300 border-b border-gray-700 pb-2">Addons</h4>
+              {/* Addon Sync */}
+              <div class="bg-gray-800 rounded-lg p-4 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                  <div>
+                    <span class="text-gray-200 font-medium">Addon Synchronization</span>
+                    <p class="text-xs text-gray-400 mt-1">
+                      Sync addons between your profiles automatically
+                    </p>
+                  </div>
+                  <div class="flex items-center">
+                    <div class="relative">
+                      <input
+                        type="checkbox"
+                        class="sr-only"
+                        checked={addonSyncEnabled.value}
+                        onChange={e => addonSyncEnabled.value = e.currentTarget.checked}
+                      />
+                      <div class={`block w-14 h-8 rounded-full transition-colors duration-200 cursor-pointer ${
+                        addonSyncEnabled.value 
+                          ? 'bg-red-600' 
+                          : 'bg-gray-600'
+                      }`}
+                        onClick={() => addonSyncEnabled.value = !addonSyncEnabled.value}
+                      ></div>
+                      <div class={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 pointer-events-none ${
+                        addonSyncEnabled.value ? 'transform translate-x-6' : ''
+                      }`}></div>
+                    </div>
+                    <span class="ml-3 text-sm font-medium text-gray-300">
+                      {addonSyncEnabled.value ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                </div>
+                {addonSyncEnabled.value && (
+                  <div class="space-y-4 border-t border-gray-700 pt-4">
+                    {/* Main Profile Selection */}
+                    <div>
+                      <label class="block text-gray-200 mb-2 text-sm font-medium">Main Profile</label>
+                      <select
+                        class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                        value={mainProfileId.value}
+                        onChange={e => mainProfileId.value = e.currentTarget.value}
+                      >
+                        <option value="">Select main profile...</option>
+                        {profiles.value.map((p) => (
+                          <option key={p._id} value={p._id}>{p.name}</option>
+                        ))}
+                      </select>
+                      <p class="text-xs text-gray-500 mt-1">
+                        The profile to sync addons from (main → all others)
+                      </p>
+                    </div>
+                    {/* Auto Sync */}
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-gray-200 text-sm font-medium">Auto Sync</span>
+                        <p class="text-xs text-gray-400">
+                          Automatically sync every {syncInterval.value} minutes
+                        </p>
+                      </div>
+                      <div class="flex items-center">
+                        <div class="relative">
+                          <input
+                            type="checkbox"
+                            class="sr-only"
+                            checked={autoSync.value}
+                            onChange={e => autoSync.value = e.currentTarget.checked}
+                          />
+                          <div class={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                            autoSync.value 
+                              ? 'bg-red-600' 
+                              : 'bg-gray-600'
+                          }`}
+                            onClick={() => autoSync.value = !autoSync.value}
+                          ></div>
+                          <div class={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
+                            autoSync.value ? 'transform translate-x-6' : ''
+                          }`}></div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Sync Interval */}
+                    {autoSync.value && (
+                      <div>
+                        <label class="block text-gray-200 mb-2 text-sm font-medium">
+                          Sync Interval (minutes)
+                        </label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="1440"
+                          value={syncInterval.value}
+                          onInput={e => syncInterval.value = Math.max(5, parseInt(e.currentTarget.value) || 60)}
+                          class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                        />
+                        <p class="text-xs text-gray-500 mt-1">
+                          Minimum 5 minutes, maximum 24 hours (1440 minutes)
+                        </p>
+                      </div>
+                    )}
+                    {/* Manual Sync Button */}
+                    <div class="flex items-center justify-between pt-2">
+                      <div>
+                        <button
+                          onClick={performManualSync}
+                          disabled={isSyncing.value || !mainProfileId.value}
+                          class={`px-4 py-2 rounded text-sm font-medium transition-colors duration-200 ${
+                            isSyncing.value || !mainProfileId.value
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                              : 'bg-red-600 hover:bg-red-700 text-white'
+                          }`}
+                        >
+                          {isSyncing.value ? 'Syncing...' : 'Sync Now'}
+                        </button>
+                        {lastSyncAt.value && (
+                          <p class="text-xs text-gray-500 mt-1">
+                            Last sync: {lastSyncAt.value}
+                          </p>
+                        )}
+                      </div>
+                      {syncStatus.value && (
+                        <div class="text-xs text-gray-300 max-w-xs">
+                          {syncStatus.value}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div class="text-xs text-gray-500 bg-gray-700 rounded p-3 mt-4 space-y-2">
+                  <div>
+                    <strong>How it works:</strong> This feature uses the Stremio API to sync addons between your profiles. 
+                    You can choose a main profile and sync direction. All profiles must have valid Stremio credentials.
+                  </div>
+                  <div class="border-t border-gray-600 pt-2">
+                    <strong>Warning:</strong> This is an experimental feature. Always backup your addon configurations 
+                    before using. Sync operations will overwrite existing addon collections.
+                  </div>
+                </div>
+              </div>
+              {/* Addon Order Userscript */}
               <div class="bg-gray-800 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-3">
                   <div>
@@ -275,7 +537,6 @@ export default function SettingsModal({
                     </span>
                   </div>
                 </div>
-                
                 <div class="text-xs text-gray-500 bg-gray-700 rounded p-3 space-y-2">
                   <div>
                     <strong>How it works:</strong> When enabled, this adds an "Edit Order" button to the Stremio web interface. 

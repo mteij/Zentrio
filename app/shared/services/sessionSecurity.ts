@@ -160,8 +160,8 @@ class SessionSecurityService {
         "manifest-src *"
       ].join('; ');
     } else {
-      // Restrictive policy for non-Stremio pages
-      headers['X-Frame-Options'] = 'DENY';
+      // Less restrictive policy that allows local framing but maintains security
+      // Remove X-Frame-Options to let CSP handle framing
       headers['Content-Security-Policy'] = [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline'", 
@@ -170,7 +170,7 @@ class SessionSecurityService {
         "font-src 'self' https://fonts.gstatic.com",
         "connect-src 'self'",
         "object-src 'none'",
-        "frame-ancestors 'none'"
+        "frame-ancestors 'self' localhost:* 127.0.0.1:*"
       ].join('; ');
     }
 
