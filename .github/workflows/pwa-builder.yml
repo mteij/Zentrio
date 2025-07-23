@@ -59,13 +59,26 @@ jobs:
         echo "Initializing Bubblewrap project..."
         cd ./build/android
         
+        # Set environment variables to avoid prompts
+        export BUBBLEWRAP_JDK_PATH=$JAVA_HOME
+        export CI=true
+        
         # First, test if the manifest is accessible
         echo "Testing manifest accessibility..."
-        curl -v https://zentrio.eu/manifest.json || echo "Manifest fetch failed"
+        curl -s -I https://zentrio.eu/manifest.json || echo "Manifest fetch failed"
         
-        # Try Bubblewrap init with more verbose output
-        echo "Running Bubblewrap init..."
-        echo "y" | timeout 60 bubblewrap init --manifest https://zentrio.eu/manifest.json 2>&1 || echo "Bubblewrap init failed or timed out"
+        # Download and inspect the manifest
+        echo "Downloading manifest..."
+        curl -s https://zentrio.eu/manifest.json > zentrio-manifest.json || echo "Could not download manifest"
+        
+        if [ -f "zentrio-manifest.json" ]; then
+          echo "✅ Manifest downloaded successfully:"
+          cat zentrio-manifest.json
+        fi
+        
+        # Try Bubblewrap init with explicit non-interactive mode
+        echo "Running Bubblewrap init (non-interactive)..."
+        printf "n\n" | timeout 30 bubblewrap init --manifest https://zentrio.eu/manifest.json 2>&1 || echo "Bubblewrap init completed/failed"
         
         # Show what was created
         echo "=== Directory contents after init ==="
@@ -156,42 +169,124 @@ jobs:
         echo "Attempting Android APK build..."
         cd ./build/android
         
+        # Set environment variables for non-interactive build
+        export BUBBLEWRAP_JDK_PATH=$JAVA_HOME
+        export CI=true
+        export ANDROID_HOME=$ANDROID_SDK_ROOT
+        
         # Show current directory contents
         echo "=== Current directory contents ==="
         ls -la
         
+        # Show environment info
+        echo "=== Environment Info ==="
+        echo "JAVA_HOME: $JAVA_HOME"
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+        java -version 2>&1 || echo "Java not found"
+        
         # Verify manifest exists
         if [ -f "twa-manifest.json" ]; then
           echo "✅ twa-manifest.json found"
-          cat twa-manifest.json
           
-          echo "Attempting Bubblewrap build..."
-          bubblewrap build --skipPwaValidation 2>&1 || echo "⚠️  Bubblewrap build failed, but configuration is available"
+          echo "Attempting Bubblewrap build (non-interactive)..."
+          printf "n\n" | timeout 60 bubblewrap build --skipPwaValidation 2>&1 || echo "⚠️  Bubblewrap build completed/failed"
+          
+          # Check if any APK files were generated
+          echo "=== Looking for generated APK files ==="
+          find . -name "*.apk" -o -name "*.aab" | head -5
+          
         else
           echo "❌ No twa-manifest.json found - this shouldn't happen"
         fi
         
-        # Create a README for the build
+        # Create comprehensive build documentation
         cat > README.md << 'EOF'
         # Zentrio Android Build Configuration
         
         This directory contains the complete configuration needed to build an Android APK for Zentrio.
         
-        ## Quick Start (Recommended)
-        Visit https://zentrio.eu in any browser and install the PWA directly - no build required!
+        ## 🚀 Quick Start (Recommended)
+        **Visit https://zentrio.eu in any browser and install the PWA directly - no build required!**
         
-        ## Manual APK Build
-        If you want to create a custom APK:
-        1. Ensure you have Android SDK and Java 17 installed
-        2. Run: `bubblewrap build` in this directory
-        3. The APK will be generated in the `app/build/outputs/apk/` directory
+        This is the easiest way to get Zentrio on your device:
+        - Chrome/Edge: Click the install button in the address bar
+        - Safari: Share → Add to Home Screen  
+        - Firefox: Menu → Add to Home Screen
         
-        ## Files Included
+        ## 🔧 Manual APK Build (Advanced)
+        
+        ### Prerequisites
+        - Java JDK 17 or higher
+        - Android SDK (via Android Studio or command line tools)
+        - Node.js and npm
+        
+        ### Build Steps
+        1. Install Bubblewrap CLI:
+           ```bash
+           npm install -g @bubblewrap/cli
+           ```
+        
+        2. Initialize project (answer "No" to JDK installation if you have Java 17+):
+           ```bash
+           bubblewrap init --manifest https://zentrio.eu/manifest.json
+           ```
+        
+        3. Build the APK:
+           ```bash
+           bubblewrap build --skipPwaValidation
+           ```
+        
+        4. Find your APK in: `app/build/outputs/apk/release/`
+        
+        ### Configuration Files
         - `twa-manifest.json` - Trusted Web Activity configuration
+        - `zentrio-manifest.json` - Downloaded PWA manifest
         - `BUILD_INSTRUCTIONS.md` - Detailed build instructions
+        
+        ### Troubleshooting
+        - If build fails, ensure Android SDK and Java 17+ are properly installed
+        - Set ANDROID_HOME environment variable to your SDK location
+        - Use `bubblewrap doctor` to check your setup
         
         For support, visit: https://github.com/MichielEijpe/Zentrio/issues
         EOF
+        
+        # Create a simple build script
+        cat > build-apk.sh << 'EOF'
+        #!/bin/bash
+        echo "Building Zentrio Android APK..."
+        echo "Prerequisites: Java 17+, Android SDK, Node.js"
+        echo ""
+        
+        # Check prerequisites
+        if ! command -v java &> /dev/null; then
+            echo "❌ Java not found. Please install Java 17 or higher."
+            exit 1
+        fi
+        
+        if ! command -v npm &> /dev/null; then
+            echo "❌ npm not found. Please install Node.js."
+            exit 1
+        fi
+        
+        # Install Bubblewrap if not present
+        if ! command -v bubblewrap &> /dev/null; then
+            echo "📦 Installing Bubblewrap CLI..."
+            npm install -g @bubblewrap/cli
+        fi
+        
+        # Initialize and build
+        echo "🔧 Initializing Bubblewrap project..."
+        bubblewrap init --manifest https://zentrio.eu/manifest.json
+        
+        echo "🏗️  Building APK..."
+        bubblewrap build --skipPwaValidation
+        
+        echo "✅ Build complete! Check app/build/outputs/apk/ for your APK"
+        EOF
+        
+        chmod +x build-apk.sh
         
         # List all files created
         echo "=== Final build directory contents ==="
