@@ -147,6 +147,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
+## 🤖 **AI-Assisted Development**
+
+This project extensively utilizes AI-powered development tools including GitHub Copilot, Claude, and other AI assistants for code generation, optimization, and documentation. While all code is reviewed and tested, users should be aware that significant portions of this codebase have been generated or enhanced through AI assistance.
+
+## ⚖️ **Legal Disclaimer**
+
+This project is a personal endeavor and is not affiliated with, endorsed, or sponsored by Stremio. The creator acknowledges that this service may operate in a manner that tests the boundaries of Stremio's terms of service and will comply with any and all takedown or cease and desist notices from Stremio or its legal representatives. For the official Stremio website, please visit [stremio.com](https://stremio.com).
+
+---
+
 <div align="center">
   
   **Made with ❤️ for the Stremio Community**
