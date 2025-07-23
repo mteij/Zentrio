@@ -29,8 +29,14 @@ export async function handler(
 
   const response = await ctx.next();
   
+  // Determine if this route should allow iframe embedding
+  const url = new URL(req.url);
+  const allowFraming = url.pathname.startsWith('/player') || 
+                      url.pathname.startsWith('/stremio') ||
+                      url.pathname === '/';
+  
   // Add security headers to all responses
-  const securityHeaders = sessionSecurity.createSecurityHeaders();
+  const securityHeaders = sessionSecurity.createSecurityHeaders(allowFraming);
   for (const [key, value] of Object.entries(securityHeaders)) {
     response.headers.set(key, value);
   }

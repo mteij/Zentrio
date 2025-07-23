@@ -122,14 +122,17 @@ class SessionSecurityService {
 
   /**
    * Create security headers for responses
+   * @param allowFraming - Whether to allow iframe embedding (default: false for security)
    */
-  createSecurityHeaders(): Record<string, string> {
+  createSecurityHeaders(allowFraming: boolean = false): Record<string, string> {
     return {
       'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
+      'X-Frame-Options': allowFraming ? 'SAMEORIGIN' : 'DENY',
       'X-XSS-Protection': '1; mode=block',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com;",
+      'Content-Security-Policy': allowFraming 
+        ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'self';"
+        : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com;",
       'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
     };
   }
