@@ -1,23 +1,22 @@
-const CACHE_NAME = "zentrio-cache-v1";
-const ASSETS = [
-  "/",
+const CACHE_NAME = "zentrio-pwa-v1";
+const STATIC_ASSETS = [
   "/static/styles.css",
   "/static/css/background.css",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/manifest.json",
-  // Add more assets as needed
+  // ...add more static assets if needed, but do not include "/"
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Try to add all assets, but skip any that fail
-      for (const asset of ASSETS) {
+      for (const asset of STATIC_ASSETS) {
         try {
           await cache.add(asset);
         } catch (e) {
-          // Ignore missing files or network errors
+          // Ignore individual asset failures to avoid breaking the install
+          // Optionally, log: console.warn("SW failed to cache:", asset, e);
         }
       }
     })
@@ -28,40 +27,47 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      )
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          if (
-            response.status === 200 &&
-            response.type === "basic" &&
-            event.request.url.startsWith(self.location.origin)
-          ) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith("/static/")) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request)
+          .then((response) => {
+            // Only cache successful (status 200) and basic (same-origin) responses
+            if (
+              response &&
+              response.status === 200 &&
+              response.type === "basic"
+            ) {
+              const copy = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+            }
+            return response;
+          })
+          .catch(() => {
+            // Always return a valid Response object with a string body and headers
+            return new Response("Network error", {
+              status: 408,
+              statusText: "Network Error",
+              headers: { "Content-Type": "text/plain" },
             });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Always return a valid Response object, fallback to a minimal offline page
-          return new Response(
-            "<h1>Offline</h1><p>This page is not available offline.</p>",
-            { headers: { "Content-Type": "text/html" }, status: 503 }
-          );
+          });
+      }).catch(() => {
+        // In case caches.match itself fails, return a fallback response
+        return new Response("Network error", {
+          status: 408,
+          statusText: "Network Error",
+          headers: { "Content-Type": "text/plain" },
         });
-    })
-  );
+      })
+    );
+  }
 });

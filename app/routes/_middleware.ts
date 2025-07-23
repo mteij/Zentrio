@@ -1,8 +1,6 @@
 import { FreshContext } from "$fresh/server.ts";
 import { getCookies } from "$std/http/cookie.ts";
 import { getSession } from "../utils/db.ts";
-import { fromFileUrl, join } from "$std/path/mod.ts";
-import { serveDir } from "$std/http/file_server.ts";
 
 export interface AppState {
   userId: string | null;

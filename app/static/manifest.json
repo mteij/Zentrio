@@ -1,12 +1,11 @@
 {
   "name": "Zentrio",
   "short_name": "Zentrio",
-  "description": "Unofficial Zentrio web client with profiles.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#141414",
   "theme_color": "#e50914",
-  "orientation": "portrait",
+  "description": "Zentrio - Stremio profile manager",
   "icons": [
     {
       "src": "/static/icons/icon-192.png",
