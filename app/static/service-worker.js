@@ -1,6 +1,5 @@
 const CACHE_NAME = "stremiohub-cache-v1";
 const ASSETS = [
-  "/",
   "/static/styles.css",
   "/static/css/background.css",
   "/static/icons/icon-192.png",
@@ -16,7 +15,12 @@ self.addEventListener("install", (event) => {
         ASSETS.map(async (url) => {
           try {
             const response = await fetch(url, { cache: "no-store" });
-            if (response.ok && response.type !== "opaqueredirect" && !response.redirected) {
+            if (
+              response.ok &&
+              response.type !== "opaqueredirect" &&
+              !response.redirected &&
+              response.status === 200
+            ) {
               await cache.put(url, response);
             } else {
               // eslint-disable-next-line no-console
@@ -44,12 +48,34 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  // For navigation requests (like "/"), always fetch from network
+  if (event.request.mode === "navigate" || event.request.destination === "document") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Don't cache redirects or non-200 responses
+          if (
+            response &&
+            response.status === 200 &&
+            response.type === "basic" &&
+            !response.redirected
+          ) {
+            const respClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, respClone));
+          }
+          return response;
+        })
+        .catch(() => caches.match("/static/styles.css")) // fallback to a static asset if needed
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
       return fetch(event.request)
         .then((response) => {
-          // Only cache successful, non-redirected, basic responses
           if (
             response &&
             response.status === 200 &&
@@ -62,8 +88,8 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => {
-          // Optionally, return a fallback page or asset here
-          return caches.match("/");
+          // Optionally, return a fallback asset here
+          return caches.match("/static/styles.css");
         });
     })
   );
