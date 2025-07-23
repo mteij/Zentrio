@@ -269,6 +269,7 @@ jobs:
         }
 
         android {
+            namespace 'eu.zentrio.app'
             compileSdkVersion 33
             buildToolsVersion "33.0.0"
             
@@ -356,10 +357,10 @@ jobs:
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           
           # Try with full debugging output
-          bubblewrap doctor || echo "Bubblewrap doctor completed"
+          echo "n" | bubblewrap doctor || echo "Bubblewrap doctor completed"
           
-          # Attempt build with verbose output
-          timeout 120 bubblewrap build --skipPwaValidation --verbose 2>&1 || echo "Bubblewrap build attempt completed"
+          # Attempt build with verbose output and auto-answers
+          echo "n" | timeout 120 bubblewrap build --skipPwaValidation --verbose 2>&1 || echo "Bubblewrap build attempt completed"
           
           # Check for any generated files
           find . -name "*.apk" -o -name "*.aab" | head -5
