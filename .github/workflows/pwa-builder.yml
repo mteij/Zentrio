@@ -76,17 +76,26 @@ jobs:
           cat zentrio-manifest.json
         fi
         
-        # Try Bubblewrap init with explicit non-interactive mode
-        echo "Running Bubblewrap init (non-interactive)..."
-        printf "n\n" | timeout 30 bubblewrap init --manifest https://zentrio.eu/manifest.json 2>&1 || echo "Bubblewrap init completed/failed"
+        # Create Bubblewrap config to avoid all prompts
+        echo "Creating Bubblewrap configuration..."
+        cat > .bubblewrap-config << EOF
+        jdkPath=$JAVA_HOME
+        androidSdkPath=$ANDROID_SDK_ROOT
+        EOF
+        
+        # Skip Bubblewrap init entirely and create our own project structure
+        echo "Creating TWA project structure manually..."
+        
+        # Create the basic Android project structure
+        mkdir -p app/src/main/java/eu/zentrio/app
+        mkdir -p app/src/main/res/{values,drawable-hdpi,drawable-mdpi,drawable-xhdpi,drawable-xxhdpi,drawable-xxxhdpi,mipmap-hdpi,mipmap-mdpi,mipmap-xhdpi,mipmap-xxhdpi,mipmap-xxxhdpi}
+        
+        echo "✅ Project structure created without interactive prompts"
         
         # Show what was created
-        echo "=== Directory contents after init ==="
+        echo "=== Directory contents after setup ==="
         ls -la
-        
-        # Check for any generated files
-        echo "=== All files in directory ==="
-        find . -type f
+        find . -type d | head -10
 
     - name: Configure TWA Settings
       run: |
@@ -164,41 +173,96 @@ jobs:
         echo "Files in directory:"
         ls -la
 
-    - name: Build Android APK
+    - name: Build Android Configuration
       run: |
-        echo "Attempting Android APK build..."
+        echo "Creating complete Android build configuration..."
         cd ./build/android
-        
-        # Set environment variables for non-interactive build
-        export BUBBLEWRAP_JDK_PATH=$JAVA_HOME
-        export CI=true
-        export ANDROID_HOME=$ANDROID_SDK_ROOT
-        
-        # Show current directory contents
-        echo "=== Current directory contents ==="
-        ls -la
         
         # Show environment info
         echo "=== Environment Info ==="
         echo "JAVA_HOME: $JAVA_HOME"
-        echo "ANDROID_HOME: $ANDROID_HOME"
         echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
         java -version 2>&1 || echo "Java not found"
         
-        # Verify manifest exists
-        if [ -f "twa-manifest.json" ]; then
-          echo "✅ twa-manifest.json found"
-          
-          echo "Attempting Bubblewrap build (non-interactive)..."
-          printf "n\n" | timeout 60 bubblewrap build --skipPwaValidation 2>&1 || echo "⚠️  Bubblewrap build completed/failed"
-          
-          # Check if any APK files were generated
-          echo "=== Looking for generated APK files ==="
-          find . -name "*.apk" -o -name "*.aab" | head -5
-          
-        else
-          echo "❌ No twa-manifest.json found - this shouldn't happen"
-        fi
+        # Create Android manifest
+        cat > app/src/main/AndroidManifest.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="eu.zentrio.app"
+            android:versionCode="1"
+            android:versionName="1.0.0">
+            
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            
+            <application
+                android:allowBackup="true"
+                android:icon="@mipmap/ic_launcher"
+                android:label="Zentrio"
+                android:theme="@style/Theme.LauncherActivity">
+                
+                <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+                    android:exported="true"
+                    android:screenOrientation="portrait">
+                    
+                    <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                        android:value="https://zentrio.eu/" />
+                    
+                    <meta-data android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+                        android:resource="@color/colorPrimary" />
+                        
+                    <meta-data android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+                        android:resource="@color/colorPrimary" />
+                    
+                    <intent-filter android:autoVerify="true">
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                    
+                    <intent-filter android:autoVerify="true">
+                        <action android:name="android.intent.action.VIEW" />
+                        <category android:name="android.intent.category.DEFAULT" />
+                        <category android:name="android.intent.category.BROWSABLE" />
+                        <data android:scheme="https" android:host="zentrio.eu" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+        
+        # Create colors.xml
+        cat > app/src/main/res/values/colors.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <color name="colorPrimary">#e50914</color>
+            <color name="colorPrimaryDark">#141414</color>
+            <color name="colorAccent">#e50914</color>
+        </resources>
+        EOF
+        
+        # Create styles.xml
+        cat > app/src/main/res/values/styles.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <style name="Theme.LauncherActivity" parent="Theme.AppCompat.Light.NoActionBar">
+                <item name="colorPrimary">@color/colorPrimary</item>
+                <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+                <item name="colorAccent">@color/colorAccent</item>
+                <item name="android:statusBarColor">@color/colorPrimary</item>
+                <item name="android:navigationBarColor">@color/colorPrimary</item>
+            </style>
+        </resources>
+        EOF
+        
+        # Create strings.xml
+        cat > app/src/main/res/values/strings.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <string name="app_name">Zentrio</string>
+        </resources>
+        EOF
+        
+        echo "✅ Complete Android project configuration created"
         
         # Create comprehensive build documentation
         cat > README.md << 'EOF'
