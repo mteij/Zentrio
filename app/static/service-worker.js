@@ -1,10 +1,10 @@
 const CACHE_NAME = "zentrio-pwa-v1";
 const STATIC_ASSETS = [
-  "/static/styles.css",
-  "/static/css/background.css",
-  "/static/icons/icon-192.png",
-  "/static/icons/icon-512.png",
-  "/static/manifest.json",
+  "/styles.css",
+  "/css/background.css",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/manifest.json",
   // ...add more static assets if needed, but do not include "/"
 ];
 
@@ -35,7 +35,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith("/static/")) {
+  if (url.pathname === "/styles.css" || url.pathname === "/css/background.css" || url.pathname === "/manifest.json" || url.pathname === "/service-worker.js" || url.pathname.startsWith("/icons/")) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         if (cached) return cached;

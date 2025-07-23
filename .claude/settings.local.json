@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(deno run:*)",
+      "Bash(curl:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell:*)",
+      "Bash(ls:*)"
+    ],
+    "deny": []
+  }
+}

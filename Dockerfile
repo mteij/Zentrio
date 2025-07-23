@@ -1,17 +1,15 @@
 # --- Build Stage ---
 FROM denoland/deno:latest AS builder
-WORKDIR /app
-COPY app/ .
-# Copy .env from the root into the build context (for dev and prod)
-COPY .env ../.env
-RUN deno cache main.ts
+WORKDIR /
+COPY app/ /app/
+COPY deno.jsonc deno.lock* ./
+RUN deno cache app/main.ts
 
 # --- Production Stage ---
 FROM denoland/deno:latest
-WORKDIR /app
+WORKDIR /
 COPY --from=builder /deno-dir /deno-dir
-COPY --from=builder /app .
-# Copy .env from the root into the container root (so ../.env from /app is /app/../.env = /)
-COPY .env /app/../.env
+COPY --from=builder /app /app
+COPY deno.jsonc deno.lock* ./
 EXPOSE 8000
 CMD ["run", "--allow-read", "--allow-env", "--allow-net", "--allow-sys", "--allow-write", "--allow-run", "--unstable-kv", "app/main.ts"]

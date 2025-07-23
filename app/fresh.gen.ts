@@ -18,6 +18,7 @@ import * as $auth_password from "./routes/auth/password.tsx";
 import * as $auth_reset from "./routes/auth/reset.tsx";
 import * as $auth_signup_success from "./routes/auth/signup-success.tsx";
 import * as $auth_verify from "./routes/auth/verify.tsx";
+import * as $index from "./routes/index.tsx";
 import * as $login from "./routes/login.tsx";
 import * as $logout from "./routes/logout.ts";
 import * as $player_profileId_ from "./routes/player/[profileId].tsx";
@@ -54,6 +55,7 @@ const manifest = {
     "./routes/auth/reset.tsx": $auth_reset,
     "./routes/auth/signup-success.tsx": $auth_signup_success,
     "./routes/auth/verify.tsx": $auth_verify,
+    "./routes/index.tsx": $index,
     "./routes/login.tsx": $login,
     "./routes/logout.ts": $logout,
     "./routes/player/[profileId].tsx": $player_profileId_,

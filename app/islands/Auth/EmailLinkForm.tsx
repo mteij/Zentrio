@@ -58,7 +58,7 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
             value={email.value}
             onInput={(e) => (email.value = e.currentTarget.value)}
             required
-            class="mt-1 block w-full px-3 py-2 bg-stremio-gray-800 border border-stremio-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-stremio-red focus:border-stremio-red sm:text-sm transition-all duration-200"
+            class="w-full bg-gray-700 text-white p-3 rounded focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
             placeholder="you@example.com"
             disabled={isLoading.value}
           />
@@ -67,7 +67,7 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
         <button
           type="submit"
           disabled={isLoading.value}
-          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-stremio-red hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stremio-red disabled:opacity-50 transition-all duration-200"
+          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-600 disabled:opacity-50 transition-all duration-200"
         >
           {isLoading.value ? "Checking..." : "Continue"}
         </button>
