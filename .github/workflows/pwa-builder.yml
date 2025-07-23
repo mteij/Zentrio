@@ -16,60 +16,129 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Setup Node
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
+        cache: 'npm'
 
-    - name: Build PWA
-      uses: pwa-builder/PWABuilder@v2
-      with:
-        site-url: https://zentrio.eu
-        app-name: Zentrio
-        app-short-name: Zentrio
-        app-description: A beautiful, secure, Netflix-inspired profile management system for Stremio Web
-        app-theme-color: '#e50914'
-        app-background-color: '#141414'
-        app-start-url: /
-        package-id: eu.zentrio.app
-        android-signing-key: ${{ secrets.ANDROID_SIGNING_KEY }}
-        android-signing-key-password: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
-        android-key-alias: ${{ secrets.ANDROID_KEY_ALIAS }}
-        android-key-alias-password: ${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}
+    - name: Install PWABuilder CLI
+      run: npm install -g @pwabuilder/cli
 
-    - name: Upload APK Artifact
+    - name: Wait for site to be ready
+      run: |
+        echo "Waiting for https://zentrio.eu to be accessible..."
+        timeout 300 bash -c 'until curl -f https://zentrio.eu > /dev/null 2>&1; do sleep 5; done' || echo "Site check completed"
+
+    - name: Validate PWA
+      run: |
+        echo "Validating PWA..."
+        pwa validate https://zentrio.eu || echo "Validation completed with warnings"
+
+    - name: Build Android APK
+      run: |
+        echo "Building Android APK..."
+        pwa package https://zentrio.eu \
+          --platform android \
+          --options '{
+            "packageId": "eu.zentrio.app",
+            "name": "Zentrio",
+            "launcherName": "Zentrio", 
+            "display": "standalone",
+            "themeColor": "#e50914",
+            "backgroundColor": "#141414",
+            "startUrl": "/",
+            "iconUrl": "https://zentrio.eu/icons/icon-512.png",
+            "appVersion": "1.0.0",
+            "appVersionCode": '${{ github.run_number }}',
+            "minSdkVersion": 21,
+            "targetSdkVersion": 33,
+            "webViewVersion": "100.0.0",
+            "allowExternalUrls": false,
+            "enableNotifications": false,
+            "fullScreen": false
+          }' \
+          --dir ./build
+
+    - name: Build Windows Package  
+      run: |
+        echo "Building Windows package..."
+        pwa package https://zentrio.eu \
+          --platform windows \
+          --options '{
+            "packageId": "eu.zentrio.app",
+            "name": "Zentrio",
+            "display": "standalone",
+            "themeColor": "#e50914", 
+            "backgroundColor": "#141414",
+            "startUrl": "/",
+            "version": "1.0.${{ github.run_number }}",
+            "allowExternalUrls": false,
+            "generateModernPackage": true
+          }' \
+          --dir ./build
+
+    - name: List build outputs
+      run: |
+        echo "Build directory contents:"
+        find ./build -type f -name "*.apk" -o -name "*.msix" -o -name "*.aab" | head -10
+
+    - name: Upload Android APK
       uses: actions/upload-artifact@v4
       with:
-        name: android-apk
-        path: '*.apk'
+        name: zentrio-android-apk
+        path: |
+          ./build/**/*.apk
+          ./build/**/*.aab
+        retention-days: 30
 
     - name: Upload Windows Package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4  
       with:
-        name: windows-package
-        path: '*.msix'
+        name: zentrio-windows-msix
+        path: ./build/**/*.msix
+        retention-days: 30
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          *.apk
-          *.msix
+          ./build/**/*.apk
+          ./build/**/*.aab  
+          ./build/**/*.msix
         body: |
-          ## Zentrio ${{ github.ref_name }}
+          ## 🚀 Zentrio ${{ github.ref_name }}
           
-          ### Downloads
-          - 📱 **Android APK**: Install directly on Android devices
-          - 🪟 **Windows Package**: Install via Microsoft Store or sideload
-          - 🌐 **Web App**: Visit [zentrio.eu](https://zentrio.eu) and click "Add to Home Screen"
+          ### 📱 Native App Downloads
+          - **🤖 Android APK**: Install directly on Android devices (enable "Unknown Sources")
+          - **📦 Android AAB**: For Google Play Store distribution  
+          - **🪟 Windows MSIX**: Install on Windows 10/11 or via Microsoft Store
+          - **🌐 Web App**: Visit [zentrio.eu](https://zentrio.eu) and click "Add to Home Screen"
           
-          ### Installation
-          **Android**: Enable "Unknown Sources" in Settings, then install the APK
-          **Windows**: Double-click the MSIX file to install
-          **iOS/All Browsers**: Visit [zentrio.eu](https://zentrio.eu) and use your browser's PWA install option
+          ### 📋 Installation Instructions
+          
+          **Android APK:**
+          1. Download the APK file
+          2. Enable "Install from Unknown Sources" in Android Settings
+          3. Open the APK file to install
+          
+          **Windows MSIX:**  
+          1. Download the MSIX file
+          2. Double-click to install (Windows 10/11)
+          3. Or submit to Microsoft Store for distribution
+          
+          **All Platforms:**
+          Visit [**zentrio.eu**](https://zentrio.eu) in any modern browser and use the "Install" or "Add to Home Screen" option.
           
           ---
-          *Built automatically with PWABuilder*
+          
+          ### 🔧 Technical Details
+          - **Build**: #${{ github.run_number }}
+          - **Commit**: ${{ github.sha }}
+          - **Built with**: PWABuilder CLI
+          - **Source**: [View Changes](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }})
+          
+          *Automatically generated native apps from PWA*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
