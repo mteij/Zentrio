@@ -1,4 +1,8 @@
-# <img src="app/static/icons/icon-192.png" alt="Zentrio Icon" width="36" height="36" style="vertical-align:middle;margin-right:8px;"> Zentrio - Profile Selector Overlay
+<p align="left">
+  <img src="app/static/icons/icon-192.png" alt="Zentrio Icon" width="48" height="48"/>
+</p>
+
+# Zentrio - Profile Selector Overlay
 
 A secure, modern, Netflix-inspired user selection overlay for the Zentrio Web UI, rebuilt with Deno and the Fresh web framework.
 
