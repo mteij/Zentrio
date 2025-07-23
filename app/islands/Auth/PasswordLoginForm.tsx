@@ -71,15 +71,22 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
       >
         Sign In
       </FormButton>
-      <div class="text-center text-sm">
+      <div class="text-center text-sm space-y-2">
         <button
           type="button"
           onClick={handleSendCode}
           disabled={isLoading.value}
-          class="text-red-500 hover:underline disabled:text-gray-400"
+          class="text-red-500 hover:underline disabled:text-gray-400 block mx-auto"
         >
           Email me a login code
         </button>
+        <div class="text-gray-400">or</div>
+        <a
+          href={`/auth/reset?email=${encodeURIComponent(email)}`}
+          class="text-red-500 hover:underline block"
+        >
+          Forgot your password?
+        </a>
       </div>
     </form>
   );

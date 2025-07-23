@@ -11,6 +11,7 @@ interface EmailLinkFormProps {
 
 export default function EmailLinkForm({}: EmailLinkFormProps) {
   const email = useSignal("");
+  const successMessage = useSignal("");
   const { error, isLoading, makeApiCall, validateEmailField } = useAuthForm();
 
   const handleFormSubmit = async (e: h.JSX.TargetedEvent<HTMLFormElement>) => {
@@ -22,12 +23,33 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
       { email: email.value },
       {
         onSuccess: (data) => {
-          console.log('API call successful, response:', data);
-          if (data?.redirectUrl) {
-            console.log('Redirecting to:', data.redirectUrl);
-            globalThis.location.href = data.redirectUrl;
+          console.log('API call successful, full response:', JSON.stringify(data, null, 2));
+          console.log('Response keys:', Object.keys(data || {}));
+          console.log('data.redirectUrl:', data?.redirectUrl);
+          console.log('data.data?.redirectUrl:', data?.data?.redirectUrl);
+          
+          // Try both possible response structures
+          const redirectUrl = data?.redirectUrl || data?.data?.redirectUrl;
+          
+          if (redirectUrl) {
+            console.log('Found redirectUrl:', redirectUrl);
+            
+            // Check if it's a signup success (new user)
+            if (redirectUrl.includes('signup-success')) {
+              successMessage.value = `Account created! We've sent a temporary password to ${email.value}. Please check your email and use it to log in.`;
+              console.log('Set success message:', successMessage.value);
+              // Delay redirect to show the message
+              setTimeout(() => {
+                console.log('Redirecting after delay to:', redirectUrl);
+                globalThis.location.href = redirectUrl;
+              }, 4000);
+            } else {
+              // Existing user - redirect immediately to password page
+              console.log('Existing user, redirecting immediately to:', redirectUrl);
+              globalThis.location.href = redirectUrl;
+            }
           } else {
-            console.error('No redirectUrl in response:', data);
+            console.error('No redirectUrl found in response. Full response:', data);
           }
         },
         onError: (error) => {
@@ -56,9 +78,23 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
           />
         </div>
         <ErrorMessage message={error.value} />
+        {successMessage.value && (
+          <div class="p-4 bg-green-900 bg-opacity-50 border border-green-500 rounded-lg">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <svg class="w-5 h-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm text-green-200">{successMessage.value}</p>
+              </div>
+            </div>
+          </div>
+        )}
         <FormButton
           type="submit"
-          disabled={isLoading.value}
+          disabled={isLoading.value || !!successMessage.value}
           isLoading={isLoading.value}
           loadingText="Checking..."
         >

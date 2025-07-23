@@ -107,14 +107,9 @@ We love contributions! Whether it's:
 
 ---
 
-## 🎯 **Roadmap**
+## 🌐 **Public Instance**
 
-- [ ] **Mobile App** - Native iOS/Android applications
-- [ ] **Themes System** - Custom theme creation and sharing
-- [ ] **Plugin Architecture** - Third-party plugin support
-- [ ] **Advanced Analytics** - Viewing statistics and recommendations
-- [ ] **Social Features** - Profile sharing and recommendations
-- [ ] **Backup & Sync** - Cloud backup and multi-device sync
+You can try Zentrio without setting up anything at **[zentrio.eu](https://zentrio.eu)** - our free public instance that's always up-to-date with the latest features.
 
 ---
 

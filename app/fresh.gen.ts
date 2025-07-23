@@ -4,6 +4,7 @@
 
 import * as $_app from "./routes/_app.tsx";
 import * as $_middleware from "./routes/_middleware.ts";
+import * as $api_auth_change_password from "./routes/api/auth/change-password.ts";
 import * as $api_auth_login_or_signup from "./routes/api/auth/login-or-signup.ts";
 import * as $api_auth_login_with_password from "./routes/api/auth/login-with-password.ts";
 import * as $api_auth_request_password_reset from "./routes/api/auth/request-password-reset.ts";
@@ -37,6 +38,7 @@ import * as $ProfileManager_DesktopProfileManager from "./islands/ProfileManager
 import * as $ProfileManager_MobileProfileManager from "./islands/ProfileManager/MobileProfileManager.tsx";
 import * as $ProfileManager_ProfileManager from "./islands/ProfileManager/ProfileManager.tsx";
 import * as $SettingsModal from "./islands/SettingsModal.tsx";
+import * as $Settings_PasswordChangeForm from "./islands/Settings/PasswordChangeForm.tsx";
 import * as $StremioFrame from "./islands/StremioFrame.tsx";
 import { type Manifest } from "$fresh/server.ts";
 
@@ -44,6 +46,7 @@ const manifest = {
   routes: {
     "./routes/_app.tsx": $_app,
     "./routes/_middleware.ts": $_middleware,
+    "./routes/api/auth/change-password.ts": $api_auth_change_password,
     "./routes/api/auth/login-or-signup.ts": $api_auth_login_or_signup,
     "./routes/api/auth/login-with-password.ts": $api_auth_login_with_password,
     "./routes/api/auth/request-password-reset.ts":
@@ -83,6 +86,7 @@ const manifest = {
     "./islands/ProfileManager/ProfileManager.tsx":
       $ProfileManager_ProfileManager,
     "./islands/SettingsModal.tsx": $SettingsModal,
+    "./islands/Settings/PasswordChangeForm.tsx": $Settings_PasswordChangeForm,
     "./islands/StremioFrame.tsx": $StremioFrame,
   },
   baseUrl: import.meta.url,

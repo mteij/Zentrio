@@ -11,11 +11,23 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
   const code = useSignal(new Array(6).fill(""));
   const error = useSignal<string | null>(null);
   const isLoading = useSignal(false);
+  const isResending = useSignal(false);
+  const resendCooldown = useSignal(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (resendCooldown.value > 0) {
+      const timer = setTimeout(() => {
+        resendCooldown.value = resendCooldown.value - 1;
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown.value]);
 
   const handleInput = (e: h.JSX.TargetedEvent<HTMLInputElement>, index: number) => {
     const input = e.currentTarget;
@@ -40,6 +52,35 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
   const handleKeyDown = (e: KeyboardEvent, index: number) => {
     if (e.key === "Backspace" && !code.value[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown.value > 0 || isResending.value) return;
+
+    isResending.value = true;
+    error.value = null;
+
+    try {
+      const res = await fetch("/api/auth/send-login-code", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (res.ok) {
+        resendCooldown.value = 30; // Start 30-second cooldown
+        // Clear the current code
+        code.value = new Array(6).fill("");
+        inputRefs.current[0]?.focus();
+      } else {
+        const data = await res.json();
+        error.value = data.error || "Failed to resend code. Please try again.";
+      }
+    } catch (err) {
+      error.value = "Network error. Please try again.";
+    } finally {
+      isResending.value = false;
     }
   };
 
@@ -102,9 +143,24 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
       >
         {isLoading.value ? "Verifying..." : "Verify"}
       </button>
-      <p class="text-xs sm:text-sm text-gray-400 mt-4 transition-all duration-200">
-        Can't find your code? Check your spam folder.
-      </p>
+      <div class="mt-4 text-center">
+        <p class="text-xs sm:text-sm text-gray-400 mb-3 transition-all duration-200">
+          Can't find your code? Check your spam folder.
+        </p>
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={resendCooldown.value > 0 || isResending.value}
+          class="text-sm text-red-500 hover:text-red-400 disabled:text-gray-500 disabled:cursor-not-allowed transition-all duration-200"
+        >
+          {isResending.value 
+            ? "Sending..." 
+            : resendCooldown.value > 0 
+              ? `Resend code in ${resendCooldown.value}s` 
+              : "Resend code"
+          }
+        </button>
+      </div>
       <style>
         {`
           @keyframes fadein {

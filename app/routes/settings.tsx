@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { PageProps } from "$fresh/server.ts";
+import PasswordChangeForm from "../islands/Settings/PasswordChangeForm.tsx";
 
 type AutoLoginOption = "none" | "last" | "profile";
 
@@ -110,6 +111,14 @@ export default function SettingsPage(_props: PageProps) {
               <p class="text-xs text-gray-500 mt-2">
                 Choose what happens when you visit the site while logged in.
               </p>
+            </div>
+            
+            <div class="border-t border-gray-700 pt-6">
+              <h3 class="text-lg font-semibold mb-4 text-white">Security</h3>
+              <div class="mb-6">
+                <h4 class="text-md font-medium mb-3 text-gray-200">Change Password</h4>
+                <PasswordChangeForm />
+              </div>
             </div>
           </div>
         )}
