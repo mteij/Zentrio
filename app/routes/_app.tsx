@@ -20,7 +20,7 @@ export default function App({ Component, route }: PageProps) {
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href="/static/manifest.json" />
         <meta name="theme-color" content="#e50914" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -33,7 +33,7 @@ export default function App({ Component, route }: PageProps) {
           __html: `
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/service-worker.js');
+                navigator.serviceWorker.register('/static/service-worker.js');
               });
             }
           `

@@ -1,5 +1,4 @@
 <p align="left">
-  <img src="app/static/icons/icon-192.png" alt="Zentrio Icon" width="48" height="48"/>
 </p>
 
 # Zentrio - Profile Selector Overlay

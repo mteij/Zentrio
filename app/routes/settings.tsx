@@ -80,6 +80,7 @@ export default function SettingsPage(_props: PageProps) {
             Experimental
           </button>
         </div>
+        {/* Show tab content based on tab.value */}
         {tab.value === "general" && (
           <div>
             <h2 class="text-lg font-semibold mb-4 text-white">General Settings</h2>
@@ -94,7 +95,7 @@ export default function SettingsPage(_props: PageProps) {
                 <option value="last">Automatically log in to last used profile</option>
                 <option value="profile">Automatically log in to a specific profile</option>
               </select>
-              {autoLogin.value === "profile" && (
+              {autoLogin.value === "profile" && profiles.value.length > 0 && (
                 <select
                   class="mt-2 w-full bg-gray-800 text-white p-2 rounded border border-gray-700"
                   value={autoLoginProfileId.value ?? ""}
