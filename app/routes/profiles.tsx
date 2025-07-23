@@ -91,8 +91,8 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
       {showSettings.value && (
         <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 transition-all duration-300 animate-fade-in">
           <SettingsModal
-            show={showSettings.value}
-            onClose={() => showSettings.value = false}
+            _show={showSettings.value}
+            onClose={() => { showSettings.value = false; }}
             addonOrderEnabled={addonOrderEnabled}
             setAddonOrderEnabled={(v: boolean) => { addonOrderEnabled.value = v; }}
           />

@@ -1,12 +1,13 @@
 import { useSignal } from "@preact/signals";
 
 export default function SettingsModal({
-  show,
+  // Rename unused prop to _show to avoid linter warning
+  _show,
   onClose,
   addonOrderEnabled,
   setAddonOrderEnabled,
 }: {
-  show: boolean;
+  _show: boolean;
   onClose: () => void;
   addonOrderEnabled: { value: boolean };
   setAddonOrderEnabled: (v: boolean) => void;
@@ -28,6 +29,7 @@ export default function SettingsModal({
       <h2 class="text-xl font-bold mb-4 text-white">Settings</h2>
       <div class="flex border-b border-gray-700 mb-4">
         <button
+          type="button"
           class={`px-4 py-2 font-semibold ${experimentalTab.value ? "text-red-500 border-b-2 border-red-500" : "text-gray-400"}`}
           onClick={() => experimentalTab.value = true}
         >

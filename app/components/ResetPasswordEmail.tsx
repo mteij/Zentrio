@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { h as _h } from "preact";
 
 interface ResetPasswordEmailProps {
   resetUrl: string;
