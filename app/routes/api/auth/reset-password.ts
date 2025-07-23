@@ -1,25 +1,33 @@
 import { Handlers } from "$fresh/server.ts";
 import { findUserByPasswordResetToken, updateUserPassword } from "../../../utils/db.ts";
+import { withErrorHandling, parseJsonBody, createJsonResponse } from "../../../shared/utils/api.ts";
 
 export const handler: Handlers = {
-  async POST(req) {
-    const { token, password } = await req.json();
+  POST: withErrorHandling(async (req) => {
+    const { token, password } = await parseJsonBody<{ token: string; password: string }>(req);
+    
     if (!token || !password) {
-      return new Response("Token and new password are required.", { status: 400 });
+      return createJsonResponse({ error: "Token and new password are required." }, 400);
+    }
+
+    if (password.length < 8) {
+      return createJsonResponse({ error: "Password must be at least 8 characters long." }, 400);
     }
 
     const user = await findUserByPasswordResetToken(token);
     if (!user) {
-      return new Response("Invalid or expired token.", { status: 400 });
+      return createJsonResponse({ error: "Invalid or expired token." }, 400);
     }
 
-    if (typeof user._id !== "string") {
-      return new Response("User ID is invalid.", { status: 400 });
+    try {
+      const typedUser = user as { _id: { toString(): string } };
+      await updateUserPassword(typedUser._id.toString(), password);
+      console.log(`Password reset successfully for user: ${user.email}`);
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      return createJsonResponse({ error: "Failed to reset password." }, 500);
     }
-    await updateUserPassword(user._id, password);
 
-    return new Response(JSON.stringify({ message: "Password has been reset successfully." }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  },
+    return createJsonResponse({ message: "Password has been reset successfully." });
+  }),
 };

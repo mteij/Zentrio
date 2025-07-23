@@ -18,6 +18,7 @@ import * as $api_sessions from "./routes/api/sessions.ts";
 import * as $api_test_email from "./routes/api/test-email.ts";
 import * as $api_tmdb_key from "./routes/api/tmdb-key.ts";
 import * as $auth_code from "./routes/auth/code.tsx";
+import * as $auth_forgot from "./routes/auth/forgot.tsx";
 import * as $auth_password from "./routes/auth/password.tsx";
 import * as $auth_reset from "./routes/auth/reset.tsx";
 import * as $auth_signup_success from "./routes/auth/signup-success.tsx";
@@ -32,6 +33,7 @@ import * as $settings from "./routes/settings.tsx";
 import * as $stremio_path_ from "./routes/stremio/[...path].ts";
 import * as $Auth_CodeInputForm from "./islands/Auth/CodeInputForm.tsx";
 import * as $Auth_EmailLinkForm from "./islands/Auth/EmailLinkForm.tsx";
+import * as $Auth_ForgotPasswordForm from "./islands/Auth/ForgotPasswordForm.tsx";
 import * as $Auth_PasswordLoginForm from "./islands/Auth/PasswordLoginForm.tsx";
 import * as $Auth_ResetPasswordForm from "./islands/Auth/ResetPasswordForm.tsx";
 import * as $ProfileManager_DesktopProfileManager from "./islands/ProfileManager/DesktopProfileManager.tsx";
@@ -61,6 +63,7 @@ const manifest = {
     "./routes/api/test-email.ts": $api_test_email,
     "./routes/api/tmdb-key.ts": $api_tmdb_key,
     "./routes/auth/code.tsx": $auth_code,
+    "./routes/auth/forgot.tsx": $auth_forgot,
     "./routes/auth/password.tsx": $auth_password,
     "./routes/auth/reset.tsx": $auth_reset,
     "./routes/auth/signup-success.tsx": $auth_signup_success,
@@ -77,6 +80,7 @@ const manifest = {
   islands: {
     "./islands/Auth/CodeInputForm.tsx": $Auth_CodeInputForm,
     "./islands/Auth/EmailLinkForm.tsx": $Auth_EmailLinkForm,
+    "./islands/Auth/ForgotPasswordForm.tsx": $Auth_ForgotPasswordForm,
     "./islands/Auth/PasswordLoginForm.tsx": $Auth_PasswordLoginForm,
     "./islands/Auth/ResetPasswordForm.tsx": $Auth_ResetPasswordForm,
     "./islands/ProfileManager/DesktopProfileManager.tsx":

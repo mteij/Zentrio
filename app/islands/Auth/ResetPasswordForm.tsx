@@ -17,17 +17,24 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     error.value = null;
     message.value = null;
 
-    const res = await fetch("/api/auth/reset-password", {
-      method: "POST",
-      body: JSON.stringify({ token, password: password.value }),
-      headers: { "Content-Type": "application/json" },
-    });
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, password: password.value }),
+        headers: { "Content-Type": "application/json" },
+      });
 
-    isLoading.value = false;
-    if (res.ok) {
-      message.value = "Password reset successfully! You can now log in.";
-    } else {
-      error.value = "Failed to reset password. The token may be invalid or expired.";
+      const data = await res.json();
+      
+      if (res.ok) {
+        message.value = data.message || "Password reset successfully! You can now log in.";
+      } else {
+        error.value = data.error || "Failed to reset password. The token may be invalid or expired.";
+      }
+    } catch (err) {
+      error.value = "Network error. Please try again.";
+    } finally {
+      isLoading.value = false;
     }
   };
 

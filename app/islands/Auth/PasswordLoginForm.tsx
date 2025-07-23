@@ -82,7 +82,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
         </button>
         <div class="text-gray-400">or</div>
         <a
-          href={`/auth/reset?email=${encodeURIComponent(email)}`}
+          href={`/auth/forgot?email=${encodeURIComponent(email)}`}
           class="text-red-500 hover:underline block"
         >
           Forgot your password?

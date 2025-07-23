@@ -59,6 +59,24 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
     );
   };
 
+  const handleSendLoginCode = async () => {
+    if (!validateEmailField(email.value)) return;
+
+    await makeApiCall("/api/auth/send-login-code", 
+      { email: email.value },
+      {
+        onSuccess: (data) => {
+          if (data.redirectUrl) {
+            successMessage.value = `Login code sent to ${email.value}. Check your email!`;
+            setTimeout(() => {
+              globalThis.location.href = data.redirectUrl;
+            }, 2000);
+          }
+        }
+      }
+    );
+  };
+
   return (
     <section role="form" class="animate-fadein">
       <form onSubmit={handleFormSubmit} class="space-y-4" autoComplete="on">
@@ -100,6 +118,18 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
         >
           Continue
         </FormButton>
+        
+        <div class="text-center">
+          <div class="text-gray-400 text-sm mb-2">or</div>
+          <button
+            type="button"
+            onClick={handleSendLoginCode}
+            disabled={isLoading.value || !!successMessage.value}
+            class="text-red-500 hover:underline disabled:text-gray-400 text-sm"
+          >
+            Email me a login code
+          </button>
+        </div>
       </form>
       <style>
         {`
