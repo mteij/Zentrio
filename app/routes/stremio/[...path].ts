@@ -186,6 +186,14 @@ const proxyRequestHandler = async (req: Request, path: string) => {
                   \`;
                 }
               }
+              
+              // Hide the calendar button if the setting is enabled
+              if (session && session.hideCalendarButton) {
+                const calendarButton = document.querySelector('[title="Calendar"]');
+                if (calendarButton) {
+                  calendarButton.style.display = 'none';
+                }
+              }
             });
 
             // Run the observer as soon as the body is available.
@@ -208,7 +216,7 @@ const proxyRequestHandler = async (req: Request, path: string) => {
           // Integrated Addon Manager Userscript
           (function() {
             // Check if the userscript is enabled
-            const isEnabled = localStorage.getItem('enableAddonOrderUserscript') === 'true';
+            const isEnabled = session?.addonManagerEnabled || false;
             if (!isEnabled) return;
 
             const buttonId = "edit-order-button";
@@ -681,15 +689,21 @@ const proxyRequestHandler = async (req: Request, path: string) => {
                     throw new Error(data.result.error || 'Failed to save changes');
                   }
 
-                  // Show success and refresh the page to update addon order
+                  // Show success and refresh the iframe to update addon order
                   saveBtn.textContent = 'Saved!';
                   setTimeout(() => {
                     closeModal();
                     saveBtn.disabled = false;
                     saveBtn.textContent = 'Save Changes';
                     
-                    // Refresh the page to reload addons in the correct order
-                    window.location.reload();
+                    // Instead of reloading the page, just refresh the iframe content
+                    // by sending a message to the parent window to reload the iframe
+                    if (window.parent !== window) {
+                      window.parent.postMessage({ type: 'reload-stremio-iframe' }, '*');
+                    } else {
+                      // Fallback to simple reload if no parent window
+                      window.location.reload();
+                    }
                   }, 1000);
 
                 } catch (err) {
@@ -783,20 +797,7 @@ const proxyRequestHandler = async (req: Request, path: string) => {
             // Also listen for hash changes since Stremio is a SPA
             window.addEventListener("hashchange", insertButton);
 
-            // Watch for changes to the userscript setting
-            window.addEventListener('storage', function(e) {
-              if (e.key === 'enableAddonOrderUserscript') {
-                const button = document.getElementById(buttonId);
-                if (e.newValue === 'true' && !button) {
-                  insertButton();
-                } else if (e.newValue !== 'true' && button) {
-                  button.remove();
-                  // Also remove modal if it exists
-                  const modal = document.getElementById(modalId);
-                  if (modal) modal.remove();
-                }
-              }
-            });
+            // No need to watch for localStorage changes since we're using session data
           })();
         </script>
       `;

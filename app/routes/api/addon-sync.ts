@@ -14,10 +14,10 @@ export const handler: Handlers<null, AppState> = {
     }
 
     try {
-      const user = await User.findById(userId).populate('addonSyncSettings.mainProfileId');
+      const user = await User.findById(userId).populate('settings.addonSyncSettings.mainProfileId');
       const profiles = await Profile.find({ userId });
 
-      const syncSettings = user?.addonSyncSettings || {
+      const syncSettings = user?.settings?.addonSyncSettings || {
         enabled: false,
         syncDirection: 'main_to_all',
         autoSync: false,
@@ -62,10 +62,10 @@ export const handler: Handlers<null, AppState> = {
       }
 
       const updateData: any = {};
-      if (enabled !== undefined) updateData['addonSyncSettings.enabled'] = enabled;
-      if (mainProfileId !== undefined) updateData['addonSyncSettings.mainProfileId'] = mainProfileId;
-      if (autoSync !== undefined) updateData['addonSyncSettings.autoSync'] = autoSync;
-      if (syncInterval !== undefined) updateData['addonSyncSettings.syncInterval'] = Math.max(5, syncInterval); // Minimum 5 minutes
+      if (enabled !== undefined) updateData['settings.addonSyncSettings.enabled'] = enabled;
+      if (mainProfileId !== undefined) updateData['settings.addonSyncSettings.mainProfileId'] = mainProfileId;
+      if (autoSync !== undefined) updateData['settings.addonSyncSettings.autoSync'] = autoSync;
+      if (syncInterval !== undefined) updateData['settings.addonSyncSettings.syncInterval'] = Math.max(5, syncInterval); // Minimum 5 minutes
 
       await User.findByIdAndUpdate(userId, updateData);
 

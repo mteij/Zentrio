@@ -13,18 +13,23 @@ export interface UserSchema extends Document {
   passwordResetToken?: string;
   passwordResetExpires?: Date;
   createdAt: Date;
-  // Encrypted TMDB API key (user-level setting)
-  encryptedTmdbApiKey?: EncryptedData;
-  // Addon manager settings
-  addonManagerEnabled?: boolean; // Whether Stremio addon manager userscript is enabled
-  // Addon sync settings (experimental feature)
-  addonSyncSettings?: {
-    enabled: boolean;
-    mainProfileId?: ObjectId; // Profile to sync addons from
-    syncDirection: 'main_to_all' | 'all_to_main'; // Direction of sync
-    lastSyncAt?: Date;
-    autoSync: boolean; // Whether to sync automatically
-    syncInterval?: number; // Sync interval in minutes (default: 60)
+  // User settings
+  settings?: {
+    // Encrypted TMDB API key (user-level setting)
+    encryptedTmdbApiKey?: EncryptedData;
+    // Addon manager settings
+    addonManagerEnabled?: boolean; // Whether Stremio addon manager userscript is enabled
+    // Hide calendar button setting
+    hideCalendarButton?: boolean; // Whether to hide the calendar button in the Stremio interface
+    // Addon sync settings (experimental feature)
+    addonSyncSettings?: {
+      enabled: boolean;
+      mainProfileId?: ObjectId; // Profile to sync addons from
+      syncDirection: 'main_to_all' | 'all_to_main'; // Direction of sync
+      lastSyncAt?: Date;
+      autoSync: boolean; // Whether to sync automatically
+      syncInterval?: number; // Sync interval in minutes (default: 60)
+    };
   };
 }
 
@@ -64,23 +69,31 @@ const userSchema = new mongoose.Schema<UserSchema>({
   passwordResetToken: { type: String },
   passwordResetExpires: { type: Date },
   createdAt: { type: Date, default: Date.now },
-  // Encrypted TMDB API key
-  encryptedTmdbApiKey: {
-    encrypted: { type: String },
-    salt: { type: String },
-    iv: { type: String },
-    tag: { type: String }
-  },
-  // Addon manager settings
-  addonManagerEnabled: { type: Boolean, default: false },
-  // Addon sync settings (experimental feature)
-  addonSyncSettings: {
-    enabled: { type: Boolean, default: false },
-    mainProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile" },
-    syncDirection: { type: String, enum: ['main_to_all', 'all_to_main'], default: 'main_to_all' },
-    lastSyncAt: { type: Date },
-    autoSync: { type: Boolean, default: false },
-    syncInterval: { type: Number, default: 60 } // minutes
+  // User settings
+  settings: {
+    type: {
+      // Encrypted TMDB API key
+      encryptedTmdbApiKey: {
+        encrypted: { type: String },
+        salt: { type: String },
+        iv: { type: String },
+        tag: { type: String }
+      },
+      // Addon manager settings
+      addonManagerEnabled: { type: Boolean, default: false },
+      // Hide calendar button setting
+      hideCalendarButton: { type: Boolean, default: false },
+      // Addon sync settings (experimental feature)
+      addonSyncSettings: {
+        enabled: { type: Boolean, default: false },
+        mainProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile" },
+        syncDirection: { type: String, enum: ['main_to_all', 'all_to_main'], default: 'main_to_all' },
+        lastSyncAt: { type: Date },
+        autoSync: { type: Boolean, default: false },
+        syncInterval: { type: Number, default: 60 } // minutes
+      }
+    },
+    default: {}
   }
 });
 
@@ -508,7 +521,7 @@ export const setUserTmdbApiKey = async (userId: string, apiKey: string): Promise
   const encryptedApiKey = await encryptionService.encrypt(apiKey);
   await Users.updateOne(
     { _id: new mongoose.Types.ObjectId(userId) },
-    { $set: { encryptedTmdbApiKey: encryptedApiKey } }
+    { $set: { 'settings.encryptedTmdbApiKey': encryptedApiKey } }
   );
 };
 
@@ -517,12 +530,12 @@ export const setUserTmdbApiKey = async (userId: string, apiKey: string): Promise
  */
 export const getUserTmdbApiKey = async (userId: string): Promise<string | null> => {
   const user = await Users.findById(userId).lean();
-  if (!user?.encryptedTmdbApiKey) {
+  if (!user?.settings?.encryptedTmdbApiKey) {
     return null;
   }
   
   try {
-    return await encryptionService.decrypt(user.encryptedTmdbApiKey);
+    return await encryptionService.decrypt(user.settings.encryptedTmdbApiKey);
   } catch (error) {
     console.error(`Failed to decrypt TMDB API key for user ${userId}:`, error);
     return null;
@@ -535,7 +548,7 @@ export const getUserTmdbApiKey = async (userId: string): Promise<string | null> 
 export const removeUserTmdbApiKey = async (userId: string): Promise<void> => {
   await Users.updateOne(
     { _id: new mongoose.Types.ObjectId(userId) },
-    { $unset: { encryptedTmdbApiKey: 1 } }
+    { $unset: { 'settings.encryptedTmdbApiKey': 1 } }
   );
 };
 
@@ -551,7 +564,7 @@ export const testDatabaseEncryption = async (): Promise<boolean> => {
  */
 export const getUserAddonSyncSettings = async (userId: string) => {
   const user = await Users.findById(userId);
-  return user?.addonSyncSettings || {
+  return user?.settings?.addonSyncSettings || {
     enabled: false,
     syncDirection: 'main_to_all',
     autoSync: false,
@@ -564,13 +577,13 @@ export const getUserAddonSyncSettings = async (userId: string) => {
  */
 export const updateUserAddonSyncSettings = async (
   userId: string, 
-  settings: Partial<UserSchema['addonSyncSettings']>
+  settings: Partial<UserSchema['settings']['addonSyncSettings']>
 ): Promise<void> => {
   const updateData: any = {};
   
   Object.entries(settings).forEach(([key, value]) => {
     if (value !== undefined) {
-      updateData[`addonSyncSettings.${key}`] = value;
+      updateData[`settings.addonSyncSettings.${key}`] = value;
     }
   });
 
@@ -585,7 +598,7 @@ export const updateUserAddonSyncSettings = async (
  */
 export const canUserPerformAddonSync = async (userId: string): Promise<boolean> => {
   const user = await Users.findById(userId);
-  return !!(user?.addonSyncSettings?.enabled && user?.addonSyncSettings?.mainProfileId);
+  return !!(user?.settings?.addonSyncSettings?.enabled && user?.settings?.addonSyncSettings?.mainProfileId);
 };
 
 /**
@@ -594,8 +607,34 @@ export const canUserPerformAddonSync = async (userId: string): Promise<boolean> 
 export const updateUserAddonManagerSetting = async (userId: string, enabled: boolean): Promise<void> => {
   await Users.updateOne(
     { _id: new mongoose.Types.ObjectId(userId) },
-    { $set: { addonManagerEnabled: enabled } }
+    { $set: { 'settings.addonManagerEnabled': enabled } }
   );
+};
+
+/**
+ * Get addon manager setting for user
+ */
+export const getUserAddonManagerSetting = async (userId: string): Promise<boolean> => {
+  const user = await Users.findById(userId);
+  return user?.settings?.addonManagerEnabled || false;
+};
+
+/**
+ * Update hide calendar button setting for user
+ */
+export const updateUserHideCalendarButtonSetting = async (userId: string, hide: boolean): Promise<void> => {
+  await Users.updateOne(
+    { _id: new mongoose.Types.ObjectId(userId) },
+    { $set: { 'settings.hideCalendarButton': hide } }
+  );
+};
+
+/**
+ * Get hide calendar button setting for user
+ */
+export const getUserHideCalendarButtonSetting = async (userId: string): Promise<boolean> => {
+  const user = await Users.findById(userId);
+  return user?.settings?.hideCalendarButton || false;
 };
 
 export type { ObjectId, EncryptedData };

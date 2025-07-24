@@ -1,6 +1,6 @@
 import { h } from "preact";
-import { useSignal, useComputed } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
 
 interface Addon {
   transportUrl: string;
@@ -194,6 +194,7 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
             <p class="text-gray-400 text-sm mt-1">Drag and drop to reorder your Stremio addons</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             class="text-gray-400 hover:text-white text-2xl"
             aria-label="Close"
@@ -258,7 +259,9 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
                         class="w-10 h-10 rounded object-cover"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling.style.display = 'block';
+                          if (e.currentTarget.nextElementSibling) {
+                            (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'block';
+                          }
                         }}
                       />
                     ) : null}
@@ -298,6 +301,7 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
                   {/* Remove Button */}
                   {!addon.flags?.protected && (
                     <button
+                      type="button"
                       onClick={() => removeAddon(index)}
                       class="ml-4 text-gray-500 hover:text-red-400 transition-colors"
                       title="Remove addon"
@@ -320,12 +324,14 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
           </div>
           <div class="flex space-x-3">
             <button
+              type="button"
               onClick={onClose}
               class="px-4 py-2 text-gray-400 hover:text-white transition-colors"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={saveAddonOrder}
               disabled={isSaving.value}
               class="px-6 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded transition-colors"

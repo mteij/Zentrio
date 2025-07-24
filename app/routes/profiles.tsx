@@ -79,6 +79,7 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
     }
   }, [data.profiles]);
 
+
   // Remove modalOpen, don't use it for dimming when settings modal is open
   // Only dim when add/edit profile modal is open (not for settings modal)
   // So, compute modalOpen based on ProfileManager modals only (not showSettings)

@@ -14,6 +14,7 @@ import * as $api_auth_reset_password from "./routes/api/auth/reset-password.ts";
 import * as $api_auth_send_login_code from "./routes/api/auth/send-login-code.ts";
 import * as $api_auth_signup from "./routes/api/auth/signup.ts";
 import * as $api_auth_verify_code from "./routes/api/auth/verify-code.ts";
+import * as $api_hide_calendar from "./routes/api/hide-calendar.ts";
 import * as $api_profiles_id_ from "./routes/api/profiles/[id].ts";
 import * as $api_profiles_index from "./routes/api/profiles/index.ts";
 import * as $api_sessions from "./routes/api/sessions.ts";
@@ -60,6 +61,7 @@ const manifest = {
     "./routes/api/auth/send-login-code.ts": $api_auth_send_login_code,
     "./routes/api/auth/signup.ts": $api_auth_signup,
     "./routes/api/auth/verify-code.ts": $api_auth_verify_code,
+    "./routes/api/hide-calendar.ts": $api_hide_calendar,
     "./routes/api/profiles/[id].ts": $api_profiles_id_,
     "./routes/api/profiles/index.ts": $api_profiles_index,
     "./routes/api/sessions.ts": $api_sessions,

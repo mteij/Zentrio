@@ -1,11 +1,22 @@
 import { Handlers, PageProps } from "$fresh/server.ts";
 import { h as _h } from "preact";
 import { AppState } from "../_middleware.ts";
-import { getProfile, getDecryptedProfilePassword, getUserTmdbApiKey, ProfileSchema } from "../../utils/db.ts";
+import { getProfile, getDecryptedProfilePassword, getUserTmdbApiKey, getUserAddonManagerSetting, getUserHideCalendarButtonSetting, ProfileSchema } from "../../utils/db.ts";
 import StremioFrame from "../../islands/StremioFrame.tsx";
 
 interface PlayerPageData {
-  profile: ProfileSchema & { tmdbApiKey?: string };
+  profile: {
+    _id: string;
+    userId: string;
+    name: string;
+    email: string;
+    password: string;
+    profilePictureUrl: string;
+    nsfwMode?: boolean;
+    tmdbApiKey?: string;
+    addonManagerEnabled?: boolean;
+    hideCalendarButton?: boolean;
+  };
 }
 
 export const handler: Handlers<PlayerPageData, AppState> = {
@@ -35,13 +46,24 @@ export const handler: Handlers<PlayerPageData, AppState> = {
       // Get the user's TMDB API key
       const tmdbApiKey = await getUserTmdbApiKey(userId);
       
+      // Get the user's addon manager setting
+      const addonManagerEnabled = await getUserAddonManagerSetting(userId);
+      
+      // Get the user's hide calendar button setting
+      const hideCalendarButton = await getUserHideCalendarButtonSetting(userId);
+      
       // Create a profile object with decrypted password and TMDB key for the client
       const clientProfile = {
-        ...profile,
+        _id: profile._id.toString(),
+        userId: profile.userId.toString(),
+        name: profile.name,
+        email: profile.email,
         password: decryptedPassword,
+        profilePictureUrl: profile.profilePictureUrl,
+        nsfwMode: profile.nsfwMode,
         tmdbApiKey: tmdbApiKey || undefined,
-        // Remove encrypted fields from client payload for security
-        encryptedPassword: undefined
+        addonManagerEnabled,
+        hideCalendarButton,
       };
 
       return ctx.render({ profile: clientProfile });

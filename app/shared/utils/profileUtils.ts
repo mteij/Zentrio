@@ -10,8 +10,10 @@ export function getInitialsUrl(name: string): string {
 export function handleProfileClick(profileId: string): void {
   try {
     localStorage.setItem("lastProfileId", profileId);
-  } catch {}
-  window.location.href = `/player/${profileId}`;
+  } catch {
+    //
+  }
+  globalThis.location.href = `/player/${profileId}`;
 }
 
 export function getProfileCardStyles(isMobile: boolean) {

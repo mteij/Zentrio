@@ -1,6 +1,9 @@
 import { h as _h } from "preact";
+import { useEffect } from "preact/hooks";
+import { useSignal } from "@preact/signals";
 import SettingsModal from "../SettingsModal.tsx";
 
+// ProfileManagerView component
 export default function ProfileManagerView(props: any) {
   const {
     profiles,
@@ -21,14 +24,61 @@ export default function ProfileManagerView(props: any) {
     isMobile,
   } = props;
 
+  const isInitialized = useSignal(false);
   const modalOpen = showAddModal.value || editingProfile.value !== null;
   const showAddProfile = profiles.value.length === 0 || (isMobile ? mobileEditMode.value : true);
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    isInitialized.value = true;
+  }, []);
+
+  // Show loading indicator until initialized
+  if (!isInitialized.value) {
+    return (
+      <div class="flex flex-col items-center justify-center w-full h-64">
+        <div class="loader"></div>
+        <p class="mt-4 text-lg text-gray-300">Loading profiles...</p>
+        <style>
+          {`
+            .loader {
+              width: 65px;
+              aspect-ratio: 1;
+              position: relative;
+            }
+            .loader:before,
+            .loader:after {
+              content: "";
+              position: absolute;
+              border-radius: 50px;
+              box-shadow: 0 0 0 3px inset #fff;
+              animation: l4 2.5s infinite;
+            }
+            .loader:after {
+              animation-delay: -1.25s;
+            }
+            @keyframes l4 {
+              0% { inset: 0 35px 35px 0; }
+              12.5% { inset: 0 35px 0 0; }
+              25% { inset: 35px 35px 0 0; }
+              37.5% { inset: 35px 0 0 0; }
+              50% { inset: 35px 0 0 35px; }
+              62.5% { inset: 0 0 0 35px; }
+              75% { inset: 0 0 35px 35px; }
+              87.5% { inset: 0 0 35px 0; }
+              100% { inset: 0 35px 35px 0; }
+            }
+          `}
+        </style>
+      </div>
+    );
+  }
 
   function handleProfileClick(profileId: string) {
     try {
       localStorage.setItem("lastProfileId", profileId);
     } catch {}
-    window.location.href = `/player/${profileId}`;
+    globalThis.location.href = `/player/${profileId}`;
   }
 
   // Desktop grid calculation
@@ -45,12 +95,15 @@ export default function ProfileManagerView(props: any) {
   }
 
   // --- MOBILE LAYOUT ---
+  // <MobileProfileManagerView>
   if (isMobile) {
     return (
       <div class="flex flex-col overflow-hidden w-full bg-black text-white" style={{ height: "100dvh" }}>
+        {/* Mobile Header */}
         <h1 class="text-2xl sm:text-5xl font-bold text-center py-4">
           {mobileEditMode.value ? "Edit mode" : "Who's watching?"}
         </h1>
+        {/* Mobile Profile Grid */}
         <div
           class="flex-1 overflow-y-auto scrollbar-hide px-4 flex flex-wrap justify-center gap-4 sm:gap-8"
           style={{
@@ -63,6 +116,7 @@ export default function ProfileManagerView(props: any) {
             } : {}),
           }}
         >
+          {/* Mobile Profile Cards */}
           {profiles.value.map((profile: any) => (
             <div
               key={profile._id}
@@ -74,24 +128,25 @@ export default function ProfileManagerView(props: any) {
               }}
             >
               {mobileEditMode.value ? (
-                <button
-                  type="button"
-                  class="w-full flex justify-center bg-transparent border-none p-0 m-0 mb-2"
-                  onClick={() => (editingProfile.value = profile)}
-                  aria-label={`Edit ${profile.name}`}
-                >
-                  <div
-                    class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
-                    style={{
-                      width: "100px",
-                      height: "100px",
-                      aspectRatio: "1 / 1",
-                      backgroundImage: `url(${profile.profilePictureUrl})`,
-                      backgroundPosition: "center",
-                      backgroundSize: "cover",
-                    }}
-                  />
-                </button>
+              <button
+                type="button"
+                class="w-full flex justify-center bg-transparent border-none p-0 m-0 mb-2"
+                onClick={() => (editingProfile.value = profile)}
+                aria-label={`Edit ${profile.name}`}
+              >
+                <div
+                  class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
+                  style={{
+                    width: "100px",
+                    height: "100px",
+                    aspectRatio: "1 / 1",
+                    backgroundImage: `url(${profile.profilePictureUrl})`,
+                    backgroundPosition: "center",
+                    backgroundSize: "cover",
+                    margin: "0 auto",
+                  }}
+                />
+              </button>
               ) : (
                 <button
                   type="button"
@@ -102,7 +157,7 @@ export default function ProfileManagerView(props: any) {
                   onClick={() => handleProfileClick(profile._id)}
                 >
                   <div
-                    class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-zentrio-red/30"
+                    class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
                     style={{
                       width: "100px",
                       height: "100px",
@@ -110,6 +165,7 @@ export default function ProfileManagerView(props: any) {
                       backgroundImage: `url(${profile.profilePictureUrl})`,
                       backgroundPosition: "center",
                       backgroundSize: "cover",
+                      margin: "0 auto",
                     }}
                   />
                 </button>
@@ -137,13 +193,14 @@ export default function ProfileManagerView(props: any) {
                 disabled={!!modalOpen}
               >
                 <div
-                  class="rounded-lg flex items-center justify-center bg-gray-700 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-zentrio-red/30"
+                  class="rounded-lg flex items-center justify-center bg-gray-700 shadow-lg transition-all duration-300"
                   style={{
                     width: "100px",
                     height: "100px",
                     aspectRatio: "1 / 1",
                     fontSize: "2.5rem",
                     color: "#fff",
+                    margin: "0 auto",
                   }}
                 >
                   +
@@ -155,6 +212,7 @@ export default function ProfileManagerView(props: any) {
             </div>
           )}
         </div>
+        {/* Mobile Profile Modal */}
         {showAddModal.value && (
           <ProfileModal
             profile={null}
@@ -162,6 +220,7 @@ export default function ProfileManagerView(props: any) {
             onCancel={() => (showAddModal.value = false)}
           />
         )}
+        {/* Mobile Edit Profile Modal */}
         {editingProfile.value && (
           <ProfileModal
             profile={editingProfile.value}
@@ -170,13 +229,19 @@ export default function ProfileManagerView(props: any) {
             onDelete={handleDelete}
           />
         )}
+        {/* Mobile Bottom Bar */}
         <div class="fixed bottom-0 inset-x-0 flex gap-2 justify-center bg-black bg-opacity-90 py-3 sm:hidden z-30 border-t border-gray-800">
+          {/* Mobile Logout Button */}
           <a
             href="/logout"
-            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-base transition-all duration-200"
+            class="text-white font-bold py-2 px-4 rounded-lg text-base transition-all duration-200"
+            style={{
+              backgroundColor: localStorage.getItem("accentColor") || "#dc2626", // fallback to red-600
+            }}
           >
             Logout
           </a>
+          {/* Mobile Edit Button */}
           <button
             type="button"
             class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
@@ -193,6 +258,7 @@ export default function ProfileManagerView(props: any) {
               </svg>
             )}
           </button>
+          {/* Mobile Settings Button */}
           <button
             type="button"
             onClick={() => (showSettings.value = true)}
@@ -202,11 +268,12 @@ export default function ProfileManagerView(props: any) {
             <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
               <g stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3.5" />
-                <path d="M19.07 13.91a7.5 7.5 0 0 0 0-3.82l2.11-1.65a1 1 0 0 0 .24-1.31l-2-3.46a1 1 0 0 0-1.25-.45l-2.49 1a7.42 7.42 0 0 0-3.3-1.91l-.38-2.65A1 1 0 0 0 10 2h-4a1 1 0 0 0-1 .89l-.38 2.65a7.42 7.42 0 0 0-3.3 1.91l-2.49-1a1 1 0 0 0-1.25.45l-2 3.46a1 1 0 0 0 .24 1.31l2.11 1.65a7.5 7.5 0 0 0 0 3.82l-2.11 1.65a1 1 0 0 0-.24 1.31l2 3.46a1 1 0 0 0 1.25.45l2.49-1a7.42 7.42 0 0 0 3.3 1.91l.38 2.65A1 1 0 0 0 6 22h4a1 1 0 0 0 1-.89l.38-2.65a7.42 7.42 0 0 0 3.3-1.91l2.49 1a1 1 0 0 0 1.25-.45l2-3.46a1 1 0 0 0-.24-1.31z" />
+                <path d="M19.07 13.91a7.5 7.5 0 0 0 0-3.82l2.11-1.65a1 1 0 0 0 .24-1.31l-2-3.46a1 1 0 0 0-1.25-.45l-2.49 1a7.42 7.42 0 0 0-3.3-1.91l-.38-2.65A1 1 0 0 0 10 2h-4a1 1 0 0 0-1 .89l-.38 2.65a7.42 7.42 0 0 0-3.3 1.91l-2.49-1a1 1 0 0 0-1.25.45l-2 3.46a1 1 0 0 0 .24 1.31l2.11 1.65a7.5 7.5 0 0 0 0 3.82l-2.11 1.65a1 1 0 0 0-.24 1.31l2 3.46a1 1 0 0 0 1.25.45l2.49-1a7.42 7.42 0 0 0 3.3 1.91l.38 2.65A1 1 0 0 0 10 22h-4a1 1 0 0 0-1-.89l-.38-2.65a7.42 7.42 0 0 0-3.3-1.91l2.49 1a1 1 0 0 0 1.25-.45l2-3.46a1 1 0 0 0-.24-1.31z" />
               </g>
             </svg>
           </button>
         </div>
+        {/* Mobile Settings Modal */}
         {showSettings.value && (
           <SettingsModal
             onClose={() => (showSettings.value = false)}
@@ -220,9 +287,12 @@ export default function ProfileManagerView(props: any) {
   }
 
   // --- DESKTOP LAYOUT ---
+  // <DesktopProfileManagerView>
   return (
     <div class="w-full flex flex-col items-center justify-center min-h-[70vh]">
-      <h1 class="text-4xl font-bold mb-10 text-center tracking-tight">{"Who's watching?"}</h1>
+      {/* Desktop Header */}
+      <h1 class="text-4xl font-bold mb-10 text-center tracking-tight">Who's watching?</h1>
+      {/* Desktop Profile Grid */}
       <div class="flex flex-col gap-8 mb-4 w-full max-w-[900px]">
         {rowsArr.map((row, rowIdx) => (
           <div
@@ -230,11 +300,13 @@ export default function ProfileManagerView(props: any) {
             class="flex flex-row gap-8 justify-center"
             style={{ width: "100%" }}
           >
-            {row.map((card, idx) =>
+            {/* Desktop Profile/Add Cards */}
+            {row.map((card) =>
               card.type === "profile" ? (
+                // Desktop Profile Card
                 <div
                   key={card.profile._id}
-                  class="relative group flex flex-col items-center rounded-xl shadow-lg p-6 transition-transform duration-200 hover:scale-105"
+                  class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 rounded-xl shadow-lg p-6 transition-transform duration-200"
                   style={{
                     width: "220px",
                     boxShadow: "0 4px 24px 0 #000a",
@@ -249,7 +321,7 @@ export default function ProfileManagerView(props: any) {
                     onClick={() => handleProfileClick(card.profile._id)}
                   >
                     <div
-                      class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-zentrio-red/30"
+                      class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
                       style={{
                         width: "120px",
                         height: "120px",
@@ -285,9 +357,10 @@ export default function ProfileManagerView(props: any) {
                   </button>
                 </div>
               ) : (
+                // Desktop Add Profile Card
                 <div
                   key="add-profile"
-                  class="relative group flex flex-col items-center rounded-xl shadow-lg p-6 transition-transform duration-200 hover:scale-105 cursor-pointer"
+                  class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 rounded-xl shadow-lg p-6 transition-transform duration-200"
                   style={{
                     width: "220px",
                     boxShadow: "0 4px 24px 0 #000a",
@@ -296,13 +369,13 @@ export default function ProfileManagerView(props: any) {
                   <button
                     type="button"
                     onClick={() => showAddModal.value = true}
-                    class="flex flex-col items-center w-full h-full bg-transparent border-none p-0 m-0 mb-4"
+                    class="block w-full bg-transparent border-none p-0 m-0 mb-4"
                     style={{ minHeight: "0" }}
                     aria-label="Add Profile"
                     disabled={!!modalOpen}
                   >
                     <div
-                      class="rounded-lg flex items-center justify-center bg-gray-700 shadow-lg transition-all duration-300 group-hover:ring-4 group-hover:ring-zentrio-red/30"
+                      class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
                       style={{
                         width: "120px",
                         height: "120px",
@@ -310,6 +383,10 @@ export default function ProfileManagerView(props: any) {
                         fontSize: "3rem",
                         color: "#fff",
                         transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        margin: "0 auto",
                       }}
                     >
                       +
@@ -322,13 +399,19 @@ export default function ProfileManagerView(props: any) {
           </div>
         ))}
       </div>
+      {/* Desktop Bottom Bar */}
       <div class="flex justify-center items-center gap-4 w-full mt-6">
+        {/* Desktop Logout Button */}
         <a
           href="/logout"
-          class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg text-lg transition-all duration-200"
+          class="text-white font-bold py-2 px-6 rounded-lg text-lg transition-all duration-200"
+          style={{
+            backgroundColor: localStorage.getItem("accentColor") || "#dc2626",
+          }}
         >
           Logout
         </a>
+        {/* Desktop Settings Button */}
         <button
           type="button"
           onClick={() => showSettings.value = true}
@@ -344,6 +427,7 @@ export default function ProfileManagerView(props: any) {
           </svg>
         </button>
       </div>
+      {/* Desktop Add Profile Modal */}
       {showAddModal.value && (
         <div class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70">
           <ProfileModal
@@ -353,6 +437,7 @@ export default function ProfileManagerView(props: any) {
           />
         </div>
       )}
+      {/* Desktop Edit Profile Modal */}
       {editingProfile.value && (
         <div class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70">
           <ProfileModal
@@ -363,6 +448,7 @@ export default function ProfileManagerView(props: any) {
           />
         </div>
       )}
+      {/* Desktop Settings Modal */}
       {showSettings.value && (
         <SettingsModal
           onClose={() => showSettings.value = false}

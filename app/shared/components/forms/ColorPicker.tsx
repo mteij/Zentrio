@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useSignal, useComputed } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 
 interface ColorPickerProps {
   value: string;
@@ -17,7 +17,6 @@ export function ColorPicker({
   disabled = false 
 }: ColorPickerProps) {
   const customInputRef = useSignal<HTMLInputElement | null>(null);
-  const selectedColor = useComputed(() => value);
 
   const handlePresetClick = (color: string) => {
     onChange(color);
@@ -52,7 +51,7 @@ export function ColorPicker({
             onClick={() => handlePresetClick(color)}
             disabled={disabled}
             class={`w-8 h-8 rounded border-2 transition-all ${
-              selectedColor.value === color 
+              value === color 
                 ? 'border-white ring-2 ring-gray-400' 
                 : 'border-gray-600 hover:border-gray-400'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}

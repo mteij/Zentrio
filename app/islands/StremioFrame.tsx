@@ -4,7 +4,18 @@ import { useSignal } from "@preact/signals";
 import { ProfileSchema } from "../utils/db.ts";
 
 interface StremioFrameProps {
-  profile: ProfileSchema;
+  profile: {
+    _id: string;
+    userId: string;
+    name: string;
+    email: string;
+    password: string;
+    profilePictureUrl: string;
+    nsfwMode?: boolean;
+    tmdbApiKey?: string;
+    addonManagerEnabled?: boolean;
+    hideCalendarButton?: boolean;
+  };
 }
 
 // Generates a 20-character hex string, matching Stremio's installation_id format.
@@ -18,6 +29,63 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const isLoading = useSignal(true);
   const statusMessage = useSignal("Initializing...");
+
+  // Function to reload the iframe with the same session data
+  const reloadIframe = () => {
+    const iframe = iframeRef.current;
+    if (iframe) {
+      // Store the current src to preserve session data
+      const currentSrc = iframe.src;
+      // Reset loading state
+      isLoading.value = true;
+      statusMessage.value = "Reloading Stremio...";
+      // Reload the iframe by setting its src to itself
+      iframe.src = currentSrc;
+    }
+  };
+
+  // Listen for messages from the iframe to reload it
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Verify the message is from the same origin
+      if (event.origin !== window.location.origin) return;
+      
+      // Check if it's our reload message
+      if (event.data && event.data.type === 'reload-stremio-iframe') {
+        reloadIframe();
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('message', handleMessage);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
+  // Add CSS to hide the calendar button when the setting is enabled
+  useEffect(() => {
+    if (profile.hideCalendarButton) {
+      const style = document.createElement('style');
+      style.id = 'hide-calendar-button';
+      style.textContent = `
+        [title="Calendar"] {
+          display: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+      
+      // Clean up the style when the component unmounts
+      return () => {
+        const existingStyle = document.getElementById('hide-calendar-button');
+        if (existingStyle) {
+          existingStyle.remove();
+        }
+      };
+    }
+  }, [profile.hideCalendarButton]);
 
   useEffect(() => {
     const loginAndLoad = async () => {
@@ -103,6 +171,8 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
           },
           stremioHubProfilePicture: profile.profilePictureUrl,
           nsfwModeEnabled: profile.nsfwMode || false,
+          addonManagerEnabled: profile.addonManagerEnabled || false,
+          hideCalendarButton: profile.hideCalendarButton || false,
           tmdbApiKey: (profile as any).tmdbApiKey || null,
           installation_id: result.installation_id || generateInstallationId(),
           schema_version: result.schema_version || 18,
@@ -135,8 +205,9 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
               Error: {error instanceof Error ? error.message : String(error)}
             </span>
             <button
+              type="button"
               class="mt-6 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-              onClick={() => history.length > 1 ? history.back() : (window.location.href = "/profiles")}
+              onClick={() => history.length > 1 ? history.back() : (globalThis.location.href = "/profiles")}
             >
               Go Back
             </button>

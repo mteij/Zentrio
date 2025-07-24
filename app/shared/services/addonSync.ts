@@ -165,7 +165,7 @@ class AddonSyncService {
     try {
       const user = await User.findById(userId);
       console.debug(`[addonSync] Loaded user:`, user);
-      if (!user || !user.addonSyncSettings?.enabled) {
+      if (!user || !user.settings?.addonSyncSettings?.enabled) {
         return {
           success: false,
           syncedProfiles: 0,
@@ -174,7 +174,7 @@ class AddonSyncService {
         };
       }
 
-      const { mainProfileId } = user.addonSyncSettings;
+      const { mainProfileId } = user.settings.addonSyncSettings;
       if (!mainProfileId) {
         return {
           success: false,
@@ -233,7 +233,7 @@ class AddonSyncService {
       }
 
       await User.findByIdAndUpdate(userId, {
-        'addonSyncSettings.lastSyncAt': new Date()
+        'settings.addonSyncSettings.lastSyncAt': new Date()
       });
 
       console.debug(`[addonSync] Sync complete. Synced profiles: ${syncedProfiles}, errors:`, errors);

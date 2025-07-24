@@ -27,6 +27,7 @@ export default function SettingsModal({
   // New general settings
   const accentColor = useSignal<string>("#dc2626");
   const tmdbApiKey = useSignal<string>("");
+  const hideCalendarButton = useSignal<boolean>(false);
 
   // Addon sync settings
   const addonSyncEnabled = useSignal<boolean>(false);
@@ -65,6 +66,9 @@ export default function SettingsModal({
       
       // Load addon sync settings
       loadAddonSyncSettings();
+      
+      // Load hide calendar button setting from server
+      loadHideCalendarButtonSetting();
     }
   }, []);
 
@@ -116,6 +120,48 @@ export default function SettingsModal({
       console.warn('Failed to load addon sync settings:', error);
     }
   };
+
+  // Load hide calendar button setting from server
+  const loadHideCalendarButtonSetting = async () => {
+    try {
+      const response = await fetch('/api/hide-calendar');
+      if (response.ok) {
+        const data = await response.json();
+        hideCalendarButton.value = data.hideCalendarButton || false;
+      }
+    } catch (error) {
+      console.warn('Failed to load hide calendar button setting:', error);
+    }
+  };
+
+  // Save hide calendar button setting to server
+  const saveHideCalendarButtonSetting = async (hide: boolean) => {
+    try {
+      const response = await fetch('/api/hide-calendar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hideCalendarButton: hide }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save hide calendar button setting');
+      }
+      
+      console.log('Hide calendar button setting saved successfully');
+    } catch (error) {
+      console.error('Error saving hide calendar button setting:', error);
+      alert('Failed to save hide calendar button setting. Please try again.');
+    }
+  };
+
+  // Auto-save hide calendar button setting with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveHideCalendarButtonSetting(hideCalendarButton.value);
+    }, 1000); // Debounce for 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [hideCalendarButton.value]);
 
   // Save auto-login settings to localStorage
   useEffect(() => {
@@ -319,112 +365,165 @@ export default function SettingsModal({
               type="button"
               className={`px-4 py-2 font-medium text-base transition-colors duration-150 ${
               tab.value === "general"
-                ? "text-red-500 border-b-2 border-red-500"
+                ? "" // Remove static color classes
                 : "text-gray-400 hover:text-gray-200"
             }`}
-            onClick={() => (tab.value = "general")}
-          >
-            General
-          </button>
+              style={
+                tab.value === "general"
+                  ? {
+                      color: accentColor.value,
+                      borderBottom: `2px solid ${accentColor.value}`,
+                    }
+                  : undefined
+              }
+              onClick={() => (tab.value = "general")}
+            >
+              General
+            </button>
             <button
               type="button"
               className={`px-4 py-2 font-medium text-base transition-colors duration-150 ${
               tab.value === "addons"
-                ? "text-red-500 border-b-2 border-red-500"
+                ? "" // Remove static color classes
                 : "text-gray-400 hover:text-gray-200"
             }`}
-            onClick={() => (tab.value = "addons")}
-          >
-            Addons
-          </button>
-        </div>
+              style={
+                tab.value === "addons"
+                  ? {
+                      color: accentColor.value,
+                      borderBottom: `2px solid ${accentColor.value}`,
+                    }
+                  : undefined
+              }
+              onClick={() => (tab.value = "addons")}
+            >
+              Addons
+            </button>
+          </div>
 
         {/* General Tab */}
           {tab.value === "general" && (
             <div>
               <h3 className="text-lg font-semibold mb-4 text-white">General Settings</h3>
-              <div className="mb-6">
-                <label className="block text-base font-medium text-gray-200 mb-2">Auto-login behavior</label>
-                <select
-                  className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-                  value={autoLogin.value}
-                  onChange={e => (autoLogin.value = e.currentTarget.value as AutoLoginOption)}
-                >
-                  <option value="none">Show profile selection page (default)</option>
-                  <option value="last">Automatically log in to last used profile</option>
-                  <option value="profile">Automatically log in to a specific profile</option>
-                </select>
-                {autoLogin.value === "profile" && profiles.value.length > 0 && (
+              
+              {/* Auto-login behavior */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <label className="block text-base font-medium text-gray-200 mb-2">Auto-login behavior</label>
                   <select
-                    className="mt-2 w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-                    value={autoLoginProfileId.value ?? ""}
-                    onChange={e => (autoLoginProfileId.value = (e.currentTarget.value || null))}
+                    className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                    value={autoLogin.value}
+                    onChange={e => (autoLogin.value = e.currentTarget.value as AutoLoginOption)}
                   >
-                    <option value="">Select a profile...</option>
-                    {profiles.value.map((p) => (
-                      <option key={p._id} value={p._id}>{p.name}</option>
-                    ))}
+                    <option value="none">Show profile selection page (default)</option>
+                    <option value="last">Automatically log in to last used profile</option>
+                    <option value="profile">Automatically log in to a specific profile</option>
                   </select>
-                )}
-                <p className="text-xs text-gray-500 mt-2">
-                  Choose what happens when you visit the site while logged in.
-                </p>
+                  {autoLogin.value === "profile" && profiles.value.length > 0 && (
+                    <select
+                      className="mt-2 w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                      value={autoLoginProfileId.value ?? ""}
+                      onChange={e => (autoLoginProfileId.value = (e.currentTarget.value || null))}
+                    >
+                      <option value="">Select a profile...</option>
+                      {profiles.value.map((p) => (
+                        <option key={p._id} value={p._id}>{p.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    Choose what happens when you visit the site while logged in.
+                  </p>
+                </div>
               </div>
 
               {/* Accent Color Setting */}
-              <div className="mb-6">
-                <label className="block text-base font-medium text-gray-200 mb-2">Accent Color</label>
-                {/* Show current color above the options */}
-                <div className="flex items-center mb-3">
-                  <span className="text-sm text-gray-400 mr-2">Current accent color:</span>
-                  <div
-                    className="w-6 h-6 rounded border-2 border-gray-600"
-                    style={{ backgroundColor: accentColor.value }}
-                  ></div>
-                  <span className="ml-2 text-sm text-gray-400 font-mono">{accentColor.value}</span>
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <label className="block text-base font-medium text-gray-200 mb-2">Accent Color</label>
+                  {/* Show current color above the options */}
+                  <div className="flex items-center mb-3">
+                    <span className="text-sm text-gray-400 mr-2">Current accent color:</span>
+                    <div
+                      className="w-6 h-6 rounded border-2 border-gray-600"
+                      style={{ backgroundColor: accentColor.value }}
+                    ></div>
+                    <span className="ml-2 text-sm text-gray-400 font-mono">{accentColor.value}</span>
+                  </div>
+                  <ColorPicker
+                    value={accentColor.value}
+                    onChange={(color) => accentColor.value = color}
+                    presets={[
+                      "#dc2626",
+                      "#2563eb",
+                      "#059669",
+                      "#7c3aed",
+                      "#ea580c",
+                      "#0891b2",
+                      "#be123c"
+                    ]}
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Choose your preferred accent color for the interface. This affects buttons, links, and highlights.
+                  </p>
                 </div>
-                <ColorPicker
-                  value={accentColor.value}
-                  onChange={(color) => accentColor.value = color}
-                  presets={[
-                    "#dc2626",
-                    "#2563eb",
-                    "#059669",
-                    "#7c3aed",
-                    "#ea580c",
-                    "#0891b2",
-                    "#be123c"
-                  ]}
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Choose your preferred accent color for the interface. This affects buttons, links, and highlights.
-                </p>
               </div>
 
               {/* TMDB API Key Setting */}
-              <div className="mb-6">
-                <label className="block text-base font-medium text-gray-200 mb-2">TMDB API Key</label>
-                <input
-                  type="password"
-                  value={tmdbApiKey.value}
-                  onInput={(e) => tmdbApiKey.value = e.currentTarget.value}
-                  placeholder="Enter your TMDB API key (optional)"
-                  className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Required for NSFW content filtering in profiles. Get your free API key from{" "}
-                  <a 
-                    href="https://www.themoviedb.org/settings/api" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 underline"
-                  >
-                    TMDB API Settings
-                  </a>
-                  {" "}(free for personal use).
-                </p>
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <label className="block text-base font-medium text-gray-200 mb-2">TMDB API Key</label>
+                  <input
+                    type="password"
+                    value={tmdbApiKey.value}
+                    onInput={(e) => tmdbApiKey.value = e.currentTarget.value}
+                    placeholder="Enter your TMDB API key (optional)"
+                    className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Required for NSFW content filtering in profiles. Get your free API key from{" "}
+                    <a 
+                      href="https://www.themoviedb.org/settings/api" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 underline"
+                    >
+                      TMDB API Settings
+                    </a>
+                    {" "}(free for personal use).
+                  </p>
+                </div>
               </div>
 
+              {/* Hide Calendar Button Setting */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-base font-medium text-gray-200">Hide Calendar Button</label>
+                    <div className="relative inline-block w-12 h-6">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={hideCalendarButton.value}
+                        onChange={e => hideCalendarButton.value = e.currentTarget.checked}
+                      />
+                      <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                        hideCalendarButton.value 
+                          ? 'bg-red-600' 
+                          : 'bg-gray-600'
+                      }`}
+                        onClick={() => hideCalendarButton.value = !hideCalendarButton.value}
+                      ></div>
+                      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
+                        hideCalendarButton.value ? 'transform translate-x-6' : ''
+                      }`}></div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Hide the calendar button in the Stremio interface. Refresh the Stremio page after changing this setting.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
