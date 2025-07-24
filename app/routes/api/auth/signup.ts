@@ -1,11 +1,11 @@
 import { Handlers } from "$fresh/server.ts";
 import { Resend } from "https://esm.sh/resend@3.2.0";
 import { render } from "https://esm.sh/preact-render-to-string@6.2.1";
-import { createUserWithPassword, findUserByEmail } from "../../../utils/db.ts";
+import { createUserWithGeneratedPassword , findUserByEmail } from "../../../utils/db.ts";
 import { WelcomeEmail } from "../../../components/WelcomeEmail.tsx";
 
 export const handler: Handlers = {
-  async POST(req) {
+  async POST(req: Request) {
     const { email } = await req.json();
     if (!email) {
       return new Response("Email is required.", { status: 400 });
@@ -23,7 +23,7 @@ export const handler: Handlers = {
     }
 
     try {
-      const { plainPassword } = await createUserWithPassword(email);
+      const { plainPassword } = await createUserWithGeneratedPassword (email);
       const url = new URL(req.url);
       const loginUrl = `${url.origin}/login`;
 

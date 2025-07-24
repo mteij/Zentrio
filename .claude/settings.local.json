@@ -14,7 +14,9 @@
       "Bash(touch:*)",
       "Bash(deno task:*)",
       "Bash(tail:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }

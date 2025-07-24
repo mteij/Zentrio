@@ -4,7 +4,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#141414",
-  "theme_color": "#e50914",
+  "theme_color": "#dc2626",
   "description": "A beautiful, secure, Netflix-inspired profile management system for Stremio Web",
   "orientation": "any",
   "scope": "/",

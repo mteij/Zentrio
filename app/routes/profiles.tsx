@@ -26,13 +26,22 @@ export const handler: Handlers<ProfilePageData, AppState> = {
 export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
   const showSettings = useSignal(false);
   const addonOrderEnabled = useSignal(false);
-  const profileManagerView = useSignal<"auto" | "desktop" | "mobile">("auto");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      addonOrderEnabled.value = localStorage.getItem("enableAddonOrderUserscript") === "true";
-      profileManagerView.value = (localStorage.getItem("profileManagerView") as "auto" | "desktop" | "mobile") || "auto";
-    }
+    // Load addon manager setting from server
+    const loadAddonManagerSetting = async () => {
+      try {
+        const response = await fetch('/api/addon-manager');
+        if (response.ok) {
+          const data = await response.json();
+          addonOrderEnabled.value = data.enabled || false;
+        }
+      } catch (error) {
+        console.warn('Failed to load addon manager setting:', error);
+      }
+    };
+    
+    loadAddonManagerSetting();
   }, []);
 
   useEffect(() => {
@@ -45,19 +54,28 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
     } else if (!addonOrderEnabled.value && document.getElementById("addon-order-userscript")) {
       document.getElementById("addon-order-userscript")?.remove();
     }
-    localStorage.setItem("enableAddonOrderUserscript", addonOrderEnabled.value ? "true" : "false");
   }, [addonOrderEnabled.value]);
 
-  // Redirect to last opened profile if available
+  // Handle auto-login behavior based on user settings
   useEffect(() => {
     if (typeof window !== "undefined") {
+      const autoLogin = localStorage.getItem("autoLogin") || "none";
+      const autoLoginProfileId = localStorage.getItem("autoLoginProfileId");
       const lastProfileId = localStorage.getItem("lastProfileId");
-      if (
-        lastProfileId &&
-        data.profiles.some((p) => p._id === lastProfileId)
-      ) {
-        window.location.href = `/player/${lastProfileId}`;
+      
+      // Only auto-redirect if user has auto-login enabled
+      if (autoLogin === "last" && lastProfileId) {
+        // Check if the last profile still exists
+        if (data.profiles.some((p) => p._id === lastProfileId)) {
+          window.location.href = `/player/${lastProfileId}`;
+        }
+      } else if (autoLogin === "profile" && autoLoginProfileId) {
+        // Check if the specific profile still exists
+        if (data.profiles.some((p) => p._id === autoLoginProfileId)) {
+          window.location.href = `/player/${autoLoginProfileId}`;
+        }
       }
+      // If autoLogin is "none", do nothing - show profile selection
     }
   }, [data.profiles]);
 
@@ -85,7 +103,6 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
               setShowSettings={showSettings}
               addonOrderEnabled={addonOrderEnabled}
               setAddonOrderEnabled={addonOrderEnabled}
-              profileManagerView={profileManagerView}
             />
           </div>
         </div>

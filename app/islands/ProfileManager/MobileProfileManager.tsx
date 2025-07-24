@@ -23,9 +23,10 @@ interface MobileProfileManagerProps {
   ProfileModal: any;
   toggleMobileEditMode: () => void;
   showSettings: { value: boolean };
-  setShowSettings: (v: boolean) => void;
+  setShowSettings: { value: boolean };
   addonOrderEnabled: { value: boolean };
   setAddonOrderEnabled: { value: boolean };
+  isMobile: boolean;
 }
 
 // Props: signals and handlers from ProfileManager
@@ -45,6 +46,7 @@ export default function MobileProfileManager({
   setShowSettings,
   addonOrderEnabled,
   setAddonOrderEnabled,
+  isMobile,
 }: MobileProfileManagerProps) {
   // Title
   const title = mobileEditMode.value ? "Edit mode" : "Who's watching?";
@@ -55,8 +57,7 @@ export default function MobileProfileManager({
 
   const modalOpen = showAddModal.value || editingProfile.value !== null;
 
-  // Ensure all cards (profile and add) use the same minHeight for alignment
-  const cardMinHeight = "150px";
+  // Cards auto-size based on content
 
   // Remember last opened profile
   function handleProfileClick(profileId: string) {
@@ -67,14 +68,15 @@ export default function MobileProfileManager({
   }
 
   return (
-    <div class="relative min-h-[70vh] w-full">
+    <div class="relative min-h-[70vh] w-full flex flex-col" style={{ height: "100vh", overflow: "hidden" }}>
       <h1 class="text-2xl sm:text-5xl font-bold mb-8 text-center">{title}</h1>
       <div
-        class="flex flex-wrap justify-center gap-4 sm:gap-8 mb-10 transition-all duration-300"
+        class="flex flex-wrap justify-center gap-4 sm:gap-8 mb-10 transition-all duration-300 flex-1"
         style={{
           maxHeight: "calc(100vh - 180px)",
-          overflowX: "visible",
-          overflowY: "visible",
+          paddingBottom: "100px",
+          overflowY: "auto",
+          overflowX: "hidden",
           ...(modalOpen
             ? { pointerEvents: "none", userSelect: "none", opacity: 0.6 }
             : {}),
@@ -86,7 +88,6 @@ export default function MobileProfileManager({
             class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
             style={{
               width: "120px",
-              minHeight: cardMinHeight,
               transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
               flex: "0 0 auto",
             }}
@@ -141,7 +142,6 @@ export default function MobileProfileManager({
             class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105"
             style={{
               width: "120px",
-              minHeight: cardMinHeight,
               transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
               flex: "0 0 auto",
             }}
@@ -188,7 +188,7 @@ export default function MobileProfileManager({
         />
       )}
       {/* Render the mobile action bar at the bottom, only on mobile */}
-      <div class="fixed bottom-0 left-0 w-full flex gap-2 justify-center bg-black bg-opacity-90 py-3 sm:hidden z-30 border-t border-gray-800">
+      <div class="fixed bottom-0 inset-x-0 flex gap-2 justify-center bg-black bg-opacity-90 py-3 sm:hidden z-30 border-t border-gray-800" style={{ width: "100%" }}>
         <a
           href="/logout"
           class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-base transition-all duration-200"
@@ -232,6 +232,7 @@ export default function MobileProfileManager({
           onClose={() => showSettings.value = false}
           addonOrderEnabled={addonOrderEnabled}
           setAddonOrderEnabled={setAddonOrderEnabled}
+          isMobile={isMobile}
         />
       )}
     </div>

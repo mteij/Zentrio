@@ -23,6 +23,7 @@ interface DesktopProfileManagerProps {
   showSettings: { value: boolean };
   addonOrderEnabled: { value: boolean };
   setAddonOrderEnabled: { value: boolean };
+  isMobile: boolean;
 }
 
 export default function DesktopProfileManager({
@@ -39,6 +40,7 @@ export default function DesktopProfileManager({
   showSettings,
   addonOrderEnabled,
   setAddonOrderEnabled,
+  isMobile,
 }: Omit<DesktopProfileManagerProps, "setShowSettings">) {
   const title = "Who's watching?";
 
@@ -234,6 +236,7 @@ export default function DesktopProfileManager({
           onClose={() => showSettings.value = false}
           addonOrderEnabled={addonOrderEnabled}
           setAddonOrderEnabled={setAddonOrderEnabled}
+          isMobile={isMobile}
         />
       )}
     </div>

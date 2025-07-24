@@ -38,7 +38,8 @@ class SessionSecurityService {
     const userAgent = headers.get('user-agent') || 'unknown';
     
     // Create a simple fingerprint from stable headers
-    const fingerprint = this.createFingerprint(userAgent, headers.get('accept-language'));
+    const acceptLanguage = headers.get('accept-language') ?? undefined;
+    const fingerprint = this.createFingerprint(userAgent, acceptLanguage);
 
     return {
       ipAddress: ipAddress.split(',')[0].trim(), // Take first IP if comma-separated

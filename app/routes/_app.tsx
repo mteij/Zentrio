@@ -21,7 +21,7 @@ export default function App({ Component, route }: PageProps) {
           rel="stylesheet"
         />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#e50914" />
+        <meta name="theme-color" content="#dc2626" id="theme-color-meta" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -36,6 +36,15 @@ export default function App({ Component, route }: PageProps) {
                 navigator.serviceWorker.register('/service-worker.js');
               });
             }
+            // Set theme color from localStorage on page load
+            document.addEventListener('DOMContentLoaded', function() {
+              const savedAccentColor = localStorage.getItem('accentColor') || '#dc2626';
+              const themeColorMeta = document.getElementById('theme-color-meta');
+              if (themeColorMeta) {
+                themeColorMeta.content = savedAccentColor;
+              }
+              document.documentElement.style.setProperty('--accent-color', savedAccentColor);
+            });
           `
         }} />
       </head>

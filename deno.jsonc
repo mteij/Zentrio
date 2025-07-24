@@ -8,18 +8,25 @@
     "preview": "deno run --allow-read --allow-env --allow-net --allow-sys --allow-write --allow-run --unstable-kv app/main.ts"
   },
   "imports": {
-    "$fresh/": "https://deno.land/x/fresh@1.6.8/",
-    "mongoose": "npm:mongoose@8.4.1",
-    "$bcrypt/": "https://deno.land/x/bcrypt@v0.4.1/",
-    "preact": "https://esm.sh/preact@10.19.6",
-    "preact/": "https://esm.sh/preact@10.19.6/",
-    "@preact/signals": "https://esm.sh/*@preact/signals@1.2.2",
-    "@preact/signals-core": "https://esm.sh/*@preact/signals-core@1.5.1",
-    "twind": "https://esm.sh/twind@0.16.19",
-    "twind/": "https://esm.sh/twind@0.16.19/",
-    "$std/": "https://deno.land/std@0.224.0/",
-    "stremio-api-client": "npm:stremio-api-client@^1.0.0",
-    "ua-parser-js": "https://esm.sh/ua-parser-js@1.0.37"
+    "/": "./",
+    "./": "./",
+  // Deno standard library and Fresh
+  "$fresh/": "https://deno.land/x/fresh@1.6.8/",
+  "$std/": "https://deno.land/std@0.224.0/",
+  "$bcrypt/": "https://deno.land/x/bcrypt@v0.4.1/",
+
+  // ESM modules
+  "@preact/signals": "https://esm.sh/@preact/signals@1.2.2",
+  "@preact/signals-core": "https://esm.sh/@preact/signals-core@1.5.1",
+  "preact": "https://esm.sh/preact@10.26.9",
+  "preact/": "https://esm.sh/preact@10.26.9/",
+  "twind": "https://esm.sh/twind@0.16.19",
+  "twind/": "https://esm.sh/twind@0.16.19/",
+  "ua-parser-js": "https://esm.sh/ua-parser-js@1.0.37",
+
+  // npm packages
+  "mongoose": "npm:mongoose@8.4.1",
+  "stremio-api-client": "npm:stremio-api-client@^1.0.0"
   },
   "compilerOptions": {
     "jsx": "react-jsx",

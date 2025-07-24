@@ -31,18 +31,21 @@ export function ColorPicker({
   return (
     <div class="space-y-3">
       {label && (
-        <label class="block text-sm font-medium text-gray-300">
+        <label class="block text-gray-200 mb-2 font-medium">
           {label}
         </label>
       )}
       
-      {/* Color Preview */}
-      <div class="flex items-center space-x-3">
-        <div 
-          class="w-8 h-8 rounded border-2 border-gray-600"
-          style={{ backgroundColor: value }}
-        ></div>
-        <span class="text-sm text-gray-400 font-mono">{value}</span>
+      {/* Currently Selected Color */}
+      <div class="space-y-2">
+        <div class="flex items-center space-x-3">
+          <span class="text-sm text-gray-400">Currently selected:</span>
+          <div 
+            class="w-8 h-8 rounded border-2 border-gray-600"
+            style={{ backgroundColor: value }}
+          ></div>
+          <span class="text-sm text-gray-400 font-mono">{value}</span>
+        </div>
       </div>
 
       {/* Preset Colors */}

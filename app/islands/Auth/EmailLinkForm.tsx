@@ -59,40 +59,6 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
     );
   };
 
-  const handleSendLoginCode = async () => {
-    if (!validateEmailField(email.value)) return;
-
-    await makeApiCall("/api/auth/send-login-code", 
-      { email: email.value },
-      {
-        onSuccess: (data) => {
-          console.log('Send login code success:', data);
-          // Handle both response structures: { redirectUrl } or { data: { redirectUrl } }
-          const redirectUrl = data.redirectUrl || data.data?.redirectUrl;
-          
-          if (redirectUrl) {
-            successMessage.value = `Login code sent to ${email.value}. Check your email!`;
-            setTimeout(() => {
-              console.log('Redirecting to:', redirectUrl);
-              globalThis.location.href = redirectUrl;
-            }, 2000);
-          } else {
-            console.error('No redirectUrl in response:', data);
-            // Fallback - redirect manually
-            const fallbackUrl = `/auth/code?email=${encodeURIComponent(email.value)}`;
-            successMessage.value = `Login code sent to ${email.value}. Check your email!`;
-            setTimeout(() => {
-              console.log('Using fallback redirect to:', fallbackUrl);
-              globalThis.location.href = fallbackUrl;
-            }, 2000);
-          }
-        },
-        onError: (error) => {
-          console.error('Send login code error:', error);
-        }
-      }
-    );
-  };
 
   return (
     <section role="form" class="animate-fadein">
@@ -135,18 +101,6 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
         >
           Continue
         </FormButton>
-        
-        <div class="text-center">
-          <div class="text-gray-400 text-sm mb-2">or</div>
-          <button
-            type="button"
-            onClick={handleSendLoginCode}
-            disabled={isLoading.value || !!successMessage.value}
-            class="text-red-500 hover:underline disabled:text-gray-400 text-sm"
-          >
-            Email me a login code
-          </button>
-        </div>
       </form>
       <style>
         {`

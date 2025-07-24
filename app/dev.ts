@@ -10,6 +10,9 @@ const envPath = `${Deno.cwd()}/.env`;
 loadSync({ envPath, export: true }); // Do not allow empty values
 
 await dev(import.meta.url, "./main.ts", {
+    server: {
+    port: 8000
+  },
   plugins: [twindPlugin(twindConfig)],
   // Add static file handler for development
   handler: (req, ctx) => {

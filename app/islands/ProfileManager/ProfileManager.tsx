@@ -1,5 +1,5 @@
 import { h as _h } from "preact";
-import { useSignal } from "@preact/signals";
+import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { ProfileSchema } from "../../utils/db.ts";
 import { ObjectId } from "mongoose";
@@ -63,13 +63,19 @@ export function ProfileModal(
 
   const handleSave = (e: Event) => {
     e.preventDefault();
-    onSave({
+    const profileData: any = {
       name: name.value,
       email: email.value,
-      password: password.value,
       profilePictureUrl: profilePictureUrl.value,
       nsfwMode: nsfwMode.value,
-    });
+    };
+    
+    // Only include password if it's not empty or if we're creating a new profile
+    if (password.value.trim() !== "" || !isEditing) {
+      profileData.password = password.value;
+    }
+    
+    onSave(profileData);
   };
 
   return (
@@ -125,10 +131,10 @@ export function ProfileModal(
           />
           <input
             type="password"
-            placeholder="Stremio Password"
+            placeholder={isEditing ? "Stremio Password (leave empty to keep current)" : "Stremio Password"}
             value={password.value}
             onInput={(e) => password.value = (e.target as HTMLInputElement).value}
-            required
+            required={!isEditing}
             name="password"
             autoComplete="current-password"
             class="w-full bg-gray-700 text-white px-3 py-2 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
@@ -290,14 +296,12 @@ export default function ProfileManager(
     setShowSettings,
     addonOrderEnabled,
     setAddonOrderEnabled,
-    profileManagerView,
   }: {
     initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[],
     showSettings: { value: boolean },
     setShowSettings: { value: boolean },
     addonOrderEnabled: { value: boolean },
     setAddonOrderEnabled: { value: boolean },
-    profileManagerView: { value: "auto" | "desktop" | "mobile" },
   }
 ) {
   const {
@@ -319,6 +323,11 @@ export default function ProfileManager(
       isMobile.value = device.type === "mobile" || device.type === "tablet";
     }
   }, []);
+
+  // Create a computed signal for the view mode - always use auto detection
+  const shouldShowMobile = useComputed(() => {
+    return isMobile.value;
+  });
 
   // Provide a reliable toggle function for mobile edit mode
   const toggleMobileEditMode = () => {
@@ -367,15 +376,12 @@ export default function ProfileManager(
     setShowSettings,
     addonOrderEnabled,
     setAddonOrderEnabled,
+    isMobile: isMobile.value, // pass device detection info
   };
-
-  // Determine which profile manager to show based on profileManagerView setting
-  const shouldShowMobile = profileManagerView.value === "mobile" || 
-    (profileManagerView.value === "auto" && isMobile.value);
 
   return (
     <>
-      {shouldShowMobile ? (
+      {shouldShowMobile.value ? (
         <MobileProfileManager {...sharedProps} />
       ) : (
         <DesktopProfileManager.default {...sharedProps} />

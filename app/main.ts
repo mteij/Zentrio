@@ -6,18 +6,21 @@
 
 import { loadSync } from "$std/dotenv/mod.ts";
 const envPath = `${Deno.cwd()}/.env`;
-loadSync({ envPath, export: true }); // Do not allow empty values
+loadSync({ envPath, export: true });
 
-import { start } from "$fresh/server.ts";
+import { start, FreshContext } from "$fresh/server.ts";
 import manifest from "./fresh.gen.ts";
 import twindPlugin from "$fresh/plugins/twind.ts";
 import twindConfig from "./twind.config.ts";
 import { serveDir } from "$std/http/file_server.ts";
 
 await start(manifest, {
+  server: {
+    port: 8000
+  },
   plugins: [twindPlugin(twindConfig)],
   // Add a custom handler to serve static files from /app/static
-  handler: (req, ctx) => {
+  handler: (req: Request, ctx: FreshContext) => {
     const url = new URL(req.url);
     if (url.pathname === "/static/service-worker.js") {
       // Always serve service worker with correct headers

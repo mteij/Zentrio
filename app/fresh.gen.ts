@@ -4,6 +4,7 @@
 
 import * as $_app from "./routes/_app.tsx";
 import * as $_middleware from "./routes/_middleware.ts";
+import * as $api_addon_manager from "./routes/api/addon-manager.ts";
 import * as $api_addon_sync from "./routes/api/addon-sync.ts";
 import * as $api_auth_change_password from "./routes/api/auth/change-password.ts";
 import * as $api_auth_login_or_signup from "./routes/api/auth/login-or-signup.ts";
@@ -49,6 +50,7 @@ const manifest = {
   routes: {
     "./routes/_app.tsx": $_app,
     "./routes/_middleware.ts": $_middleware,
+    "./routes/api/addon-manager.ts": $api_addon_manager,
     "./routes/api/addon-sync.ts": $api_addon_sync,
     "./routes/api/auth/change-password.ts": $api_auth_change_password,
     "./routes/api/auth/login-or-signup.ts": $api_auth_login_or_signup,

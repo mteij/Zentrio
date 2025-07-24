@@ -15,6 +15,8 @@ export interface UserSchema extends Document {
   createdAt: Date;
   // Encrypted TMDB API key (user-level setting)
   encryptedTmdbApiKey?: EncryptedData;
+  // Addon manager settings
+  addonManagerEnabled?: boolean; // Whether Stremio addon manager userscript is enabled
   // Addon sync settings (experimental feature)
   addonSyncSettings?: {
     enabled: boolean;
@@ -69,6 +71,8 @@ const userSchema = new mongoose.Schema<UserSchema>({
     iv: { type: String },
     tag: { type: String }
   },
+  // Addon manager settings
+  addonManagerEnabled: { type: Boolean, default: false },
   // Addon sync settings (experimental feature)
   addonSyncSettings: {
     enabled: { type: Boolean, default: false },
@@ -582,6 +586,16 @@ export const updateUserAddonSyncSettings = async (
 export const canUserPerformAddonSync = async (userId: string): Promise<boolean> => {
   const user = await Users.findById(userId);
   return !!(user?.addonSyncSettings?.enabled && user?.addonSyncSettings?.mainProfileId);
+};
+
+/**
+ * Update addon manager setting for user
+ */
+export const updateUserAddonManagerSetting = async (userId: string, enabled: boolean): Promise<void> => {
+  await Users.updateOne(
+    { _id: new mongoose.Types.ObjectId(userId) },
+    { $set: { addonManagerEnabled: enabled } }
+  );
 };
 
 export type { ObjectId, EncryptedData };
