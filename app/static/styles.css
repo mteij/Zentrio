@@ -1,6 +1,13 @@
 body {
   font-family: 'Inter', sans-serif;
   background-color: #141414;
+  /* Prevent pull-to-refresh */
+  overscroll-behavior-y: none;
+}
+
+/* Prevent pull-to-refresh on all elements */
+* {
+  overscroll-behavior-y: none;
 }
 
 .profile-avatar {

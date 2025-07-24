@@ -17,6 +17,7 @@ export const handler: Handlers<null, AppState> = {
       const user = await User.findById(userId).populate('settings.addonSyncSettings.mainProfileId');
       const profiles = await Profile.find({ userId });
 
+      // Ensure mainProfileId is properly converted to string if it's an ObjectId
       const syncSettings = user?.settings?.addonSyncSettings || {
         enabled: false,
         syncDirection: 'main_to_all',
@@ -24,10 +25,41 @@ export const handler: Handlers<null, AppState> = {
         syncInterval: 60
       };
 
+      // Handle corrupted mainProfileId data
+      let mainProfileIdValue = null;
+      if (syncSettings.mainProfileId) {
+        // If it's already a string that looks like an ObjectId, use it directly
+        if (typeof syncSettings.mainProfileId === 'string' && /^[0-9a-fA-F]{24}$/.test(syncSettings.mainProfileId)) {
+          mainProfileIdValue = syncSettings.mainProfileId;
+        } 
+        // If it's an ObjectId, convert to string
+        else if (syncSettings.mainProfileId.toString && typeof syncSettings.mainProfileId.toString === 'function') {
+          try {
+            mainProfileIdValue = syncSettings.mainProfileId.toString();
+            // If toString() returns the object representation, extract just the ID
+            if (mainProfileIdValue.includes('ObjectId(')) {
+              const match = mainProfileIdValue.match(/ObjectId\('([0-9a-fA-F]{24})'\)/);
+              if (match && match[1]) {
+                mainProfileIdValue = match[1];
+              }
+            }
+          } catch (e) {
+            // If conversion fails, set to null
+            mainProfileIdValue = null;
+          }
+        }
+      }
+
+      // Create a copy of syncSettings with properly handled mainProfileId
+      const serializedSettings = {
+        ...syncSettings,
+        mainProfileId: mainProfileIdValue
+      };
+
       return new Response(JSON.stringify({
-        settings: syncSettings,
+        settings: serializedSettings,
         profiles: profiles.map(p => ({
-          _id: p._id,
+          _id: p._id.toString(),
           name: p.name,
           email: p.email
         }))
@@ -53,19 +85,36 @@ export const handler: Handlers<null, AppState> = {
     try {
       const { enabled, mainProfileId, autoSync, syncInterval } = await req.json();
 
-      // Validate main profile belongs to user
+      // Validate and sanitize mainProfileId
+      let sanitizedMainProfileId = null;
       if (mainProfileId) {
-        const profile = await Profile.findOne({ _id: mainProfileId, userId });
-        if (!profile) {
-          return new Response("Profile not found or doesn't belong to user", { status: 400 });
+        // If mainProfileId is an object, extract the _id
+        if (typeof mainProfileId === 'object' && mainProfileId._id) {
+          sanitizedMainProfileId = mainProfileId._id;
+        } else if (typeof mainProfileId === 'string') {
+          sanitizedMainProfileId = mainProfileId;
+        }
+        
+        // Validate main profile belongs to user
+        if (sanitizedMainProfileId) {
+          const profile = await Profile.findOne({ _id: sanitizedMainProfileId, userId });
+          if (!profile) {
+            return new Response("Profile not found or doesn't belong to user", { status: 400 });
+          }
         }
       }
 
+      // Validate and sanitize syncInterval
+      let sanitizedSyncInterval = 60;
+      if (syncInterval !== undefined) {
+        sanitizedSyncInterval = Math.max(5, Math.min(1440, Number(syncInterval) || 60)); // Between 5 and 1440 minutes
+      }
+
       const updateData: any = {};
-      if (enabled !== undefined) updateData['settings.addonSyncSettings.enabled'] = enabled;
-      if (mainProfileId !== undefined) updateData['settings.addonSyncSettings.mainProfileId'] = mainProfileId;
-      if (autoSync !== undefined) updateData['settings.addonSyncSettings.autoSync'] = autoSync;
-      if (syncInterval !== undefined) updateData['settings.addonSyncSettings.syncInterval'] = Math.max(5, syncInterval); // Minimum 5 minutes
+      if (enabled !== undefined) updateData['settings.addonSyncSettings.enabled'] = Boolean(enabled);
+      if (sanitizedMainProfileId !== undefined) updateData['settings.addonSyncSettings.mainProfileId'] = sanitizedMainProfileId || null;
+      if (autoSync !== undefined) updateData['settings.addonSyncSettings.autoSync'] = Boolean(autoSync);
+      if (syncInterval !== undefined) updateData['settings.addonSyncSettings.syncInterval'] = sanitizedSyncInterval;
 
       await User.findByIdAndUpdate(userId, updateData);
 

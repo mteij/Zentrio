@@ -18,13 +18,64 @@
 
 ## ✨ **Features**
 
-**🎭 Profile Management** - Netflix-style interface with unlimited profiles, custom avatars, and secure credential storage  
-**🔐 Enterprise Security** - AES-256-GCM encryption, session security, rate limiting, and magic link authentication  
-**🛡️ Content Filtering** - Smart NSFW detection using TMDB API with per-profile parental controls  
-**🎨 Customization** - Custom accent colors, dark theme, responsive design with smooth animations  
-**🔧 Advanced Features** - Drag-and-drop addon manager, auto-login options, and real-time sync  
-**⚡ Performance** - Edge-ready architecture with islands-based fast loading and offline support  
-**📱 Native Apps** - Automatic APK and Windows package generation via PWABuilder integration
+### **🎭 Profile Management**
+Netflix-style interface with unlimited profiles, custom avatars, and secure credential storage. Each profile can have its own Stremio credentials, settings, and content preferences.
+
+### **🔐 Enterprise Security**
+- AES-256-GCM encryption for all sensitive data
+- Session security with automatic timeout
+- Rate limiting to prevent abuse
+- Magic link authentication for easy login
+- Secure credential storage with encryption
+
+### **🛡️ Content Filtering**
+Smart NSFW detection using TMDB API with per-profile parental controls. Automatically filters adult content based on movie/series metadata.
+
+### **🎨 Customization Options**
+- Custom accent colors with preset options
+- Dark theme optimized for media consumption
+- Responsive design with smooth animations
+- Mobile-friendly interface
+
+### **🎛️ Comprehensive Settings Panel**
+
+#### **Auto-login Behavior**
+Choose how the application handles authentication:
+- Show profile selection page (default)
+- Automatically log in to last used profile
+- Automatically log in to a specific profile
+
+#### **UI Customization**
+- Custom accent colors with real-time preview
+- Hide calendar button in Stremio interface
+- Responsive design for all device sizes
+
+#### **Addon Management**
+- Integrated drag-and-drop addon manager
+- Reorder addons with a simple interface
+- Remove non-protected addons directly
+
+#### **Addon Synchronization (Experimental)**
+- Sync addons between profiles automatically
+- Configure main profile for synchronization
+- Set auto-sync intervals (5 minutes to 24 hours)
+- Manual sync option with status feedback
+
+#### **Content Services**
+- TMDB API key management for NSFW filtering
+- Per-profile NSFW filtering controls
+
+### **⚡ Performance Features**
+- Edge-ready architecture with islands-based fast loading
+- Offline support via Progressive Web App (PWA)
+- Optimized asset caching
+- Pull-to-refresh prevention for better mobile experience
+
+### **📱 Native App Support**
+Automatic APK and Windows package generation via PWABuilder integration:
+- Android APK for direct installation
+- Windows MSIX for Microsoft Store distribution
+- iOS PWA support via Safari "Add to Home Screen"
 
 ---
 

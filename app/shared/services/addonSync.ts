@@ -1,10 +1,8 @@
 /**
  * Addon Sync Service
- * Syncs addons between profiles using the Stremio API client
+ * Syncs addons between profiles using the Stremio API proxy
  */
 
-// --- FIX: Use StremioAPIStore for login and addon sync, not the stateless APIClient ---
-import { StremioAPIStore } from "stremio-api-client";
 import { Profile, User, getDecryptedProfilePassword } from '../../utils/db.ts';
 
 interface SyncResult {
@@ -29,127 +27,157 @@ interface AddonData {
   };
 }
 
-class AddonSyncService {
-  // Remove the client cache, as the API is stateless
+interface LoginResponse {
+  result?: {
+    authKey: string;
+    user: {
+      _id: string;
+      email: string;
+      // ... other user properties
+    };
+    addons?: AddonData[];
+    // ... other properties
+  };
+}
 
-  // Use StremioAPIStore for login and addon management
-  private async getStremioStore(profile: any): Promise<StremioAPIStore> {
+class AddonSyncService {
+  /**
+   * Login to Stremio using the proxy approach
+   */
+  private async loginToStremio(profile: any): Promise<string> {
     try {
       // Passwords are encrypted in the DB, so we must always use getDecryptedProfilePassword
       const password = await getDecryptedProfilePassword(profile);
       console.debug(`[addonSync] Logging in profile ${profile.email}...`);
       console.debug(`[addonSync] Credentials: email=${profile.email}, password.length=${password?.length}`);
+      
       if (!password || password.length < 4) {
-        console.error(`[addonSync] Decrypted password for ${profile.email} is empty or too short!`);
+        throw new Error(`Decrypted password for ${profile.email} is empty or too short!`);
       }
-      const store = new StremioAPIStore();
-      console.debug(`[addonSync] StremioAPIStore endpoint:`, (store as any).endpoint);
-
-      // Extra debug: check if password is empty or suspicious
-      if (!password || password.length < 4) {
-        console.error(`[addonSync] Password for ${profile.email} is empty or too short!`);
-      }
+      
       // Extra debug: check if email looks valid
       if (!profile.email || !profile.email.includes("@")) {
-        console.error(`[addonSync] Email for profile is invalid:`, profile.email);
+        throw new Error(`Email for profile is invalid: ${profile.email}`);
       }
 
-      let loginResult;
-      try {
-        loginResult = await store.login({
+      // Login using the same approach as StremioFrame component
+      const loginRes = await fetch("http://localhost:8000/stremio/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "Login",
           email: profile.email,
           password: password,
-        });
-      } catch (err) {
-        console.error(`[addonSync] store.login() threw for ${profile.email}:`, err);
-        if (err && typeof err === "object" && "message" in err) {
-          if ((err as any).message?.toLowerCase().includes("invalid password")) {
-            console.error(`[addonSync] Stremio API says: Invalid password for ${profile.email}`);
-          }
-          if ((err as any).message?.toLowerCase().includes("user not found")) {
-            console.error(`[addonSync] Stremio API says: User not found for ${profile.email}`);
-          }
-        }
-        throw new Error(`store.login() threw: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      console.debug(`[addonSync] store.login() result for ${profile.email}:`, loginResult);
-      console.debug(`[addonSync] store.user after login for ${profile.email}:`, store.user);
+          facebook: false,
+        }),
+      });
 
-      // Try to pull user to see if API is reachable
-      if (store.user && store.user._id) {
+      if (!loginRes.ok) {
+        let errorMessage = `Login failed with status: ${loginRes.status}`;
         try {
-          await store.pullUser();
-          console.debug(`[addonSync] Successfully pulled user for ${profile.email}`);
-        } catch (pullErr) {
-          console.error(`[addonSync] pullUser() failed for ${profile.email}:`, pullErr);
+          const errorData = await loginRes.json();
+          if (errorData && errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (_e) {
+          // Ignore if JSON parsing fails
         }
+        throw new Error(errorMessage);
       }
 
-      // Extra debug: log the raw password (for local debugging only, remove in production!)
-      // console.debug(`[addonSync] RAW PASSWORD for ${profile.email}:`, password);
+      const loginData: LoginResponse = await loginRes.json();
+      const result = loginData?.result;
 
-      // If authKey is missing, try to fetch it manually from store.user or loginResult
-      if (!store.user || !store.user.authKey) {
-        console.error(`[addonSync] store.user.authKey is missing after login for ${profile.email}. store.user:`, store.user);
-        if (loginResult && loginResult.authKey) {
-          console.warn(`[addonSync] loginResult.authKey exists but not set on store.user. Forcing it.`);
-          store.user.authKey = loginResult.authKey;
-        }
+      // If result is falsy, treat as login failure
+      if (!result) {
+        throw new Error("Login failed: No result returned from server.");
+      }
+      
+      if (!result.authKey || !result.user?._id) {
+        throw new Error("Login failed: Missing authentication data. Please check your credentials.");
       }
 
-      // Final check
-      if (!store.user || !store.user.authKey) {
-        // Print out the full user object and store for inspection
-        console.error(`[addonSync] Login failed for ${profile.email}: store.user=`, store.user, "store=", store);
-        // Suggest next debugging steps
-        console.error(`[addonSync] Possible causes:`);
-        console.error(`- Wrong email or password (try logging in manually at https://web.stremio.com/)`);
-        console.error(`- Stremio API is down or unreachable from your server`);
-        console.error(`- Account is locked, banned, or requires email verification`);
-        console.error(`- StremioAPIStore or stremio-api-client version mismatch`);
-        throw new Error("Login failed: No authKey returned. Possible reasons: wrong credentials, Stremio API unreachable, or account locked. (Password was decrypted before use)");
-      }
-      return store;
+      console.debug(`[addonSync] Login successful for ${profile.email}`);
+      console.debug(`[addonSync] authKey: ${result.authKey.substring(0, 10)}...`);
+      
+      return result.authKey;
     } catch (error) {
-      // Log the full error stack for deep debugging
-      if (error instanceof Error && error.stack) {
-        console.error(`[addonSync] Full error stack for ${profile.email}:`, error.stack);
-      }
       console.error(`[addonSync] Failed to login for profile ${profile.email}:`, error);
       throw new Error(`Failed to login for profile ${profile.name}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
+  /**
+   * Get addons for a profile using the proxy approach
+   */
   private async getProfileAddons(profile: any): Promise<AddonData[]> {
     try {
-      const store = await this.getStremioStore(profile);
+      const authKey = await this.loginToStremio(profile);
       console.debug(`[addonSync] Pulling addons for profile ${profile.email}...`);
-      await store.pullAddonCollection();
-      const addons = store.addons || [];
-      console.debug(`[addonSync] Pulled addons for ${profile.email}:`, addons);
-      return addons.map((addon: any) => ({
-        transportUrl: addon.transportUrl,
-        manifest: {
-          id: addon.manifest.id,
-          name: addon.manifest.name,
-          version: addon.manifest.version,
-          description: addon.manifest.description,
-          logo: addon.manifest.logo,
-        },
-        flags: addon.flags,
-      }));
+      
+      const response = await fetch('http://localhost:8000/stremio/api/addonCollectionGet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'AddonCollectionGet',
+          authKey,
+          update: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch addons: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.debug(`[addonSync] Full addon data for ${profile.email}:`, JSON.stringify(data, null, 2));
+      if (data.result && Array.isArray(data.result.addons)) {
+        const addons = data.result.addons;
+        console.debug(`[addonSync] Pulled addons for ${profile.email}:`, addons.length);
+        return addons.map((addon: any) => {
+          // Preserve all addon properties, not just the ones we explicitly define
+          return {
+            transportUrl: addon.transportUrl,
+            manifest: addon.manifest, // Keep the entire manifest as-is
+            flags: addon.flags,
+          };
+        });
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error(`[addonSync] Failed to get addons for profile ${profile.email}:`, error);
       throw new Error(`Failed to get addons for profile ${profile.name}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
+  /**
+   * Set addons for a profile using the proxy approach
+   */
   private async setProfileAddons(profile: any, addons: AddonData[]): Promise<void> {
     try {
-      const store = await this.getStremioStore(profile);
-      console.debug(`[addonSync] Setting addons for profile ${profile.email}...`, addons);
-      await store.pushAddonCollection(addons);
-      // Optionally, verify by pulling again or checking store.addons
+      const authKey = await this.loginToStremio(profile);
+      console.debug(`[addonSync] Setting addons for profile ${profile.email}...`, addons.length);
+      
+      const response = await fetch('http://localhost:8000/stremio/api/addonCollectionSet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'AddonCollectionSet',
+          authKey,
+          addons
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to set addons: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (data.result?.success === false) {
+        throw new Error(data.result.error || 'Failed to save changes');
+      }
+
       console.debug(`[addonSync] Set addons for ${profile.email}`);
     } catch (error) {
       console.error(`[addonSync] Failed to set addons for profile ${profile.email}:`, error);
@@ -200,7 +228,7 @@ class AddonSyncService {
       let mainAddons: AddonData[];
       try {
         mainAddons = await this.getProfileAddons(mainProfile);
-        console.debug(`[addonSync] Main profile addons:`, mainAddons);
+        console.debug(`[addonSync] Main profile addons:`, mainAddons.length);
       } catch (err) {
         errors.push(err instanceof Error ? err.message : String(err));
         return {
@@ -261,7 +289,7 @@ class AddonSyncService {
   }
 
   cleanup(): void {
-    // this.clients.clear(); // No client cache to clear
+    // No cleanup needed for this approach
   }
 }
 

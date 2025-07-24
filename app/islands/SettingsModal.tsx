@@ -109,7 +109,7 @@ export default function SettingsModal({
         const { settings } = data;
         
         addonSyncEnabled.value = settings.enabled || false;
-        mainProfileId.value = settings.mainProfileId || "";
+        mainProfileId.value = settings.mainProfileId ? settings.mainProfileId.toString() : "";
         // Remove syncDirection, always main_to_all
         // syncDirection.value = settings.syncDirection || "main_to_all";
         autoSync.value = settings.autoSync || false;
@@ -533,7 +533,7 @@ export default function SettingsModal({
               <h3 className="text-lg font-semibold mb-6 text-white">Addons</h3>
                 {/* Addon Sync */}
                 <div className="bg-gray-800 rounded-lg p-4 mb-6">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1 gap-2">
                     <button
                       type="button"
                       onClick={() => addonSyncCollapsed.value = !addonSyncCollapsed.value}
@@ -551,11 +551,11 @@ export default function SettingsModal({
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-gray-200 font-medium text-base group-hover:text-white transition-colors">
                             Addon Synchronization
                           </span>
-                          <span className="ml-2 text-xs font-semibold text-red-500">Experimental</span>
+                          <span className="text-xs font-semibold text-red-500">Experimental</span>
                         </div>
                       </div>
                     </button>
@@ -699,7 +699,7 @@ export default function SettingsModal({
                 </div>
                 {/* Addon Order Userscript */}
                 <div className="bg-gray-800 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1 gap-2">
                     <button
                       type="button"
                       onClick={() => addonManagerCollapsed.value = !addonManagerCollapsed.value}

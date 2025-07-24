@@ -74,6 +74,10 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
         [title="Calendar"] {
           display: none !important;
         }
+        /* Hide mobile calendar container - exact match from user feedback */
+        a[href="#/calendar"].nav-tab-button-tW6qT.nav-tab-button-container-dYhs0.button-container-zVLH6 {
+          display: none !important;
+        }
       `;
       document.head.appendChild(style);
       
@@ -277,6 +281,16 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
           }
           .animate-fadein {
             animation: fadein 0.5s cubic-bezier(.4,2,.6,1);
+          }
+          
+          /* Prevent pull-to-refresh specifically for the Stremio frame */
+          .w-full.h-full.fixed.inset-0.bg-black.z-0.animate-fadein {
+            overscroll-behavior-y: none;
+          }
+          
+          /* Prevent pull-to-refresh on iframe */
+          iframe {
+            overscroll-behavior-y: none;
           }
         `}
       </style>

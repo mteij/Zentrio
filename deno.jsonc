@@ -26,7 +26,7 @@
 
   // npm packages
   "mongoose": "npm:mongoose@8.4.1",
-  "stremio-api-client": "npm:stremio-api-client@^1.0.0"
+  "stremio-api-client": "npm:stremio-api-client@^1.6.0"
   },
   "compilerOptions": {
     "jsx": "react-jsx",

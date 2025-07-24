@@ -12,7 +12,7 @@
     "npm:mongoose@*": "8.4.1",
     "npm:mongoose@8.4.1": "8.4.1",
     "npm:preact@*": "10.26.9",
-    "npm:stremio-api-client@1": "1.6.0",
+    "npm:stremio-api-client@^1.6.0": "1.6.0",
     "npm:ua-parser-js@*": "2.0.4"
   },
   "jsr": {
@@ -348,7 +348,7 @@
     "stremio-addon-client@1.16.1": {
       "integrity": "sha512-QUtIlUpOn1SwkZSC1zmTwv5ZxFUDe/f0xbAsGosy98COA/ajJztGAjp3vFX1QKU5x5/G7/U+OkgEVIL3kxzqYQ==",
       "dependencies": [
-        "node-fetch@2.2.0",
+        "node-fetch@2.7.0",
         "stremio-addon-linter",
         "thunky",
         "url"
@@ -985,7 +985,7 @@
   "workspace": {
     "dependencies": [
       "npm:mongoose@8.4.1",
-      "npm:stremio-api-client@1"
+      "npm:stremio-api-client@^1.6.0"
     ]
   }
 }
