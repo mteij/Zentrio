@@ -3,10 +3,9 @@ import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { ProfileSchema } from "../../utils/db.ts";
 import { ObjectId } from "mongoose";
-import * as DesktopProfileManager from "./DesktopProfileManager.tsx";
-import MobileProfileManager from "./MobileProfileManager.tsx";
+import ProfileManagerView from "./ProfileManagerView.tsx";
 import ConfirmDialog from "../../components/ConfirmDialog.tsx";
-import UAParser from "ua-parser-js";
+import { UAParser } from "npm:ua-parser-js";
 
 // Helper to convert MongoDB objects to plain objects for client-side use
 const toPlainObject = (
@@ -317,7 +316,7 @@ export default function ProfileManager(
   // Detect mobile using UAParser.js
   const isMobile = useSignal(false);
   useEffect(() => {
-    if (typeof window !== "undefined" && window.navigator) {
+    if (typeof window !== "undefined" && globalThis.navigator) {
       const parser = new UAParser();
       const device = parser.getDevice();
       isMobile.value = device.type === "mobile" || device.type === "tablet";
@@ -371,21 +370,17 @@ export default function ProfileManager(
     getInitialsUrl,
     ProfileModal: (props: any) =>
       ProfileModal({ ...props, onRequestDelete: handleRequestDelete }),
-    toggleMobileEditMode, // pass to mobile
+    toggleMobileEditMode,
     showSettings,
     setShowSettings,
     addonOrderEnabled,
     setAddonOrderEnabled,
-    isMobile: isMobile.value, // pass device detection info
+    isMobile: isMobile.value,
   };
 
   return (
     <>
-      {shouldShowMobile.value ? (
-        <MobileProfileManager {...sharedProps} />
-      ) : (
-        <DesktopProfileManager.default {...sharedProps} />
-      )}
+      <ProfileManagerView {...sharedProps} />
       <ConfirmDialog
         open={showDeleteConfirm.value}
         title="Delete Profile?"

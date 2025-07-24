@@ -58,7 +58,7 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
 
   // Handle auto-login behavior based on user settings
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof globalThis !== "undefined") {
       const autoLogin = localStorage.getItem("autoLogin") || "none";
       const autoLoginProfileId = localStorage.getItem("autoLoginProfileId");
       const lastProfileId = localStorage.getItem("lastProfileId");
@@ -66,13 +66,13 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
       // Only auto-redirect if user has auto-login enabled
       if (autoLogin === "last" && lastProfileId) {
         // Check if the last profile still exists
-        if (data.profiles.some((p) => p._id === lastProfileId)) {
-          window.location.href = `/player/${lastProfileId}`;
+        if (data.profiles.some((p) => String(p._id) === lastProfileId)) {
+          globalThis.location.href = `/player/${lastProfileId}`;
         }
       } else if (autoLogin === "profile" && autoLoginProfileId) {
         // Check if the specific profile still exists
-        if (data.profiles.some((p) => p._id === autoLoginProfileId)) {
-          window.location.href = `/player/${autoLoginProfileId}`;
+        if (data.profiles.some((p) => String(p._id) === autoLoginProfileId)) {
+          globalThis.location.href = `/player/${autoLoginProfileId}`;
         }
       }
       // If autoLogin is "none", do nothing - show profile selection

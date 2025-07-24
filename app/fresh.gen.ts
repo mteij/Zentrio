@@ -38,9 +38,8 @@ import * as $Auth_EmailLinkForm from "./islands/Auth/EmailLinkForm.tsx";
 import * as $Auth_ForgotPasswordForm from "./islands/Auth/ForgotPasswordForm.tsx";
 import * as $Auth_PasswordLoginForm from "./islands/Auth/PasswordLoginForm.tsx";
 import * as $Auth_ResetPasswordForm from "./islands/Auth/ResetPasswordForm.tsx";
-import * as $ProfileManager_DesktopProfileManager from "./islands/ProfileManager/DesktopProfileManager.tsx";
-import * as $ProfileManager_MobileProfileManager from "./islands/ProfileManager/MobileProfileManager.tsx";
 import * as $ProfileManager_ProfileManager from "./islands/ProfileManager/ProfileManager.tsx";
+import * as $ProfileManager_ProfileManagerView from "./islands/ProfileManager/ProfileManagerView.tsx";
 import * as $SettingsModal from "./islands/SettingsModal.tsx";
 import * as $Settings_PasswordChangeForm from "./islands/Settings/PasswordChangeForm.tsx";
 import * as $StremioFrame from "./islands/StremioFrame.tsx";
@@ -87,12 +86,10 @@ const manifest = {
     "./islands/Auth/ForgotPasswordForm.tsx": $Auth_ForgotPasswordForm,
     "./islands/Auth/PasswordLoginForm.tsx": $Auth_PasswordLoginForm,
     "./islands/Auth/ResetPasswordForm.tsx": $Auth_ResetPasswordForm,
-    "./islands/ProfileManager/DesktopProfileManager.tsx":
-      $ProfileManager_DesktopProfileManager,
-    "./islands/ProfileManager/MobileProfileManager.tsx":
-      $ProfileManager_MobileProfileManager,
     "./islands/ProfileManager/ProfileManager.tsx":
       $ProfileManager_ProfileManager,
+    "./islands/ProfileManager/ProfileManagerView.tsx":
+      $ProfileManager_ProfileManagerView,
     "./islands/SettingsModal.tsx": $SettingsModal,
     "./islands/Settings/PasswordChangeForm.tsx": $Settings_PasswordChangeForm,
     "./islands/StremioFrame.tsx": $StremioFrame,

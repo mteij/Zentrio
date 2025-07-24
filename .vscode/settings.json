@@ -1,4 +1,6 @@
 {
   "deno.enable": true,
-  "deno.config": "./app/deno.jsonc"
+  "deno.lint": true,
+  "typescript.validate.enable": false,
+  "javascript.validate.enable": false
 }

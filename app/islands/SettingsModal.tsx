@@ -344,81 +344,89 @@ export default function SettingsModal({
             <div>
               <h3 className="text-lg font-semibold mb-4 text-white">General Settings</h3>
               <div className="mb-6">
-                <label className="block text-gray-200 mb-2 font-medium text-base">Auto-login behavior</label>
+                <label className="block text-base font-medium text-gray-200 mb-2">Auto-login behavior</label>
                 <select
                   className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-                value={autoLogin.value}
-                onChange={e => (autoLogin.value = e.currentTarget.value as AutoLoginOption)}
-              >
-                <option value="none">Show profile selection page (default)</option>
-                <option value="last">Automatically log in to last used profile</option>
-                <option value="profile">Automatically log in to a specific profile</option>
-              </select>
+                  value={autoLogin.value}
+                  onChange={e => (autoLogin.value = e.currentTarget.value as AutoLoginOption)}
+                >
+                  <option value="none">Show profile selection page (default)</option>
+                  <option value="last">Automatically log in to last used profile</option>
+                  <option value="profile">Automatically log in to a specific profile</option>
+                </select>
                 {autoLogin.value === "profile" && profiles.value.length > 0 && (
                   <select
                     className="mt-2 w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-                  value={autoLoginProfileId.value ?? ""}
-                  onChange={e => (autoLoginProfileId.value = (e.currentTarget.value || null))}
-                >
-                  <option value="">Select a profile...</option>
-                  {profiles.value.map((p) => (
-                    <option key={p._id} value={p._id}>{p.name}</option>
-                  ))}
-                </select>
-              )}
+                    value={autoLoginProfileId.value ?? ""}
+                    onChange={e => (autoLoginProfileId.value = (e.currentTarget.value || null))}
+                  >
+                    <option value="">Select a profile...</option>
+                    {profiles.value.map((p) => (
+                      <option key={p._id} value={p._id}>{p.name}</option>
+                    ))}
+                  </select>
+                )}
                 <p className="text-xs text-gray-500 mt-2">
-                Choose what happens when you visit the site while logged in.
-              </p>
-            </div>
+                  Choose what happens when you visit the site while logged in.
+                </p>
+              </div>
 
-            {/* Accent Color Setting */}
+              {/* Accent Color Setting */}
               <div className="mb-6">
-              <ColorPicker
-                label="Accent Color"
-                labelClass="text-base"
-                value={accentColor.value}
-                onChange={(color) => accentColor.value = color}
-                presets={[
-                  "#dc2626",
-                  "#2563eb",
-                  "#059669",
-                  "#7c3aed",
-                  "#ea580c",
-                  "#0891b2",
-                  "#be123c"
-                ]}
-              />
+                <label className="block text-base font-medium text-gray-200 mb-2">Accent Color</label>
+                {/* Show current color above the options */}
+                <div className="flex items-center mb-3">
+                  <span className="text-sm text-gray-400 mr-2">Current accent color:</span>
+                  <div
+                    className="w-6 h-6 rounded border-2 border-gray-600"
+                    style={{ backgroundColor: accentColor.value }}
+                  ></div>
+                  <span className="ml-2 text-sm text-gray-400 font-mono">{accentColor.value}</span>
+                </div>
+                <ColorPicker
+                  value={accentColor.value}
+                  onChange={(color) => accentColor.value = color}
+                  presets={[
+                    "#dc2626",
+                    "#2563eb",
+                    "#059669",
+                    "#7c3aed",
+                    "#ea580c",
+                    "#0891b2",
+                    "#be123c"
+                  ]}
+                />
                 <p className="text-xs text-gray-500 mt-2">
-                Choose your preferred accent color for the interface. This affects buttons, links, and highlights.
-              </p>
-            </div>
+                  Choose your preferred accent color for the interface. This affects buttons, links, and highlights.
+                </p>
+              </div>
 
-            {/* TMDB API Key Setting */}
+              {/* TMDB API Key Setting */}
               <div className="mb-6">
-                <label className="block text-gray-200 mb-2 font-medium text-base">TMDB API Key</label>
+                <label className="block text-base font-medium text-gray-200 mb-2">TMDB API Key</label>
                 <input
                   type="password"
                   value={tmdbApiKey.value}
                   onInput={(e) => tmdbApiKey.value = e.currentTarget.value}
                   placeholder="Enter your TMDB API key (optional)"
                   className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-              />
+                />
                 <p className="text-xs text-gray-500 mt-2">
-                Required for NSFW content filtering in profiles. Get your free API key from{" "}
+                  Required for NSFW content filtering in profiles. Get your free API key from{" "}
                   <a 
                     href="https://www.themoviedb.org/settings/api" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-blue-400 hover:text-blue-300 underline"
-                >
-                  TMDB API Settings
-                </a>
-                {" "}(free for personal use).
-              </p>
-            </div>
+                  >
+                    TMDB API Settings
+                  </a>
+                  {" "}(free for personal use).
+                </p>
+              </div>
 
-          </div>
-        )}
+            </div>
+          )}
 
         {/* Addons Tab */}
           {tab.value === "addons" && (
@@ -431,157 +439,165 @@ export default function SettingsModal({
                       type="button"
                       onClick={() => addonSyncCollapsed.value = !addonSyncCollapsed.value}
                       className="flex items-center gap-3 flex-1 text-left bg-transparent border-none p-0 cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <svg
-                        className={`w-5 h-5 text-gray-300 transition-transform duration-200 ${
-                          addonSyncCollapsed.value ? '' : 'rotate-90'
-                        }`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                      <div>
-                        <span className="text-gray-200 font-medium text-base group-hover:text-white transition-colors">Addon Synchronization</span>
-                      </div>
-                    </div>
-                  </button>
-                  <div className="flex items-center">
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={addonSyncEnabled.value}
-                        onChange={e => addonSyncEnabled.value = e.currentTarget.checked}
-                      />
-                      <div className={`block w-14 h-8 rounded-full transition-colors duration-200 cursor-pointer ${
-                        addonSyncEnabled.value 
-                          ? 'bg-red-600' 
-                          : 'bg-gray-600'
-                      }`}
-                        onClick={() => addonSyncEnabled.value = !addonSyncEnabled.value}
-                      ></div>
-                      <div className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 pointer-events-none ${
-                        addonSyncEnabled.value ? 'transform translate-x-6' : ''
-                      }`}></div>
-                    </div>
-                    <span className="ml-3 text-sm font-medium text-gray-300">
-                      {addonSyncEnabled.value ? "Enabled" : "Disabled"}
-                    </span>
-                  </div>
-                </div>
-                {addonSyncEnabled.value && !addonSyncCollapsed.value && (
-                  <div className="space-y-4 border-t border-gray-700 pt-4 animate-fadeIn">
-                    <p className="text-sm text-gray-400">
-                      Sync addons between your profiles automatically
-                    </p>
-                    {/* Main Profile Selection */}
-                    <div>
-                      <label className="block text-gray-200 mb-2 text-sm font-medium">Main Profile</label>
-                      <select
-                        className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-                        value={mainProfileId.value}
-                        onChange={e => mainProfileId.value = e.currentTarget.value}
-                      >
-                        <option value="">Select main profile...</option>
-                        {profiles.value.map((p) => (
-                          <option key={p._id} value={p._id}>{p.name}</option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        The profile to sync addons from (main → all others)
-                      </p>
-                    </div>
-                    {/* Auto Sync */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-gray-200 text-sm font-medium">Auto Sync</span>
-                        <p className="text-xs text-gray-400">
-                          Automatically sync every {syncInterval.value} minutes
-                        </p>
-                      </div>
-                      <div className="flex items-center">
-                        <div className="relative">
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={autoSync.value}
-                            onChange={e => autoSync.value = e.currentTarget.checked}
-                          />
-                          <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
-                            autoSync.value 
-                              ? 'bg-red-600' 
-                              : 'bg-gray-600'
+                    >
+                      <div className="flex items-center gap-3">
+                        <svg
+                          className={`w-5 h-5 text-gray-300 transition-transform duration-200 ${
+                            addonSyncCollapsed.value ? '' : 'rotate-90'
                           }`}
-                            onClick={() => autoSync.value = !autoSync.value}
-                          ></div>
-                          <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
-                            autoSync.value ? 'transform translate-x-6' : ''
-                          }`}></div>
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-200 font-medium text-base group-hover:text-white transition-colors">
+                            Addon Synchronization
+                          </span>
+                          <span className="ml-2 text-xs font-semibold text-red-500">Experimental</span>
                         </div>
                       </div>
-                    </div>
-                    {/* Sync Interval */}
-                    {autoSync.value && (
-                      <div>
-                        <label className="block text-gray-200 mb-2 text-sm font-medium">
-                          Sync Interval (minutes)
-                        </label>
+                    </button>
+                    <div className="flex items-center">
+                      <div className="relative">
                         <input
-                          type="number"
-                          min="5"
-                          max="1440"
-                          value={syncInterval.value}
-                          onInput={e => syncInterval.value = Math.max(5, parseInt(e.currentTarget.value) || 60)}
-                          className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                          type="checkbox"
+                          className="sr-only"
+                          checked={addonSyncEnabled.value}
+                          onChange={e => addonSyncEnabled.value = e.currentTarget.checked}
                         />
+                        <div className={`block w-14 h-8 rounded-full transition-colors duration-200 cursor-pointer ${
+                          addonSyncEnabled.value 
+                            ? 'bg-red-600' 
+                            : 'bg-gray-600'
+                        }`}
+                          onClick={() => addonSyncEnabled.value = !addonSyncEnabled.value}
+                        ></div>
+                        <div className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 pointer-events-none ${
+                          addonSyncEnabled.value ? 'transform translate-x-6' : ''
+                        }`}></div>
+                      </div>
+                      <span className="ml-3 text-sm font-medium text-gray-300">
+                        {addonSyncEnabled.value ? "Enabled" : "Disabled"}
+                      </span>
+                    </div>
+                  </div>
+                  {addonSyncCollapsed.value ? (
+                    <p className="text-xs text-gray-400 mt-2">
+                      Sync your Stremio addons between profiles automatically. Click to expand for options and important warnings.
+                    </p>
+                  ) : (
+                    <div className="space-y-4 border-t border-gray-700 pt-4 animate-fadeIn">
+                      <p className="text-sm text-gray-400">
+                        Sync addons between your profiles automatically.
+                      </p>
+                      {/* Main Profile Selection */}
+                      <div>
+                        <label className="block text-gray-200 mb-2 text-sm font-medium">Main Profile</label>
+                        <select
+                          className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                          value={mainProfileId.value}
+                          onChange={e => mainProfileId.value = e.currentTarget.value}
+                        >
+                          <option value="">Select main profile...</option>
+                          {profiles.value.map((p) => (
+                            <option key={p._id} value={p._id}>{p.name}</option>
+                          ))}
+                        </select>
                         <p className="text-xs text-gray-500 mt-1">
-                          Minimum 5 minutes, maximum 24 hours (1440 minutes)
+                          The profile to sync addons from (main → all others)
                         </p>
                       </div>
-                    )}
-                    {/* Manual Sync Button */}
-                    <div className="flex items-center justify-between pt-2">
-                      <div>
-                        <button
-                          onClick={performManualSync}
-                          disabled={isSyncing.value || !mainProfileId.value}
-                          className={`px-4 py-2 rounded text-sm font-medium transition-colors duration-200 ${
-                            isSyncing.value || !mainProfileId.value
-                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                              : 'bg-red-600 hover:bg-red-700 text-white'
-                          }`}
-                        >
-                          {isSyncing.value ? 'Syncing...' : 'Sync Now'}
-                        </button>
-                        {lastSyncAt.value && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Last sync: {lastSyncAt.value}
+                      {/* Auto Sync */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-gray-200 text-sm font-medium">Auto Sync</span>
+                          <p className="text-xs text-gray-400">
+                            Automatically sync every {syncInterval.value} minutes
                           </p>
-                        )}
+                        </div>
+                        <div className="flex items-center">
+                          <div className="relative">
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={autoSync.value}
+                              onChange={e => autoSync.value = e.currentTarget.checked}
+                            />
+                            <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                              autoSync.value 
+                                ? 'bg-red-600' 
+                                : 'bg-gray-600'
+                            }`}
+                              onClick={() => autoSync.value = !autoSync.value}
+                            ></div>
+                            <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
+                              autoSync.value ? 'transform translate-x-6' : ''
+                            }`}></div>
+                          </div>
+                        </div>
                       </div>
-                      {syncStatus.value && (
-                        <div className="text-xs text-gray-300 max-w-xs">
-                          {syncStatus.value}
+                      {/* Sync Interval */}
+                      {autoSync.value && (
+                        <div>
+                          <label className="block text-gray-200 mb-2 text-sm font-medium">
+                            Sync Interval (minutes)
+                          </label>
+                          <input
+                            type="number"
+                            min="5"
+                            max="1440"
+                            value={syncInterval.value}
+                            onInput={e => syncInterval.value = Math.max(5, parseInt(e.currentTarget.value) || 60)}
+                            className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Minimum 5 minutes, maximum 24 hours (1440 minutes)
+                          </p>
                         </div>
                       )}
+                      {/* Manual Sync Button */}
+                      <div className="flex items-center justify-between pt-2">
+                        <div>
+                          <button
+                            onClick={performManualSync}
+                            disabled={isSyncing.value || !mainProfileId.value}
+                            className={`px-4 py-2 rounded text-sm font-medium transition-colors duration-200 ${
+                              isSyncing.value || !mainProfileId.value
+                                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                : 'bg-red-600 hover:bg-red-700 text-white'
+                            }`}
+                          >
+                            {isSyncing.value ? 'Syncing...' : 'Sync Now'}
+                          </button>
+                          {lastSyncAt.value && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Last sync: {lastSyncAt.value}
+                            </p>
+                          )}
+                        </div>
+                        {syncStatus.value && (
+                          <div className="text-xs text-gray-300 max-w-xs">
+                            {syncStatus.value}
+                          </div>
+                        )}
+                      </div>
+                      {/* Warnings and disclaimers only when expanded */}
+                      <div className="text-xs text-gray-500 bg-gray-700 rounded p-3 mt-4 space-y-2">
+                        <div>
+                          <strong>How it works:</strong> This feature uses the Stremio API to sync addons between your profiles. 
+                          You can choose a main profile and sync direction. All profiles must have valid Stremio credentials.
+                        </div>
+                        <div className="border-t border-gray-600 pt-2">
+                          <strong>Warning:</strong> This is an experimental feature. Always backup your addon configurations 
+                          before using. Sync operations will overwrite existing addon collections.
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
-                  <div className="text-xs text-gray-500 bg-gray-700 rounded p-3 mt-4 space-y-2">
-                  <div>
-                    <strong>How it works:</strong> This feature uses the Stremio API to sync addons between your profiles. 
-                    You can choose a main profile and sync direction. All profiles must have valid Stremio credentials.
-                  </div>
-                  <div className="border-t border-gray-600 pt-2">
-                    <strong>Warning:</strong> This is an experimental feature. Always backup your addon configurations 
-                    before using. Sync operations will overwrite existing addon collections.
-                  </div>
+                  )}
                 </div>
-              </div>
                 {/* Addon Order Userscript */}
                 <div className="bg-gray-800 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-1">
@@ -602,8 +618,11 @@ export default function SettingsModal({
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
-                      <div>
-                        <span className="text-gray-200 font-medium text-base group-hover:text-white transition-colors">Stremio Addon Manager</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-200 font-medium text-base group-hover:text-white transition-colors">
+                          Stremio Addon Manager
+                        </span>
+                        {/* Removed Experimental tag */}
                       </div>
                     </div>
                   </button>
@@ -631,30 +650,34 @@ export default function SettingsModal({
                     </span>
                   </div>
                 </div>
-                {!addonManagerCollapsed.value && (
+                {addonManagerCollapsed.value ? (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Adds an "Edit Order" button to the Stremio Addons page.
+                  </p>
+                ) : (
                   <div className="space-y-4 border-t border-gray-700 pt-4 animate-fadeIn">
                     <p className="text-sm text-gray-400">
-                      Adds an "Edit Order" button to the Stremio Addons page
+                      Adds an "Edit Order" button to the Stremio Addons page.
                     </p>
                     <div className="text-xs text-gray-500 bg-gray-700 rounded p-3 space-y-2">
-                  <div>
-                    <strong>How it works:</strong> When enabled, this adds an "Edit Order" button to the Stremio web interface. 
-                    Clicking it opens an integrated popup where you can drag-and-drop to reorder your addons and remove 
-                    non-protected ones. Changes are saved directly to your Stremio account.
-                  </div>
-                  <div className="border-t border-gray-600 pt-2">
-                    <strong>Credits:</strong> This feature is inspired by and built upon the work of{" "}
-                      <a 
-                        href="https://github.com/pancake3000/stremio-addon-manager" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 underline"
-                    >
-                      pancake3000's stremio-addon-manager
-                    </a>
-                    . Thank you for the original concept and implementation that made this integrated solution possible.
-                  </div>
-                </div>
+                      <div>
+                        <strong>How it works:</strong> When enabled, this adds an "Edit Order" button to the Stremio web interface. 
+                        Clicking it opens an integrated popup where you can drag-and-drop to reorder your addons and remove 
+                        non-protected ones. Changes are saved directly to your Stremio account.
+                      </div>
+                      <div className="border-t border-gray-600 pt-2">
+                        <strong>Credits:</strong> This feature is inspired by and built upon the work of{" "}
+                          <a 
+                            href="https://github.com/pancake3000/stremio-addon-manager" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-300 underline"
+                        >
+                          pancake3000's stremio-addon-manager
+                        </a>
+                        . Thank you for the original concept and implementation that made this integrated solution possible.
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
