@@ -18,7 +18,8 @@
     "twind": "https://esm.sh/twind@0.16.19",
     "twind/": "https://esm.sh/twind@0.16.19/",
     "$std/": "https://deno.land/std@0.224.0/",
-    "stremio-api-client": "npm:stremio-api-client@^1.0.0"
+    "stremio-api-client": "npm:stremio-api-client@^1.0.0",
+    "ua-parser-js": "https://esm.sh/ua-parser-js@1.0.37"
   },
   "compilerOptions": {
     "jsx": "react-jsx",

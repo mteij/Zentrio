@@ -26,10 +26,12 @@ export const handler: Handlers<ProfilePageData, AppState> = {
 export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
   const showSettings = useSignal(false);
   const addonOrderEnabled = useSignal(false);
+  const profileManagerView = useSignal<"auto" | "desktop" | "mobile">("auto");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       addonOrderEnabled.value = localStorage.getItem("enableAddonOrderUserscript") === "true";
+      profileManagerView.value = (localStorage.getItem("profileManagerView") as "auto" | "desktop" | "mobile") || "auto";
     }
   }, []);
 
@@ -83,6 +85,7 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
               setShowSettings={showSettings}
               addonOrderEnabled={addonOrderEnabled}
               setAddonOrderEnabled={addonOrderEnabled}
+              profileManagerView={profileManagerView}
             />
           </div>
         </div>

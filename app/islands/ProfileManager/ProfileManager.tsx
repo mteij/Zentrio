@@ -6,6 +6,7 @@ import { ObjectId } from "mongoose";
 import * as DesktopProfileManager from "./DesktopProfileManager.tsx";
 import MobileProfileManager from "./MobileProfileManager.tsx";
 import ConfirmDialog from "../../components/ConfirmDialog.tsx";
+import UAParser from "ua-parser-js";
 
 // Helper to convert MongoDB objects to plain objects for client-side use
 const toPlainObject = (
@@ -289,12 +290,14 @@ export default function ProfileManager(
     setShowSettings,
     addonOrderEnabled,
     setAddonOrderEnabled,
+    profileManagerView,
   }: {
     initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[],
     showSettings: { value: boolean },
     setShowSettings: { value: boolean },
     addonOrderEnabled: { value: boolean },
     setAddonOrderEnabled: { value: boolean },
+    profileManagerView: { value: "auto" | "desktop" | "mobile" },
   }
 ) {
   const {
@@ -307,14 +310,14 @@ export default function ProfileManager(
     handleDelete,
   } = useProfileManagerState(initialProfiles);
 
-  // Detect mobile using a signal
+  // Detect mobile using UAParser.js
   const isMobile = useSignal(false);
   useEffect(() => {
-    const check = () =>
-      (isMobile.value = globalThis.matchMedia("(max-width: 639px)").matches);
-    check();
-    globalThis.addEventListener("resize", check);
-    return () => globalThis.removeEventListener("resize", check);
+    if (typeof window !== "undefined" && window.navigator) {
+      const parser = new UAParser();
+      const device = parser.getDevice();
+      isMobile.value = device.type === "mobile" || device.type === "tablet";
+    }
   }, []);
 
   // Provide a reliable toggle function for mobile edit mode
@@ -366,9 +369,13 @@ export default function ProfileManager(
     setAddonOrderEnabled,
   };
 
+  // Determine which profile manager to show based on profileManagerView setting
+  const shouldShowMobile = profileManagerView.value === "mobile" || 
+    (profileManagerView.value === "auto" && isMobile.value);
+
   return (
     <>
-      {isMobile.value ? (
+      {shouldShowMobile ? (
         <MobileProfileManager {...sharedProps} />
       ) : (
         <DesktopProfileManager.default {...sharedProps} />

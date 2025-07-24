@@ -837,7 +837,9 @@
     "https://esm.sh/twind@0.16.19": "5e722de0c4173d99739386032a7f529aa3b91796aa2f990405eb87baafbb901d",
     "https://esm.sh/twind@0.16.19/denonext/sheets.mjs": "26c1aabb09751f0dedf9d1419d8e2e3e5996ef9fc192f5d3160a4062937d5053",
     "https://esm.sh/twind@0.16.19/denonext/twind.mjs": "fa5076812b8d3fed2299cff30dba4344cbe58825751b429c9f0a3a70868e94bc",
-    "https://esm.sh/twind@0.16.19/sheets": "92a397a7f283e14aeec25da0eb1559a8489b78d5b2b14c83be157680c67ad0bb"
+    "https://esm.sh/twind@0.16.19/sheets": "92a397a7f283e14aeec25da0eb1559a8489b78d5b2b14c83be157680c67ad0bb",
+    "https://esm.sh/ua-parser-js@1.0.37": "7574c52a746e561e4fbbdaa740fbb85c52c49be03df28b04df6d1d4b7fceabd4",
+    "https://esm.sh/ua-parser-js@1.0.37/denonext/ua-parser-js.mjs": "f4b8fdc5817f754970a7ef33ab32ae307591ba234fd22bbf3a0d861db6be9408"
   },
   "workspace": {
     "dependencies": [

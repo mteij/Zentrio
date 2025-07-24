@@ -3,6 +3,7 @@ import { useEffect } from "preact/hooks";
 import { ColorPicker } from "../shared/components/forms/ColorPicker.tsx";
 
 type AutoLoginOption = "none" | "last" | "profile";
+type ProfileManagerViewOption = "auto" | "desktop" | "mobile";
 
 export default function SettingsModal({
   onClose,
@@ -23,6 +24,7 @@ export default function SettingsModal({
   // New general settings
   const accentColor = useSignal<string>("#dc2626");
   const tmdbApiKey = useSignal<string>("");
+  const profileManagerView = useSignal<ProfileManagerViewOption>("auto");
   
   // Addon sync settings
   const addonSyncEnabled = useSignal<boolean>(false);
@@ -39,6 +41,7 @@ export default function SettingsModal({
       autoLogin.value = (localStorage.getItem("autoLogin") as AutoLoginOption) || "none";
       autoLoginProfileId.value = localStorage.getItem("autoLoginProfileId") || null;
       accentColor.value = localStorage.getItem("accentColor") || "#dc2626";
+      profileManagerView.value = (localStorage.getItem("profileManagerView") as ProfileManagerViewOption) || "auto";
       
       // Load profiles for dropdown
       try {
@@ -108,10 +111,11 @@ export default function SettingsModal({
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("accentColor", accentColor.value);
+      localStorage.setItem("profileManagerView", profileManagerView.value);
       // Apply accent color to CSS custom property
       document.documentElement.style.setProperty('--accent-color', accentColor.value);
     }
-  }, [accentColor.value]);
+  }, [accentColor.value, profileManagerView.value]);
 
   // Save TMDB API key to server
   const saveTmdbApiKey = async (apiKey: string) => {
@@ -375,6 +379,23 @@ export default function SettingsModal({
                   TMDB API Settings
                 </a>
                 {" "}(free for personal use).
+              </p>
+            </div>
+
+            {/* Profile Manager View Setting */}
+            <div class="mb-6">
+              <label class="block text-gray-200 mb-2 font-medium">Profile Manager View</label>
+              <select
+                class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                value={profileManagerView.value}
+                onChange={e => (profileManagerView.value = e.currentTarget.value as ProfileManagerViewOption)}
+              >
+                <option value="auto">Auto (based on device)</option>
+                <option value="desktop">Desktop</option>
+                <option value="mobile">Mobile</option>
+              </select>
+              <p class="text-xs text-gray-500 mt-2">
+                Choose how the profile manager is displayed. Auto detects your device type.
               </p>
             </div>
           </div>
