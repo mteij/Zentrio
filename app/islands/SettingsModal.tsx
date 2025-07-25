@@ -348,7 +348,7 @@ export default function SettingsModal({
 
   return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
-        <div className="bg-gray-900 rounded-lg shadow-2xl w-full max-w-2xl p-6 relative animate-modal-pop max-h-[90vh] overflow-y-auto">
+        <div className={`bg-gray-900 rounded-lg shadow-2xl w-full ${isMobile ? 'max-w-md p-4' : 'max-w-2xl p-6'} relative animate-modal-pop max-h-[90vh] overflow-y-auto`}>
           <button
             type="button"
             className="absolute top-3 right-3 text-gray-400 hover:text-white text-2xl"
@@ -491,6 +491,32 @@ export default function SettingsModal({
                       TMDB API Settings
                     </a>
                     {" "}(free for personal use).
+                  </p>
+                </div>
+              </div>
+
+              {/* Session Length Setting */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <label className="block text-base font-medium text-gray-200 mb-2">Session Length</label>
+                  <select
+                    className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                    value={localStorage.getItem("sessionLengthDays") || "30"}
+                    onChange={e => {
+                      localStorage.setItem("sessionLengthDays", e.currentTarget.value);
+                    }}
+                  >
+                    <option value="0">Never (stay logged in)</option>
+                    <option value="0.0417">1 hour</option>
+                    <option value="0.125">3 hours</option>
+                    <option value="1">1 day</option>
+                    <option value="7">7 days</option>
+                    <option value="30">30 days</option>
+                    <option value="90">90 days</option>
+                    <option value="365">1 year</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    How long your login session should last before requiring re-authentication
                   </p>
                 </div>
               </div>

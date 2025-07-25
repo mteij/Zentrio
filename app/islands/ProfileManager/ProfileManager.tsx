@@ -158,9 +158,12 @@ export function ProfileModal(
                 />
                 <div 
                   class={`block w-14 h-8 rounded-full cursor-pointer transition-colors duration-200 ${
-                    nsfwMode.value ? 'bg-red-600' : 'bg-gray-600'
+                    nsfwMode.value 
                   }`}
                   onClick={() => nsfwMode.value = !nsfwMode.value}
+                  style={{
+              backgroundColor: localStorage.getItem("accentColor") || "#dc2626", // fallback to red-600
+            }}
                 >
                   <div class={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 ${
                     nsfwMode.value ? 'transform translate-x-6' : ''
@@ -175,7 +178,10 @@ export function ProfileModal(
                 <button
                   type="button"
                   onClick={() => onRequestDelete(profile!)}
-                  class="bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors duration-200"
+                  class="text-white font-bold py-2 px-4 rounded transition duration-200"
+                  style={{
+                    backgroundColor: localStorage.getItem("accentColor"),
+                  }}
                 >
                   Delete
                 </button>
@@ -191,7 +197,10 @@ export function ProfileModal(
               </button>
               <button
                 type="submit"
-                class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded transition-colors duration-200"
+                class="text-white font-bold py-3 px-4 rounded transition duration-200"
+                style={{
+                    backgroundColor: localStorage.getItem("accentColor"),
+                  }}
               >
                 Save
               </button>
@@ -313,7 +322,7 @@ export default function ProfileManager(
     handleDelete,
   } = useProfileManagerState(initialProfiles);
 
-  // Detect mobile using UAParser.js
+  // Device detection using UAParser only
   const isMobile = useSignal(false);
   useEffect(() => {
     if (typeof window !== "undefined" && globalThis.navigator) {

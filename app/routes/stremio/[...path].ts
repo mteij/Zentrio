@@ -187,12 +187,26 @@ const proxyRequestHandler = async (req: Request, path: string) => {
                 }
               }
               
-              // Hide the calendar button if the setting is enabled
-              if (session && session.hideCalendarButton) {
-                const calendarButton = document.querySelector('[title="Calendar"]');
-                if (calendarButton) {
-                  calendarButton.style.display = 'none';
-                }
+              // Hide calendar buttons if setting is enabled
+              if (session?.hideCalendarButton) {
+                const hideCalendarButtons = () => {
+                  document.querySelectorAll('a[href="#/calendar"]').forEach(el => {
+                    el.style.display = 'none';
+                  });
+                };
+
+                // Initial hide
+                hideCalendarButtons();
+
+                // Set up MutationObserver to watch for dynamically added elements
+                const observer = new MutationObserver(() => {
+                  hideCalendarButtons();
+                });
+
+                observer.observe(document.body, {
+                  childList: true,
+                  subtree: true
+                });
               }
             });
 

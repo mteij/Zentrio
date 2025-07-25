@@ -30,13 +30,28 @@ export function ColorPicker({
   // When "Custom Color..." is clicked, focus the color input immediately
   const handleCustomColorButtonClick = () => {
     setTimeout(() => {
-      customInputRef.value?.focus();
-      customInputRef.value?.click();
+      if (customInputRef.value) {
+        customInputRef.value.focus();
+        customInputRef.value.click();
+      }
     }, 0);
   };
 
   return (
-    <div class="space-y-3">
+    <div class="space-y-3 relative">
+      {/* Hidden color input for native picker */}
+      <input
+        type="color"
+        ref={(el) => customInputRef.value = el}
+        value={value}
+        onChange={handleCustomColorChange}
+        class="absolute opacity-0 w-0 h-0"
+        style={{
+          top: '100%',
+          left: '0'
+        }}
+      />
+      
       {label && (
         <label class="block text-gray-200 mb-2 font-medium">
           {label}

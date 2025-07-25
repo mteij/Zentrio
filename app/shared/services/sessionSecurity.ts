@@ -19,7 +19,13 @@ interface SecureSessionData {
 }
 
 class SessionSecurityService {
-  private readonly maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+  private get maxSessionAge(): number {
+    if (typeof window !== "undefined") {
+      const days = parseFloat(localStorage.getItem("sessionLengthDays") || "30");
+      return days === 0 ? Infinity : days * 24 * 60 * 60 * 1000;
+    }
+    return 30 * 24 * 60 * 60 * 1000; // Default 30 days
+  }
   private readonly inactivityTimeout = 2 * 60 * 60 * 1000; // 2 hours
   private readonly maxConcurrentSessions = 5; // Max sessions per user
 
@@ -107,6 +113,9 @@ class SessionSecurityService {
    * Check if session has exceeded maximum age
    */
   isSessionExpiredByAge(createdAt: Date): boolean {
+    if (this.maxSessionAge === Infinity) {
+      return false; // Never expires
+    }
     const now = new Date();
     const sessionAge = now.getTime() - createdAt.getTime();
     return sessionAge > this.maxSessionAge;

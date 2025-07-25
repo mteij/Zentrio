@@ -98,16 +98,16 @@ export default function ProfileManagerView(props: any) {
   // <MobileProfileManagerView>
   if (isMobile) {
     return (
-      <div class="flex flex-col overflow-hidden w-full bg-black text-white" style={{ height: "100dvh" }}>
+      <div class="flex flex-col justify-center w-full bg-black text-white" style={{ height: "100dvh" }}>
         {/* Mobile Header */}
-        <h1 class="text-2xl sm:text-5xl font-bold text-center py-4">
+        <h1 class="text-xl sm:text-5xl font-bold text-center pb-4">
           {mobileEditMode.value ? "Edit mode" : "Who's watching?"}
         </h1>
         {/* Mobile Profile Grid */}
         <div
-          class="flex-1 overflow-y-auto scrollbar-hide px-4 flex flex-wrap justify-center gap-4 sm:gap-8"
+          class="flex-1 overflow-hidden px-4 flex flex-wrap justify-center items-center gap-4 sm:gap-8"
           style={{
-            paddingBottom: "120px",
+            paddingBottom: "100px",
             overflowX: "hidden",
             ...(modalOpen ? {
               pointerEvents: "none",
@@ -119,14 +119,16 @@ export default function ProfileManagerView(props: any) {
           {/* Mobile Profile Cards */}
           {profiles.value.map((profile: any) => (
             <div
-            key={profile._id}
-            class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
-            style={{
-              width: "120px",
-              transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
-              flex: "0 0 auto",
-              paddingTop: "12px", // Adjust this value if needed
-            }}
+              key={profile._id}
+              class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
+              style={{
+                width: "120px",
+                transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
+                flex: "0 0 auto",
+                paddingTop: "12px",
+                height: "160px", // Fixed height for profile container
+                overflow: "hidden",
+              }}
             >
               {mobileEditMode.value ? (
               <button
@@ -180,9 +182,12 @@ export default function ProfileManagerView(props: any) {
             <div
               class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105"
               style={{
-                width: "120px",
+                width: "clamp(80px, 28vw, 120px)",
                 transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
                 flex: "0 0 auto",
+                height: "auto",
+                aspectRatio: "1/1.3",
+                marginBottom: "8px",
               }}
             >
               <button
@@ -230,8 +235,9 @@ export default function ProfileManagerView(props: any) {
             onDelete={handleDelete}
           />
         )}
-        {/* Mobile Bottom Bar */}
-        <div class="fixed bottom-0 inset-x-0 flex gap-2 justify-center bg-black bg-opacity-90 py-3 sm:hidden z-30 border-t border-gray-800">
+        {/* Mobile Bottom Bar - Only show when isMobile is true */}
+        {isMobile && (
+          <div class="fixed bottom-0 inset-x-0 flex gap-2 justify-center bg-black bg-opacity-90 py-3 z-30 border-t border-gray-800">
           {/* Mobile Logout Button */}
           <a
             href="/logout"
@@ -274,6 +280,7 @@ export default function ProfileManagerView(props: any) {
             </svg>
           </button>
         </div>
+        )}
         {/* Mobile Settings Modal */}
         {showSettings.value && (
           <SettingsModal

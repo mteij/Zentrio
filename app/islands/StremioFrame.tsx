@@ -65,31 +65,6 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
     };
   }, []);
 
-  // Add CSS to hide the calendar button when the setting is enabled
-  useEffect(() => {
-    if (profile.hideCalendarButton) {
-      const style = document.createElement('style');
-      style.id = 'hide-calendar-button';
-      style.textContent = `
-        [title="Calendar"] {
-          display: none !important;
-        }
-        /* Hide mobile calendar container - exact match from user feedback */
-        a[href="#/calendar"].nav-tab-button-tW6qT.nav-tab-button-container-dYhs0.button-container-zVLH6 {
-          display: none !important;
-        }
-      `;
-      document.head.appendChild(style);
-      
-      // Clean up the style when the component unmounts
-      return () => {
-        const existingStyle = document.getElementById('hide-calendar-button');
-        if (existingStyle) {
-          existingStyle.remove();
-        }
-      };
-    }
-  }, [profile.hideCalendarButton]);
 
   useEffect(() => {
     const loginAndLoad = async () => {
