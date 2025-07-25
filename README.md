@@ -21,61 +21,26 @@
 ### **🎭 Profile Management**
 Netflix-style interface with unlimited profiles, custom avatars, and secure credential storage. Each profile can have its own Stremio credentials, settings, and content preferences.
 
-### **🔐 Enterprise Security**
-- AES-256-GCM encryption for all sensitive data
-- Session security with automatic timeout
-- Rate limiting to prevent abuse
-- Magic link authentication for easy login
-- Secure credential storage with encryption
-
 ### **🛡️ Content Filtering**
 Smart NSFW detection using TMDB API with per-profile parental controls. Automatically filters adult content based on movie/series metadata.
-
-### **🎨 Customization Options**
-- Custom accent colors with preset options
-- Dark theme optimized for media consumption
-- Responsive design with smooth animations
-- Mobile-friendly interface
 
 ### **🎛️ Comprehensive Settings Panel**
 
 #### **Auto-login Behavior**
-Choose how the application handles authentication:
-- Show profile selection page (default)
-- Automatically log in to last used profile
-- Automatically log in to a specific profile
-
-#### **UI Customization**
-- Custom accent colors with real-time preview
-- Hide calendar button in Stremio interface
-- Responsive design for all device sizes
 
 #### **Addon Management**
-- Integrated drag-and-drop addon manager
 - Reorder addons with a simple interface
-- Remove non-protected addons directly
 
 #### **Addon Synchronization (Experimental)**
 - Sync addons between profiles automatically
-- Configure main profile for synchronization
-- Set auto-sync intervals (5 minutes to 24 hours)
-- Manual sync option with status feedback
 
-#### **Content Services**
-- TMDB API key management for NSFW filtering
-- Per-profile NSFW filtering controls
+#### **NSFW Filtering**
+- Uses TMDB for NSFW filtering
 
-### **⚡ Performance Features**
-- Edge-ready architecture with islands-based fast loading
-- Offline support via Progressive Web App (PWA)
-- Optimized asset caching
-- Pull-to-refresh prevention for better mobile experience
-
-### **📱 Native App Support**
-Automatic APK and Windows package generation via PWABuilder integration:
-- Android APK for direct installation
-- Windows MSIX for Microsoft Store distribution
-- iOS PWA support via Safari "Add to Home Screen"
+### **📱 Supports major platforms**
+- Android: Webapp & APK file
+- Windows: Webapp & MSIX file
+- iOS: Webapp support via Safari "Add to Home Screen"
 
 ---
 
@@ -118,14 +83,6 @@ docker run -d -p 8000:8000 --env-file .env ghcr.io/michieleijpe/zentrio:latest
 
 Includes health checks, MongoDB service, and production-ready configuration.
 
-## 📱 **Native Apps**
-
-Zentrio automatically builds native apps using PWABuilder:
-
-**🤖 Android APK** - Installable Android app package  
-**🪟 Windows MSIX** - Microsoft Store compatible package  
-**🍎 iOS PWA** - Add to Home Screen from Safari
-
 ### Automatic Builds
 - APKs and Windows packages are automatically built on every push/tag
 - Download from [GitHub Releases](https://github.com/MichielEijpe/Zentrio/releases)
@@ -133,14 +90,6 @@ Zentrio automatically builds native apps using PWABuilder:
 
 ### Manual Install
 Visit **[zentrio.eu](https://zentrio.eu)** and use your browser's "Add to Home Screen" or install button.
-
-## 🛠️ **Tech Stack**
-
-**Frontend:** Fresh (Preact) + TypeScript + Tailwind CSS  
-**Backend:** Deno runtime with Fresh framework  
-**Database:** MongoDB with Mongoose ODM  
-**Security:** AES-256-GCM encryption + session security  
-**Deployment:** Docker + health checks
 
 ---
 
