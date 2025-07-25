@@ -8,7 +8,7 @@ export const handler: Handlers<null, AppState> = {
     if (!userId) {
       // Not logged in, redirect to login
       const headers = new Headers();
-      headers.set("location", "/login");
+      headers.set("location", "/auth/login");
       return new Response(null, {
         status: 307,
         headers,

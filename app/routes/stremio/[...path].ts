@@ -388,13 +388,13 @@ const proxyRequestHandler = async (req: Request, path: string) => {
                     color: #d1d5db;
                   }
                   .spinner {
-                    width: 32px;
-                    height: 32px;
-                    border: 2px solid #374151;
-                    border-top: 2px solid #dc2626;
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid rgba(255,255,255,0.3);
                     border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                    margin-right: 12px;
+                    border-top-color: #fff;
+                    animation: spin 1s ease-in-out infinite;
+                    margin: 0 auto;
                   }
                   @keyframes spin {
                     0% { transform: rotate(0deg); }

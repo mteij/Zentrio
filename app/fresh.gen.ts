@@ -22,14 +22,14 @@ import * as $api_test_email from "./routes/api/test-email.ts";
 import * as $api_tmdb_key from "./routes/api/tmdb-key.ts";
 import * as $auth_code from "./routes/auth/code.tsx";
 import * as $auth_forgot from "./routes/auth/forgot.tsx";
+import * as $auth_login from "./routes/auth/login.tsx";
+import * as $auth_logout from "./routes/auth/logout.tsx";
 import * as $auth_password from "./routes/auth/password.tsx";
 import * as $auth_reset from "./routes/auth/reset.tsx";
 import * as $auth_signup_success from "./routes/auth/signup-success.tsx";
 import * as $auth_verify from "./routes/auth/verify.tsx";
 import * as $health from "./routes/health.ts";
 import * as $index from "./routes/index.tsx";
-import * as $login from "./routes/login.tsx";
-import * as $logout from "./routes/logout.ts";
 import * as $player_profileId_ from "./routes/player/[profileId].tsx";
 import * as $profiles from "./routes/profiles.tsx";
 import * as $settings from "./routes/settings.tsx";
@@ -69,14 +69,14 @@ const manifest = {
     "./routes/api/tmdb-key.ts": $api_tmdb_key,
     "./routes/auth/code.tsx": $auth_code,
     "./routes/auth/forgot.tsx": $auth_forgot,
+    "./routes/auth/login.tsx": $auth_login,
+    "./routes/auth/logout.tsx": $auth_logout,
     "./routes/auth/password.tsx": $auth_password,
     "./routes/auth/reset.tsx": $auth_reset,
     "./routes/auth/signup-success.tsx": $auth_signup_success,
     "./routes/auth/verify.tsx": $auth_verify,
     "./routes/health.ts": $health,
     "./routes/index.tsx": $index,
-    "./routes/login.tsx": $login,
-    "./routes/logout.ts": $logout,
     "./routes/player/[profileId].tsx": $player_profileId_,
     "./routes/profiles.tsx": $profiles,
     "./routes/settings.tsx": $settings,

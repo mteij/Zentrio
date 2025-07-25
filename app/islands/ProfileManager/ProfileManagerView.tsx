@@ -35,43 +35,12 @@ export default function ProfileManagerView(props: any) {
 
   // Show loading indicator until initialized
   if (!isInitialized.value) {
-    return (
-      <div class="flex flex-col items-center justify-center w-full h-64">
-        <div class="loader"></div>
-        <p class="mt-4 text-lg text-gray-300">Loading profiles...</p>
-        <style>
-          {`
-            .loader {
-              width: 65px;
-              aspect-ratio: 1;
-              position: relative;
-            }
-            .loader:before,
-            .loader:after {
-              content: "";
-              position: absolute;
-              border-radius: 50px;
-              box-shadow: 0 0 0 3px inset #fff;
-              animation: l4 2.5s infinite;
-            }
-            .loader:after {
-              animation-delay: -1.25s;
-            }
-            @keyframes l4 {
-              0% { inset: 0 35px 35px 0; }
-              12.5% { inset: 0 35px 0 0; }
-              25% { inset: 35px 35px 0 0; }
-              37.5% { inset: 35px 0 0 0; }
-              50% { inset: 35px 0 0 35px; }
-              62.5% { inset: 0 0 0 35px; }
-              75% { inset: 0 0 35px 35px; }
-              87.5% { inset: 0 0 35px 0; }
-              100% { inset: 0 35px 35px 0; }
-            }
-          `}
-        </style>
-      </div>
-    );
+      return (
+        <div class="flex flex-col items-center justify-center w-full h-[70vh]">
+          <div class="spinner"></div>
+          <p class="mt-4 text-lg text-gray-300">Loading profiles...</p>
+        </div>
+      );
   }
 
   function handleProfileClick(profileId: string) {
@@ -98,16 +67,16 @@ export default function ProfileManagerView(props: any) {
   // <MobileProfileManagerView>
   if (isMobile) {
     return (
-      <div class="flex flex-col justify-center w-full bg-black text-white" style={{ height: "100dvh" }}>
+      <div class="flex flex-col justify-start pt-[5vh] w-full bg-black text-white" style={{ height: "100dvh" }}>
         {/* Mobile Header */}
-        <h1 class="text-xl sm:text-5xl font-bold text-center pb-4">
+        <h1 class="text-[5vw] sm:text-[3vw] font-bold text-center pb-[2vw]">
           {mobileEditMode.value ? "Edit mode" : "Who's watching?"}
         </h1>
         {/* Mobile Profile Grid */}
         <div
-          class="flex-1 overflow-hidden px-4 flex flex-wrap justify-center items-center gap-4 sm:gap-8"
+          class="flex-1 overflow-hidden px-[4vw] flex flex-wrap justify-center items-center gap-[4vw] sm:gap-[3vw]"
           style={{
-            paddingBottom: "100px",
+            paddingBottom: "80px",
             overflowX: "hidden",
             ...(modalOpen ? {
               pointerEvents: "none",
@@ -122,11 +91,12 @@ export default function ProfileManagerView(props: any) {
               key={profile._id}
               class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
               style={{
-                width: "120px",
+                width: "clamp(80px, 28vw, 120px)",
                 transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
                 flex: "0 0 auto",
-                paddingTop: "12px",
-                height: "160px", // Fixed height for profile container
+                paddingTop: "1vw",
+                height: "auto",
+                aspectRatio: "1/1.3",
                 overflow: "hidden",
               }}
             >
@@ -180,31 +150,34 @@ export default function ProfileManagerView(props: any) {
           ))}
           {showAddProfile && (
             <div
-              class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105"
+              key="add-profile"
+              class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
               style={{
                 width: "clamp(80px, 28vw, 120px)",
                 transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
                 flex: "0 0 auto",
+                paddingTop: "1vw",
                 height: "auto",
                 aspectRatio: "1/1.3",
-                marginBottom: "8px",
+                overflow: "hidden",
               }}
             >
               <button
                 type="button"
+                class="w-full flex justify-center bg-transparent border-none p-0 m-0 mb-2"
                 onClick={() => (showAddModal.value = true)}
-                class="flex flex-col items-center w-full h-full bg-transparent border-none p-0 m-0 mb-2 transition-all duration-300"
-                style={{ minHeight: "100px" }}
+                tabIndex={modalOpen ? -1 : 0}
+                aria-disabled={modalOpen ? "true" : undefined}
+                style={modalOpen ? { pointerEvents: "none" } : undefined}
                 aria-label="Add Profile"
-                disabled={!!modalOpen}
               >
                 <div
-                  class="rounded-lg flex items-center justify-center bg-gray-700 shadow-lg transition-all duration-300"
+                  class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
                   style={{
-                    width: "100px",
-                    height: "100px",
+                    width: "clamp(80px, 25vw, 100px)",
+                    height: "clamp(80px, 25vw, 100px)",
                     aspectRatio: "1 / 1",
-                    fontSize: "2.5rem",
+                    fontSize: "clamp(2rem, 8vw, 2.5rem)",
                     color: "#fff",
                     margin: "0 auto",
                   }}
@@ -240,7 +213,7 @@ export default function ProfileManagerView(props: any) {
           <div class="fixed bottom-0 inset-x-0 flex gap-2 justify-center bg-black bg-opacity-90 py-3 z-30 border-t border-gray-800">
           {/* Mobile Logout Button */}
           <a
-            href="/logout"
+            href="/auth/logout"
             class="text-white font-bold py-2 px-4 rounded-lg text-base transition-all duration-200"
             style={{
               backgroundColor: localStorage.getItem("accentColor") || "#dc2626", // fallback to red-600
@@ -411,7 +384,7 @@ export default function ProfileManagerView(props: any) {
       <div class="flex justify-center items-center gap-4 w-full mt-6">
         {/* Desktop Logout Button */}
         <a
-          href="/logout"
+          href="/auth/logout"
           class="text-white font-bold py-2 px-6 rounded-lg text-lg transition-all duration-200"
           style={{
             backgroundColor: localStorage.getItem("accentColor") || "#dc2626",

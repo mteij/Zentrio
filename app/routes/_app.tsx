@@ -3,7 +3,6 @@ import Footer from "../components/Footer.tsx";
 
 export default function App({ Component, route }: PageProps) {
   const showFooter =
-    route.startsWith("/login") ||
     route.startsWith("/auth") ||
     route === "/";
 
@@ -48,9 +47,9 @@ export default function App({ Component, route }: PageProps) {
           }}
         />
       </head>
-      <body class="text-white bg-black flex flex-col overflow-y-hidden">
-        <div id="app" class="flex flex-col flex-1">
-          <main class="flex flex-1 items-center justify-center animate-fadein">
+      <body class="text-white bg-black flex flex-col min-h-screen overflow-y-hidden">
+        <div id="app" class="flex flex-col min-h-[calc(100vh-4rem)]">
+          <main class="flex-1 flex flex-col animate-fadein">
             <Component />
           </main>
           {showFooter && <Footer />}
