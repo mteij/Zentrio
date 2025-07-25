@@ -2,7 +2,6 @@ import { PageProps } from "$fresh/server.ts";
 import Footer from "../components/Footer.tsx";
 
 export default function App({ Component, route }: PageProps) {
-  // Only show the footer on login/signup/reset pages (not on profile, player, stremio, settings)
   const showFooter =
     route.startsWith("/login") ||
     route.startsWith("/auth") ||
@@ -11,7 +10,7 @@ export default function App({ Component, route }: PageProps) {
   return (
     <html lang="en">
       <head>
-        <meta charset="utf-8" />
+        <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Zentrio</title>
         <link rel="stylesheet" href="/styles.css" />
@@ -29,28 +28,29 @@ export default function App({ Component, route }: PageProps) {
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
         <link rel="shortcut icon" type="image/png" href="/icons/icon-192.png" />
-        <script dangerouslySetInnerHTML={{
-          __html: `
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/service-worker.js');
-              });
-            }
-            // Set theme color from localStorage on page load
-            document.addEventListener('DOMContentLoaded', function() {
-              const savedAccentColor = localStorage.getItem('accentColor') || '#dc2626';
-              const themeColorMeta = document.getElementById('theme-color-meta');
-              if (themeColorMeta) {
-                themeColorMeta.content = savedAccentColor;
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/service-worker.js');
+                });
               }
-              document.documentElement.style.setProperty('--accent-color', savedAccentColor);
-            });
-          `
-        }} />
+              document.addEventListener('DOMContentLoaded', function() {
+                const savedAccentColor = localStorage.getItem('accentColor') || '#dc2626';
+                const themeColorMeta = document.getElementById('theme-color-meta');
+                if (themeColorMeta) {
+                  themeColorMeta.content = savedAccentColor;
+                }
+                document.documentElement.style.setProperty('--accent-color', savedAccentColor);
+              });
+            `,
+          }}
+        />
       </head>
-      <body class="text-white min-h-screen flex flex-col bg-black">
-        <div id="app" class="flex flex-col min-h-screen">
-          <main class="flex-1 flex items-center justify-center animate-fadein">
+      <body class="text-white bg-black flex flex-col overflow-y-hidden">
+        <div id="app" class="flex flex-col flex-1">
+          <main class="flex flex-1 items-center justify-center animate-fadein">
             <Component />
           </main>
           {showFooter && <Footer />}

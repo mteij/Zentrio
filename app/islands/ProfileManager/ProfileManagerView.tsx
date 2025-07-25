@@ -119,13 +119,14 @@ export default function ProfileManagerView(props: any) {
           {/* Mobile Profile Cards */}
           {profiles.value.map((profile: any) => (
             <div
-              key={profile._id}
-              class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
-              style={{
-                width: "120px",
-                transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
-                flex: "0 0 auto",
-              }}
+            key={profile._id}
+            class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
+            style={{
+              width: "120px",
+              transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
+              flex: "0 0 auto",
+              paddingTop: "12px", // Adjust this value if needed
+            }}
             >
               {mobileEditMode.value ? (
               <button
@@ -268,7 +269,7 @@ export default function ProfileManagerView(props: any) {
             <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
               <g stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3.5" />
-                <path d="M19.07 13.91a7.5 7.5 0 0 0 0-3.82l2.11-1.65a1 1 0 0 0 .24-1.31l-2-3.46a1 1 0 0 0-1.25-.45l-2.49 1a7.42 7.42 0 0 0-3.3-1.91l-.38-2.65A1 1 0 0 0 10 2h-4a1 1 0 0 0-1 .89l-.38 2.65a7.42 7.42 0 0 0-3.3 1.91l-2.49-1a1 1 0 0 0-1.25.45l-2 3.46a1 1 0 0 0 .24 1.31l2.11 1.65a7.5 7.5 0 0 0 0 3.82l-2.11 1.65a1 1 0 0 0-.24 1.31l2 3.46a1 1 0 0 0 1.25.45l2.49-1a7.42 7.42 0 0 0 3.3 1.91l.38 2.65A1 1 0 0 0 10 22h-4a1 1 0 0 0-1-.89l-.38-2.65a7.42 7.42 0 0 0-3.3-1.91l2.49 1a1 1 0 0 0 1.25-.45l2-3.46a1 1 0 0 0-.24-1.31z" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 8.6 15a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 15 8.6a1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 15z"/>
               </g>
             </svg>
           </button>
