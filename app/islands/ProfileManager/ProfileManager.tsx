@@ -4,7 +4,6 @@ import { useEffect } from "preact/hooks";
 import { ProfileSchema } from "../../utils/db.ts";
 import { ObjectId } from "mongoose";
 import ProfileManagerView from "./ProfileManagerView.tsx";
-import ConfirmDialog from "../../components/ConfirmDialog.tsx";
 import { UAParser } from "npm:ua-parser-js";
 
 // Helper to convert MongoDB objects to plain objects for client-side use
@@ -38,6 +37,7 @@ export function ProfileModal(
   const email = useSignal(profile?.email || "");
   const password = useSignal(profile?.password || "");
   const nsfwMode = useSignal(profile?.nsfwMode || false);
+  const showDeleteConfirm = useSignal(false);
   const isEditing = !!profile?._id;
   const [initialPic] = profile
     ? [profile.profilePictureUrl]
@@ -75,6 +75,23 @@ export function ProfileModal(
     }
     
     onSave(profileData);
+  };
+
+  const handleDeleteRequest = () => {
+    console.log("[DEBUG] Delete button clicked - showing inline confirmation for profile:", profile!.name, profile!._id);
+    showDeleteConfirm.value = true;
+  };
+
+  const handleConfirmDelete = () => {
+    console.log("[DEBUG] Inline delete confirmed for profile:", profile!.name);
+    if (onRequestDelete && profile) {
+      onRequestDelete(profile);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    console.log("[DEBUG] Inline delete cancelled");
+    showDeleteConfirm.value = false;
   };
 
   return (
@@ -173,25 +190,60 @@ export function ProfileModal(
             </div>
           </div>
           <div class="flex justify-between">
-            <div>
-              {isEditing && onRequestDelete && (
-                <button
-                  type="button"
-                  onClick={() => onRequestDelete(profile!)}
-                  class="text-white font-bold py-2 px-4 rounded transition duration-200"
-                  style={{
-                    backgroundColor: localStorage.getItem("accentColor"),
-                  }}
-                >
-                  Delete
-                </button>
-              )}
-            </div>
+            {/* Delete section - only show when editing existing profile */}
+            {isEditing && onRequestDelete && (
+              <div class="flex flex-col">
+                {!showDeleteConfirm.value ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteRequest}
+                    class="text-white font-bold py-2 px-4 rounded transition-colors duration-200"
+                    style={{
+                      backgroundColor: localStorage.getItem("accentColor") || "#dc2626",
+                    }}
+                    onMouseEnter={(e) => {
+                      const currentColor = localStorage.getItem("accentColor") || "#dc2626";
+                      // Darken the color on hover
+                      (e.target as HTMLElement).style.backgroundColor = currentColor === "#dc2626" ? "#b91c1c" : "#b91c1c";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.target as HTMLElement).style.backgroundColor = localStorage.getItem("accentColor") || "#dc2626";
+                    }}
+                  >
+                    Delete
+                  </button>
+                ) : (
+                  <div class="flex flex-col space-y-2">
+                    <p class="text-sm text-red-400 font-medium">
+                      Delete "{profile!.name}"? This cannot be undone.
+                    </p>
+                    <div class="flex space-x-2">
+                      <button
+                        type="button"
+                        onClick={handleConfirmDelete}
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors duration-200"
+                      >
+                        Yes, Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelDelete}
+                        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors duration-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div class="flex space-x-4">
               <button
                 type="button"
                 onClick={onCancel}
                 class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors duration-200"
+                disabled={showDeleteConfirm.value}
+                style={showDeleteConfirm.value ? { opacity: 0.5 } : {}}
               >
                 Cancel
               </button>
@@ -200,7 +252,9 @@ export function ProfileModal(
                 class="text-white font-bold py-3 px-4 rounded transition duration-200"
                 style={{
                     backgroundColor: localStorage.getItem("accentColor"),
+                    ...(showDeleteConfirm.value ? { opacity: 0.5 } : {})
                   }}
+                disabled={showDeleteConfirm.value}
               >
                 Save
               </button>
@@ -242,6 +296,8 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
   const showAddModal = useSignal(false);
   const editingProfile = useSignal<PlainProfile | null>(null);
   const mobileEditMode = useSignal(false);
+  const showDeleteConfirm = useSignal(false);
+  const profileToDelete = useSignal<PlainProfile | null>(null);
 
   // Store profiles in localStorage for auto-login functionality
   useEffect(() => {
@@ -279,11 +335,47 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
   };
 
   const handleDelete = async (profile: PlainProfile) => {
-    const res = await fetch(`/api/profiles/${profile._id}`, { method: "DELETE" });
-    if (res.ok) {
-      profiles.value = profiles.value.filter((p) => p._id !== profile._id);
-      editingProfile.value = null;
+    console.log("[DEBUG] handleDelete called - making API request to delete profile:", profile.name, profile._id);
+    try {
+      const res = await fetch(`/api/profiles/${profile._id}`, { method: "DELETE" });
+      console.log("[DEBUG] Delete API response status:", res.status, res.statusText);
+      
+      if (res.ok) {
+        console.log("[DEBUG] Profile deleted successfully, updating UI state");
+        profiles.value = profiles.value.filter((p) => p._id !== profile._id);
+        editingProfile.value = null;
+        showDeleteConfirm.value = false;
+        profileToDelete.value = null;
+        console.log("[DEBUG] UI state updated - profile removed from list");
+      } else {
+        console.error("[DEBUG] Delete API failed with status:", res.status);
+        const errorText = await res.text();
+        console.error("[DEBUG] Delete API error response:", errorText);
+      }
+    } catch (error) {
+      console.error("[DEBUG] Delete API request failed with error:", error);
     }
+  };
+
+  const handleRequestDelete = (profile: PlainProfile) => {
+    console.log("[DEBUG] handleRequestDelete called for profile:", profile.name, profile._id);
+    profileToDelete.value = profile;
+    showDeleteConfirm.value = true;
+    console.log("[DEBUG] Confirmation dialog state set - showDeleteConfirm:", showDeleteConfirm.value);
+  };
+
+  const handleConfirmDelete = () => {
+    console.log("[DEBUG] handleConfirmDelete called for profile:", profileToDelete.value?.name);
+    if (profileToDelete.value) {
+      handleDelete(profileToDelete.value);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    console.log("[DEBUG] handleCancelDelete called");
+    showDeleteConfirm.value = false;
+    profileToDelete.value = null;
+    console.log("[DEBUG] Confirmation dialog closed");
   };
 
   return {
@@ -291,9 +383,14 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
     showAddModal,
     editingProfile,
     mobileEditMode,
+    showDeleteConfirm,
+    profileToDelete,
     handleCreate,
     handleUpdate,
     handleDelete,
+    handleRequestDelete,
+    handleConfirmDelete,
+    handleCancelDelete,
   };
 }
 
@@ -317,9 +414,14 @@ export default function ProfileManager(
     showAddModal,
     editingProfile,
     mobileEditMode,
+    showDeleteConfirm,
+    profileToDelete,
     handleCreate,
     handleUpdate,
     handleDelete,
+    handleRequestDelete,
+    handleConfirmDelete,
+    handleCancelDelete,
   } = useProfileManagerState(initialProfiles);
 
   // Device detection using UAParser only
@@ -342,67 +444,30 @@ export default function ProfileManager(
     mobileEditMode.value = !mobileEditMode.value;
   };
 
-  // Add signals for delete confirmation modal
-  const showDeleteConfirm = useSignal(false);
-  const profileToDelete = useSignal<PlainProfile | null>(null);
 
-  // Handler for requesting delete (shows modal)
-  const handleRequestDelete = (profile: PlainProfile) => {
-    profileToDelete.value = profile;
-    showDeleteConfirm.value = true;
-  };
-
-  // Handler for confirming delete
-  const confirmDelete = async () => {
-    if (profileToDelete.value) {
-      await handleDelete(profileToDelete.value);
-    }
-    showDeleteConfirm.value = false;
-    profileToDelete.value = null;
-  };
-
-  // Handler for canceling delete
-  const cancelDelete = () => {
-    showDeleteConfirm.value = false;
-    profileToDelete.value = null;
-  };
-
-  const sharedProps = {
-    profiles,
-    showAddModal,
-    editingProfile,
-    mobileEditMode,
-    handleCreate,
-    handleUpdate,
-    handleDelete,
-    getRandomFunEmojiUrl,
-    getInitialsUrl,
-    ProfileModal: (props: any) =>
-      ProfileModal({ ...props, onRequestDelete: handleRequestDelete }),
-    toggleMobileEditMode,
-    showSettings,
-    setShowSettings,
-    addonOrderEnabled,
-    setAddonOrderEnabled,
-    isMobile: isMobile.value,
-  };
+const sharedProps = {
+  profiles,
+  showAddModal,
+  editingProfile,
+  mobileEditMode,
+  handleCreate,
+  handleUpdate,
+  handleDelete,
+  handleRequestDelete,
+  getRandomFunEmojiUrl,
+  getInitialsUrl,
+  ProfileModal,
+  toggleMobileEditMode,
+  showSettings,
+  setShowSettings,
+  addonOrderEnabled,
+  setAddonOrderEnabled,
+  isMobile: isMobile.value,
+};
 
   return (
     <>
       <ProfileManagerView {...sharedProps} />
-      <ConfirmDialog
-        open={showDeleteConfirm.value}
-        title="Delete Profile?"
-        message={
-          profileToDelete.value
-            ? `Are you sure you want to delete "${profileToDelete.value.name}"? This cannot be undone.`
-            : ""
-        }
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={confirmDelete}
-        onCancel={cancelDelete}
-      />
     </>
   );
 }

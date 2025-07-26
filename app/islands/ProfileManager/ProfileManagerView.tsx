@@ -5,24 +5,24 @@ import SettingsModal from "../SettingsModal.tsx";
 
 // ProfileManagerView component
 export default function ProfileManagerView(props: any) {
-  const {
-    profiles,
-    showAddModal,
-    editingProfile,
-    mobileEditMode,
-    handleCreate,
-    handleUpdate,
-    handleDelete,
-    getRandomFunEmojiUrl,
-    getInitialsUrl,
-    ProfileModal,
-    toggleMobileEditMode,
-    showSettings,
-    setShowSettings,
-    addonOrderEnabled,
-    setAddonOrderEnabled,
-    isMobile,
-  } = props;
+const {
+  profiles,
+  showAddModal,
+  editingProfile,
+  mobileEditMode,
+  handleCreate,
+  handleUpdate,
+  handleRequestDelete,
+  getRandomFunEmojiUrl,
+  getInitialsUrl,
+  ProfileModal,
+  toggleMobileEditMode,
+  showSettings,
+  setShowSettings,
+  addonOrderEnabled,
+  setAddonOrderEnabled,
+  isMobile,
+} = props;
 
   const isInitialized = useSignal(false);
   const modalOpen = showAddModal.value || editingProfile.value !== null;
@@ -67,22 +67,26 @@ export default function ProfileManagerView(props: any) {
   // <MobileProfileManagerView>
   if (isMobile) {
     return (
-      <div class="flex flex-col justify-start pt-[5vh] w-full bg-black text-white" style={{ height: "100dvh" }}>
+      <div class="flex flex-col w-full bg-black text-white" style={{ height: "100dvh", paddingTop: "clamp(0px, 0vh, 50px)" }}>
         {/* Mobile Header */}
-        <h1 class="text-[5vw] sm:text-[3vw] font-bold text-center pb-[2vw]">
+        <h1 class="text-[5vw] sm:text-[3vw] font-bold text-center pb-4">
           {mobileEditMode.value ? "Edit mode" : "Who's watching?"}
         </h1>
         {/* Mobile Profile Grid */}
         <div
-          class="flex-1 overflow-hidden px-[4vw] flex flex-wrap justify-center items-center gap-[4vw] sm:gap-[3vw]"
+          class="flex-1 px-[2vw] grid auto-rows-min justify-items-center items-start gap-y-8 gap-x-4"
           style={{
-            paddingBottom: "80px",
-            overflowX: "hidden",
+            gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+            maxWidth: "calc(100vw - 4vw)",
+            margin: "0 auto",
+            paddingBottom: "100px",
+            height: "calc(100dvh - 80px - clamp(0px, 0vh, 50px))",
+            overflowY: "auto",
             ...(modalOpen ? {
               pointerEvents: "none",
-              userSelect: "none",
-              opacity: 0.6,
-            } : {}),
+              userSelect: "none", 
+              opacity: 0.6
+            } : {})
           }}
         >
           {/* Mobile Profile Cards */}
@@ -91,13 +95,12 @@ export default function ProfileManagerView(props: any) {
               key={profile._id}
               class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
               style={{
-                width: "clamp(80px, 28vw, 120px)",
+                width: "100%",
+                minWidth: "80px",
+                maxWidth: "120px",
                 transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
-                flex: "0 0 auto",
-                paddingTop: "1vw",
                 height: "auto",
                 aspectRatio: "1/1.3",
-                overflow: "hidden",
               }}
             >
               {mobileEditMode.value ? (
@@ -107,18 +110,19 @@ export default function ProfileManagerView(props: any) {
                 onClick={() => (editingProfile.value = profile)}
                 aria-label={`Edit ${profile.name}`}
               >
-                <div
-                  class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
-                  style={{
-                    width: "100px",
-                    height: "100px",
-                    aspectRatio: "1 / 1",
-                    backgroundImage: `url(${profile.profilePictureUrl})`,
-                    backgroundPosition: "center",
-                    backgroundSize: "cover",
-                    margin: "0 auto",
-                  }}
-                />
+              <div
+                class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
+                style={{
+                  width: "80%",
+                  height: "auto",
+                  aspectRatio: "1 / 1",
+                  maxWidth: "100px",
+                  backgroundImage: `url(${profile.profilePictureUrl})`,
+                  backgroundPosition: "center",
+                  backgroundSize: "cover",
+                  margin: "0 auto",
+                }}
+              />
               </button>
               ) : (
                 <button
@@ -131,10 +135,11 @@ export default function ProfileManagerView(props: any) {
                 >
                   <div
                     class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
-                    style={{
-                      width: "100px",
-                      height: "100px",
-                      aspectRatio: "1 / 1",
+                style={{
+                  width: "80%",
+                  height: "auto",
+                  aspectRatio: "1 / 1",
+                  maxWidth: "100px",
                       backgroundImage: `url(${profile.profilePictureUrl})`,
                       backgroundPosition: "center",
                       backgroundSize: "cover",
@@ -153,13 +158,12 @@ export default function ProfileManagerView(props: any) {
               key="add-profile"
               class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
               style={{
-                width: "clamp(80px, 28vw, 120px)",
+                width: "100%",
+                minWidth: "80px",
+                maxWidth: "120px",
                 transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
-                flex: "0 0 auto",
-                paddingTop: "1vw",
                 height: "auto",
                 aspectRatio: "1/1.3",
-                overflow: "hidden",
               }}
             >
               <button
@@ -173,11 +177,12 @@ export default function ProfileManagerView(props: any) {
               >
                 <div
                   class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
-                  style={{
-                    width: "clamp(80px, 25vw, 100px)",
-                    height: "clamp(80px, 25vw, 100px)",
-                    aspectRatio: "1 / 1",
-                    fontSize: "clamp(2rem, 8vw, 2.5rem)",
+                style={{
+                  width: "80%",
+                  height: "auto",
+                  aspectRatio: "1 / 1",
+                  maxWidth: "100px",
+                  fontSize: "clamp(1.5rem, 6vw, 2.5rem)",
                     color: "#fff",
                     margin: "0 auto",
                   }}
@@ -200,14 +205,14 @@ export default function ProfileManagerView(props: any) {
           />
         )}
         {/* Mobile Edit Profile Modal */}
-        {editingProfile.value && (
-          <ProfileModal
-            profile={editingProfile.value}
-            onSave={handleUpdate}
-            onCancel={() => (editingProfile.value = null)}
-            onDelete={handleDelete}
-          />
-        )}
+{editingProfile.value && (
+  <ProfileModal
+    profile={editingProfile.value}
+    onSave={handleUpdate}
+    onCancel={() => (editingProfile.value = null)}
+    onRequestDelete={handleRequestDelete}
+  />
+)}
         {/* Mobile Bottom Bar - Only show when isMobile is true */}
         {isMobile && (
           <div class="fixed bottom-0 inset-x-0 flex gap-2 justify-center bg-black bg-opacity-90 py-3 z-30 border-t border-gray-800">
@@ -270,9 +275,9 @@ export default function ProfileManagerView(props: any) {
   // --- DESKTOP LAYOUT ---
   // <DesktopProfileManagerView>
   return (
-    <div class="w-full flex flex-col items-center justify-center min-h-[70vh]">
+    <div class="w-full flex flex-col items-center justify-center py-[5vh]">
       {/* Desktop Header */}
-      <h1 class="text-4xl font-bold mb-10 text-center tracking-tight">Who's watching?</h1>
+      <h1 class="text-4xl font-bold mb-[3vh] text-center tracking-tight">Who's watching?</h1>
       {/* Desktop Profile Grid */}
       <div class="flex flex-col gap-8 mb-4 w-full max-w-[900px]">
         {rowsArr.map((row, rowIdx) => (
@@ -419,16 +424,16 @@ export default function ProfileManagerView(props: any) {
         </div>
       )}
       {/* Desktop Edit Profile Modal */}
-      {editingProfile.value && (
-        <div class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70">
-          <ProfileModal
-            profile={editingProfile.value}
-            onSave={handleUpdate}
-            onCancel={() => editingProfile.value = null}
-            onDelete={handleDelete}
-          />
-        </div>
-      )}
+{editingProfile.value && (
+  <div class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70">
+    <ProfileModal
+      profile={editingProfile.value}
+      onSave={handleUpdate}
+      onCancel={() => editingProfile.value = null}
+      onRequestDelete={handleRequestDelete}
+    />
+  </div>
+)}
       {/* Desktop Settings Modal */}
       {showSettings.value && (
         <SettingsModal

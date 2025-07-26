@@ -375,6 +375,10 @@ export const createVerificationToken = async (
     code,
     expiresAt,
   });
+  
+  // Development logging - show the verification code in terminal
+  console.log(`🔐 DEVELOPMENT: Verification code generated: ${code} for user ${userId}`);
+  
   return { token: (tokenDoc as { _id: ObjectId })._id.toString(), code };
 };
 

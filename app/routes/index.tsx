@@ -1,4 +1,4 @@
-import { Handlers, PageProps } from "$fresh/server.ts";
+import { Handlers } from "$fresh/server.ts";
 import { AppState } from "./_middleware.ts";
 
 export const handler: Handlers<null, AppState> = {

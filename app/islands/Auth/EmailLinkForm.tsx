@@ -25,11 +25,11 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
         onSuccess: (data) => {
           console.log('API call successful, full response:', JSON.stringify(data, null, 2));
           console.log('Response keys:', Object.keys(data || {}));
-          console.log('data.redirectUrl:', data?.redirectUrl);
-          console.log('data.data?.redirectUrl:', data?.data?.redirectUrl);
+          console.log('data.redirectUrl:', (data as any)?.redirectUrl);
+          console.log('data.data?.redirectUrl:', (data as any)?.data?.redirectUrl);
           
           // Try both possible response structures
-          const redirectUrl = data?.redirectUrl || data?.data?.redirectUrl;
+          const redirectUrl = (data as any)?.redirectUrl || (data as any)?.data?.redirectUrl;
           
           if (redirectUrl) {
             console.log('Found redirectUrl:', redirectUrl);
@@ -72,7 +72,7 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
             id="email"
             name="email"
             value={email.value}
-            onInput={(e) => (email.value = e.currentTarget.value)}
+            onInput={(e) => (email.value = (e.currentTarget as HTMLInputElement)?.value || "")}
             placeholder="you@example.com"
             disabled={isLoading.value}
             required
