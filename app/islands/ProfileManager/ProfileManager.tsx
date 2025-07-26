@@ -37,7 +37,6 @@ export function ProfileModal(
   const email = useSignal(profile?.email || "");
   const password = useSignal(profile?.password || "");
   const nsfwMode = useSignal(profile?.nsfwMode || false);
-  const showDeleteConfirm = useSignal(false);
   const isEditing = !!profile?._id;
   const [initialPic] = profile
     ? [profile.profilePictureUrl]
@@ -77,22 +76,6 @@ export function ProfileModal(
     onSave(profileData);
   };
 
-  const handleDeleteRequest = () => {
-    console.log("[DEBUG] Delete button clicked - showing inline confirmation for profile:", profile!.name, profile!._id);
-    showDeleteConfirm.value = true;
-  };
-
-  const handleConfirmDelete = () => {
-    console.log("[DEBUG] Inline delete confirmed for profile:", profile!.name);
-    if (onRequestDelete && profile) {
-      onRequestDelete(profile);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    console.log("[DEBUG] Inline delete cancelled");
-    showDeleteConfirm.value = false;
-  };
 
   return (
     <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-20 transition-all duration-300 animate-fade-in">
@@ -190,60 +173,35 @@ export function ProfileModal(
             </div>
           </div>
           <div class="flex justify-between">
-            {/* Delete section - only show when editing existing profile */}
+            {/* Delete button - only show when editing existing profile */}
             {isEditing && onRequestDelete && (
-              <div class="flex flex-col">
-                {!showDeleteConfirm.value ? (
-                  <button
-                    type="button"
-                    onClick={handleDeleteRequest}
-                    class="text-white font-bold py-2 px-4 rounded transition-colors duration-200"
-                    style={{
-                      backgroundColor: localStorage.getItem("accentColor") || "#dc2626",
-                    }}
-                    onMouseEnter={(e) => {
-                      const currentColor = localStorage.getItem("accentColor") || "#dc2626";
-                      // Darken the color on hover
-                      (e.target as HTMLElement).style.backgroundColor = currentColor === "#dc2626" ? "#b91c1c" : "#b91c1c";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as HTMLElement).style.backgroundColor = localStorage.getItem("accentColor") || "#dc2626";
-                    }}
-                  >
-                    Delete
-                  </button>
-                ) : (
-                  <div class="flex flex-col space-y-2">
-                    <p class="text-sm text-red-400 font-medium">
-                      Delete "{profile!.name}"? This cannot be undone.
-                    </p>
-                    <div class="flex space-x-2">
-                      <button
-                        type="button"
-                        onClick={handleConfirmDelete}
-                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors duration-200"
-                      >
-                        Yes, Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelDelete}
-                        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors duration-200"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  console.log("[DEBUG] Delete button clicked for profile:", profile!.name, profile!._id);
+                  onRequestDelete(profile!);
+                }}
+                class="text-white font-bold py-2 px-4 rounded transition-colors duration-200"
+                style={{
+                  backgroundColor: localStorage.getItem("accentColor") || "#dc2626",
+                }}
+                onMouseEnter={(e) => {
+                  const currentColor = localStorage.getItem("accentColor") || "#dc2626";
+                  // Darken the color on hover
+                  (e.target as HTMLElement).style.backgroundColor = currentColor === "#dc2626" ? "#b91c1c" : "#b91c1c";
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLElement).style.backgroundColor = localStorage.getItem("accentColor") || "#dc2626";
+                }}
+              >
+                Delete
+              </button>
             )}
             <div class="flex space-x-4">
               <button
                 type="button"
                 onClick={onCancel}
                 class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors duration-200"
-                disabled={showDeleteConfirm.value}
-                style={showDeleteConfirm.value ? { opacity: 0.5 } : {}}
               >
                 Cancel
               </button>
@@ -252,9 +210,7 @@ export function ProfileModal(
                 class="text-white font-bold py-3 px-4 rounded transition duration-200"
                 style={{
                     backgroundColor: localStorage.getItem("accentColor"),
-                    ...(showDeleteConfirm.value ? { opacity: 0.5 } : {})
                   }}
-                disabled={showDeleteConfirm.value}
               >
                 Save
               </button>
@@ -296,8 +252,6 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
   const showAddModal = useSignal(false);
   const editingProfile = useSignal<PlainProfile | null>(null);
   const mobileEditMode = useSignal(false);
-  const showDeleteConfirm = useSignal(false);
-  const profileToDelete = useSignal<PlainProfile | null>(null);
 
   // Store profiles in localStorage for auto-login functionality
   useEffect(() => {
@@ -344,8 +298,6 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
         console.log("[DEBUG] Profile deleted successfully, updating UI state");
         profiles.value = profiles.value.filter((p) => p._id !== profile._id);
         editingProfile.value = null;
-        showDeleteConfirm.value = false;
-        profileToDelete.value = null;
         console.log("[DEBUG] UI state updated - profile removed from list");
       } else {
         console.error("[DEBUG] Delete API failed with status:", res.status);
@@ -359,38 +311,34 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
 
   const handleRequestDelete = (profile: PlainProfile) => {
     console.log("[DEBUG] handleRequestDelete called for profile:", profile.name, profile._id);
-    profileToDelete.value = profile;
-    showDeleteConfirm.value = true;
-    console.log("[DEBUG] Confirmation dialog state set - showDeleteConfirm:", showDeleteConfirm.value);
-  };
-
-  const handleConfirmDelete = () => {
-    console.log("[DEBUG] handleConfirmDelete called for profile:", profileToDelete.value?.name);
-    if (profileToDelete.value) {
-      handleDelete(profileToDelete.value);
+    console.log("[DEBUG] Using native browser confirm dialog");
+    
+    // Close the profile modal first
+    editingProfile.value = null;
+    
+    // Use native browser confirm dialog temporarily to test
+    const confirmed = confirm(`Are you sure you want to delete the profile "${profile.name}"? This action cannot be undone.`);
+    
+    if (confirmed) {
+      console.log("[DEBUG] User confirmed deletion");
+      handleDelete(profile);
+    } else {
+      console.log("[DEBUG] User cancelled deletion, reopening profile modal");
+      // Reopen the profile modal
+      editingProfile.value = profile;
     }
   };
 
-  const handleCancelDelete = () => {
-    console.log("[DEBUG] handleCancelDelete called");
-    showDeleteConfirm.value = false;
-    profileToDelete.value = null;
-    console.log("[DEBUG] Confirmation dialog closed");
-  };
 
   return {
     profiles,
     showAddModal,
     editingProfile,
     mobileEditMode,
-    showDeleteConfirm,
-    profileToDelete,
     handleCreate,
     handleUpdate,
     handleDelete,
     handleRequestDelete,
-    handleConfirmDelete,
-    handleCancelDelete,
   };
 }
 
@@ -414,14 +362,10 @@ export default function ProfileManager(
     showAddModal,
     editingProfile,
     mobileEditMode,
-    showDeleteConfirm,
-    profileToDelete,
     handleCreate,
     handleUpdate,
     handleDelete,
     handleRequestDelete,
-    handleConfirmDelete,
-    handleCancelDelete,
   } = useProfileManagerState(initialProfiles);
 
   // Device detection using UAParser only
