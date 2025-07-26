@@ -125,7 +125,7 @@ class NSFWFilterService {
     const cacheKey = `${title}${year ? `-${year}` : ''}`;
     if (this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey);
-      return cached ? { id: cached as number, type: 'movie' } : null;
+      return cached ? { id: this.cache.get(cacheKey) as unknown as number, type: 'movie' } : null;
     }
 
     try {

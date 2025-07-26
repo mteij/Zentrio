@@ -5,7 +5,7 @@ export interface ApiResponse<T = any> {
 }
 
 export class ApiError extends Error {
-  constructor(public message: string, public status: number) {
+  constructor(public override message: string, public status: number) {
     super(message);
   }
 }

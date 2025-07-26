@@ -63,7 +63,7 @@ export default function PasswordChangeForm() {
           id="currentPassword"
           name="currentPassword"
           value={currentPassword.value}
-          onInput={(e) => (currentPassword.value = e.currentTarget.value)}
+          onInput={(e) => (currentPassword.value = (e.target as HTMLInputElement).value)}
           placeholder="Enter your current password"
           disabled={isLoading.value}
           required
@@ -79,7 +79,7 @@ export default function PasswordChangeForm() {
           id="newPassword"
           name="newPassword"
           value={newPassword.value}
-          onInput={(e) => (newPassword.value = e.currentTarget.value)}
+          onInput={(e) => (newPassword.value = (e.target as HTMLInputElement).value)}
           placeholder="Enter your new password"
           disabled={isLoading.value}
           required
@@ -95,7 +95,7 @@ export default function PasswordChangeForm() {
           id="confirmPassword"
           name="confirmPassword"
           value={confirmPassword.value}
-          onInput={(e) => (confirmPassword.value = e.currentTarget.value)}
+          onInput={(e) => (confirmPassword.value = (e.target as HTMLInputElement).value)}
           placeholder="Confirm your new password"
           disabled={isLoading.value}
           required

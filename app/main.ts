@@ -19,28 +19,5 @@ await start(manifest, {
     port: 8000
   },
   plugins: [twindPlugin(twindConfig)],
-  // Add a custom handler to serve static files from /app/static
-  handler: (req: Request, ctx: FreshContext) => {
-    const url = new URL(req.url);
-    if (url.pathname === "/static/service-worker.js") {
-      // Always serve service worker with correct headers
-      return serveDir(req, {
-        fsRoot: `${Deno.cwd()}/app/static`,
-        urlRoot: "/static",
-        // Set correct content type for service worker
-        headers: {
-          "Content-Type": "application/javascript",
-          "Service-Worker-Allowed": "/",
-        },
-      });
-    }
-    if (url.pathname.startsWith("/static/")) {
-      // Serve from app/static
-      return serveDir(req, {
-        fsRoot: `${Deno.cwd()}/app/static`,
-        urlRoot: "/static",
-      });
-    }
-    return ctx.next();
-  },
+  staticDir: "./app/static",
 });

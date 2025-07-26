@@ -245,7 +245,7 @@ export const createSession = async (
     isActive: true
   });
   
-  return session._id.toString();
+  return (session as { _id: { toString(): string } })._id.toString();
 };
 
 export const getSession = async (sessionId: string, request?: Request): Promise<SessionSchema | null> => {
@@ -342,7 +342,7 @@ export const detectSuspiciousActivity = async (userId: string): Promise<boolean>
   const suspiciousActivity = sessionSecurity.detectSuspiciousActivity(
     sessions.map(s => ({
       userId: s.userId.toString(),
-      sessionId: s._id.toString(),
+      sessionId: (s as { _id: { toString(): string } })._id.toString(),
       expiresAt: s.expiresAt,
       lastActivity: s.lastActivity,
       isActive: s.isActive,
@@ -581,7 +581,7 @@ export const getUserAddonSyncSettings = async (userId: string) => {
  */
 export const updateUserAddonSyncSettings = async (
   userId: string, 
-  settings: Partial<UserSchema['settings']['addonSyncSettings']>
+  settings: Partial<UserSchema['settings']['addonSyncSettings' & keyof UserSchema['settings']]>
 ): Promise<void> => {
   const updateData: any = {};
   

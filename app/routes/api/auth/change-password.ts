@@ -7,7 +7,7 @@ import { getCookies } from "$std/http/cookie.ts";
 export const handler: Handlers = {
   POST: withErrorHandling(async (req) => {
     // Check rate limit
-    const rateLimitResponse = rateLimiter.checkRateLimit('password-change')(req);
+    const rateLimitResponse = rateLimiter.checkRateLimit('password_reset')(req);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
@@ -52,7 +52,7 @@ export const handler: Handlers = {
     }
 
     // Verify current password
-    const isCurrentPasswordValid = await comparePassword(currentPassword, user.password);
+    const isCurrentPasswordValid = await comparePassword(currentPassword, user.password || "");
     if (!isCurrentPasswordValid) {
       return createJsonResponse({ error: "Current password is incorrect" }, 400);
     }
@@ -68,7 +68,7 @@ export const handler: Handlers = {
     }
 
     // Record successful operation
-    rateLimiter.recordSuccess(req, 'password-change');
+    rateLimiter.recordSuccess(req, 'password_reset');
 
     return createJsonResponse({ success: true, message: "Password updated successfully" });
   }),

@@ -35,7 +35,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
     await makeApiCall("/api/auth/send-login-code", 
       { email },
       {
-        onSuccess: (data) => {
+        onSuccess: (data: { redirectUrl?: string; data?: { redirectUrl?: string } }) => {
           console.log('Send login code success:', data);
           // Handle both response structures: { redirectUrl } or { data: { redirectUrl } }
           const redirectUrl = data.redirectUrl || data.data?.redirectUrl;
@@ -118,7 +118,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
           name="password"
           placeholder="Password"
           value={password.value}
-          onInput={(e) => password.value = e.currentTarget.value}
+          onInput={(e) => password.value = (e.target as HTMLInputElement).value}
           disabled={isLoading.value || !!successMessage.value}
           required
         />

@@ -22,7 +22,7 @@ export default function ForgotPasswordForm({ initialEmail = "" }: ForgotPassword
     await makeApiCall("/api/auth/request-password-reset", 
       { email: email.value },
       {
-        onSuccess: (data) => {
+        onSuccess: (data: { message?: string }) => {
           successMessage.value = data.message || "If a user with that email exists, a reset link has been sent.";
         }
       }
@@ -66,7 +66,7 @@ export default function ForgotPasswordForm({ initialEmail = "" }: ForgotPassword
         name="email"
         placeholder="you@example.com"
         value={email.value}
-        onInput={(e) => email.value = e.currentTarget.value}
+        onInput={(e) => email.value = (e.target as HTMLInputElement).value}
         disabled={isLoading.value}
         required
       />

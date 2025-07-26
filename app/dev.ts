@@ -14,22 +14,4 @@ await dev(import.meta.url, "./main.ts", {
     port: 8000
   },
   plugins: [twindPlugin(twindConfig)],
-  // Add static file handler for development
-  handler: (req, ctx) => {
-    const url = new URL(req.url);
-    
-    // Serve static files at root level (e.g., /styles.css, /manifest.json)
-    if (url.pathname === "/styles.css" || 
-        url.pathname === "/manifest.json" || 
-        url.pathname === "/service-worker.js" ||
-        url.pathname.startsWith("/css/") ||
-        url.pathname.startsWith("/icons/")) {
-      return serveDir(req, {
-        fsRoot: `${Deno.cwd()}/app/static`,
-        urlRoot: "/",
-      });
-    }
-    
-    return ctx.next();
-  },
 });

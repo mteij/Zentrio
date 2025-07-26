@@ -22,14 +22,14 @@ export const handler: Handlers<null, AppState> = {
       
       // Return sanitized session data (no sensitive info)
       const sanitizedSessions = sessions.map(session => ({
-        id: session._id.toString(),
-        createdAt: session.createdAt,
-        lastActivity: session.lastActivity,
-        ipAddress: session.ipAddress ? 
-          session.ipAddress.replace(/\.\d+$/, '.***') : // Mask last octet
+        id: (session as { _id: { toString(): string } })._id.toString(),
+        createdAt: (session as { createdAt: Date }).createdAt,
+        lastActivity: (session as { lastActivity: Date }).lastActivity,
+        ipAddress: (session as { ipAddress?: string }).ipAddress ?
+          (session as { ipAddress: string }).ipAddress.replace(/\.\d+$/, '.***') : // Mask last octet
           'Unknown',
-        userAgent: session.userAgent ? 
-          session.userAgent.slice(0, 100) + '...' : // Truncate user agent
+        userAgent: (session as { userAgent?: string }).userAgent ?
+          (session as { userAgent: string }).userAgent.slice(0, 100) + '...' : // Truncate user agent
           'Unknown',
         isCurrentSession: false // Will be determined client-side
       }));

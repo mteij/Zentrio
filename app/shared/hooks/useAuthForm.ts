@@ -1,5 +1,5 @@
 import { useSignal } from "@preact/signals";
-import { validateEmail } from "../utils/validation.ts";
+import { validateEmail } from "../utils/api.ts";
 
 export interface AuthFormState {
   error: string | null;
