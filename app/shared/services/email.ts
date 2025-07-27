@@ -35,6 +35,7 @@ export class EmailService {
         port,
         secure,
         auth: { user, pass },
+        connectionTimeout: 1000 * 10, // 10 seconds
       });
     } else {
       throw new Error(`Invalid EMAIL_PROVIDER: ${this.emailProvider}`);
