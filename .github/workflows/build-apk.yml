@@ -23,8 +23,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install PWABuilder CLI
+        run: npm install -g @pwabuilder/cli
+
       - name: Generate APK with PWABuilder CLI
-        run: npx pwabuilder https://zentrio.eu -p android -d .
+        run: pwabuilder https://zentrio.eu -p android -d .
 
       - name: Create Release and Upload APK
         env:
