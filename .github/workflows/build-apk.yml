@@ -28,9 +28,8 @@ jobs:
 
       - name: Init Bubblewrap project
         run: |
-          yes | bubblewrap init \
-            --manifest "${{ github.workspace }}/app/static/manifest.json" \
-            --host "https://zentrio.eu"
+          (sleep 1; echo "y") | bubblewrap init \
+            --manifest "${{ github.workspace }}/app/static/manifest.json"
 
       - name: Build unsigned APK with Bubblewrap
         run: |
