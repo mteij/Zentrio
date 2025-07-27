@@ -27,7 +27,9 @@
   // npm packages
   "mongoose": "npm:mongoose@8.4.1",
   "stremio-api-client": "npm:stremio-api-client@^1.6.0",
-  "node-cron": "npm:node-cron@3.0.3"
+  "node-cron": "npm:node-cron@3.0.3",
+  "nodemailer": "npm:nodemailer@6.9.13",
+  "@types/nodemailer": "npm:@types/nodemailer@6.4.15"
   },
   "compilerOptions": {
     "jsx": "react-jsx",

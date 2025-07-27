@@ -1,5 +1,3 @@
-# ❗Under heavy development, do not currently use❗
-
 <div align="center">
   
   # 🎬 **Zentrio** 
@@ -18,29 +16,10 @@
 
 ## ✨ **Features**
 
-### **🎭 Profile Management**
-Netflix-style interface with unlimited profiles, custom avatars, and secure credential storage. Each profile can have its own Stremio credentials, settings, and content preferences.
-
-### **🛡️ Content Filtering**
-Smart NSFW detection using TMDB API with per-profile parental controls. Automatically filters adult content based on movie/series metadata.
-
-### **🎛️ Comprehensive Settings Panel**
-
-#### **Auto-login Behavior**
-
-#### **Addon Management**
-- Reorder addons with a simple interface
-
-#### **Addon Synchronization (Experimental)**
-- Sync addons between profiles automatically
-
-#### **NSFW Filtering**
-- Uses TMDB for NSFW filtering
-
-### **📱 Supports major platforms**
-- Android: Webapp & APK file
-- Windows: Webapp & MSIX file
-- iOS: Webapp support via Safari "Add to Home Screen"
+- **Profile Management**: Unlimited profiles with custom avatars.
+- **Content Filtering**: Per-profile NSFW filtering.
+- **Addon Management**: Reorder and sync addons.
+- **PWA Support**: Installable as a web app.
 
 ---
 
@@ -83,13 +62,8 @@ docker run -d -p 8000:8000 --env-file .env ghcr.io/michieleijpe/zentrio:latest
 
 Includes health checks, MongoDB service, and production-ready configuration.
 
-### Automatic Builds
-- APKs and Windows packages are automatically built on every push/tag
-- Download from [GitHub Releases](https://github.com/MichielEijpe/Zentrio/releases)
-- Signed packages ready for distribution
-
-### Manual Install
-Visit **[zentrio.eu](https://zentrio.eu)** and use your browser's "Add to Home Screen" or install button.
+### **Install**
+Visit **[zentrio.eu](https://zentrio.eu)** and use your browser's "Add to Home Screen" or install button to install the Webapp.
 
 ---
 

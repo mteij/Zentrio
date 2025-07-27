@@ -15,7 +15,7 @@ export default function SettingsModal({
   addonOrderEnabled: { value: boolean };
   isMobile: boolean;
 }) {
-  const tab = useSignal<"general" | "addons" | "ui">("general");
+  const tab = useSignal<"general" | "addons" | "ui" | "account">("general");
   
   // Auto-login settings
   const autoLogin = useSignal<AutoLoginOption>("none");
@@ -39,6 +39,7 @@ export default function SettingsModal({
   // Collapsible section states - collapsed by default
   const addonSyncCollapsed = useSignal<boolean>(true);
   const addonManagerCollapsed = useSignal<boolean>(true);
+  const deletePassword = useSignal<string>("");
 
   // Load settings from localStorage and server
   useEffect(() => {
@@ -455,6 +456,25 @@ export default function SettingsModal({
             >
               Addons
             </button>
+           <button
+             type="button"
+             className={`px-4 py-2 font-medium text-base transition-colors duration-150 ${
+             tab.value === "account"
+               ? "" // Remove static color classes
+               : "text-gray-400 hover:text-gray-200"
+           }`}
+             style={
+               tab.value === "account"
+                 ? {
+                     color: accentColor.value,
+                     borderBottom: `2px solid ${accentColor.value}`,
+                   }
+                 : undefined
+             }
+             onClick={() => (tab.value = "account")}
+           >
+             Account
+           </button>
           </div>
 
         {/* General Tab */}
@@ -887,6 +907,97 @@ export default function SettingsModal({
 
             </div>
           )}
+
+       {/* Account Tab */}
+         {tab.value === "account" && (
+           <div>
+             <h3 className="text-lg font-semibold mb-4 text-white">Account Settings</h3>
+             
+             {/* Change Password */}
+             <div className="bg-gray-800 rounded-lg p-4 mb-4">
+               <h4 className="text-base font-medium text-gray-200 mb-2">Change Password</h4>
+               <p className="text-xs text-gray-400 mt-2 mb-3">
+                 Click the button below to receive an email with a link to reset your password.
+               </p>
+               <button
+                 type="button"
+                 onClick={async () => {
+                   try {
+                     const response = await fetch('/api/auth/request-password-change', { method: 'POST' });
+                     const result = await response.json();
+                     if (response.ok) {
+                       alert(result.message || 'Password reset email sent successfully.');
+                     } else {
+                       throw new Error(result.error || 'Failed to send password reset email.');
+                     }
+                   } catch (error) {
+                     console.error('Password reset request failed:', error);
+                     if (error instanceof Error) {
+                       alert(error.message);
+                     } else {
+                       alert('An unknown error occurred while sending the password reset email.');
+                     }
+                   }
+                 }}
+                 className="px-4 py-2 rounded text-sm font-medium transition-colors duration-200 bg-red-600 hover:bg-red-700 text-white"
+               >
+                 Send Password Reset Email
+               </button>
+             </div>
+
+             {/* Delete Account */}
+             <div className="bg-gray-800 rounded-lg p-4 border border-red-600/50">
+               <h4 className="text-base font-medium text-red-400 mb-2">Delete Account</h4>
+               <p className="text-xs text-gray-400 mt-2 mb-3">
+                 This action is irreversible. All your data, including profiles and settings, will be permanently deleted. You will be logged out immediately.
+               </p>
+               <div className="mt-4">
+                 <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="password-confirm">Confirm with password</label>
+                 <input
+                   type="password"
+                   id="password-confirm"
+                   placeholder="Enter your password"
+                   className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                   value={deletePassword.value}
+                   onInput={(e) => deletePassword.value = e.currentTarget.value}
+                 />
+               </div>
+               <button
+                 type="button"
+                 onClick={async () => {
+                   if (!confirm("Are you sure you want to permanently delete your account? This action cannot be undone.")) {
+                     return;
+                   }
+                   try {
+                     const response = await fetch('/api/auth/delete-account', {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({ password: deletePassword.value }),
+                     });
+                     const result = await response.json();
+                     if (response.ok) {
+                       alert(result.message || 'Account deleted successfully.');
+                       // Redirect to logout to clear session
+                       window.location.href = '/auth/logout';
+                     } else {
+                       throw new Error(result.error || 'Failed to delete account.');
+                     }
+                   } catch (error) {
+                     console.error('Account deletion failed:', error);
+                     if (error instanceof Error) {
+                       alert(error.message);
+                     } else {
+                       alert('An unknown error occurred during account deletion.');
+                     }
+                   }
+                 }}
+                 className="mt-4 px-4 py-2 rounded text-sm font-medium transition-colors duration-200 bg-red-800 hover:bg-red-700 text-white w-full"
+               >
+                 Permanently Delete My Account
+               </button>
+             </div>
+           </div>
+         )}
 
         <style>
           {`

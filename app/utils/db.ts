@@ -217,6 +217,33 @@ export const findUserByPasswordResetToken = async (token: string): Promise<UserS
   return await Users.findOne({ passwordResetToken: token, passwordResetExpires: { $gt: new Date() } });
 };
 
+export const deleteUser = async (userId: string) => {
+ if (!mongoose.Types.ObjectId.isValid(userId)) return;
+ const userObjectId = new mongoose.Types.ObjectId(userId);
+
+ // Start a session for transaction
+ const session = await mongoose.startSession();
+ session.startTransaction();
+ try {
+   // Delete all profiles associated with the user
+   await Profiles.deleteMany({ userId: userObjectId }).session(session);
+
+   // Delete the user
+   await Users.deleteOne({ _id: userObjectId }).session(session);
+
+   // Commit the transaction
+   await session.commitTransaction();
+ } catch (error) {
+   // If an error occurred, abort the transaction
+   await session.abortTransaction();
+   console.error("Error deleting user and profiles:", error);
+   throw error; // Re-throw the error to be handled by the caller
+ } finally {
+   // End the session
+   session.endSession();
+ }
+};
+
 // --- Session Functions ---
 import { sessionSecurity } from "../shared/services/sessionSecurity.ts";
 

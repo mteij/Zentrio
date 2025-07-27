@@ -1032,8 +1032,10 @@
   },
   "workspace": {
     "dependencies": [
+      "npm:@types/nodemailer@6.4.15",
       "npm:mongoose@8.4.1",
       "npm:node-cron@3.0.3",
+      "npm:nodemailer@6.9.13",
       "npm:stremio-api-client@^1.6.0"
     ]
   }

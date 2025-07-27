@@ -7,8 +7,10 @@ import * as $_middleware from "./routes/_middleware.ts";
 import * as $api_addon_manager from "./routes/api/addon-manager.ts";
 import * as $api_addon_sync from "./routes/api/addon-sync.ts";
 import * as $api_auth_change_password from "./routes/api/auth/change-password.ts";
+import * as $api_auth_delete_account from "./routes/api/auth/delete-account.ts";
 import * as $api_auth_login_or_signup from "./routes/api/auth/login-or-signup.ts";
 import * as $api_auth_login_with_password from "./routes/api/auth/login-with-password.ts";
+import * as $api_auth_request_password_change from "./routes/api/auth/request-password-change.ts";
 import * as $api_auth_request_password_reset from "./routes/api/auth/request-password-reset.ts";
 import * as $api_auth_reset_password from "./routes/api/auth/reset-password.ts";
 import * as $api_auth_send_login_code from "./routes/api/auth/send-login-code.ts";
@@ -55,8 +57,11 @@ const manifest = {
     "./routes/api/addon-manager.ts": $api_addon_manager,
     "./routes/api/addon-sync.ts": $api_addon_sync,
     "./routes/api/auth/change-password.ts": $api_auth_change_password,
+    "./routes/api/auth/delete-account.ts": $api_auth_delete_account,
     "./routes/api/auth/login-or-signup.ts": $api_auth_login_or_signup,
     "./routes/api/auth/login-with-password.ts": $api_auth_login_with_password,
+    "./routes/api/auth/request-password-change.ts":
+      $api_auth_request_password_change,
     "./routes/api/auth/request-password-reset.ts":
       $api_auth_request_password_reset,
     "./routes/api/auth/reset-password.ts": $api_auth_reset_password,
