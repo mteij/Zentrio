@@ -1,5 +1,3 @@
-import { h } from "preact";
-
 interface ToggleSliderProps {
   enabled: boolean;
   onChange: (enabled: boolean) => void;

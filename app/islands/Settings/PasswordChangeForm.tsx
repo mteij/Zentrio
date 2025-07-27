@@ -45,7 +45,7 @@ export default function PasswordChangeForm() {
           newPassword.value = "";
           confirmPassword.value = "";
         },
-        onError: (errorMessage) => {
+        onError: (_errorMessage) => {
           // Error is handled by the hook
         }
       }

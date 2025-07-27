@@ -6,7 +6,7 @@ interface EmailTemplateProps {
   body: ComponentChildren;
 }
 
-export function EmailTemplate({ title, header, body }: EmailTemplateProps) {
+export function EmailTemplate({ header, body }: EmailTemplateProps) {
   return (
     <div
       style={{

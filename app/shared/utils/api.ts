@@ -1,4 +1,4 @@
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
   message?: string;
@@ -14,7 +14,7 @@ export async function parseJsonBody<T>(req: Request): Promise<T> {
   try {
     const body = await req.json();
     return body as T;
-  } catch (error) {
+  } catch (_error) {
     throw new ApiError("Invalid JSON in request body", 400);
   }
 }
@@ -23,7 +23,7 @@ export function createJsonResponse<T>(
   data: ApiResponse<T> | T,
   status: number = 200
 ): Response {
-  const responseData = 'data' in (data as any) || 'error' in (data as any) || 'message' in (data as any) 
+  const responseData = 'data' in (data as Record<string, unknown>) || 'error' in (data as Record<string, unknown>) || 'message' in (data as Record<string, unknown>)
     ? data as ApiResponse<T>
     : { data } as ApiResponse<T>;
     
@@ -56,7 +56,7 @@ export function validateEmail(email: string): string {
 }
 
 export function validateRequiredFields(
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   fields: string[]
 ): void {
   for (const field of fields) {
@@ -66,7 +66,7 @@ export function validateRequiredFields(
   }
 }
 
-export function withErrorHandling<T extends any[]>(
+export function withErrorHandling<T extends unknown[]>(
   handler: (...args: T) => Promise<Response>
 ) {
   return async (...args: T): Promise<Response> => {

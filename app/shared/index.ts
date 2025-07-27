@@ -21,7 +21,6 @@ export * from "./utils/profileUtils.ts";
 
 // Shared services
 export { EmailService } from "./services/email.ts";
-export { nsfwFilter } from "./services/nsfwFilter.ts";
 export { encryptionService } from "./services/encryption.ts";
 export { sessionSecurity } from "./services/sessionSecurity.ts";
 export { rateLimiter } from "./services/rateLimiter.ts";

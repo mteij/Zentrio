@@ -3,7 +3,7 @@
  * Syncs addons between profiles using the Stremio API proxy
  */
 
-import { Profile, User, getDecryptedProfilePassword } from '../../utils/db.ts';
+import { Profile, User, getDecryptedProfilePassword, ProfileSchema } from '../../utils/db.ts';
 
 interface SyncResult {
   success: boolean;
@@ -44,7 +44,7 @@ class AddonSyncService {
   /**
    * Login to Stremio using the proxy approach
    */
-  private async loginToStremio(profile: any): Promise<string> {
+  private async loginToStremio(profile: ProfileSchema): Promise<string> {
     try {
       // Passwords are encrypted in the DB, so we must always use getDecryptedProfilePassword
       const password = await getDecryptedProfilePassword(profile);
@@ -110,7 +110,7 @@ class AddonSyncService {
   /**
    * Get addons for a profile using the proxy approach
    */
-  private async getProfileAddons(profile: any): Promise<AddonData[]> {
+  private async getProfileAddons(profile: ProfileSchema): Promise<AddonData[]> {
     try {
       const authKey = await this.loginToStremio(profile);
       console.debug(`[addonSync] Pulling addons for profile ${profile.email}...`);
@@ -134,7 +134,7 @@ class AddonSyncService {
       if (data.result && Array.isArray(data.result.addons)) {
         const addons = data.result.addons;
         console.debug(`[addonSync] Pulled addons for ${profile.email}:`, addons.length);
-        return addons.map((addon: any) => {
+        return addons.map((addon: AddonData) => {
           // Preserve all addon properties, not just the ones we explicitly define
           return {
             transportUrl: addon.transportUrl,
@@ -154,7 +154,7 @@ class AddonSyncService {
   /**
    * Set addons for a profile using the proxy approach
    */
-  private async setProfileAddons(profile: any, addons: AddonData[]): Promise<void> {
+  private async setProfileAddons(profile: ProfileSchema, addons: AddonData[]): Promise<void> {
     try {
       const authKey = await this.loginToStremio(profile);
       console.debug(`[addonSync] Setting addons for profile ${profile.email}...`, addons.length);
@@ -213,8 +213,8 @@ class AddonSyncService {
       }
 
       const profiles = await Profile.find({ userId });
-      console.debug(`[addonSync] Loaded profiles:`, profiles.map((p: any) => ({ id: p._id, email: p.email })));
-      const mainProfile = profiles.find((p: any) => p._id.toString() === mainProfileId.toString());
+      console.debug(`[addonSync] Loaded profiles:`, profiles.map((p: { _id: { toString: () => string }; email: string }) => ({ id: p._id, email: p.email })));
+      const mainProfile = profiles.find((p: { _id: { toString: () => string } }) => p._id.toString() === mainProfileId.toString());
 
       if (!mainProfile) {
         return {
@@ -248,7 +248,7 @@ class AddonSyncService {
         };
       }
 
-      const otherProfiles = profiles.filter((p: any) => p._id.toString() !== mainProfileId.toString());
+      const otherProfiles = profiles.filter((p: { _id: { toString: () => string } }) => p._id.toString() !== mainProfileId.toString());
 
       for (const profile of otherProfiles) {
         try {

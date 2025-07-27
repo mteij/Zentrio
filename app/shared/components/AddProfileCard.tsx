@@ -1,4 +1,3 @@
-import { h } from "preact";
 import { profileStyles } from "../constants/styles.ts";
 
 interface AddProfileCardProps {

@@ -77,7 +77,7 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
         const data = await res.json();
         error.value = data.error || "Failed to resend code. Please try again.";
       }
-    } catch (err) {
+    } catch (_err) {
       error.value = "Network error. Please try again.";
     } finally {
       isResending.value = false;

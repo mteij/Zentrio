@@ -35,7 +35,7 @@ export function useAuthForm() {
 
   const makeApiCall = async <T>(
     url: string,
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     options: {
       method?: string;
       onSuccess?: (response: T) => void;
@@ -78,7 +78,7 @@ export function useAuthForm() {
         onSuccess(result);
       }
       return result;
-    } catch (err) {
+    } catch (_err) {
       const errorMessage = "Network error occurred";
       if (onError) {
         onError(errorMessage);

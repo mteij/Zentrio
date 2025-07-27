@@ -40,6 +40,8 @@ interface HealthStatus {
       percentage: number;
     };
   };
+  issues?: string[];
+  responseTime?: number;
 }
 
 export const handler: Handlers = {
@@ -95,7 +97,7 @@ export const handler: Handlers = {
     // Environment checks
     const encryptionMasterKey = Deno.env.get("ENCRYPTION_MASTER_KEY");
     const mongoUri = Deno.env.get("MONGO_URI");
-    const isProduction = Deno.env.get("NODE_ENV") === "production" || 
+    const isProduction = Deno.env.get("NODE_ENV") === "production" ||
                         Deno.env.get("DENO_ENV") === "production";
     
     const environmentSecure = !!(encryptionMasterKey && mongoUri);
@@ -158,7 +160,7 @@ export const handler: Handlers = {
 
     // Add issues to response if any
     if (issues.length > 0) {
-      (healthData as any).issues = issues;
+      healthData.issues = issues;
     }
 
     // Set appropriate HTTP status code
@@ -170,7 +172,7 @@ export const handler: Handlers = {
     }
 
     // Add response time
-    (healthData as any).responseTime = Date.now() - startTime;
+    healthData.responseTime = Date.now() - startTime;
 
     return new Response(JSON.stringify(healthData, null, 2), {
       status: statusCode,

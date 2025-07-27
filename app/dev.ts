@@ -4,7 +4,6 @@ import dev from "$fresh/dev.ts";
 import twindPlugin from "$fresh/plugins/twind.ts";
 import twindConfig from "./twind.config.ts";
 import { loadSync } from "$std/dotenv/mod.ts";
-import { serveDir } from "$std/http/file_server.ts";
 
 const envPath = `${Deno.cwd()}/.env`;
 loadSync({ envPath, export: true }); // Do not allow empty values

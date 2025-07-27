@@ -18,7 +18,7 @@ async function runSync() {
     console.log(`[syncScheduler] Found ${usersToSync.length} users to sync.`);
 
     for (const user of usersToSync) {
-      const userId = (user as any)._id.toString();
+      const userId = (user as { _id: { toString: () => string } })._id.toString();
       console.log(`[syncScheduler] Processing sync for user ${userId}`);
       try {
         const result = await addonSyncService.performSync(userId);

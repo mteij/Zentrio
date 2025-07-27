@@ -9,11 +9,9 @@ export const getNsfwFilterScript = () => `
     // This will be set by the session data if NSFW mode is enabled for the profile
     const nsfwModeEnabled = session?.nsfwModeEnabled || false;
     const tmdbApiKey = session?.tmdbApiKey;
-    const ageRating = session?.profile?.ageRating || 0;
+    const ageRating = session?.ageRating || 0;
 
     if (ageRating === 0 || !tmdbApiKey) return;
-
-    console.log('NSFW Content Filter: Active');
 
     // NSFW Filter Service (embedded)
     class NSFWFilter {
@@ -22,14 +20,6 @@ export const getNsfwFilterScript = () => `
         this.rateLimitDelay = 100; // TMDB allows 40 requests per 10 seconds
         this.lastApiCall = 0;
         this.apiKey = tmdbApiKey;
-      }
-
-      log(...args) {
-        console.log('[NSFW Filter]', ...args);
-      }
-
-      warn(...args) {
-        console.warn('[NSFW Filter]', ...args);
       }
 
       extractTitleInfo(text) {
@@ -72,7 +62,6 @@ export const getNsfwFilterScript = () => `
           const response = await fetch(searchUrl);
           
           if (!response.ok) {
-            this.warn('TMDB API request failed:', response.statusText);
             return null;
           }
 
@@ -98,7 +87,6 @@ export const getNsfwFilterScript = () => `
           this.cache.set(cacheKey, false);
           return null;
         } catch (error) {
-          this.warn('Error searching TMDB:', error);
           return null;
         }
       }
@@ -107,19 +95,24 @@ export const getNsfwFilterScript = () => `
         try {
           await this.rateLimit();
           
-          const endpoint = type === 'movie' ? 'movie' : 'tv';
-          const detailUrl = \`https://api.themoviedb.org/3/\${endpoint}/\${id}?api_key=\${this.apiKey}&append_to_response=release_dates\`;
-          const response = await fetch(detailUrl);
+          let endpoint = type;
+          let detailUrl = \`https://api.themoviedb.org/3/\${endpoint}/\${id}?api_key=\${this.apiKey}&append_to_response=release_dates\`;
+          let response = await fetch(detailUrl);
+          
+          if (response.status === 404) {
+            endpoint = type === 'movie' ? 'tv' : 'movie';
+            detailUrl = \`https://api.themoviedb.org/3/\${endpoint}/\${id}?api_key=\${this.apiKey}&append_to_response=release_dates\`;
+            await this.rateLimit();
+            response = await fetch(detailUrl);
+          }
           
           if (!response.ok) {
-            this.warn('TMDB API details request failed:', response.statusText);
             return null;
           }
 
           const data = await response.json();
           return data;
         } catch (error) {
-          this.warn('Error fetching TMDB details:', error);
           return null;
         }
       }
@@ -212,7 +205,6 @@ export const getNsfwFilterScript = () => `
           this.cache.set(cacheKey, isNSFW);
           return isNSFW;
         } catch (error) {
-          this.warn('Error checking NSFW status:', error);
           this.cache.set(cacheKey, false);
           return false;
         }
@@ -221,26 +213,20 @@ export const getNsfwFilterScript = () => `
       async isNSFWById(id, type) {
         const cacheKey = \`nsfw-\${type}-\${id}\`;
         if (this.cache.has(cacheKey)) {
-          const cachedResult = this.cache.get(cacheKey);
-          this.log(\`Cache hit for \${type} \${id}: \${cachedResult}\`);
-          return cachedResult || false;
+          return this.cache.get(cacheKey) || false;
         }
 
-        this.log(\`Checking NSFW status for \${type} \${id}...\`);
         try {
           const details = await this.getDetails(id, type);
           if (!details) {
-            this.warn(\`No details found for \${type} \${id}.\`);
             this.cache.set(cacheKey, false);
             return false;
           }
 
           const isNSFW = this.isNSFWContent(details);
-          this.log(\`Result for \${type} \${id}: \${isNSFW ? 'NSFW' : 'Not NSFW'}\`);
           this.cache.set(cacheKey, isNSFW);
           return isNSFW;
         } catch (error) {
-          this.warn(\`Error checking NSFW status for \${type} \${id}:\`, error);
           this.cache.set(cacheKey, false);
           return false;
         }
@@ -296,23 +282,32 @@ export const getNsfwFilterScript = () => `
         if (processedElements.has(element)) return;
         processedElements.add(element);
 
-        const placeholder = document.createElement('div');
-        placeholder.className = element.className;
-        placeholder.style.cssText = \`
-            background-image: url('https://i.imgur.com/g1p3vHh.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            border: 2px solid #4a0e0e;
+        // Make the item unclickable
+        element.style.pointerEvents = 'none';
+
+        const posterContainer = element.querySelector('.poster-image-layer-KimPZ');
+        if (!posterContainer) return;
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = \`
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
             border-radius: 8px;
-            position: relative;
-            cursor: not-allowed;
-            min-height: \${element.offsetHeight}px;
-            min-width: \${element.offsetWidth}px;
         \`;
+        overlay.textContent = \`\${ageRating}+\`;
         
-        placeholder.style.pointerEvents = 'none';
-        element.parentNode?.replaceChild(placeholder, element);
+        posterContainer.appendChild(overlay);
     }
 
     async function processContentItem(element) {
@@ -324,7 +319,6 @@ export const getNsfwFilterScript = () => `
       if (tmdbInfo && tmdbInfo.id && tmdbInfo.type) {
         isNSFW = await filter.isNSFWById(tmdbInfo.id, tmdbInfo.type);
         if (isNSFW) {
-            filter.log(\`Censoring content with TMDB ID \${tmdbInfo.id}\`);
             censorElement(element);
             return;
         }
@@ -336,16 +330,14 @@ export const getNsfwFilterScript = () => `
       try {
         isNSFW = await filter.isNSFW(title);
         if (isNSFW) {
-          filter.log(\`Censoring "\${title}"\`);
           censorElement(element);
         }
       } catch (error) {
-        filter.warn('Error processing content item by title:', error);
+        // Do nothing
       }
     }
 
     function scanForContent() {
-      filter.log('Scanning for new content...');
       const contentSelectors = [
         '[class*="board-item"]',
         '[class*="item-"]',
@@ -394,20 +386,26 @@ export const getNsfwFilterScript = () => `
 
     // Set up observer for dynamic content
     const observer = new MutationObserver(() => {
-        filter.log('DOM mutation detected, triggering scan.');
         debouncedScanForContent();
     });
 
     // Start observing
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    if (document.body) {
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    } else {
+        document.addEventListener('DOMContentLoaded', () => {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        });
+    }
 
     // Periodic scan for missed content
     setInterval(scanForContent, 5000);
-
-    console.log('NSFW Content Filter: Initialized and monitoring');
   })();
 </script>
 `;

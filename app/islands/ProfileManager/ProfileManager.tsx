@@ -5,7 +5,6 @@ import { ProfileSchema } from "../../utils/db.ts";
 import { ObjectId } from "mongoose";
 import ProfileManagerView from "./ProfileManagerView.tsx";
 import { UAParser } from "npm:ua-parser-js";
-import { ToggleSlider } from "../../shared/components/forms/ToggleSlider.tsx";
 
 export type PlainProfile = {
   _id: string;
@@ -62,7 +61,7 @@ export function ProfileModal(
 
   const handleSave = (e: Event) => {
     e.preventDefault();
-    const profileData: any = {
+    const profileData: Partial<Omit<ProfileSchema, "_id" | "userId">> = {
       name: name.value,
       email: email.value,
       profilePictureUrl: profilePictureUrl.value,
@@ -393,7 +392,7 @@ export default function ProfileManager(
   }, []);
 
   // Create a computed signal for the view mode - always use auto detection
-  const shouldShowMobile = useComputed(() => {
+  const _shouldShowMobile = useComputed(() => {
     return isMobile.value;
   });
 

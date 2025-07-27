@@ -42,7 +42,7 @@ export const handler: Handlers<null, AppState> = {
                 mainProfileIdValue = match[1];
               }
             }
-          } catch (e) {
+          } catch (_e) {
             // If conversion fails, set to null
             mainProfileIdValue = null;
           }
@@ -103,7 +103,7 @@ export const handler: Handlers<null, AppState> = {
         }
       }
 
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
       if (enabled !== undefined) updateData['settings.addonSyncSettings.enabled'] = Boolean(enabled);
       if (sanitizedMainProfileId !== undefined) updateData['settings.addonSyncSettings.mainProfileId'] = sanitizedMainProfileId || null;
       if (autoSync !== undefined) updateData['settings.addonSyncSettings.autoSync'] = Boolean(autoSync);

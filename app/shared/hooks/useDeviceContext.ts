@@ -32,7 +32,7 @@ export function useDeviceContext() {
       
       // Determine screen size based on viewport width
       const getScreenSize = (): 'sm' | 'md' | 'lg' | 'xl' => {
-        const width = window.innerWidth;
+        const width = globalThis.innerWidth;
         if (width < 640) return 'sm';
         if (width < 768) return 'md';
         if (width < 1024) return 'lg';
@@ -55,8 +55,8 @@ export function useDeviceContext() {
         };
       };
 
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
+      globalThis.addEventListener('resize', handleResize);
+      return () => globalThis.removeEventListener('resize', handleResize);
     }
   }, []);
 

@@ -1,27 +1,21 @@
-export const getSessionScript = (safeSessionData: string) => `
+export const getSessionScript = (sessionData: string) => `
 <script>
   let session; // Declare session in a wider scope
   // This script runs before Stremio's own scripts to set up the session.
   try {
-    session = JSON.parse(\`\${safeSessionData}\`);
+    session = JSON.parse(decodeURIComponent(\`${encodeURIComponent(sessionData)}\`));
+    console.log('Zentrio: Session object created successfully.', session);
     // Iterate over the session object and set each key in localStorage.
     // Stremio expects some values to be JSON.stringified (like strings), and others not (like numbers).
     for (const key in session) {
-      const value = session[key];
-      if (typeof value === 'object') {
+        const value = session[key];
+        // Stremio expects all values to be stored as JSON strings.
         localStorage.setItem(key, JSON.stringify(value));
-      } else if (typeof value === 'string') {
-        // Strings like installation_id must be stored as JSON strings (i.e., with quotes).
-        localStorage.setItem(key, JSON.stringify(value));
-      } else {
-        // Numbers like schema_version are stored as plain strings.
-        localStorage.setItem(key, value);
-      }
     }
     // Clean the URL in the browser's history.
     history.replaceState(null, '', '/stremio/');
   } catch (e) {
-    console.error('StremioHub: Failed to inject session.', e);
+    console.error('Zentrio: Failed to inject session.', e);
   }
 
   // This observer removes the "Streaming server is not available" warning
@@ -36,16 +30,16 @@ export const getSessionScript = (safeSessionData: string) => `
 
     // Check for the logo and replace it.
     const logoImg = document.querySelector('img[src*="stremio_symbol.png"]');
-    if (logoImg && session && session.stremioHubProfilePicture) {
+    if (logoImg && session && session.profilePictureUrl) {
       const logoContainer = logoImg.closest('div[class*="logo-container"]');
-      if (logoContainer && !logoContainer.querySelector('#stremio-hub-profile-link')) {
-        const profilePicUrl = session.stremioHubProfilePicture;
+      if (logoContainer && !logoContainer.querySelector('#zentrio-profile-link')) {
+        const profilePicUrl = session.profilePictureUrl;
         logoContainer.innerHTML = \`
-          <a id="stremio-hub-profile-link" href="#" title="Back to Profiles" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+          <a id="zentrio-profile-link" href="#" title="Back to Profiles" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
             <img src="\${profilePicUrl}" alt="Profiles" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 0 2px #141414;" />
           </a>
         \`;
-        const profileLink = logoContainer.querySelector('#stremio-hub-profile-link');
+        const profileLink = logoContainer.querySelector('#zentrio-profile-link');
         if (profileLink) {
           profileLink.addEventListener('click', async (e) => {
             e.preventDefault();
@@ -59,7 +53,7 @@ export const getSessionScript = (safeSessionData: string) => `
                 });
               }
             } catch (err) {
-              console.error('StremioHub: Failed to logout.', err);
+              console.error('Zentrio: Failed to logout.', err);
             } finally {
               window.top.location.href = '/profiles';
             }

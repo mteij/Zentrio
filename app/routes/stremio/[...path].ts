@@ -127,20 +127,7 @@ const proxyRequestHandler = async (req: Request, path: string) => {
         // The data is a URL-encoded JSON string. We decode it and inject it.
         const decodedSessionData = decodeURIComponent(sessionData);
         
-        // Properly escape the session data for safe JavaScript injection
-        const escapeForJS = (str: string): string => {
-          return str
-            .replace(/\\/g, "\\\\")  // Escape backslashes first
-            .replace(/`/g, "\\`")    // Escape backticks
-            .replace(/\$/g, "\\$")   // Escape dollar signs (template literals)
-            .replace(/\r?\n/g, "\\n") // Escape newlines
-            .replace(/\r/g, "\\r")   // Escape carriage returns
-            .replace(/\t/g, "\\t");  // Escape tabs
-        };
-        
-        const safeSessionData = escapeForJS(decodedSessionData);
-        
-        const injectionScript = getSessionScript(safeSessionData);
+        const injectionScript = getSessionScript(decodedSessionData);
         // Inject the script at the beginning of the head.
         body = body.replace(/<head[^>]*>/i, `$&${injectionScript}`);
       }

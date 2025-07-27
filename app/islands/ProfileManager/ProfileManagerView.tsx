@@ -5,25 +5,45 @@ import SettingsModal from "../SettingsModal.tsx";
 import { PlainProfile } from "./ProfileManager.tsx";
 
 // ProfileManagerView component
-export default function ProfileManagerView(props: any) {
+export default function ProfileManagerView(props: {
+  profiles: { value: PlainProfile[] };
+  showAddModal: { value: boolean };
+  editingProfile: { value: PlainProfile | null };
+  mobileEditMode: { value: boolean };
+  handleCreate: (data: Partial<Omit<PlainProfile, "_id" | "userId">>) => void;
+  handleUpdate: (data: Partial<Omit<PlainProfile, "_id" | "userId">>) => void;
+  handleRequestDelete: (profile: PlainProfile) => void;
+  ProfileModal: (props: {
+    profile: PlainProfile | null;
+    onSave: (data: Partial<Omit<PlainProfile, "_id" | "userId">>) => void;
+    onCancel: () => void;
+    onRequestDelete?: (profile: PlainProfile) => void;
+  }) => h.JSX.Element;
+  toggleMobileEditMode: () => void;
+  showSettings: { value: boolean };
+  setShowSettings: (value: boolean) => void;
+  addonOrderEnabled: { value: boolean };
+  setAddonOrderEnabled: (value: boolean) => void;
+  isMobile: boolean;
+}) {
   const {
     profiles,
     showAddModal,
-  editingProfile,
-  mobileEditMode,
-  handleCreate,
-  handleUpdate,
-  handleRequestDelete,
-  getRandomFunEmojiUrl,
-  getInitialsUrl,
-  ProfileModal,
-  toggleMobileEditMode,
-  showSettings,
-  setShowSettings,
-  addonOrderEnabled,
-  setAddonOrderEnabled,
-  isMobile,
-} = props;
+    editingProfile,
+    mobileEditMode,
+    handleCreate,
+    handleUpdate,
+    handleRequestDelete,
+    _getRandomFunEmojiUrl,
+    _getInitialsUrl,
+    ProfileModal,
+    toggleMobileEditMode,
+    showSettings,
+    _setShowSettings,
+    addonOrderEnabled,
+    setAddonOrderEnabled,
+    isMobile,
+  } = props;
 
   const isInitialized = useSignal(false);
   const lastProfileId = useSignal<string | null>(null);
@@ -51,9 +71,9 @@ export default function ProfileManagerView(props: any) {
       }
     };
 
-    window.addEventListener("pageshow", handlePageShow);
+    globalThis.addEventListener("pageshow", handlePageShow);
     return () => {
-      window.removeEventListener("pageshow", handlePageShow);
+      globalThis.removeEventListener("pageshow", handlePageShow);
     };
   }, []);
 
@@ -76,9 +96,9 @@ export default function ProfileManagerView(props: any) {
     ...profiles.value.map((profile: PlainProfile) => ({ type: "profile", profile })),
     ...(showAddProfile ? [{ type: "add" }] : []),
   ];
-  const rowsArr: any[][] = [];
+  const rowsArr: ({ type: string; profile?: PlainProfile })[][] = [];
   for (let i = 0; i < rows; i++) {
-    rowsArr.push(cards.slice(i * maxColumns, (i + 1) * maxColumns));
+    rowsArr.push(cards.slice(i * maxColumns, (i + 1) * maxColumns) as ({ type: string; profile?: PlainProfile })[]);
   }
 
   // --- MOBILE LAYOUT ---
@@ -106,7 +126,7 @@ export default function ProfileManagerView(props: any) {
         >
           {/* Mobile Profile Cards */}
           {profiles.value.map((profile: PlainProfile) => {
-            const isActive = profile._id === lastProfileId.value;
+            const _isActive = profile._id === lastProfileId.value;
             return (
               <div
                 key={profile._id}
@@ -308,7 +328,7 @@ export default function ProfileManagerView(props: any) {
             {row.map((card) =>
               card.type === "profile"
                 ? (() => {
-                  const isActive = card.profile._id === lastProfileId.value;
+                  const _isActive = card.profile._id === lastProfileId.value;
                   return (
                     // Desktop Profile Card
                     <div

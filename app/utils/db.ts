@@ -466,7 +466,7 @@ export const updateEncryptedProfile = async (
   userId: string,
   data: Partial<Omit<ProfileSchema, "_id" | "userId">>,
 ) => {
-  const updateData: any = { ...data };
+  const updateData: Partial<Omit<ProfileSchema, "_id" | "userId">> = { ...data };
   
   // If password is being updated, encrypt it
   if (data.password) {
@@ -587,7 +587,7 @@ export const updateUserAddonSyncSettings = async (
   userId: string, 
   settings: Partial<UserSchema['settings']['addonSyncSettings' & keyof UserSchema['settings']]>
 ): Promise<void> => {
-  const updateData: any = {};
+  const updateData: Record<string, unknown> = {};
   
   Object.entries(settings).forEach(([key, value]) => {
     if (value !== undefined) {

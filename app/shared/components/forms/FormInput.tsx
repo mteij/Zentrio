@@ -1,4 +1,3 @@
-import { h } from "preact";
 import { formStyles } from "../../constants/styles.ts";
 
 interface FormInputProps {

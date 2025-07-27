@@ -135,7 +135,7 @@ class SessionSecurityService {
    * @param allowFraming - Whether to allow iframe embedding (default: false for security)
    * @param allowCORS - Whether to allow cross-origin requests (default: false for security)
    */
-  createSecurityHeaders(allowFraming: boolean = false, allowCORS: boolean = false): Record<string, string> {
+  createSecurityHeaders(_allowFraming: boolean = false, allowCORS: boolean = false): Record<string, string> {
     const headers: Record<string, string> = {
       'X-Content-Type-Options': 'nosniff',
       'X-XSS-Protection': '1; mode=block',
@@ -176,7 +176,7 @@ class SessionSecurityService {
    */
   detectSuspiciousActivity(
     sessions: SecureSessionData[],
-    currentRequest: SessionSecurityData
+    _currentRequest: SessionSecurityData
   ): { isSuspicious: boolean; reason?: string } {
     // Check for concurrent sessions from different IPs
     const activeIPs = sessions

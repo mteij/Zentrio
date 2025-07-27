@@ -1,7 +1,7 @@
 import { Handlers, PageProps } from "$fresh/server.ts";
 import { h as _h } from "preact";
 import { AppState } from "../_middleware.ts";
-import { getProfile, getDecryptedProfilePassword, getUserTmdbApiKey, getUserAddonManagerSetting, getUserHideCalendarButtonSetting, getUserHideAddonsButtonSetting, ProfileSchema } from "../../utils/db.ts";
+import { getProfile, getDecryptedProfilePassword, getUserTmdbApiKey, getUserAddonManagerSetting, getUserHideCalendarButtonSetting, getUserHideAddonsButtonSetting } from "../../utils/db.ts";
 import StremioFrame from "../../islands/StremioFrame.tsx";
 
 interface PlayerPageData {

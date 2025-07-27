@@ -1,4 +1,3 @@
-import { h } from "preact";
 import { profileStyles } from "../constants/styles.ts";
 import { handleProfileClick } from "../utils/profileUtils.ts";
 
@@ -56,6 +55,7 @@ export function ProfileCard({
       </span>
       {!isMobile && !isEditMode && onEditClick && (
         <button
+          type="button"
           class={profileStyles.editButton}
           onClick={(e) => {
             e.stopPropagation();
@@ -67,6 +67,7 @@ export function ProfileCard({
       )}
       {isMobile && isEditMode && onEditClick && (
         <button
+          type="button"
           class="mt-2 bg-blue-600 text-white px-3 py-1 rounded text-sm"
           onClick={() => onEditClick(profile)}
         >

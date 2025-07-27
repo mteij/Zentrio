@@ -8,11 +8,10 @@ import { loadSync } from "$std/dotenv/mod.ts";
 const envPath = `${Deno.cwd()}/.env`;
 loadSync({ envPath, export: true });
 
-import { start, FreshContext } from "$fresh/server.ts";
+import { start } from "$fresh/server.ts";
 import manifest from "./fresh.gen.ts";
 import twindPlugin from "$fresh/plugins/twind.ts";
 import twindConfig from "./twind.config.ts";
-import { serveDir } from "$std/http/file_server.ts";
 import { startSyncScheduler } from "./shared/services/syncScheduler.ts";
 
 // Start the addon sync scheduler

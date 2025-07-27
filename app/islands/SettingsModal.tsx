@@ -59,7 +59,9 @@ export default function SettingsModal({
         if (stored) {
           profiles.value = JSON.parse(stored);
         }
-      } catch {}
+      } catch {
+        // Ignore parsing errors
+      }
 
       // Load TMDB API key from server
       loadTmdbApiKey();
@@ -75,7 +77,7 @@ export default function SettingsModal({
 
       // Load hide addons button setting from server
       loadHideAddonsButtonSetting();
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (globalThis.matchMedia('(display-mode: standalone)').matches) {
         isPWA.value = true;
       }
     }
@@ -354,7 +356,9 @@ export default function SettingsModal({
       if (!response.ok) {
         try {
           debugText = await response.text();
-        } catch {}
+        } catch {
+          // Ignore if reading text fails
+        }
         console.error("Addon sync failed, status:", response.status, "body:", debugText);
       }
 
@@ -672,6 +676,7 @@ export default function SettingsModal({
                       <div className="flex items-center justify-between pt-2">
                         <div>
                           <button
+                            type="button"
                             onClick={performManualSync}
                             disabled={isSyncing.value || !mainProfileId.value}
                             className={`px-4 py-2 rounded text-sm font-medium transition-colors duration-200 ${

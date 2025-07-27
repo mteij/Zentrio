@@ -1,7 +1,6 @@
 import { h as _h } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { ProfileSchema } from "../utils/db.ts";
 
 interface StremioFrameProps {
   profile: {
@@ -50,7 +49,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Verify the message is from the same origin
-      if (event.origin !== window.location.origin) return;
+      if (event.origin !== globalThis.location.origin) return;
       
       // Check if it's our reload message
       if (event.data && event.data.type === 'reload-stremio-iframe') {
@@ -59,11 +58,11 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
     };
 
     // Add event listener
-    window.addEventListener('message', handleMessage);
+    globalThis.addEventListener('message', handleMessage);
 
     // Cleanup
     return () => {
-      window.removeEventListener('message', handleMessage);
+      globalThis.removeEventListener('message', handleMessage);
     };
   }, []);
 
@@ -153,13 +152,13 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
               sendCrashReports: true,
             },
           },
-          stremioHubProfilePicture: profile.profilePictureUrl,
+          profilePictureUrl: profile.profilePictureUrl,
           nsfwModeEnabled: profile.nsfwMode || false,
           ageRating: profile.ageRating || 0,
           addonManagerEnabled: profile.addonManagerEnabled || false,
           hideCalendarButton: profile.hideCalendarButton || false,
           hideAddonsButton: profile.hideAddonsButton || false,
-          tmdbApiKey: (profile as any).tmdbApiKey || null,
+          tmdbApiKey: profile.tmdbApiKey || null,
           installation_id: result.installation_id || generateInstallationId(),
           schema_version: result.schema_version || 18,
           library: result.library || { uid: result.user._id, items: {} },

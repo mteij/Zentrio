@@ -5,11 +5,14 @@ import { FormInput } from "../../shared/components/forms/FormInput.tsx";
 import { FormButton } from "../../shared/components/forms/FormButton.tsx";
 import { ErrorMessage } from "../../shared/components/forms/ErrorMessage.tsx";
 
-interface EmailLinkFormProps {
-  // No props needed anymore as it's self-contained
+interface ApiResponse {
+  redirectUrl?: string;
+  data?: {
+    redirectUrl?: string;
+  };
 }
 
-export default function EmailLinkForm({}: EmailLinkFormProps) {
+export default function EmailLinkForm() {
   const email = useSignal("");
   const successMessage = useSignal("");
   const { error, isLoading, makeApiCall, validateEmailField } = useAuthForm();
@@ -19,33 +22,19 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
 
     if (!validateEmailField(email.value)) return;
 
-    await makeApiCall("/api/auth/login-or-signup", 
+    await makeApiCall<ApiResponse>("/api/auth/login-or-signup",
       { email: email.value },
       {
         onSuccess: (data) => {
-          console.log('API call successful, full response:', JSON.stringify(data, null, 2));
-          console.log('Response keys:', Object.keys(data || {}));
-          console.log('data.redirectUrl:', (data as any)?.redirectUrl);
-          console.log('data.data?.redirectUrl:', (data as any)?.data?.redirectUrl);
-          
-          // Try both possible response structures
-          const redirectUrl = (data as any)?.redirectUrl || (data as any)?.data?.redirectUrl;
+          const redirectUrl = data?.redirectUrl || data?.data?.redirectUrl;
           
           if (redirectUrl) {
-            console.log('Found redirectUrl:', redirectUrl);
-            
-            // Check if it's a signup success (new user)
             if (redirectUrl.includes('signup-success')) {
               successMessage.value = `Account created! We've sent a temporary password to ${email.value}. Please check your email and use it to log in.`;
-              console.log('Set success message:', successMessage.value);
-              // Delay redirect to show the message
               setTimeout(() => {
-                console.log('Redirecting after delay to:', redirectUrl);
                 globalThis.location.href = redirectUrl;
               }, 4000);
             } else {
-              // Existing user - redirect immediately to password page
-              console.log('Existing user, redirecting immediately to:', redirectUrl);
               globalThis.location.href = redirectUrl;
             }
           } else {

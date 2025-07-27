@@ -2,13 +2,13 @@ import { Handlers } from "$fresh/server.ts";
 import { EmailService } from "../../shared/services/email.ts";
 
 export const handler: Handlers = {
-  async GET(_req) {
+  GET(_req) {
     try {
       // Check if RESEND_API_KEY is configured
       const apiKey = Deno.env.get("RESEND_API_KEY");
       if (!apiKey) {
-        return new Response(JSON.stringify({ 
-          error: "RESEND_API_KEY environment variable is not set" 
+        return new Response(JSON.stringify({
+          error: "RESEND_API_KEY environment variable is not set"
         }), {
           status: 500,
           headers: { "Content-Type": "application/json" }
@@ -16,9 +16,8 @@ export const handler: Handlers = {
       }
 
       // Test email service initialization
-      const emailService = new EmailService();
       
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         success: true,
         message: "Email service initialized successfully",
         apiKeyConfigured: !!apiKey,

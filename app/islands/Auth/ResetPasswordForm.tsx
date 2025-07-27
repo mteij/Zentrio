@@ -31,7 +31,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       } else {
         error.value = data.error || "Failed to reset password. The token may be invalid or expired.";
       }
-    } catch (err) {
+    } catch (_err) {
       error.value = "Network error. Please try again.";
     } finally {
       isLoading.value = false;
