@@ -18,19 +18,30 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Generate APK via PWABuilder API
-        run: |
-          curl -X POST "https://prod.pwabuilder.com/api/build/package" \
-          -H "Content-Type: application/json" \
-          -d '{"url": "https://zentrio.eu", "platforms": ["android"]}' \
-          -o android.zip
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Unzip Generated Project
-        run: unzip android.zip -d android_project
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Set up Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build unsigned APK with Bubblewrap
+        run: |
+          bubblewrap build \
+            --manifest "${{ github.workspace }}/app/static/manifest.json" \
+            --host "https://zentrio.eu" \
+            --skip-signing
 
       - name: Find Generated APK
         id: find_apk
-        run: echo "apk_path=$(find android_project -name '*.apk' -print -quit)" >> $GITHUB_OUTPUT
+        run: echo "apk_path=$(find . -name 'app-release-unsigned.apk' -print -quit)" >> $GITHUB_OUTPUT
 
       - name: Create Release and Upload APK
         env:
