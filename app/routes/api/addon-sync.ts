@@ -21,8 +21,7 @@ export const handler: Handlers<null, AppState> = {
       const syncSettings = user?.settings?.addonSyncSettings || {
         enabled: false,
         syncDirection: 'main_to_all',
-        autoSync: false,
-        syncInterval: 60
+        autoSync: false
       };
 
       // Handle corrupted mainProfileId data
@@ -83,7 +82,7 @@ export const handler: Handlers<null, AppState> = {
     }
 
     try {
-      const { enabled, mainProfileId, autoSync, syncInterval } = await req.json();
+      const { enabled, mainProfileId, autoSync } = await req.json();
 
       // Validate and sanitize mainProfileId
       let sanitizedMainProfileId = null;
@@ -104,17 +103,10 @@ export const handler: Handlers<null, AppState> = {
         }
       }
 
-      // Validate and sanitize syncInterval
-      let sanitizedSyncInterval = 60;
-      if (syncInterval !== undefined) {
-        sanitizedSyncInterval = Math.max(5, Math.min(1440, Number(syncInterval) || 60)); // Between 5 and 1440 minutes
-      }
-
       const updateData: any = {};
       if (enabled !== undefined) updateData['settings.addonSyncSettings.enabled'] = Boolean(enabled);
       if (sanitizedMainProfileId !== undefined) updateData['settings.addonSyncSettings.mainProfileId'] = sanitizedMainProfileId || null;
       if (autoSync !== undefined) updateData['settings.addonSyncSettings.autoSync'] = Boolean(autoSync);
-      if (syncInterval !== undefined) updateData['settings.addonSyncSettings.syncInterval'] = sanitizedSyncInterval;
 
       await User.findByIdAndUpdate(userId, updateData);
 
@@ -148,7 +140,7 @@ export const handler: Handlers<null, AppState> = {
       switch (action) {
         case 'sync':
         case 'sync_main_to_all':
-          result = await addonSyncService.syncMainToAll(userId);
+          result = await addonSyncService.performSync(userId);
           break;
         default:
           return new Response("Invalid action", { status: 400 });

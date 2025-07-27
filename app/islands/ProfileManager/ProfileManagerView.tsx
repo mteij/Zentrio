@@ -95,10 +95,7 @@ export default function ProfileManagerView(props: any) {
           class="flex-1 px-4 grid auto-rows-min justify-center content-start gap-4"
           style={{
             gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
-            maxWidth: "calc(100vw - 4vw)",
-            margin: "0 auto",
-            paddingBottom: "100px",
-            height: "calc(100dvh - 80px - clamp(0px, 0vh, 50px))",
+            paddingBottom: "120px",
             overflowY: "auto",
             ...(modalOpen ? {
               pointerEvents: "none",

@@ -260,9 +260,6 @@ class AddonSyncService {
         }
       }
 
-      await User.findByIdAndUpdate(userId, {
-        'settings.addonSyncSettings.lastSyncAt': new Date()
-      });
 
       console.debug(`[addonSync] Sync complete. Synced profiles: ${syncedProfiles}, errors:`, errors);
 
@@ -285,6 +282,16 @@ class AddonSyncService {
   }
 
   async performSync(userId: string): Promise<SyncResult> {
+    console.log(`[addonSync] Performing addon sync for user ${userId}`);
+    try {
+      // Always update the last sync time when a sync is attempted
+      await User.findByIdAndUpdate(userId, {
+        'settings.addonSyncSettings.lastSyncAt': new Date()
+      });
+    } catch (error) {
+      console.error(`[addonSync] Failed to update lastSyncAt for user ${userId} before sync:`, error);
+      // Do not block sync if this fails, just log it.
+    }
     return this.syncMainToAll(userId);
   }
 

@@ -13,6 +13,7 @@ interface PlayerPageData {
     password: string;
     profilePictureUrl: string;
     nsfwMode?: boolean;
+    ageRating?: number;
     tmdbApiKey?: string;
     addonManagerEnabled?: boolean;
     hideCalendarButton?: boolean;
@@ -65,6 +66,7 @@ export const handler: Handlers<PlayerPageData, AppState> = {
         password: decryptedPassword,
         profilePictureUrl: profile.profilePictureUrl,
         nsfwMode: profile.nsfwMode,
+        ageRating: profile.ageRating,
         tmdbApiKey: tmdbApiKey || undefined,
         addonManagerEnabled,
         hideCalendarButton,

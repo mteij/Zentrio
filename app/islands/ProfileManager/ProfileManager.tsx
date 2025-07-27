@@ -5,6 +5,7 @@ import { ProfileSchema } from "../../utils/db.ts";
 import { ObjectId } from "mongoose";
 import ProfileManagerView from "./ProfileManagerView.tsx";
 import { UAParser } from "npm:ua-parser-js";
+import { ToggleSlider } from "../../shared/components/forms/ToggleSlider.tsx";
 
 export type PlainProfile = {
   _id: string;
@@ -13,6 +14,7 @@ export type PlainProfile = {
   email: string;
   profilePictureUrl: string;
   nsfwMode?: boolean;
+  ageRating?: number;
   password?: string;
 };
 
@@ -35,7 +37,7 @@ export function ProfileModal(
   const name = useSignal(profile?.name || "");
   const email = useSignal(profile?.email || "");
   const password = useSignal(profile?.password || "");
-  const nsfwMode = useSignal(profile?.nsfwMode || false);
+  const ageRating = useSignal(profile?.ageRating || 0);
   const isEditing = !!profile?._id;
   const [initialPic] = profile
     ? [profile.profilePictureUrl]
@@ -64,7 +66,8 @@ export function ProfileModal(
       name: name.value,
       email: email.value,
       profilePictureUrl: profilePictureUrl.value,
-      nsfwMode: nsfwMode.value,
+      nsfwMode: ageRating.value > 0,
+      ageRating: ageRating.value,
     };
     
     // Only include password if it's not empty or if we're creating a new profile
@@ -77,8 +80,8 @@ export function ProfileModal(
 
 
   return (
-    <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-20 transition-all duration-300 animate-fade-in">
-      <div class="bg-gray-800 p-8 rounded-lg w-full max-w-md shadow-2xl transform transition-all duration-300 animate-modal-pop">
+    <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-40 transition-all duration-300 animate-fade-in">
+      <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md shadow-2xl transform transition-all duration-300 animate-modal-pop max-h-full overflow-y-auto">
         <h2 class="text-2xl font-bold mb-4 transition-colors duration-300">
           {isEditing ? "Edit Profile" : "Add Profile"}
         </h2>
@@ -140,37 +143,26 @@ export function ProfileModal(
           
           {/* NSFW Mode Toggle */}
           <div class="mb-6 bg-gray-700 p-4 rounded">
-            <div class="flex items-center justify-between">
-              <div>
-                <label class="text-white font-medium">NSFW Content Filter</label>
-                <p class="text-xs text-gray-400 mt-1">
-                  Hide adult content from this profile (requires TMDB API key)
-                </p>
-              </div>
-              <div class="relative">
-                <input
-                  type="checkbox"
-                  id="nsfwMode"
-                  checked={nsfwMode.value}
-                  onChange={(e) => nsfwMode.value = e.currentTarget.checked}
-                  class="sr-only"
-                />
-                <div 
-                  class={`block w-14 h-8 rounded-full cursor-pointer transition-colors duration-200 ${
-                    nsfwMode.value 
-                  }`}
-                  onClick={() => nsfwMode.value = !nsfwMode.value}
-                  style={{
-              backgroundColor: localStorage.getItem("accentColor") || "#dc2626", // fallback to red-600
-            }}
-                >
-                  <div class={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 ${
-                    nsfwMode.value ? 'transform translate-x-6' : ''
-                  }`}></div>
-                </div>
-              </div>
-            </div>
-          </div>
+               <div class="flex items-center justify-between">
+                   <div>
+                       <label class="text-white font-medium">Content Filter</label>
+                       <p class="text-xs text-gray-400 mt-1">
+                           Set the maximum allowed age rating for this profile.
+                       </p>
+                   </div>
+                   <select
+                       value={ageRating.value}
+                       onChange={(e) => ageRating.value = parseInt(e.currentTarget.value)}
+                       class="bg-gray-600 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-red-600"
+                       >
+                       <option value="0">Disabled</option>
+                       <option value="6">6+</option>
+                       <option value="12">12+</option>
+                       <option value="16">16+</option>
+                       <option value="18">18+</option>
+                   </select>
+               </div>
+           </div>
           <div class="flex justify-between">
             {/* Delete button - only show when editing existing profile */}
             {isEditing && onRequestDelete && (
@@ -255,6 +247,7 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
       email: p.email,
       profilePictureUrl: p.profilePictureUrl,
       nsfwMode: p.nsfwMode,
+      ageRating: p.ageRating,
     }))
   );
   const showAddModal = useSignal(false);
@@ -283,6 +276,7 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
         email: newProfile.email,
         profilePictureUrl: newProfile.profilePictureUrl,
         nsfwMode: newProfile.nsfwMode,
+        ageRating: newProfile.ageRating,
       }];
       showAddModal.value = false;
     }

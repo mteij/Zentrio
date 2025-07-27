@@ -13,6 +13,10 @@ import manifest from "./fresh.gen.ts";
 import twindPlugin from "$fresh/plugins/twind.ts";
 import twindConfig from "./twind.config.ts";
 import { serveDir } from "$std/http/file_server.ts";
+import { startSyncScheduler } from "./shared/services/syncScheduler.ts";
+
+// Start the addon sync scheduler
+startSyncScheduler();
 
 await start(manifest, {
   server: {

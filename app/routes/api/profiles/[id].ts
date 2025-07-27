@@ -9,7 +9,7 @@ export const handler: Handlers<null, AppState> = {
       return new Response("Unauthorized", { status: 401 });
     }
     const { id } = ctx.params;
-    const { name, email, password, profilePictureUrl, nsfwMode } = await req.json();
+    const { name, email, password, profilePictureUrl, nsfwMode, ageRating } = await req.json();
 
     await updateEncryptedProfile(id, userId, {
       name,
@@ -17,6 +17,7 @@ export const handler: Handlers<null, AppState> = {
       password,
       profilePictureUrl,
       nsfwMode,
+      ageRating,
     });
     return new Response(null, { status: 204 });
   },

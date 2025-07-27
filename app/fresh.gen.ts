@@ -36,6 +36,9 @@ import * as $player_profileId_ from "./routes/player/[profileId].tsx";
 import * as $profiles from "./routes/profiles.tsx";
 import * as $settings from "./routes/settings.tsx";
 import * as $stremio_path_ from "./routes/stremio/[...path].ts";
+import * as $stremio_scripts_addonManager from "./routes/stremio/scripts/addonManager.ts";
+import * as $stremio_scripts_nsfwFilter from "./routes/stremio/scripts/nsfwFilter.ts";
+import * as $stremio_scripts_session from "./routes/stremio/scripts/session.ts";
 import * as $Auth_CodeInputForm from "./islands/Auth/CodeInputForm.tsx";
 import * as $Auth_EmailLinkForm from "./islands/Auth/EmailLinkForm.tsx";
 import * as $Auth_ForgotPasswordForm from "./islands/Auth/ForgotPasswordForm.tsx";
@@ -85,6 +88,9 @@ const manifest = {
     "./routes/profiles.tsx": $profiles,
     "./routes/settings.tsx": $settings,
     "./routes/stremio/[...path].ts": $stremio_path_,
+    "./routes/stremio/scripts/addonManager.ts": $stremio_scripts_addonManager,
+    "./routes/stremio/scripts/nsfwFilter.ts": $stremio_scripts_nsfwFilter,
+    "./routes/stremio/scripts/session.ts": $stremio_scripts_session,
   },
   islands: {
     "./islands/Auth/CodeInputForm.tsx": $Auth_CodeInputForm,

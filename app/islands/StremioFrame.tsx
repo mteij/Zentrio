@@ -12,6 +12,7 @@ interface StremioFrameProps {
     password: string;
     profilePictureUrl: string;
     nsfwMode?: boolean;
+    ageRating?: number;
     tmdbApiKey?: string;
     addonManagerEnabled?: boolean;
     hideCalendarButton?: boolean;
@@ -154,6 +155,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
           },
           stremioHubProfilePicture: profile.profilePictureUrl,
           nsfwModeEnabled: profile.nsfwMode || false,
+          ageRating: profile.ageRating || 0,
           addonManagerEnabled: profile.addonManagerEnabled || false,
           hideCalendarButton: profile.hideCalendarButton || false,
           hideAddonsButton: profile.hideAddonsButton || false,
@@ -181,7 +183,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
             // Inject a script to handle logout and redirect
             const script = document.createElement("script");
             script.textContent = `
-              const observer = new MutationObserver((mutations, obs) => {
+              const logoutObserver = new MutationObserver((mutations, obs) => {
                 const backLink = document.querySelector('a[href="#"]');
                 if (backLink && backLink.querySelector('img[src*="dicebear.com"]')) {
                   backLink.onclick = async (e) => {
@@ -199,7 +201,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
                   obs.disconnect();
                 }
               });
-              observer.observe(document.body, {
+              logoutObserver.observe(document.body, {
                 childList: true,
                 subtree: true
               });

@@ -30,7 +30,6 @@ export interface UserSchema extends Document {
       syncDirection: 'main_to_all' | 'all_to_main'; // Direction of sync
       lastSyncAt?: Date;
       autoSync: boolean; // Whether to sync automatically
-      syncInterval?: number; // Sync interval in minutes (default: 60)
     };
   };
 }
@@ -44,6 +43,7 @@ export interface ProfileSchema extends Document {
   encryptedPassword?: EncryptedData; // Stremio password (new - encrypted)
   profilePictureUrl: string;
   nsfwMode?: boolean; // NSFW content filtering enabled
+  ageRating?: number; // Age rating for content filtering
 }
 
 export interface SessionSchema extends Document {
@@ -93,8 +93,7 @@ const userSchema = new mongoose.Schema<UserSchema>({
         mainProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile" },
         syncDirection: { type: String, enum: ['main_to_all', 'all_to_main'], default: 'main_to_all' },
         lastSyncAt: { type: Date },
-        autoSync: { type: Boolean, default: false },
-        syncInterval: { type: Number, default: 60 } // minutes
+        autoSync: { type: Boolean, default: false }
       }
     },
     default: {}
@@ -114,6 +113,7 @@ const profileSchema = new mongoose.Schema<ProfileSchema>({
     tag: { type: String }
   },
   nsfwMode: { type: Boolean, default: false },
+  ageRating: { type: Number, default: 0 },
   profilePictureUrl: { type: String, required: true },
 });
 
@@ -447,6 +447,7 @@ export const createEncryptedProfile = async (profileData: {
   password: string;
   profilePictureUrl: string;
   nsfwMode?: boolean;
+  ageRating?: number;
 }): Promise<ProfileSchema> => {
   const encryptedPassword = await encryptionService.encrypt(profileData.password);
   
@@ -575,8 +576,7 @@ export const getUserAddonSyncSettings = async (userId: string) => {
   return user?.settings?.addonSyncSettings || {
     enabled: false,
     syncDirection: 'main_to_all',
-    autoSync: false,
-    syncInterval: 60
+    autoSync: false
   };
 };
 

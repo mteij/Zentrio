@@ -36,7 +36,6 @@ export default function SettingsModal({
   const mainProfileId = useSignal<string>("");
 
   const autoSync = useSignal<boolean>(false);
-  const syncInterval = useSignal<number>(60);
   const lastSyncAt = useSignal<string>("");
   const isSyncing = useSignal<boolean>(false);
   const syncStatus = useSignal<string>("");
@@ -123,7 +122,6 @@ export default function SettingsModal({
         // Remove syncDirection, always main_to_all
         // syncDirection.value = settings.syncDirection || "main_to_all";
         autoSync.value = settings.autoSync || false;
-        syncInterval.value = settings.syncInterval || 60;
         lastSyncAt.value = settings.lastSyncAt ? new Date(settings.lastSyncAt).toLocaleString() : "";
       }
     } catch (error) {
@@ -156,8 +154,6 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save hide calendar button setting');
       }
-      
-      console.log('Hide calendar button setting saved successfully');
     } catch (error) {
       console.error('Error saving hide calendar button setting:', error);
       alert('Failed to save hide calendar button setting. Please try again.');
@@ -198,8 +194,6 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save hide addons button setting');
       }
-      
-      console.log('Hide addons button setting saved successfully');
     } catch (error) {
       console.error('Error saving hide addons button setting:', error);
       alert('Failed to save hide addons button setting. Please try again.');
@@ -263,8 +257,6 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save API key');
       }
-      
-      console.log('TMDB API key saved successfully');
     } catch (error) {
       console.error('Error saving TMDB API key:', error);
       alert('Failed to save TMDB API key. Please try again.');
@@ -296,8 +288,6 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save addon manager setting');
       }
-      
-      console.log('Addon manager setting saved successfully');
     } catch (error) {
       console.error('Error saving addon manager setting:', error);
       alert('Failed to save addon manager setting. Please try again.');
@@ -323,16 +313,13 @@ export default function SettingsModal({
           enabled: addonSyncEnabled.value,
           mainProfileId: mainProfileId.value || null,
           // syncDirection: syncDirection.value, // REMOVE
-          autoSync: autoSync.value,
-          syncInterval: syncInterval.value
+          autoSync: autoSync.value
         }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to save addon sync settings');
       }
-      
-      console.log('Addon sync settings saved successfully');
     } catch (error) {
       console.error('Error saving addon sync settings:', error);
       alert('Failed to save addon sync settings. Please try again.');
@@ -346,7 +333,7 @@ export default function SettingsModal({
     }, 1000); // Debounce for 1 second
 
     return () => clearTimeout(timeoutId);
-  }, [addonSyncEnabled.value, mainProfileId.value, autoSync.value, syncInterval.value]);
+  }, [addonSyncEnabled.value, mainProfileId.value, autoSync.value]);
 
   // Manual sync function
   const performManualSync = async () => {
@@ -657,7 +644,7 @@ export default function SettingsModal({
                         <div>
                           <span className="text-gray-200 text-sm font-medium">Auto Sync</span>
                           <p className="text-xs text-gray-400">
-                            Automatically sync every {syncInterval.value} minutes
+                            Automatically sync every 5 minutes
                           </p>
                         </div>
                         <div className="flex items-center">
@@ -681,25 +668,6 @@ export default function SettingsModal({
                           </div>
                         </div>
                       </div>
-                      {/* Sync Interval */}
-                      {autoSync.value && (
-                        <div>
-                          <label className="block text-gray-200 mb-2 text-sm font-medium">
-                            Sync Interval (minutes)
-                          </label>
-                          <input
-                            type="number"
-                            min="5"
-                            max="1440"
-                            value={syncInterval.value}
-                            onInput={e => syncInterval.value = Math.max(5, parseInt(e.currentTarget.value) || 60)}
-                            className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-                          />
-                          <p className="text-xs text-gray-400 mt-1">
-                            Minimum 5 minutes, maximum 24 hours (1440 minutes)
-                          </p>
-                        </div>
-                      )}
                       {/* Manual Sync Button */}
                       <div className="flex items-center justify-between pt-2">
                         <div>
