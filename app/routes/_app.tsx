@@ -1,5 +1,6 @@
 import { PageProps } from "$fresh/server.ts";
 import Footer from "../shared/components/Footer.tsx";
+import InstallPWA from "../islands/InstallPWA.tsx";
 
 export default function App({ Component, route }: PageProps) {
   const showFooter =
@@ -63,6 +64,7 @@ export default function App({ Component, route }: PageProps) {
             }
           `}
         </style>
+        <InstallPWA />
       </body>
     </html>
   );
