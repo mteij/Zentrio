@@ -40,13 +40,6 @@ export default function App({ Component, route }: PageProps) {
                 }
                 document.documentElement.style.setProperty('--accent-color', savedAccentColor);
 
-                const savedOrientation = localStorage.getItem('pwaOrientation') || 'auto';
-                const manifestLink = document.querySelector('link[rel="manifest"]');
-                if (manifestLink) {
-                  const manifestUrl = new URL(manifestLink.href);
-                  manifestUrl.searchParams.set('orientation', savedOrientation);
-                  manifestLink.href = manifestUrl.href;
-                }
               });
             `,
           }}
