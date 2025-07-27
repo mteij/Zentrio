@@ -561,6 +561,7 @@ export const removeUserTmdbApiKey = async (userId: string): Promise<void> => {
   );
 };
 
+
 /**
  * Test encryption functionality
  */

@@ -150,6 +150,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
               streamingServerWarningDismissed: null,
               serverInForeground: false,
               sendCrashReports: true,
+              keyMode: 'arrows',
             },
           },
           profilePictureUrl: profile.profilePictureUrl,

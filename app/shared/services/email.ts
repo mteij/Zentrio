@@ -39,7 +39,7 @@ export class EmailService {
     const html = render(WelcomeEmail({ 
       email, 
       password, 
-      loginUrl: `${Deno.env.get("APP_URL") || "http://localhost:8000"}/login`
+      loginUrl: `${Deno.env.get("APP_DOMAIN") || "http://localhost:8000"}/auth/login`
     }));
     await this.sendEmail(email, "Welcome to Zentrio - Your Login Details", html);
   }

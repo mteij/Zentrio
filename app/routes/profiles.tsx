@@ -101,9 +101,8 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
             <ProfileManager
               initialProfiles={data.profiles}
               showSettings={showSettings}
-              setShowSettings={showSettings}
+              setShowSettings={(value) => (showSettings.value = value)}
               addonOrderEnabled={addonOrderEnabled}
-              setAddonOrderEnabled={addonOrderEnabled}
             />
           </div>
         </div>

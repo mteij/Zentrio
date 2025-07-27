@@ -19,7 +19,7 @@ export const getNsfwFilterScript = () => `
         this.cache = new Map();
         this.rateLimitDelay = 100; // TMDB allows 40 requests per 10 seconds
         this.lastApiCall = 0;
-        this.apiKey = tmdbApiKey;
+        this.tmdbApiKey = tmdbApiKey;
       }
 
       extractTitleInfo(text) {
@@ -33,7 +33,7 @@ export const getNsfwFilterScript = () => `
         const year = yearMatch ? (yearMatch[1] || yearMatch[2]) : undefined;
 
         if (year) {
-          cleanTitle = cleanTitle.replace(new RegExp(\`\\\\b\${year}\\\\b|\\\\(\${year}\\\\)\`), '').trim();
+          cleanTitle = cleanTitle.replace(new RegExp('\\\\b' + year + '\\\\b|\\\\(' + year + '\\\\)'), '').trim();
         }
 
         return { title: cleanTitle, year };
@@ -49,7 +49,7 @@ export const getNsfwFilterScript = () => `
       }
 
       async searchTitle(title, year) {
-        const cacheKey = \`\${title}\${year ? \`-\${year}\` : ''}\`;
+        const cacheKey = title + (year ? '-' + year : '');
         if (this.cache.has(cacheKey)) {
           const cached = this.cache.get(cacheKey);
           return cached ? { id: cached.id, type: cached.type } : null;
@@ -58,9 +58,8 @@ export const getNsfwFilterScript = () => `
         try {
           await this.rateLimit();
           
-          const searchUrl = \`https://api.themoviedb.org/3/search/multi?api_key=\${this.apiKey}&query=\${encodeURIComponent(title)}\${year ? \`&year=\${year}\` : ''}\`;
+          const searchUrl = 'https://api.themoviedb.org/3/search/multi?api_key=' + this.tmdbApiKey + '&query=' + encodeURIComponent(title) + (year ? '&year=' + year : '');
           const response = await fetch(searchUrl);
-          
           if (!response.ok) {
             return null;
           }
@@ -96,12 +95,12 @@ export const getNsfwFilterScript = () => `
           await this.rateLimit();
           
           let endpoint = type;
-          let detailUrl = \`https://api.themoviedb.org/3/\${endpoint}/\${id}?api_key=\${this.apiKey}&append_to_response=release_dates\`;
+          let detailUrl = 'https://api.themoviedb.org/3/' + endpoint + '/' + id + '?api_key=' + this.tmdbApiKey + '&append_to_response=release_dates';
           let response = await fetch(detailUrl);
           
           if (response.status === 404) {
             endpoint = type === 'movie' ? 'tv' : 'movie';
-            detailUrl = \`https://api.themoviedb.org/3/\${endpoint}/\${id}?api_key=\${this.apiKey}&append_to_response=release_dates\`;
+            detailUrl = 'https://api.themoviedb.org/3/' + endpoint + '/' + id + '?api_key=' + this.tmdbApiKey + '&append_to_response=release_dates';
             await this.rateLimit();
             response = await fetch(detailUrl);
           }
@@ -118,17 +117,31 @@ export const getNsfwFilterScript = () => `
       }
 
       isNSFWContent(details) {
-        if (details.adult) {
+        if (details && details.adult) {
           return true;
         }
 
         if (details.release_dates) {
             const usRelease = details.release_dates.results.find(r => r.iso_3166_1 === 'US');
-            if (usRelease) {
-                const rating = usRelease.release_dates[0].certification;
-                if (rating) {
-                    const ratingAge = parseInt(rating.replace('R', '17').replace('NC-', ''));
-                    if (!isNaN(ratingAge) && ratingAge > ageRating) {
+            if (usRelease && usRelease.release_dates && usRelease.release_dates.length > 0) {
+                const certification = usRelease.release_dates[0].certification;
+                if (certification) {
+                    let ratingValue = 0;
+                    // Handle specific ratings like R, NC-17
+                    if (certification.toUpperCase() === 'R') {
+                        ratingValue = 17;
+                    } else if (certification.toUpperCase() === 'NC-17') {
+                        ratingValue = 18;
+                    } else {
+                        // Try to parse a number from ratings like "PG-13"
+                        const ageMatch = certification.match(/\\d+/);
+                        if (ageMatch) {
+                            ratingValue = parseInt(ageMatch[0], 10);
+                        }
+                    }
+                    
+                    // If we found a valid rating, check if it exceeds the user's limit
+                    if (ratingValue > 0 && ratingValue > ageRating) {
                         return true;
                     }
                 }
@@ -181,27 +194,27 @@ export const getNsfwFilterScript = () => `
       }
 
       async isNSFW(titleText) {
-        const cacheKey = \`nsfw-\${titleText}\`;
+        const cacheKey = 'nsfw-' + titleText;
         if (this.cache.has(cacheKey)) {
           return this.cache.get(cacheKey) || false;
         }
 
         try {
-          const { title, year } = this.extractTitleInfo(titleText);
-          
-          const searchResult = await this.searchTitle(title, year);
-          if (!searchResult) {
-            this.cache.set(cacheKey, false);
-            return false;
-          }
+           const { title, year } = this.extractTitleInfo(titleText);
+           
+           const tmdbSearchResult = await this.searchTitle(title, year);
 
-          const details = await this.getDetails(searchResult.id, searchResult.type);
-          if (!details) {
-            this.cache.set(cacheKey, false);
-            return false;
-          }
+           let tmdbDetails = null;
+           if (tmdbSearchResult) {
+               tmdbDetails = await this.getDetails(tmdbSearchResult.id, tmdbSearchResult.type);
+           }
 
-          const isNSFW = this.isNSFWContent(details);
+           if (!tmdbDetails) {
+               this.cache.set(cacheKey, false);
+               return false;
+           }
+
+          const isNSFW = this.isNSFWContent(tmdbDetails);
           this.cache.set(cacheKey, isNSFW);
           return isNSFW;
         } catch (error) {
@@ -211,13 +224,14 @@ export const getNsfwFilterScript = () => `
       }
 
       async isNSFWById(id, type) {
-        const cacheKey = \`nsfw-\${type}-\${id}\`;
+        const cacheKey = 'nsfw-' + type + '-' + id;
         if (this.cache.has(cacheKey)) {
           return this.cache.get(cacheKey) || false;
         }
 
         try {
-          const details = await this.getDetails(id, type);
+           const details = await this.getDetails(id, type);
+
           if (!details) {
             this.cache.set(cacheKey, false);
             return false;
@@ -231,25 +245,68 @@ export const getNsfwFilterScript = () => `
           return false;
         }
       }
+
+      async convertImdbToTmdb(imdbId) {
+        const cacheKey = 'imdb-' + imdbId;
+        if (this.cache.has(cacheKey)) {
+            const cached = this.cache.get(cacheKey);
+            return cached ? { id: cached.id, type: cached.type } : null;
+        }
+
+        try {
+            await this.rateLimit();
+            const findUrl = 'https://api.themoviedb.org/3/find/' + imdbId + '?api_key=' + this.tmdbApiKey + '&external_source=imdb_id';
+            const response = await fetch(findUrl);
+            if (!response.ok) {
+                this.cache.set(cacheKey, false);
+                return null;
+            }
+
+            const data = await response.json();
+            const results = [...(data.movie_results || []), ...(data.tv_results || [])];
+
+            if (results.length > 0) {
+                const bestMatch = results[0];
+                const mediaType = bestMatch.media_type || (bestMatch.title ? 'movie' : 'tv');
+                const result = { id: bestMatch.id, type: mediaType };
+                this.cache.set(cacheKey, result);
+                return result;
+            }
+
+            this.cache.set(cacheKey, false);
+            return null;
+        } catch (error) {
+            this.cache.set(cacheKey, false);
+            return null;
+        }
+      }
     }
 
     const filter = new NSFWFilter();
     const processedElements = new WeakSet();
 
-    function extractTmdbInfo(element) {
+    function extractIdInfo(element) {
         const href = element.getAttribute('href');
         if (href) {
-            const match = href.match(/\\/detail\\/(movie|series)\\/tmdb%3A(\\d+)/);
-            if (match) {
-                return { type: match[1] === 'series' ? 'tv' : 'movie', id: match[2] };
+            const tmdbMatch = href.match(/\\/detail\\/(movie|series)\\/tmdb%3A(\\d+)/);
+            if (tmdbMatch) {
+                return { source: 'tmdb', type: tmdbMatch[1] === 'series' ? 'tv' : 'movie', id: tmdbMatch[2] };
+            }
+            const imdbMatch = href.match(/\\/detail\\/(movie|series)\\/(tt\\d+)/);
+            if (imdbMatch) {
+                return { source: 'imdb', type: imdbMatch[1] === 'series' ? 'tv' : 'movie', id: imdbMatch[2] };
             }
         }
 
         const idAttr = element.getAttribute('id');
         if (idAttr) {
-            const match = idAttr.match(/tmdb:(\\d+)/);
-            if (match) {
-                return { id: match[1], type: null };
+            const tmdbMatch = idAttr.match(/tmdb:(\\d+)/);
+            if (tmdbMatch) {
+                return { source: 'tmdb', id: tmdbMatch[1], type: null };
+            }
+            const imdbMatch = idAttr.match(/(tt\\d+)/);
+            if (imdbMatch) {
+                return { source: 'imdb', id: imdbMatch[1], type: null };
             }
         }
         
@@ -278,9 +335,10 @@ export const getNsfwFilterScript = () => `
       return element.textContent?.trim() || '';
     }
 
-    function censorElement(element) {
+    function censorElement(element, reason) {
         if (processedElements.has(element)) return;
         processedElements.add(element);
+        console.log('Censoring element:', element, 'Reason:', reason);
 
         // Make the item unclickable
         element.style.pointerEvents = 'none';
@@ -289,81 +347,59 @@ export const getNsfwFilterScript = () => `
         if (!posterContainer) return;
 
         const overlay = document.createElement('div');
-        overlay.style.cssText = \`
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            font-weight: bold;
-            text-align: center;
-            border-radius: 8px;
-        \`;
-        overlay.textContent = \`\${ageRating}+\`;
+        overlay.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); color: white; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-align: center; border-radius: 8px;';
+        overlay.textContent = ageRating + '+';
         
         posterContainer.appendChild(overlay);
     }
 
     async function processContentItem(element) {
-      if (processedElements.has(element) || !element.parentNode) return;
+        if (processedElements.has(element) || !element.parentNode) return;
 
-      const tmdbInfo = extractTmdbInfo(element);
-      let isNSFW = false;
+        const idInfo = extractIdInfo(element);
+        let isNSFW = false;
 
-      if (tmdbInfo && tmdbInfo.id && tmdbInfo.type) {
-        isNSFW = await filter.isNSFWById(tmdbInfo.id, tmdbInfo.type);
-        if (isNSFW) {
-            censorElement(element);
-            return;
+        if (idInfo && idInfo.id) {
+            let tmdbInfo = null;
+            if (idInfo.source === 'tmdb' && idInfo.type) {
+                tmdbInfo = { id: idInfo.id, type: idInfo.type };
+            } else if (idInfo.source === 'imdb') {
+                tmdbInfo = await filter.convertImdbToTmdb(idInfo.id);
+            }
+
+            if (tmdbInfo && tmdbInfo.id && tmdbInfo.type) {
+                isNSFW = await filter.isNSFWById(tmdbInfo.id, tmdbInfo.type);
+                if (isNSFW) {
+                    const reason = idInfo.source === 'imdb' ? 'IMDB ID: ' + idInfo.id + ' -> TMDB ID: ' + tmdbInfo.id : 'TMDB ID: ' + tmdbInfo.id;
+                    censorElement(element, reason);
+                    return;
+                }
+            }
         }
-      }
 
-      const title = extractTitle(element);
-      if (!title || title.length < 2) return;
+        const title = extractTitle(element);
+        if (!title || title.length < 2) return;
 
-      try {
-        isNSFW = await filter.isNSFW(title);
-        if (isNSFW) {
-          censorElement(element);
+        try {
+            isNSFW = await filter.isNSFW(title);
+            if (isNSFW) {
+                censorElement(element, 'Title: ' + title);
+            }
+        } catch (error) {
+            // Do nothing
         }
-      } catch (error) {
-        // Do nothing
-      }
     }
 
     function scanForContent() {
-      const contentSelectors = [
-        '[class*="board-item"]',
-        '[class*="item-"]',
-        '[class*="poster"]',
-        '[class*="movie"]',
-        '[class*="series"]',
-        '[class*="video"]',
-        '[class*="stream"]',
-        '.item',
-        '[class*="content-item"]'
-      ];
+      // Target elements that are likely to be content items.
+      // These are typically links to detail pages.
+      const potentialItems = document.querySelectorAll('a[href*="/detail/"]');
 
-      const items = new Set();
-      
-      contentSelectors.forEach(selector => {
-        document.querySelectorAll(selector).forEach(el => {
-          if (!processedElements.has(el) && el.textContent?.trim()) {
-            items.add(el);
-          }
-        });
-      });
-
-      let delay = 0;
-      items.forEach(item => {
-        setTimeout(() => processContentItem(item), delay);
-        delay += 100;
+      potentialItems.forEach(item => {
+        // We process each item individually.
+        // The processContentItem function is asynchronous, so we don't need to manage delays here.
+        // The rate limiting is handled inside the NSFWFilter class.
+        processContentItem(item);
       });
     }
 

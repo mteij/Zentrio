@@ -5,6 +5,8 @@
 
 import { Profile, User, getDecryptedProfilePassword, ProfileSchema } from '../../utils/db.ts';
 
+const APP_DOMAIN = Deno.env.get("APP_DOMAIN") || "http://localhost:8000";
+
 interface SyncResult {
   success: boolean;
   syncedProfiles: number;
@@ -61,7 +63,7 @@ class AddonSyncService {
       }
 
       // Login using the same approach as StremioFrame component
-      const loginRes = await fetch("http://localhost:8000/stremio/api/login", {
+      const loginRes = await fetch(`${APP_DOMAIN}/stremio/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -115,7 +117,7 @@ class AddonSyncService {
       const authKey = await this.loginToStremio(profile);
       console.debug(`[addonSync] Pulling addons for profile ${profile.email}...`);
       
-      const response = await fetch('http://localhost:8000/stremio/api/addonCollectionGet', {
+      const response = await fetch(`${APP_DOMAIN}/stremio/api/addonCollectionGet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,7 +161,7 @@ class AddonSyncService {
       const authKey = await this.loginToStremio(profile);
       console.debug(`[addonSync] Setting addons for profile ${profile.email}...`, addons.length);
       
-      const response = await fetch('http://localhost:8000/stremio/api/addonCollectionSet', {
+      const response = await fetch(`${APP_DOMAIN}/stremio/api/addonCollectionSet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

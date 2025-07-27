@@ -361,13 +361,11 @@ export default function ProfileManager(
     showSettings,
     setShowSettings,
     addonOrderEnabled,
-    setAddonOrderEnabled,
   }: {
     initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[],
     showSettings: { value: boolean },
-    setShowSettings: { value: boolean },
+    setShowSettings: (value: boolean) => void,
     addonOrderEnabled: { value: boolean },
-    setAddonOrderEnabled: { value: boolean },
   }
 ) {
   const {
@@ -418,7 +416,6 @@ const sharedProps = {
   showSettings,
   setShowSettings,
   addonOrderEnabled,
-  setAddonOrderEnabled,
   isMobile: isMobile.value,
 };
 

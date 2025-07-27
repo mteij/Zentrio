@@ -9,12 +9,10 @@ type AutoLoginOption = "none" | "last" | "profile";
 export default function SettingsModal({
   onClose,
   addonOrderEnabled,
-  setAddonOrderEnabled,
   isMobile,
 }: {
   onClose: () => void;
   addonOrderEnabled: { value: boolean };
-  setAddonOrderEnabled: { value: boolean };
   isMobile: boolean;
 }) {
   const tab = useSignal<"general" | "addons" | "ui">("general");
@@ -66,6 +64,7 @@ export default function SettingsModal({
       // Load TMDB API key from server
       loadTmdbApiKey();
       
+      
       // Load addon manager setting from server
       loadAddonManagerSetting();
       
@@ -104,7 +103,7 @@ export default function SettingsModal({
       const response = await fetch('/api/addon-manager');
       if (response.ok) {
         const data = await response.json();
-        setAddonOrderEnabled.value = data.enabled || false;
+        addonOrderEnabled.value = data.enabled || false;
       }
     } catch (error) {
       console.warn('Failed to load addon manager setting:', error);
@@ -265,6 +264,7 @@ export default function SettingsModal({
     }
   };
 
+
   // Auto-save TMDB API key with debounce
   useEffect(() => {
     if (!tmdbApiKey.value || tmdbApiKey.value.startsWith('***')) {
@@ -277,6 +277,7 @@ export default function SettingsModal({
 
     return () => clearTimeout(timeoutId);
   }, [tmdbApiKey.value]);
+
 
   // Save addon manager setting to server
   const saveAddonManagerSetting = async (enabled: boolean) => {
@@ -299,7 +300,7 @@ export default function SettingsModal({
   // Auto-save addon manager setting with debounce
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      saveAddonManagerSetting(addonOrderEnabled.value);
+      saveAddonManagerSetting(addonOrderEnabled.value); // This seems to be a signal here, let's check usage
     }, 1000); // Debounce for 1 second
 
     return () => clearTimeout(timeoutId);
@@ -532,6 +533,7 @@ export default function SettingsModal({
                 </div>
               </div>
 
+
               {/* Session Length Setting */}
               <div className="bg-gray-800 rounded-lg p-4 mb-4">
                 <div className="mb-0">
@@ -747,14 +749,14 @@ export default function SettingsModal({
                         type="checkbox"
                         className="sr-only"
                         checked={addonOrderEnabled.value}
-                        onChange={e => setAddonOrderEnabled.value = e.currentTarget.checked}
+                        onChange={e => addonOrderEnabled.value = e.currentTarget.checked}
                       />
                       <div className={`block w-14 h-8 rounded-full transition-colors duration-200 cursor-pointer ${
-                        addonOrderEnabled.value 
-                          ? 'bg-red-600' 
+                        addonOrderEnabled.value
+                          ? 'bg-red-600'
                           : 'bg-gray-600'
                       }`}
-                        onClick={() => setAddonOrderEnabled.value = !addonOrderEnabled.value}
+                        onClick={() => addonOrderEnabled.value = !addonOrderEnabled.value}
                       ></div>
                       <div className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 pointer-events-none ${
                         addonOrderEnabled.value ? 'transform translate-x-6' : ''
