@@ -1,6 +1,7 @@
 import { h } from "preact";
 import { useSignal } from "@preact/signals";
 import { useAuthForm } from "../../shared/hooks/useAuthForm.ts";
+import { useToast } from "../../shared/hooks/useToast.ts";
 import { FormInput } from "../../shared/components/forms/FormInput.tsx";
 import { FormButton } from "../../shared/components/forms/FormButton.tsx";
 import { ErrorMessage } from "../../shared/components/forms/ErrorMessage.tsx";
@@ -15,7 +16,7 @@ interface PasswordLoginFormProps {
  */
 export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
   const password = useSignal("");
-  const successMessage = useSignal("");
+  const { success, error: showError } = useToast();
   const { error, isLoading, makeApiCall } = useAuthForm();
 
   const handlePasswordLogin = async (e: h.JSX.TargetedEvent<HTMLFormElement>) => {
@@ -25,7 +26,13 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
       { email, password: password.value },
       {
         onSuccess: () => {
-          globalThis.location.href = "/profiles";
+          success("Login successful!");
+          setTimeout(() => {
+            globalThis.location.href = "/profiles";
+          }, 1000);
+        },
+        onError: (err) => {
+          showError(err);
         }
       }
     );
@@ -41,7 +48,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
           const redirectUrl = data.redirectUrl || data.data?.redirectUrl;
           
           if (redirectUrl) {
-            successMessage.value = `Login code sent to ${email}. Check your email!`;
+            success(`Login code sent to ${email}. Check your email!`);
             setTimeout(() => {
               console.log('Redirecting to:', redirectUrl);
               globalThis.location.href = redirectUrl;
@@ -50,7 +57,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
             console.error('No redirectUrl in response:', data);
             // Fallback - redirect manually
             const fallbackUrl = `/auth/code?email=${encodeURIComponent(email)}`;
-            successMessage.value = `Login code sent to ${email}. Check your email!`;
+            success(`Login code sent to ${email}. Check your email!`);
             setTimeout(() => {
               console.log('Using fallback redirect to:', fallbackUrl);
               globalThis.location.href = fallbackUrl;
@@ -82,22 +89,6 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
       <form onSubmit={handlePasswordLogin} class="space-y-4">
         <ErrorMessage message={error.value} />
         
-        {/* Success message for login code */}
-        {successMessage.value && (
-          <div class="p-4 bg-green-900 bg-opacity-50 border border-green-500 rounded-lg">
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <svg class="w-5 h-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="ml-3">
-                <p class="text-sm text-green-200">{successMessage.value}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Email field - darker and non-editable */}
         <div>
           <label htmlFor="email" class="block text-sm font-medium text-gray-300 mb-2">
@@ -119,13 +110,13 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
           placeholder="Password"
           value={password.value}
           onInput={(e) => password.value = (e.target as HTMLInputElement).value}
-          disabled={isLoading.value || !!successMessage.value}
+          disabled={isLoading.value}
           required
         />
 
         <FormButton
           type="submit"
-          disabled={isLoading.value || !!successMessage.value}
+          disabled={isLoading.value}
           isLoading={isLoading.value}
           loadingText="Signing In..."
         >
@@ -136,7 +127,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
         <FormButton
           type="button"
           onClick={handleSendCode}
-          disabled={isLoading.value || !!successMessage.value}
+          disabled={isLoading.value}
           className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-500"
         >
           Email me a login code

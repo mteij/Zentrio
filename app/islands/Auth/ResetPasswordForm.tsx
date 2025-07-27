@@ -1,5 +1,6 @@
 import { h as _h } from "preact";
 import { useSignal } from "@preact/signals";
+import { useToast } from "../../shared/hooks/useToast.ts";
 
 interface ResetPasswordFormProps {
   token: string;
@@ -7,7 +8,7 @@ interface ResetPasswordFormProps {
 
 export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const password = useSignal("");
-  const message = useSignal<string | null>(null);
+  const { success } = useToast();
   const error = useSignal<string | null>(null);
   const isLoading = useSignal(false);
 
@@ -15,7 +16,6 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     e.preventDefault();
     isLoading.value = true;
     error.value = null;
-    message.value = null;
 
     try {
       const res = await fetch("/api/auth/reset-password", {
@@ -27,7 +27,10 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       const data = await res.json();
       
       if (res.ok) {
-        message.value = data.message || "Password reset successfully! You can now log in.";
+        success(data.message || "Password reset successfully! You can now log in.");
+        setTimeout(() => {
+          globalThis.location.href = "/auth/login";
+        }, 2000);
       } else {
         error.value = data.error || "Failed to reset password. The token may be invalid or expired.";
       }
@@ -37,17 +40,6 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       isLoading.value = false;
     }
   };
-
-  if (message.value) {
-    return (
-      <div class="text-center">
-        <p class="text-green-400 mb-4">{message.value}</p>
-        <a href="/auth/login" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-          Go to Login
-        </a>
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={handleSubmit} class="space-y-4">

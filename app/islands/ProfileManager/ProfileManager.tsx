@@ -1,6 +1,7 @@
 import { h as _h } from "preact";
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { useToast } from "../../shared/hooks/useToast.ts";
 import { ProfileSchema } from "../../utils/db.ts";
 import { ObjectId } from "mongoose";
 import ProfileManagerView from "./ProfileManagerView.tsx";
@@ -199,7 +200,7 @@ export function ProfileModal(
                 type="submit"
                 class="text-white font-bold py-3 px-4 rounded transition duration-200"
                 style={{
-                    backgroundColor: localStorage.getItem("accentColor"),
+                    backgroundColor: localStorage.getItem("accentColor") || "#dc2626",
                   }}
               >
                 Save
@@ -238,6 +239,7 @@ export function ProfileModal(
 }
 
 function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[]) {
+  const { success, error } = useToast();
   const profiles = useSignal<PlainProfile[]>(
     initialProfiles.map((p) => ({
       _id: p._id.toString(),
@@ -278,6 +280,9 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
         ageRating: newProfile.ageRating,
       }];
       showAddModal.value = false;
+      success("Profile created successfully.");
+    } else {
+      error("Failed to create profile.");
     }
   };
 
@@ -298,6 +303,9 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
         p._id === updatedProfile._id ? updatedProfile : p
       );
       editingProfile.value = null;
+      success("Profile updated successfully.");
+    } else {
+      error("Failed to update profile.");
     }
   };
 
@@ -311,14 +319,17 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
         console.log("[DEBUG] Profile deleted successfully, updating UI state");
         profiles.value = profiles.value.filter((p) => p._id !== profile._id);
         editingProfile.value = null;
+        success("Profile deleted successfully.");
         console.log("[DEBUG] UI state updated - profile removed from list");
       } else {
+        error("Failed to delete profile.");
         console.error("[DEBUG] Delete API failed with status:", res.status);
         const errorText = await res.text();
         console.error("[DEBUG] Delete API error response:", errorText);
       }
-    } catch (error) {
-      console.error("[DEBUG] Delete API request failed with error:", error);
+    } catch (err) {
+      error(err instanceof Error ? err.message : "An unknown error occurred.");
+      console.error("[DEBUG] Delete API request failed with error:", err);
     }
   };
 

@@ -49,6 +49,7 @@ import * as $ProfileManager_ProfileManagerView from "./islands/ProfileManager/Pr
 import * as $SettingsModal from "./islands/SettingsModal.tsx";
 import * as $Settings_PasswordChangeForm from "./islands/Settings/PasswordChangeForm.tsx";
 import * as $StremioFrame from "./islands/StremioFrame.tsx";
+import * as $ToastHandler from "./islands/ToastHandler.tsx";
 import { type Manifest } from "$fresh/server.ts";
 
 const manifest = {
@@ -106,6 +107,7 @@ const manifest = {
     "./islands/SettingsModal.tsx": $SettingsModal,
     "./islands/Settings/PasswordChangeForm.tsx": $Settings_PasswordChangeForm,
     "./islands/StremioFrame.tsx": $StremioFrame,
+    "./islands/ToastHandler.tsx": $ToastHandler,
   },
   baseUrl: import.meta.url,
 } satisfies Manifest;

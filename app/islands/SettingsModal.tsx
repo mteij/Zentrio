@@ -1,8 +1,9 @@
 import { h as _h } from "preact";
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 
 import { ColorPicker } from "../shared/components/forms/ColorPicker.tsx";
+import { useToast } from "../shared/hooks/useToast.ts";
 
 type AutoLoginOption = "none" | "last" | "profile";
 
@@ -16,6 +17,7 @@ export default function SettingsModal({
   isMobile: boolean;
 }) {
   const tab = useSignal<"general" | "addons" | "ui" | "account">("general");
+  const { success, error } = useToast();
   
   // Auto-login settings
   const autoLogin = useSignal<AutoLoginOption>("none");
@@ -148,14 +150,19 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save hide calendar button setting');
       }
-    } catch (error) {
-      console.error('Error saving hide calendar button setting:', error);
-      alert('Failed to save hide calendar button setting. Please try again.');
+      success("Setting saved successfully.");
+    } catch (err) {
+      error(err instanceof Error ? err.message : "An unknown error occurred.");
     }
   };
 
   // Auto-save hide calendar button setting with debounce
+  const isInitialMountHideCalendar = useRef(true);
   useEffect(() => {
+    if (isInitialMountHideCalendar.current) {
+      isInitialMountHideCalendar.current = false;
+      return;
+    }
     const timeoutId = setTimeout(() => {
       saveHideCalendarButtonSetting(hideCalendarButton.value);
     }, 1000); // Debounce for 1 second
@@ -188,14 +195,19 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save hide addons button setting');
       }
-    } catch (error) {
-      console.error('Error saving hide addons button setting:', error);
-      alert('Failed to save hide addons button setting. Please try again.');
+      success("Setting saved successfully.");
+    } catch (err) {
+      error(err instanceof Error ? err.message : "An unknown error occurred.");
     }
   };
 
   // Auto-save hide addons button setting with debounce
+  const isInitialMountHideAddons = useRef(true);
   useEffect(() => {
+    if (isInitialMountHideAddons.current) {
+      isInitialMountHideAddons.current = false;
+      return;
+    }
     const timeoutId = setTimeout(() => {
       saveHideAddonsButtonSetting(hideAddonsButton.value);
     }, 1000); // Debounce for 1 second
@@ -204,7 +216,12 @@ export default function SettingsModal({
   }, [hideAddonsButton.value]);
 
   // Save auto-login settings to localStorage
+  const isInitialMountAutoLogin = useRef(true);
   useEffect(() => {
+    if (isInitialMountAutoLogin.current) {
+      isInitialMountAutoLogin.current = false;
+      return;
+    }
     if (typeof window !== "undefined") {
       localStorage.setItem("autoLogin", autoLogin.value);
       if (autoLogin.value === "profile" && autoLoginProfileId.value) {
@@ -212,11 +229,17 @@ export default function SettingsModal({
       } else {
         localStorage.removeItem("autoLoginProfileId");
       }
+      success("Auto-login settings saved.");
     }
   }, [autoLogin.value, autoLoginProfileId.value]);
 
   // Save new general settings to localStorage
+  const isInitialMountAccentColor = useRef(true);
   useEffect(() => {
+    if (isInitialMountAccentColor.current) {
+      isInitialMountAccentColor.current = false;
+      return;
+    }
     if (typeof window !== "undefined") {
       localStorage.setItem("accentColor", accentColor.value);
       // Apply accent color to CSS custom property
@@ -226,6 +249,7 @@ export default function SettingsModal({
       if (themeColorMeta) {
         themeColorMeta.content = accentColor.value;
       }
+      success("Accent color saved.");
     }
   }, [accentColor.value]);
 
@@ -246,15 +270,20 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save API key');
       }
-    } catch (error) {
-      console.error('Error saving TMDB API key:', error);
-      alert('Failed to save TMDB API key. Please try again.');
+      success("TMDB API key saved successfully.");
+    } catch (err) {
+      error(err instanceof Error ? err.message : "An unknown error occurred.");
     }
   };
 
 
   // Auto-save TMDB API key with debounce
+  const isInitialMountTmdb = useRef(true);
   useEffect(() => {
+    if (isInitialMountTmdb.current) {
+      isInitialMountTmdb.current = false;
+      return;
+    }
     if (!tmdbApiKey.value || tmdbApiKey.value.startsWith('***')) {
       return;
     }
@@ -279,14 +308,19 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save addon manager setting');
       }
-    } catch (error) {
-      console.error('Error saving addon manager setting:', error);
-      alert('Failed to save addon manager setting. Please try again.');
+      success("Addon manager setting saved successfully.");
+    } catch (err) {
+      error(err instanceof Error ? err.message : "An unknown error occurred.");
     }
   };
 
   // Auto-save addon manager setting with debounce
+  const isInitialMountAddonManager = useRef(true);
   useEffect(() => {
+    if (isInitialMountAddonManager.current) {
+      isInitialMountAddonManager.current = false;
+      return;
+    }
     const timeoutId = setTimeout(() => {
       saveAddonManagerSetting(addonOrderEnabled.value); // This seems to be a signal here, let's check usage
     }, 1000); // Debounce for 1 second
@@ -311,14 +345,19 @@ export default function SettingsModal({
       if (!response.ok) {
         throw new Error('Failed to save addon sync settings');
       }
-    } catch (error) {
-      console.error('Error saving addon sync settings:', error);
-      alert('Failed to save addon sync settings. Please try again.');
+      success("Addon sync settings saved successfully.");
+    } catch (err) {
+      error(err instanceof Error ? err.message : "An unknown error occurred.");
     }
   };
 
   // Auto-save addon sync settings with debounce
+  const isInitialMountAddonSync = useRef(true);
   useEffect(() => {
+    if (isInitialMountAddonSync.current) {
+      isInitialMountAddonSync.current = false;
+      return;
+    }
     const timeoutId = setTimeout(() => {
       saveAddonSyncSettings();
     }, 1000); // Debounce for 1 second
@@ -550,6 +589,7 @@ export default function SettingsModal({
                     value={localStorage.getItem("sessionLengthDays") || "30"}
                     onChange={e => {
                       localStorage.setItem("sessionLengthDays", e.currentTarget.value);
+                      success("Session length saved.");
                     }}
                   >
                     <option value="0">Never (stay logged in)</option>
@@ -978,7 +1018,7 @@ export default function SettingsModal({
                      if (response.ok) {
                        alert(result.message || 'Account deleted successfully.');
                        // Redirect to logout to clear session
-                       window.location.href = '/auth/logout';
+                       globalThis.location.href = '/auth/logout';
                      } else {
                        throw new Error(result.error || 'Failed to delete account.');
                      }

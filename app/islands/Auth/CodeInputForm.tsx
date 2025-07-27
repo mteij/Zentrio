@@ -2,6 +2,7 @@
 import { h } from "preact";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { useToast } from "../../shared/hooks/useToast.ts";
 
 interface CodeInputFormProps {
   email: string;
@@ -14,6 +15,7 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
   const isResending = useSignal(false);
   const resendCooldown = useSignal(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const { success, error: showError } = useToast();
 
   useEffect(() => {
     inputRefs.current[0]?.focus();
@@ -67,12 +69,13 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
         body: JSON.stringify({ email }),
         headers: { "Content-Type": "application/json" },
       });
-
+ 
       if (res.ok) {
         resendCooldown.value = 30; // Start 30-second cooldown
         // Clear the current code
         code.value = new Array(6).fill("");
         inputRefs.current[0]?.focus();
+        success("A new code has been sent to your email.");
       } else {
         const data = await res.json();
         error.value = data.error || "Failed to resend code. Please try again.";
@@ -104,10 +107,13 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
 
     if (res.ok) {
       // The cookie is now set by the server. We just need to redirect.
-      globalThis.location.href = "/profiles";
+      success("Login successful!");
+      setTimeout(() => {
+        globalThis.location.href = "/profiles";
+      }, 1000);
     } else {
       const data = await res.json();
-      error.value = data.error || "Verification failed.";
+      showError(data.error || "Verification failed.");
       isLoading.value = false;
       code.value = new Array(6).fill("");
       inputRefs.current[0]?.focus();

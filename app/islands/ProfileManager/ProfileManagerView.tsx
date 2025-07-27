@@ -1,6 +1,7 @@
 import { h } from "preact";
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
+import { useToast } from "../../shared/hooks/useToast.ts";
 import SettingsModal from "../SettingsModal.tsx";
 import { PlainProfile } from "./ProfileManager.tsx";
 
@@ -40,6 +41,7 @@ export default function ProfileManagerView(props: {
     isMobile,
   } = props;
 
+  const { success } = useToast();
   const isInitialized = useSignal(false);
   const lastProfileId = useSignal<string | null>(null);
   const modalOpen = showAddModal.value || editingProfile.value !== null;
@@ -250,15 +252,21 @@ export default function ProfileManagerView(props: {
         {isMobile && (
           <div class="fixed bottom-0 inset-x-0 flex gap-2 justify-center bg-black bg-opacity-90 py-3 z-30 border-t border-gray-800">
           {/* Mobile Logout Button */}
-          <a
-            href="/auth/logout"
+          <button
+            type="button"
+            onClick={() => {
+              success("You have been logged out.");
+              setTimeout(() => {
+                globalThis.location.href = "/auth/logout";
+              }, 1000);
+            }}
             class="text-white font-bold py-2 px-4 rounded-lg text-base transition-all duration-200"
             style={{
               backgroundColor: localStorage.getItem("accentColor") || "#dc2626", // fallback to red-600
             }}
           >
             Logout
-          </a>
+          </button>
           {/* Mobile Edit Button */}
           <button
             type="button"
@@ -435,15 +443,21 @@ export default function ProfileManagerView(props: {
       {/* Desktop Bottom Bar */}
       <div class="flex justify-center items-center gap-4 w-full mt-6">
         {/* Desktop Logout Button */}
-        <a
-          href="/auth/logout"
+        <button
+          type="button"
+          onClick={() => {
+            success("You have been logged out.");
+            setTimeout(() => {
+              globalThis.location.href = "/auth/logout";
+            }, 1000);
+          }}
           class="text-white font-bold py-2 px-6 rounded-lg text-lg transition-all duration-200"
           style={{
             backgroundColor: localStorage.getItem("accentColor") || "#dc2626",
           }}
         >
           Logout
-        </a>
+        </button>
         {/* Desktop Settings Button */}
         <button
           type="button"

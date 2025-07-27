@@ -1,5 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { useToast } from "../hooks/useToast.ts";
 
 interface Addon {
   transportUrl: string;
@@ -24,17 +25,24 @@ interface AddonManagerModalProps {
 export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModalProps) {
   const addons = useSignal<Addon[]>([]);
   const isLoading = useSignal(false);
-  const error = useSignal<string | null>(null);
+  const { success, error } = useToast();
   const isSaving = useSignal(false);
   const draggedIndex = useSignal<number | null>(null);
   const dragOverIndex = useSignal<number | null>(null);
+  const accentColor = useSignal("#dc2626");
+
+  // Load accent color from local storage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      accentColor.value = localStorage.getItem("accentColor") || "#dc2626";
+    }
+  }, []);
 
   // Fetch addons from Stremio API
   const fetchAddons = async () => {
     if (!authKey) return;
     
     isLoading.value = true;
-    error.value = null;
 
     try {
       const response = await fetch('/stremio/api/addonCollectionGet', {
@@ -61,7 +69,7 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
       }
     } catch (err) {
       console.error('Error fetching addons:', err);
-      error.value = err instanceof Error ? err.message : 'Failed to fetch addons';
+      error(err instanceof Error ? err.message : 'Failed to fetch addons');
     } finally {
       isLoading.value = false;
     }
@@ -72,7 +80,6 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
     if (!authKey || addons.value.length === 0) return;
 
     isSaving.value = true;
-    error.value = null;
 
     try {
       const response = await fetch('/stremio/api/addonCollectionSet', {
@@ -96,18 +103,11 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
         throw new Error(data.result.error || 'Failed to save changes');
       }
 
-      // Show success message briefly
-      const originalError = error.value;
-      error.value = 'Addon order saved successfully!';
-      setTimeout(() => {
-        if (error.value === 'Addon order saved successfully!') {
-          error.value = originalError;
-        }
-      }, 3000);
+      success('Addon order saved successfully!');
 
     } catch (err) {
       console.error('Error saving addon order:', err);
-      error.value = err instanceof Error ? err.message : 'Failed to save addon order';
+      error(err instanceof Error ? err.message : 'Failed to save addon order');
     } finally {
       isSaving.value = false;
     }
@@ -172,7 +172,7 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
     
     // Don't allow removing protected addons
     if (addon.flags?.protected) {
-      error.value = 'Cannot remove protected addons';
+      error('Cannot remove protected addons');
       return;
     }
 
@@ -204,16 +204,6 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
 
         {/* Content */}
         <div class="flex-1 overflow-y-auto p-6">
-          {error.value && (
-            <div class={`mb-4 p-3 rounded ${
-              error.value.includes('successfully') 
-                ? 'bg-green-900 text-green-200' 
-                : 'bg-red-900 text-red-200'
-            }`}>
-              {error.value}
-            </div>
-          )}
-
           {isLoading.value ? (
             <div class="flex items-center justify-center py-12">
               <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
@@ -324,18 +314,12 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
           <div class="flex space-x-3">
             <button
               type="button"
-              onClick={onClose}
-              class="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
               onClick={saveAddonOrder}
               disabled={isSaving.value}
-              class="px-6 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded transition-colors"
+              class="px-6 py-2 disabled:bg-gray-600 text-white rounded transition-colors"
+              style={{ backgroundColor: !isSaving.value ? accentColor.value : undefined }}
             >
-              {isSaving.value ? 'Saving...' : 'Save Changes'}
+              {isSaving.value ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>

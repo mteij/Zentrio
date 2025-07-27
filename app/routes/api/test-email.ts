@@ -51,13 +51,10 @@ export const handler: Handlers = {
       }
 
       const emailService = new EmailService();
-      await emailService.sendWelcomeEmail(email, "test123");
+      const result = await emailService.sendWelcomeEmail(email, "test123");
       
-      return new Response(JSON.stringify({ 
-        success: true,
-        message: `Test email sent successfully to ${email}`
-      }), {
-        status: 200,
+      return new Response(JSON.stringify(result), {
+        status: result.success ? 200 : 500,
         headers: { "Content-Type": "application/json" }
       });
     } catch (error) {
