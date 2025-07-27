@@ -36,7 +36,6 @@ export default function ProfileManagerView(props: {
     ProfileModal,
     toggleMobileEditMode,
     showSettings,
-    setShowSettings,
     addonOrderEnabled,
     isMobile,
   } = props;

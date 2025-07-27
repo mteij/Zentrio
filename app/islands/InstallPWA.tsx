@@ -1,23 +1,32 @@
 import { useEffect, useState } from "preact/hooks";
 
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+
 export default function InstallPWA() {
-  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
-      setInstallPrompt(event);
+      setInstallPrompt(event as BeforeInstallPromptEvent);
       const dismissed = sessionStorage.getItem("pwaInstallDismissed");
       if (!dismissed) {
         setIsVisible(true);
       }
     };
 
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    globalThis.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
     return () => {
-      window.removeEventListener(
+      globalThis.removeEventListener(
         "beforeinstallprompt",
         handleBeforeInstallPrompt,
       );
@@ -27,9 +36,9 @@ export default function InstallPWA() {
   const handleInstallClick = () => {
     if (!installPrompt) return;
 
-    (installPrompt as any).prompt();
+    installPrompt.prompt();
 
-    (installPrompt as any).userChoice.then((choiceResult: { outcome: string }) => {
+    installPrompt.userChoice.then((choiceResult) => {
       if (choiceResult.outcome === "accepted") {
         console.log("User accepted the install prompt");
       } else {
