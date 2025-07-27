@@ -34,7 +34,7 @@ jobs:
         run: npx @pwa/builder-cli http://localhost:8000/manifest.json -p android -d .
         
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: app
           path: Zentrio.apk
