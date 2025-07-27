@@ -27,8 +27,6 @@ export default function SettingsModal({
   const tmdbApiKey = useSignal<string>("");
   const hideCalendarButton = useSignal<boolean>(false);
   const hideAddonsButton = useSignal<boolean>(false);
-  const pwaOrientation = useSignal<string>("auto");
-
   // Addon sync settings
   const addonSyncEnabled = useSignal<boolean>(false);
   const mainProfileId = useSignal<string>("");
@@ -38,7 +36,6 @@ export default function SettingsModal({
   const isSyncing = useSignal<boolean>(false);
   const syncStatus = useSignal<string>("");
 
-  const isPWA = useSignal<boolean>(false);
   // Collapsible section states - collapsed by default
   const addonSyncCollapsed = useSignal<boolean>(true);
   const addonManagerCollapsed = useSignal<boolean>(true);
@@ -49,8 +46,6 @@ export default function SettingsModal({
       autoLogin.value = (localStorage.getItem("autoLogin") as AutoLoginOption) || "none";
       autoLoginProfileId.value = localStorage.getItem("autoLoginProfileId") || null;
       accentColor.value = localStorage.getItem("accentColor") || "#dc2626";
-      pwaOrientation.value = localStorage.getItem("pwaOrientation") || "auto";
-      
       // Load profiles for dropdown
       try {
         const stored = localStorage.getItem("profiles");
@@ -76,9 +71,6 @@ export default function SettingsModal({
 
       // Load hide addons button setting from server
       loadHideAddonsButtonSetting();
-    if (globalThis.matchMedia('(display-mode: standalone)').matches) {
-        isPWA.value = true;
-      }
     }
   }, []);
 
@@ -236,11 +228,6 @@ export default function SettingsModal({
     }
   }, [accentColor.value]);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("pwaOrientation", pwaOrientation.value);
-    }
-  }, [pwaOrientation.value]);
 
   // Save TMDB API key to server
   const saveTmdbApiKey = async (apiKey: string) => {
@@ -898,25 +885,6 @@ export default function SettingsModal({
                 </div>
               </div>
 
-              {/* PWA Orientation Setting */}
-              {isPWA.value &&
-              <div className="bg-gray-800 rounded-lg p-4 mb-4">
-                <div className="mb-0">
-                  <label className="block text-base font-medium text-gray-200 mb-2">PWA Orientation</label>
-                  <select
-                    className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
-                    value={pwaOrientation.value}
-                    onChange={e => (pwaOrientation.value = e.currentTarget.value)}
-                  >
-                    <option value="auto">Auto (default)</option>
-                    <option value="portrait">Portrait</option>
-                    <option value="landscape">Landscape</option>
-                  </select>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Sets the orientation for the Progressive Web App.
-                  </p>
-                </div>
-              </div>}
             </div>
           )}
 
