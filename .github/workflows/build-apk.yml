@@ -1,0 +1,40 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Start server
+        run: deno task preview &
+        
+      - name: Wait for server to start
+        run: |
+          timeout 120 sh -c 'until curl -s --fail http://localhost:8000/manifest.json; do echo "Waiting for server..."; sleep 1; done'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Generate APK with PWABuilder CLI
+        run: npx @pwa/builder-cli http://localhost:8000/manifest.json -p android -d .
+        
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: app
+          path: Zentrio.apk
