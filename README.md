@@ -1,8 +1,8 @@
 <div align="center">
   
-  # 💠 **Zentrio** 
+  # <img src="app/static/icons/icon-512.png" alt="Zentrio Icon" width="48" height="48" align="center"> **Zentrio**
   
-  **A beautiful, secure, Netflix-inspired profile management system for Stremio Web**
+  **A profile management system for Stremio Web**
   
   [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![Deno](https://img.shields.io/badge/Deno-000?style=for-the-badge&logo=deno&logoColor=white)](https://deno.land/)
@@ -16,7 +16,8 @@
 
 ---
 
-## 🛡️ **Important Note & Disclaimer**
+<details>
+<summary>🛡️ Important Note & Disclaimer</summary>
 
 Welcome to Zentrio! Before you proceed, please take a moment to read this.
 
@@ -27,6 +28,8 @@ Welcome to Zentrio! Before you proceed, please take a moment to read this.
 *   **New Stremio Profiles:** It is strongly recommended to create new, empty Stremio profiles when using this service, instead of linking your existing ones.
 
 **Legal Disclaimer:** This is a personal project and is not affiliated with, endorsed, or sponsored by Stremio. I acknowledge that this service may test the boundaries of Stremio's terms of service and will comply with any and all takedown or cease and desist notices from Stremio or its legal representatives. The official Stremio website can be found at [stremio.com](https://stremio.com).
+
+</details>
 
 ---
 
@@ -54,14 +57,27 @@ cd app && deno task start
 ```
 
 **Environment Variables (`.env`):**
-```env
-MONGO_URI="your_mongodb_connection_string"
-RESEND_API_KEY="your_resend_api_key" 
-EMAIL_FROM_DOMAIN="noreply@yourdomain.com"
-ENCRYPTION_MASTER_KEY="generated_64_char_hex_key"
-```
 
-Generate the encryption key with: `python3 -c "import uuid; print((uuid.uuid4().hex + uuid.uuid4().hex))"`
+Create a `.env` file in the root directory by copying the example: `cp .env.example .env`. Then, fill in the following variables:
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `MONGO_URI` | **Required.** Your MongoDB connection string. | `""` |
+| `EMAIL_PROVIDER` | **Required.** The email service to use. Can be `resend` or `smtp`. | `resend` |
+| `RESEND_API_KEY` | **Required if `EMAIL_PROVIDER` is `resend`**. Your API key for Resend. | `""` |
+| `SMTP_HOST` | **Required if `EMAIL_PROVIDER` is `smtp`**. Hostname of your SMTP server. | `""` |
+| `SMTP_PORT` | **Required if `EMAIL_PROVIDER` is `smtp`**. Port for your SMTP server. | `587` |
+| `SMTP_USER` | **Required if `EMAIL_PROVIDER` is `smtp`**. Username for your SMTP server. | `""` |
+| `SMTP_PASS` | **Required if `EMAIL_PROVIDER` is `smtp`**. Password for your SMTP server. | `""` |
+| `SMTP_SECURE`| **Required if `EMAIL_PROVIDER` is `smtp`**. Use `true` for direct SSL/TLS (port 465) or `false` for STARTTLS (port 587/25). | `false` |
+| `EMAIL_FROM_DOMAIN` | **Required.** The "from" address for emails. For Resend, use `onboarding@resend.dev` for testing if you don't have a verified domain. | `""` |
+| `ENCRYPTION_MASTER_KEY` | **Required.** A 64-character hex key for encrypting sensitive data. | `""` |
+| `APP_DOMAIN` | **Required.** The public domain where the app is hosted, including the protocol. | `http://localhost:8000` |
+
+**Generate `ENCRYPTION_MASTER_KEY`:**
+```bash
+python3 -c "import uuid; print((uuid.uuid4().hex + uuid.uuid4().hex))"
+```
 
 ---
 
@@ -124,9 +140,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   **Made with ❤️ for the Stremio Community**
   
   ⭐ **Star this repo if you found it helpful!** ⭐
-  
-  ---
-  
-  **[🚀 Hosted Version](https:/zentrio.eu)** • **[💬 Join Discussion](https://github.com/MichielEijpe/Zentrio/discussions)** • **[🐛 Report Bug](https://github.com/MichielEijpe/Zentrio/issues)**
   
 </div>
