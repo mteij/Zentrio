@@ -1,12 +1,18 @@
 name: Build and Release Android APK
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The tag for the new release (e.g., v1.0.1)'
+        required: true
+        type: string
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to create a release
 
     steps:
       - name: Check out repository
@@ -20,12 +26,13 @@ jobs:
       - name: Generate APK with PWABuilder CLI
         run: npx @pwa/builder-cli https://zentrio.eu -p android -d .
 
-      - name: Upload APK to Release
-        uses: actions/upload-release-asset@v1
+      - name: Create Release and Upload APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./Zentrio.apk
-          asset_name: Zentrio.apk
-          asset_content_type: application/vnd.android.package-archive
+          TAG_NAME: ${{ github.event.inputs.tag }}
+        run: |
+          gh release create "$TAG_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Release $TAG_NAME" \
+            --notes "Automated APK release for $TAG_NAME" \
+            ./Zentrio.apk
