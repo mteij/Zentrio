@@ -26,15 +26,9 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Set up Java JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Build unsigned APK with Bubblewrap
         run: |
-          bubblewrap build \
+          yes | bubblewrap build \
             --manifest "${{ github.workspace }}/app/static/manifest.json" \
             --host "https://zentrio.eu" \
             --skip-signing
