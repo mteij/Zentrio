@@ -42,7 +42,7 @@ export class EmailService {
     }
   }
 
-  private async sendEmail(to: string, subject: string, html: string): Promise<void> {
+  private async sendEmail(to: string, subject: string, html: string, text: string): Promise<void> {
     try {
       console.log(`Attempting to send email to: ${to} via ${this.emailProvider}`);
       
@@ -52,6 +52,7 @@ export class EmailService {
           to,
           subject,
           html,
+          text,
         });
         console.log(`Email sent successfully via Resend:`, result);
       } else if (this.emailProvider === "smtp" && this.nodemailer) {
@@ -59,6 +60,7 @@ export class EmailService {
           from: `"Zentrio" <${this.fromDomain}>`,
           to,
           subject,
+          text,
           html,
         });
         console.log(`Email sent successfully via SMTP:`, result);
@@ -73,21 +75,25 @@ export class EmailService {
   }
 
   async sendWelcomeEmail(email: string, password: string): Promise<void> {
-    const html = render(WelcomeEmail({ 
-      email, 
-      password, 
-      loginUrl: `${Deno.env.get("APP_DOMAIN") || "http://localhost:8000"}/auth/login`
+    const loginUrl = `${Deno.env.get("APP_DOMAIN") || "http://localhost:8000"}/auth/login`;
+    const html = render(WelcomeEmail({
+      email,
+      password,
+      loginUrl,
     }));
-    await this.sendEmail(email, "Welcome to Zentrio - Your Login Details", html);
+    const text = `Welcome to Zentrio! Here are your login details:\nEmail: ${email}\nPassword: ${password}\nLogin here: ${loginUrl}`;
+    await this.sendEmail(email, "Welcome to Zentrio - Your Login Details", html, text);
   }
 
   async sendLoginCode(email: string, code: string, verificationUrl: string): Promise<void> {
     const html = render(LoginCodeEmail({ code, verificationUrl }));
-    await this.sendEmail(email, "Your Zentrio Login Code", html);
+    const text = `Your Zentrio login code is: ${code}\nYou can also use this link to log in: ${verificationUrl}`;
+    await this.sendEmail(email, "Your Zentrio Login Code", html, text);
   }
 
   async sendPasswordReset(email: string, resetUrl: string): Promise<void> {
     const html = render(ResetPasswordEmail({ resetUrl }));
-    await this.sendEmail(email, "Reset Your Zentrio Password", html);
+    const text = `Please reset your password by clicking the following link: ${resetUrl}`;
+    await this.sendEmail(email, "Reset Your Zentrio Password", html, text);
   }
 }
