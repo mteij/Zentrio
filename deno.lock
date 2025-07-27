@@ -10,11 +10,11 @@
     "jsr:@std/path@0.213": "0.213.1",
     "npm:@preact/signals@*": "2.2.1_preact@10.26.9",
     "npm:@types/node@*": "22.15.15",
-    "npm:@types/nodemailer@6.4.15": "6.4.15",
     "npm:mongoose@*": "8.4.1",
     "npm:mongoose@8.4.1": "8.4.1",
     "npm:node-cron@3.0.3": "3.0.3",
     "npm:nodemailer@6.9.13": "6.9.13",
+    "npm:nodemailer@7.0.5": "7.0.5",
     "npm:preact@*": "10.26.9",
     "npm:stremio-api-client@^1.6.0": "1.6.0",
     "npm:ua-parser-js@*": "2.0.4"
@@ -82,12 +82,6 @@
       "integrity": "sha512-R5muMcZob3/Jjchn5LcO8jdKwSCbzqmPB6ruBxMcf9kbxtniZHP327s6C37iOfuw8mbKK3cAQa7sEl7afLrQ8A==",
       "dependencies": [
         "undici-types"
-      ]
-    },
-    "@types/nodemailer@6.4.15": {
-      "integrity": "sha512-0EBJxawVNjPkng1zm2vopRctuWVCxk34JcIlRuXSf54habUWdz1FB7wHDqOqvDa8Mtpt0Q3LTXQkAs2LNyK5jQ==",
-      "dependencies": [
-        "@types/node"
       ]
     },
     "@types/webidl-conversions@7.0.3": {
@@ -299,6 +293,9 @@
     },
     "nodemailer@6.9.13": {
       "integrity": "sha512-7o38Yogx6krdoBf3jCAqnIN4oSQFx+fMa0I7dK1D+me9kBxx12D+/33wSb+fhOCtIxvYJ+4x4IMEhmhCKfAiOA=="
+    },
+    "nodemailer@7.0.5": {
+      "integrity": "sha512-nsrh2lO3j4GkLLXoeEksAMgAOqxOv6QumNRVQTJwKH4nuiww6iC2y7GyANs9kRAxCexg3+lTWM3PZ91iLlVjfg=="
     },
     "object-inspect@1.13.4": {
       "integrity": "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew=="
@@ -1047,10 +1044,10 @@
   },
   "workspace": {
     "dependencies": [
-      "npm:@types/nodemailer@6.4.15",
+      "npm:@types/nodemailer@6.4.17",
       "npm:mongoose@8.4.1",
       "npm:node-cron@3.0.3",
-      "npm:nodemailer@6.9.13",
+      "npm:nodemailer@7.0.5",
       "npm:stremio-api-client@^1.6.0"
     ]
   }
