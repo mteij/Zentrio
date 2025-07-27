@@ -1,3 +1,4 @@
+import { asset } from "$fresh/runtime.ts";
 import { PageProps } from "$fresh/server.ts";
 import Footer from "../shared/components/Footer.tsx";
 import InstallPWA from "../islands/InstallPWA.tsx";
@@ -6,6 +7,8 @@ export default function App({ Component, route }: PageProps) {
   const showFooter =
     route.startsWith("/auth") ||
     route === "/";
+
+  const serviceWorkerUrl = asset("/service-worker.js");
 
   return (
     <html lang="en">
@@ -30,7 +33,7 @@ export default function App({ Component, route }: PageProps) {
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/service-worker.js');
+                  navigator.serviceWorker.register('${serviceWorkerUrl}');
                 });
               }
               document.addEventListener('DOMContentLoaded', function() {

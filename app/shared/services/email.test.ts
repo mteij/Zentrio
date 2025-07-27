@@ -1,7 +1,7 @@
 import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { EmailService } from "./email.ts";
 
-Deno.test("EmailService - SMTP Fallback to Resend", async () => {
+Deno.test("EmailService - SMTP Fallback to Resend for all email types", async () => {
   // Set up environment variables for the test
   Deno.env.set("EMAIL_PROVIDER", "smtp");
   Deno.env.set("SMTP_HOST", "smtp.invalid");
@@ -21,15 +21,17 @@ Deno.test("EmailService - SMTP Fallback to Resend", async () => {
   };
 
   // Mock the sendResendEmail method to simulate a successful call
-  let resendCalled = false;
+  let resendCallCount = 0;
   emailService["sendResendEmail"] = () => {
-    resendCalled = true;
+    resendCallCount++;
     return Promise.resolve();
   };
 
   await emailService.sendWelcomeEmail("test@example.com", "password");
+  await emailService.sendLoginCode("test@example.com", "123456", "http://verify.com");
+  await emailService.sendPasswordReset("test@example.com", "http://reset.com");
 
-  assertEquals(resendCalled, true, "Resend should be called as a fallback");
+  assertEquals(resendCallCount, 3, "Resend should be called as a fallback for all email types");
 });
 
 Deno.test("EmailService - SMTP without fallback", async () => {

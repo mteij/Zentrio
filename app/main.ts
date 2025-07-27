@@ -10,6 +10,7 @@ import manifest from "./fresh.gen.ts";
 import twindPlugin from "$fresh/plugins/twind.ts";
 import twindConfig from "./twind.config.ts";
 import { startSyncScheduler } from "./shared/services/syncScheduler.ts";
+import { join } from "$std/path/mod.ts";
 
 // Start the addon sync scheduler
 startSyncScheduler();
@@ -19,5 +20,5 @@ await start(manifest, {
     port: 8000
   },
   plugins: [twindPlugin(twindConfig)],
-  staticDir: "./app/static",
+  staticDir: join(Deno.cwd(), "app", "static"),
 });

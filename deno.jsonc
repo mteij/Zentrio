@@ -1,7 +1,7 @@
 {
   "tasks": {
     "clean": "deno eval \"await Deno.remove('fresh.gen.ts').catch(() => {})\"",
-    "cache": "deno cache --reload app/dev.ts",
+    "cache": "deno cache --reload app/dev.ts app/main.ts",
     "start": "deno run -A --unstable-kv --watch=app/static,app/routes/ app/dev.ts",
     "update": "deno run -A -r https://fresh.deno.dev/update .",
     "build": "deno cache app/main.ts",

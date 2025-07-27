@@ -46,7 +46,7 @@ export class EmailService {
         port,
         secure,
         auth: { user, pass },
-        connectionTimeout: 1000 * 10, // 10 seconds
+        connectionTimeout: 1000 * 5, // 5 seconds
       });
     } else if (this.emailProvider !== "resend") {
       throw new Error(`Invalid EMAIL_PROVIDER: ${this.emailProvider}`);

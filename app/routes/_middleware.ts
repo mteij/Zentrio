@@ -11,6 +11,11 @@ export async function handler(
   req: Request,
   ctx: FreshContext<AppState>,
 ) {
+  const url = new URL(req.url);
+  if (url.pathname === "/service-worker.js") {
+    return await ctx.next();
+  }
+
   const { sessionId } = getCookies(req.headers);
   ctx.state.userId = null;
 
@@ -30,14 +35,14 @@ export async function handler(
   const response = await ctx.next();
   
   // Determine security policy based on route
-  const url = new URL(req.url);
   const isStremioProxyRoute = url.pathname.startsWith('/stremio/');
   const isPlayerRoute = url.pathname.startsWith('/player');
   const isRootRoute = url.pathname === '/';
   const isEmbeddableRoute = isPlayerRoute || isRootRoute || url.pathname.startsWith('/profiles');
+  const isServiceWorker = url.pathname.includes('service-worker.js');
   
   // Skip adding security headers for /stremio/ routes as they handle their own
-  if (!isStremioProxyRoute) {
+  if (!isStremioProxyRoute && !isServiceWorker) {
     const allowFraming = isEmbeddableRoute;
     const allowCORS = isEmbeddableRoute;
     

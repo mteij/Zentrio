@@ -48,13 +48,9 @@ self.addEventListener('activate', event => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', event => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  // Skip external requests
-  if (!event.request.url.startsWith(self.location.origin)) {
+  // Only handle requests for static assets
+  const isStaticAsset = STATIC_CACHE_URLS.some(url => event.request.url.endsWith(url));
+  if (!isStaticAsset) {
     return;
   }
 
@@ -65,17 +61,13 @@ self.addEventListener('fetch', event => {
       }
 
       // Create a new request object that can handle redirects
-      const newRequest = new Request(event.request, {
-        redirect: 'follow'
-      });
-
-      return fetch(newRequest).then(response => {
-        // For redirected responses, just return them directly without caching
+      return fetch(event.request).then(response => {
+        // Do not cache redirected responses.
         if (response.redirected) {
           return response;
         }
-        
-        // Don't cache other responses that aren't successful
+
+        // Do not cache responses that are not successful.
         if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
