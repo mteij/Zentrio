@@ -11,6 +11,7 @@
     "npm:@types/node@*": "22.15.15",
     "npm:mongoose@*": "8.4.1",
     "npm:mongoose@8.4.1": "8.4.1",
+    "npm:node-cron@3.0.3": "3.0.3",
     "npm:preact@*": "10.26.9",
     "npm:stremio-api-client@^1.6.0": "1.6.0",
     "npm:ua-parser-js@*": "2.0.4"
@@ -269,6 +270,12 @@
     "ms@2.1.3": {
       "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
     },
+    "node-cron@3.0.3": {
+      "integrity": "sha512-dOal67//nohNgYWb+nWmg5dkFdIwDm8EpeGYMekPMrngV3637lqnX0lbUcCtgibHTz6SEz7DAIjKvKDFYCnO1A==",
+      "dependencies": [
+        "uuid"
+      ]
+    },
     "node-fetch@2.2.0": {
       "integrity": "sha512-OayFWziIxiHY8bCUyLX6sTpDH8Jsbp4FfYd1j1f7vZyfgkcOnAyM4oQR16f8a0s7Gl/viMGRey8eScYk4V4EZA=="
     },
@@ -407,6 +414,10 @@
         "punycode@1.4.1",
         "qs"
       ]
+    },
+    "uuid@8.3.2": {
+      "integrity": "sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==",
+      "bin": true
     },
     "webidl-conversions@3.0.1": {
       "integrity": "sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ=="
@@ -994,6 +1005,7 @@
   "workspace": {
     "dependencies": [
       "npm:mongoose@8.4.1",
+      "npm:node-cron@3.0.3",
       "npm:stremio-api-client@^1.6.0"
     ]
   }

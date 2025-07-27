@@ -1,7 +1,6 @@
 import { User } from "../../utils/db.ts";
 import { addonSyncService } from "./addonSync.ts";
-
-const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+import cron from "node-cron";
 
 async function runSync() {
   console.log(`[syncScheduler] Starting scheduled addon sync run at ${new Date().toISOString()}`);
@@ -34,39 +33,26 @@ async function runSync() {
   console.log(`[syncScheduler] Finished scheduled addon sync run at ${new Date().toISOString()}`);
 }
 
-let intervalId: number | null = null;
+let cronTask: cron.ScheduledTask | null = null;
 
 export function startSyncScheduler() {
-  if (intervalId) {
+  if (cronTask) {
     console.log("[syncScheduler] Scheduler already running.");
     return;
   }
 
-  const now = new Date();
-  const minutes = now.getMinutes();
-  const seconds = now.getSeconds();
-  const milliseconds = now.getMilliseconds();
+  // Schedule the task to run every 5 minutes
+  cronTask = cron.schedule("*/5 * * * *", runSync, {
+    scheduled: true,
+  });
 
-  // Calculate the delay until the next 5-minute mark
-  const minutesUntilNextInterval = 5 - (minutes % 5);
-  const secondsUntilNextInterval = (minutesUntilNextInterval * 60) - seconds;
-  const delay = (secondsUntilNextInterval * 1000) - milliseconds;
-
-  console.log(`[syncScheduler] Next sync scheduled in ${Math.round(delay / 1000)} seconds.`);
-
-  // Schedule the first run
-  setTimeout(() => {
-    runSync();
-    // After the first run, schedule subsequent runs every 5 minutes
-    console.log(`[syncScheduler] Starting addon sync scheduler with a ${SYNC_INTERVAL_MS / 1000 / 60} minute interval.`);
-    intervalId = setInterval(runSync, SYNC_INTERVAL_MS);
-  }, delay);
+  console.log("[syncScheduler] Addon sync scheduler started.");
 }
 
 export function stopSyncScheduler() {
-  if (intervalId) {
+  if (cronTask) {
     console.log("[syncScheduler] Stopping addon sync scheduler.");
-    clearInterval(intervalId);
-    intervalId = null;
+    cronTask.stop();
+    cronTask = null;
   }
 }

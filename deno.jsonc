@@ -26,10 +26,11 @@
 
   // npm packages
   "mongoose": "npm:mongoose@8.4.1",
-  "stremio-api-client": "npm:stremio-api-client@^1.6.0"
+  "stremio-api-client": "npm:stremio-api-client@^1.6.0",
+  "node-cron": "npm:node-cron@3.0.3"
   },
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "preact"
+    "jsxImportSource": "preact",
   }
 }

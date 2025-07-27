@@ -34,6 +34,7 @@ import * as $index from "./routes/index.tsx";
 import * as $manifest_json from "./routes/manifest.json.ts";
 import * as $player_profileId_ from "./routes/player/[profileId].tsx";
 import * as $profiles from "./routes/profiles.tsx";
+import * as $scripts_path_ from "./routes/scripts/[...path].ts";
 import * as $settings from "./routes/settings.tsx";
 import * as $stremio_path_ from "./routes/stremio/[...path].ts";
 import * as $Auth_CodeInputForm from "./islands/Auth/CodeInputForm.tsx";
@@ -83,6 +84,7 @@ const manifest = {
     "./routes/manifest.json.ts": $manifest_json,
     "./routes/player/[profileId].tsx": $player_profileId_,
     "./routes/profiles.tsx": $profiles,
+    "./routes/scripts/[...path].ts": $scripts_path_,
     "./routes/settings.tsx": $settings,
     "./routes/stremio/[...path].ts": $stremio_path_,
   },
