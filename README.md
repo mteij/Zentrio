@@ -1,6 +1,6 @@
 <div align="center">
   
-  # 🎬 **Zentrio** 
+  # 💠 **Zentrio** 
   
   **A beautiful, secure, Netflix-inspired profile management system for Stremio Web**
   
@@ -13,6 +13,22 @@
   **[🚀 Public Instance](https://zentrio.eu)** • **[🐛 Report Issues](https://github.com/MichielEijpe/Zentrio/issues)**
   
 </div>
+
+---
+
+## 🛡️ **Belangrijke opmerking & Disclaimer**
+
+Welkom bij Zentrio! Voordat je verdergaat, neem even de tijd om dit door te lezen.
+
+**Over de ontwikkeling:** Dit project is grotendeels ontwikkeld met behulp van AI-assistenten zoals GitHub Copilot en Claude. Hoewel ik de code zorgvuldig controleer en test, is het belangrijk te weten dat een aanzienlijk deel van de codebase door AI is gegenereerd of verbeterd.
+
+**Jouw veiligheid:**
+*   **Gebruik unieke wachtwoorden:** Gebruik voor je eigen veiligheid een uniek wachtwoord voor Zentrio dat je nergens anders gebruikt.
+*   **Nieuwe Stremio-profielen:** Het wordt sterk aangeraden om nieuwe, lege Stremio-profielen aan te maken wanneer je deze dienst gebruikt, in plaats van je bestaande profielen te koppelen.
+
+**Juridische disclaimer:** Dit is een persoonlijk project en is niet gelieerd aan, onderschreven door of gesponsord door Stremio. Ik erken dat deze dienst de grenzen van de servicevoorwaarden van Stremio kan opzoeken en zal voldoen aan alle verzoeken tot verwijdering of stopzetting van Stremio of hun wettelijke vertegenwoordigers. De officiële Stremio-website vind je op [stremio.com](https://stremio.com).
+
+---
 
 ## ✨ **Features**
 
@@ -100,16 +116,6 @@ Special thanks to:
 ## 📄 **License**
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🤖 **AI-Assisted Development**
-
-This project extensively utilizes AI-powered development tools including GitHub Copilot, Claude, and other AI assistants for code generation, optimization, and documentation. While all code is reviewed and tested, users should be aware that significant portions of this codebase have been generated or enhanced through AI assistance.
-
-## ⚖️ **Legal Disclaimer**
-
-This project is a personal endeavor and is not affiliated with, endorsed, or sponsored by Stremio. The creator acknowledges that this service may operate in a manner that tests the boundaries of Stremio's terms of service and will comply with any and all takedown or cease and desist notices from Stremio or its legal representatives. For the official Stremio website, please visit [stremio.com](https://stremio.com).
 
 ---
 
