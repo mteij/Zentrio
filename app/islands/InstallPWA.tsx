@@ -9,10 +9,10 @@ export default function InstallPWA() {
       setInstallPrompt(event);
     };
 
-    globalThis.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
     return () => {
-      globalThis.removeEventListener(
+      window.removeEventListener(
         "beforeinstallprompt",
         handleBeforeInstallPrompt,
       );
@@ -39,7 +39,7 @@ export default function InstallPWA() {
   }
 
   return (
-    <div class="fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow-lg flex items-center space-x-4">
+    <div class="fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow-lg flex items-center space-x-4 z-50">
       <p>Get the best experience. Install Zentrio?</p>
       <button
         type="button"
