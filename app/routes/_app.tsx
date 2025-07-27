@@ -1,5 +1,5 @@
 import { PageProps } from "$fresh/server.ts";
-import Footer from "../components/Footer.tsx";
+import Footer from "../shared/components/Footer.tsx";
 
 export default function App({ Component, route }: PageProps) {
   const showFooter =

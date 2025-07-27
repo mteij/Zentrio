@@ -177,13 +177,33 @@ const proxyRequestHandler = async (req: Request, path: string) => {
               const logoImg = document.querySelector('img[src*="stremio_symbol.png"]');
               if (logoImg && session && session.stremioHubProfilePicture) {
                 const logoContainer = logoImg.closest('div[class*="logo-container"]');
-                if (logoContainer && !logoContainer.querySelector('a[href="/profiles"]')) {
+                if (logoContainer && !logoContainer.querySelector('#stremio-hub-profile-link')) {
                   const profilePicUrl = session.stremioHubProfilePicture;
                   logoContainer.innerHTML = \`
-                    <a href="/profiles" title="Back to Profiles" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                    <a id="stremio-hub-profile-link" href="#" title="Back to Profiles" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
                       <img src="\${profilePicUrl}" alt="Profiles" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 0 2px #141414;" />
                     </a>
                   \`;
+                  const profileLink = logoContainer.querySelector('#stremio-hub-profile-link');
+                  if (profileLink) {
+                    profileLink.addEventListener('click', async (e) => {
+                      e.preventDefault();
+                      try {
+                        const authKey = session?.profile?.auth?.key;
+                        if (authKey) {
+                          await fetch('/stremio/api/logout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ type: 'Logout', authKey: authKey })
+                          });
+                        }
+                      } catch (err) {
+                        console.error('StremioHub: Failed to logout.', err);
+                      } finally {
+                        window.top.location.href = '/profiles';
+                      }
+                    });
+                  }
                 }
               }
               
@@ -201,6 +221,28 @@ const proxyRequestHandler = async (req: Request, path: string) => {
                 // Set up MutationObserver to watch for dynamically added elements
                 const observer = new MutationObserver(() => {
                   hideCalendarButtons();
+                });
+
+                observer.observe(document.body, {
+                  childList: true,
+                  subtree: true
+                });
+              }
+
+              // Hide addons buttons if setting is enabled
+              if (session?.hideAddonsButton) {
+                const hideAddonsButtons = () => {
+                  document.querySelectorAll('a[href="#/addons"]').forEach(el => {
+                    el.style.display = 'none';
+                  });
+                };
+
+                // Initial hide
+                hideAddonsButtons();
+
+                // Set up MutationObserver to watch for dynamically added elements
+                const observer = new MutationObserver(() => {
+                  hideAddonsButtons();
                 });
 
                 observer.observe(document.body, {

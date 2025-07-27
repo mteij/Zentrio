@@ -2,12 +2,13 @@ import { h as _h } from "preact";
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import SettingsModal from "../SettingsModal.tsx";
+import { PlainProfile } from "./ProfileManager.tsx";
 
 // ProfileManagerView component
 export default function ProfileManagerView(props: any) {
-const {
-  profiles,
-  showAddModal,
+  const {
+    profiles,
+    showAddModal,
   editingProfile,
   mobileEditMode,
   handleCreate,
@@ -25,12 +26,35 @@ const {
 } = props;
 
   const isInitialized = useSignal(false);
+  const lastProfileId = useSignal<string | null>(null);
   const modalOpen = showAddModal.value || editingProfile.value !== null;
   const showAddProfile = profiles.value.length === 0 || (isMobile ? mobileEditMode.value : true);
 
   // Mark as initialized after first render
   useEffect(() => {
+    // On initial load, try to get the last used profile ID from localStorage
+    try {
+      lastProfileId.value = localStorage.getItem("lastProfileId");
+    } catch {
+      // Ignore localStorage access errors
+    }
     isInitialized.value = true;
+  }, []);
+
+  // Listen for page show events (e.g., when navigating back)
+  useEffect(() => {
+    const handlePageShow = () => {
+      try {
+        lastProfileId.value = localStorage.getItem("lastProfileId");
+      } catch {
+        // Ignore localStorage access errors
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+    };
   }, []);
 
   // Show loading indicator until initialized
@@ -43,19 +67,13 @@ const {
       );
   }
 
-  function handleProfileClick(profileId: string) {
-    try {
-      localStorage.setItem("lastProfileId", profileId);
-    } catch {}
-    globalThis.location.href = `/player/${profileId}`;
-  }
 
   // Desktop grid calculation
   const maxColumns = 4;
   const totalCards = profiles.value.length + (showAddProfile ? 1 : 0);
   const rows = Math.ceil(totalCards / maxColumns);
   const cards = [
-    ...profiles.value.map((profile: any) => ({ type: "profile", profile })),
+    ...profiles.value.map((profile: PlainProfile) => ({ type: "profile", profile })),
     ...(showAddProfile ? [{ type: "add" }] : []),
   ];
   const rowsArr: any[][] = [];
@@ -90,69 +108,76 @@ const {
           }}
         >
           {/* Mobile Profile Cards */}
-          {profiles.value.map((profile: any) => (
-            <div
-              key={profile._id}
-              class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
-              style={{
-                width: "100%",
-                minWidth: "80px",
-                maxWidth: "120px",
-                transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
-                height: "auto",
-                aspectRatio: "1/1.3",
-              }}
-            >
-              {mobileEditMode.value ? (
-              <button
-                type="button"
-                class="w-full flex justify-center bg-transparent border-none p-0 m-0 mb-2"
-                onClick={() => (editingProfile.value = profile)}
-                aria-label={`Edit ${profile.name}`}
-              >
+          {profiles.value.map((profile: PlainProfile) => {
+            const isActive = profile._id === lastProfileId.value;
+            return (
               <div
-                class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
+                key={profile._id}
+                class="flex flex-col items-center group relative transition-all duration-300"
                 style={{
-                  width: "80%",
+                  width: "100%",
+                  minWidth: "80px",
+                  maxWidth: "120px",
+                  transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
                   height: "auto",
-                  aspectRatio: "1 / 1",
-                  maxWidth: "100px",
-                  backgroundImage: `url(${profile.profilePictureUrl})`,
-                  backgroundPosition: "center",
-                  backgroundSize: "cover",
-                  margin: "0 auto",
+                  aspectRatio: "1/1.3",
+                  cursor: "pointer",
                 }}
-              />
-              </button>
-              ) : (
-                <button
-                  type="button"
-                  class="w-full flex justify-center bg-transparent border-none p-0 m-0 mb-2"
-                  tabIndex={modalOpen ? -1 : 0}
-                  aria-disabled={modalOpen ? "true" : undefined}
-                  style={modalOpen ? { pointerEvents: "none" } : undefined}
-                  onClick={() => handleProfileClick(profile._id)}
-                >
-                  <div
-                    class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
-                style={{
-                  width: "80%",
-                  height: "auto",
-                  aspectRatio: "1 / 1",
-                  maxWidth: "100px",
-                      backgroundImage: `url(${profile.profilePictureUrl})`,
-                      backgroundPosition: "center",
-                      backgroundSize: "cover",
-                      margin: "0 auto",
+              >
+                {mobileEditMode.value ? (
+                  <button
+                    type="button"
+                    class="w-full flex justify-center bg-transparent border-none p-0 m-0 mb-2"
+                    onClick={() => (editingProfile.value = profile)}
+                    aria-label={`Edit ${profile.name}`}
+                  >
+                    <div
+                      class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
+                      style={{
+                        width: "80%",
+                        height: "auto",
+                        aspectRatio: "1 / 1",
+                        maxWidth: "100px",
+                        backgroundImage: `url(${profile.profilePictureUrl})`,
+                        backgroundPosition: "center",
+                        backgroundSize: "cover",
+                        margin: "0 auto",
+                      }}
+                    />
+                  </button>
+                ) : (
+                  <a
+                    href={`/player/${profile._id}`}
+                    class={`w-full flex justify-center bg-transparent border-none p-0 m-0 mb-2 hover:scale-105`}
+                    tabIndex={modalOpen ? -1 : 0}
+                    aria-disabled={modalOpen ? "true" : undefined}
+                    style={{
+                      pointerEvents: modalOpen ? "none" : "auto",
+                      transition: "transform 0.2s",
                     }}
-                  />
-                </button>
-              )}
-              <span class="text-lg font-semibold text-white truncate w-full text-center">
-                {profile.name}
-              </span>
-            </div>
-          ))}
+                  >
+                    <div
+                      class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
+                      style={{
+                        width: "80%",
+                        height: "auto",
+                        aspectRatio: "1 / 1",
+                        maxWidth: "100px",
+                        backgroundImage: `url(${profile.profilePictureUrl})`,
+                        backgroundPosition: "center",
+                        backgroundSize: "cover",
+                        margin: "0 auto",
+                        filter: "none",
+                      }}
+                    />
+                  </a>
+                )}
+                <span class="text-lg font-semibold text-white truncate w-full text-center">
+                  {profile.name}
+                </span>
+              </div>
+            );
+          })}
           {showAddProfile && (
             <div
               key="add-profile"
@@ -288,61 +313,75 @@ const {
           >
             {/* Desktop Profile/Add Cards */}
             {row.map((card) =>
-              card.type === "profile" ? (
-                // Desktop Profile Card
-                <div
-                  key={card.profile._id}
-                  class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 rounded-xl shadow-lg p-6 transition-transform duration-200"
-                  style={{
-                    width: "220px",
-                    boxShadow: "0 4px 24px 0 #000a",
-                  }}
-                >
-                  <button
-                    type="button"
-                    class="block w-full bg-transparent border-none p-0 m-0 mb-4"
-                    tabIndex={modalOpen ? -1 : 0}
-                    aria-disabled={modalOpen ? "true" : undefined}
-                    style={modalOpen ? { pointerEvents: "none" } : undefined}
-                    onClick={() => handleProfileClick(card.profile._id)}
-                  >
+              card.type === "profile"
+                ? (() => {
+                  const isActive = card.profile._id === lastProfileId.value;
+                  return (
+                    // Desktop Profile Card
                     <div
-                      class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
+                      key={card.profile._id}
+                      class={`flex flex-col items-center group relative transition-all duration-300 rounded-xl shadow-lg p-6 hover:scale-105 cursor-pointer`}
                       style={{
-                        width: "120px",
-                        height: "120px",
-                        aspectRatio: "1 / 1",
-                        backgroundImage: `url(${card.profile.profilePictureUrl})`,
-                        backgroundPosition: "center",
-                        backgroundSize: "cover",
-                        margin: "0 auto",
+                        width: "220px",
+                        boxShadow: "0 4px 24px 0 #000a",
+                        transition: "transform 0.2s",
                       }}
-                    />
-                  </button>
-                  <span class="text-lg font-semibold text-white mb-0.5 truncate w-full text-center">{card.profile.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => editingProfile.value = card.profile}
-                    class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-900 bg-opacity-80 rounded-full p-2 shadow-md hover:bg-zentrio-red"
-                    title={`Edit ${card.profile.name}`}
-                    style={{
-                      zIndex: 2,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="18"
-                      height="18"
-                      fill="none"
-                      viewBox="0 0 20 20"
-                      style={{ color: "#fff" }}
                     >
-                      <path d="M4 15.5V16h.5l9.1-9.1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0L4 13.5z" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
-                </div>
-              ) : (
+                      <a
+                        href={`/player/${card.profile._id}`}
+                        class="block w-full bg-transparent border-none p-0 m-0 mb-4"
+                        tabIndex={modalOpen ? -1 : 0}
+                        aria-disabled={modalOpen ? "true" : undefined}
+                        style={{
+                          pointerEvents: modalOpen ? "none" : "auto",
+                        }}
+                      >
+                        <div
+                          class="rounded-lg profile-avatar flex items-center justify-center text-5xl font-bold bg-gray-700 shadow-lg transition-all duration-300"
+                          style={{
+                            width: "120px",
+                            height: "120px",
+                            aspectRatio: "1 / 1",
+                            backgroundImage: `url(${card.profile.profilePictureUrl})`,
+                            backgroundPosition: "center",
+                            backgroundSize: "cover",
+                            margin: "0 auto",
+                            filter: "none",
+                          }}
+                        />
+                      </a>
+                      <span class="text-lg font-semibold text-white mb-0.5 truncate w-full text-center">{card.profile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => (editingProfile.value = card.profile)}
+                        class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-900 bg-opacity-80 rounded-full p-2 shadow-md hover:bg-zentrio-red"
+                        title={`Edit ${card.profile.name}`}
+                        style={{
+                          zIndex: 2,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="18"
+                          height="18"
+                          fill="none"
+                          viewBox="0 0 20 20"
+                          style={{ color: "#fff" }}
+                        >
+                          <path
+                            d="M4 15.5V16h.5l9.1-9.1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0L4 13.5z"
+                            stroke="#fff"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })()
+              : (
                 // Desktop Add Profile Card
                 <div
                   key="add-profile"

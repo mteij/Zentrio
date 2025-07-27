@@ -1,5 +1,5 @@
 import { PageProps } from "$fresh/server.ts";
-import ModernBackground from "../../components/ModernBackground.tsx";
+import ModernBackground from "../../shared/components/ModernBackground.tsx";
 
 export default function SignupSuccessPage(props: PageProps) {
   const email = props.url.searchParams.get("email");

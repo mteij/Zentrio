@@ -6,16 +6,15 @@ import { ObjectId } from "mongoose";
 import ProfileManagerView from "./ProfileManagerView.tsx";
 import { UAParser } from "npm:ua-parser-js";
 
-// Helper to convert MongoDB objects to plain objects for client-side use
-const toPlainObject = (
-  p: ProfileSchema & { _id: ObjectId; userId: ObjectId },
-) => ({
-  ...p,
-  _id: p._id.toString(),
-  userId: p.userId.toString(),
-});
-
-type PlainProfile = ReturnType<typeof toPlainObject>;
+export type PlainProfile = {
+  _id: string;
+  userId: string;
+  name: string;
+  email: string;
+  profilePictureUrl: string;
+  nsfwMode?: boolean;
+  password?: string;
+};
 
 function getRandomFunEmojiUrl(name: string) {
   const seed = Math.random().toString(36).substring(2, 10);
@@ -248,7 +247,16 @@ export function ProfileModal(
 }
 
 function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[]) {
-  const profiles = useSignal<PlainProfile[]>(initialProfiles.map(toPlainObject));
+  const profiles = useSignal<PlainProfile[]>(
+    initialProfiles.map((p) => ({
+      _id: p._id.toString(),
+      userId: p.userId.toString(),
+      name: p.name,
+      email: p.email,
+      profilePictureUrl: p.profilePictureUrl,
+      nsfwMode: p.nsfwMode,
+    }))
+  );
   const showAddModal = useSignal(false);
   const editingProfile = useSignal<PlainProfile | null>(null);
   const mobileEditMode = useSignal(false);
@@ -268,7 +276,14 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
     });
     if (res.ok) {
       const newProfile = await res.json();
-      profiles.value = [...profiles.value, toPlainObject(newProfile)];
+      profiles.value = [...profiles.value, {
+        _id: newProfile._id.toString(),
+        userId: newProfile.userId.toString(),
+        name: newProfile.name,
+        email: newProfile.email,
+        profilePictureUrl: newProfile.profilePictureUrl,
+        nsfwMode: newProfile.nsfwMode,
+      }];
       showAddModal.value = false;
     }
   };
@@ -280,7 +295,12 @@ function useProfileManagerState(initialProfiles: (ProfileSchema & { _id: ObjectI
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      const updatedProfile = { ...editingProfile.value, ...data };
+      const updatedProfile = {
+        ...editingProfile.value,
+        ...data,
+        // Ensure profilePictureUrl is a string, not undefined
+        profilePictureUrl: data.profilePictureUrl || editingProfile.value.profilePictureUrl,
+      };
       profiles.value = profiles.value.map((p) =>
         p._id === updatedProfile._id ? updatedProfile : p
       );

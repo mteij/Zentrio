@@ -1,6 +1,6 @@
 import { PageProps } from "$fresh/server.ts";
 import CodeInputForm from "../../islands/Auth/CodeInputForm.tsx";
-import ModernBackground from "../../components/ModernBackground.tsx";
+import ModernBackground from "../../shared/components/ModernBackground.tsx";
 
 export default function CodeVerificationPage(props: PageProps) {
   const emailParam = props.url.searchParams.get("email");

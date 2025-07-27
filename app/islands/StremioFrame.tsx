@@ -15,6 +15,7 @@ interface StremioFrameProps {
     tmdbApiKey?: string;
     addonManagerEnabled?: boolean;
     hideCalendarButton?: boolean;
+    hideAddonsButton?: boolean;
   };
 }
 
@@ -69,6 +70,9 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
   useEffect(() => {
     const loginAndLoad = async () => {
       try {
+        // Set last profile ID on load
+        localStorage.setItem("lastProfileId", profile._id);
+        
         statusMessage.value = `Logging in as ${profile.name}...`;
         const loginRes = await fetch("/stremio/api/login", {
           method: "POST",
@@ -152,6 +156,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
           nsfwModeEnabled: profile.nsfwMode || false,
           addonManagerEnabled: profile.addonManagerEnabled || false,
           hideCalendarButton: profile.hideCalendarButton || false,
+          hideAddonsButton: profile.hideAddonsButton || false,
           tmdbApiKey: (profile as any).tmdbApiKey || null,
           installation_id: result.installation_id || generateInstallationId(),
           schema_version: result.schema_version || 18,
@@ -172,6 +177,34 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
           iframe.onload = () => {
             isLoading.value = false;
             statusMessage.value = "Loaded!";
+
+            // Inject a script to handle logout and redirect
+            const script = document.createElement("script");
+            script.textContent = `
+              const observer = new MutationObserver((mutations, obs) => {
+                const backLink = document.querySelector('a[href="#"]');
+                if (backLink && backLink.querySelector('img[src*="dicebear.com"]')) {
+                  backLink.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    try {
+                      await fetch('/stremio/api/logout', { method: 'POST' });
+                    } catch (error) {
+                      console.error('Failed to logout from Stremio:', error);
+                    } finally {
+                      window.top.location.href = '/profiles';
+                    }
+                  };
+                  obs.disconnect();
+                }
+              });
+              observer.observe(document.body, {
+                childList: true,
+                subtree: true
+              });
+            `;
+            iframe.contentDocument?.body.appendChild(script);
           };
           const sessionData = encodeURIComponent(JSON.stringify(sessionObject));
           iframe.src = `/stremio/?sessionData=${sessionData}`;

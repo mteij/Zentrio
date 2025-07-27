@@ -1,6 +1,6 @@
 import { h as _h } from "preact";
 import { EmailTemplate } from "./EmailTemplate.tsx";
-import { EmailButton } from "../shared/components/email/EmailButton.tsx";
+import { EmailButton } from "./EmailButton.tsx";
 
 interface ResetPasswordEmailProps {
   resetUrl: string;

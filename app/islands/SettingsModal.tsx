@@ -28,6 +28,7 @@ export default function SettingsModal({
   const accentColor = useSignal<string>("#dc2626");
   const tmdbApiKey = useSignal<string>("");
   const hideCalendarButton = useSignal<boolean>(false);
+  const hideAddonsButton = useSignal<boolean>(false);
 
   // Addon sync settings
   const addonSyncEnabled = useSignal<boolean>(false);
@@ -69,6 +70,9 @@ export default function SettingsModal({
       
       // Load hide calendar button setting from server
       loadHideCalendarButtonSetting();
+
+      // Load hide addons button setting from server
+      loadHideAddonsButtonSetting();
     }
   }, []);
 
@@ -162,6 +166,48 @@ export default function SettingsModal({
 
     return () => clearTimeout(timeoutId);
   }, [hideCalendarButton.value]);
+
+  // Load hide addons button setting from server
+  const loadHideAddonsButtonSetting = async () => {
+    try {
+      const response = await fetch('/api/hide-addons');
+      if (response.ok) {
+        const data = await response.json();
+        hideAddonsButton.value = data.hideAddonsButton || false;
+      }
+    } catch (error) {
+      console.warn('Failed to load hide addons button setting:', error);
+    }
+  };
+
+  // Save hide addons button setting to server
+  const saveHideAddonsButtonSetting = async (hide: boolean) => {
+    try {
+      const response = await fetch('/api/hide-addons', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hideAddonsButton: hide }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save hide addons button setting');
+      }
+      
+      console.log('Hide addons button setting saved successfully');
+    } catch (error) {
+      console.error('Error saving hide addons button setting:', error);
+      alert('Failed to save hide addons button setting. Please try again.');
+    }
+  };
+
+  // Auto-save hide addons button setting with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveHideAddonsButtonSetting(hideAddonsButton.value);
+    }, 1000); // Debounce for 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [hideAddonsButton.value]);
 
   // Save auto-login settings to localStorage
   useEffect(() => {
@@ -547,6 +593,36 @@ export default function SettingsModal({
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Hide the calendar button in the Stremio interface. Refresh the Stremio page after changing this setting.
+                  </p>
+                </div>
+              </div>
+
+              {/* Hide Addons Button Setting */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-base font-medium text-gray-200">Hide Addons Button</label>
+                    <div className="relative inline-block w-12 h-6">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={hideAddonsButton.value}
+                        onChange={e => hideAddonsButton.value = e.currentTarget.checked}
+                      />
+                      <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                        hideAddonsButton.value
+                          ? 'bg-red-600'
+                          : 'bg-gray-600'
+                      }`}
+                        onClick={() => hideAddonsButton.value = !hideAddonsButton.value}
+                      ></div>
+                      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
+                        hideAddonsButton.value ? 'transform translate-x-6' : ''
+                      }`}></div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Hide the addons button in the Stremio interface. Refresh the Stremio page after changing this setting.
                   </p>
                 </div>
               </div>

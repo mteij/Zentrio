@@ -2,7 +2,7 @@ import { Handlers } from "$fresh/server.ts";
 import { Resend } from "https://esm.sh/resend@3.2.0";
 import { render } from "https://esm.sh/preact-render-to-string@6.2.1";
 import { createUserWithGeneratedPassword , findUserByEmail } from "../../../utils/db.ts";
-import { WelcomeEmail } from "../../../components/WelcomeEmail.tsx";
+import { WelcomeEmail } from "../../../shared/components/email/WelcomeEmail.tsx";
 
 export const handler: Handlers = {
   async POST(req: Request) {

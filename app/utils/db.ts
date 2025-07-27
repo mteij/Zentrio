@@ -21,6 +21,8 @@ export interface UserSchema extends Document {
     addonManagerEnabled?: boolean; // Whether Stremio addon manager userscript is enabled
     // Hide calendar button setting
     hideCalendarButton?: boolean; // Whether to hide the calendar button in the Stremio interface
+    // Hide addons button setting
+    hideAddonsButton?: boolean; // Whether to hide the addons button in the Stremio interface
     // Addon sync settings (experimental feature)
     addonSyncSettings?: {
       enabled: boolean;
@@ -83,6 +85,8 @@ const userSchema = new mongoose.Schema<UserSchema>({
       addonManagerEnabled: { type: Boolean, default: false },
       // Hide calendar button setting
       hideCalendarButton: { type: Boolean, default: false },
+      // Hide addons button setting
+      hideAddonsButton: { type: Boolean, default: false },
       // Addon sync settings (experimental feature)
       addonSyncSettings: {
         enabled: { type: Boolean, default: false },
@@ -639,6 +643,24 @@ export const updateUserHideCalendarButtonSetting = async (userId: string, hide: 
 export const getUserHideCalendarButtonSetting = async (userId: string): Promise<boolean> => {
   const user = await Users.findById(userId);
   return user?.settings?.hideCalendarButton || false;
+};
+
+/**
+ * Update hide addons button setting for user
+ */
+export const updateUserHideAddonsButtonSetting = async (userId: string, hide: boolean): Promise<void> => {
+  await Users.updateOne(
+    { _id: new mongoose.Types.ObjectId(userId) },
+    { $set: { 'settings.hideAddonsButton': hide } }
+  );
+};
+
+/**
+ * Get hide addons button setting for user
+ */
+export const getUserHideAddonsButtonSetting = async (userId: string): Promise<boolean> => {
+  const user = await Users.findById(userId);
+  return user?.settings?.hideAddonsButton || false;
 };
 
 export type { ObjectId, EncryptedData };

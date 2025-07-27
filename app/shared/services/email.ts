@@ -1,7 +1,7 @@
 import { Resend } from "https://esm.sh/resend@3.2.0";
-import { WelcomeEmail } from "../../components/WelcomeEmail.tsx";
-import { LoginCodeEmail } from "../../components/LoginCodeEmail.tsx";
-import { ResetPasswordEmail } from "../../components/ResetPasswordEmail.tsx";
+import { WelcomeEmail } from "../components/email/WelcomeEmail.tsx";
+import { LoginCodeEmail } from "../components/email/LoginCodeEmail.tsx";
+import { ResetPasswordEmail } from "../components/email/ResetPasswordEmail.tsx";
 import { render } from "https://esm.sh/preact-render-to-string@6.2.1";
 
 export class EmailService {
