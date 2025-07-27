@@ -46,6 +46,17 @@ export default function App({ Component, route }: PageProps) {
             `,
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('orientationchange', function() {
+                if (window.orientation === 0 || window.orientation === 180) {
+                  screen.orientation.lock('portrait-primary');
+                }
+              });
+            `,
+          }}
+        />
       </head>
       <body class="text-white bg-black flex flex-col min-h-screen overflow-y-hidden">
         <div id="app" class="flex flex-col min-h-[calc(100vh-4rem)]">
