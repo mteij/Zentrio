@@ -10,7 +10,7 @@
   [![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
   [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
   
-  **[🚀 Public Instance](https://zentrio.eu)** • **[🐛 Report Issues](https://github.com/MichielEijpe/Zentrio/issues)**
+  **[🚀 Visit Zentrio.eu](https://zentrio.eu)** • **[🐛 Report Issues](https://github.com/MichielEijpe/Zentrio/issues)**
   
 </div>
 
@@ -18,8 +18,9 @@
 
 <details>
 <summary>🛡️ Important Note & Disclaimer</summary>
+<div style="color: red;">
 
-Welcome to Zentrio! Before you proceed, please take a moment to read this.
+**Welcome to Zentrio! Before you proceed, please take a moment to read this.**
 
 **About Development:** This project has been largely developed with the help of AI assistants like GitHub Copilot and Claude. While I carefully review and test the code, it's important to know that a significant portion of the codebase has been generated or enhanced by AI.
 
@@ -28,7 +29,7 @@ Welcome to Zentrio! Before you proceed, please take a moment to read this.
 *   **New Stremio Profiles:** It is strongly recommended to create new, empty Stremio profiles when using this service, instead of linking your existing ones.
 
 **Legal Disclaimer:** This is a personal project and is not affiliated with, endorsed, or sponsored by Stremio. I acknowledge that this service may test the boundaries of Stremio's terms of service and will comply with any and all takedown or cease and desist notices from Stremio or its legal representatives. The official Stremio website can be found at [stremio.com](https://stremio.com).
-
+</div>
 </details>
 
 ---
