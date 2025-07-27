@@ -79,6 +79,7 @@ Create a `.env` file in the root directory by copying the example: `cp .env.exam
 | `SMTP_USER`             | The username for your SMTP server.                                                                                                       | `"your_smtp_user"`                                                               |
 | `SMTP_PASS`             | The password for your SMTP server.                                                                                                       | `"your_smtp_password"`                                                           |
 | `SMTP_SECURE`           | Use `"true"` for SSL/TLS (port 465) or `"false"` for STARTTLS (port 587).                                                                | `"false"`                                                                        |
+| `SMTP_FALLBACK_ENABLED` | If enabled, Resend will be used as a fallback if the primary SMTP provider fails. This requires `RESEND_API_KEY` to be set.                | `"false"`                                                                        |
 
 </details>
 
