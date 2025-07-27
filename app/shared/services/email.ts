@@ -35,6 +35,8 @@ export class EmailService {
         const pass = Deno.env.get("SMTP_PASS");
         const secure = Deno.env.get("SMTP_SECURE") === "true";
 
+        console.log("SMTP Config:", { host, port, user, pass: pass ? '******' : undefined, secure });
+
         if (!host || !user || !pass) {
             console.warn("SMTP configuration is incomplete. SMTP provider will be unavailable.");
         } else {
