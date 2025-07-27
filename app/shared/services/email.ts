@@ -17,66 +17,79 @@ export class EmailService {
     this.fromDomain = Deno.env.get("EMAIL_FROM_DOMAIN") || "noreply@yourdomain.com";
     this.smtpFallbackEnabled = Deno.env.get("SMTP_FALLBACK_ENABLED")?.toLowerCase() === "true";
 
+    console.log(`EmailService initialized with provider: ${this.emailProvider}, fallback enabled: ${this.smtpFallbackEnabled}`);
+
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-
-    if (this.smtpFallbackEnabled && !resendApiKey) {
-      throw new Error("SMTP_FALLBACK_ENABLED is true, but RESEND_API_KEY is not configured.");
+    if (this.emailProvider === "resend" || this.smtpFallbackEnabled) {
+        if (!resendApiKey) {
+            console.warn("Resend API key is missing. Resend provider will be unavailable.");
+        } else {
+            this.resend = new Resend(resendApiKey);
+        }
     }
 
-    if (this.emailProvider === "resend") {
-      if (!resendApiKey) {
-        throw new Error("EMAIL_PROVIDER is set to 'resend', but RESEND_API_KEY is not configured.");
-      }
-      this.resend = new Resend(resendApiKey);
-    }
-    
-    if (this.emailProvider === "smtp") {
-      const host = Deno.env.get("SMTP_HOST");
-      const port = parseInt(Deno.env.get("SMTP_PORT") || "587", 10);
-      const user = Deno.env.get("SMTP_USER");
-      const pass = Deno.env.get("SMTP_PASS");
-      const secure = Deno.env.get("SMTP_SECURE") === "true";
+    if (this.emailProvider === "smtp" || this.smtpFallbackEnabled) {
+        const host = Deno.env.get("SMTP_HOST");
+        const port = parseInt(Deno.env.get("SMTP_PORT") || "587", 10);
+        const user = Deno.env.get("SMTP_USER");
+        const pass = Deno.env.get("SMTP_PASS");
+        const secure = Deno.env.get("SMTP_SECURE") === "true";
 
-      if (!host || !user || !pass) {
-        throw new Error("SMTP configuration is incomplete");
-      }
-
-      this.nodemailer = createTransport({
-        host,
-        port,
-        secure,
-        auth: { user, pass },
-        connectionTimeout: 1000 * 5, // 5 seconds
-      });
-    } else if (this.emailProvider !== "resend") {
-      throw new Error(`Invalid EMAIL_PROVIDER: ${this.emailProvider}`);
+        if (!host || !user || !pass) {
+            console.warn("SMTP configuration is incomplete. SMTP provider will be unavailable.");
+        } else {
+            this.nodemailer = createTransport({
+                host,
+                port,
+                secure,
+                auth: { user, pass },
+                connectionTimeout: 1000 * 5, // 5 seconds
+            });
+        }
     }
-  }
+
+    if (this.emailProvider !== "resend" && this.emailProvider !== "smtp") {
+        throw new Error(`Invalid EMAIL_PROVIDER: ${this.emailProvider}`);
+    }
+}
 
   private async sendEmail(to: string, subject: string, html: string, text: string): Promise<void> {
+    const primaryFailed = false;
     try {
-      if (this.emailProvider === "smtp" && this.nodemailer) {
-        await this.sendSmtpEmail(to, subject, html, text);
-      } else if (this.emailProvider === "resend" && this.resend) {
-        await this.sendResendEmail(to, subject, html, text);
-      } else {
-        throw new Error("No primary email provider is configured correctly.");
-      }
-    } catch (error) {
-      console.error(`Primary email provider (${this.emailProvider}) failed:`, error);
-      if (this.emailProvider === "smtp" && this.smtpFallbackEnabled && this.resend) {
-        console.log("Attempting to send email via Resend as a fallback...");
-        try {
-          await this.sendResendEmail(to, subject, html, text);
-        } catch (fallbackError) {
-          console.error("Fallback email provider (Resend) also failed:", fallbackError);
-          throw new Error(`Failed to send email with both primary and fallback providers: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
+        console.log(`Attempting to send email via primary provider: ${this.emailProvider}`);
+        if (this.emailProvider === "smtp" && this.nodemailer) {
+            await this.sendSmtpEmail(to, subject, html, text);
+        } else if (this.emailProvider === "resend" && this.resend) {
+            await this.sendResendEmail(to, subject, html, text);
+        } else {
+            console.error("Primary email provider is not configured correctly.");
+            throw new Error("Primary email provider is not configured correctly.");
         }
-      } else {
-        throw new Error(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+    } catch (error) {
+        console.error(`Primary email provider (${this.emailProvider}) failed:`, error);
+
+        if (this.smtpFallbackEnabled) {
+            console.log("Fallback enabled, attempting to use fallback provider.");
+            try {
+                if (this.emailProvider === "smtp" && this.resend) {
+                    console.log("Attempting to send email via Resend as a fallback...");
+                    await this.sendResendEmail(to, subject, html, text);
+                } else if (this.emailProvider === "resend" && this.nodemailer) {
+                    console.log("Attempting to send email via SMTP as a fallback...");
+                    await this.sendSmtpEmail(to, subject, html, text);
+                } else {
+                    console.error("Fallback provider is not configured correctly.");
+                    throw new Error("Fallback provider is not configured correctly.");
+                }
+            } catch (fallbackError) {
+                console.error("Fallback email provider also failed:", fallbackError);
+                throw new Error(`Failed to send email with both primary and fallback providers: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
+            }
+        } else {
+            throw new Error(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
-  }
+}
 
   private async sendSmtpEmail(to: string, subject: string, html: string, text: string): Promise<void> {
     if (!this.nodemailer) throw new Error("Nodemailer is not initialized.");
