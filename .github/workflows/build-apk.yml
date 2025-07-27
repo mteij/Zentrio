@@ -26,12 +26,15 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
+      - name: Init Bubblewrap project
+        run: |
+          yes | bubblewrap init \
+            --manifest "${{ github.workspace }}/app/static/manifest.json" \
+            --host "https://zentrio.eu"
+
       - name: Build unsigned APK with Bubblewrap
         run: |
-          yes | bubblewrap build \
-            --manifest "${{ github.workspace }}/app/static/manifest.json" \
-            --host "https://zentrio.eu" \
-            --skip-signing
+          bubblewrap build --skip-signing
 
       - name: Find Generated APK
         id: find_apk
