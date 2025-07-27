@@ -20,10 +20,16 @@ jobs:
 
       - name: Recreate lockfile
         run: |
-          rm deno.lock
-          deno cache app/main.ts
+          rm -f deno.lock
+          deno cache app/main.ts --lock-write
 
       - name: Start server
+        env:
+          MONGO_URI: "mongodb://dummy:27017"
+          RESEND_API_KEY: "dummy_key"
+          EMAIL_FROM_DOMAIN: "dummy@dummy.com"
+          ENCRYPTION_MASTER_KEY: "dummy_master_key_must_be_64_characters_long_dummy_master_key"
+          APP_DOMAIN: "http://localhost:8000"
         run: deno task preview &
         
       - name: Wait for server to start
