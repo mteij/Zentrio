@@ -16,17 +16,17 @@
 
 ---
 
-## 🛡️ **Belangrijke opmerking & Disclaimer**
+## 🛡️ **Important Note & Disclaimer**
 
-Welkom bij Zentrio! Voordat je verdergaat, neem even de tijd om dit door te lezen.
+Welcome to Zentrio! Before you proceed, please take a moment to read this.
 
-**Over de ontwikkeling:** Dit project is grotendeels ontwikkeld met behulp van AI-assistenten zoals GitHub Copilot en Claude. Hoewel ik de code zorgvuldig controleer en test, is het belangrijk te weten dat een aanzienlijk deel van de codebase door AI is gegenereerd of verbeterd.
+**About Development:** This project has been largely developed with the help of AI assistants like GitHub Copilot and Claude. While I carefully review and test the code, it's important to know that a significant portion of the codebase has been generated or enhanced by AI.
 
-**Jouw veiligheid:**
-*   **Gebruik unieke wachtwoorden:** Gebruik voor je eigen veiligheid een uniek wachtwoord voor Zentrio dat je nergens anders gebruikt.
-*   **Nieuwe Stremio-profielen:** Het wordt sterk aangeraden om nieuwe, lege Stremio-profielen aan te maken wanneer je deze dienst gebruikt, in plaats van je bestaande profielen te koppelen.
+**Your Security:**
+*   **Use Unique Passwords:** For your own safety, please use a unique password for Zentrio that you don't use anywhere else.
+*   **New Stremio Profiles:** It is strongly recommended to create new, empty Stremio profiles when using this service, instead of linking your existing ones.
 
-**Juridische disclaimer:** Dit is een persoonlijk project en is niet gelieerd aan, onderschreven door of gesponsord door Stremio. Ik erken dat deze dienst de grenzen van de servicevoorwaarden van Stremio kan opzoeken en zal voldoen aan alle verzoeken tot verwijdering of stopzetting van Stremio of hun wettelijke vertegenwoordigers. De officiële Stremio-website vind je op [stremio.com](https://stremio.com).
+**Legal Disclaimer:** This is a personal project and is not affiliated with, endorsed, or sponsored by Stremio. I acknowledge that this service may test the boundaries of Stremio's terms of service and will comply with any and all takedown or cease and desist notices from Stremio or its legal representatives. The official Stremio website can be found at [stremio.com](https://stremio.com).
 
 ---
 
