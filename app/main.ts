@@ -4,10 +4,7 @@
 /// <reference lib="dom.asynciterable" />
 /// <reference lib="deno.ns" />
 
-import { loadSync } from "$std/dotenv/mod.ts";
-const envPath = `${Deno.cwd()}/.env`;
-loadSync({ envPath, export: true });
-
+import "jsr:@std/dotenv/load";
 import { start } from "$fresh/server.ts";
 import manifest from "./fresh.gen.ts";
 import twindPlugin from "$fresh/plugins/twind.ts";

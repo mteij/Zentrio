@@ -3,15 +3,18 @@
   "specifiers": {
     "jsr:@luca/esbuild-deno-loader@0.10.3": "0.10.3",
     "jsr:@std/assert@~0.213.1": "0.213.1",
+    "jsr:@std/dotenv@*": "0.225.5",
     "jsr:@std/encoding@0.213": "0.213.1",
     "jsr:@std/json@~0.213.1": "0.213.1",
     "jsr:@std/jsonc@0.213": "0.213.1",
     "jsr:@std/path@0.213": "0.213.1",
     "npm:@preact/signals@*": "2.2.1_preact@10.26.9",
     "npm:@types/node@*": "22.15.15",
+    "npm:@types/nodemailer@6.4.15": "6.4.15",
     "npm:mongoose@*": "8.4.1",
     "npm:mongoose@8.4.1": "8.4.1",
     "npm:node-cron@3.0.3": "3.0.3",
+    "npm:nodemailer@6.9.13": "6.9.13",
     "npm:preact@*": "10.26.9",
     "npm:stremio-api-client@^1.6.0": "1.6.0",
     "npm:ua-parser-js@*": "2.0.4"
@@ -27,6 +30,9 @@
     },
     "@std/assert@0.213.1": {
       "integrity": "24c28178b30c8e0782c18e8e94ea72b16282207569cdd10ffb9d1d26f2edebfe"
+    },
+    "@std/dotenv@0.225.5": {
+      "integrity": "9ce6f9d0ec3311f74a32535aa1b8c62ed88b1ab91b7f0815797d77a6f60c922f"
     },
     "@std/encoding@0.213.1": {
       "integrity": "fcbb6928713dde941a18ca5db88ca1544d0755ec8fb20fe61e2dc8144b390c62"
@@ -76,6 +82,12 @@
       "integrity": "sha512-R5muMcZob3/Jjchn5LcO8jdKwSCbzqmPB6ruBxMcf9kbxtniZHP327s6C37iOfuw8mbKK3cAQa7sEl7afLrQ8A==",
       "dependencies": [
         "undici-types"
+      ]
+    },
+    "@types/nodemailer@6.4.15": {
+      "integrity": "sha512-0EBJxawVNjPkng1zm2vopRctuWVCxk34JcIlRuXSf54habUWdz1FB7wHDqOqvDa8Mtpt0Q3LTXQkAs2LNyK5jQ==",
+      "dependencies": [
+        "@types/node"
       ]
     },
     "@types/webidl-conversions@7.0.3": {
@@ -284,6 +296,9 @@
       "dependencies": [
         "whatwg-url@5.0.0"
       ]
+    },
+    "nodemailer@6.9.13": {
+      "integrity": "sha512-7o38Yogx6krdoBf3jCAqnIN4oSQFx+fMa0I7dK1D+me9kBxx12D+/33wSb+fhOCtIxvYJ+4x4IMEhmhCKfAiOA=="
     },
     "object-inspect@1.13.4": {
       "integrity": "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew=="
