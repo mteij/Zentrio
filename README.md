@@ -60,40 +60,25 @@ cd app && deno task start
 <details>
 <summary>Environment Variables (`.env`)</summary>
 
-Create a `.env` file in the root directory by copying the example: `cp .env.example .env`. Then, fill in the variables:
+Create a `.env` file in the root directory by copying the example: `cp .env.example .env`. Then, fill in the variables according to the new structure below.
 
-```dotenv
-# MongoDB Credentials
-MONGO_URI="mongodb+srv://<user>:<password>@<cluster-url>/<db-name>?retryWrites=true&w=majority"
-
-# Email Provider: "resend" or "smtp"
-EMAIL_PROVIDER="resend"
-
-# --- Resend Configuration ---
-# Required if EMAIL_PROVIDER is "resend"
-RESEND_API_KEY="re_xxxxxxxx_xxxxxxxx"
-
-# --- SMTP Configuration ---
-# Required if EMAIL_PROVIDER is "smtp"
-SMTP_HOST="smtp.example.com"
-SMTP_PORT="587"
-SMTP_USER="your_smtp_user"
-SMTP_PASS="your_smtp_password"
-# Use "true" for direct SSL/TLS (usually on port 465).
-# Use "false" for STARTTLS (usually on port 587 or 25).
-SMTP_SECURE="false"
-
-# --- General Email Settings ---
-# Production: Use your verified domain (e.g., "noreply@zentrio.eu")
-# Testing: Use "onboarding@resend.dev" for Resend if domain not verified yet
-EMAIL_FROM_DOMAIN="noreply@yourdomain.com"
-
-# Security - Generate with: python3 -c "import uuid; print((uuid.uuid4().hex + uuid.uuid4().hex))"
-ENCRYPTION_MASTER_KEY="your_64_character_hex_master_key_here"
-
-# Application Domain - Change when using a domain name
-APP_DOMAIN="http://localhost:8000"
-```
+| Variable                | Description                                                                                                                              | Example                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **Core Settings**       |                                                                                                                                          |                                                                                  |
+| `APP_DOMAIN`            | The public URL of your instance, used for generating links in emails.                                                                    | `"https://zentrio.yourdomain.com"`                                               |
+| **Database**            |                                                                                                                                          |                                                                                  |
+| `MONGO_URI`             | Your full MongoDB connection string.                                                                                                     | `"mongodb+srv://user:pass@cluster.mongodb.net/dbname"`                           |
+| **Security**            |                                                                                                                                          |                                                                                  |
+| `ENCRYPTION_MASTER_KEY` | **CRITICAL:** A 64-character hex key for encrypting data. **Back this up!**                                                              | `(generate one)`                                                                 |
+| **Email Configuration** |                                                                                                                                          |                                                                                  |
+| `EMAIL_PROVIDER`        | The service for sending emails. Can be `"resend"` or `"smtp"`.                                                                           | `"resend"`                                                                       |
+| `EMAIL_FROM_DOMAIN`     | The "From" address for emails. For Resend, use `onboarding@resend.dev` for testing.                                                      | `"noreply@yourdomain.com"`                                                       |
+| `RESEND_API_KEY`        | Your API key from Resend. (Required if `EMAIL_PROVIDER` is `"resend"`)                                                                   | `"re_xxxxxxxx_xxxxxxxx"`                                                         |
+| `SMTP_HOST`             | Your SMTP server address. (Required if `EMAIL_PROVIDER` is `"smtp"`)                                                                     | `"smtp.example.com"`                                                             |
+| `SMTP_PORT`             | The port for your SMTP server.                                                                                                           | `"587"`                                                                          |
+| `SMTP_USER`             | The username for your SMTP server.                                                                                                       | `"your_smtp_user"`                                                               |
+| `SMTP_PASS`             | The password for your SMTP server.                                                                                                       | `"your_smtp_password"`                                                           |
+| `SMTP_SECURE`           | Use `"true"` for SSL/TLS (port 465) or `"false"` for STARTTLS (port 587).                                                                | `"false"`                                                                        |
 
 </details>
 

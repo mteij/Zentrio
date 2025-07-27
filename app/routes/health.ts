@@ -20,10 +20,6 @@ interface HealthStatus {
       status: "configured" | "not_configured";
       domain?: string;
     };
-    environment: {
-      status: "production" | "development";
-      secure: boolean;
-    };
   };
   security: {
     rateLimiting: boolean;
@@ -32,7 +28,6 @@ interface HealthStatus {
     securityHeaders: boolean;
   };
   metadata: {
-    nodeVersion: string;
     denoVersion: string;
     memoryUsage: {
       used: number;
@@ -97,9 +92,6 @@ export const handler: Handlers = {
     // Environment checks
     const encryptionMasterKey = Deno.env.get("ENCRYPTION_MASTER_KEY");
     const mongoUri = Deno.env.get("MONGO_URI");
-    const isProduction = Deno.env.get("NODE_ENV") === "production" ||
-                        Deno.env.get("DENO_ENV") === "production";
-    
     const environmentSecure = !!(encryptionMasterKey && mongoUri);
     if (!environmentSecure) {
       overallStatus = "unhealthy";
@@ -136,10 +128,6 @@ export const handler: Handlers = {
           status: emailStatus,
           domain: emailDomain,
         },
-        environment: {
-          status: isProduction ? "production" : "development",
-          secure: environmentSecure,
-        },
       },
       security: {
         rateLimiting: true, // We implemented this
@@ -148,7 +136,6 @@ export const handler: Handlers = {
         securityHeaders: true, // We implemented this
       },
       metadata: {
-        nodeVersion: "N/A", // Deno doesn't use Node.js
         denoVersion: Deno.version.deno,
         memoryUsage: {
           used: Math.round(usedMemory / 1024 / 1024), // MB
