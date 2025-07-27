@@ -3,7 +3,7 @@ export const getSessionScript = (safeSessionData: string) => `
   let session; // Declare session in a wider scope
   // This script runs before Stremio's own scripts to set up the session.
   try {
-    session = JSON.parse(\`${safeSessionData}\`);
+    session = JSON.parse(\`\${safeSessionData}\`);
     // Iterate over the session object and set each key in localStorage.
     // Stremio expects some values to be JSON.stringified (like strings), and others not (like numbers).
     for (const key in session) {

@@ -1,7 +1,7 @@
 import { Handlers } from "$fresh/server.ts";
-import { getSessionScript } from "./scripts/session.ts";
-import { getAddonManagerScript } from "./scripts/addonManager.ts";
-import { getNsfwFilterScript } from "./scripts/nsfwFilter.ts";
+import { getSessionScript } from "../../shared/scripts/session.ts";
+import { getAddonManagerScript } from "../../shared/scripts/addonManager.ts";
+import { getNsfwFilterScript } from "../../shared/scripts/nsfwFilter.ts";
 
 const STREMIO_WEB_URL = "https://web.stremio.com/";
 const STREMIO_API_URL = "https://api.strem.io/";
