@@ -113,19 +113,19 @@ jobs:
         fi
         
         # Create Android launcher icons in different sizes
-        # Using simple copy approach since we may not have image conversion tools
-        cp icon-512.png app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-        cp icon-512.png app/src/main/res/mipmap-xxhdpi/ic_launcher.png  
-        cp icon-512.png app/src/main/res/mipmap-xhdpi/ic_launcher.png
-        cp icon-512.png app/src/main/res/mipmap-hdpi/ic_launcher.png
-        cp icon-512.png app/src/main/res/mipmap-mdpi/ic_launcher.png
+        # Using image conversion tools to resize icons to the correct dimensions
+        convert icon-512.png -resize 192x192 app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+        convert icon-512.png -resize 144x144 app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+        convert icon-512.png -resize 96x96 app/src/main/res/mipmap-xhdpi/ic_launcher.png
+        convert icon-512.png -resize 72x72 app/src/main/res/mipmap-hdpi/ic_launcher.png
+        convert icon-512.png -resize 48x48 app/src/main/res/mipmap-mdpi/ic_launcher.png
         
-        # Also create drawable versions
-        cp icon-512.png app/src/main/res/drawable-xxxhdpi/ic_launcher.png
-        cp icon-512.png app/src/main/res/drawable-xxhdpi/ic_launcher.png
-        cp icon-512.png app/src/main/res/drawable-xhdpi/ic_launcher.png
-        cp icon-512.png app/src/main/res/drawable-hdpi/ic_launcher.png
-        cp icon-512.png app/src/main/res/drawable-mdpi/ic_launcher.png
+        # Also create drawable versions with correct sizes
+        convert icon-512.png -resize 192x192 app/src/main/res/drawable-xxxhdpi/ic_launcher.png
+        convert icon-512.png -resize 144x144 app/src/main/res/drawable-xxhdpi/ic_launcher.png
+        convert icon-512.png -resize 96x96 app/src/main/res/drawable-xhdpi/ic_launcher.png
+        convert icon-512.png -resize 72x72 app/src/main/res/drawable-hdpi/ic_launcher.png
+        convert icon-512.png -resize 48x48 app/src/main/res/drawable-mdpi/ic_launcher.png
         
         # Create adaptive icon XML (modern Android)
         mkdir -p app/src/main/res/mipmap-anydpi-v26
