@@ -11,7 +11,10 @@ const STATIC_CACHE_URLS = [
   '/styles.css',
   '/css/background.css',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
+  '/screenshots/mobile-1.jpg',
+  '/screenshots/mobile-2.jpg',
+  '/screenshots/mobile-3.jpg'
 ];
 
 // Install event - cache essential resources
