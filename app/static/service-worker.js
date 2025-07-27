@@ -8,7 +8,7 @@ const RUNTIME_CACHE = 'zentrio-runtime-v2';
 const STATIC_CACHE_URLS = [
   '/',
   '/manifest.json',
-  '/styles.css',
+  '/css/styles.css',
   '/css/background.css',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
