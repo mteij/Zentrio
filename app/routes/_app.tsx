@@ -18,7 +18,7 @@ export default function App({ Component, route }: PageProps) {
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href="/manifest.json.ts" />
         <meta name="theme-color" content="#dc2626" id="theme-color-meta" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -42,6 +42,14 @@ export default function App({ Component, route }: PageProps) {
                   themeColorMeta.content = savedAccentColor;
                 }
                 document.documentElement.style.setProperty('--accent-color', savedAccentColor);
+
+                const savedOrientation = localStorage.getItem('pwaOrientation') || 'auto';
+                const manifestLink = document.querySelector('link[rel="manifest"]');
+                if (manifestLink) {
+                  const manifestUrl = new URL(manifestLink.href);
+                  manifestUrl.searchParams.set('orientation', savedOrientation);
+                  manifestLink.href = manifestUrl.href;
+                }
               });
             `,
           }}

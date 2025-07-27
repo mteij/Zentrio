@@ -17,7 +17,7 @@ export default function SettingsModal({
   setAddonOrderEnabled: { value: boolean };
   isMobile: boolean;
 }) {
-  const tab = useSignal<"general" | "addons">("general");
+  const tab = useSignal<"general" | "addons" | "ui">("general");
   
   // Auto-login settings
   const autoLogin = useSignal<AutoLoginOption>("none");
@@ -29,6 +29,7 @@ export default function SettingsModal({
   const tmdbApiKey = useSignal<string>("");
   const hideCalendarButton = useSignal<boolean>(false);
   const hideAddonsButton = useSignal<boolean>(false);
+  const pwaOrientation = useSignal<string>("auto");
 
   // Addon sync settings
   const addonSyncEnabled = useSignal<boolean>(false);
@@ -40,6 +41,7 @@ export default function SettingsModal({
   const isSyncing = useSignal<boolean>(false);
   const syncStatus = useSignal<string>("");
 
+  const isPWA = useSignal<boolean>(false);
   // Collapsible section states - collapsed by default
   const addonSyncCollapsed = useSignal<boolean>(true);
   const addonManagerCollapsed = useSignal<boolean>(true);
@@ -50,6 +52,7 @@ export default function SettingsModal({
       autoLogin.value = (localStorage.getItem("autoLogin") as AutoLoginOption) || "none";
       autoLoginProfileId.value = localStorage.getItem("autoLoginProfileId") || null;
       accentColor.value = localStorage.getItem("accentColor") || "#dc2626";
+      pwaOrientation.value = localStorage.getItem("pwaOrientation") || "auto";
       
       // Load profiles for dropdown
       try {
@@ -73,6 +76,9 @@ export default function SettingsModal({
 
       // Load hide addons button setting from server
       loadHideAddonsButtonSetting();
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        isPWA.value = true;
+      }
     }
   }, []);
 
@@ -234,6 +240,12 @@ export default function SettingsModal({
       }
     }
   }, [accentColor.value]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pwaOrientation", pwaOrientation.value);
+    }
+  }, [pwaOrientation.value]);
 
   // Save TMDB API key to server
   const saveTmdbApiKey = async (apiKey: string) => {
@@ -429,6 +441,25 @@ export default function SettingsModal({
             <button
               type="button"
               className={`px-4 py-2 font-medium text-base transition-colors duration-150 ${
+              tab.value === "ui"
+                ? "" // Remove static color classes
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+              style={
+                tab.value === "ui"
+                  ? {
+                      color: accentColor.value,
+                      borderBottom: `2px solid ${accentColor.value}`,
+                    }
+                  : undefined
+              }
+              onClick={() => (tab.value = "ui")}
+            >
+              UI
+            </button>
+            <button
+              type="button"
+              className={`px-4 py-2 font-medium text-base transition-colors duration-150 ${
               tab.value === "addons"
                 ? "" // Remove static color classes
                 : "text-gray-400 hover:text-gray-200"
@@ -483,37 +514,6 @@ export default function SettingsModal({
                 </div>
               </div>
 
-              {/* Accent Color Setting */}
-              <div className="bg-gray-800 rounded-lg p-4 mb-4">
-                <div className="mb-0">
-                  <label className="block text-base font-medium text-gray-200 mb-2">Accent Color</label>
-                  {/* Show current color above the options */}
-                  <div className="flex items-center mb-3">
-                    <span className="text-sm text-gray-400 mr-2">Current accent color:</span>
-                    <div
-                      className="w-6 h-6 rounded border-2 border-gray-600"
-                      style={{ backgroundColor: accentColor.value }}
-                    ></div>
-                    <span className="ml-2 text-sm text-gray-400 font-mono">{accentColor.value}</span>
-                  </div>
-                  <ColorPicker
-                    value={accentColor.value}
-                    onChange={(color) => accentColor.value = color}
-                    presets={[
-                      "#dc2626",
-                      "#2563eb",
-                      "#059669",
-                      "#7c3aed",
-                      "#ea580c",
-                      "#0891b2",
-                      "#be123c"
-                    ]}
-                  />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Choose your preferred accent color for the interface. This affects buttons, links, and highlights.
-                  </p>
-                </div>
-              </div>
 
               {/* TMDB API Key Setting */}
               <div className="bg-gray-800 rounded-lg p-4 mb-4">
@@ -567,65 +567,6 @@ export default function SettingsModal({
                 </div>
               </div>
 
-              {/* Hide Calendar Button Setting */}
-              <div className="bg-gray-800 rounded-lg p-4 mb-4">
-                <div className="mb-0">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-base font-medium text-gray-200">Hide Calendar Button</label>
-                    <div className="relative inline-block w-12 h-6">
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={hideCalendarButton.value}
-                        onChange={e => hideCalendarButton.value = e.currentTarget.checked}
-                      />
-                      <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
-                        hideCalendarButton.value 
-                          ? 'bg-red-600' 
-                          : 'bg-gray-600'
-                      }`}
-                        onClick={() => hideCalendarButton.value = !hideCalendarButton.value}
-                      ></div>
-                      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
-                        hideCalendarButton.value ? 'transform translate-x-6' : ''
-                      }`}></div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Hide the calendar button in the Stremio interface. Refresh the Stremio page after changing this setting.
-                  </p>
-                </div>
-              </div>
-
-              {/* Hide Addons Button Setting */}
-              <div className="bg-gray-800 rounded-lg p-4 mb-4">
-                <div className="mb-0">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-base font-medium text-gray-200">Hide Addons Button</label>
-                    <div className="relative inline-block w-12 h-6">
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={hideAddonsButton.value}
-                        onChange={e => hideAddonsButton.value = e.currentTarget.checked}
-                      />
-                      <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
-                        hideAddonsButton.value
-                          ? 'bg-red-600'
-                          : 'bg-gray-600'
-                      }`}
-                        onClick={() => hideAddonsButton.value = !hideAddonsButton.value}
-                      ></div>
-                      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
-                        hideAddonsButton.value ? 'transform translate-x-6' : ''
-                      }`}></div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Hide the addons button in the Stremio interface. Refresh the Stremio page after changing this setting.
-                  </p>
-                </div>
-              </div>
             </div>
           )}
 
@@ -884,6 +825,125 @@ export default function SettingsModal({
               </div>
           </div>
         )}
+
+        {/* UI Tab */}
+          {tab.value === "ui" && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4 text-white">UI Settings</h3>
+              
+              {/* Accent Color Setting */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <label className="block text-base font-medium text-gray-200 mb-2">Accent Color</label>
+                  {/* Show current color above the options */}
+                  <div className="flex items-center mb-3">
+                    <span className="text-sm text-gray-400 mr-2">Current accent color:</span>
+                    <div
+                      className="w-6 h-6 rounded border-2 border-gray-600"
+                      style={{ backgroundColor: accentColor.value }}
+                    ></div>
+                    <span className="ml-2 text-sm text-gray-400 font-mono">{accentColor.value}</span>
+                  </div>
+                  <ColorPicker
+                    value={accentColor.value}
+                    onChange={(color) => accentColor.value = color}
+                    presets={[
+                      "#dc2626",
+                      "#2563eb",
+                      "#059669",
+                      "#7c3aed",
+                      "#ea580c",
+                      "#0891b2",
+                      "#be123c"
+                    ]}
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Choose your preferred accent color for the interface. This affects buttons, links, and highlights.
+                  </p>
+                </div>
+              </div>
+
+              {/* Hide Calendar Button Setting */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-base font-medium text-gray-200">Hide Calendar Button</label>
+                    <div className="relative inline-block w-12 h-6">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={hideCalendarButton.value}
+                        onChange={e => hideCalendarButton.value = e.currentTarget.checked}
+                      />
+                      <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                        hideCalendarButton.value
+                          ? 'bg-red-600'
+                          : 'bg-gray-600'
+                      }`}
+                        onClick={() => hideCalendarButton.value = !hideCalendarButton.value}
+                      ></div>
+                      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
+                        hideCalendarButton.value ? 'transform translate-x-6' : ''
+                      }`}></div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Hide the calendar button in the Stremio interface. Refresh the Stremio page after changing this setting.
+                  </p>
+                </div>
+              </div>
+
+              {/* Hide Addons Button Setting */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-base font-medium text-gray-200">Hide Addons Button</label>
+                    <div className="relative inline-block w-12 h-6">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={hideAddonsButton.value}
+                        onChange={e => hideAddonsButton.value = e.currentTarget.checked}
+                      />
+                      <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                        hideAddonsButton.value
+                          ? 'bg-red-600'
+                          : 'bg-gray-600'
+                      }`}
+                        onClick={() => hideAddonsButton.value = !hideAddonsButton.value}
+                      ></div>
+                      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
+                        hideAddonsButton.value ? 'transform translate-x-6' : ''
+                      }`}></div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Hide the addons button in the Stremio interface. Refresh the Stremio page after changing this setting.
+                  </p>
+                </div>
+              </div>
+
+              {/* PWA Orientation Setting */}
+              {isPWA.value &&
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <label className="block text-base font-medium text-gray-200 mb-2">PWA Orientation</label>
+                  <select
+                    className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
+                    value={pwaOrientation.value}
+                    onChange={e => (pwaOrientation.value = e.currentTarget.value)}
+                  >
+                    <option value="auto">Auto (default)</option>
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Sets the orientation for the Progressive Web App.
+                  </p>
+                </div>
+              </div>}
+            </div>
+          )}
 
         <style>
           {`

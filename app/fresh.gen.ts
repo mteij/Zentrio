@@ -31,6 +31,7 @@ import * as $auth_signup_success from "./routes/auth/signup-success.tsx";
 import * as $auth_verify from "./routes/auth/verify.tsx";
 import * as $health from "./routes/health.ts";
 import * as $index from "./routes/index.tsx";
+import * as $manifest_json from "./routes/manifest.json.ts";
 import * as $player_profileId_ from "./routes/player/[profileId].tsx";
 import * as $profiles from "./routes/profiles.tsx";
 import * as $settings from "./routes/settings.tsx";
@@ -79,6 +80,7 @@ const manifest = {
     "./routes/auth/verify.tsx": $auth_verify,
     "./routes/health.ts": $health,
     "./routes/index.tsx": $index,
+    "./routes/manifest.json.ts": $manifest_json,
     "./routes/player/[profileId].tsx": $player_profileId_,
     "./routes/profiles.tsx": $profiles,
     "./routes/settings.tsx": $settings,

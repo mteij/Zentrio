@@ -6,7 +6,7 @@
   "background_color": "#141414",
   "theme_color": "#dc2626",
   "description": "A beautiful, secure, Netflix-inspired profile management system for Stremio Web",
-  "orientation": "natural",
+  "orientation": "any",
   "scope": "/",
   "categories": ["entertainment", "utilities"],
   "lang": "en",
