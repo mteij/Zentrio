@@ -42,7 +42,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     return (
       <div class="text-center">
         <p class="text-green-400 mb-4">{message.value}</p>
-        <a href="/login" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+        <a href="/auth/login" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
           Go to Login
         </a>
       </div>

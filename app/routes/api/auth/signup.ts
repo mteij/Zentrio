@@ -25,7 +25,7 @@ export const handler: Handlers = {
     try {
       const { plainPassword } = await createUserWithGeneratedPassword (email);
       const url = new URL(req.url);
-      const loginUrl = `${url.origin}/login`;
+      const loginUrl = `${url.origin}/auth/login`;
 
       const resend = new Resend(resendApiKey);
       await resend.emails.send({

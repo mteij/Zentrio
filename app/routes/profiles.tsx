@@ -15,7 +15,7 @@ export const handler: Handlers<ProfilePageData, AppState> = {
     if (!userId) {
       return new Response("", {
         status: 307,
-        headers: { Location: "/login" },
+        headers: { Location: "/auth/login" },
       });
     }
     const profiles = await getProfilesByUser(userId);

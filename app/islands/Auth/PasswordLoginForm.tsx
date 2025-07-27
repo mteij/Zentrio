@@ -69,7 +69,7 @@ export default function PasswordLoginForm({ email }: PasswordLoginFormProps) {
       {/* Back button */}
       <div class="mb-4">
         <a
-          href="/login"
+          href="/auth/login"
           class="inline-flex items-center text-gray-400 hover:text-white transition-colors text-sm"
         >
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -27,7 +27,7 @@ export const handler: Handlers<PlayerPageData, AppState> = {
     if (!userId) {
       return new Response("", {
         status: 307,
-        headers: { Location: "/login" },
+        headers: { Location: "/auth/login" },
       });
     }
 

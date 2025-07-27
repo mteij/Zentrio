@@ -16,7 +16,7 @@ export default function SignupSuccessPage(props: PageProps) {
             Please use it to log in.
           </p>
           <a
-            href="/login"
+            href="/auth/login"
             class="w-full inline-block bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded"
           >
             Proceed to Login
