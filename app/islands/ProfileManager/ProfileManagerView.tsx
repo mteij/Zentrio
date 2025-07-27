@@ -92,9 +92,9 @@ export default function ProfileManagerView(props: any) {
         </h1>
         {/* Mobile Profile Grid */}
         <div
-          class="flex-1 px-[2vw] grid auto-rows-min justify-items-center items-start gap-y-8 gap-x-4"
+          class="flex-1 px-[2vw] grid auto-rows-min justify-center content-start gap-4"
           style={{
-            gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
             maxWidth: "calc(100vw - 4vw)",
             margin: "0 auto",
             paddingBottom: "100px",
@@ -102,7 +102,7 @@ export default function ProfileManagerView(props: any) {
             overflowY: "auto",
             ...(modalOpen ? {
               pointerEvents: "none",
-              userSelect: "none", 
+              userSelect: "none",
               opacity: 0.6
             } : {})
           }}
@@ -116,8 +116,6 @@ export default function ProfileManagerView(props: any) {
                 class="flex flex-col items-center group relative transition-all duration-300"
                 style={{
                   width: "100%",
-                  minWidth: "80px",
-                  maxWidth: "120px",
                   transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
                   height: "auto",
                   aspectRatio: "1/1.3",
@@ -184,8 +182,6 @@ export default function ProfileManagerView(props: any) {
               class="flex flex-col items-center cursor-pointer group relative transition-all duration-300 hover:scale-105 hover:z-10"
               style={{
                 width: "100%",
-                minWidth: "80px",
-                maxWidth: "120px",
                 transition: "all 0.2s cubic-bezier(.4,2,.6,1)",
                 height: "auto",
                 aspectRatio: "1/1.3",
@@ -216,7 +212,7 @@ export default function ProfileManagerView(props: any) {
                 </div>
               </button>
               <span class="text-lg font-semibold text-white truncate w-full text-center">
-                Add Profile
+                Add
               </span>
             </div>
           )}
