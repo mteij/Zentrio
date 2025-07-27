@@ -10,6 +10,7 @@
     "jsr:@std/path@0.213": "0.213.1",
     "npm:@preact/signals@*": "2.2.1_preact@10.26.9",
     "npm:@types/node@*": "22.15.15",
+    "npm:@types/nodemailer@6.4.17": "6.4.17",
     "npm:mongoose@*": "8.4.1",
     "npm:mongoose@8.4.1": "8.4.1",
     "npm:node-cron@3.0.3": "3.0.3",
@@ -82,6 +83,12 @@
       "integrity": "sha512-R5muMcZob3/Jjchn5LcO8jdKwSCbzqmPB6ruBxMcf9kbxtniZHP327s6C37iOfuw8mbKK3cAQa7sEl7afLrQ8A==",
       "dependencies": [
         "undici-types"
+      ]
+    },
+    "@types/nodemailer@6.4.17": {
+      "integrity": "sha512-I9CCaIp6DTldEg7vyUTZi8+9Vo0hi1/T8gv3C89yk1rSAAzoKQ8H8ki/jBYJSFoH/BisgLP8tkZMlQ91CIquww==",
+      "dependencies": [
+        "@types/node"
       ]
     },
     "@types/webidl-conversions@7.0.3": {
