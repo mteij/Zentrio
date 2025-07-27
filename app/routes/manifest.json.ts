@@ -8,11 +8,19 @@ export const handler: Handlers = {
     const manifest = {
       "name": "Zentrio",
       "short_name": "Zentrio",
+      "description": "A beautiful, secure, Netflix-inspired profile management system for Stremio Web",
+      "id": "/",
       "start_url": "/",
+      "scope": "/",
       "display": "standalone",
       "background_color": "#000000",
       "theme_color": "#dc2626",
       "orientation": orientation,
+      "lang": "en",
+      "categories": ["entertainment", "utilities"],
+      "launch_handler": {
+        "client_mode": "navigate-existing"
+      },
       "icons": [
         {
           "src": "/icons/icon-192.png",
@@ -23,6 +31,20 @@ export const handler: Handlers = {
           "src": "/icons/icon-512.png",
           "type": "image/png",
           "sizes": "512x512"
+        }
+      ],
+      "screenshots": [
+        {
+          "src": "/icons/icon-512.png",
+          "sizes": "512x512",
+          "type": "image/png",
+          "form_factor": "wide"
+        },
+        {
+          "src": "/icons/icon-512.png",
+          "sizes": "512x512",
+          "type": "image/png",
+          "form_factor": "narrow"
         }
       ]
     };
