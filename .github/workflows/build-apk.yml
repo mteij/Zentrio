@@ -18,20 +18,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+      - name: Generate APK via PWABuilder API
+        run: |
+          curl -X POST "https://prod.pwabuilder.com/api/build/package" \
+          -H "Content-Type: application/json" \
+          -d '{"url": "https://zentrio.eu", "platforms": ["android"]}' \
+          -o android.zip
 
-      - name: Install PWABuilder CLI
-        run: npm install -g @pwabuilder/cli
-
-      - name: Generate Android Project from URL
-        run: pwa package https://zentrio.eu -p android -d .
+      - name: Unzip Generated Project
+        run: unzip android.zip -d android_project
 
       - name: Find Generated APK
         id: find_apk
-        run: echo "apk_path=$(find . -name '*.apk' -print -quit)" >> $GITHUB_OUTPUT
+        run: echo "apk_path=$(find android_project -name '*.apk' -print -quit)" >> $GITHUB_OUTPUT
 
       - name: Create Release and Upload APK
         env:
