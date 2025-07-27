@@ -28,7 +28,7 @@ jobs:
 
       - name: Init Bubblewrap project
         run: |
-          (sleep 1; echo "y") | bubblewrap init \
+          (printf "y\ny\n") | bubblewrap init \
             --manifest "${{ github.workspace }}/app/static/manifest.json"
 
       - name: Build unsigned APK with Bubblewrap
