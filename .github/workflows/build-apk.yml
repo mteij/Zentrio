@@ -1,9 +1,8 @@
-name: Build Android APK
+name: Build and Release Android APK
 
 on:
-  push:
-    branches:
-      - main
+  release:
+    types: [published]
 
 jobs:
   build:
@@ -11,41 +10,22 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
-
-      - name: Set up Deno
-        uses: denoland/setup-deno@v1
-        with:
-          deno-version: v1.44.4
-
-      - name: Recreate lockfile
-        run: |
-          rm -f deno.lock
-          deno cache app/main.ts --lock-write
-
-      - name: Start server
-        env:
-          MONGO_URI: "mongodb://dummy:27017"
-          RESEND_API_KEY: "dummy_key"
-          EMAIL_FROM_DOMAIN: "dummy@dummy.com"
-          ENCRYPTION_MASTER_KEY: "dummy_master_key_must_be_64_characters_long_dummy_master_key"
-          APP_DOMAIN: "http://localhost:8000"
-        run: deno task preview &
-        
-      - name: Wait for server to start
-        run: |
-          timeout 120 sh -c 'until curl -s --fail http://localhost:8000/manifest.json; do echo "Waiting for server..."; sleep 1; done'
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Generate APK with PWABuilder CLI
-        run: npx @pwa/builder-cli http://localhost:8000/manifest.json -p android -d .
-        
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+        run: npx @pwa/builder-cli https://zentrio.eu -p android -d .
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: app
-          path: Zentrio.apk
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./Zentrio.apk
+          asset_name: Zentrio.apk
+          asset_content_type: application/vnd.android.package-archive
