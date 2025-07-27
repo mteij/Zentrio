@@ -12,13 +12,10 @@ export default function App({ Component, route }: PageProps) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Zentrio</title>
+        <meta name="description" content="Zentrio is a self-hosted Stremio server and client, offering a centralized media hub for all your entertainment needs." />
         <link rel="stylesheet" href="/css/styles.css" />
         <link rel="stylesheet" href="/css/background.css" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-        <link rel="manifest" href="/manifest.json.ts" />
+        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#dc2626" id="theme-color-meta" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

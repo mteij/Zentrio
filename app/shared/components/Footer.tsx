@@ -29,7 +29,7 @@ export default function Footer() {
             <GitHubIcon />
           </a>
         </div>
-        <div class="text-xs text-gray-500 pt-2">
+        <div class="text-xs text-gray-400 pt-2">
           <p>
             This project is a personal endeavor and is not affiliated with, endorsed, or sponsored by Stremio.
             The creator acknowledges that this service may operate in a manner that tests the boundaries of Stremio's terms of service

@@ -244,7 +244,7 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
                   }`}
                 >
                   {/* Drag Handle */}
-                  <div class="text-gray-500 mr-3 cursor-move">
+                  <div class="text-gray-400 mr-3 cursor-move">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
                     </svg>
@@ -293,7 +293,7 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
                         {addon.manifest.description}
                       </p>
                     )}
-                    <p class="text-gray-500 text-xs mt-1 truncate">
+                    <p class="text-gray-400 text-xs mt-1 truncate">
                       {addon.transportUrl}
                     </p>
                   </div>
@@ -303,7 +303,7 @@ export function AddonManagerModal({ isOpen, onClose, authKey }: AddonManagerModa
                     <button
                       type="button"
                       onClick={() => removeAddon(index)}
-                      class="ml-4 text-gray-500 hover:text-red-400 transition-colors"
+                      class="ml-4 text-gray-400 hover:text-red-400 transition-colors"
                       title="Remove addon"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

@@ -125,7 +125,7 @@ export default function SettingsPage(_props: PageProps) {
                     ))}
                   </select>
                 )}
-                <p class="text-xs text-gray-500 mt-2">
+                <p class="text-xs text-gray-400 mt-2">
                   Choose what happens when you visit the site while logged in.
                 </p>
               </div>
@@ -156,7 +156,7 @@ export default function SettingsPage(_props: PageProps) {
                   </span>
                 </label>
               </div>
-              <p class="text-xs text-gray-500">
+              <p class="text-xs text-gray-400">
                 Adds a button to the Zentrio Addons page to copy your auth key and open the community Addon Manager.
               </p>
             </div>

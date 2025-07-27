@@ -508,7 +508,7 @@ export default function SettingsModal({
                       ))}
                     </select>
                   )}
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-400 mt-2">
                     Choose what happens when you visit the site while logged in.
                   </p>
                 </div>
@@ -526,7 +526,7 @@ export default function SettingsModal({
                     placeholder="Enter your TMDB API key (optional)"
                     className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
                   />
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-400 mt-2">
                     Required for NSFW content filtering in profiles. Get your free API key from{" "}
                     <a 
                       href="https://www.themoviedb.org/settings/api" 
@@ -561,7 +561,7 @@ export default function SettingsModal({
                     <option value="90">90 days</option>
                     <option value="365">1 year</option>
                   </select>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-400 mt-2">
                     How long your login session should last before requiring re-authentication
                   </p>
                 </div>
@@ -648,7 +648,7 @@ export default function SettingsModal({
                             <option key={p._id} value={p._id}>{p.name}</option>
                           ))}
                         </select>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-400 mt-1">
                           The profile to sync addons from (main → all others)
                         </p>
                       </div>
@@ -695,7 +695,7 @@ export default function SettingsModal({
                             onInput={e => syncInterval.value = Math.max(5, parseInt(e.currentTarget.value) || 60)}
                             className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-600 transition-all duration-200"
                           />
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-400 mt-1">
                             Minimum 5 minutes, maximum 24 hours (1440 minutes)
                           </p>
                         </div>
@@ -715,7 +715,7 @@ export default function SettingsModal({
                             {isSyncing.value ? 'Syncing...' : 'Sync Now'}
                           </button>
                           {lastSyncAt.value && (
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-400 mt-1">
                               Last sync: {lastSyncAt.value}
                             </p>
                           )}
@@ -727,7 +727,7 @@ export default function SettingsModal({
                         )}
                       </div>
                       {/* Warnings and disclaimers only when expanded */}
-                      <div className="text-xs text-gray-500 bg-gray-700 rounded p-3 mt-4 space-y-2">
+                      <div className="text-xs text-gray-400 bg-gray-700 rounded p-3 mt-4 space-y-2">
                         <div>
                           <strong>How it works:</strong> This feature uses the Stremio API to sync addons between your profiles. 
                           You can choose a main profile and sync direction. All profiles must have valid Stremio credentials.
@@ -801,7 +801,7 @@ export default function SettingsModal({
                     <p className="text-sm text-gray-400">
                       Adds an "Edit Order" button to the Stremio Addons page.
                     </p>
-                    <div className="text-xs text-gray-500 bg-gray-700 rounded p-3 space-y-2">
+                    <div className="text-xs text-gray-400 bg-gray-700 rounded p-3 space-y-2">
                       <div>
                         <strong>How it works:</strong> When enabled, this adds an "Edit Order" button to the Stremio web interface. 
                         Clicking it opens an integrated popup where you can drag-and-drop to reorder your addons and remove 
@@ -857,7 +857,7 @@ export default function SettingsModal({
                       "#be123c"
                     ]}
                   />
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-400 mt-2">
                     Choose your preferred accent color for the interface. This affects buttons, links, and highlights.
                   </p>
                 </div>
@@ -887,7 +887,7 @@ export default function SettingsModal({
                       }`}></div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-400 mt-2">
                     Hide the calendar button in the Stremio interface. Refresh the Stremio page after changing this setting.
                   </p>
                 </div>
@@ -917,7 +917,7 @@ export default function SettingsModal({
                       }`}></div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-400 mt-2">
                     Hide the addons button in the Stremio interface. Refresh the Stremio page after changing this setting.
                   </p>
                 </div>
@@ -937,7 +937,7 @@ export default function SettingsModal({
                     <option value="portrait">Portrait</option>
                     <option value="landscape">Landscape</option>
                   </select>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-400 mt-2">
                     Sets the orientation for the Progressive Web App.
                   </p>
                 </div>

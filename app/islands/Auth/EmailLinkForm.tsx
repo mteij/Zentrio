@@ -61,7 +61,7 @@ export default function EmailLinkForm({}: EmailLinkFormProps) {
 
 
   return (
-    <section role="form" class="animate-fadein">
+    <section class="animate-fadein">
       <form onSubmit={handleFormSubmit} class="space-y-4" autoComplete="on">
         <div>
           <label htmlFor="email" class="block text-sm font-medium text-gray-300 transition-all duration-200">

@@ -151,7 +151,7 @@ export default function CodeInputForm({ email }: CodeInputFormProps) {
           type="button"
           onClick={handleResend}
           disabled={resendCooldown.value > 0 || isResending.value}
-          class="text-sm text-red-500 hover:text-red-400 disabled:text-gray-500 disabled:cursor-not-allowed transition-all duration-200"
+          class="text-sm text-red-500 hover:text-red-400 disabled:text-gray-400 disabled:cursor-not-allowed transition-all duration-200"
         >
           {isResending.value 
             ? "Sending..." 

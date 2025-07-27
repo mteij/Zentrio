@@ -92,7 +92,7 @@ export default function ProfileManagerView(props: any) {
         </h1>
         {/* Mobile Profile Grid */}
         <div
-          class="flex-1 px-[2vw] grid auto-rows-min justify-center content-start gap-4"
+          class="flex-1 px-4 grid auto-rows-min justify-center content-start gap-4"
           style={{
             gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
             maxWidth: "calc(100vw - 4vw)",
