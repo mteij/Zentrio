@@ -1,5 +1,5 @@
 import { h as _h } from "preact";
-import { useSignal, useComputed } from "@preact/signals";
+import { useSignal, useComputed, Signal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { useToast } from "../../shared/hooks/useToast.ts";
 import { ProfileSchema } from "../../utils/db.ts";
@@ -372,11 +372,15 @@ export default function ProfileManager(
     showSettings,
     setShowSettings,
     addonOrderEnabled,
+    downloadsManagerEnabled,
+    setShowDownloads,
   }: {
     initialProfiles: (ProfileSchema & { _id: ObjectId; userId: ObjectId })[],
     showSettings: { value: boolean },
     setShowSettings: (value: boolean) => void,
-    addonOrderEnabled: { value: boolean },
+    addonOrderEnabled: boolean,
+    downloadsManagerEnabled: Signal<boolean>,
+    setShowDownloads: (value: boolean) => void,
   }
 ) {
   const {
@@ -427,6 +431,8 @@ const sharedProps = {
   showSettings,
   setShowSettings,
   addonOrderEnabled,
+  downloadsManagerEnabled: downloadsManagerEnabled,
+  setShowDownloads,
   isMobile: isMobile.value,
 };
 

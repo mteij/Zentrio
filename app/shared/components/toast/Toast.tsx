@@ -1,7 +1,7 @@
 import { h as _h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 
-export type ToastType = "Success" | "Warning" | "Message" | "Error";
+export type ToastType = "Success" | "Warning" | "Info" | "Error";
 
 export interface ToastProps {
   id: number;
@@ -26,7 +26,7 @@ export function Toast({ id, message, type, duration = 3000, onClose }: ToastProp
   const toastStyles = {
     Success: "bg-green-500",
     Warning: "bg-yellow-500",
-    Message: "bg-blue-500",
+    Info: "bg-blue-500",
     Error: "bg-red-500",
   };
 

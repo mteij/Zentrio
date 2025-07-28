@@ -1,11 +1,13 @@
 import { h, ComponentChildren } from "preact";
-import { useSignal } from "@preact/signals";
+import { useSignal, Signal } from "@preact/signals";
+import { usePwa } from "../../hooks/usePwa.ts";
 
 interface PluginSettingProps {
   title: string;
-  enabled: boolean;
-  onChange: (enabled: boolean) => void;
+  enabled: Signal<boolean>;
+  onChange?: (enabled: boolean) => void;
   isExperimental?: boolean;
+  pwaOnly?: boolean;
   warning?: ComponentChildren;
   credits?: ComponentChildren;
   howItWorks?: ComponentChildren;
@@ -17,12 +19,18 @@ export default function PluginSetting({
   enabled,
   onChange,
   isExperimental,
+  pwaOnly,
   warning,
   credits,
   howItWorks,
   children,
 }: PluginSettingProps) {
   const collapsed = useSignal(true);
+  const isPwa = usePwa();
+
+  if (pwaOnly && !isPwa) {
+    return null;
+  }
 
   return (
     <div className="bg-gray-800 rounded-lg p-4 mb-6">
@@ -59,23 +67,29 @@ export default function PluginSetting({
             <input
               type="checkbox"
               className="sr-only"
-              checked={enabled}
-              onChange={(e) => onChange(e.currentTarget.checked)}
+              checked={enabled.value}
+              onChange={(e) => {
+                enabled.value = e.currentTarget.checked;
+                onChange?.(e.currentTarget.checked);
+              }}
             />
             <div
               className={`block w-14 h-8 rounded-full transition-colors duration-200 cursor-pointer ${
-                enabled ? "bg-red-600" : "bg-gray-600"
-              }`}
-              onClick={() => onChange(!enabled)}
+                enabled.value ? "bg-red-600" : "bg-gray-600"
+               }`}
+              onClick={() => {
+                enabled.value = !enabled.value;
+                onChange?.(!enabled.value);
+              }}
             ></div>
             <div
               className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200 pointer-events-none ${
-                enabled ? "transform translate-x-6" : ""
+                enabled.value ? "transform translate-x-6" : ""
               }`}
             ></div>
           </div>
           <span className="ml-3 text-sm font-medium text-gray-300">
-            {enabled ? "Enabled" : "Disabled"}
+            {enabled.value ? "Enabled" : "Disabled"}
           </span>
         </div>
       </div>

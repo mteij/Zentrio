@@ -1,6 +1,6 @@
 import { h } from "preact";
 import { useEffect } from "preact/hooks";
-import { useSignal } from "@preact/signals";
+import { useSignal, Signal } from "@preact/signals";
 import { useToast } from "../../shared/hooks/useToast.ts";
 import { useSetting } from "../../shared/hooks/useSetting.ts";
 import SettingsModal from "../Settings/SettingsModal.tsx";
@@ -25,6 +25,7 @@ export default function ProfileManagerView(props: {
   }) => h.JSX.Element;
   toggleMobileEditMode: () => void;
   isMobile: boolean;
+  setShowDownloads: (value: boolean) => void;
 }) {
   const {
     profiles,
@@ -39,10 +40,10 @@ export default function ProfileManagerView(props: {
     isMobile,
   } = props;
 
-  const { success } = useToast();
+  const { success, info } = useToast();
   const isPwa = usePwa();
   const accentColor = useSetting<string>("accentColor", "#dc2626", "localStorage");
-  const downloadsEnabled = useSignal(false);
+  const downloadsManagerEnabled = useSetting<boolean>("downloadsEnabled", false, "server");
   const isInitialized = useSignal(false);
   const lastProfileId = useSignal<string | null>(null);
   const showSettings = useSignal(false);
@@ -59,20 +60,6 @@ export default function ProfileManagerView(props: {
       // Ignore localStorage access errors
     }
     isInitialized.value = true;
-
-    // Load downloads enabled setting
-    const loadDownloadsEnabledSetting = async () => {
-      try {
-        const response = await fetch('/api/settings/downloadsEnabled');
-        if (response.ok) {
-          const data = await response.json();
-          downloadsEnabled.value = data.enabled || false;
-        }
-      } catch (error) {
-        console.warn('Failed to load downloads enabled setting:', error);
-      }
-    };
-    loadDownloadsEnabledSetting();
   }, []);
 
   // Listen for page show events (e.g., when navigating back)
@@ -315,19 +302,34 @@ export default function ProfileManagerView(props: {
               </g>
             </svg>
           </button>
-           {isPwa && downloadsEnabled.value && (
-             <button
-               type="button"
-               onClick={() => (showDownloads.value = true)}
-               class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
-               aria-label="Downloads"
-             >
-               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-               </svg>
-             </button>
-           )}
-        </div>
+            {isPwa && downloadsManagerEnabled.value && (
+              <button
+                type="button"
+                onClick={() => showDownloads.value = true}
+                class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
+                aria-label="Downloads"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+            )}
+            {/* PWA Install Prompt for Downloads */}
+            {!isPwa && downloadsManagerEnabled.value && (
+              <button
+                type="button"
+                onClick={() => {
+                  info("Install the app to use the downloads manager.");
+                }}
+                class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
+                aria-label="Install App for Downloads"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+            )}
+          </div>
         )}
         {showSettings.value && (
           <SettingsModal
@@ -336,10 +338,10 @@ export default function ProfileManagerView(props: {
           />
         )}
        {showDownloads.value && (
-         <DownloadsModal
-           onClose={() => (showDownloads.value = false)}
-           isMobile={isMobile}
-         />
+           <DownloadsModal
+               onClose={() => showDownloads.value = false}
+               isMobile={isMobile}
+           />
        )}
       </div>
     );
@@ -506,18 +508,33 @@ export default function ProfileManagerView(props: {
             </g>
           </svg>
         </button>
-         {isPwa && downloadsEnabled.value && (
-           <button
-             type="button"
-             onClick={() => (showDownloads.value = true)}
-             class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
-             aria-label="Downloads"
-           >
-             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-               <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-             </svg>
-           </button>
-         )}
+        {isPwa && downloadsManagerEnabled.value && (
+          <button
+            type="button"
+            onClick={() => showDownloads.value = true}
+            class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
+            aria-label="Downloads"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+        )}
+        {/* PWA Install Prompt for Downloads */}
+        {!isPwa && downloadsManagerEnabled.value && (
+          <button
+            type="button"
+            onClick={() => {
+              info("Install the app to use the downloads manager.");
+            }}
+            class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
+            aria-label="Install App for Downloads"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </button>
+        )}
       </div>
       {/* Desktop Add Profile Modal */}
       {showAddModal.value && (
@@ -546,12 +563,12 @@ export default function ProfileManagerView(props: {
           isMobile={isMobile}
         />
       )}
-     {showDownloads.value && (
-       <DownloadsModal
-         onClose={() => (showDownloads.value = false)}
-         isMobile={isMobile}
-       />
-     )}
+       {showDownloads.value && (
+           <DownloadsModal
+               onClose={() => showDownloads.value = false}
+               isMobile={isMobile}
+           />
+       )}
     </div>
   );
 }

@@ -36,54 +36,6 @@ export default function DownloadsModal({
         </button>
         <h2 className="text-2xl font-bold mb-6 text-white">Downloads</h2>
 
-        <div>
-            <h3 className="text-lg font-semibold mb-4 text-white">Download Settings</h3>
-            <Setting
-              title="Enable Downloads"
-              description="Enable or disable video downloads."
-            >
-              <div class="flex items-center justify-end">
-                <input
-                  type="checkbox"
-                  checked={downloadsEnabled.value}
-                  onChange={(e) => (downloadsEnabled.value = e.currentTarget.checked)}
-                />
-              </div>
-            </Setting>
-            {isPwa && downloadsEnabled.value && (
-                <Setting
-                title="Download Location"
-                description="Choose where to store downloaded files."
-              >
-                <div>
-                  {canUseFileSystem ? (
-                    <div>
-                      <button
-                        type="button"
-                        onClick={selectDirectory}
-                        className="px-4 py-2 rounded text-sm font-medium text-white"
-                        style={{ backgroundColor: accentColor.value }}
-                      >
-                        Choose Directory
-                      </button>
-                      {directoryName.value && (
-                        <p className="text-sm text-gray-300 mt-2">
-                          Selected:{" "}
-                          <span className="font-semibold">
-                            {directoryName.value}
-                          </span>
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-yellow-400">
-                      File System API not supported in this browser.
-                    </p>
-                  )}
-                </div>
-              </Setting>
-            )}
-          </div>
           <div class="mt-6">
             <h3 class="text-lg font-semibold mb-4 text-white">Downloaded Files</h3>
             <p class="text-gray-400">You have no downloaded files.</p>

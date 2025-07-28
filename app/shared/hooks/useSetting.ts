@@ -59,6 +59,8 @@ export function useSetting<T>(
         try {
           if (storageMethod === "localStorage") {
             localStorage.setItem(key, JSON.stringify(value.value));
+            success("Setting saved successfully.");
+            initialValueRef.value = value.value;
           } else if (storageMethod === "server") {
             const response = await fetch(`/api/settings/${key}`, {
               method: "PUT",

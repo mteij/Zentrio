@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useSignal } from "@preact/signals";
+import { useSignal, Signal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 
 import { ColorPicker } from "../../shared/components/forms/ColorPicker.tsx";
@@ -25,7 +25,7 @@ export default function SettingsModal({
   const { canUseFileSystem, directoryName, selectDirectory } = useFileSystem();
 
   // Settings using the useSetting hook
-  const settingsToLoad = 11;
+  const settingsToLoad = 12;
   const loadedSettings = useSignal(0);
   const loadToastShown = useSignal(false);
 
@@ -44,7 +44,7 @@ export default function SettingsModal({
   const addonSyncEnabled = useSetting<boolean>("addonSyncEnabled", false, "server", onSettingLoad);
   const addonSyncData = useSetting<any>("addonSyncData", { mainProfileId: null, autoSync: false }, "server", onSettingLoad);
   const addonOrderEnabled = useSetting<boolean>("addonOrderEnabled", false, "server", onSettingLoad);
-  const downloadsEnabled = useSetting<boolean>("downloadsEnabled", false, "server", onSettingLoad);
+  const downloadsManagerEnabled = useSetting<boolean>("downloadsEnabled", false, "server", onSettingLoad);
 
   // Other state signals
   const profiles = useSignal<{ _id: string; name: string }[]>([]);
@@ -243,8 +243,7 @@ export default function SettingsModal({
             <h3 className="text-lg font-semibold mb-6 text-white">Plugins</h3>
             <PluginSetting
               title="Addons Synchronization"
-              enabled={addonSyncEnabled.value}
-              onChange={(v) => addonSyncEnabled.value = v}
+              enabled={addonSyncEnabled}
               isExperimental
               howItWorks="Syncs Stremio addons between profiles."
               warning="This is experimental. Back up your addons."
@@ -256,7 +255,7 @@ export default function SettingsModal({
                 <select
                   className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
                   value={addonSyncData.value.mainProfileId}
-                  onChange={(e) => addonSyncData.value = { ...addonSyncData.value, mainProfileId: e.currentTarget.value }}
+                  onChange={(e) => (addonSyncData.value = { ...addonSyncData.value, mainProfileId: e.currentTarget.value })}
                 >
                   <option value="">Select main profile...</option>
                   {profiles.value.map((p) => (
@@ -273,60 +272,57 @@ export default function SettingsModal({
                 <input
                   type="checkbox"
                   checked={addonSyncData.value.autoSync}
-                  onChange={(e) => addonSyncData.value = { ...addonSyncData.value, autoSync: e.currentTarget.checked }}
+                  onChange={(e) => (addonSyncData.value = { ...addonSyncData.value, autoSync: (e.target as HTMLInputElement).checked })}
                 />
               </div>
             </PluginSetting>
             <PluginSetting
               title="Stremio Addon Manager"
-              enabled={addonOrderEnabled.value}
-              onChange={(v) => addonOrderEnabled.value = v}
+              enabled={addonOrderEnabled}
               howItWorks="Adds an 'Edit Order' button to the Stremio addons page."
             >
               <p class="text-sm text-gray-400">
                 This feature is enabled or disabled globally.
               </p>
             </PluginSetting>
-            {isPwa && (
-              <PluginSetting
-                title="Downloads"
-                enabled={downloadsEnabled.value}
-                onChange={(v) => downloadsEnabled.value = v}
-                isExperimental
-                howItWorks="Download videos for offline viewing."
-              >
-                {downloadsEnabled.value && (
-                  <div>
-                    <label className="block text-gray-200 mb-2 text-sm font-medium">
-                      Download Location
-                    </label>
-                    {canUseFileSystem ? (
-                      <div>
-                        <button
-                          type="button"
-                          onClick={selectDirectory}
-                          className="px-4 py-2 rounded text-sm font-medium bg-red-600 hover:bg-red-700 text-white"
-                        >
-                          Choose Directory
-                        </button>
-                        {directoryName.value && (
-                          <p className="text-sm text-gray-300 mt-2">
-                            Selected:{" "}
-                            <span className="font-semibold">
-                              {directoryName.value}
-                            </span>
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-yellow-400">
-                        File System API not supported.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </PluginSetting>
-            )}
+            <PluginSetting
+              title="Downloads Manager"
+              enabled={downloadsManagerEnabled}
+              isExperimental
+              howItWorks="Download videos for offline viewing."
+              pwaOnly
+            >
+              {downloadsManagerEnabled.value && (
+                <div>
+                  <label className="block text-gray-200 mb-2 text-sm font-medium">
+                    Download Location
+                  </label>
+                  {canUseFileSystem ? (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={selectDirectory}
+                        className="px-4 py-2 rounded text-sm font-medium bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        Choose Directory
+                      </button>
+                      {directoryName.value && (
+                        <p className="text-sm text-gray-300 mt-2">
+                          Selected:{" "}
+                          <span className="font-semibold">
+                            {directoryName.value}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-yellow-400">
+                      File System API not supported.
+                    </p>
+                  )}
+                </div>
+              )}
+            </PluginSetting>
           </div>
         )}
 

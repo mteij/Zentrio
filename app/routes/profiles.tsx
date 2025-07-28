@@ -4,6 +4,8 @@ import { getProfilesByUser, ProfileSchema } from "../utils/db.ts";
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import ProfileManager from "../islands/ProfileManager/ProfileManager.tsx";
+import DownloadsModal from "../islands/Downloads/DownloadsModal.tsx";
+import { useSetting } from "../shared/hooks/useSetting.ts";
 
 interface ProfilePageData {
   profiles: ProfileSchema[];
@@ -25,7 +27,9 @@ export const handler: Handlers<ProfilePageData, AppState> = {
 
 export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
   const showSettings = useSignal(false);
+  const showDownloads = useSignal(false);
   const addonOrderEnabled = useSignal(false);
+  const downloadsManagerEnabled = useSetting<boolean>("downloadsManagerEnabled", false, "localStorage");
 
   useEffect(() => {
     // Load addon manager setting from server
@@ -43,6 +47,10 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
     
     loadAddonManagerSetting();
   }, []);
+
+  useEffect(() => {
+    console.log("downloadsManagerEnabled", downloadsManagerEnabled.value);
+  }, [downloadsManagerEnabled.value]);
 
   useEffect(() => {
     if (addonOrderEnabled.value && !document.getElementById("addon-order-userscript")) {
@@ -102,10 +110,13 @@ export default function ProfilesPage({ data }: PageProps<ProfilePageData>) {
               initialProfiles={data.profiles}
               showSettings={showSettings}
               setShowSettings={(value) => (showSettings.value = value)}
-              addonOrderEnabled={addonOrderEnabled}
+              setShowDownloads={(value) => (showDownloads.value = value)}
+              addonOrderEnabled={addonOrderEnabled.value}
+              downloadsManagerEnabled={downloadsManagerEnabled}
             />
           </div>
         </div>
+        {showDownloads.value && <DownloadsModal onClose={() => showDownloads.value = false} isMobile={false} />}
         <style>
           {`
             @keyframes profilecard-in {

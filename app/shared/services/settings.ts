@@ -105,20 +105,20 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
     validate: (value) => typeof value === 'object' && value !== null,
   },
 
-  // Downloads Enabled Setting
-  downloadsEnabled: {
-    get: async (user) => user.settings?.downloadsEnabled || false,
-    set: async (userId, value) => {
-      await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.downloadsEnabled': value } });
-    },
-    validate: (value) => typeof value === 'boolean',
-  },
-
   // Addon Manager Enabled Setting
   addonOrderEnabled: {
     get: async (user) => user.settings?.addonManagerEnabled || false,
     set: async (userId, value) => {
         await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.addonManagerEnabled': value } });
+    },
+    validate: (value) => typeof value === 'boolean',
+  },
+
+  // Downloads Manager Enabled Setting
+  downloadsEnabled: {
+    get: async (user) => user.settings?.downloadsEnabled || false,
+    set: async (userId, value) => {
+        await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.downloadsEnabled': value } });
     },
     validate: (value) => typeof value === 'boolean',
   }
