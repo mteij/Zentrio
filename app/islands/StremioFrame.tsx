@@ -25,20 +25,6 @@ interface StremioFrameProps {
   };
 }
 
-// Define an interface for the config object to be injected into the iframe
-interface StremioHubConfig {
-  downloadsEnabled: boolean;
-  isMobile: boolean;
-  mobileClickToHover: boolean;
-}
-
-// Extend the Window interface to include stremioHubConfig
-declare global {
-  interface Window {
-    stremioHubConfig?: StremioHubConfig;
-  }
-}
-
 // Generates a 20-character hex string, matching Stremio's installation_id format.
 const generateInstallationId = () => {
   const randomBytes = crypto.getRandomValues(new Uint8Array(10));
@@ -220,7 +206,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
             if (!doc || !win) return;
 
             // Inject config object
-            win.stremioHubConfig = {
+            (win as any).stremioHubConfig = {
               downloadsEnabled: profile.downloadsEnabled || false,
               isMobile: deviceContext.value.isMobile,
               mobileClickToHover: profile.mobileClickToHover || false,

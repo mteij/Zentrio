@@ -11,7 +11,7 @@ export default function DownloadsModal({
   const { downloads, isLoading, deleteDownload, groupedDownloads } = useDownloads();
 
   const openVideoPlayer = (src: string) => {
-    globalThis.location.href = `/player?src=${encodeURIComponent(src)}`;
+    window.location.href = `/player?src=${encodeURIComponent(src)}`;
   };
 
   return (

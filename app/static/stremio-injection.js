@@ -1,11 +1,11 @@
 (function() {
   'use strict';
 
-  const config = globalThis.stremioHubConfig || {};
+  const config = window.stremioHubConfig || {};
   const { downloadsEnabled, isMobile, mobileClickToHover } = config;
 
   function setupDownloads() {
-    if (!globalThis.pako) {
+    if (!window.pako) {
       console.error("Pako library not loaded.");
       return;
     }
@@ -27,7 +27,7 @@
     }
 
     // --- Inject download buttons ---
-    const _streamsInterval = setInterval(() => {
+    const streamsInterval = setInterval(() => {
       const streamsContainer = document.querySelector('.streams-container-bbSc4');
       if (streamsContainer) {
         const streamLinks = streamsContainer.querySelectorAll('a.stream-container-JPdah');
@@ -98,17 +98,17 @@
                   fileName = mainTitle;
                 }
 
-                const _sanitizedFileName = fileName.replace(/[/\\\\?%*:|\\"<>]/g, '-') + '.mp4';
+                const sanitizedFileName = fileName.replace(/[/\\\\?%*:|\\"<>]/g, '-') + '.mp4';
 
                 if (streamUrl) {
                   console.log('Zentrio: Starting download for', fileName);
-                  globalThis.top.postMessage({ type: 'download-stream', streamUrl: streamUrl, fileName: fileName }, '*');
+                  window.top.postMessage({ type: 'download-stream', streamUrl: streamUrl, fileName: fileName }, '*');
                 } else {
                   throw new Error('No stream URL found in the decoded stream information.');
                 }
               } catch (error) {
                 console.error('Zentrio: Failed to initiate download.', error);
-                globalThis.top.postMessage({ type: 'download-error', message: 'Could not start download: ' + error.message }, '*');
+                window.top.postMessage({ type: 'download-error', message: 'Could not start download: ' + error.message }, '*');
               }
             };
             link.parentNode.insertBefore(container, link);
@@ -134,7 +134,7 @@
         }, true);
       }
     };
-    const observer = new MutationObserver((_mutations, obs) => {
+    const observer = new MutationObserver((mutations, obs) => {
       if (document.querySelector('.video-container-v9_vA')) {
         setupMobileClickHandler();
         obs.disconnect();
@@ -144,7 +144,7 @@
   }
 
   function setupLogout() {
-    const logoutObserver = new MutationObserver((_mutations, obs) => {
+    const logoutObserver = new MutationObserver((mutations, obs) => {
       const backLink = document.querySelector('a[href="#"]');
       if (backLink && backLink.querySelector('img[src*="dicebear.com"]')) {
         backLink.onclick = async (e) => {
@@ -155,7 +155,7 @@
           } catch (error) {
             console.error('Failed to logout from Stremio:', error);
           } finally {
-            globalThis.top.location.href = '/profiles';
+            window.top.location.href = '/profiles';
           }
         };
         obs.disconnect();
