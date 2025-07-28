@@ -1,9 +1,10 @@
 const DB_NAME = "ZentrioDB";
-const DB_VERSION = 4; // Incremented version to force upgrade
+const DB_VERSION = 5; // Incremented version to force upgrade
 
 export const STORES = {
   HANDLES: "fileSystemHandles",
   DOWNLOADS: "downloads",
+  PROGRESS: "video-progression",
 };
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -38,6 +39,10 @@ function openDB(): Promise<IDBDatabase> {
       } else {
         console.log("Creating 'downloads' store for the first time.");
         db.createObjectStore(STORES.DOWNLOADS, { keyPath: "id" });
+      }
+
+      if (!db.objectStoreNames.contains(STORES.PROGRESS)) {
+        db.createObjectStore(STORES.PROGRESS, { keyPath: "id" });
       }
     };
 

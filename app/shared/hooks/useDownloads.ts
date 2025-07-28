@@ -1,15 +1,28 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { Download, getAllDownloads, addDownload as dbAddDownload, deleteDownload as dbDeleteDownload } from "../services/downloadManager.ts";
+import { getAll, STORES } from "../utils/idb.ts";
+import { useSetting } from "./useSetting.ts";
 
 export function useDownloads() {
   const downloads = useSignal<Download[]>([]);
   const isLoading = useSignal(true);
+  const subDlApiKey = useSetting<string>("subDlApiKey", "", "server");
 
   const loadDownloads = async () => {
     isLoading.value = true;
     const allDownloads = await getAllDownloads();
-    downloads.value = allDownloads;
+    const allProgress = await getAll<{ id: string, currentTime: number }>(STORES.PROGRESS);
+
+    const downloadsWithProgress = allDownloads.map(download => {
+      const progress = allProgress.find(p => p.id === download.streamUrl);
+      return {
+        ...download,
+        currentTime: progress?.currentTime,
+      };
+    });
+
+    downloads.value = downloadsWithProgress;
     isLoading.value = false;
   };
 
@@ -34,6 +47,7 @@ export function useDownloads() {
     navigator.serviceWorker.controller?.postMessage({
       type: 'DOWNLOAD_VIDEO',
       download: newDownload,
+      subDlApiKey: subDlApiKey.value,
     });
   };
 
@@ -42,10 +56,23 @@ export function useDownloads() {
     downloads.value = downloads.value.filter(d => d.id !== id);
   };
 
+  const groupedDownloads = () => {
+    const groups: { [key: string]: Download[] } = {};
+    for (const download of downloads.value) {
+      const seriesName = download.fileName.split(' - ')[0];
+      if (!groups[seriesName]) {
+        groups[seriesName] = [];
+      }
+      groups[seriesName].push(download);
+    }
+    return groups;
+  };
+
   return {
     downloads,
     isLoading,
     addDownload,
     deleteDownload,
+    groupedDownloads,
   };
 }

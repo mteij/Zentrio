@@ -1,12 +1,14 @@
 const DB_NAME = "ZentrioDB";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 const STORES = {
   HANDLES: "fileSystemHandles",
   DOWNLOADS: "downloads",
+  PROGRESS: "video-progression",
 };
 
 let db = null;
+let subDlApiKey = null;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -35,6 +37,10 @@ function openDB() {
         }
       } else {
         db.createObjectStore(STORES.DOWNLOADS, { keyPath: "id" });
+      }
+
+      if (!db.objectStoreNames.contains(STORES.PROGRESS)) {
+        db.createObjectStore(STORES.PROGRESS, { keyPath: "id" });
       }
     };
 
@@ -117,12 +123,23 @@ self.addEventListener('message', (event) => {
   }
 
   if (event.data && event.data.type === 'DOWNLOAD_VIDEO') {
+    subDlApiKey = event.data.subDlApiKey;
     processDownloadQueue();
   }
 });
 
 async function processDownloadQueue() {
     if (isDownloading) return;
+
+    if (!directoryHandle) {
+      const db = await openDB();
+      const transaction = db.transaction(STORES.HANDLES, "readonly");
+      const store = transaction.objectStore(STORES.HANDLES);
+      const request = store.get("downloadDir");
+      request.onsuccess = () => {
+        directoryHandle = request.result;
+      };
+    }
 
     const downloads = await getAll(STORES.DOWNLOADS);
     const queuedDownload = downloads.find(d => d.status === 'queued');
@@ -135,9 +152,39 @@ async function processDownloadQueue() {
     }
 }
 
+async function downloadSubtitles(fileName) {
+  if (!subDlApiKey) {
+    console.log("SubDL API key not provided. Skipping subtitle download.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/subtitles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName, apiKey: subDlApiKey }),
+    });
+
+    if (response.ok) {
+      const subData = await response.text();
+      const subFileName = `${fileName.split('.').slice(0, -1).join('.')}.srt`;
+      console.log("Saving subtitle to:", subFileName);
+      const fileHandle = await directoryHandle.getFileHandle(subFileName, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(subData);
+      await writable.close();
+      console.log("Subtitle downloaded:", subFileName);
+    } else {
+      console.error("Failed to download subtitles:", response.statusText);
+    }
+  } catch (error) {
+    console.error("Failed to download subtitles:", error);
+  }
+}
+
 async function handleDownload(download) {
     if (!directoryHandle) {
-        await updateDownload(download.id, { status: 'failed' });
+        await updateDownload(download.id, { status: 'failed', error: 'No download directory selected.' });
         if (self.Notification.permission === 'granted') {
             self.registration.showNotification('Download Failed', {
                 body: `No download directory selected. Please choose one in settings.`,
@@ -148,6 +195,7 @@ async function handleDownload(download) {
     }
 
     await updateDownload(download.id, { status: 'downloading' });
+    await downloadSubtitles(download.fileName);
 
     try {
         const proxyUrl = `/api/proxy?url=${encodeURIComponent(download.streamUrl)}`;
@@ -196,8 +244,9 @@ async function handleDownload(download) {
           });
         }
 
-      } catch (_error) {
-        await updateDownload(download.id, { status: 'failed' });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await updateDownload(download.id, { status: 'failed', error: errorMessage });
         self.clients.matchAll().then(clients => {
             clients.forEach(client => client.postMessage({ type: 'DOWNLOAD_PROGRESS', download: { ...download, status: 'failed' } }));
         });

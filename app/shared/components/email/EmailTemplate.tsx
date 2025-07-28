@@ -29,7 +29,7 @@ export function EmailTemplate({ header, body }: EmailTemplateProps) {
         }}
       >
         <div style={{ backgroundColor: "#141414", padding: "20px", textAlign: "center" }}>
-         <img src="https://github.com/michaeltukdev/StremioHub/blob/main/app/static/icons/icon-192.png?raw=true" alt="Zentrio Logo" style={{ width: "64px", height: "64px", margin: "0 auto" }} />
+         <img src="https://github.com/michaeltukdev/Zentrio/blob/main/app/static/icons/icon-192.png?raw=true" alt="Zentrio Logo" style={{ width: "64px", height: "64px", margin: "0 auto" }} />
         </div>
         <div style={{ padding: "30px" }}>
           <h2 style={{ fontSize: "20px", margin: "0 0 20px 0" }}>

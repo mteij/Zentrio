@@ -20,6 +20,8 @@ export default function App({ Component, route }: PageProps) {
         <meta name="description" content="Zentrio is a self-hosted Stremio server and client, offering a centralized media hub for all your entertainment needs." />
         <link rel="stylesheet" href="/css/styles.css" />
         <link rel="stylesheet" href="/css/background.css" />
+        <link href="https://unpkg.com/video.js/dist/video-js.min.css" rel="stylesheet" />
+        <script src="https://unpkg.com/video.js/dist/video.min.js"></script>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#dc2626" id="theme-color-meta" />
         <meta name="mobile-web-app-capable" content="yes" />

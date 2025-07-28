@@ -20,6 +20,7 @@ import * as $api_profiles_index from "./routes/api/profiles/index.ts";
 import * as $api_proxy from "./routes/api/proxy.ts";
 import * as $api_sessions from "./routes/api/sessions.ts";
 import * as $api_settings_key_ from "./routes/api/settings/[key].ts";
+import * as $api_subtitles from "./routes/api/subtitles.ts";
 import * as $api_test_email from "./routes/api/test-email.ts";
 import * as $auth_code from "./routes/auth/code.tsx";
 import * as $auth_forgot from "./routes/auth/forgot.tsx";
@@ -33,6 +34,7 @@ import * as $downloads from "./routes/downloads.tsx";
 import * as $health from "./routes/health.ts";
 import * as $index from "./routes/index.tsx";
 import * as $player_profileId_ from "./routes/player/[profileId].tsx";
+import * as $player_index from "./routes/player/index.tsx";
 import * as $profiles from "./routes/profiles.tsx";
 import * as $settings from "./routes/settings.tsx";
 import * as $stremio_path_ from "./routes/stremio/[...path].ts";
@@ -41,6 +43,7 @@ import * as $Auth_EmailLinkForm from "./islands/Auth/EmailLinkForm.tsx";
 import * as $Auth_ForgotPasswordForm from "./islands/Auth/ForgotPasswordForm.tsx";
 import * as $Auth_PasswordLoginForm from "./islands/Auth/PasswordLoginForm.tsx";
 import * as $Auth_ResetPasswordForm from "./islands/Auth/ResetPasswordForm.tsx";
+import * as $Downloads_DownloadsGroup from "./islands/Downloads/DownloadsGroup.tsx";
 import * as $Downloads_DownloadsModal from "./islands/Downloads/DownloadsModal.tsx";
 import * as $InstallPWA from "./islands/InstallPWA.tsx";
 import * as $ProfileManager_ProfileManager from "./islands/ProfileManager/ProfileManager.tsx";
@@ -49,6 +52,7 @@ import * as $Settings_PasswordChangeForm from "./islands/Settings/PasswordChange
 import * as $Settings_SettingsModal from "./islands/Settings/SettingsModal.tsx";
 import * as $StremioFrame from "./islands/StremioFrame.tsx";
 import * as $ToastHandler from "./islands/ToastHandler.tsx";
+import * as $VideoPlayerHandler from "./islands/VideoPlayerHandler.tsx";
 import { type Manifest } from "$fresh/server.ts";
 
 const manifest = {
@@ -73,6 +77,7 @@ const manifest = {
     "./routes/api/proxy.ts": $api_proxy,
     "./routes/api/sessions.ts": $api_sessions,
     "./routes/api/settings/[key].ts": $api_settings_key_,
+    "./routes/api/subtitles.ts": $api_subtitles,
     "./routes/api/test-email.ts": $api_test_email,
     "./routes/auth/code.tsx": $auth_code,
     "./routes/auth/forgot.tsx": $auth_forgot,
@@ -86,6 +91,7 @@ const manifest = {
     "./routes/health.ts": $health,
     "./routes/index.tsx": $index,
     "./routes/player/[profileId].tsx": $player_profileId_,
+    "./routes/player/index.tsx": $player_index,
     "./routes/profiles.tsx": $profiles,
     "./routes/settings.tsx": $settings,
     "./routes/stremio/[...path].ts": $stremio_path_,
@@ -96,6 +102,7 @@ const manifest = {
     "./islands/Auth/ForgotPasswordForm.tsx": $Auth_ForgotPasswordForm,
     "./islands/Auth/PasswordLoginForm.tsx": $Auth_PasswordLoginForm,
     "./islands/Auth/ResetPasswordForm.tsx": $Auth_ResetPasswordForm,
+    "./islands/Downloads/DownloadsGroup.tsx": $Downloads_DownloadsGroup,
     "./islands/Downloads/DownloadsModal.tsx": $Downloads_DownloadsModal,
     "./islands/InstallPWA.tsx": $InstallPWA,
     "./islands/ProfileManager/ProfileManager.tsx":
@@ -106,6 +113,7 @@ const manifest = {
     "./islands/Settings/SettingsModal.tsx": $Settings_SettingsModal,
     "./islands/StremioFrame.tsx": $StremioFrame,
     "./islands/ToastHandler.tsx": $ToastHandler,
+    "./islands/VideoPlayerHandler.tsx": $VideoPlayerHandler,
   },
   baseUrl: import.meta.url,
 } satisfies Manifest;

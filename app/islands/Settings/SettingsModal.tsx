@@ -24,7 +24,7 @@ export default function SettingsModal({
   const { canUseFileSystem, directoryName, selectDirectory } = useFileSystem();
 
   // Settings using the useSetting hook
-  const settingsToLoad = 12;
+  const settingsToLoad = 14;
   const loadedSettings = useSignal(0);
   const loadToastShown = useSignal(false);
 
@@ -36,6 +36,8 @@ export default function SettingsModal({
   const autoLoginProfileId = useSetting<string | null>("autoLoginProfileId", null, "localStorage", onSettingLoad);
   const accentColor = useSetting<string>("accentColor", "#dc2626", "localStorage", onSettingLoad);
   const tmdbApiKey = useSetting<string>("tmdbApiKey", "", "server", onSettingLoad);
+  const subDlApiKey = useSetting<string>("subDlApiKey", "", "server", onSettingLoad);
+  const subtitleLanguage = useSetting<string>("subtitleLanguage", "en", "server", onSettingLoad);
   const sessionLength = useSetting<string>("sessionLengthDays", "30", "localStorage", onSettingLoad);
   const hideCalendarButton = useSetting<boolean>("hideCalendarButton", false, "server", onSettingLoad);
   const hideAddonsButton = useSetting<boolean>("hideAddonsButton", false, "server", onSettingLoad);
@@ -319,6 +321,30 @@ export default function SettingsModal({
                       File System API not supported.
                     </p>
                   )}
+                  <div class="mt-4">
+                    <label className="block text-gray-200 mb-2 text-sm font-medium">
+                      SubDL API Key
+                    </label>
+                    <input
+                      type="password"
+                      value={subDlApiKey.value}
+                      onInput={(e) => (subDlApiKey.value = e.currentTarget.value)}
+                      placeholder="Enter your SubDL API key"
+                      className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+                    />
+                  </div>
+                  <div class="mt-4">
+                    <label className="block text-gray-200 mb-2 text-sm font-medium">
+                      Subtitle Language
+                    </label>
+                    <input
+                      type="text"
+                      value={subtitleLanguage.value}
+                      onInput={(e) => (subtitleLanguage.value = e.currentTarget.value)}
+                      placeholder="Enter language code (e.g., en)"
+                      className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+                    />
+                  </div>
                 </div>
               )}
             </PluginSetting>
