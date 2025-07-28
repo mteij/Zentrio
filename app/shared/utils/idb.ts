@@ -1,87 +1,105 @@
 const DB_NAME = "ZentrioDB";
-const DB_VERSION = 2; // Incremented version
+const DB_VERSION = 4; // Incremented version to force upgrade
 
 export const STORES = {
   HANDLES: "fileSystemHandles",
   DOWNLOADS: "downloads",
 };
 
-let db: IDBDatabase | null = null;
+let dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (db) {
-      resolve(db);
-      return;
-    }
+  if (dbPromise) {
+    return dbPromise;
+  }
 
+  dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = (event) => {
-      const dbInstance = (event.target as IDBOpenDBRequest).result;
-      if (!dbInstance.objectStoreNames.contains(STORES.HANDLES)) {
-        dbInstance.createObjectStore(STORES.HANDLES);
+      const db = (event.target as IDBOpenDBRequest).result;
+      const transaction = (event.target as IDBOpenDBRequest).transaction;
+
+      // Create handles store if it doesn't exist
+      if (!db.objectStoreNames.contains(STORES.HANDLES)) {
+        db.createObjectStore(STORES.HANDLES);
       }
-      if (!dbInstance.objectStoreNames.contains(STORES.DOWNLOADS)) {
-        dbInstance.createObjectStore(STORES.DOWNLOADS, { keyPath: "name" });
+
+      // Check and fix downloads store
+      if (db.objectStoreNames.contains(STORES.DOWNLOADS)) {
+        if (transaction) {
+          const store = transaction.objectStore(STORES.DOWNLOADS);
+          if (store.keyPath !== "id") {
+            console.log("Recreating 'downloads' store due to incorrect keyPath.");
+            db.deleteObjectStore(STORES.DOWNLOADS);
+            db.createObjectStore(STORES.DOWNLOADS, { keyPath: "id" });
+          }
+        }
+      } else {
+        console.log("Creating 'downloads' store for the first time.");
+        db.createObjectStore(STORES.DOWNLOADS, { keyPath: "id" });
       }
     };
 
     request.onsuccess = (event) => {
-      db = (event.target as IDBOpenDBRequest).result;
+      const db = (event.target as IDBOpenDBRequest).result;
       resolve(db);
     };
 
     request.onerror = (event) => {
-      reject("Error opening IndexedDB: " + (event.target as IDBOpenDBRequest).error);
+      const error = (event.target as IDBOpenDBRequest).error;
+      console.error(`IndexedDB error: ${error?.message}`);
+      reject(`Error opening IndexedDB: ${error?.name}`);
+      dbPromise = null; // Reset promise on error
+    };
+
+    request.onblocked = () => {
+      console.warn("IndexedDB open request is blocked. Please close other tabs with this application open.");
     };
   });
+
+  return dbPromise;
 }
 
-export async function set(storeName: string, value: unknown, key?: string): Promise<void> {
+async function performTransaction<T>(
+  storeName: string,
+  mode: IDBTransactionMode,
+  action: (store: IDBObjectStore) => IDBRequest,
+): Promise<T> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, "readwrite");
-    const store = transaction.objectStore(storeName);
-    const request = key ? store.put(value, key) : store.put(value);
+    // Use a try-catch block to handle potential transaction creation errors
+    try {
+      const transaction = db.transaction(storeName, mode);
+      const store = transaction.objectStore(storeName);
+      const request = action(store);
 
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result as T);
+      request.onerror = () => {
+        console.error("Transaction error:", request.error);
+        reject(request.error);
+      };
+    } catch (error) {
+      console.error("Failed to create transaction:", error);
+      reject(error);
+    }
   });
 }
 
-export async function get<T>(storeName: string, key: string): Promise<T | undefined> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, "readonly");
-    const store = transaction.objectStore(storeName);
-    const request = store.get(key);
-
-    request.onsuccess = () => resolve(request.result as T);
-    request.onerror = () => reject(request.error);
+export function set(storeName: string, value: unknown, key?: IDBValidKey): Promise<void> {
+  return performTransaction<void>(storeName, "readwrite", (store) => {
+    return key ? store.put(value, key) : store.put(value);
   });
 }
 
-export async function getAll<T>(storeName: string): Promise<T[]> {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, "readonly");
-        const store = transaction.objectStore(storeName);
-        const request = store.getAll();
-
-        request.onsuccess = () => resolve(request.result as T[]);
-        request.onerror = () => reject(request.error);
-    });
+export function get<T>(storeName: string, key: IDBValidKey): Promise<T | undefined> {
+  return performTransaction<T | undefined>(storeName, "readonly", (store) => store.get(key));
 }
 
-export async function remove(storeName: string, key: string): Promise<void> {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, "readwrite");
-        const store = transaction.objectStore(storeName);
-        const request = store.delete(key);
+export function getAll<T>(storeName:string): Promise<T[]> {
+  return performTransaction<T[]>(storeName, "readonly", (store) => store.getAll());
+}
 
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
+export function remove(storeName: string, key: IDBValidKey): Promise<void> {
+  return performTransaction<void>(storeName, "readwrite", (store) => store.delete(key));
 }

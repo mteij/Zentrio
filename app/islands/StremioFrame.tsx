@@ -4,6 +4,7 @@ import { useSignal } from "@preact/signals";
 import { useDeviceContext } from "../shared/hooks/useDeviceContext.ts";
 import { useFileSystem } from "../shared/hooks/useFileSystem.ts";
 import { useToast } from "../shared/hooks/useToast.ts";
+import { useDownloads } from "../shared/hooks/useDownloads.ts";
 
 interface StremioFrameProps {
   profile: {
@@ -38,6 +39,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
   const deviceContext = useDeviceContext();
   const { getDirectoryHandle: _getDirectoryHandle } = useFileSystem();
   const { success, error: showError } = useToast();
+  const { addDownload } = useDownloads();
 
   // Function to reload the iframe with the same session data
   const reloadIframe = () => {
@@ -65,16 +67,8 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
       if (event.data && event.data.type === "download-stream") {
         const { streamUrl, fileName } = event.data;
         if (streamUrl && fileName) {
-          if (navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'DOWNLOAD_VIDEO',
-              streamUrl: streamUrl,
-              fileName: fileName,
-            });
+            addDownload(fileName, streamUrl);
             success(`Download started for ${fileName}. You will be notified upon completion.`);
-          } else {
-            showError("Service worker not available. Cannot start download.");
-          }
         }
       }
     };
@@ -201,113 +195,26 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
           iframe.onload = () => {
             isLoading.value = false;
             statusMessage.value = "Loaded!";
+            const doc = iframe.contentDocument;
+            const win = iframe.contentWindow;
+            if (!doc || !win) return;
 
-            // Inject a script to handle logout and redirect
-            const script = document.createElement("script");
-            const isMobile = deviceContext.value.isMobile;
-            const mobileClickToHover = profile.mobileClickToHover;
-            const downloadsEnabled = profile.downloadsEnabled;
+            // Inject config object
+            (win as any).stremioHubConfig = {
+              downloadsEnabled: profile.downloadsEnabled || false,
+              isMobile: deviceContext.value.isMobile,
+              mobileClickToHover: profile.mobileClickToHover || false,
+            };
 
-            let scriptContent = '';
-            scriptContent += 'const isMobile = ' + isMobile + ';';
-            scriptContent += 'const mobileClickToHover = ' + mobileClickToHover + ';';
-            scriptContent += 'const downloadsEnabled = ' + downloadsEnabled + ';';
-
-            if (downloadsEnabled) {
-              scriptContent += `
-                const streamsInterval = setInterval(() => {
-                  const streamsContainer = document.querySelector('.streams-container-bbSc4');
-                  if (streamsContainer) {
-                    const streamLinks = streamsContainer.querySelectorAll('a.stream-container-JPdah');
-                    streamLinks.forEach(link => {
-                      if (!link.previousElementSibling || !link.previousElementSibling.classList.contains('download-stream-button')) {
-                        const downloadBtn = document.createElement('button');
-                        downloadBtn.className = 'download-stream-button';
-                        downloadBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>';
-                        downloadBtn.style.background = 'transparent';
-                        downloadBtn.style.border = 'none';
-                        downloadBtn.style.color = 'white';
-                        downloadBtn.style.fontSize = '22px';
-                        downloadBtn.style.cursor = 'pointer';
-                        downloadBtn.style.padding = '0 10px';
-                        downloadBtn.style.opacity = '0.8';
-                        downloadBtn.onmouseover = () => { downloadBtn.style.opacity = '1'; };
-                        downloadBtn.onmouseout = () => { downloadBtn.style.opacity = '0.8'; };
-                        downloadBtn.onclick = (e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          const streamUrl = link.href;
-                          const titleElement = link.querySelector('.description-container-vW_De');
-                          const fileName = (titleElement ? titleElement.title.split('\\n')[0].replace(/[/\\\\?%*:|\\"<>]/g, '-') : 'video') + '.mp4';
-                          window.top.postMessage({ type: 'download-stream', streamUrl, fileName }, '*');
-                          alert('Download started!');
-                        };
-                        link.parentNode.insertBefore(downloadBtn, link);
-                      }
-                    });
-                  }
-                }, 1000);
-              `;
-            }
-
-            if (isMobile && mobileClickToHover) {
-              scriptContent += `
-                const setupMobileClickHandler = () => {
-                  const videoContainer = document.querySelector('.video-container-v9_vA');
-                  const playerContainer = document.querySelector('.player-container-wIELK');
-
-                  if (videoContainer && playerContainer) {
-                    videoContainer.addEventListener('click', (e) => {
-                      if (e.target.tagName === 'VIDEO') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true, cancelable: true });
-                        playerContainer.dispatchEvent(mouseEnterEvent);
-                      }
-                    }, true);
-                  }
-                };
-
-                const observer = new MutationObserver((mutations, obs) => {
-                  if (document.querySelector('.video-container-v9_vA')) {
-                    setupMobileClickHandler();
-                    obs.disconnect();
-                  }
-                });
-
-                observer.observe(document.body, {
-                  childList: true,
-                  subtree: true
-                });
-              `;
-            }
-
-            scriptContent += `
-              const logoutObserver = new MutationObserver((mutations, obs) => {
-                const backLink = document.querySelector('a[href="#"]');
-                if (backLink && backLink.querySelector('img[src*="dicebear.com"]')) {
-                  backLink.onclick = async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    try {
-                      await fetch('/stremio/api/logout', { method: 'POST' });
-                    } catch (error) {
-                      console.error('Failed to logout from Stremio:', error);
-                    } finally {
-                      window.top.location.href = '/profiles';
-                    }
-                  };
-                  obs.disconnect();
-                }
-              });
-              logoutObserver.observe(document.body, {
-                childList: true,
-                subtree: true
-              });
-            `;
-            script.textContent = scriptContent;
-            iframe.contentDocument?.body.appendChild(script);
+            // Load scripts
+            const pakoScript = doc.createElement("script");
+            pakoScript.src = "https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js";
+            pakoScript.onload = () => {
+              const mainScript = doc.createElement("script");
+              mainScript.src = "/stremio-injection.js";
+              doc.body.appendChild(mainScript);
+            };
+            doc.head.appendChild(pakoScript);
           };
           const sessionData = encodeURIComponent(JSON.stringify(sessionObject));
           iframe.src = `/stremio/?sessionData=${sessionData}`;

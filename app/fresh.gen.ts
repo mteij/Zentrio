@@ -41,7 +41,6 @@ import * as $Auth_EmailLinkForm from "./islands/Auth/EmailLinkForm.tsx";
 import * as $Auth_ForgotPasswordForm from "./islands/Auth/ForgotPasswordForm.tsx";
 import * as $Auth_PasswordLoginForm from "./islands/Auth/PasswordLoginForm.tsx";
 import * as $Auth_ResetPasswordForm from "./islands/Auth/ResetPasswordForm.tsx";
-import * as $DownloadsManager from "./islands/DownloadsManager.tsx";
 import * as $Downloads_DownloadsModal from "./islands/Downloads/DownloadsModal.tsx";
 import * as $InstallPWA from "./islands/InstallPWA.tsx";
 import * as $ProfileManager_ProfileManager from "./islands/ProfileManager/ProfileManager.tsx";
@@ -97,7 +96,6 @@ const manifest = {
     "./islands/Auth/ForgotPasswordForm.tsx": $Auth_ForgotPasswordForm,
     "./islands/Auth/PasswordLoginForm.tsx": $Auth_PasswordLoginForm,
     "./islands/Auth/ResetPasswordForm.tsx": $Auth_ResetPasswordForm,
-    "./islands/DownloadsManager.tsx": $DownloadsManager,
     "./islands/Downloads/DownloadsModal.tsx": $Downloads_DownloadsModal,
     "./islands/InstallPWA.tsx": $InstallPWA,
     "./islands/ProfileManager/ProfileManager.tsx":
