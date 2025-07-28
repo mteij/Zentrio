@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useSignal, Signal } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 
 import { ColorPicker } from "../../shared/components/forms/ColorPicker.tsx";
@@ -20,8 +19,8 @@ export default function SettingsModal({
   isMobile: boolean;
 }) {
   const tab = useSignal<"general" | "plugins" | "ui" | "account">("general");
-  const { success, error } = useToast();
-  const isPwa = usePwa();
+  const { success, error: _error } = useToast();
+  const _isPwa = usePwa();
   const { canUseFileSystem, directoryName, selectDirectory } = useFileSystem();
 
   // Settings using the useSetting hook
@@ -42,7 +41,7 @@ export default function SettingsModal({
   const hideAddonsButton = useSetting<boolean>("hideAddonsButton", false, "server", onSettingLoad);
   const mobileClickToHover = useSetting<boolean>("mobileClickToHover", false, "server", onSettingLoad);
   const addonSyncEnabled = useSetting<boolean>("addonSyncEnabled", false, "server", onSettingLoad);
-  const addonSyncData = useSetting<any>("addonSyncData", { mainProfileId: null, autoSync: false }, "server", onSettingLoad);
+  const addonSyncData = useSetting<{ mainProfileId: string | null, autoSync: boolean }>("addonSyncData", { mainProfileId: null, autoSync: false }, "server", onSettingLoad);
   const addonOrderEnabled = useSetting<boolean>("addonOrderEnabled", false, "server", onSettingLoad);
   const downloadsManagerEnabled = useSetting<boolean>("downloadsEnabled", false, "server", onSettingLoad);
 
@@ -107,7 +106,7 @@ export default function SettingsModal({
                   ? { color: accentColor.value, borderBottom: `2px solid ${accentColor.value}` }
                   : undefined
               }
-              onClick={() => (tab.value = tabName as any)}
+              onClick={() => (tab.value = tabName as "general" | "plugins" | "ui" | "account")}
             >
               {tabName.charAt(0).toUpperCase() + tabName.slice(1)}
             </button>
@@ -254,7 +253,7 @@ export default function SettingsModal({
                 </label>
                 <select
                   className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
-                  value={addonSyncData.value.mainProfileId}
+                  value={addonSyncData.value.mainProfileId ?? ""}
                   onChange={(e) => (addonSyncData.value = { ...addonSyncData.value, mainProfileId: e.currentTarget.value })}
                 >
                   <option value="">Select main profile...</option>

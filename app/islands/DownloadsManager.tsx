@@ -1,5 +1,4 @@
-import { h } from "preact";
-import { useSignal, useSignalEffect } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import { useFileSystem } from "../shared/hooks/useFileSystem.ts";
 import { getAll, remove, STORES } from "../shared/utils/idb.ts";
 import { useEffect } from "preact/hooks";
@@ -38,7 +37,7 @@ export default function DownloadsManager() {
       const completedFiles: DisplayFile[] = [];
       for await (const entry of dirHandle.values()) {
         if (entry.kind === "file") {
-          const file = await (entry as any).getFile();
+          const file = await (entry as FileSystemFileHandle).getFile();
           if (!inProgress.some(d => d.name === file.name && d.status !== 'completed')) {
             completedFiles.push({ name: file.name, size: file.size, status: 'completed' });
           }
@@ -136,6 +135,7 @@ export default function DownloadsManager() {
               </div>
             </div>
             <button
+            type="button"
               onClick={() => deleteFile(file.name)}
               class="mt-3 sm:mt-0 sm:ml-4 px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-gray-900"
             >

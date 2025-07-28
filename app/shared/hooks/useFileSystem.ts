@@ -14,7 +14,11 @@ export function useFileSystem() {
   useEffect(() => {
     get<FileSystemDirectoryHandle>(STORES.HANDLES, "download_directory_handle").then(async (handle) => {
       if (handle) {
-        if (await (handle as any).requestPermission({ mode: "readwrite" }) === "granted") {
+        interface FileSystemHandleWithPermission extends FileSystemDirectoryHandle {
+            requestPermission(options: { mode: "readwrite" }): Promise<"granted" | "denied">;
+        }
+        
+        if (await (handle as FileSystemHandleWithPermission).requestPermission({ mode: "readwrite" }) === "granted") {
           directoryHandle = handle;
           directoryName.value = handle.name;
           if (navigator.serviceWorker.controller) {
@@ -43,7 +47,7 @@ export function useFileSystem() {
     }
 
     try {
-      const handle = await (globalThis as any).showDirectoryPicker();
+      const handle = await (globalThis as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
       if (await handle.requestPermission({ mode: 'readwrite' }) !== 'granted') {
         showError("Permission denied for the selected directory.");
         return;

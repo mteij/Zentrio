@@ -36,7 +36,7 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
   const isLoading = useSignal(true);
   const statusMessage = useSignal("Initializing...");
   const deviceContext = useDeviceContext();
-  const { getDirectoryHandle } = useFileSystem();
+  const { getDirectoryHandle: _getDirectoryHandle } = useFileSystem();
   const { success, error: showError } = useToast();
 
   // Function to reload the iframe with the same session data

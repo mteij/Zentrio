@@ -1,6 +1,6 @@
 import { h } from "preact";
 import { useEffect } from "preact/hooks";
-import { useSignal, Signal } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import { useToast } from "../../shared/hooks/useToast.ts";
 import { useSetting } from "../../shared/hooks/useSetting.ts";
 import SettingsModal from "../Settings/SettingsModal.tsx";

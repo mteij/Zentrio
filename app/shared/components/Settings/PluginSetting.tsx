@@ -1,4 +1,4 @@
-import { h, ComponentChildren } from "preact";
+import { ComponentChildren } from "preact";
 import { useSignal, Signal } from "@preact/signals";
 import { usePwa } from "../../hooks/usePwa.ts";
 

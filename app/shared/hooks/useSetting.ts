@@ -1,11 +1,10 @@
-import { useSignal, Signal } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { useToast } from "./useToast.ts";
 
 export type StorageMethod = "localStorage" | "server";
 
 // We can extend this with more complex server-side logic later
-const serverStore: Record<string, any> = {};
 
 export function useSetting<T>(
   key: string,

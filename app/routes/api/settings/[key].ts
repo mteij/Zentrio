@@ -4,7 +4,7 @@ import { User } from "../../../utils/db.ts";
 import { settingsRegistry } from "../../../shared/services/settings.ts";
 
 export const handler: Handlers<unknown, AppState> = {
-  async GET(req, ctx) {
+  async GET(_req, ctx) {
     const { userId } = ctx.state;
     if (!userId) {
       return new Response("Unauthorized", { status: 401 });

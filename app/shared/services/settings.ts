@@ -47,7 +47,7 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
 
   // Hide Calendar Button Setting
   hideCalendarButton: {
-    get: async (user) => user.settings?.hideCalendarButton || false,
+    get: (user) => Promise.resolve(user.settings?.hideCalendarButton || false),
     set: async (userId, value) => {
       await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.hideCalendarButton': value } });
     },
@@ -56,7 +56,7 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
 
   // Hide Addons Button Setting
   hideAddonsButton: {
-    get: async (user) => user.settings?.hideAddonsButton || false,
+    get: (user) => Promise.resolve(user.settings?.hideAddonsButton || false),
     set: async (userId, value) => {
       await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.hideAddonsButton': value } });
     },
@@ -65,7 +65,7 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
 
   // Mobile Click to Hover Setting
   mobileClickToHover: {
-    get: async (user) => user.settings?.mobileClickToHover || false,
+    get: (user) => Promise.resolve(user.settings?.mobileClickToHover || false),
     set: async (userId, value) => {
       await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.mobileClickToHover': value } });
     },
@@ -74,7 +74,7 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
 
   // Addon Sync Settings
   addonSyncEnabled: {
-    get: async (user) => user.settings?.addonSyncSettings?.enabled || false,
+    get: (user) => Promise.resolve(user.settings?.addonSyncSettings?.enabled || false),
     set: async (userId, value) => {
       await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.addonSyncSettings.enabled': value } });
     },
@@ -82,13 +82,13 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
   },
 
   addonSyncData: {
-    get: async (user) => {
-        return {
-            mainProfileId: user.settings?.addonSyncSettings?.mainProfileId || null,
-            autoSync: user.settings?.addonSyncSettings?.autoSync || false,
-            lastSyncAt: user.settings?.addonSyncSettings?.lastSyncAt || null,
-        };
-    },
+    get: (user) => {
+            return Promise.resolve({
+                mainProfileId: user.settings?.addonSyncSettings?.mainProfileId || null,
+                autoSync: user.settings?.addonSyncSettings?.autoSync || false,
+                lastSyncAt: user.settings?.addonSyncSettings?.lastSyncAt || null,
+            });
+        },
     set: async (userId, value) => {
         if (typeof value !== 'object' || value === null) throw new Error("Invalid settings format");
         const updateData: Record<string, unknown> = {};
@@ -107,7 +107,7 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
 
   // Addon Manager Enabled Setting
   addonOrderEnabled: {
-    get: async (user) => user.settings?.addonManagerEnabled || false,
+    get: (user) => Promise.resolve(user.settings?.addonManagerEnabled || false),
     set: async (userId, value) => {
         await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.addonManagerEnabled': value } });
     },
@@ -116,7 +116,7 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
 
   // Downloads Manager Enabled Setting
   downloadsEnabled: {
-    get: async (user) => user.settings?.downloadsEnabled || false,
+    get: (user) => Promise.resolve(user.settings?.downloadsEnabled || false),
     set: async (userId, value) => {
         await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.downloadsEnabled': value } });
     },

@@ -11,7 +11,7 @@ export function usePwa() {
       if (document.referrer.startsWith("android-app://")) {
         console.log("usePwa: detected android-app referrer");
         setIsPwa(true);
-      } else if ((navigator as any).standalone || isStandalone || isMinimalUi) {
+      } else if ((navigator as Navigator & { standalone?: boolean }).standalone || isStandalone || isMinimalUi) {
         console.log("usePwa: detected standalone or minimal-ui display mode");
         setIsPwa(true);
       } else {

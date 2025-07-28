@@ -1,12 +1,3 @@
-import { h } from "preact";
-import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
-
-import { useToast } from "../../shared/hooks/useToast.ts";
-import { usePwa } from "../../shared/hooks/usePwa.ts";
-import { useFileSystem } from "../../shared/hooks/useFileSystem.ts";
-import Setting from "../../shared/components/Settings/Setting.tsx";
-import { useSetting } from "../../shared/hooks/useSetting.ts";
 
 export default function DownloadsModal({
   onClose,
@@ -15,14 +6,6 @@ export default function DownloadsModal({
   onClose: () => void;
   isMobile: boolean;
 }) {
-  const { success, error } = useToast();
-  const isPwa = usePwa();
-  const { canUseFileSystem, directoryName, selectDirectory } = useFileSystem();
-
-  const downloadsEnabled = useSetting<boolean>("downloadsEnabled", false, "server");
-    const accentColor = useSetting<string>("accentColor", "#dc2626", "localStorage");
-
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
       <div className={`bg-gray-900 rounded-lg shadow-2xl w-full ${isMobile ? 'max-w-md p-4' : 'max-w-2xl p-6'} relative animate-modal-pop max-h-[90vh] overflow-y-auto`}>

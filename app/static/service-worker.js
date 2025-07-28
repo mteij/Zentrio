@@ -96,7 +96,7 @@ self.addEventListener('message', (event) => {
           });
         }
 
-      } catch (error) {
+      } catch (_error) {
         download.status = 'failed';
         await set(STORES.DOWNLOADS, download);
         self.clients.matchAll().then(clients => {
@@ -151,7 +151,7 @@ self.addEventListener('activate', event => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
+  const _url = new URL(event.request.url);
 
   // Bypass caching for development environment
   if (self.location.hostname === 'localhost') {

@@ -38,7 +38,7 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function set(storeName: string, value: any, key?: string): Promise<void> {
+export async function set(storeName: string, value: unknown, key?: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeName, "readwrite");
