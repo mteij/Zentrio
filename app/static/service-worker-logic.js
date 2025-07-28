@@ -91,7 +91,7 @@ async function getAll(storeName) {
     });
 }
 
-async function remove(storeName, key) {
+async function _remove(storeName, key) {
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(storeName, "readwrite");

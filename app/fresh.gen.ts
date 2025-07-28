@@ -38,6 +38,7 @@ import * as $player_index from "./routes/player/index.tsx";
 import * as $profiles from "./routes/profiles.tsx";
 import * as $settings from "./routes/settings.tsx";
 import * as $stremio_path_ from "./routes/stremio/[...path].ts";
+import * as $stremio_workbox_path_ from "./routes/stremio/workbox-[...path].ts";
 import * as $Auth_CodeInputForm from "./islands/Auth/CodeInputForm.tsx";
 import * as $Auth_EmailLinkForm from "./islands/Auth/EmailLinkForm.tsx";
 import * as $Auth_ForgotPasswordForm from "./islands/Auth/ForgotPasswordForm.tsx";
@@ -95,6 +96,7 @@ const manifest = {
     "./routes/profiles.tsx": $profiles,
     "./routes/settings.tsx": $settings,
     "./routes/stremio/[...path].ts": $stremio_path_,
+    "./routes/stremio/workbox-[...path].ts": $stremio_workbox_path_,
   },
   islands: {
     "./islands/Auth/CodeInputForm.tsx": $Auth_CodeInputForm,

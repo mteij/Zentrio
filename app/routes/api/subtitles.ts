@@ -86,7 +86,7 @@ export const handler: Handlers<unknown, AppState> = {
           } else {
             return new Response("No .srt file found in the zip archive", { status: 404 });
           }
-        } catch (error) {
+        } catch (_error) {
           // If it's not a zip file, assume it's a raw srt file
           const srtContent = await subData.text();
           return new Response(srtContent, {
