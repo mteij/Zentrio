@@ -66,6 +66,12 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
+  // Bypass caching for development environment
+  if (self.location.hostname === 'localhost') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   if (url.pathname === '/download-video') {
     event.respondWith((async () => {
       if (!directoryHandle) {

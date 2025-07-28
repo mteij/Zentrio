@@ -52,21 +52,35 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
   // Listen for messages from the iframe to reload it
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Verify the message is from the same origin
       if (event.origin !== globalThis.location.origin) return;
-      
-      // Check if it's our reload message
-      if (event.data && event.data.type === 'reload-stremio-iframe') {
+
+      if (event.data && event.data.type === "reload-stremio-iframe") {
         reloadIframe();
+      }
+
+      if (event.data && event.data.type === "download-stream") {
+        const { streamUrl, fileName } = event.data;
+        if (streamUrl && fileName) {
+          const downloadUrl = `/download-video?url=${
+            encodeURIComponent(streamUrl)
+          }&name=${encodeURIComponent(fileName)}`;
+          fetch(downloadUrl)
+            .then((response) => {
+              if (!response.ok) {
+                console.error("Failed to start download:", response.statusText);
+              }
+            })
+            .catch((error) => {
+              console.error("Error triggering download:", error);
+            });
+        }
       }
     };
 
-    // Add event listener
-    globalThis.addEventListener('message', handleMessage);
+    globalThis.addEventListener("message", handleMessage);
 
-    // Cleanup
     return () => {
-      globalThis.removeEventListener('message', handleMessage);
+      globalThis.removeEventListener("message", handleMessage);
     };
   }, []);
 
@@ -199,100 +213,38 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
 
             if (downloadsEnabled) {
               scriptContent += `
-                const headerInterval = setInterval(() => {
-                  const header = document.querySelector('.header-container-g320p');
-                  if (header && !header.querySelector('.downloads-header-button')) {
-                    clearInterval(headerInterval);
-                    const downloadBtn = document.createElement('button');
-                    downloadBtn.innerHTML = 'Downloads';
-                    downloadBtn.className = 'downloads-header-button';
-                    downloadBtn.style.background = 'none';
-                    downloadBtn.style.border = 'none';
-                    downloadBtn.style.color = 'rgba(255, 255, 255, 0.7)';
-                    downloadBtn.style.cursor = 'pointer';
-                    downloadBtn.style.fontSize = '1em';
-                    downloadBtn.style.margin = '0 15px';
-                    downloadBtn.style.lineHeight = '1';
-                    downloadBtn.onmouseover = () => { downloadBtn.style.color = 'rgba(255, 255, 255, 1)'; };
-                    downloadBtn.onmouseout = () => { downloadBtn.style.color = 'rgba(255, 255, 255, 0.7)'; };
-                    downloadBtn.onclick = () => {
-                      window.top.location.href = '/downloads';
-                    };
-                    const logoutButton = header.querySelector('a[href="#"]');
-                    if (logoutButton) {
-                      header.insertBefore(downloadBtn, logoutButton);
-                    } else {
-                      header.appendChild(downloadBtn);
-                    }
+                const streamsInterval = setInterval(() => {
+                  const streamsContainer = document.querySelector('.streams-container-bbSc4');
+                  if (streamsContainer) {
+                    const streamLinks = streamsContainer.querySelectorAll('a.stream-container-JPdah');
+                    streamLinks.forEach(link => {
+                      if (!link.previousElementSibling || !link.previousElementSibling.classList.contains('download-stream-button')) {
+                        const downloadBtn = document.createElement('button');
+                        downloadBtn.className = 'download-stream-button';
+                        downloadBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>';
+                        downloadBtn.style.background = 'transparent';
+                        downloadBtn.style.border = 'none';
+                        downloadBtn.style.color = 'white';
+                        downloadBtn.style.fontSize = '22px';
+                        downloadBtn.style.cursor = 'pointer';
+                        downloadBtn.style.padding = '0 10px';
+                        downloadBtn.style.opacity = '0.8';
+                        downloadBtn.onmouseover = () => { downloadBtn.style.opacity = '1'; };
+                        downloadBtn.onmouseout = () => { downloadBtn.style.opacity = '0.8'; };
+                        downloadBtn.onclick = (e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const streamUrl = link.href;
+                          const titleElement = link.querySelector('.description-container-vW_De');
+                          const fileName = (titleElement ? titleElement.title.split('\\n')[0].replace(/[/\\\\?%*:|\\"<>]/g, '-') : 'video') + '.mp4';
+                          window.top.postMessage({ type: 'download-stream', streamUrl, fileName }, '*');
+                          alert('Download started!');
+                        };
+                        link.parentNode.insertBefore(downloadBtn, link);
+                      }
+                    });
                   }
-                }, 500);
-
-                const playerControlsInterval = setInterval(() => {
-                   const playerControls = document.querySelector('[class*="controls-container"]');
-                   if (playerControls && !playerControls.querySelector('.download-button')) {
-                       const downloadButton = document.createElement('button');
-                       downloadButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>';
-                       downloadButton.className = 'download-button';
-                       downloadButton.title = 'Download';
-                       downloadButton.style.background = 'transparent';
-                       downloadButton.style.border = 'none';
-                       downloadButton.style.color = 'white';
-                       downloadButton.style.fontSize = '22px';
-                       downloadButton.style.cursor = 'pointer';
-                       downloadButton.style.padding = '0 10px';
-                       downloadButton.style.opacity = '0.8';
-                       downloadButton.onmouseover = () => { downloadButton.style.opacity = '1'; };
-                       downloadButton.onmouseout = () => { downloadButton.style.opacity = '0.8'; };
-
-                       downloadButton.onclick = (e) => {
-                           e.stopPropagation();
-                           const videoElement = document.querySelector('video');
-                           if (videoElement) {
-                               const videoSrc = videoElement.src;
-                               const titleElement = document.querySelector('.title-text-v1B8A');
-                               const fileName = titleElement ? titleElement.textContent.trim() + '.mp4' : 'video.mp4';
-                               const downloadUrl = '/download-video?url=' + encodeURIComponent(videoSrc) + '&name=' + encodeURIComponent(fileName);
-                               fetch(downloadUrl);
-                               alert('Download started!');
-                           }
-                       };
-                       playerControls.prepend(downloadButton);
-                   }
                 }, 1000);
-
-               const streamsInterval = setInterval(() => {
-                 const streamsContainer = document.querySelector('.streams-container-bbSc4');
-                 if (streamsContainer) {
-                   const streamLinks = streamsContainer.querySelectorAll('a.stream-container-JPdah');
-                   streamLinks.forEach(link => {
-                     if (!link.previousElementSibling || !link.previousElementSibling.classList.contains('download-stream-button')) {
-                       const downloadBtn = document.createElement('button');
-                       downloadBtn.className = 'download-stream-button';
-                       downloadBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>';
-                       downloadBtn.style.background = 'transparent';
-                       downloadBtn.style.border = 'none';
-                       downloadBtn.style.color = 'white';
-                       downloadBtn.style.fontSize = '22px';
-                       downloadBtn.style.cursor = 'pointer';
-                       downloadBtn.style.padding = '0 10px';
-                       downloadBtn.style.opacity = '0.8';
-                       downloadBtn.onmouseover = () => { downloadBtn.style.opacity = '1'; };
-                       downloadBtn.onmouseout = () => { downloadBtn.style.opacity = '0.8'; };
-                       downloadBtn.onclick = (e) => {
-                         e.stopPropagation();
-                         e.preventDefault();
-                         const streamUrl = link.href;
-                         const titleElement = link.querySelector('.description-container-vW_De');
-                         const fileName = titleElement ? titleElement.title.split('\\n')[0] : 'video.mp4';
-                         const downloadUrl = '/download-video?url=' + encodeURIComponent(streamUrl) + '&name=' + encodeURIComponent(fileName);
-                         fetch(downloadUrl);
-                         alert('Download started!');
-                       };
-                       link.parentNode.insertBefore(downloadBtn, link);
-                     }
-                   });
-                 }
-               }, 1000);
               `;
             }
 

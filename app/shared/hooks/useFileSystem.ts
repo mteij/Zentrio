@@ -14,9 +14,15 @@ export function useFileSystem() {
   useEffect(() => {
     get<FileSystemDirectoryHandle>("download_directory_handle").then(async (handle) => {
       if (handle) {
-        if (await handle.queryPermission({ mode: 'readwrite' }) === 'granted') {
+        if (await handle.queryPermission({ mode: "readwrite" }) === "granted") {
           directoryHandle = handle;
           directoryName.value = handle.name;
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: "SET_DIRECTORY_HANDLE",
+              handle: handle,
+            });
+          }
         } else {
           await set("download_directory_handle", undefined);
           directoryHandle = null;
@@ -24,7 +30,7 @@ export function useFileSystem() {
         }
       }
       isLoading.value = false;
-    }).catch(err => {
+    }).catch((err) => {
       console.error("Failed to load directory handle from IDB", err);
       isLoading.value = false;
     });

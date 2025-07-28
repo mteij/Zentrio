@@ -6,6 +6,7 @@ import { ColorPicker } from "../shared/components/forms/ColorPicker.tsx";
 import { useToast } from "../shared/hooks/useToast.ts";
 import { usePwa } from "../shared/hooks/usePwa.ts";
 import { useFileSystem } from "../shared/hooks/useFileSystem.ts";
+import CacheManager from "./Settings/CacheManager.tsx";
 
 type AutoLoginOption = "none" | "last" | "profile";
 
@@ -730,6 +731,8 @@ export default function SettingsModal({
                 </div>
               </div>
 
+              {/* Cache Manager */}
+              <CacheManager />
             </div>
           )}
 

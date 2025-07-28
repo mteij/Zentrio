@@ -12,7 +12,7 @@ export default function ToastHandler() {
       const { message, type, duration } = e.detail;
       toasts.value = [
         ...toasts.value,
-        { id: Date.now(), message, type, duration },
+        { id: Date.now() + Math.random(), message, type, duration },
       ];
     };
 
