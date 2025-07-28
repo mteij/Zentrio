@@ -7,7 +7,6 @@ export interface Download {
   total: number;
   downloaded: number;
   status: 'queued' | 'downloading' | 'completed' | 'failed' | 'paused';
-  error?: string;
   createdAt: Date;
   updatedAt: Date;
 }

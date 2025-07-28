@@ -66,16 +66,10 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
 
       if (event.data && event.data.type === "download-stream") {
         const { streamUrl, fileName } = event.data;
-        console.log("Received download request with fileName:", fileName);
-        if (streamUrl && fileName && typeof fileName === 'string') {
+        if (streamUrl && fileName) {
             addDownload(fileName, streamUrl);
             success(`Download started for ${fileName}. You will be notified upon completion.`);
         }
-      }
-      
-      if (event.data && event.data.type === "download-error") {
-        const { message } = event.data;
-        showError(message || 'An unknown error occurred during download.');
       }
     };
 

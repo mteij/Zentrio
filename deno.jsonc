@@ -27,8 +27,6 @@
 
   // npm packages
   "mongoose": "npm:mongoose@8.4.1",
-  "opensubtitles.com": "npm:opensubtitles.com@^1.1.0",
-  "@zip.js/zip.js": "npm:@zip.js/zip.js@^2.7.44",
   "stremio-api-client": "npm:stremio-api-client@^1.6.0",
   "node-cron": "npm:node-cron@3.0.3",
   "nodemailer": "npm:nodemailer@7.0.5",

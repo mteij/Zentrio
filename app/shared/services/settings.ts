@@ -17,12 +17,16 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
   // TMDB API Key Setting
   tmdbApiKey: {
     get: async (user) => {
-      if (!user.settings?.encryptedTmdbApiKey || !user.settings.encryptedTmdbApiKey.encrypted) return "";
+      if (!user.settings?.encryptedTmdbApiKey) return { hasApiKey: false, apiKey: null };
       try {
-        return await encryptionService.decrypt(user.settings.encryptedTmdbApiKey);
+        const apiKey = await encryptionService.decrypt(user.settings.encryptedTmdbApiKey);
+        return {
+          hasApiKey: !!apiKey,
+          apiKey: apiKey ? '***' + apiKey.slice(-4) : null,
+        };
       } catch (error) {
         console.error(`Failed to decrypt TMDB API key for user ${user._id}:`, error);
-        return "";
+        return { hasApiKey: false, apiKey: null };
       }
     },
     set: async (userId, value) => {
@@ -39,41 +43,6 @@ export const settingsRegistry: Record<string, SettingHandler<SettingValue>> = {
         if (value === '') return true; // Allow empty string
         return value.length > 20 && value.length < 50;
     },
-  },
-
-  // SubDL API Key Setting
-  subDlApiKey: {
-    get: async (user) => {
-      if (!user.settings?.encryptedSubDlApiKey || !user.settings.encryptedSubDlApiKey.encrypted) return "";
-      try {
-        return await encryptionService.decrypt(user.settings.encryptedSubDlApiKey);
-      } catch (error) {
-        console.error(`Failed to decrypt SubDL API key for user ${user._id}:`, error);
-        return "";
-      }
-    },
-    set: async (userId, value) => {
-      if (typeof value !== 'string') throw new Error("Invalid API key format");
-      if (value === '') {
-        await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $unset: { 'settings.encryptedSubDlApiKey': 1 } });
-      } else {
-        const encryptedApiKey = await encryptionService.encrypt(value as string);
-        await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.encryptedSubDlApiKey': encryptedApiKey } });
-      }
-    },
-    validate: (value) => {
-        if (typeof value !== 'string') return false;
-        return true; // Allow any string
-    },
-  },
-
-  // Subtitle Language Setting
-  subtitleLanguage: {
-    get: (user) => Promise.resolve(user.settings?.subtitleLanguage || "en"),
-    set: async (userId, value) => {
-      await User.updateOne({ _id: new mongoose.Types.ObjectId(userId) }, { $set: { 'settings.subtitleLanguage': value } });
-    },
-    validate: (value) => typeof value === 'string',
   },
 
   // Hide Calendar Button Setting

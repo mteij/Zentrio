@@ -10,21 +10,10 @@
       return;
     }
 
-    // Helper function to convert URL-safe base64 to Uint8Array
-    function urlSafeBase64ToUint8Array(base64) {
-        const padding = '='.repeat((4 - base64.length % 4) % 4);
-        const b64 = (base64 + padding)
-            .replace(/-/g, '+')
-            .replace(/_/g, '/');
-
-        const rawData = atob(b64);
-        const outputArray = new Uint8Array(rawData.length);
-
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
-    }
+    // --- Monkey-patch fetch to intercept video URLs ---
+    const originalFetch = window.fetch;
+    // This function is no longer needed as we will get the URL directly.
+    // The fetch override is removed.
 
     // --- Inject download buttons ---
     const streamsInterval = setInterval(() => {
@@ -47,69 +36,56 @@
               e.stopPropagation();
               e.preventDefault();
 
-              try {
-                const href = link.getAttribute('href');
-                if (!href) throw new Error('Stream link has no href attribute.');
+              // Get the main title from the meta info container, falling back to the header
+              const metaInfoContainer = document.querySelector('.meta-info-container-ub8AH');
+              let titleElement = metaInfoContainer ? metaInfoContainer.querySelector('img[title]') : null;
+              if (!titleElement) {
+                titleElement = document.querySelector('.desktop-header-title-V5d6B, .meta-details .title, h1.title');
+              }
+              const mainTitle = titleElement ? (titleElement.title || titleElement.textContent).trim() : 'video';
 
-                const b64part = href.split('/')[2];
-                if (!b64part) throw new Error('Could not find stream data in href.');
-                
-                const b64string = decodeURIComponent(b64part);
-
-                let streamInfo;
-                try {
-                  const uint8array = urlSafeBase64ToUint8Array(b64string);
-                  const decompressed = pako.inflate(uint8array);
-                  const jsonString = new TextDecoder().decode(decompressed);
-                  streamInfo = JSON.parse(jsonString);
-                } catch (pakoErr) {
-                  try {
-                    const bytes = urlSafeBase64ToUint8Array(b64string);
-                    const jsonString = new TextDecoder().decode(bytes);
-                    streamInfo = JSON.parse(jsonString);
-                  } catch (jsonErr) {
-                    console.error('Zentrio: Failed to parse stream data. It is not valid gzipped data or JSON.', { pakoError: pakoErr, jsonError: jsonErr });
-                    throw new Error('Could not parse stream data.');
-                  }
-                }
-
-                const streamUrl = streamInfo.url;
-                const metaInfoContainer = document.querySelector('.meta-info-container-ub8AH');
-                let titleElement = metaInfoContainer ? metaInfoContainer.querySelector('img[title]') : null;
-                if (!titleElement) {
-                  titleElement = document.querySelector('.desktop-header-title-V5d6B, .meta-details .title, h1.title');
-                }
-                const mainTitle = titleElement ? (titleElement.title || titleElement.textContent).trim() : 'video';
-
-                const episodeTitleElement = document.querySelector('.episode-title-dln_c');
-                
-                let fileName;
-                if (episodeTitleElement) {
-                  const episodeText = episodeTitleElement.textContent;
-                  const match = episodeText.match(/S(\d+)E(\d+)/i);
-                  if (match) {
-                    const season = match[1].padStart(2, '0');
-                    const episode = match[2].padStart(2, '0');
-                    fileName = `${mainTitle} - S${season}E${episode}`;
-                  } else {
-                    fileName = mainTitle;
-                  }
+              // Find the episode title, which contains season/episode info
+              const episodeTitleElement = document.querySelector('.episode-title-dln_c');
+              
+              let fileName;
+              if (episodeTitleElement) {
+                const episodeText = episodeTitleElement.textContent;
+                const match = episodeText.match(/S(\d+)E(\d+)/i);
+                if (match) {
+                  const season = match[1].padStart(2, '0');
+                  const episode = match[2].padStart(2, '0');
+                  fileName = `${mainTitle} - S${season}E${episode}`;
                 } else {
                   fileName = mainTitle;
                 }
-
-                const sanitizedFileName = fileName.replace(/[/\\\\?%*:|\\"<>]/g, '-') + '.mp4';
-
-                if (streamUrl) {
-                  console.log('Zentrio: Starting download for', fileName);
-                  window.top.postMessage({ type: 'download-stream', streamUrl: streamUrl, fileName: fileName }, '*');
-                } else {
-                  throw new Error('No stream URL found in the decoded stream information.');
-                }
-              } catch (error) {
-                console.error('Zentrio: Failed to initiate download.', error);
-                window.top.postMessage({ type: 'download-error', message: 'Could not start download: ' + error.message }, '*');
+              } else {
+                fileName = mainTitle;
               }
+
+              const sanitizedFileName = fileName.replace(/[/\\\\?%*:|\\"<>]/g, '-') + '.mp4';
+
+              // Now that we have the filename, open the player
+              link.click();
+
+              // Poll for the video element
+              const maxRetries = 40; // 40 * 500ms = 20 seconds
+              let retries = 0;
+              const interval = setInterval(() => {
+                const videoElement = document.querySelector('video');
+                if (videoElement && videoElement.src) {
+                  clearInterval(interval);
+                  console.log('StremioHub: Found video element. Source:', videoElement.src);
+                  window.top.postMessage({ type: 'download-stream', streamUrl: videoElement.src, fileName: sanitizedFileName }, '*');
+                  history.back();
+                } else {
+                  retries++;
+                  if (retries >= maxRetries) {
+                    clearInterval(interval);
+                    console.error('StremioHub: Could not find video element or its source after 20 seconds.');
+                    alert('Could not find video source. Please try again.');
+                  }
+                }
+              }, 500);
             };
             link.parentNode.insertBefore(container, link);
             container.appendChild(downloadBtn);

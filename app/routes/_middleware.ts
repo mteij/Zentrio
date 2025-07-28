@@ -65,9 +65,9 @@ export async function handler(
       response.headers.delete('x-frame-options');
       
       // Ensure we have the most permissive CSP for framing
-      response.headers.set('Content-Security-Policy',
+      response.headers.set('Content-Security-Policy', 
         "default-src *; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; " +
-        "img-src * data: blob:; font-src * data:; connect-src *; media-src * blob:; object-src *; " +
+        "img-src * data: blob:; font-src *; connect-src *; media-src * blob:; object-src *; " +
         "frame-src *; frame-ancestors *; worker-src * blob:; child-src *; manifest-src *;"
       );
     }

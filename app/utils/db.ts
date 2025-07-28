@@ -17,10 +17,6 @@ export interface UserSchema extends Document {
   settings?: {
     // Encrypted TMDB API key (user-level setting)
     encryptedTmdbApiKey?: EncryptedData;
-    // Encrypted SubDL API key (user-level setting)
-    encryptedSubDlApiKey?: EncryptedData;
-    // Preferred subtitle language
-    subtitleLanguage?: string;
     // Addon manager settings
     addonManagerEnabled?: boolean; // Whether Stremio addon manager userscript is enabled
     // Hide calendar button setting
@@ -89,15 +85,6 @@ const userSchema = new mongoose.Schema<UserSchema>({
         iv: { type: String },
         tag: { type: String }
       },
-      // Encrypted SubDL API key
-      encryptedSubDlApiKey: {
-        encrypted: { type: String },
-        salt: { type: String },
-        iv: { type: String },
-        tag: { type: String }
-      },
-      // Preferred subtitle language
-      subtitleLanguage: { type: String, default: "en" },
       // Addon manager settings
       addonManagerEnabled: { type: Boolean, default: false },
       // Hide calendar button setting
@@ -607,52 +594,6 @@ export const removeUserTmdbApiKey = async (userId: string): Promise<void> => {
     { _id: new mongoose.Types.ObjectId(userId) },
     { $unset: { 'settings.encryptedTmdbApiKey': 1 } }
   );
-};
-
-/**
- * Set encrypted SubDL API key for user
- */
-export const setUserSubDlApiKey = async (userId: string, apiKey: string): Promise<void> => {
-    const encryptedApiKey = await encryptionService.encrypt(apiKey);
-    await Users.updateOne(
-        { _id: new mongoose.Types.ObjectId(userId) },
-        { $set: { 'settings.encryptedSubDlApiKey': encryptedApiKey } }
-    );
-};
-
-/**
- * Get decrypted SubDL API key for user
- */
-export const getUserSubDlApiKey = async (userId: string): Promise<string | null> => {
-    const user = await Users.findById(userId).lean();
-    if (!user?.settings?.encryptedSubDlApiKey) {
-        return null;
-    }
-    
-    try {
-        return await encryptionService.decrypt(user.settings.encryptedSubDlApiKey);
-    } catch (error) {
-        console.error(`Failed to decrypt SubDL API key for user ${userId}:`, error);
-        return null;
-    }
-};
-
-/**
- * Set subtitle language for user
- */
-export const setUserSubtitleLanguage = async (userId: string, language: string): Promise<void> => {
-    await Users.updateOne(
-        { _id: new mongoose.Types.ObjectId(userId) },
-        { $set: { 'settings.subtitleLanguage': language } }
-    );
-};
-
-/**
- * Get subtitle language for user
- */
-export const getUserSubtitleLanguage = async (userId: string): Promise<string> => {
-    const user = await Users.findById(userId).lean();
-    return user?.settings?.subtitleLanguage || "en";
 };
 
 
