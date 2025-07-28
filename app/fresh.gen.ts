@@ -5,8 +5,6 @@
 import * as $_404 from "./routes/_404.tsx";
 import * as $_app from "./routes/_app.tsx";
 import * as $_middleware from "./routes/_middleware.ts";
-import * as $api_addon_manager from "./routes/api/addon-manager.ts";
-import * as $api_addon_sync from "./routes/api/addon-sync.ts";
 import * as $api_auth_change_password from "./routes/api/auth/change-password.ts";
 import * as $api_auth_delete_account from "./routes/api/auth/delete-account.ts";
 import * as $api_auth_login_or_signup from "./routes/api/auth/login-or-signup.ts";
@@ -17,13 +15,17 @@ import * as $api_auth_reset_password from "./routes/api/auth/reset-password.ts";
 import * as $api_auth_send_login_code from "./routes/api/auth/send-login-code.ts";
 import * as $api_auth_signup from "./routes/api/auth/signup.ts";
 import * as $api_auth_verify_code from "./routes/api/auth/verify-code.ts";
-import * as $api_hide_addons from "./routes/api/hide-addons.ts";
-import * as $api_hide_calendar from "./routes/api/hide-calendar.ts";
 import * as $api_profiles_id_ from "./routes/api/profiles/[id].ts";
 import * as $api_profiles_index from "./routes/api/profiles/index.ts";
 import * as $api_sessions from "./routes/api/sessions.ts";
+import * as $api_settings_addon_manager from "./routes/api/settings/addon-manager.ts";
+import * as $api_settings_addon_sync from "./routes/api/settings/addon-sync.ts";
+import * as $api_settings_downloads from "./routes/api/settings/downloads.ts";
+import * as $api_settings_hide_addons from "./routes/api/settings/hide-addons.ts";
+import * as $api_settings_hide_calendar from "./routes/api/settings/hide-calendar.ts";
+import * as $api_settings_mobile_click_hover from "./routes/api/settings/mobile-click-hover.ts";
+import * as $api_settings_tmdb_key from "./routes/api/settings/tmdb-key.ts";
 import * as $api_test_email from "./routes/api/test-email.ts";
-import * as $api_tmdb_key from "./routes/api/tmdb-key.ts";
 import * as $auth_code from "./routes/auth/code.tsx";
 import * as $auth_forgot from "./routes/auth/forgot.tsx";
 import * as $auth_login from "./routes/auth/login.tsx";
@@ -32,6 +34,7 @@ import * as $auth_password from "./routes/auth/password.tsx";
 import * as $auth_reset from "./routes/auth/reset.tsx";
 import * as $auth_signup_success from "./routes/auth/signup-success.tsx";
 import * as $auth_verify from "./routes/auth/verify.tsx";
+import * as $downloads from "./routes/downloads.tsx";
 import * as $health from "./routes/health.ts";
 import * as $index from "./routes/index.tsx";
 import * as $player_profileId_ from "./routes/player/[profileId].tsx";
@@ -43,6 +46,7 @@ import * as $Auth_EmailLinkForm from "./islands/Auth/EmailLinkForm.tsx";
 import * as $Auth_ForgotPasswordForm from "./islands/Auth/ForgotPasswordForm.tsx";
 import * as $Auth_PasswordLoginForm from "./islands/Auth/PasswordLoginForm.tsx";
 import * as $Auth_ResetPasswordForm from "./islands/Auth/ResetPasswordForm.tsx";
+import * as $DownloadsManager from "./islands/DownloadsManager.tsx";
 import * as $InstallPWA from "./islands/InstallPWA.tsx";
 import * as $ProfileManager_ProfileManager from "./islands/ProfileManager/ProfileManager.tsx";
 import * as $ProfileManager_ProfileManagerView from "./islands/ProfileManager/ProfileManagerView.tsx";
@@ -57,8 +61,6 @@ const manifest = {
     "./routes/_404.tsx": $_404,
     "./routes/_app.tsx": $_app,
     "./routes/_middleware.ts": $_middleware,
-    "./routes/api/addon-manager.ts": $api_addon_manager,
-    "./routes/api/addon-sync.ts": $api_addon_sync,
     "./routes/api/auth/change-password.ts": $api_auth_change_password,
     "./routes/api/auth/delete-account.ts": $api_auth_delete_account,
     "./routes/api/auth/login-or-signup.ts": $api_auth_login_or_signup,
@@ -71,13 +73,18 @@ const manifest = {
     "./routes/api/auth/send-login-code.ts": $api_auth_send_login_code,
     "./routes/api/auth/signup.ts": $api_auth_signup,
     "./routes/api/auth/verify-code.ts": $api_auth_verify_code,
-    "./routes/api/hide-addons.ts": $api_hide_addons,
-    "./routes/api/hide-calendar.ts": $api_hide_calendar,
     "./routes/api/profiles/[id].ts": $api_profiles_id_,
     "./routes/api/profiles/index.ts": $api_profiles_index,
     "./routes/api/sessions.ts": $api_sessions,
+    "./routes/api/settings/addon-manager.ts": $api_settings_addon_manager,
+    "./routes/api/settings/addon-sync.ts": $api_settings_addon_sync,
+    "./routes/api/settings/downloads.ts": $api_settings_downloads,
+    "./routes/api/settings/hide-addons.ts": $api_settings_hide_addons,
+    "./routes/api/settings/hide-calendar.ts": $api_settings_hide_calendar,
+    "./routes/api/settings/mobile-click-hover.ts":
+      $api_settings_mobile_click_hover,
+    "./routes/api/settings/tmdb-key.ts": $api_settings_tmdb_key,
     "./routes/api/test-email.ts": $api_test_email,
-    "./routes/api/tmdb-key.ts": $api_tmdb_key,
     "./routes/auth/code.tsx": $auth_code,
     "./routes/auth/forgot.tsx": $auth_forgot,
     "./routes/auth/login.tsx": $auth_login,
@@ -86,6 +93,7 @@ const manifest = {
     "./routes/auth/reset.tsx": $auth_reset,
     "./routes/auth/signup-success.tsx": $auth_signup_success,
     "./routes/auth/verify.tsx": $auth_verify,
+    "./routes/downloads.tsx": $downloads,
     "./routes/health.ts": $health,
     "./routes/index.tsx": $index,
     "./routes/player/[profileId].tsx": $player_profileId_,
@@ -99,6 +107,7 @@ const manifest = {
     "./islands/Auth/ForgotPasswordForm.tsx": $Auth_ForgotPasswordForm,
     "./islands/Auth/PasswordLoginForm.tsx": $Auth_PasswordLoginForm,
     "./islands/Auth/ResetPasswordForm.tsx": $Auth_ResetPasswordForm,
+    "./islands/DownloadsManager.tsx": $DownloadsManager,
     "./islands/InstallPWA.tsx": $InstallPWA,
     "./islands/ProfileManager/ProfileManager.tsx":
       $ProfileManager_ProfileManager,

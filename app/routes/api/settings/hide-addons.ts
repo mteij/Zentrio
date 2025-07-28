@@ -1,9 +1,9 @@
 import { Handlers } from "$fresh/server.ts";
-import { AppState } from "../_middleware.ts";
-import { updateUserHideCalendarButtonSetting, getUserById } from "../../utils/db.ts";
+import { AppState } from "../../_middleware.ts";
+import { updateUserHideAddonsButtonSetting, getUserById } from "../../../utils/db.ts";
 
 export const handler: Handlers<null, AppState> = {
-  // Get hide calendar button setting
+  // Get hide addons button setting
   async GET(_req, ctx) {
     const { userId } = ctx.state;
     if (!userId) {
@@ -17,17 +17,17 @@ export const handler: Handlers<null, AppState> = {
       }
 
       return new Response(JSON.stringify({
-        hideCalendarButton: user.settings?.hideCalendarButton || false
+        hideAddonsButton: user.settings?.hideAddonsButton || false
       }), {
         headers: { "Content-Type": "application/json" }
       });
     } catch (error) {
-      console.error("Failed to get hide calendar button setting:", error);
+      console.error("Failed to get hide addons button setting:", error);
       return new Response("Internal server error", { status: 500 });
     }
   },
 
-  // Update hide calendar button setting
+  // Update hide addons button setting
   async PUT(req, ctx) {
     const { userId } = ctx.state;
     if (!userId) {
@@ -35,19 +35,19 @@ export const handler: Handlers<null, AppState> = {
     }
 
     try {
-      const { hideCalendarButton } = await req.json();
+      const { hideAddonsButton } = await req.json();
       
-      if (typeof hideCalendarButton !== 'boolean') {
-        return new Response("Invalid hideCalendarButton value", { status: 400 });
+      if (typeof hideAddonsButton !== 'boolean') {
+        return new Response("Invalid hideAddonsButton value", { status: 400 });
       }
 
-      await updateUserHideCalendarButtonSetting(userId, hideCalendarButton);
+      await updateUserHideAddonsButtonSetting(userId, hideAddonsButton);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" }
       });
     } catch (error) {
-      console.error("Failed to update hide calendar button setting:", error);
+      console.error("Failed to update hide addons button setting:", error);
       return new Response("Internal server error", { status: 500 });
     }
   }

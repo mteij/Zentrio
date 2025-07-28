@@ -4,6 +4,7 @@ import { useSignal } from "@preact/signals";
 import { useToast } from "../../shared/hooks/useToast.ts";
 import SettingsModal from "../SettingsModal.tsx";
 import { PlainProfile } from "./ProfileManager.tsx";
+import { usePwa } from "../../shared/hooks/usePwa.ts";
 
 // ProfileManagerView component
 export default function ProfileManagerView(props: {
@@ -42,6 +43,8 @@ export default function ProfileManagerView(props: {
   } = props;
 
   const { success } = useToast();
+  const isPwa = usePwa();
+  const downloadsEnabled = useSignal(false);
   const isInitialized = useSignal(false);
   const lastProfileId = useSignal<string | null>(null);
   const modalOpen = showAddModal.value || editingProfile.value !== null;
@@ -56,6 +59,20 @@ export default function ProfileManagerView(props: {
       // Ignore localStorage access errors
     }
     isInitialized.value = true;
+
+    // Load downloads enabled setting
+    const loadDownloadsEnabledSetting = async () => {
+      try {
+        const response = await fetch('/api/settings/downloads');
+        if (response.ok) {
+          const data = await response.json();
+          downloadsEnabled.value = data.enabled || false;
+        }
+      } catch (error) {
+        console.warn('Failed to load downloads enabled setting:', error);
+      }
+    };
+    loadDownloadsEnabledSetting();
   }, []);
 
   // Listen for page show events (e.g., when navigating back)
@@ -298,6 +315,18 @@ export default function ProfileManagerView(props: {
               </g>
             </svg>
           </button>
+           {isPwa && downloadsEnabled.value && (
+             <button
+               type="button"
+               onClick={() => (globalThis.location.href = "/downloads")}
+               class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
+               aria-label="Downloads"
+             >
+               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+               </svg>
+             </button>
+           )}
         </div>
         )}
         {/* Mobile Settings Modal */}
@@ -473,6 +502,18 @@ export default function ProfileManagerView(props: {
             </g>
           </svg>
         </button>
+         {isPwa && downloadsEnabled.value && (
+           <button
+             type="button"
+             onClick={() => (globalThis.location.href = "/downloads")}
+             class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
+             aria-label="Downloads"
+           >
+             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+               <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+             </svg>
+           </button>
+         )}
       </div>
       {/* Desktop Add Profile Modal */}
       {showAddModal.value && (

@@ -1,9 +1,9 @@
 import { Handlers } from "$fresh/server.ts";
-import { AppState } from "../_middleware.ts";
-import { updateUserHideAddonsButtonSetting, getUserById } from "../../utils/db.ts";
+import { AppState } from "../../_middleware.ts";
+import { updateUserMobileClickToHoverSetting, getUserById } from "../../../utils/db.ts";
 
 export const handler: Handlers<null, AppState> = {
-  // Get hide addons button setting
+  // Get mobile click to hover setting
   async GET(_req, ctx) {
     const { userId } = ctx.state;
     if (!userId) {
@@ -17,17 +17,17 @@ export const handler: Handlers<null, AppState> = {
       }
 
       return new Response(JSON.stringify({
-        hideAddonsButton: user.settings?.hideAddonsButton || false
+        mobileClickToHover: user.settings?.mobileClickToHover || false
       }), {
         headers: { "Content-Type": "application/json" }
       });
     } catch (error) {
-      console.error("Failed to get hide addons button setting:", error);
+      console.error("Failed to get mobile click to hover setting:", error);
       return new Response("Internal server error", { status: 500 });
     }
   },
 
-  // Update hide addons button setting
+  // Update mobile click to hover setting
   async PUT(req, ctx) {
     const { userId } = ctx.state;
     if (!userId) {
@@ -35,19 +35,19 @@ export const handler: Handlers<null, AppState> = {
     }
 
     try {
-      const { hideAddonsButton } = await req.json();
+      const { mobileClickToHover } = await req.json();
       
-      if (typeof hideAddonsButton !== 'boolean') {
-        return new Response("Invalid hideAddonsButton value", { status: 400 });
+      if (typeof mobileClickToHover !== 'boolean') {
+        return new Response("Invalid mobileClickToHover value", { status: 400 });
       }
 
-      await updateUserHideAddonsButtonSetting(userId, hideAddonsButton);
+      await updateUserMobileClickToHoverSetting(userId, mobileClickToHover);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" }
       });
     } catch (error) {
-      console.error("Failed to update hide addons button setting:", error);
+      console.error("Failed to update mobile click to hover setting:", error);
       return new Response("Internal server error", { status: 500 });
     }
   }

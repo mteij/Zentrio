@@ -1,7 +1,7 @@
 import { Handlers, PageProps } from "$fresh/server.ts";
 import { h as _h } from "preact";
 import { AppState } from "../_middleware.ts";
-import { getProfile, getDecryptedProfilePassword, getUserTmdbApiKey, getUserAddonManagerSetting, getUserHideCalendarButtonSetting, getUserHideAddonsButtonSetting } from "../../utils/db.ts";
+import { getProfile, getDecryptedProfilePassword, getUserTmdbApiKey, getUserAddonManagerSetting, getUserHideCalendarButtonSetting, getUserHideAddonsButtonSetting, getUserMobileClickToHoverSetting, getUserDownloadsEnabled } from "../../utils/db.ts";
 import StremioFrame from "../../islands/StremioFrame.tsx";
 
 interface PlayerPageData {
@@ -18,6 +18,8 @@ interface PlayerPageData {
     addonManagerEnabled?: boolean;
     hideCalendarButton?: boolean;
     hideAddonsButton?: boolean;
+    mobileClickToHover?: boolean;
+    downloadsEnabled?: boolean;
   };
 }
 
@@ -57,6 +59,12 @@ export const handler: Handlers<PlayerPageData, AppState> = {
       // Get the user's hide addons button setting
       const hideAddonsButton = await getUserHideAddonsButtonSetting(userId);
       
+      // Get the user's mobile click to hover setting
+      const mobileClickToHover = await getUserMobileClickToHoverSetting(userId);
+      
+      // Get the user's downloads enabled setting
+      const downloadsEnabled = await getUserDownloadsEnabled(userId);
+
       // Create a profile object with decrypted password and TMDB key for the client
       const clientProfile = {
         _id: profile._id.toString(),
@@ -71,6 +79,8 @@ export const handler: Handlers<PlayerPageData, AppState> = {
         addonManagerEnabled,
         hideCalendarButton,
         hideAddonsButton,
+        mobileClickToHover,
+        downloadsEnabled,
       };
 
       return ctx.render({ profile: clientProfile });

@@ -1,7 +1,7 @@
 import { Handlers } from "$fresh/server.ts";
-import { AppState } from "../_middleware.ts";
-import { User, Profile } from "../../utils/db.ts";
-import { addonSyncService } from "../../shared/services/addonSync.ts";
+import { AppState } from "../../_middleware.ts";
+import { User, Profile } from "../../../utils/db.ts";
+import { addonSyncService } from "../../../shared/services/addonSync.ts";
 
 export const handler: Handlers<null, AppState> = {
   /**

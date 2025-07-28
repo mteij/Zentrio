@@ -4,6 +4,8 @@ import { useEffect, useRef } from "preact/hooks";
 
 import { ColorPicker } from "../shared/components/forms/ColorPicker.tsx";
 import { useToast } from "../shared/hooks/useToast.ts";
+import { usePwa } from "../shared/hooks/usePwa.ts";
+import { useFileSystem } from "../shared/hooks/useFileSystem.ts";
 
 type AutoLoginOption = "none" | "last" | "profile";
 
@@ -16,8 +18,11 @@ export default function SettingsModal({
   addonOrderEnabled: { value: boolean };
   isMobile: boolean;
 }) {
-  const tab = useSignal<"general" | "addons" | "ui" | "account">("general");
+  const tab = useSignal<"general" | "addons" | "ui" | "downloads" | "account">("general");
   const { success, error } = useToast();
+  const isPwa = usePwa();
+  const { canUseFileSystem, directoryName, selectDirectory } = useFileSystem();
+  const downloadsEnabled = useSignal(false);
   
   // Auto-login settings
   const autoLogin = useSignal<AutoLoginOption>("none");
@@ -29,6 +34,7 @@ export default function SettingsModal({
   const tmdbApiKey = useSignal<string>("");
   const hideCalendarButton = useSignal<boolean>(false);
   const hideAddonsButton = useSignal<boolean>(false);
+  const mobileClickToHover = useSignal<boolean>(false);
   // Addon sync settings
   const addonSyncEnabled = useSignal<boolean>(false);
   const mainProfileId = useSignal<string>("");
@@ -74,13 +80,64 @@ export default function SettingsModal({
 
       // Load hide addons button setting from server
       loadHideAddonsButtonSetting();
+      
+      // Load mobile click to hover setting from server
+      loadMobileClickToHoverSetting();
+
+      // Load downloads enabled setting
+      loadDownloadsEnabledSetting();
     }
   }, []);
+
+  // Load downloads enabled setting from server
+  const loadDownloadsEnabledSetting = async () => {
+    try {
+      const response = await fetch('/api/settings/downloads');
+      if (response.ok) {
+        const data = await response.json();
+        downloadsEnabled.value = data.enabled || false;
+      }
+    } catch (error) {
+      console.warn('Failed to load downloads enabled setting:', error);
+    }
+  };
+
+  // Save downloads enabled setting to server
+  const saveDownloadsEnabledSetting = async (enabled: boolean) => {
+    try {
+      const response = await fetch('/api/settings/downloads', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save downloads enabled setting');
+      }
+      success("Setting saved successfully.");
+    } catch (err) {
+      error(err instanceof Error ? err.message : "An unknown error occurred.");
+    }
+  };
+
+  // Auto-save downloads enabled setting with debounce
+  const isInitialMountDownloadsEnabled = useRef(true);
+  useEffect(() => {
+    if (isInitialMountDownloadsEnabled.current) {
+      isInitialMountDownloadsEnabled.current = false;
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      saveDownloadsEnabledSetting(downloadsEnabled.value);
+    }, 1000); // Debounce for 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [downloadsEnabled.value]);
 
   // Load TMDB API key from server
   const loadTmdbApiKey = async () => {
     try {
-      const response = await fetch('/api/tmdb-key');
+      const response = await fetch('/api/settings/tmdb-key');
       if (response.ok) {
         const data = await response.json();
         if (data.hasApiKey) {
@@ -95,7 +152,7 @@ export default function SettingsModal({
   // Load addon manager setting from server
   const loadAddonManagerSetting = async () => {
     try {
-      const response = await fetch('/api/addon-manager');
+      const response = await fetch('/api/settings/addon-manager');
       if (response.ok) {
         const data = await response.json();
         addonOrderEnabled.value = data.enabled || false;
@@ -108,7 +165,7 @@ export default function SettingsModal({
   // Load addon sync settings from server
   const loadAddonSyncSettings = async () => {
     try {
-      const response = await fetch('/api/addon-sync');
+      const response = await fetch('/api/settings/addon-sync');
       if (response.ok) {
         const data = await response.json();
         const { settings } = data;
@@ -128,7 +185,7 @@ export default function SettingsModal({
   // Load hide calendar button setting from server
   const loadHideCalendarButtonSetting = async () => {
     try {
-      const response = await fetch('/api/hide-calendar');
+      const response = await fetch('/api/settings/hide-calendar');
       if (response.ok) {
         const data = await response.json();
         hideCalendarButton.value = data.hideCalendarButton || false;
@@ -141,7 +198,7 @@ export default function SettingsModal({
   // Save hide calendar button setting to server
   const saveHideCalendarButtonSetting = async (hide: boolean) => {
     try {
-      const response = await fetch('/api/hide-calendar', {
+      const response = await fetch('/api/settings/hide-calendar', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hideCalendarButton: hide }),
@@ -173,7 +230,7 @@ export default function SettingsModal({
   // Load hide addons button setting from server
   const loadHideAddonsButtonSetting = async () => {
     try {
-      const response = await fetch('/api/hide-addons');
+      const response = await fetch('/api/settings/hide-addons');
       if (response.ok) {
         const data = await response.json();
         hideAddonsButton.value = data.hideAddonsButton || false;
@@ -186,7 +243,7 @@ export default function SettingsModal({
   // Save hide addons button setting to server
   const saveHideAddonsButtonSetting = async (hide: boolean) => {
     try {
-      const response = await fetch('/api/hide-addons', {
+      const response = await fetch('/api/settings/hide-addons', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hideAddonsButton: hide }),
@@ -214,6 +271,51 @@ export default function SettingsModal({
 
     return () => clearTimeout(timeoutId);
   }, [hideAddonsButton.value]);
+
+  // Load mobile click to hover setting from server
+  const loadMobileClickToHoverSetting = async () => {
+    try {
+      const response = await fetch('/api/settings/mobile-click-hover');
+      if (response.ok) {
+        const data = await response.json();
+        mobileClickToHover.value = data.mobileClickToHover || false;
+      }
+    } catch (error) {
+      console.warn('Failed to load mobile click to hover setting:', error);
+    }
+  };
+
+  // Save mobile click to hover setting to server
+  const saveMobileClickToHoverSetting = async (enabled: boolean) => {
+    try {
+      const response = await fetch('/api/settings/mobile-click-hover', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobileClickToHover: enabled }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save mobile click to hover setting');
+      }
+      success("Setting saved successfully.");
+    } catch (err) {
+      error(err instanceof Error ? err.message : "An unknown error occurred.");
+    }
+  };
+
+  // Auto-save mobile click to hover setting with debounce
+  const isInitialMountMobileClick = useRef(true);
+  useEffect(() => {
+    if (isInitialMountMobileClick.current) {
+      isInitialMountMobileClick.current = false;
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      saveMobileClickToHoverSetting(mobileClickToHover.value);
+    }, 1000); // Debounce for 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [mobileClickToHover.value]);
 
   // Save auto-login settings to localStorage
   const isInitialMountAutoLogin = useRef(true);
@@ -261,7 +363,7 @@ export default function SettingsModal({
     }
 
     try {
-      const response = await fetch('/api/tmdb-key', {
+      const response = await fetch('/api/settings/tmdb-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey }),
@@ -299,7 +401,7 @@ export default function SettingsModal({
   // Save addon manager setting to server
   const saveAddonManagerSetting = async (enabled: boolean) => {
     try {
-      const response = await fetch('/api/addon-manager', {
+      const response = await fetch('/api/settings/addon-manager', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
@@ -331,7 +433,7 @@ export default function SettingsModal({
   // Save addon sync settings to server
   const saveAddonSyncSettings = async () => {
     try {
-      const response = await fetch('/api/addon-sync', {
+      const response = await fetch('/api/settings/addon-sync', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -373,7 +475,7 @@ export default function SettingsModal({
     syncStatus.value = "Syncing...";
 
     try {
-      const response = await fetch('/api/addon-sync', {
+      const response = await fetch('/api/settings/addon-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'sync' }),
@@ -514,6 +616,27 @@ export default function SettingsModal({
            >
              Account
            </button>
+           {isPwa && (
+             <button
+               type="button"
+               className={`px-4 py-2 font-medium text-base transition-colors duration-150 ${
+               tab.value === "downloads"
+                 ? "" // Remove static color classes
+                 : "text-gray-400 hover:text-gray-200"
+             }`}
+               style={
+                 tab.value === "downloads"
+                   ? {
+                       color: accentColor.value,
+                       borderBottom: `2px solid ${accentColor.value}`,
+                     }
+                   : undefined
+               }
+               onClick={() => (tab.value = "downloads")}
+             >
+               Downloads
+             </button>
+           )}
           </div>
 
         {/* General Tab */}
@@ -945,12 +1068,105 @@ export default function SettingsModal({
                 </div>
               </div>
 
+              {/* Mobile Click to Hover Setting */}
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="mb-0">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-base font-medium text-gray-200">Mobile Click to Show Controls</label>
+                    <div className="relative inline-block w-12 h-6">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={mobileClickToHover.value}
+                        onChange={e => mobileClickToHover.value = e.currentTarget.checked}
+                      />
+                      <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                        mobileClickToHover.value
+                          ? 'bg-red-600'
+                          : 'bg-gray-600'
+                      }`}
+                        onClick={() => mobileClickToHover.value = !mobileClickToHover.value}
+                      ></div>
+                      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
+                        mobileClickToHover.value ? 'transform translate-x-6' : ''
+                      }`}></div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    On mobile, tapping the video player will show the controls instead of pausing.
+                  </p>
+                </div>
+              </div>
+
             </div>
           )}
 
-       {/* Account Tab */}
-         {tab.value === "account" && (
+       {/* Downloads Tab */}
+         {isPwa && tab.value === "downloads" && (
            <div>
+             <h3 className="text-lg font-semibold mb-4 text-white">Downloads Settings</h3>
+             
+             <div className="bg-gray-800 rounded-lg p-4 mb-4">
+               <div className="flex items-center justify-between">
+                 <label className="block text-base font-medium text-gray-200">Enable Downloads</label>
+                 <div className="relative inline-block w-12 h-6">
+                   <input
+                     type="checkbox"
+                     className="sr-only"
+                     checked={downloadsEnabled.value}
+                     onChange={e => downloadsEnabled.value = e.currentTarget.checked}
+                   />
+                   <div className={`block w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                     downloadsEnabled.value
+                       ? 'bg-red-600'
+                       : 'bg-gray-600'
+                   }`}
+                     onClick={() => downloadsEnabled.value = !downloadsEnabled.value}
+                   ></div>
+                   <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 pointer-events-none ${
+                     downloadsEnabled.value ? 'transform translate-x-6' : ''
+                   }`}></div>
+                 </div>
+               </div>
+               <p className="text-xs text-gray-400 mt-2">
+                 Enable or disable the video download feature.
+               </p>
+             </div>
+
+             {downloadsEnabled.value && (
+               <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                 <label className="block text-base font-medium text-gray-200 mb-2">Download Location</label>
+                 {canUseFileSystem ? (
+                   <div>
+                     <button
+                       type="button"
+                       onClick={selectDirectory}
+                       className="px-4 py-2 rounded text-sm font-medium transition-colors duration-200 bg-red-600 hover:bg-red-700 text-white"
+                     >
+                       Choose Directory
+                     </button>
+                     {directoryName.value && (
+                       <p className="text-sm text-gray-300 mt-2">
+                         Selected directory: <span className="font-semibold">{directoryName.value}</span>
+                       </p>
+                     )}
+                   </div>
+                 ) : (
+                   <p className="text-sm text-yellow-400">
+                     The File System API is not supported in your browser. Downloads will be saved to the default browser location.
+                   </p>
+                 )}
+                 <p className="text-xs text-gray-400 mt-2">
+                   Select a folder where downloaded videos will be stored.
+                 </p>
+               </div>
+             )}
+           </div>
+         )}
+
+      {/* Account Tab */}
+        {tab.value === "account" && (
+          <div>
              <h3 className="text-lg font-semibold mb-4 text-white">Account Settings</h3>
              
              {/* Change Password */}

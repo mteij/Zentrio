@@ -1,6 +1,6 @@
 import { Handlers } from "$fresh/server.ts";
-import { AppState } from "../_middleware.ts";
-import { setUserTmdbApiKey, getUserTmdbApiKey, removeUserTmdbApiKey } from "../../utils/db.ts";
+import { AppState } from "../../_middleware.ts";
+import { setUserTmdbApiKey, getUserTmdbApiKey, removeUserTmdbApiKey } from "../../../utils/db.ts";
 
 export const handler: Handlers<null, AppState> = {
   /**

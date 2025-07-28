@@ -23,6 +23,10 @@ export interface UserSchema extends Document {
     hideCalendarButton?: boolean; // Whether to hide the calendar button in the Stremio interface
     // Hide addons button setting
     hideAddonsButton?: boolean; // Whether to hide the addons button in the Stremio interface
+    // Mobile player settings
+    mobileClickToHover?: boolean; // On mobile, click to show hover menu instead of pausing
+    // Downloads settings
+    downloadsEnabled?: boolean;
     // Addon sync settings (experimental feature)
     addonSyncSettings?: {
       enabled: boolean;
@@ -87,6 +91,10 @@ const userSchema = new mongoose.Schema<UserSchema>({
       hideCalendarButton: { type: Boolean, default: false },
       // Hide addons button setting
       hideAddonsButton: { type: Boolean, default: false },
+      // Mobile player settings
+      mobileClickToHover: { type: Boolean, default: false },
+      // Downloads settings
+      downloadsEnabled: { type: Boolean, default: false },
       // Addon sync settings (experimental feature)
       addonSyncSettings: {
         enabled: { type: Boolean, default: false },
@@ -689,6 +697,42 @@ export const updateUserHideAddonsButtonSetting = async (userId: string, hide: bo
 export const getUserHideAddonsButtonSetting = async (userId: string): Promise<boolean> => {
   const user = await Users.findById(userId);
   return user?.settings?.hideAddonsButton || false;
+};
+
+/**
+ * Update mobile click to hover setting for user
+ */
+export const updateUserMobileClickToHoverSetting = async (userId: string, enabled: boolean): Promise<void> => {
+  await Users.updateOne(
+    { _id: new mongoose.Types.ObjectId(userId) },
+    { $set: { 'settings.mobileClickToHover': enabled } }
+  );
+};
+
+/**
+ * Get mobile click to hover setting for user
+ */
+export const getUserMobileClickToHoverSetting = async (userId: string): Promise<boolean> => {
+  const user = await Users.findById(userId);
+  return user?.settings?.mobileClickToHover || false;
+};
+
+/**
+ * Update downloads enabled setting for user
+ */
+export const setUserDownloadsEnabled = async (userId: string, enabled: boolean): Promise<void> => {
+  await Users.updateOne(
+    { _id: new mongoose.Types.ObjectId(userId) },
+    { $set: { 'settings.downloadsEnabled': enabled } }
+  );
+};
+
+/**
+ * Get downloads enabled setting for user
+ */
+export const getUserDownloadsEnabled = async (userId: string): Promise<boolean> => {
+  const user = await Users.findById(userId);
+  return user?.settings?.downloadsEnabled || false;
 };
 
 export type { ObjectId, EncryptedData };
