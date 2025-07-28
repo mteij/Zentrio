@@ -23,6 +23,7 @@
   "twind": "https://esm.sh/twind@0.16.19",
   "twind/": "https://esm.sh/twind@0.16.19/",
   "ua-parser-js": "https://esm.sh/ua-parser-js@1.0.37",
+  "idb-keyval": "https://esm.sh/idb-keyval@6.2.1",
 
   // npm packages
   "mongoose": "npm:mongoose@8.4.1",

@@ -2,7 +2,9 @@ import { h } from "preact";
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { useToast } from "../../shared/hooks/useToast.ts";
-import SettingsModal from "../SettingsModal.tsx";
+import { useSetting } from "../../shared/hooks/useSetting.ts";
+import SettingsModal from "../Settings/SettingsModal.tsx";
+import DownloadsModal from "../Downloads/DownloadsModal.tsx";
 import { PlainProfile } from "./ProfileManager.tsx";
 import { usePwa } from "../../shared/hooks/usePwa.ts";
 
@@ -22,9 +24,6 @@ export default function ProfileManagerView(props: {
     onRequestDelete?: (profile: PlainProfile) => void;
   }) => h.JSX.Element;
   toggleMobileEditMode: () => void;
-  showSettings: { value: boolean };
-  setShowSettings: (value: boolean) => void;
-  addonOrderEnabled: { value: boolean };
   isMobile: boolean;
 }) {
   const {
@@ -37,16 +36,17 @@ export default function ProfileManagerView(props: {
     handleRequestDelete,
     ProfileModal,
     toggleMobileEditMode,
-    showSettings,
-    addonOrderEnabled,
     isMobile,
   } = props;
 
   const { success } = useToast();
   const isPwa = usePwa();
+  const accentColor = useSetting<string>("accentColor", "#dc2626", "localStorage");
   const downloadsEnabled = useSignal(false);
   const isInitialized = useSignal(false);
   const lastProfileId = useSignal<string | null>(null);
+  const showSettings = useSignal(false);
+  const showDownloads = useSignal(false);
   const modalOpen = showAddModal.value || editingProfile.value !== null;
   const showAddProfile = profiles.value.length === 0 || (isMobile ? mobileEditMode.value : true);
 
@@ -63,7 +63,7 @@ export default function ProfileManagerView(props: {
     // Load downloads enabled setting
     const loadDownloadsEnabledSetting = async () => {
       try {
-        const response = await fetch('/api/settings/downloads');
+        const response = await fetch('/api/settings/downloadsEnabled');
         if (response.ok) {
           const data = await response.json();
           downloadsEnabled.value = data.enabled || false;
@@ -257,14 +257,14 @@ export default function ProfileManagerView(props: {
           />
         )}
         {/* Mobile Edit Profile Modal */}
-{editingProfile.value && (
-  <ProfileModal
-    profile={editingProfile.value}
-    onSave={handleUpdate}
-    onCancel={() => (editingProfile.value = null)}
-    onRequestDelete={handleRequestDelete}
-  />
-)}
+        {editingProfile.value && (
+          <ProfileModal
+            profile={editingProfile.value}
+            onSave={handleUpdate}
+            onCancel={() => (editingProfile.value = null)}
+            onRequestDelete={handleRequestDelete}
+          />
+        )}
         {/* Mobile Bottom Bar - Only show when isMobile is true */}
         {isMobile && (
           <div class="fixed bottom-0 inset-x-0 flex gap-2 justify-center bg-black bg-opacity-90 py-3 z-30 border-t border-gray-800">
@@ -279,7 +279,7 @@ export default function ProfileManagerView(props: {
             }}
             class="text-white font-bold py-2 px-4 rounded-lg text-base transition-all duration-200"
             style={{
-              backgroundColor: localStorage.getItem("accentColor") || "#dc2626", // fallback to red-600
+              backgroundColor: accentColor.value,
             }}
           >
             Logout
@@ -318,7 +318,7 @@ export default function ProfileManagerView(props: {
            {isPwa && downloadsEnabled.value && (
              <button
                type="button"
-               onClick={() => (globalThis.location.href = "/downloads")}
+               onClick={() => (showDownloads.value = true)}
                class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
                aria-label="Downloads"
              >
@@ -329,14 +329,18 @@ export default function ProfileManagerView(props: {
            )}
         </div>
         )}
-        {/* Mobile Settings Modal */}
         {showSettings.value && (
           <SettingsModal
             onClose={() => (showSettings.value = false)}
-            addonOrderEnabled={addonOrderEnabled}
             isMobile={isMobile}
           />
         )}
+       {showDownloads.value && (
+         <DownloadsModal
+           onClose={() => (showDownloads.value = false)}
+           isMobile={isMobile}
+         />
+       )}
       </div>
     );
   }
@@ -482,7 +486,7 @@ export default function ProfileManagerView(props: {
           }}
           class="text-white font-bold py-2 px-6 rounded-lg text-lg transition-all duration-200"
           style={{
-            backgroundColor: localStorage.getItem("accentColor") || "#dc2626",
+            backgroundColor: accentColor.value,
           }}
         >
           Logout
@@ -490,7 +494,7 @@ export default function ProfileManagerView(props: {
         {/* Desktop Settings Button */}
         <button
           type="button"
-          onClick={() => showSettings.value = true}
+          onClick={() => (showSettings.value = true)}
           class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
           aria-label="Settings"
           style={{ minWidth: "40px", minHeight: "40px" }}
@@ -505,7 +509,7 @@ export default function ProfileManagerView(props: {
          {isPwa && downloadsEnabled.value && (
            <button
              type="button"
-             onClick={() => (globalThis.location.href = "/downloads")}
+             onClick={() => (showDownloads.value = true)}
              class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-colors text-lg"
              aria-label="Downloads"
            >
@@ -526,24 +530,28 @@ export default function ProfileManagerView(props: {
         </div>
       )}
       {/* Desktop Edit Profile Modal */}
-{editingProfile.value && (
-  <div class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70">
-    <ProfileModal
-      profile={editingProfile.value}
-      onSave={handleUpdate}
-      onCancel={() => editingProfile.value = null}
-      onRequestDelete={handleRequestDelete}
-    />
-  </div>
-)}
-      {/* Desktop Settings Modal */}
+      {editingProfile.value && (
+        <div class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70">
+          <ProfileModal
+            profile={editingProfile.value}
+            onSave={handleUpdate}
+            onCancel={() => editingProfile.value = null}
+            onRequestDelete={handleRequestDelete}
+          />
+        </div>
+      )}
       {showSettings.value && (
         <SettingsModal
-          onClose={() => showSettings.value = false}
-          addonOrderEnabled={addonOrderEnabled}
+          onClose={() => (showSettings.value = false)}
           isMobile={isMobile}
         />
       )}
+     {showDownloads.value && (
+       <DownloadsModal
+         onClose={() => (showDownloads.value = false)}
+         isMobile={isMobile}
+       />
+     )}
     </div>
   );
 }

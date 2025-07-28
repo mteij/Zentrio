@@ -24,6 +24,93 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SET_DIRECTORY_HANDLE') {
     directoryHandle = event.data.handle;
   }
+
+  if (event.data && event.data.type === 'DOWNLOAD_VIDEO') {
+    const { streamUrl, fileName } = event.data;
+
+    event.waitUntil((async () => {
+      if (!directoryHandle) {
+        if (self.Notification.permission === 'granted') {
+          self.registration.showNotification('Download Failed', {
+            body: `No download directory selected. Please choose one in settings.`,
+            icon: '/icons/icon-192.png',
+          });
+        }
+        return;
+      }
+
+      const download = {
+        name: fileName,
+        total: 0,
+        downloaded: 0,
+        status: 'starting',
+      };
+
+      try {
+        await set(STORES.DOWNLOADS, download);
+
+        const proxyUrl = `/api/proxy?url=${encodeURIComponent(streamUrl)}`;
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok || !response.body) {
+          throw new Error(`Fetch failed: ${response.statusText}`);
+        }
+
+        download.total = Number(response.headers.get('Content-Length')) || 0;
+        download.status = 'downloading';
+        await set(STORES.DOWNLOADS, download);
+
+        const reader = response.body.getReader();
+        const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        
+        let lastUpdate = Date.now();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          await writable.write(value);
+          download.downloaded += value.length;
+
+          if (Date.now() - lastUpdate > 1000) { // Update every second
+            await set(STORES.DOWNLOADS, download);
+            self.clients.matchAll().then(clients => {
+              clients.forEach(client => client.postMessage({ type: 'DOWNLOAD_PROGRESS', download }));
+            });
+            lastUpdate = Date.now();
+          }
+        }
+        await writable.close();
+
+        download.status = 'completed';
+        await set(STORES.DOWNLOADS, download);
+        self.clients.matchAll().then(clients => {
+            clients.forEach(client => client.postMessage({ type: 'DOWNLOAD_PROGRESS', download }));
+        });
+
+        if (self.Notification.permission === 'granted') {
+          self.registration.showNotification('Download Complete', {
+            body: `${fileName} downloaded.`,
+            icon: '/icons/icon-192.png',
+          });
+        }
+
+      } catch (error) {
+        download.status = 'failed';
+        await set(STORES.DOWNLOADS, download);
+        self.clients.matchAll().then(clients => {
+            clients.forEach(client => client.postMessage({ type: 'DOWNLOAD_PROGRESS', download }));
+        });
+        if (self.Notification.permission === 'granted') {
+          self.registration.showNotification('Download Failed', {
+            body: `Could not download ${fileName}.`,
+            icon: '/icons/icon-192.png',
+          });
+        }
+      }
+    })());
+  }
 });
 
 // Install event - cache essential resources
@@ -53,7 +140,7 @@ self.addEventListener('activate', event => {
     }).then(() => {
       return self.clients.claim();
     }).then(() => {
-      return get('download_directory_handle').then(handle => {
+      return get(STORES.HANDLES, 'download_directory_handle').then(handle => {
         if (handle) {
           directoryHandle = handle;
         }
@@ -72,31 +159,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (url.pathname === '/download-video') {
-    event.respondWith((async () => {
-      if (!directoryHandle) {
-        return new Response('No directory selected.', { status: 400 });
-      }
-
-      const videoUrl = url.searchParams.get('url');
-      const fileName = url.searchParams.get('name') || 'video.mp4';
-
-      if (!videoUrl) {
-        return new Response('Missing video URL.', { status: 400 });
-      }
-
-      try {
-        const response = await fetch(videoUrl);
-        const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
-        const writable = await fileHandle.createWritable();
-        await response.body.pipeTo(writable);
-        return new Response('Download complete.', { status: 200 });
-      } catch (error) {
-        return new Response(`Download failed: ${error.message}`, { status: 500 });
-      }
-    })());
-    return;
-  }
 
   // Only handle requests for static assets
   const isStaticAsset = STATIC_CACHE_URLS.some(assetUrl => event.request.url.endsWith(assetUrl));

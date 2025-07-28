@@ -17,14 +17,9 @@ import * as $api_auth_signup from "./routes/api/auth/signup.ts";
 import * as $api_auth_verify_code from "./routes/api/auth/verify-code.ts";
 import * as $api_profiles_id_ from "./routes/api/profiles/[id].ts";
 import * as $api_profiles_index from "./routes/api/profiles/index.ts";
+import * as $api_proxy from "./routes/api/proxy.ts";
 import * as $api_sessions from "./routes/api/sessions.ts";
-import * as $api_settings_addon_manager from "./routes/api/settings/addon-manager.ts";
-import * as $api_settings_addon_sync from "./routes/api/settings/addon-sync.ts";
-import * as $api_settings_downloads from "./routes/api/settings/downloads.ts";
-import * as $api_settings_hide_addons from "./routes/api/settings/hide-addons.ts";
-import * as $api_settings_hide_calendar from "./routes/api/settings/hide-calendar.ts";
-import * as $api_settings_mobile_click_hover from "./routes/api/settings/mobile-click-hover.ts";
-import * as $api_settings_tmdb_key from "./routes/api/settings/tmdb-key.ts";
+import * as $api_settings_key_ from "./routes/api/settings/[key].ts";
 import * as $api_test_email from "./routes/api/test-email.ts";
 import * as $auth_code from "./routes/auth/code.tsx";
 import * as $auth_forgot from "./routes/auth/forgot.tsx";
@@ -47,11 +42,12 @@ import * as $Auth_ForgotPasswordForm from "./islands/Auth/ForgotPasswordForm.tsx
 import * as $Auth_PasswordLoginForm from "./islands/Auth/PasswordLoginForm.tsx";
 import * as $Auth_ResetPasswordForm from "./islands/Auth/ResetPasswordForm.tsx";
 import * as $DownloadsManager from "./islands/DownloadsManager.tsx";
+import * as $Downloads_DownloadsModal from "./islands/Downloads/DownloadsModal.tsx";
 import * as $InstallPWA from "./islands/InstallPWA.tsx";
 import * as $ProfileManager_ProfileManager from "./islands/ProfileManager/ProfileManager.tsx";
 import * as $ProfileManager_ProfileManagerView from "./islands/ProfileManager/ProfileManagerView.tsx";
-import * as $SettingsModal from "./islands/SettingsModal.tsx";
 import * as $Settings_PasswordChangeForm from "./islands/Settings/PasswordChangeForm.tsx";
+import * as $Settings_SettingsModal from "./islands/Settings/SettingsModal.tsx";
 import * as $StremioFrame from "./islands/StremioFrame.tsx";
 import * as $ToastHandler from "./islands/ToastHandler.tsx";
 import { type Manifest } from "$fresh/server.ts";
@@ -75,15 +71,9 @@ const manifest = {
     "./routes/api/auth/verify-code.ts": $api_auth_verify_code,
     "./routes/api/profiles/[id].ts": $api_profiles_id_,
     "./routes/api/profiles/index.ts": $api_profiles_index,
+    "./routes/api/proxy.ts": $api_proxy,
     "./routes/api/sessions.ts": $api_sessions,
-    "./routes/api/settings/addon-manager.ts": $api_settings_addon_manager,
-    "./routes/api/settings/addon-sync.ts": $api_settings_addon_sync,
-    "./routes/api/settings/downloads.ts": $api_settings_downloads,
-    "./routes/api/settings/hide-addons.ts": $api_settings_hide_addons,
-    "./routes/api/settings/hide-calendar.ts": $api_settings_hide_calendar,
-    "./routes/api/settings/mobile-click-hover.ts":
-      $api_settings_mobile_click_hover,
-    "./routes/api/settings/tmdb-key.ts": $api_settings_tmdb_key,
+    "./routes/api/settings/[key].ts": $api_settings_key_,
     "./routes/api/test-email.ts": $api_test_email,
     "./routes/auth/code.tsx": $auth_code,
     "./routes/auth/forgot.tsx": $auth_forgot,
@@ -108,13 +98,14 @@ const manifest = {
     "./islands/Auth/PasswordLoginForm.tsx": $Auth_PasswordLoginForm,
     "./islands/Auth/ResetPasswordForm.tsx": $Auth_ResetPasswordForm,
     "./islands/DownloadsManager.tsx": $DownloadsManager,
+    "./islands/Downloads/DownloadsModal.tsx": $Downloads_DownloadsModal,
     "./islands/InstallPWA.tsx": $InstallPWA,
     "./islands/ProfileManager/ProfileManager.tsx":
       $ProfileManager_ProfileManager,
     "./islands/ProfileManager/ProfileManagerView.tsx":
       $ProfileManager_ProfileManagerView,
-    "./islands/SettingsModal.tsx": $SettingsModal,
     "./islands/Settings/PasswordChangeForm.tsx": $Settings_PasswordChangeForm,
+    "./islands/Settings/SettingsModal.tsx": $Settings_SettingsModal,
     "./islands/StremioFrame.tsx": $StremioFrame,
     "./islands/ToastHandler.tsx": $ToastHandler,
   },

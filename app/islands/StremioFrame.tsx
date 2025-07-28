@@ -2,6 +2,8 @@ import { h as _h } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { useDeviceContext } from "../shared/hooks/useDeviceContext.ts";
+import { useFileSystem } from "../shared/hooks/useFileSystem.ts";
+import { useToast } from "../shared/hooks/useToast.ts";
 
 interface StremioFrameProps {
   profile: {
@@ -34,6 +36,8 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
   const isLoading = useSignal(true);
   const statusMessage = useSignal("Initializing...");
   const deviceContext = useDeviceContext();
+  const { getDirectoryHandle } = useFileSystem();
+  const { success, error: showError } = useToast();
 
   // Function to reload the iframe with the same session data
   const reloadIframe = () => {
@@ -61,18 +65,16 @@ export default function StremioFrame({ profile }: StremioFrameProps) {
       if (event.data && event.data.type === "download-stream") {
         const { streamUrl, fileName } = event.data;
         if (streamUrl && fileName) {
-          const downloadUrl = `/download-video?url=${
-            encodeURIComponent(streamUrl)
-          }&name=${encodeURIComponent(fileName)}`;
-          fetch(downloadUrl)
-            .then((response) => {
-              if (!response.ok) {
-                console.error("Failed to start download:", response.statusText);
-              }
-            })
-            .catch((error) => {
-              console.error("Error triggering download:", error);
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'DOWNLOAD_VIDEO',
+              streamUrl: streamUrl,
+              fileName: fileName,
             });
+            success(`Download started for ${fileName}. You will be notified upon completion.`);
+          } else {
+            showError("Service worker not available. Cannot start download.");
+          }
         }
       }
     };

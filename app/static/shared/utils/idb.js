@@ -1,6 +1,10 @@
 const DB_NAME = "ZentrioDB";
-const STORE_NAME = "fileSystemHandles";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+
+const STORES = {
+  HANDLES: "fileSystemHandles",
+  DOWNLOADS: "downloads",
+};
 
 let db = null;
 
@@ -15,8 +19,11 @@ function openDB() {
 
     request.onupgradeneeded = (event) => {
       const dbInstance = event.target.result;
-      if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
-        dbInstance.createObjectStore(STORE_NAME);
+      if (!dbInstance.objectStoreNames.contains(STORES.HANDLES)) {
+        dbInstance.createObjectStore(STORES.HANDLES);
+      }
+      if (!dbInstance.objectStoreNames.contains(STORES.DOWNLOADS)) {
+        dbInstance.createObjectStore(STORES.DOWNLOADS, { keyPath: "name" });
       }
     };
 
@@ -31,26 +38,50 @@ function openDB() {
   });
 }
 
-async function set(key, value) {
+async function set(storeName, value, key) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(value, key);
+    const transaction = db.transaction(storeName, "readwrite");
+    const store = transaction.objectStore(storeName);
+    const request = key ? store.put(value, key) : store.put(value);
 
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
 }
 
-async function get(key) {
+async function get(storeName, key) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readonly");
-    const store = transaction.objectStore(STORE_NAME);
+    const transaction = db.transaction(storeName, "readonly");
+    const store = transaction.objectStore(storeName);
     const request = store.get(key);
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+async function getAll(storeName) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, "readonly");
+        const store = transaction.objectStore(storeName);
+        const request = store.getAll();
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function remove(storeName, key) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, "readwrite");
+        const store = transaction.objectStore(storeName);
+        const request = store.delete(key);
+
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
 }
