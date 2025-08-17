@@ -56,11 +56,11 @@
                         <label for="profileName">Profile Name</label>
                         <input type="text" id="profileName" name="profileName" required>
                     </div>
-                    <div class="form-group" style="display: none;">
-                        <label for="stremioUsername">Stremio Username <span style="color: #e50914;">*</span></label>
-                        <input type="text" id="stremioUsername" name="stremioUsername">
+                    <div class="form-group">
+                        <label for="stremioEmail">Stremio Email <span style="color: #e50914;">*</span></label>
+                        <input type="email" id="stremioEmail" name="stremioEmail" required>
                     </div>
-                    <div class="form-group" style="display: none;">
+                    <div class="form-group">
                         <label for="stremioPassword">Stremio Password</label>
                         <input type="password" id="stremioPassword" name="stremioPassword" aria-describedby="stremioPasswordHelp">
                     </div>
@@ -163,7 +163,9 @@
             editingProfileId = null;
             modalTitle.textContent = 'Create New Profile';
             profileForm.reset();
-            document.getElementById('stremioPassword').placeholder = 'Enter Stremio password';
+            const passwordInput = document.getElementById('stremioPassword');
+            passwordInput.placeholder = 'Enter Stremio password';
+            passwordInput.required = true;
             generateNewAvatar();
             profileModal.style.display = 'block';
         }
@@ -182,11 +184,12 @@
             modalTitle.textContent = 'Edit Profile';
             
             document.getElementById('profileName').value = profile.name;
-            // Stremio credentials are no longer handled in the frontend
-            // Don't populate password field for security - leave it empty
-            document.getElementById('stremioPassword').value = '';
+            document.getElementById('stremioEmail').value = profile.stremio_email || '';
             
-            document.getElementById('stremioPassword').placeholder = 'Leave blank to keep current password';
+            const passwordInput = document.getElementById('stremioPassword');
+            passwordInput.value = '';
+            passwordInput.placeholder = 'Leave blank to keep current password';
+            passwordInput.required = false;
             
             currentAvatarSeed = profile.avatar;
             updateAvatarPreview(profile.avatar);
@@ -329,14 +332,12 @@
                 saveBtn.textContent = 'Saving...';
                 saveBtn.disabled = true;
                 
-                const pwdInput = document.getElementById('stremioPassword').value;
                 const formData = {
                     name: document.getElementById('profileName').value,
-                    avatar: currentAvatarSeed || document.getElementById('profileName').value
+                    avatar: currentAvatarSeed || document.getElementById('profileName').value,
+                    stremioEmail: document.getElementById('stremioEmail').value,
+                    stremioPassword: document.getElementById('stremioPassword').value
                 };
-                
-                // Validate required fields
-                // Stremio credentials are no longer handled in the frontend
                 
                 const url = editingProfileId ? `/api/profiles/${editingProfileId}` : '/api/profiles';
                 const method = editingProfileId ? 'PUT' : 'POST';

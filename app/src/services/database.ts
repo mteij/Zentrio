@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite'
 import * as bcrypt from 'bcryptjs'
 import { join } from 'path'
 import { randomBytes, randomInt, createHash } from 'crypto'
+import { encrypt } from './encryption'
 
 // Initialize SQLite database
 const db = new Database(join(process.cwd(), 'zentrio.db'))
@@ -29,7 +30,7 @@ db.exec(`
       avatar TEXT NOT NULL,
       avatar_type TEXT DEFAULT 'initials',
       is_default BOOLEAN DEFAULT FALSE,
-      stremio_username TEXT,
+      stremio_email TEXT,
       stremio_password TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -169,7 +170,7 @@ export interface Profile {
   avatar: string
   avatar_type: 'initials' | 'avatar'
   is_default: boolean
-  stremio_username?: string
+  stremio_email?: string
   stremio_password?: string
   created_at: string
   updated_at: string
@@ -328,22 +329,24 @@ export const profileDb = {
       avatar: string
       avatar_type?: 'initials' | 'avatar'
       is_default?: boolean
-      stremio_username?: string
+      stremio_email?: string
       stremio_password?: string
     }): Promise<Profile> => {
       const stmt = db.prepare(`
-        INSERT INTO profiles (user_id, name, avatar, avatar_type, is_default, stremio_username, stremio_password)
+        INSERT INTO profiles (user_id, name, avatar, avatar_type, is_default, stremio_email, stremio_password)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `)
       
+      const encryptedPassword = profileData.stremio_password ? encrypt(profileData.stremio_password) : null;
+
       const result = stmt.run(
         profileData.user_id,
         profileData.name,
         profileData.avatar,
         profileData.avatar_type || 'initials',
         profileData.is_default || false,
-        profileData.stremio_username || null,
-        profileData.stremio_password || null
+        profileData.stremio_email || null,
+        encryptedPassword
       )
       
       return profileDb.findById(result.lastInsertRowid as number)!
@@ -364,7 +367,7 @@ export const profileDb = {
       avatar?: string
       avatar_type?: 'initials' | 'avatar'
       is_default?: boolean
-      stremio_username?: string
+      stremio_email?: string
       stremio_password?: string
     }): Promise<Profile | undefined> => {
       const fields: string[] = []
@@ -386,13 +389,13 @@ export const profileDb = {
         fields.push('is_default = ?')
         values.push(updates.is_default)
       }
-      if (updates.stremio_username !== undefined) {
-        fields.push('stremio_username = ?')
-        values.push(updates.stremio_username)
+      if (updates.stremio_email !== undefined) {
+        fields.push('stremio_email = ?')
+        values.push(updates.stremio_email)
       }
       if (updates.stremio_password !== undefined) {
         fields.push('stremio_password = ?')
-        values.push(updates.stremio_password)
+        values.push(encrypt(updates.stremio_password))
       }
     
     if (fields.length === 0) return profileDb.findById(id)

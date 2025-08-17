@@ -14,15 +14,20 @@ import { sessionMiddleware } from '../../middleware/session'
  app.get('/', async (c) => {
    const user = c.get('user')
    const profiles = profileDb.findByUserId(user.id)
-   return c.json(profiles)
+   // Remove password from profiles
+   const sanitizedProfiles = profiles.map(p => {
+     const { stremio_password, ...rest } = p;
+     return rest;
+   });
+   return c.json(sanitizedProfiles)
  })
  
  app.post('/', async (c) => {
    const user = c.get('user')
-   const { name, avatar, avatarType } = await c.req.json()
+   const { name, avatar, avatarType, stremioEmail, stremioPassword } = await c.req.json()
  
-   if (!name) {
-     return c.json({ error: 'Profile name is required' }, 400)
+   if (!name || !stremioEmail || !stremioPassword) {
+     return c.json({ error: 'Profile name, Stremio email, and password are required' }, 400)
    }
  
    const profile = await profileDb.create({
@@ -31,15 +36,24 @@ import { sessionMiddleware } from '../../middleware/session'
      avatar: avatar || name,
      avatar_type: avatarType || 'initials',
      is_default: false,
+     stremio_email: stremioEmail,
+     stremio_password: stremioPassword,
    })
  
-   return c.json(profile)
+   // Don't return password
+   const { stremio_password, ...safeProfile } = profile;
+
+   return c.json(safeProfile)
  })
  
  app.put('/:id', async (c) => {
    const user = c.get('user')
    const profileId = parseInt(c.req.param('id'))
-   const { name, avatar, avatarType } = await c.req.json()
+   const { name, avatar, avatarType, stremioEmail, stremioPassword } = await c.req.json()
+
+   if (!name || !stremioEmail) {
+     return c.json({ error: 'Profile name and Stremio email are required' }, 400)
+   }
  
    const profile = profileDb.findById(profileId)
    if (profile?.user_id !== user.id) {
@@ -50,10 +64,17 @@ import { sessionMiddleware } from '../../middleware/session'
      name?: string
      avatar?: string
      avatar_type?: 'initials' | 'avatar'
+     stremio_email?: string
+     stremio_password?: string
    } = {
      name,
      avatar: avatar || name,
      avatar_type: avatarType,
+     stremio_email: stremioEmail,
+   }
+
+   if (stremioPassword) {
+     updates.stremio_password = stremioPassword;
    }
  
    const updatedProfile = await profileDb.update(profileId, updates)
@@ -62,7 +83,10 @@ import { sessionMiddleware } from '../../middleware/session'
      return c.json({ error: 'Profile not found' }, 404)
    }
  
-   return c.json(updatedProfile)
+   // Don't return password
+   const { stremio_password, ...safeProfile } = updatedProfile;
+
+   return c.json(safeProfile)
  })
  
  app.delete('/:id', async (c) => {
