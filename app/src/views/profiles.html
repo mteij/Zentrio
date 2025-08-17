@@ -64,6 +64,22 @@
                         <label for="stremioPassword">Stremio Password</label>
                         <input type="password" id="stremioPassword" name="stremioPassword" aria-describedby="stremioPasswordHelp">
                     </div>
+
+                    <div class="form-group setting-item">
+                        <div class="setting-info">
+                            <label for="nsfwFilterEnabledToggle">Enable NSFW Filter</label>
+                            <p>Censor content based on age rating.</p>
+                        </div>
+                        <div class="setting-control">
+                            <div class="toggle" id="nsfwFilterEnabledToggle"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="ageRatingGroup" style="display: none;">
+                        <label for="ageRatingInput">Age Rating</label>
+                        <input type="number" id="ageRatingInput" name="ageRating" min="0" max="18">
+                    </div>
+
                     <button type="submit" class="btn-primary save-btn" id="saveProfileBtn">Save Profile</button>
                 </div>
             </form>
@@ -85,6 +101,9 @@
         const modalMessage = document.getElementById('modalMessage');
         const logoutBtn = document.getElementById('logoutBtn');
         const shuffleBtn = document.getElementById('shuffleBtn');
+        const nsfwFilterEnabledToggle = document.getElementById('nsfwFilterEnabledToggle');
+        const ageRatingGroup = document.getElementById('ageRatingGroup');
+        const ageRatingInput = document.getElementById('ageRatingInput');
 
         // Load profiles from server (enhanced with better error handling)
         async function loadProfiles() {
@@ -166,6 +185,11 @@
             const passwordInput = document.getElementById('stremioPassword');
             passwordInput.placeholder = 'Enter Stremio password';
             passwordInput.required = true;
+
+            nsfwFilterEnabledToggle.classList.remove('active');
+            ageRatingGroup.style.display = 'none';
+            ageRatingInput.value = 0;
+
             generateNewAvatar();
             profileModal.style.display = 'block';
         }
@@ -191,6 +215,11 @@
             passwordInput.placeholder = 'Leave blank to keep current password';
             passwordInput.required = false;
             
+            const nsfwEnabled = profile.nsfw_filter_enabled || false;
+            nsfwFilterEnabledToggle.classList.toggle('active', nsfwEnabled);
+            ageRatingGroup.style.display = nsfwEnabled ? 'block' : 'none';
+            ageRatingInput.value = profile.nsfw_age_rating || 0;
+
             currentAvatarSeed = profile.avatar;
             updateAvatarPreview(profile.avatar);
             profileModal.style.display = 'block';
@@ -336,7 +365,9 @@
                     name: document.getElementById('profileName').value,
                     avatar: currentAvatarSeed || document.getElementById('profileName').value,
                     stremioEmail: document.getElementById('stremioEmail').value,
-                    stremioPassword: document.getElementById('stremioPassword').value
+                    stremioPassword: document.getElementById('stremioPassword').value,
+                    nsfwFilterEnabled: nsfwFilterEnabledToggle.classList.contains('active'),
+                    ageRating: parseInt(ageRatingInput.value, 10)
                 };
                 
                 const url = editingProfileId ? `/api/profiles/${editingProfileId}` : '/api/profiles';
@@ -425,6 +456,13 @@
             if (e.target === profileModal) {
                 profileModal.style.display = 'none';
             }
+        });
+
+        // NSFW toggle handler
+        nsfwFilterEnabledToggle.addEventListener('click', () => {
+            nsfwFilterEnabledToggle.classList.toggle('active');
+            const isEnabled = nsfwFilterEnabledToggle.classList.contains('active');
+            ageRatingGroup.style.display = isEnabled ? 'block' : 'none';
         });
 
         // Initialize page

@@ -19,6 +19,7 @@ db.exec(`
     password_hash TEXT NOT NULL,
     first_name TEXT,
     last_name TEXT,
+    addon_manager_enabled BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -117,7 +118,6 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS profile_proxy_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id INTEGER NOT NULL,
-    addon_manager_enabled BOOLEAN DEFAULT FALSE,
     nsfw_filter_enabled BOOLEAN DEFAULT FALSE,
     nsfw_age_rating INTEGER DEFAULT 0,
     hide_calendar_button BOOLEAN DEFAULT FALSE,
@@ -159,6 +159,7 @@ export interface User {
   password_hash: string
   first_name?: string
   last_name?: string
+  addon_manager_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -220,7 +221,6 @@ export interface ProxyLog {
 export interface ProfileProxySettings {
   id: number
   profile_id: number
-  addon_manager_enabled: boolean
   nsfw_filter_enabled: boolean
   nsfw_age_rating: number
   hide_calendar_button: boolean
@@ -315,6 +315,46 @@ export const userDb = {
     return result.changes > 0
   },
 
+  update: (id: number, updates: Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>): User | undefined => {
+    const fields: string[] = []
+    const values: any[] = []
+
+    if (updates.email) {
+        fields.push('email = ?')
+        values.push(updates.email)
+    }
+    if (updates.username) {
+        fields.push('username = ?')
+        values.push(updates.username)
+    }
+    if (updates.password_hash) {
+        fields.push('password_hash = ?')
+        values.push(updates.password_hash)
+    }
+    if (updates.first_name) {
+        fields.push('first_name = ?')
+        values.push(updates.first_name)
+    }
+    if (updates.last_name) {
+        fields.push('last_name = ?')
+        values.push(updates.last_name)
+    }
+    if (updates.addon_manager_enabled !== undefined) {
+        fields.push('addon_manager_enabled = ?')
+        values.push(updates.addon_manager_enabled)
+    }
+
+    if (fields.length === 0) return userDb.findById(id)
+
+    fields.push('updated_at = CURRENT_TIMESTAMP')
+    values.push(id)
+
+    const stmt = db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`)
+    const result = stmt.run(...values)
+
+    return result.changes > 0 ? userDb.findById(id) : undefined
+  },
+
   getAll: (): User[] => {
     const stmt = db.prepare('SELECT * FROM users ORDER BY created_at DESC')
     return stmt.all() as User[]
@@ -357,10 +397,26 @@ export const profileDb = {
     return stmt.get(id) as Profile | undefined
   },
 
-  findByUserId: (userId: number): Profile[] => {
-    const stmt = db.prepare('SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC')
-    return stmt.all(userId) as Profile[]
+  findByUserId: (userId: number): (Profile & { settings?: ProfileProxySettings })[] => {
+    const stmt = db.prepare(`
+        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating
+        FROM profiles p
+        LEFT JOIN profile_proxy_settings s ON p.id = s.profile_id
+        WHERE p.user_id = ?
+        ORDER BY p.created_at DESC
+    `)
+    return stmt.all(userId) as (Profile & { settings?: ProfileProxySettings })[]
   },
+
+  findWithSettingsById: (id: number): (Profile & { settings?: ProfileProxySettings }) | undefined => {
+    const stmt = db.prepare(`
+        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating
+        FROM profiles p
+        LEFT JOIN profile_proxy_settings s ON p.id = s.profile_id
+        WHERE p.id = ?
+    `)
+    return stmt.get(id) as (Profile & { settings?: ProfileProxySettings }) | undefined
+    },
 
   update: async (id: number, updates: {
       name?: string
@@ -687,7 +743,6 @@ export const proxyLogDb = {
 export const profileProxySettingsDb = {
   create: (settingsData: {
     profile_id: number
-    addon_manager_enabled?: boolean
     nsfw_filter_enabled?: boolean
     nsfw_age_rating?: number
     hide_calendar_button?: boolean
@@ -697,13 +752,12 @@ export const profileProxySettingsDb = {
     tmdb_api_key?: string
   }): ProfileProxySettings => {
     const stmt = db.prepare(`
-      INSERT INTO profile_proxy_settings (profile_id, addon_manager_enabled, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, downloads_enabled, mobile_click_to_hover, tmdb_api_key)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO profile_proxy_settings (profile_id, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, downloads_enabled, mobile_click_to_hover, tmdb_api_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `)
     
     const result = stmt.run(
       settingsData.profile_id,
-      settingsData.addon_manager_enabled || false,
       settingsData.nsfw_filter_enabled || false,
       settingsData.nsfw_age_rating || 0,
       settingsData.hide_calendar_button || false,
