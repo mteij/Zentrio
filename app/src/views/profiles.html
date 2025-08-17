@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profiles - Zentrio</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/profiles.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <!-- Header is now empty, buttons moved to footer -->
+        </nav>
+    </header>
+
+    <main class="profiles-page">
+        <h1 class="sr-only">Profiles</h1>
+        <div class="profiles-main">
+            <section class="profiles-section">
+        <h2 class="section-title">Who's watching?</h2>
+        <div class="profiles-grid" id="profilesGrid">
+            <!-- Profiles will be loaded here -->
+        </div>
+    </section>
+        </div>
+    </main>
+ 
+    <!-- Footer with buttons -->
+    <footer class="footer">
+        <div class="footer-buttons">
+            <button class="btn btn-secondary btn-small" id="downloadsBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 4px;">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>
+                Downloads
+            </button>
+            <a href="/settings" class="btn btn-secondary btn-small">Settings</a>
+            <button class="btn btn-danger btn-small" id="logoutBtn">Logout</button>
+        </div>
+    </footer>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Create New Profile</h2>
+            <form id="profileForm" class="profile-edit-form">
+                <div class="profile-edit-container">
+                    <div class="avatar-section">
+                        <div class="avatar-preview" id="avatarPreview" aria-live="polite"></div>
+                        <button type="button" class="btn btn-secondary shuffle-btn" id="shuffleBtn">🎲 Shuffle Avatar</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="profileName">Profile Name</label>
+                        <input type="text" id="profileName" name="profileName" required>
+                    </div>
+                    <div class="form-group" style="display: none;">
+                        <label for="stremioUsername">Stremio Username <span style="color: #e50914;">*</span></label>
+                        <input type="text" id="stremioUsername" name="stremioUsername">
+                    </div>
+                    <div class="form-group" style="display: none;">
+                        <label for="stremioPassword">Stremio Password</label>
+                        <input type="password" id="stremioPassword" name="stremioPassword" aria-describedby="stremioPasswordHelp">
+                    </div>
+                    <button type="submit" class="btn-primary save-btn" id="saveProfileBtn">Save Profile</button>
+                </div>
+            </form>
+            <div class="message" id="modalMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        let profiles = [];
+        let editingProfileId = null;
+        let currentAvatarSeed = '';
+
+        // DOM elements
+        const profilesGrid = document.getElementById('profilesGrid');
+        const profileModal = document.getElementById('profileModal');
+        const profileForm = document.getElementById('profileForm');
+        const modalTitle = document.getElementById('modalTitle');
+        const avatarPreview = document.getElementById('avatarPreview');
+        const modalMessage = document.getElementById('modalMessage');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const shuffleBtn = document.getElementById('shuffleBtn');
+
+        // Load profiles from server (enhanced with better error handling)
+        async function loadProfiles() {
+            try {
+                const response = await fetch('/api/profiles');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Failed to load profiles: ${response.status} ${response.statusText}`);
+                }
+                profiles = await response.json();
+                renderProfiles();
+            } catch (error) {
+                console.error('Failed to load profiles:', error);
+                showMessage('Failed to load profiles. Please refresh the page.', 'error');
+            }
+        }
+
+        // Render profiles grid
+        function renderProfiles() {
+            profilesGrid.innerHTML = '';
+            
+            // Add existing profiles
+            profiles.forEach(profile => {
+                const profileCard = document.createElement('div');
+                profileCard.className = 'profile-card';
+                profileCard.innerHTML = `
+                    <div class="profile-avatar">
+                        <div class="profile-actions">
+                            <button class="action-btn edit-btn" onclick="editProfile('${profile.id}')">✏️</button>
+                            <button class="action-btn delete-btn" onclick="deleteProfile('${profile.id}')">🗑️</button>
+                        </div>
+                        <div id="avatar-${profile.id}"></div>
+                    </div>
+                    <div class="profile-name">${profile.name}</div>
+                    ${profile.isDefault ? '<div class="profile-status">Default</div>' : ''}
+                `;
+                profileCard.addEventListener('click', (e) => {
+                    if (!e.target.closest('.profile-actions')) {
+                        selectProfile(profile);
+                    }
+                });
+                profilesGrid.appendChild(profileCard);
+                
+                // Load avatar
+                loadAvatar(profile.avatar, `avatar-${profile.id}`);
+            });
+            
+            // Add "Create Profile" card
+            const addProfileCard = document.createElement('div');
+            addProfileCard.className = 'profile-card';
+            addProfileCard.innerHTML = `
+                <div class="profile-avatar add-profile">
+                    <div class="add-icon">+</div>
+                </div>
+                <div class="profile-name">Create Profile</div>
+            `;
+            addProfileCard.addEventListener('click', createProfile);
+            profilesGrid.appendChild(addProfileCard);
+        }
+
+        // Load avatar from server
+        async function loadAvatar(seed, containerId) {
+            try {
+                const response = await fetch(`/api/avatar/${encodeURIComponent(seed)}`);
+                if (response.ok) {
+                    const svg = await response.text();
+                    document.getElementById(containerId).innerHTML = svg;
+                }
+            } catch (error) {
+                console.error('Failed to load avatar:', error);
+            }
+        }
+
+        // Create new profile
+        function createProfile() {
+            editingProfileId = null;
+            modalTitle.textContent = 'Create New Profile';
+            profileForm.reset();
+            document.getElementById('stremioPassword').placeholder = 'Enter Stremio password';
+            generateNewAvatar();
+            profileModal.style.display = 'block';
+        }
+
+        // Edit existing profile
+        function editProfile(profileId) {
+            // Convert profileId to number for comparison
+            const numericProfileId = parseInt(profileId);
+            const profile = profiles.find(p => p.id === numericProfileId);
+            if (!profile) {
+                console.error('Profile not found:', profileId, profiles);
+                return;
+            }
+            
+            editingProfileId = numericProfileId;
+            modalTitle.textContent = 'Edit Profile';
+            
+            document.getElementById('profileName').value = profile.name;
+            // Stremio credentials are no longer handled in the frontend
+            // Don't populate password field for security - leave it empty
+            document.getElementById('stremioPassword').value = '';
+            
+            document.getElementById('stremioPassword').placeholder = 'Leave blank to keep current password';
+            
+            currentAvatarSeed = profile.avatar;
+            updateAvatarPreview(profile.avatar);
+            profileModal.style.display = 'block';
+        }
+
+        // Delete profile (enhanced with better error handling)
+        async function deleteProfile(profileId) {
+            if (!confirm('Are you sure you want to delete this profile?')) return;
+            
+            try {
+                showMessage('Deleting profile...', 'info');
+                
+                // Convert profileId to number
+                const numericProfileId = parseInt(profileId);
+                const response = await fetch(`/api/profiles/${numericProfileId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Failed to delete profile: ${response.status} ${response.statusText}`);
+                }
+                
+                await loadProfiles();
+                showMessage('Profile deleted successfully', 'success');
+            } catch (error) {
+                console.error('Profile delete error:', error);
+                showMessage(error.message, 'error');
+            }
+        }
+
+        // Select profile and create Stremio session
+        async function selectProfile(profile) {
+            try {
+                // Show loading state
+                showMessage('Creating Stremio session...', 'info');
+                
+                // Use the session creation endpoint instead of auth login
+                const response = await fetch(`/api/stremio/profiles/${profile.id}/session`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Session creation failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const sessionResult = await response.json();
+                
+                if (sessionResult.success) {
+                    // Store session information
+                    localStorage.setItem('selectedProfile', JSON.stringify(profile));
+                    localStorage.setItem('stremioSessionToken', sessionResult.session.sessionToken);
+                    
+                    showMessage(`Successfully created session for ${profile.name}!`, 'success');
+                    
+                    // Redirect to Stremio interface after successful session creation
+                    setTimeout(() => {
+                        showMessage('Redirecting to Stremio interface...', 'info');
+                        
+                        // Construct the Stremio interface URL with the profile ID and session token
+                        const stremioUrl = `/stremio/${profile.id}/web/`;
+                        const sessionToken = sessionResult.session.sessionToken;
+                        
+                        // Add session token as query parameter for authentication
+                        const redirectUrl = `${stremioUrl}?sessionToken=${encodeURIComponent(sessionToken)}`;
+                        
+                        // Redirect to the Stremio interface
+                        window.location.href = redirectUrl;
+                    }, 1500);
+                } else {
+                    throw new Error(sessionResult.error || 'Session creation failed');
+                }
+            } catch (error) {
+                console.error('Profile selection error:', error);
+                showMessage(`Failed to create session: ${error.message}`, 'error');
+            }
+        }
+
+        // Update avatar preview
+        async function updateAvatarPreview(seed = null) {
+            const profileName = document.getElementById('profileName').value;
+            const avatarSeed = seed || currentAvatarSeed || profileName || 'default';
+            
+            try {
+                const response = await fetch(`/api/avatar/${encodeURIComponent(avatarSeed)}`);
+                if (response.ok) {
+                    const svg = await response.text();
+                    avatarPreview.innerHTML = svg;
+                    currentAvatarSeed = avatarSeed;
+                }
+            } catch (error) {
+                console.error('Failed to update avatar preview:', error);
+            }
+        }
+
+        // Generate new random avatar
+        async function generateNewAvatar() {
+            try {
+                const response = await fetch('/api/avatar/random');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentAvatarSeed = data.seed;
+                    avatarPreview.innerHTML = data.svg;
+                }
+            } catch (error) {
+                console.error('Failed to generate new avatar:', error);
+                // Fallback to name-based seed
+                const profileName = document.getElementById('profileName').value || 'default';
+                updateAvatarPreview(profileName);
+            }
+        }
+
+        // Show message (enhanced with better styling and longer display for info messages)
+        function showMessage(text, type) {
+            modalMessage.textContent = text;
+            modalMessage.className = `message ${type}`;
+            modalMessage.style.display = 'block';
+            
+            // Show info messages longer for loading states
+            const timeout = type === 'info' ? 5000 : 3000;
+            setTimeout(() => {
+                modalMessage.style.display = 'none';
+            }, timeout);
+        }
+
+        // Handle form submission (enhanced with better error handling and loading states)
+        profileForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const saveBtn = document.getElementById('saveProfileBtn');
+            const originalText = saveBtn.textContent;
+            
+            try {
+                // Show loading state
+                saveBtn.textContent = 'Saving...';
+                saveBtn.disabled = true;
+                
+                const pwdInput = document.getElementById('stremioPassword').value;
+                const formData = {
+                    name: document.getElementById('profileName').value,
+                    avatar: currentAvatarSeed || document.getElementById('profileName').value
+                };
+                
+                // Validate required fields
+                // Stremio credentials are no longer handled in the frontend
+                
+                const url = editingProfileId ? `/api/profiles/${editingProfileId}` : '/api/profiles';
+                const method = editingProfileId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Failed to save profile: ${response.status} ${response.statusText}`);
+                }
+                
+                profileModal.style.display = 'none';
+                await loadProfiles();
+                showMessage(editingProfileId ? 'Profile updated successfully' : 'Profile created successfully', 'success');
+                
+            } catch (error) {
+                console.error('Profile save error:', error);
+                showMessage(error.message, 'error');
+            } finally {
+                // Reset button state
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+            }
+        });
+
+        // Shuffle button
+        shuffleBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/avatar/random');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentAvatarSeed = data.seed;
+                    avatarPreview.innerHTML = data.svg;
+                }
+            } catch (error) {
+                console.error('Failed to shuffle avatar:', error);
+            }
+        });
+
+        // Handle profile name input for avatar preview
+        document.getElementById('profileName').addEventListener('input', () => {
+            if (!currentAvatarSeed) {
+                updateAvatarPreview();
+            }
+        });
+
+        // Handle modal close
+        document.querySelector('.close').addEventListener('click', () => {
+            profileModal.style.display = 'none';
+        });
+
+        // Handle logout
+        logoutBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to logout?')) return;
+            logoutBtn.disabled = true;
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                });
+            } catch (e) {
+                console.error('Logout request failed:', e);
+            } finally {
+                try { localStorage.removeItem('selectedProfile'); } catch {}
+                try { localStorage.removeItem('stremioSessionToken'); } catch {}
+                window.location.href = '/';
+            }
+        });
+
+        // Handle downloads button
+        document.getElementById('downloadsBtn').addEventListener('click', () => {
+            // In a real app, this would open a downloads manager
+            alert('Downloads feature coming soon!');
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === profileModal) {
+                profileModal.style.display = 'none';
+            }
+        });
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProfiles();
+        });
+    </script>
+</body>
+</html>

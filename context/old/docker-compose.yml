@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  zentrio:
+    image: ghcr.io/michieleijpe/zentrio:latest
+    container_name: zentrio
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - zentrio-network
+
+  # Optional: Local MongoDB service (remove if using external MongoDB)
+  mongo:
+    image: mongo:7.0
+    container_name: zentrio-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme123}
+      MONGO_INITDB_DATABASE: zentrio
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:27017:27017"  # Only bind to localhost for security
+    networks:
+      - zentrio-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: ["mongod", "--auth"]
+
+volumes:
+  mongo_data:
+
+networks:
+  zentrio-network:

@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zentrio - Stream Your Way</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #000000;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #vanta-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 0;
+        }
+
+        .hero-content {
+            text-align: center;
+            z-index: 1;
+            position: relative;
+        }
+
+        .hero-content h1 {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #e50914, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.1;
+        }
+
+        .hero-content p {
+            font-size: 1.3rem;
+            margin-bottom: 30px;
+            color: #b3b3b3;
+            line-height: 1.4;
+        }
+
+        .email-form {
+            display: flex;
+            max-width: 500px;
+            margin: 0 auto;
+            gap: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(229, 9, 20, 0.3);
+            box-shadow: 0 10px 40px rgba(229, 9, 20, 0.2);
+        }
+
+        .email-input {
+            flex: 1;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .email-input:focus {
+            border-color: #e50914;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .email-input::placeholder {
+            color: #888;
+        }
+
+        .cta-button {
+            padding: 16px 32px;
+            background: linear-gradient(135deg, #e50914, #ff1a1a);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .cta-button:hover {
+            background: linear-gradient(135deg, #ff1a1a, #e50914);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(229, 9, 20, 0.4);
+        }
+
+        .cta-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Loading and Messages */
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 2px solid #333;
+            border-top: 2px solid #e50914;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+
+        .message.success {
+            background: rgba(46, 125, 50, 0.2);
+            border: 1px solid #2e7d32;
+            color: #4caf50;
+        }
+
+        .message.error {
+            background: rgba(211, 47, 47, 0.2);
+            border: 1px solid #d32f2f;
+            color: #f44336;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 15px 0;
+            background: transparent;
+        }
+
+        .footer-content {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #666;
+            line-height: 1.3;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .footer-content a {
+            color: #e50914;
+            text-decoration: none;
+        }
+
+        .footer-content a:hover {
+            text-decoration: underline;
+        }
+
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: #888;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .github-link:hover {
+            color: #e50914;
+        }
+
+        .github-icon {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .hero-content h1 {
+                font-size: 2.2rem;
+                margin-bottom: 10px;
+            }
+
+            .hero-content p {
+                font-size: 1.1rem;
+                margin-bottom: 25px;
+            }
+
+            .email-form {
+                flex-direction: column;
+                max-width: 400px;
+                padding: 15px;
+            }
+
+            .container {
+                padding: 0 15px;
+            }
+
+            .footer-content {
+                font-size: 0.7rem;
+            }
+
+            .github-link {
+                font-size: 0.75rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero-content h1 {
+                font-size: 1.8rem;
+            }
+
+            .hero-content p {
+                font-size: 1rem;
+            }
+
+            .email-form {
+                max-width: 100%;
+            }
+
+            .footer-content {
+                font-size: 0.65rem;
+            }
+
+            .github-link {
+                font-size: 0.7rem;
+            }
+
+            .github-icon {
+                width: 14px;
+                height: 14px;
+            }
+        }
+
+        /* Welcome Message Styles */
+        .welcome-message {
+            background: linear-gradient(135deg, rgba(229, 9, 20, 0.1), rgba(255, 107, 107, 0.1));
+            border: 1px solid rgba(229, 9, 20, 0.3);
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            0% {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Dedicated Container Styles */
+        #otpContainer, #magicLinkContainer {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid rgba(229, 9, 20, 0.3);
+            box-shadow: 0 10px 40px rgba(229, 9, 20, 0.2);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* OTP Input Styling */
+        #otpCodeInput {
+            transition: all 0.3s ease;
+        }
+
+        #otpCodeInput:focus {
+            border-color: #e50914 !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.2);
+            outline: none;
+        }
+
+        /* Resend Text Styling */
+        #resendOtpText, #resendMagicText {
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        #resendOtpText:hover, #resendMagicText:hover {
+            transform: translateY(-1px);
+        }
+
+        /* Fade-in Animation */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Step Hidden */
+        .step-hidden {
+            display: none !important;
+        }
+
+        /* Field Error Styling */
+        .field-error {
+            color: #f44336;
+            font-size: 0.875rem;
+            margin-top: 4px;
+            display: block;
+        }
+
+        /* Button Hover Effects for Back Buttons */
+        .btn.btn-secondary:hover {
+            background: #333 !important;
+            border-color: #555 !important;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div id="vanta-bg"></div>
+    
+    <main class="main-content">
+        <div class="container">
+            <div class="hero-content" id="heroContent">
+                <h1>Stream Your Way</h1>
+                <p>Experience unlimited streaming with Stremio integration. Create profiles, manage your content, and enjoy seamless entertainment.</p>
+                
+                <form class="email-form" id="emailForm">
+                    <input 
+                        type="email" 
+                        class="email-input" 
+                        id="email" 
+                        placeholder="Enter your email address" 
+                        required
+                    >
+                    <button type="submit" class="cta-button" id="submitBtn">Get Started</button>
+                </form>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    Checking your account...
+                </div>
+                
+                <div class="message" id="message" role="alert" aria-live="polite"></div>
+                <div id="inlineAuth" class="inline-auth-container step-hidden" aria-live="polite"></div>
+                <noscript>
+                    <p style="margin-top:12px;">
+                        JavaScript is disabled. Continue to
+                        <a href="/signin">Sign in</a> or
+                        <a href="/register">Create an account</a>.
+                    </p>
+                </noscript>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <p>This is a personal project and is not affiliated with, endorsed, or sponsored by Stremio. I acknowledge that this service may test the boundaries of Stremio's terms of service and will comply with any and all takedown or cease and desist notices from Stremio or its legal representatives. The official Stremio website can be found at <a href="https://stremio.com" target="_blank">stremio.com</a>.</p>
+                <a href="https://github.com/MichielEijpe/Zentrio" target="_blank" class="github-link">
+                    <svg class="github-icon" viewBox="0 0 24 24">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    Made with love for the stremio community
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        (function () {
+            const emailForm = document.getElementById('emailForm');
+            const emailInput = document.getElementById('email');
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const globalMessage = document.getElementById('message');
+            const inlineAuth = document.getElementById('inlineAuth');
+
+            function showGlobalMessage(text, type = 'error') {
+                globalMessage.textContent = text;
+                globalMessage.className = `message ${type}`;
+                globalMessage.style.display = 'block';
+            }
+            function clearGlobalMessage() {
+                globalMessage.textContent = '';
+                globalMessage.className = 'message';
+                globalMessage.style.display = 'none';
+            }
+            function setFieldError(inputEl, text) {
+                if (!inputEl) return;
+                inputEl.setAttribute('aria-invalid', 'true');
+                let err = inputEl.parentElement.querySelector(`#${inputEl.id}-error`);
+                if (!err) {
+                    err = document.createElement('div');
+                    err.id = `${inputEl.id}-error`;
+                    err.className = 'field-error';
+                    err.setAttribute('role', 'alert');
+                    inputEl.parentElement.appendChild(err);
+                }
+                inputEl.setAttribute('aria-describedby', err.id);
+                err.textContent = text;
+                inputEl.focus();
+            }
+            function clearFieldError(inputEl) {
+                if (!inputEl) return;
+                inputEl.removeAttribute('aria-invalid');
+                const err = inputEl.parentElement.querySelector(`#${inputEl.id}-error`);
+                if (err) err.remove();
+                inputEl.removeAttribute('aria-describedby');
+            }
+            function hideEmailStep() {
+                emailForm.classList.add('step-hidden');
+                // Hide hero content when showing auth forms
+                const heroContent = document.querySelector('.hero-content h1, .hero-content p');
+                if (heroContent) {
+                    document.querySelector('.hero-content h1').style.display = 'none';
+                    document.querySelector('.hero-content p').style.display = 'none';
+                }
+            }
+            function showEmailStep() {
+                emailForm.classList.remove('step-hidden');
+                // Show hero content when back to email step
+                const heroTitle = document.querySelector('.hero-content h1');
+                const heroDesc = document.querySelector('.hero-content p');
+                if (heroTitle) heroTitle.style.display = 'block';
+                if (heroDesc) heroDesc.style.display = 'block';
+            }
+            function showLoading() {
+                loading.style.display = 'block';
+                submitBtn.disabled = true;
+            }
+            function hideLoading() {
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+
+            // Helper function to load modal templates
+            async function loadModalTemplate(templatePath) {
+                try {
+                    const response = await fetch(templatePath);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load template: ${templatePath}`);
+                    }
+                    return await response.text();
+                } catch (error) {
+                    console.error('Error loading modal template:', error);
+                    return null;
+                }
+            }
+
+            function renderLoginForm(email, nickname = null) {
+                const welcomeMessage = nickname ? `<div class="welcome-message" style="text-align:center;margin-bottom:20px;color:#e50914;font-size:1.2rem;font-weight:bold;">Welcome back, ${nickname.replace(/"/g, '&quot;')}!</div>` : '';
+                
+                inlineAuth.innerHTML = `
+      <form id="loginForm" class="fade-in" novalidate>
+        <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
+          <button id="loginBackBtn" type="button" class="btn btn-secondary" style="background:#000;border:1px solid #333;padding:8px 12px;">← Back</button>
+        </div>
+        ${welcomeMessage}
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input id="loginEmail" type="email" value="${email.replace(/"/g,'"')}" disabled aria-readonly="true" />
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter your password" />
+        </div>
+        <button type="submit" class="cta-button">Sign in</button>
+        <div class="divider" style="text-align:center;margin:16px 0;color:#b3b3b3;">or</div>
+        <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+          <button id="magicLinkBtn" type="button" class="cta-button" style="background:#333;border:1px solid #555;">Send Magic Link</button>
+          <button id="otpBtn" type="button" class="cta-button" style="background:#333;border:1px solid #555;">Get OTP Code</button>
+        </div>
+        <div id="otpSection" class="form-group step-hidden">
+          <label for="otpCode">Enter OTP Code</label>
+          <input id="otpCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" aria-describedby="otpHelp" />
+          <div id="otpHelp" class="sr-only">Enter the 6-digit code sent to your email.</div>
+          <div style="margin-top:12px">
+            <button id="verifyOtpBtn" type="button" class="cta-button">Verify Code</button>
+          </div>
+        </div>
+        <div id="loginMessage" class="message" aria-live="polite"></div>
+      </form>
+    `;
+                // Reveal container when rendering a form
+                inlineAuth.classList.remove('step-hidden');
+                inlineAuth.classList.add('fade-in');
+    
+                const form = document.getElementById('loginForm');
+                const backBtn = document.getElementById('loginBackBtn');
+                const pwd = document.getElementById('loginPassword');
+                const msg = document.getElementById('loginMessage');
+                const magicLinkBtn = document.getElementById('magicLinkBtn');
+                const otpBtn = document.getElementById('otpBtn');
+    
+    
+                // Back to email step
+                backBtn?.addEventListener('click', () => {
+                  showEmailStep();
+                  inlineAuth.classList.add('step-hidden');
+                  inlineAuth.innerHTML = '';
+                  clearGlobalMessage();
+                  emailInput.focus();
+                });
+    
+                pwd.focus();
+    
+                // Password submit
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    clearFieldError(pwd);
+                    msg.style.display = 'none';
+    
+                    if (!pwd.value) {
+                        setFieldError(pwd, 'Please enter your password');
+                        return;
+                    }
+    
+                    try {
+                        form.querySelector('button[type="submit"]').disabled = true;
+                        const res = await fetch('/api/auth/signin-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, password: pwd.value })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            msg.textContent = 'Success! Redirecting...';
+                            msg.className = 'message success';
+                            msg.style.display = 'block';
+                            setTimeout(() => { window.location.href = '/profiles'; }, 800);
+                        } else {
+                            setFieldError(pwd, data.error || 'Invalid email or password');
+                            msg.textContent = data.error || 'Invalid email or password';
+                            msg.className = 'message error';
+                            msg.style.display = 'block';
+                        }
+                    } catch (err) {
+                        setFieldError(pwd, 'Network error, try again');
+                        msg.textContent = 'Network error, try again';
+                        msg.className = 'message error';
+                        msg.style.display = 'block';
+                    } finally {
+                        form.querySelector('button[type="submit"]').disabled = false;
+                    }
+                });
+    
+                // Magic link - transition to dedicated container
+                magicLinkBtn?.addEventListener('click', async () => {
+                    msg.style.display = 'none';
+                    magicLinkBtn.setAttribute('disabled', 'true');
+                    try {
+                        const res = await fetch('/api/auth/magic-link', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            // Transition to dedicated Magic Link container
+                            await renderMagicLinkContainer(email, nickname);
+                        } else {
+                            msg.textContent = data.error || 'Failed to send magic link';
+                            msg.className = 'message error';
+                            msg.style.display = 'block';
+                        }
+                    } catch (err) {
+                        msg.textContent = 'Network error, try again';
+                        msg.className = 'message error';
+                        msg.style.display = 'block';
+                    } finally {
+                        magicLinkBtn.removeAttribute('disabled');
+                    }
+                });
+    
+                // OTP request - transition to dedicated container
+                otpBtn?.addEventListener('click', async () => {
+                    clearFieldError(otpInput);
+                    msg.style.display = 'none';
+                    otpBtn.setAttribute('disabled', 'true');
+                    try {
+                        const res = await fetch('/api/auth/send-otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            // Transition to dedicated OTP container
+                            await renderOTPContainer(email, nickname);
+                        } else {
+                            msg.textContent = data.error || 'Failed to send OTP';
+                            msg.className = 'message error';
+                            msg.style.display = 'block';
+                        }
+                    } catch (err) {
+                        msg.textContent = 'Network error, try again';
+                        msg.className = 'message error';
+                        msg.style.display = 'block';
+                    } finally {
+                        otpBtn.removeAttribute('disabled');
+                    }
+                });
+            }
+
+            function renderRegisterForm(email) {
+                inlineAuth.innerHTML = `
+      <form id="registerInlineForm" class="fade-in" novalidate>
+        <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
+          <button id="registerBackBtn" type="button" class="btn btn-secondary" style="background:#000;border:1px solid #333;padding:8px 12px;">← Back</button>
+        </div>
+        <div class="form-group">
+          <label for="regEmail">Email</label>
+          <input id="regEmail" type="email" value="${email.replace(/"/g,'"')}" disabled aria-readonly="true" />
+        </div>
+        <div class="form-group">
+          <label for="regUsername">Nickname</label>
+          <input id="regUsername" type="text" placeholder="Enter your nickname" autocomplete="nickname" />
+        </div>
+        <div class="form-group">
+          <label for="regPassword">Password</label>
+          <input id="regPassword" type="password" placeholder="Enter your password" minlength="6" autocomplete="new-password" />
+        </div>
+        <button type="submit" class="cta-button">Create account</button>
+        <div id="regMessage" class="message" aria-live="polite"></div>
+      </form>
+    `;
+                // Reveal container when rendering a form
+                inlineAuth.classList.remove('step-hidden');
+                inlineAuth.classList.add('fade-in');
+    
+                const form = document.getElementById('registerInlineForm');
+                const backBtn = document.getElementById('registerBackBtn');
+                const username = document.getElementById('regUsername');
+                const password = document.getElementById('regPassword');
+                const msg = document.getElementById('regMessage');
+    
+                // Back to email step
+                backBtn?.addEventListener('click', () => {
+                  showEmailStep();
+                  inlineAuth.classList.add('step-hidden');
+                  inlineAuth.innerHTML = '';
+                  clearGlobalMessage();
+                  emailInput.focus();
+                });
+    
+                username.focus();
+    
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    clearFieldError(username);
+                    clearFieldError(password);
+                    msg.style.display = 'none';
+    
+                    const uname = username.value.trim();
+                    const pwd = password.value;
+    
+                    if (!uname) {
+                        setFieldError(username, 'Please enter your nickname');
+                        return;
+                    }
+                    if (!pwd || pwd.length < 6) {
+                        setFieldError(password, 'Password must be at least 6 characters long');
+                        return;
+                    }
+    
+                    try {
+                        form.querySelector('button[type="submit"]').disabled = true;
+                        const res = await fetch('/api/auth/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, username: uname, password: pwd })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            msg.textContent = 'Account created! Redirecting...';
+                            msg.className = 'message success';
+                            msg.style.display = 'block';
+                            setTimeout(() => { window.location.href = '/profiles'; }, 800);
+                        } else {
+                            const errText = data.error || 'Failed to create account';
+                            if (/username/i.test(errText)) {
+                                setFieldError(username, errText);
+                            } else if (/password/i.test(errText)) {
+                                setFieldError(password, errText);
+                            }
+                            msg.textContent = errText;
+                            msg.className = 'message error';
+                            msg.style.display = 'block';
+                        }
+                    } catch (err) {
+                        msg.textContent = 'Network error, try again';
+                        msg.className = 'message error';
+                        msg.style.display = 'block';
+                    } finally {
+                        form.querySelector('button[type="submit"]').disabled = false;
+                    }
+                });
+            }
+
+            async function renderOTPContainer(email, nickname = null) {
+                const template = await loadModalTemplate('/views/auth/otp-modal.html');
+                if (!template) {
+                    // Fallback to inline template if loading fails
+                    inlineAuth.innerHTML = `
+      <div id="otpContainer" class="fade-in" style="text-align:center;">
+        <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
+          <button id="otpBackBtn" type="button" class="btn btn-secondary" style="background:#000;border:1px solid #333;padding:8px 12px;">← Back</button>
+        </div>
+        <div style="margin-bottom:20px;">
+          <h3 style="color:#fff;margin-bottom:10px;">Enter OTP Code</h3>
+          <p style="color:#b3b3b3;margin-bottom:20px;">We've sent a 6-digit code to ${email.replace(/"/g, '&quot;')}</p>
+        </div>
+        <div class="form-group">
+          <input id="otpCodeInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000"
+                 style="text-align:center;font-size:1.5rem;letter-spacing:0.5rem;padding:16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:white;width:200px;margin:0 auto;display:block;"
+                 aria-describedby="otpHelp" />
+          <div id="otpHelp" class="sr-only">Enter the 6-digit code sent to your email.</div>
+        </div>
+        <div style="margin:20px 0;">
+          <button id="verifyOtpCodeBtn" type="button" class="cta-button">Verify Code</button>
+        </div>
+        <div style="margin:16px 0;">
+          <span id="resendOtpText" style="color:#b3b3b3;cursor:pointer;text-decoration:underline;font-size:0.9rem;"
+                onmouseover="this.style.color='#e50914'" onmouseout="this.style.color='#b3b3b3'">
+            Resend OTP (30s)
+          </span>
+        </div>
+        <div id="otpContainerMessage" class="message" aria-live="polite"></div>
+      </div>
+    `;
+                } else {
+                    // Use the loaded template and replace placeholders
+                    const processedTemplate = template.replace(/\{\{EMAIL\}\}/g, email.replace(/"/g, '&quot;'));
+                    inlineAuth.innerHTML = processedTemplate;
+                }
+                
+                // Reveal container
+                inlineAuth.classList.remove('step-hidden');
+                inlineAuth.classList.add('fade-in');
+                
+                const backBtn = document.getElementById('otpBackBtn');
+                const otpInput = document.getElementById('otpCodeInput');
+                const verifyBtn = document.getElementById('verifyOtpCodeBtn');
+                const resendText = document.getElementById('resendOtpText');
+                const msg = document.getElementById('otpContainerMessage');
+                
+                let otpTimer = null;
+                
+                function startOtpCooldown(seconds = 30) {
+                    let remain = seconds;
+                    resendText.style.pointerEvents = 'none';
+                    resendText.style.color = '#666';
+                    resendText.textContent = `Resend OTP (${remain}s)`;
+                    otpTimer = setInterval(() => {
+                        remain -= 1;
+                        if (remain <= 0) {
+                            clearInterval(otpTimer);
+                            resendText.style.pointerEvents = 'auto';
+                            resendText.style.color = '#b3b3b3';
+                            resendText.textContent = 'Resend OTP';
+                        } else {
+                            resendText.textContent = `Resend OTP (${remain}s)`;
+                        }
+                    }, 1000);
+                }
+                
+                // Start initial cooldown
+                startOtpCooldown(30);
+                
+                // Back to login options
+                backBtn?.addEventListener('click', () => {
+                    if (otpTimer) clearInterval(otpTimer);
+                    renderLoginForm(email, nickname);
+                });
+                
+                // Focus OTP input
+                otpInput.focus();
+                
+                // Verify OTP
+                verifyBtn?.addEventListener('click', async () => {
+                    clearFieldError(otpInput);
+                    msg.style.display = 'none';
+                    const code = otpInput.value.trim();
+                    if (!code || code.length !== 6) {
+                        setFieldError(otpInput, 'Please enter a valid 6-digit OTP code');
+                        return;
+                    }
+                    verifyBtn.setAttribute('disabled', 'true');
+                    try {
+                        const res = await fetch('/api/auth/verify-otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, otp: code })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            msg.textContent = 'Success! Redirecting...';
+                            msg.className = 'message success';
+                            msg.style.display = 'block';
+                            setTimeout(() => { window.location.href = '/profiles'; }, 800);
+                        } else {
+                            setFieldError(otpInput, data.error || 'Invalid OTP code');
+                            msg.textContent = data.error || 'Invalid OTP code';
+                            msg.className = 'message error';
+                            msg.style.display = 'block';
+                        }
+                    } catch (err) {
+                        setFieldError(otpInput, 'Network error, try again');
+                        msg.textContent = 'Network error, try again';
+                        msg.className = 'message error';
+                        msg.style.display = 'block';
+                    } finally {
+                        verifyBtn.removeAttribute('disabled');
+                    }
+                });
+                
+                // Resend OTP
+                resendText?.addEventListener('click', async () => {
+                    if (resendText.style.pointerEvents === 'none') return;
+                    msg.style.display = 'none';
+                    try {
+                        const res = await fetch('/api/auth/send-otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            msg.textContent = 'OTP resent! Check your email.';
+                            msg.className = 'message success';
+                            msg.style.display = 'block';
+                            startOtpCooldown(30);
+                        } else {
+                            msg.textContent = data.error || 'Failed to resend OTP';
+                            msg.className = 'message error';
+                            msg.style.display = 'block';
+                        }
+                    } catch (err) {
+                        msg.textContent = 'Network error, try again';
+                        msg.className = 'message error';
+                        msg.style.display = 'block';
+                    }
+                });
+                
+                // Auto-verify when 6 digits entered
+                otpInput?.addEventListener('input', (e) => {
+                    const v = e.target.value;
+                    if (v && v.length === 6) {
+                        verifyBtn?.click();
+                    }
+                });
+            }
+
+            async function renderMagicLinkContainer(email, nickname = null) {
+                const template = await loadModalTemplate('/views/auth/magic-link-modal.html');
+                if (!template) {
+                    // Fallback to inline template if loading fails
+                    inlineAuth.innerHTML = `
+      <div id="magicLinkContainer" class="fade-in" style="text-align:center;">
+        <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
+          <button id="magicLinkBackBtn" type="button" class="btn btn-secondary" style="background:#000;border:1px solid #333;padding:8px 12px;">← Back</button>
+        </div>
+        <div style="margin-bottom:30px;">
+          <h3 style="color:#fff;margin-bottom:10px;">Magic Link Sent!</h3>
+          <p style="color:#b3b3b3;margin-bottom:20px;">We've sent a magic link to ${email.replace(/"/g, '&quot;')}</p>
+          <p style="color:#b3b3b3;font-size:0.9rem;">Click the link in your email to sign in automatically.</p>
+        </div>
+        <div style="margin:20px 0;">
+          <svg style="width:64px;height:64px;color:#e50914;margin-bottom:20px;" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" />
+          </svg>
+        </div>
+        <div style="margin:16px 0;">
+          <span id="resendMagicText" style="color:#b3b3b3;cursor:pointer;text-decoration:underline;font-size:0.9rem;"
+                onmouseover="this.style.color='#e50914'" onmouseout="this.style.color='#b3b3b3'">
+            Resend Magic Link (30s)
+          </span>
+        </div>
+        <div id="magicLinkContainerMessage" class="message" aria-live="polite"></div>
+      </div>
+    `;
+                } else {
+                    // Use the loaded template and replace placeholders
+                    const processedTemplate = template.replace(/\{\{EMAIL\}\}/g, email.replace(/"/g, '&quot;'));
+                    inlineAuth.innerHTML = processedTemplate;
+                }
+                
+                // Reveal container
+                inlineAuth.classList.remove('step-hidden');
+                inlineAuth.classList.add('fade-in');
+                
+                const backBtn = document.getElementById('magicLinkBackBtn');
+                const resendText = document.getElementById('resendMagicText');
+                const msg = document.getElementById('magicLinkContainerMessage');
+                
+                let magicTimer = null;
+                
+                function startMagicCooldown(seconds = 30) {
+                    let remain = seconds;
+                    resendText.style.pointerEvents = 'none';
+                    resendText.style.color = '#666';
+                    resendText.textContent = `Resend Magic Link (${remain}s)`;
+                    magicTimer = setInterval(() => {
+                        remain -= 1;
+                        if (remain <= 0) {
+                            clearInterval(magicTimer);
+                            resendText.style.pointerEvents = 'auto';
+                            resendText.style.color = '#b3b3b3';
+                            resendText.textContent = 'Resend Magic Link';
+                        } else {
+                            resendText.textContent = `Resend Magic Link (${remain}s)`;
+                        }
+                    }, 1000);
+                }
+                
+                // Start initial cooldown
+                startMagicCooldown(30);
+                
+                // Back to login options
+                backBtn?.addEventListener('click', () => {
+                    if (magicTimer) clearInterval(magicTimer);
+                    renderLoginForm(email, nickname);
+                });
+                
+                // Resend Magic Link
+                resendText?.addEventListener('click', async () => {
+                    if (resendText.style.pointerEvents === 'none') return;
+                    msg.style.display = 'none';
+                    try {
+                        const res = await fetch('/api/auth/magic-link', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            msg.textContent = 'Magic link resent! Check your email.';
+                            msg.className = 'message success';
+                            msg.style.display = 'block';
+                            startMagicCooldown(30);
+                        } else {
+                            msg.textContent = data.error || 'Failed to resend magic link';
+                            msg.className = 'message error';
+                            msg.style.display = 'block';
+                        }
+                    } catch (err) {
+                        msg.textContent = 'Network error, try again';
+                        msg.className = 'message error';
+                        msg.style.display = 'block';
+                    }
+                });
+            }
+
+            async function identifyAndRender(email) {
+                clearGlobalMessage();
+                clearFieldError(emailInput);
+                showLoading();
+                try {
+                    const res = await fetch('/api/auth/identify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email })
+                    });
+                    const data = await res.json();
+
+                    // Handle validation (4xx) explicitly: inline error + focus email
+                    if (res.status >= 400 && res.status < 500) {
+                        setFieldError(emailInput, data.error || 'Invalid email');
+                        emailInput.focus();
+                        return;
+                    }
+                    if (!res.ok) {
+                        throw new Error(data.error || 'Something went wrong');
+                    }
+
+                    hideEmailStep();
+                    if (data.exists) {
+                        // Pass both email and nickname to renderLoginForm
+                        renderLoginForm(email, data.nickname || null);
+                    } else {
+                        renderRegisterForm(email);
+                    }
+                } catch (err) {
+                    showGlobalMessage(err.message || 'Something went wrong', 'error');
+                    emailInput.focus();
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            // Handle email form submission
+            emailForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = emailInput.value.trim();
+                if (!email) {
+                    showGlobalMessage('Please enter a valid email address', 'error');
+                    emailInput.focus();
+                    return;
+                }
+                identifyAndRender(email);
+            });
+
+            // Query param handling
+            const params = new URLSearchParams(window.location.search);
+            const qpEmail = params.get('email') || '';
+            const intent = params.get('intent');
+            if (qpEmail) {
+                emailInput.value = qpEmail;
+            }
+            if (intent && qpEmail) {
+                hideEmailStep();
+                if (intent === 'signin') {
+                    renderLoginForm(qpEmail);
+                } else if (intent === 'register') {
+                    renderRegisterForm(qpEmail);
+                } else {
+                    identifyAndRender(qpEmail);
+                }
+            } else {
+                emailInput.focus();
+            }
+        })();
+    </script>
+
+    <!-- Vanta.js Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+    <script>
+        VANTA.FOG({
+            el: "#vanta-bg",
+            mouseControls: true,
+            touchControls: true,
+            gyroControls: false,
+            minHeight: 200.00,
+            minWidth: 200.00,
+            highlightColor: 0xe50914,
+            midtoneColor: 0x333333,
+            lowlightColor: 0x000000,
+            baseColor: 0x000000,
+            blurFactor: 0.90,
+            speed: 0.50,
+            zoom: 0.30
+        });
+    </script>
+</body>
+</html>

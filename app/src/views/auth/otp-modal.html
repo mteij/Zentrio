@@ -1,0 +1,25 @@
+<div id="otpContainer" class="fade-in" style="text-align:center;">
+  <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
+    <button id="otpBackBtn" type="button" class="btn btn-secondary" style="background:#000;border:1px solid #333;padding:8px 12px;">← Back</button>
+  </div>
+  <div style="margin-bottom:20px;">
+    <h3 style="color:#fff;margin-bottom:10px;">Enter OTP Code</h3>
+    <p style="color:#b3b3b3;margin-bottom:20px;">We've sent a 6-digit code to {{EMAIL}}</p>
+  </div>
+  <div class="form-group">
+    <input id="otpCodeInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" 
+           style="text-align:center;font-size:1.5rem;letter-spacing:0.5rem;padding:16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:white;width:200px;margin:0 auto;display:block;" 
+           aria-describedby="otpHelp" />
+    <div id="otpHelp" class="sr-only">Enter the 6-digit code sent to your email.</div>
+  </div>
+  <div style="margin:20px 0;">
+    <button id="verifyOtpCodeBtn" type="button" class="cta-button">Verify Code</button>
+  </div>
+  <div style="margin:16px 0;">
+    <span id="resendOtpText" style="color:#b3b3b3;cursor:pointer;text-decoration:underline;font-size:0.9rem;" 
+          onmouseover="this.style.color='#e50914'" onmouseout="this.style.color='#b3b3b3'">
+      Resend OTP (30s)
+    </span>
+  </div>
+  <div id="otpContainerMessage" class="message" aria-live="polite"></div>
+</div>

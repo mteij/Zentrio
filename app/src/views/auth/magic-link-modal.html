@@ -1,0 +1,22 @@
+<div id="magicLinkContainer" class="fade-in" style="text-align:center;">
+  <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
+    <button id="magicLinkBackBtn" type="button" class="btn btn-secondary" style="background:#000;border:1px solid #333;padding:8px 12px;">← Back</button>
+  </div>
+  <div style="margin-bottom:30px;">
+    <h3 style="color:#fff;margin-bottom:10px;">Magic Link Sent!</h3>
+    <p style="color:#b3b3b3;margin-bottom:20px;">We've sent a magic link to {{EMAIL}}</p>
+    <p style="color:#b3b3b3;font-size:0.9rem;">Click the link in your email to sign in automatically.</p>
+  </div>
+  <div style="margin:20px 0;">
+    <svg style="width:64px;height:64px;color:#e50914;margin-bottom:20px;" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" />
+    </svg>
+  </div>
+  <div style="margin:16px 0;">
+    <span id="resendMagicText" style="color:#b3b3b3;cursor:pointer;text-decoration:underline;font-size:0.9rem;" 
+          onmouseover="this.style.color='#e50914'" onmouseout="this.style.color='#b3b3b3'">
+      Resend Magic Link (30s)
+    </span>
+  </div>
+  <div id="magicLinkContainerMessage" class="message" aria-live="polite"></div>
+</div>
