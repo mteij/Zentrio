@@ -6,6 +6,8 @@ import { initEnv, getConfig } from './services/envParser'
 
 // Import route modules
 import viewRoutes from './routes/views'
+import sessionRoutes from './routes/session'
+import stremioRoutes from './routes/stremio'
 
 // Import API route modules
 import apiRoutes from './routes/api/index'
@@ -59,5 +61,7 @@ app.get('/static/*', async (c) => {
 // Mount route modules
 app.route('/', viewRoutes)              // HTML pages (/, /signin, /register, etc.)
 app.route('/api', apiRoutes)            // API routes, including auth, profiles, user, avatar, health, stream
+app.route('/session', sessionRoutes)
+app.route('/stremio', stremioRoutes)
 
 export default app

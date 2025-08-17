@@ -251,55 +251,13 @@
             }
         }
 
-        // Select profile and create Stremio session
-        async function selectProfile(profile) {
-            try {
-                // Show loading state
-                showMessage('Creating Stremio session...', 'info');
-                
-                // Use the session creation endpoint instead of auth login
-                const response = await fetch(`/api/stremio/profiles/${profile.id}/session`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || `Session creation failed: ${response.status} ${response.statusText}`);
-                }
-                
-                const sessionResult = await response.json();
-                
-                if (sessionResult.success) {
-                    // Store session information
-                    localStorage.setItem('selectedProfile', JSON.stringify(profile));
-                    localStorage.setItem('stremioSessionToken', sessionResult.session.sessionToken);
-                    
-                    showMessage(`Successfully created session for ${profile.name}!`, 'success');
-                    
-                    // Redirect to Stremio interface after successful session creation
-                    setTimeout(() => {
-                        showMessage('Redirecting to Stremio interface...', 'info');
-                        
-                        // Construct the Stremio interface URL with the profile ID and session token
-                        const stremioUrl = `/stremio/${profile.id}/web/`;
-                        const sessionToken = sessionResult.session.sessionToken;
-                        
-                        // Add session token as query parameter for authentication
-                        const redirectUrl = `${stremioUrl}?sessionToken=${encodeURIComponent(sessionToken)}`;
-                        
-                        // Redirect to the Stremio interface
-                        window.location.href = redirectUrl;
-                    }, 1500);
-                } else {
-                    throw new Error(sessionResult.error || 'Session creation failed');
-                }
-            } catch (error) {
-                console.error('Profile selection error:', error);
-                showMessage(`Failed to create session: ${error.message}`, 'error');
-            }
+        // Select profile and redirect to the session page
+        function selectProfile(profile) {
+            // Store the selected profile to be used on the session page if needed
+            localStorage.setItem('selectedProfile', JSON.stringify(profile));
+
+            // Redirect to the session page, which will handle loading Stremio
+            window.location.href = `/session/${profile.id}`;
         }
 
         // Update avatar preview
