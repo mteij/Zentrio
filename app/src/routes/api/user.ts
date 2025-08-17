@@ -4,25 +4,20 @@ import type { Profile } from '../../services/database'
 
 const app = new Hono()
 
-// In-memory storage for user settings
-const userSettings = new Map()
-
 // User Settings API - Simplified without authentication for now
 app.get('/settings', async (c) => {
   try {
     // For demo purposes, use a default user ID
     const userId = 1
-    
-    const settings = userSettings.get(userId) || {
-      autoplay: false,
-      subtitles: false,
-      sync: false,
-      analytics: false,
-      recommendations: true,
-      videoQuality: 'auto'
+    const user = userDb.findById(userId)
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404)
     }
     
-    return c.json(settings)
+    return c.json({
+      addonManagerEnabled: user.addon_manager_enabled,
+    })
   } catch (error) {
     return c.json({ error: 'Failed to load settings' }, 500)
   }
@@ -34,8 +29,19 @@ app.put('/settings', async (c) => {
     
     // For demo purposes, use a default user ID
     const userId = 1
-    
-    userSettings.set(userId, settings)
+    const user = userDb.findById(userId)
+
+    if (!user) {
+        return c.json({ error: 'User not found' }, 404)
+    }
+
+    const updatedUser = userDb.update(userId, {
+        addon_manager_enabled: settings.addonManagerEnabled,
+    })
+
+    if (!updatedUser) {
+        return c.json({ error: 'Failed to save settings' }, 500)
+    }
     
     return c.json({ message: 'Settings saved successfully' })
   } catch (error) {

@@ -915,3 +915,34 @@ body {
         animation: none;
     }
 }
+
+/* Reusable Loading Screen Styles */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #141414;
+    color: white;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 9999;
+}
+
+.loading-container .spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-left-color: #e50914;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+}
+
+.loading-message {
+    margin-top: 20px;
+    font-size: 18px;
+    color: #b3b3b3;
+}
