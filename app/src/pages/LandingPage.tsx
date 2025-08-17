@@ -27,7 +27,11 @@ export function LandingPage({}: LandingPageProps) {
             </form>
             
             <div className="loading" id="loading" style={{ display: 'none' }}>
-              <div className="spinner"></div>
+              <div className="pulsing-dots small">
+                <div className="dot"></div>
+                <div className="dot"></div>
+                <div className="dot"></div>
+              </div>
               Checking your account...
             </div>
             
@@ -189,21 +193,6 @@ export function LandingPage({}: LandingPageProps) {
           margin-top: 20px;
         }
 
-        .spinner {
-          border: 2px solid #333;
-          border-top: 2px solid #e50914;
-          border-radius: 50%;
-          width: 20px;
-          height: 20px;
-          animation: spin 1s linear infinite;
-          display: inline-block;
-          margin-right: 8px;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
 
         .footer {
           padding: 15px 0;
