@@ -178,20 +178,50 @@ body {
     margin-top: 16px;
 }
 
-.spinner {
-    border: 2px solid #333;
-    border-top: 2px solid #e50914;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    animation: spin 1s linear infinite;
-    display: inline-block;
-    margin-right: 8px;
+/* New Pulsing Dots Animation */
+.pulsing-dots {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    height: 50px; /* Same height as old spinner for consistency */
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+.pulsing-dots .dot {
+    width: 15px;
+    height: 15px;
+    background-color: #e50914;
+    border-radius: 50%;
+    animation: pulse 1.4s infinite ease-in-out both;
+}
+
+.pulsing-dots .dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.pulsing-dots .dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes pulse {
+    0%, 80%, 100% {
+        transform: scale(0.5);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1.0);
+        opacity: 1;
+    }
+}
+
+.pulsing-dots.small {
+    gap: 8px;
+    height: 20px;
+}
+
+.pulsing-dots.small .dot {
+    width: 8px;
+    height: 8px;
 }
 
 /* Modal Styles */
@@ -932,14 +962,6 @@ body {
     z-index: 9999;
 }
 
-.loading-container .spinner {
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-left-color: #e50914;
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    animation: spin 1s linear infinite;
-}
 
 .loading-message {
     margin-top: 20px;

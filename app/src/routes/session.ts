@@ -53,13 +53,17 @@ app.get('/:profileId', async (c) => {
             <meta name="theme-color" content="#141414">
             <link rel="stylesheet" href="/static/styles.css">
         </head>
-        <body>
+        <body style="margin: 0; overflow: hidden; background-color: #141414;">
             <div class="loading-container">
-                <div class="spinner"></div>
+                <div class="pulsing-dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
                 <p class="loading-message" id="loadingMessage">Initializing...</p>
             </div>
 
-            <div id="stremio-container" style="width: 100%; height: 100vh; display: none;"></div>
+            <div id="stremio-container" style="width: 100vw; height: 100vh; display: none;"></div>
 
             <script>
                 window.sessionData = ${raw(JSON.stringify(sessionData))};

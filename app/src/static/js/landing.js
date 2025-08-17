@@ -174,8 +174,201 @@
             }
         });
 
-        // Magic link and OTP handlers would go here...
-        // Simplified for brevity
+        // Magic link and OTP handlers
+        magicLinkBtn.addEventListener('click', async () => {
+            try {
+                magicLinkBtn.disabled = true;
+                magicLinkBtn.textContent = 'Sending...';
+                const res = await fetch('/api/auth/magic-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    renderMagicLinkSent(email);
+                } else {
+                    msg.textContent = data.error || 'Failed to send magic link.';
+                    msg.className = 'message error';
+                    msg.style.display = 'block';
+                }
+            } catch (err) {
+                msg.textContent = 'Network error, try again.';
+                msg.className = 'message error';
+                msg.style.display = 'block';
+            } finally {
+                magicLinkBtn.disabled = false;
+                magicLinkBtn.textContent = 'Send Magic Link';
+            }
+        });
+
+        otpBtn.addEventListener('click', async () => {
+            try {
+                otpBtn.disabled = true;
+                otpBtn.textContent = 'Sending...';
+                const res = await fetch('/api/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    renderOtpForm(email);
+                } else {
+                    msg.textContent = data.error || 'Failed to send OTP.';
+                    msg.className = 'message error';
+                    msg.style.display = 'block';
+                }
+            } catch (err) {
+                msg.textContent = 'Network error, try again.';
+                msg.className = 'message error';
+                msg.style.display = 'block';
+            } finally {
+                otpBtn.disabled = false;
+                otpBtn.textContent = 'Get OTP Code';
+            }
+        });
+    }
+
+    function renderMagicLinkSent(email) {
+        inlineAuth.innerHTML = `
+            <div class="magic-link-container fade-in">
+                <button id="magicLinkBackBtn" type="button" class="back-button">
+                    <svg class="back-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+                    Back
+                </button>
+                <h3>
+                    <svg class="email-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path></svg>
+                    Magic Link Sent
+                </h3>
+                <div class="magic-link-sent">
+                    <p>A magic link has been sent to <strong>${email.replace(/"/g, '&quot;')}</strong>. Check your inbox and click the link to sign in.</p>
+                </div>
+                <p class="resend-text" id="resendMagicLink">Didn't receive it? Resend link</p>
+            </div>
+        `;
+        inlineAuth.classList.remove('step-hidden');
+
+        document.getElementById('magicLinkBackBtn').addEventListener('click', () => {
+            renderLoginForm(email);
+        });
+
+        const resendBtn = document.getElementById('resendMagicLink');
+        resendBtn.addEventListener('click', async () => {
+            resendBtn.textContent = 'Sending...';
+            resendBtn.classList.add('disabled');
+            try {
+                await fetch('/api/auth/magic-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+            } finally {
+                setTimeout(() => {
+                    resendBtn.textContent = "Didn't receive it? Resend link";
+                    resendBtn.classList.remove('disabled');
+                }, 5000); // Prevent spamming
+            }
+        });
+    }
+
+    function renderOtpForm(email) {
+        inlineAuth.innerHTML = `
+            <div class="otp-container fade-in">
+                <button id="otpBackBtn" type="button" class="back-button">
+                    <svg class="back-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+                    Back
+                </button>
+                <h3>Enter OTP Code</h3>
+                <p>An OTP code has been sent to <strong>${email.replace(/"/g, '&quot;')}</strong>. Please enter it below.</p>
+                <form id="otpForm" novalidate>
+                    <div class="form-group">
+                        <label for="otpInput" class="sr-only">OTP Code</label>
+                        <input id="otpInput" type="text" class="otp-input" placeholder="_ _ _ _ _ _" required pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
+                    </div>
+                    <button type="submit" class="cta-button">Verify & Sign In</button>
+                    <div id="otpMessage" class="message" aria-live="polite"></div>
+                </form>
+                <p class="resend-text" id="resendOtp">Resend OTP</p>
+            </div>
+        `;
+        inlineAuth.classList.remove('step-hidden');
+
+        document.getElementById('otpBackBtn').addEventListener('click', () => {
+            renderLoginForm(email);
+        });
+
+        const otpForm = document.getElementById('otpForm');
+        const otpInput = document.getElementById('otpInput');
+        const otpMessage = document.getElementById('otpMessage');
+        const submitBtn = otpForm.querySelector('button[type="submit"]');
+
+        otpInput.focus();
+
+        otpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            otpMessage.style.display = 'none';
+            const otp = otpInput.value;
+
+            if (!otp || otp.length !== 6) {
+                otpMessage.textContent = 'Please enter a valid 6-digit OTP.';
+                otpMessage.className = 'message error';
+                otpMessage.style.display = 'block';
+                otpInput.classList.add('error');
+                return;
+            }
+            otpInput.classList.remove('error');
+
+            try {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Verifying...';
+                const res = await fetch('/api/auth/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, otp })
+                });
+
+                if (res.ok) {
+                    otpMessage.textContent = 'Success! Redirecting...';
+                    otpMessage.className = 'message success';
+                    otpMessage.style.display = 'block';
+                    otpInput.classList.add('success');
+                    setTimeout(() => { window.location.href = '/profiles'; }, 800);
+                } else {
+                    const data = await res.json();
+                    otpMessage.textContent = data.error || 'Invalid or expired OTP.';
+                    otpMessage.className = 'message error';
+                    otpMessage.style.display = 'block';
+                    otpInput.classList.add('error');
+                    otpInput.value = '';
+                }
+            } catch (err) {
+                otpMessage.textContent = 'Network error, please try again.';
+                otpMessage.className = 'message error';
+                otpMessage.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verify & Sign In';
+            }
+        });
+
+        const resendBtn = document.getElementById('resendOtp');
+        resendBtn.addEventListener('click', async () => {
+            resendBtn.textContent = 'Sending...';
+            resendBtn.classList.add('disabled');
+            try {
+                await fetch('/api/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+            } finally {
+                setTimeout(() => {
+                    resendBtn.textContent = "Resend OTP";
+                    resendBtn.classList.remove('disabled');
+                }, 5000);
+            }
+        });
     }
 
     function renderRegisterForm(email) {

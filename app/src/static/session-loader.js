@@ -132,13 +132,15 @@
         console.error("Session loading failed:", error);
         document.title = 'Zentrio - Error';
         loadingMessage.innerHTML = `
-            <div style="text-align: center; color: #f44336;">
-                <p>Error: ${error.message}</p>
+            <div class="message error" style="display: block; margin: 0 auto; max-width: 400px;">
+                <p style="margin-bottom: 15px;"><strong>Error</strong></p>
+                <p>${error.message}</p>
                 <button
-                    onclick="window.location.href='/profiles'"
-                    style="margin-top: 20px; padding: 10px 20px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                    onclick="window.history.back()"
+                    class="btn btn-secondary"
+                    style="margin-top: 20px;"
                 >
-                    Back to Profiles
+                    Go Back
                 </button>
             </div>
         `;
