@@ -5,7 +5,7 @@ import { getNsfwFilterScript } from './scripts/nsfwFilter'
 const STREMIO_WEB_URL = "https://web.stremio.com/";
 const STREMIO_API_URL = "https://api.strem.io/";
 
-export const proxyRequestHandler = async (req: Request, path: string) => {
+export const proxyRequestHandler = async (req: Request, path: string, sessionData: string | null) => {
   const stremioPath = `/${path || ""}`;
   const isApiCall = stremioPath.startsWith("/api/");
   const baseUrl = isApiCall ? STREMIO_API_URL : STREMIO_WEB_URL;
@@ -44,6 +44,7 @@ export const proxyRequestHandler = async (req: Request, path: string) => {
 
     responseHeaders.delete("content-security-policy");
     responseHeaders.delete("Content-Security-Policy");
+    
     responseHeaders.delete("x-frame-options");
     responseHeaders.delete("X-Frame-Options");
 
@@ -97,12 +98,9 @@ export const proxyRequestHandler = async (req: Request, path: string) => {
       let body = await response.text();
       body = body.replace(/<head[^>]*>/i, `$&<base href="/stremio/">`);
 
-      const url = new URL(req.url);
-      const sessionData = url.searchParams.get("sessionData");
-      if (sessionData) {
-        const decodedSessionData = decodeURIComponent(sessionData);
 
-        const sessionScript = getSessionScript(decodedSessionData);
+      if (sessionData) {
+        const sessionScript = getSessionScript(sessionData);
         body = body.replace(/<head[^>]*>/i, `$&<script>${sessionScript}</script>`);
 
         const addonManagerScript = getAddonManagerScript();
@@ -110,6 +108,10 @@ export const proxyRequestHandler = async (req: Request, path: string) => {
         body = body.replace(/<\/head>/i, `<script>${addonManagerScript}</script><script>${nsfwFilterScript}</script>$&`);
       }
 
+      responseHeaders.delete("content-encoding");
+      responseHeaders.delete("Content-Encoding");
+      responseHeaders.delete("content-length");
+      responseHeaders.delete("Content-Length");
       return new Response(body, {
         status: response.status,
         statusText: response.statusText,
@@ -117,7 +119,12 @@ export const proxyRequestHandler = async (req: Request, path: string) => {
       });
     }
 
-    return new Response(response.body, {
+    const buffer = await response.arrayBuffer();
+    responseHeaders.delete("content-encoding");
+    responseHeaders.delete("Content-Encoding");
+    responseHeaders.delete("content-length");
+    responseHeaders.delete("Content-Length");
+    return new Response(buffer, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders,

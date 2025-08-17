@@ -24,7 +24,7 @@ import { sessionMiddleware } from '../../middleware/session'
  
  app.post('/', async (c) => {
    const user = c.get('user')
-   const { name, avatar, avatarType, stremioEmail, stremioPassword, nsfwFilterEnabled, ageRating } = await c.req.json()
+   const { name, avatar, avatarType, stremioEmail, stremioPassword, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton } = await c.req.json()
  
    if (!name || !stremioEmail || !stremioPassword) {
      return c.json({ error: 'Profile name, Stremio email, and password are required' }, 400)
@@ -45,6 +45,8 @@ import { sessionMiddleware } from '../../middleware/session'
         profile_id: profile.id,
         nsfw_filter_enabled: nsfwFilterEnabled,
         nsfw_age_rating: ageRating,
+        hide_calendar_button: hideCalendarButton,
+        hide_addons_button: hideAddonsButton,
     })
 
     return profile;
@@ -61,7 +63,7 @@ import { sessionMiddleware } from '../../middleware/session'
  app.put('/:id', async (c) => {
    const user = c.get('user')
    const profileId = parseInt(c.req.param('id'))
-   const { name, avatar, avatarType, stremioEmail, stremioPassword, nsfwFilterEnabled, ageRating } = await c.req.json()
+   const { name, avatar, avatarType, stremioEmail, stremioPassword, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton } = await c.req.json()
 
    if (!name || !stremioEmail) {
      return c.json({ error: 'Profile name and Stremio email are required' }, 400)
@@ -99,6 +101,8 @@ import { sessionMiddleware } from '../../middleware/session'
       await profileProxySettingsDb.update(profileId, {
         nsfw_filter_enabled: nsfwFilterEnabled,
         nsfw_age_rating: ageRating,
+        hide_calendar_button: hideCalendarButton,
+        hide_addons_button: hideAddonsButton,
       })
 
       return updatedProfile;
@@ -133,5 +137,50 @@ import { sessionMiddleware } from '../../middleware/session'
  
    return c.json({ message: 'Profile deleted successfully' })
  })
+
+/**
+ * Profile Proxy Settings endpoints
+ * - GET /api/profiles/:id/settings
+ * - PUT /api/profiles/:id/settings
+ */
+app.get('/:id/settings', async (c) => {
+  const user = c.get('user')
+  const profileId = parseInt(c.req.param('id'))
+  const profile = profileDb.findById(profileId)
+  if (profile?.user_id !== user.id) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+  const settings = profileProxySettingsDb.findByProfileId(profileId)
+  return c.json({
+    nsfwFilterEnabled: settings?.nsfw_filter_enabled ?? false,
+    ageRating: settings?.nsfw_age_rating ?? 0,
+    hideCalendarButton: settings?.hide_calendar_button ?? false,
+    hideAddonsButton: settings?.hide_addons_button ?? false,
+  })
+})
+
+app.put('/:id/settings', async (c) => {
+  try {
+    const user = c.get('user')
+    const profileId = parseInt(c.req.param('id'))
+    const profile = profileDb.findById(profileId)
+    if (profile?.user_id !== user.id) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    const body = await c.req.json()
+    const updated = profileProxySettingsDb.update(profileId, {
+      nsfw_filter_enabled: body.nsfwFilterEnabled,
+      nsfw_age_rating: body.ageRating,
+      hide_calendar_button: body.hideCalendarButton,
+      hide_addons_button: body.hideAddonsButton,
+    })
+    if (!updated) {
+      return c.json({ error: 'Failed to save settings' }, 500)
+    }
+    return c.json({ message: 'Settings saved successfully' })
+  } catch (_e) {
+    return c.json({ error: 'Failed to save settings' }, 500)
+  }
+})
 
 export default app

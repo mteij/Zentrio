@@ -1,8 +1,10 @@
 export const getAddonManagerScript = () => `
   // Integrated Addon Manager Userscript
   (function() {
+    // Ensure a local reference to the global session
+    var session = (typeof window !== 'undefined' ? (window['session'] || window['zentrioSession'] || null) : null);
     // Check if the userscript is enabled
-    const isEnabled = session?.addonManagerEnabled || false;
+    const isEnabled = session && session.addonManagerEnabled ? session.addonManagerEnabled : false;
     if (!isEnabled) return;
 
     const buttonId = "edit-order-button";

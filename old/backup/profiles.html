@@ -6,6 +6,12 @@
     <title>Profiles - Zentrio</title>
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/profiles.css">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon_io/favicon-16x16.png">
+    <link rel="manifest" href="/static/logo/favicon_io/site.webmanifest">
+    <link rel="icon" href="/static/logo/favicon_io/favicon.ico">
+    <meta name="theme-color" content="#141414">
 </head>
 <body>
     <header class="header">
@@ -29,13 +35,21 @@
     <!-- Footer with buttons -->
     <footer class="footer">
         <div class="footer-buttons">
-            <button class="btn btn-secondary btn-small" id="downloadsBtn">
+            <button class="btn btn-secondary btn-small" id="downloadsBtn" aria-label="Downloads">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 4px;">
                     <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                 </svg>
                 Downloads
             </button>
             <a href="/settings" class="btn btn-secondary btn-small">Settings</a>
+            <!-- Edit mode toggle (icon-only) -->
+            <button class="btn btn-secondary btn-small" id="editModeBtn" aria-pressed="false" aria-label="Toggle edit mode" title="Edit mode">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.99-1.66z"/>
+                </svg>
+            </button>
+            <!-- Visible only when there are 0 profiles -->
+            <button class="btn btn-primary btn-small" id="createProfileBtn" style="display: none;">Create Profile</button>
             <button class="btn btn-danger btn-small" id="logoutBtn">Logout</button>
         </div>
     </footer>
@@ -81,6 +95,7 @@
                     </div>
 
                     <button type="submit" class="btn-primary save-btn" id="saveProfileBtn">Save Profile</button>
+                    <button type="button" class="btn btn-danger btn-small" id="deleteProfileBtn" style="display: none; margin-top: 8px;">Delete Profile</button>
                 </div>
             </form>
             <div class="message" id="modalMessage"></div>
@@ -104,6 +119,11 @@
         const nsfwFilterEnabledToggle = document.getElementById('nsfwFilterEnabledToggle');
         const ageRatingGroup = document.getElementById('ageRatingGroup');
         const ageRatingInput = document.getElementById('ageRatingInput');
+        const editModeBtn = document.getElementById('editModeBtn');
+        const createProfileBtn = document.getElementById('createProfileBtn');
+        const deleteProfileBtn = document.getElementById('deleteProfileBtn');
+        // UI state
+        let editMode = false;
 
         // Load profiles from server (enhanced with better error handling)
         async function loadProfiles() {
@@ -124,44 +144,44 @@
         // Render profiles grid
         function renderProfiles() {
             profilesGrid.innerHTML = '';
-            
+
             // Add existing profiles
             profiles.forEach(profile => {
                 const profileCard = document.createElement('div');
                 profileCard.className = 'profile-card';
                 profileCard.innerHTML = `
                     <div class="profile-avatar">
-                        <div class="profile-actions">
-                            <button class="action-btn edit-btn" onclick="editProfile('${profile.id}')">✏️</button>
-                            <button class="action-btn delete-btn" onclick="deleteProfile('${profile.id}')">🗑️</button>
-                        </div>
                         <div id="avatar-${profile.id}"></div>
                     </div>
                     <div class="profile-name">${profile.name}</div>
                     ${profile.isDefault ? '<div class="profile-status">Default</div>' : ''}
                 `;
-                profileCard.addEventListener('click', (e) => {
-                    if (!e.target.closest('.profile-actions')) {
+                profileCard.addEventListener('click', () => {
+                    if (editMode) {
+                        editProfile(String(profile.id));
+                    } else {
                         selectProfile(profile);
                     }
                 });
                 profilesGrid.appendChild(profileCard);
-                
+
                 // Load avatar
                 loadAvatar(profile.avatar, `avatar-${profile.id}`);
             });
-            
-            // Add "Create Profile" card
-            const addProfileCard = document.createElement('div');
-            addProfileCard.className = 'profile-card';
-            addProfileCard.innerHTML = `
-                <div class="profile-avatar add-profile">
-                    <div class="add-icon">+</div>
-                </div>
-                <div class="profile-name">Create Profile</div>
-            `;
-            addProfileCard.addEventListener('click', createProfile);
-            profilesGrid.appendChild(addProfileCard);
+
+            // Toggle visibility of Create Profile button and Edit Mode availability
+            if (createProfileBtn) {
+                createProfileBtn.style.display = profiles.length === 0 ? 'inline-flex' : 'none';
+            }
+            if (editModeBtn) {
+                editModeBtn.disabled = profiles.length === 0;
+                if (profiles.length === 0 && editMode) {
+                    // Auto-disable edit mode if no profiles exist
+                    editMode = false;
+                    editModeBtn.setAttribute('aria-pressed', 'false');
+                    editModeBtn.classList.remove('active');
+                }
+            }
         }
 
         // Load avatar from server
@@ -190,6 +210,8 @@
             ageRatingGroup.style.display = 'none';
             ageRatingInput.value = 0;
 
+            if (deleteProfileBtn) deleteProfileBtn.style.display = 'none';
+
             generateNewAvatar();
             profileModal.style.display = 'block';
         }
@@ -203,18 +225,18 @@
                 console.error('Profile not found:', profileId, profiles);
                 return;
             }
-            
+
             editingProfileId = numericProfileId;
             modalTitle.textContent = 'Edit Profile';
-            
+
             document.getElementById('profileName').value = profile.name;
             document.getElementById('stremioEmail').value = profile.stremio_email || '';
-            
+
             const passwordInput = document.getElementById('stremioPassword');
             passwordInput.value = '';
             passwordInput.placeholder = 'Leave blank to keep current password';
             passwordInput.required = false;
-            
+
             const nsfwEnabled = profile.nsfw_filter_enabled || false;
             nsfwFilterEnabledToggle.classList.toggle('active', nsfwEnabled);
             ageRatingGroup.style.display = nsfwEnabled ? 'block' : 'none';
@@ -222,6 +244,9 @@
 
             currentAvatarSeed = profile.avatar;
             updateAvatarPreview(profile.avatar);
+
+            if (deleteProfileBtn) deleteProfileBtn.style.display = 'inline-flex';
+
             profileModal.style.display = 'block';
         }
 
@@ -408,6 +433,29 @@
             // In a real app, this would open a downloads manager
             alert('Downloads feature coming soon!');
         });
+
+        // Edit mode toggle
+        if (editModeBtn) {
+            editModeBtn.addEventListener('click', () => {
+                editMode = !editMode;
+                editModeBtn.setAttribute('aria-pressed', String(editMode));
+                editModeBtn.classList.toggle('active', editMode);
+            });
+        }
+
+        // Create profile button (visible only when no profiles)
+        if (createProfileBtn) {
+            createProfileBtn.addEventListener('click', createProfile);
+        }
+
+        // Delete profile from inside the modal (only visible while editing)
+        if (deleteProfileBtn) {
+            deleteProfileBtn.addEventListener('click', () => {
+                if (editingProfileId != null) {
+                    deleteProfile(String(editingProfileId));
+                }
+            });
+        }
 
         // Close modal when clicking outside
         window.addEventListener('click', (e) => {

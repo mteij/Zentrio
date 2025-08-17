@@ -577,3 +577,67 @@
     font-size: 13px;
   }
 }
+/* Edit Mode UI + compact modal for profiles page */
+.footer-buttons #editModeBtn.active {
+  background: #e50914;
+  border-color: #e50914;
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.25) inset;
+}
+.footer-buttons #editModeBtn svg {
+  display: block;
+}
+.footer-buttons #editModeBtn:focus-visible {
+  outline: 2px solid #e50914;
+  outline-offset: 2px;
+}
+
+/* Hide legacy hover actions on profile cards */
+.profile-actions {
+  display: none !important;
+}
+
+/* Slimmer, modern profile modal */
+#profileModal .modal-content {
+  max-width: 520px;
+  padding: 24px;
+}
+#profileModal .profile-edit-container {
+  gap: 16px;
+  max-width: 360px;
+}
+#profileModal .avatar-preview {
+  max-width: 120px;
+  border-radius: 10px;
+}
+#profileModal .form-group {
+  margin-bottom: 12px;
+}
+#profileModal label {
+  font-size: 14px;
+}
+#profileModal input {
+  padding: 10px 12px;
+  font-size: 14px;
+}
+#profileModal .shuffle-btn {
+  min-width: 120px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+#profileModal .save-btn {
+  padding: 10px 16px;
+  font-size: 15px;
+}
+
+/* Responsive fine-tuning */
+@media (max-width: 480px) {
+  #profileModal .modal-content {
+    padding: 20px;
+    max-width: 95%;
+  }
+  #profileModal .profile-edit-container {
+    max-width: 320px;
+    gap: 14px;
+  }
+}

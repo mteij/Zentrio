@@ -37,6 +37,7 @@ app.get('/static/*', async (c) => {
       '.css': 'text/css; charset=utf-8',
       '.js': 'text/javascript; charset=utf-8',
       '.json': 'application/json; charset=utf-8',
+      '.webmanifest': 'application/manifest+json; charset=utf-8',
       '.svg': 'image/svg+xml',
       '.png': 'image/png',
       '.jpg': 'image/jpeg',
@@ -57,9 +58,26 @@ app.get('/static/*', async (c) => {
   }
 })
 
+// Favicon at root for browser defaults
+app.get('/favicon.ico', async (c) => {
+  try {
+    const filePath = join(process.cwd(), 'src', 'static', 'logo', 'favicon_io', 'favicon.ico')
+    const file = Bun.file(filePath)
+    const buf = await file.arrayBuffer()
+    return new Response(new Uint8Array(buf), {
+      headers: {
+        'Content-Type': 'image/x-icon',
+        'Cache-Control': 'public, max-age=3600',
+      },
+    })
+  } catch {
+    return new Response('Not Found', { status: 404 })
+  }
+})
+
 // Mount proxy middleware for proxy routes
 // Mount route modules
-app.route('/', viewRoutes)              // HTML pages (/, /signin, /register, etc.)
+app.route('/', viewRoutes)              // JSX-rendered pages (converted from HTML)
 app.route('/api', apiRoutes)            // API routes, including auth, profiles, user, avatar, health, stream
 app.route('/session', sessionRoutes)
 app.route('/stremio', stremioRoutes)

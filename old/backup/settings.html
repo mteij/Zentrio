@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - Zentrio</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon_io/favicon-16x16.png">
+    <link rel="manifest" href="/static/logo/favicon_io/site.webmanifest">
+    <link rel="icon" href="/static/logo/favicon_io/favicon.ico">
+    <meta name="theme-color" content="#141414">
     <style>
         * {
             margin: 0;
@@ -459,9 +465,9 @@
 
 
 
-        <!-- Proxy Settings -->
+        <!-- Plugins -->
         <div class="settings-section">
-            <h2 class="section-title">Proxy Settings</h2>
+            <h2 class="section-title">Plugins</h2>
             <div class="setting-item">
                 <div class="setting-info">
                     <h3>Enable Addon Manager</h3>
@@ -471,7 +477,28 @@
                     <div class="toggle" id="addonManagerEnabledToggle" onclick="toggleSetting('addonManagerEnabled')"></div>
                 </div>
             </div>
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h3>Hide Calendar Button</h3>
+                    <p>Removes the Calendar button from the Stremio UI for all profiles</p>
+                </div>
+                <div class="setting-control">
+                    <div class="toggle" id="hideCalendarButtonToggle" onclick="toggleSetting('hideCalendarButton')"></div>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h3>Hide Addons Button</h3>
+                    <p>Removes the Addons button from the Stremio UI for all profiles</p>
+                </div>
+                <div class="setting-control">
+                    <div class="toggle" id="hideAddonsButtonToggle" onclick="toggleSetting('hideAddonsButton')"></div>
+                </div>
+            </div>
         </div>
+
 
         <!-- Danger Zone -->
         <div class="danger-zone">
@@ -733,6 +760,7 @@
         }
 
 
+
         // Delete account
         function deleteAccount() {
             const confirmation = prompt('Type "DELETE" to confirm account deletion:');
@@ -764,7 +792,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
             loadUserInfo();
-            
+
             // Add modal event listeners
             document.getElementById('emailModal').addEventListener('click', (e) => handleModalClick(e, 'emailModal'));
             document.getElementById('passwordModal').addEventListener('click', (e) => handleModalClick(e, 'passwordModal'));

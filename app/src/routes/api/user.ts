@@ -17,6 +17,8 @@ app.get('/settings', async (c) => {
     
     return c.json({
       addonManagerEnabled: user.addon_manager_enabled,
+      hideCalendarButton: user.hide_calendar_button ?? false,
+      hideAddonsButton: user.hide_addons_button ?? false,
     })
   } catch (error) {
     return c.json({ error: 'Failed to load settings' }, 500)
@@ -37,6 +39,8 @@ app.put('/settings', async (c) => {
 
     const updatedUser = userDb.update(userId, {
         addon_manager_enabled: settings.addonManagerEnabled,
+        hide_calendar_button: settings.hideCalendarButton,
+        hide_addons_button: settings.hideAddonsButton,
     })
 
     if (!updatedUser) {

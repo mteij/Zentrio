@@ -20,6 +20,8 @@ db.exec(`
     first_name TEXT,
     last_name TEXT,
     addon_manager_enabled BOOLEAN DEFAULT FALSE,
+    hide_calendar_button BOOLEAN DEFAULT FALSE,
+    hide_addons_button BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -160,6 +162,8 @@ export interface User {
   first_name?: string
   last_name?: string
   addon_manager_enabled: boolean
+  hide_calendar_button: boolean
+  hide_addons_button: boolean
   created_at: string
   updated_at: string
 }
@@ -343,7 +347,15 @@ export const userDb = {
         fields.push('addon_manager_enabled = ?')
         values.push(updates.addon_manager_enabled)
     }
-
+    if (updates.hide_calendar_button !== undefined) {
+        fields.push('hide_calendar_button = ?')
+        values.push(updates.hide_calendar_button)
+    }
+    if (updates.hide_addons_button !== undefined) {
+        fields.push('hide_addons_button = ?')
+        values.push(updates.hide_addons_button)
+    }
+    
     if (fields.length === 0) return userDb.findById(id)
 
     fields.push('updated_at = CURRENT_TIMESTAMP')
@@ -399,7 +411,7 @@ export const profileDb = {
 
   findByUserId: (userId: number): (Profile & { settings?: ProfileProxySettings })[] => {
     const stmt = db.prepare(`
-        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating
+        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating, s.hide_calendar_button, s.hide_addons_button
         FROM profiles p
         LEFT JOIN profile_proxy_settings s ON p.id = s.profile_id
         WHERE p.user_id = ?
@@ -410,7 +422,7 @@ export const profileDb = {
 
   findWithSettingsById: (id: number): (Profile & { settings?: ProfileProxySettings }) | undefined => {
     const stmt = db.prepare(`
-        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating
+        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating, s.hide_calendar_button, s.hide_addons_button
         FROM profiles p
         LEFT JOIN profile_proxy_settings s ON p.id = s.profile_id
         WHERE p.id = ?

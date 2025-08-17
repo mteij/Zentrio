@@ -1,14 +1,15 @@
 export const getNsfwFilterScript = () => `
   // NSFW Content Filter
   (function() {
-    // Check if current profile has NSFW filtering enabled
-    const currentProfile = session?.profile?.auth?.user;
+    // Resolve session safely from globals to avoid ReferenceError
+    var __s = (typeof window !== 'undefined' ? (window['session'] || window['zentrioSession'] || null) : null);
+    var currentProfile = __s && __s.profile && __s.profile.auth && __s.profile.auth.user;
     if (!currentProfile) return;
 
-    // This will be set by the session data if NSFW mode is enabled for the profile
-    const nsfwModeEnabled = session?.nsfwFilterEnabled || false;
-    const tmdbApiKey = session?.tmdbApiKey;
-    const ageRating = session?.ageRating || 0;
+    // Settings from the resolved session
+    var nsfwModeEnabled = (__s && __s.nsfwFilterEnabled) ? __s.nsfwFilterEnabled : false;
+    var tmdbApiKey = __s && __s.tmdbApiKey;
+    var ageRating = (__s && __s.ageRating) ? __s.ageRating : 0;
 
     if (ageRating === 0 || !tmdbApiKey || !nsfwModeEnabled) return;
 

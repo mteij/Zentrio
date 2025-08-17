@@ -3,6 +3,9 @@ import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { getCookie } from 'hono/cookie'
 import { sessionDb } from '../services/database'
+import { LandingPage } from '../pages/LandingPage'
+import { ProfilesPage } from '../pages/ProfilesPage'
+import { SettingsPage } from '../pages/SettingsPage'
  
 const app = new Hono()
 
@@ -37,21 +40,23 @@ async function serveHTML(filePath: string) {
   }
 }
  
-// HTML Routes
+// JSX Component Routes (New)
 app.get('/', async (c) => {
   if (isAuthenticated(c)) return c.redirect('/profiles')
-  return serveHTML('landing.html')
+  return c.html(LandingPage({}))
 })
  
 app.get('/profiles', async (c) => {
-  return serveHTML('profiles.html')
+  if (!isAuthenticated(c)) return c.redirect('/')
+  return c.html(ProfilesPage({}))
 })
  
 app.get('/settings', async (c) => {
-  return serveHTML('settings.html')
+  if (!isAuthenticated(c)) return c.redirect('/')
+  return c.html(SettingsPage({}))
 })
 
-// Auth modal routes
+// Auth modal routes (keep for compatibility)
 app.get('/views/auth/otp-modal.html', async (c) => {
   return serveHTML('auth/otp-modal.html')
 })

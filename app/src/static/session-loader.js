@@ -92,10 +92,12 @@
                     keyMode: 'arrows',
                 },
             },
-            profilePictureUrl: profile.avatar,
+            profilePictureUrl: `/api/avatar/${encodeURIComponent(profile.avatar)}`,
             nsfwFilterEnabled: profile.nsfw_filter_enabled || false,
             ageRating: profile.nsfw_age_rating || 0,
-            addonManagerEnabled: user.addonManagerEnabled || false,
+            hideCalendarButton: !!(user && user.hideCalendarButton),
+            hideAddonsButton: !!(user && user.hideAddonsButton),
+            addonManagerEnabled: !!(user && user.addonManagerEnabled),
             tmdbApiKey: profile.tmdb_api_key || null,
             installation_id: result.installation_id || generateInstallationId(),
             schema_version: result.schema_version || 18,
@@ -118,15 +120,17 @@
         iframe.onload = () => {
             loadingContainer.style.display = 'none';
             stremioContainer.style.display = 'block';
+            document.title = 'Zentrio';
         };
 
-        const sessionDataString = encodeURIComponent(JSON.stringify(sessionObject));
+        const sessionDataString = btoa(JSON.stringify(sessionObject));
         iframe.src = `/stremio/?sessionData=${sessionDataString}`;
 
         stremioContainer.appendChild(iframe);
 
     } catch (error) {
         console.error("Session loading failed:", error);
+        document.title = 'Zentrio - Error';
         loadingMessage.innerHTML = `
             <div style="text-align: center; color: #f44336;">
                 <p>Error: ${error.message}</p>
