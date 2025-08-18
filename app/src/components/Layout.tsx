@@ -34,11 +34,11 @@ export function Layout({
         <title>{title} - Zentrio</title>
         <link rel="stylesheet" href="/static/css/styles.css" />
         {additionalCSS.map(css => <link rel="stylesheet" href={css} />)}
-        <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon_io/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon_io/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon_io/favicon-16x16.png" />
-        <link rel="manifest" href="/static/logo/favicon_io/site.webmanifest" />
-        <link rel="icon" href="/static/logo/favicon_io/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon/favicon-16x16.png" />
+        <link rel="manifest" href="/static/logo/favicon/site.webmanifest" />
+        <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
       </head>
       <body className={className}>
@@ -80,11 +80,11 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <title>{title} - Zentrio</title>
         <link rel="stylesheet" href="/static/css/styles.css" />
         {additionalCSS.map(css => <link rel="stylesheet" href={css} />)}
-        <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon_io/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon_io/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon_io/favicon-16x16.png" />
-        <link rel="manifest" href="/static/logo/favicon_io/site.webmanifest" />
-        <link rel="icon" href="/static/logo/favicon_io/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon/favicon-16x16.png" />
+        <link rel="manifest" href="/static/logo/favicon/site.webmanifest" />
+        <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
       </head>
       <body className={className}>

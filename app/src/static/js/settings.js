@@ -211,7 +211,17 @@ function showMessage(text, type) {
 
 // Go back to profiles page
 function goBack() {
-    window.location.href = '/profiles';
+   // Ensure navigation affects the top-level window when embedded
+   try {
+       if (window.top && window.top !== window) {
+           window.top.location.href = '/profiles';
+       } else {
+           window.location.href = '/profiles';
+       }
+   } catch (e) {
+       // Accessing window.top can throw in some contexts; fallback to current window
+       window.location.href = '/profiles';
+   }
 }
 
 // Initialize page

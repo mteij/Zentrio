@@ -354,6 +354,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // Handle settings button (navigate to settings). Added for non-hydrated pages.
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            window.location.href = '/settings';
+        });
+    }
+    
     // Edit mode toggle
     if (editModeBtn) {
         editModeBtn.addEventListener('click', () => {

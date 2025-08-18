@@ -61,7 +61,7 @@ app.get('/static/*', async (c) => {
 // Favicon at root for browser defaults
 app.get('/favicon.ico', async (c) => {
   try {
-    const filePath = join(process.cwd(), 'src', 'static', 'logo', 'favicon_io', 'favicon.ico')
+    const filePath = join(process.cwd(), 'src', 'static', 'logo', 'favicon', 'favicon.ico')
     const file = Bun.file(filePath)
     const buf = await file.arrayBuffer()
     return new Response(new Uint8Array(buf), {
