@@ -56,15 +56,20 @@ export function getConfig() {
   const DATABASE_URL = process.env.DATABASE_URL ?? 'sqlite://./zentrio.db'
   const AUTH_SECRET = process.env.AUTH_SECRET ?? 'super-secret-key-change-in-production'
   const APP_URL = process.env.APP_URL ?? `http://localhost:${PORT}`
-    const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY ?? 'super-secret-key-change-in-production'
-   
-     return {
-       PORT,
-       DATABASE_URL,
-       AUTH_SECRET,
-       APP_URL,
-       ENCRYPTION_KEY,
-     }
+  const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY ?? 'super-secret-key-change-in-production'
+  // Rate limit settings (configurable via environment variables)
+  const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000)
+  const RATE_LIMIT_LIMIT = Number(process.env.RATE_LIMIT_LIMIT ?? 100)
+ 
+  return {
+    PORT,
+    DATABASE_URL,
+    AUTH_SECRET,
+    APP_URL,
+    ENCRYPTION_KEY,
+    RATE_LIMIT_WINDOW_MS,
+    RATE_LIMIT_LIMIT
+  }
 }
 
 export function requireEnv(key: string): string {

@@ -75,14 +75,14 @@
     font-weight: bold;
     position: relative;
     overflow: hidden;
-    background: #333;
+    background: var(--btn-secondary-bg);
     border: 3px solid transparent;
     transition: border-color 0.3s ease;
     line-height: 0; /* prevent baseline gaps */
 }
 
 .profile-card:hover .profile-avatar {
-    border-color: #e50914;
+    border-color: var(--accent);
 }
 
 .profile-avatar svg {
@@ -94,30 +94,30 @@
 }
 
 .profile-avatar.add-profile {
-    background: #333;
-    border: 2px dashed #666;
+    background: var(--btn-secondary-bg);
+    border: 2px dashed rgba(255,255,255,0.06);
 }
 
 .profile-avatar.add-profile:hover {
-    border-color: #e50914;
-    background: rgba(229, 9, 20, 0.1);
+    border-color: var(--accent);
+    background: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.06));
 }
 
 .profile-name {
     font-size: 16px;
-    color: #b3b3b3;
+    color: var(--muted, #b3b3b3);
     margin-bottom: 5px;
     font-weight: 500;
     word-wrap: break-word;
 }
 
 .profile-card:hover .profile-name {
-    color: white;
+    color: var(--text, white);
 }
 
 .profile-status {
     font-size: 12px;
-    color: #e50914;
+    color: var(--accent);
     font-weight: bold;
 }
 
@@ -127,7 +127,7 @@
 }
 
 .profile-card:hover .add-icon {
-    color: #e50914;
+    color: var(--accent);
 }
 
 .profile-actions {
@@ -158,8 +158,8 @@
 }
 
 .edit-btn {
-    background: #007bff;
-    color: white;
+    background: var(--edit-btn-bg, #007bff);
+    color: var(--text, white);
 }
 
 .edit-btn:hover {
@@ -208,22 +208,22 @@
 .btn-avatar {
     padding: 8px 16px;
     font-size: 14px;
-    border: 1px solid #555;
-    background: #333;
-    color: white;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: var(--btn-secondary-bg);
+    color: var(--text);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.3s;
 }
 
 .btn-avatar:hover {
-    background: #555;
-    border-color: #e50914;
+    background: rgba(255,255,255,0.03);
+    border-color: var(--accent);
 }
 
 .btn-avatar.active {
-    background: #e50914;
-    border-color: #e50914;
+    background: var(--btn-primary-bg);
+    border-color: var(--btn-primary-bg);
 }
 
 /* Mobile Optimizations */
@@ -373,16 +373,31 @@
 }
 /* Profiles page: scoped layout, background, responsive grid, and accessibility */
 .profiles-page {
-  /* Page background */
-  background:
-    linear-gradient(180deg, rgb(18 18 22) 0%, rgb(10 10 12) 100%),
-    radial-gradient(800px 400px at 0% 0%, rgba(103, 80, 164, 0.18) 0%, rgba(0, 0, 0, 0) 60%),
-    radial-gradient(800px 400px at 100% 100%, rgba(0, 184, 212, 0.14) 0%, rgba(0, 0, 0, 0) 60%);
-  background-blend-mode: overlay;
+  /* create stacking context for overlay & content */
+  position: relative;
+  background: transparent; /* let the Vanta canvas show through */
   min-height: 100svh;
   display: grid;           /* enables centering */
   place-items: center;     /* centers content vertically and horizontally */
   padding-block: 2rem;     /* ensures comfort on small screens */
+}
+
+/* translucent overlay above the Vanta background (keeps depth but doesn't hide Vanta) */
+.profiles-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Removed colored radial highlights to eliminate blue/purple overlay */
+  background: linear-gradient(180deg, rgba(18,18,22,0.25) 0%, rgba(10,10,12,0.25) 100%);
+  background-blend-mode: normal;
+}
+
+/* ensure page content is above the overlay */
+.profiles-page > * {
+  position: relative;
+  z-index: 2; /* content above overlay */
 }
 
 .profiles-main {
@@ -456,7 +471,7 @@
 
 .avatar-option {
   background: #222;
-  border: 1px solid #555;
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: 8px;
   padding: 0;
   cursor: pointer;
@@ -464,17 +479,17 @@
 }
 
 .avatar-option:hover {
-  border-color: #777;
+  border-color: rgba(255,255,255,0.12);
 }
 
 .avatar-option:focus-visible {
-  outline: 2px solid #e50914;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 .avatar-option[aria-pressed="true"] {
-  border-color: #e50914;
-  box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.35) inset;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.22) inset;
 }
 
 .avatar-option-media {
@@ -495,7 +510,7 @@
 
 /* Improve focus visibility on avatar type buttons */
 .btn-avatar:focus-visible {
-  outline: 2px solid #e50914;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -536,8 +551,8 @@
 }
 
 .shuffle-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(229, 9, 20, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.28);
 }
 
 /* Form fields now directly in container */
@@ -579,10 +594,10 @@
 }
 /* Edit Mode UI + compact modal for profiles page */
 .footer-buttons #editModeBtn.active {
-  background: #e50914;
-  border-color: #e50914;
-  color: #fff;
-  box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.25) inset;
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: var(--text);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.18) inset;
 }
 .footer-buttons #editModeBtn svg {
   display: block;
@@ -590,6 +605,17 @@
 .footer-buttons #editModeBtn:focus-visible {
   outline: 2px solid #e50914;
   outline-offset: 2px;
+}
+
+/* Make the logout button use the theme accent on the Profiles page */
+.footer-buttons #logoutBtn {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--text) !important;
+}
+.footer-buttons #logoutBtn:hover {
+  background: var(--btn-primary-bg-hover) !important;
+  border-color: var(--btn-primary-bg-hover) !important;
 }
 
 /* Hide legacy hover actions on profile cards */
@@ -640,4 +666,21 @@
     max-width: 320px;
     gap: 14px;
   }
+}
+/* Ensure Vanta canvas sits behind the overlay and is non-interactive */
+#vanta-bg {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 0 !important; /* sit above page background but below overlay/header/footer */
+  pointer-events: none !important;
+}
+
+/* If Vanta injects a canvas element, make sure it fills the container */
+#vanta-bg canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
 }

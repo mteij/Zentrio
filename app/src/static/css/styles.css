@@ -6,10 +6,24 @@
     box-sizing: border-box;
 }
 
+:root {
+    --accent: #e50914;
+    --btn-primary-bg: var(--accent);
+    --btn-primary-bg-hover: #f40612;
+    --btn-secondary-bg: #333;
+    --btn-danger-bg: #dc3545;
+    --btn-danger-bg-hover: #c82333;
+    --text: #ffffff;
+    --vanta-highlight: #222222;
+    --vanta-midtone: #111111;
+    --vanta-lowlight: #000000;
+    --vanta-base: #000000;
+}
+
 body {
     font-family: 'Helvetica Neue', Arial, sans-serif;
-    background: #141414;
-    color: white;
+    background: var(--bg, #141414);
+    color: var(--text);
     min-height: 100vh;
 }
 
@@ -65,20 +79,20 @@ body {
 }
 
 .btn-primary {
-    background: #e50914;
-    color: white;
+    background: var(--btn-primary-bg);
+    color: var(--text);
     padding: 16px 24px;
     font-size: 16px;
     font-weight: bold;
 }
 
 .btn-primary:hover {
-    background: #f40612;
+    background: var(--btn-primary-bg-hover);
 }
 
 .btn-secondary {
-    background: #333;
-    color: white;
+    background: var(--btn-secondary-bg);
+    color: var(--text);
 }
 
 .btn-secondary:hover {
@@ -86,12 +100,12 @@ body {
 }
 
 .btn-danger {
-    background: #dc3545;
+    background: var(--btn-danger-bg, #dc3545);
     color: white;
 }
-
+ 
 .btn-danger:hover {
-    background: #c82333;
+    background: var(--btn-danger-bg-hover, #c82333);
 }
 
 .btn-small {
@@ -121,16 +135,81 @@ body {
     color: white;
     font-size: 16px;
 }
-
+ 
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
     border-color: #e50914;
 }
-
+ 
 .form-group input:disabled {
     background: #222;
     color: #666;
+}
+ 
+/* Subtitle labels and preview elements — use theme accent where appropriate.
+   Matches elements with 'subtitle' in class/id/for/name to keep selector broad
+   without changing markup. */
+[class*="subtitle"],
+[id*="subtitle"],
+[for*="subtitle"],
+[name*="subtitle"] {
+    color: var(--accent);
+}
+
+/* Range/slider styling using theme variables.
+   Provides consistent look across browsers and leverages --accent.
+   Visual filled track is handled in supported browsers; JS will update
+   the gradient for precise filled percentage when needed. */
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent) 50%, rgba(255,255,255,0.06) 50%);
+    outline: none;
+    transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 999px;
+    background: transparent;
+}
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid rgba(0,0,0,0.4);
+    margin-top: -5px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+    cursor: pointer;
+}
+input[type="range"]::-moz-range-track {
+    height: 8px;
+    border-radius: 999px;
+    background: transparent;
+}
+input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid rgba(0,0,0,0.4);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+    cursor: pointer;
+}
+
+/* Focus/active states */
+input[type="range"]:focus::-webkit-slider-thumb,
+input[type="range"]:active::-webkit-slider-thumb,
+input[type="range"]:focus::-moz-range-thumb,
+input[type="range"]:active::-moz-range-thumb {
+    box-shadow: 0 0 0 6px rgba(229,9,20,0.12);
+    transform: scale(1.03);
 }
 
 /* Container Styles */
@@ -190,7 +269,7 @@ body {
 .pulsing-dots .dot {
     width: 15px;
     height: 15px;
-    background-color: #e50914;
+    background-color: var(--accent);
     border-radius: 50%;
     animation: pulse 1.4s infinite ease-in-out both;
 }
@@ -266,14 +345,14 @@ body {
     position: relative;
     width: 50px;
     height: 24px;
-    background: #333;
+    background: var(--btn-secondary-bg);
     border-radius: 12px;
     cursor: pointer;
     transition: background 0.3s;
 }
 
 .toggle.active {
-    background: #e50914;
+    background: var(--accent);
 }
 
 .toggle::after {
@@ -708,9 +787,9 @@ body {
 }
 
 .back-button:hover {
-    border-color: #e50914;
-    color: #e50914;
-    background: rgba(229, 9, 20, 0.05);
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,0,0,0.05);
     transform: translateX(-2px);
 }
 
@@ -953,7 +1032,7 @@ body {
     align-items: center;
     justify-content: center;
     height: 100vh;
-    background-color: #141414;
+    background-color: var(--bg, #141414);
     color: white;
     position: fixed;
     top: 0;
@@ -962,9 +1041,21 @@ body {
     z-index: 9999;
 }
 
-
+/* Ensure loading text stays white */
 .loading-message {
     margin-top: 20px;
     font-size: 18px;
-    color: #b3b3b3;
+    color: var(--text, #ffffff);
+}
+
+/* When the Profiles page is active, remove the header/footer dark shadow to let Vanta show through */
+.profiles-page + .footer {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Make header transparent on the Profiles page to remove the dark top shadow */
+.profiles-header {
+    background: transparent !important;
+    box-shadow: none !important;
 }

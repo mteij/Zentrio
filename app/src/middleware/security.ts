@@ -53,10 +53,16 @@ export const securityHeaders = async (c: Context, next: Next) => {
 
 export const rateLimiter = (options: { windowMs: number; limit: number }) => {
   return async (c: Context, next: Next) => {
+    const { windowMs, limit } = options
+
+    // Disable rate limiting when limit is 0 or negative, or window is non-positive.
+    if (!limit || limit <= 0 || !windowMs || windowMs <= 0) {
+      return await next()
+    }
+
     const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown'
     const now = Date.now()
-    const { windowMs, limit } = options
-    
+
     if (!rateLimitMap.has(ip)) {
       rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs })
     } else {
@@ -71,7 +77,7 @@ export const rateLimiter = (options: { windowMs: number; limit: number }) => {
         }
       }
     }
-    
+
     await next()
   }
 }

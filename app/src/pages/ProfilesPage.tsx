@@ -20,7 +20,7 @@ export function ProfilesPage({ profiles = [] }: ProfilesPageProps) {
       {/* VANTA background container (same as Settings page) */}
       <div id="vanta-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, width: '100vw', height: '100vh' }}></div>
 
-      <header className="header">
+      <header className="header" style={{ background: 'transparent', boxShadow: 'none' }}>
         <nav className="nav">
           {/* Header is now empty, buttons moved to footer */}
         </nav>
@@ -113,37 +113,6 @@ export function ProfilesPage({ profiles = [] }: ProfilesPageProps) {
       {/* Vanta.js and Three.js for background visuals */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
-      <script>{`
-        (function initVanta() {
-          function start() {
-            if (window.VANTA && window.VANTA.FOG) {
-              try {
-                window.VANTA.FOG({
-                  el: "#vanta-bg",
-                  mouseControls: false,
-                  touchControls: false,
-                  minHeight: 200.00,
-                  minWidth: 200.00,
-                  highlightColor: 0x222222,
-                  midtoneColor: 0x111111,
-                  lowlightColor: 0x000000,
-                  baseColor: 0x000000,
-                  blurFactor: 0.9,
-                  speed: 0.5,
-                  zoom: 0.7
-                });
-              } catch (e) {
-                // fail silently
-                console.error('Vanta init failed', e);
-              }
-            } else {
-              // try again shortly if library not loaded yet
-              setTimeout(start, 300);
-            }
-          }
-          start();
-        })();
-      `}</script>
       <script src="/static/js/profiles.js"></script>
     </SimpleLayout>
   )

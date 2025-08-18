@@ -3,6 +3,7 @@ import authApiRoutes from './auth'
 import profileApiRoutes from './profiles'
 import userApiRoutes from './user'
 import avatarApiRoutes from './avatar'
+import themesApiRoutes from './themes'
 import { getConfig } from '../../services/envParser'
 
 const app = new Hono()
@@ -12,6 +13,7 @@ app.route('/auth', authApiRoutes)
 app.route('/profiles', profileApiRoutes)
 app.route('/user', userApiRoutes)
 app.route('/avatar', avatarApiRoutes)
+app.route('/themes', themesApiRoutes)
 
 // Environment Configuration now read via getConfig() within handlers
 

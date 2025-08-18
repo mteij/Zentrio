@@ -1,0 +1,15 @@
+{
+  "id": "midnight",
+  "name": "Midnight",
+  "accent": "#6C8CFF",
+  "btnPrimary": "#6C8CFF",
+  "btnPrimaryHover": "#5a74e0",
+  "text": "#E6E9F2",
+  "muted": "#9AA4C0",
+  "vanta": {
+    "highlight": "#1f2430",
+    "midtone": "#0f1626",
+    "lowlight": "#03040a",
+    "base": "#00020a"
+  }
+}

@@ -17,7 +17,7 @@ app.get('/settings', async (c) => {
     
     return c.json({
       addonManagerEnabled: user.addon_manager_enabled,
-      hideCalendarButton: user.hide_calendar_button ?? false,
+      hideCalendarButton: user.hide_calendar_button ?? true,
       hideAddonsButton: user.hide_addons_button ?? false,
     })
   } catch (error) {

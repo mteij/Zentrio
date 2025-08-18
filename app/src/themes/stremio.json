@@ -1,0 +1,15 @@
+{
+  "id": "stremio",
+  "name": "Stremio",
+  "accent": "#8C43FF",
+  "btnPrimary": "#8C43FF",
+  "btnPrimaryHover": "#732BFF",
+  "text": "#F7F7F7",
+  "muted": "#CFCFCF",
+  "vanta": {
+    "highlight": "#3A2A4D",
+    "midtone": "#241933",
+    "lowlight": "#150E1F",
+    "base": "#0B0710"
+  }
+}

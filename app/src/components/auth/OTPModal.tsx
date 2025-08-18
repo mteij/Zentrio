@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Button, Message } from '../index'
 
 interface OTPModalProps {
@@ -53,7 +53,10 @@ export function OTPModal({
           }}
           aria-describedby="otpHelp"
           value={code}
-          onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+          onChange={(e: Event) => {
+            const v = ((e.target as HTMLInputElement)?.value ?? '').replace(/\D/g, '')
+            setCode(v)
+          }}
         />
         <div id="otpHelp" className="sr-only">Enter the 6-digit code sent to your email.</div>
       </div>
@@ -72,8 +75,14 @@ export function OTPModal({
             fontSize: '0.9rem'
           }}
           onClick={onResend}
-          onMouseOver={e => (e.currentTarget.style.color = '#e50914')}
-          onMouseOut={e => (e.currentTarget.style.color = '#b3b3b3')}
+          onMouseOver={(e: Event) => {
+            const el = e.currentTarget as HTMLElement
+            el.style.color = '#e50914'
+          }}
+          onMouseOut={(e: Event) => {
+            const el = e.currentTarget as HTMLElement
+            el.style.color = '#b3b3b3'
+          }}
         >
           Resend OTP ({resendSeconds}s)
         </span>

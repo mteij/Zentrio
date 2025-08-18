@@ -15,16 +15,70 @@ import apiRoutes from './routes/api/index'
 // Initialize environment variables before starting the app
 await initEnv()
 
+// Create app instance
 const app = new Hono()
 
-// Environment Configuration
-const { PORT } = getConfig()
+// Load runtime config
+const cfg = getConfig()
+const { PORT, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY } = cfg
+
+// Console helpers for a fancy startup display
+const color = (code: string, text: string) => `\x1b[${code}m${text}\x1b[0m`
+const ok = (text: string) => console.log(`${color('32', '✔')} ${text}`)
+const fail = (text: string) => console.log(`${color('31', '✖')} ${text}`)
+const info = (text: string) => console.log(color('36', `ℹ ${text}`))
+const warn = (text: string) => console.log(color('33', `⚠ ${text}`))
+
+const banner = color('1;31', ` _____          _        _
+|__  /___ _ __ | |_ _ __(_) ___
+  / // _ \\ '_ \\| __| '__| |/ _ \\
+ / /|  __/ | | | |_| |  | | (_) |
+/____\\___|_| |_|\\__|_|  |_|\\___/`)
+
+console.log(banner)
+info('Starting Zentrio — performing startup checks...')
+
+// Basic checks & status output
+try {
+  ok(`Environment loaded (PORT=${PORT})`)
+} catch (e) {
+  fail('Failed to read environment configuration')
+}
+
+if (!AUTH_SECRET || AUTH_SECRET === 'super-secret-key-change-in-production') {
+  fail('AUTH_SECRET is not configured or uses the default.')
+} else {
+  ok('AUTH_SECRET loaded')
+}
+
+if (!ENCRYPTION_KEY || ENCRYPTION_KEY === 'super-secret-key-change-in-production') {
+  fail('ENCRYPTION_KEY is not configured or uses the default.')
+} else {
+  ok('ENCRYPTION_KEY loaded')
+}
+
+if (DATABASE_URL && DATABASE_URL.includes('sqlite')) {
+  ok(`Database: using sqlite at ${DATABASE_URL}`)
+  ok('Database configured')
+} else if (DATABASE_URL) {
+  ok(`Database configured: ${DATABASE_URL}`)
+} else {
+  fail('DATABASE_URL not configured')
+}
+
+if (!RATE_LIMIT_LIMIT || RATE_LIMIT_LIMIT <= 0 || !RATE_LIMIT_WINDOW_MS || RATE_LIMIT_WINDOW_MS <= 0) {
+  info('Rate limiter: disabled')
+} else {
+  ok(`Rate limiter: ${RATE_LIMIT_LIMIT} requests / ${RATE_LIMIT_WINDOW_MS}ms`)
+}
+
+info('Preparing middleware and routes...')
 
 // Basic Middleware
 app.use('*', corsMiddleware())
 app.use('*', logger())
 app.use('*', securityHeaders)
-app.use('*', rateLimiter({ windowMs: 15 * 60 * 1000, limit: 100 }))
+app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
 
 // Static file serving (explicit, to avoid path mismatches)
 app.get('/static/*', async (c) => {

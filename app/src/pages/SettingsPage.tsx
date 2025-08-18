@@ -10,21 +10,8 @@ export function SettingsPage({}: SettingsPageProps) {
       <div className="container" style={{ position: 'relative', zIndex: 1 }}>
         <h1 className="page-title">Settings</h1>
         <button
+          id="backButton"
           className="back-btn"
-          onClick={() => {
-            // Navigate via top window when embedded; guard against null / cross-origin errors
-            try {
-              const topWindow = (window.top as Window | null);
-              if (topWindow && topWindow !== window) {
-                topWindow.location.href = '/profiles';
-              } else {
-                window.location.href = '/profiles';
-              }
-            } catch (e) {
-              // Accessing window.top can throw in some embed scenarios; fallback to current window
-              window.location.href = '/profiles';
-            }
-          }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
@@ -74,7 +61,7 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="toggle" id="addonManagerEnabledToggle"></div>
             </div>
           </div>
-
+ 
           <div className="setting-item">
             <div className="setting-info">
               <h3>Hide Calendar Button</h3>
@@ -84,7 +71,7 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="toggle" id="hideCalendarButtonToggle"></div>
             </div>
           </div>
-
+ 
           <div className="setting-item">
             <div className="setting-info">
               <h3>Hide Addons Button</h3>
@@ -95,6 +82,78 @@ export function SettingsPage({}: SettingsPageProps) {
             </div>
           </div>
         </div>
+ 
+        {/* Appearance (local-only theme selection) */}
+        <div className="settings-section">
+          <h2 className="section-title">Appearance</h2>
+
+          <div className="setting-item" style={{ alignItems: 'flex-start', gap: 16 }}>
+            <div className="setting-info">
+              <h3>Theme</h3>
+              <p>Choose a subtle, modern theme for button colors, accents and the background. Use previews to pick a look; selection is stored locally on this device.</p>
+            </div>
+
+            <div className="setting-control" style={{ flexDirection: 'column', alignItems: 'flex-end' }}>
+              <div id="themeGallery" style={{ display: 'flex', gap: 12 }}>
+                {/* Previews will be rendered by client JS */}
+              </div>
+
+              <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+                <label htmlFor="vantaToggle" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted, #b3b3b3)' }}>
+                  <input id="vantaToggle" type="checkbox" />
+                  Enable animated background
+                </label>
+    
+                <button id="customizeThemeBtn" className="btn btn-secondary btn-small" type="button" onClick={() => {
+                  try {
+                    const top = (window as any);
+                    const ev = new CustomEvent('openThemeCustomize');
+                    document.dispatchEvent(ev);
+                  } catch (e) {}
+                }}>
+                  Customize
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {/* Theme customization modal */}
+        <ModalWithFooter
+          id="themeCustomizeModal"
+          title="Customize Theme"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => {
+                try { document.getElementById('themeCustomizeModal')?.classList.remove('active'); document.body.classList.remove('modal-open'); } catch (e) {}
+              }}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={() => {
+                try { document.getElementById('themeCustomizeModal')?.classList.remove('active'); document.body.classList.remove('modal-open'); } catch (e) {}
+                // save handled by client JS event listener
+                const saveEv = new CustomEvent('saveThemeCustomizations');
+                document.dispatchEvent(saveEv);
+              }}>
+                Save
+              </Button>
+            </>
+          }
+        >
+          <FormGroup>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input id="customVantaToggle" type="checkbox" defaultChecked />
+              Animated background
+            </label>
+            <p style={{ color: 'var(--muted,#b3b3b3)', fontSize: 13 }}>Enable or disable the animated Vanta background.</p>
+          </FormGroup>
+
+          <FormGroup label="Grain size" htmlFor="grainSizeInput">
+            <input type="number" id="grainSizeInput" defaultValue={0.6} step={0.1} min={0} max={5} className="form-control" />
+            <p style={{ color: 'var(--muted,#b3b3b3)', fontSize: 13 }}>Smaller values = finer grain. Default is 0.6 for a subtle effect.</p>
+          </FormGroup>
+        </ModalWithFooter>
 
         {/* Danger Zone */}
         <div className="danger-zone">
@@ -191,8 +250,8 @@ export function SettingsPage({}: SettingsPageProps) {
 
         body {
           font-family: 'Helvetica Neue', Arial, sans-serif;
-          background: #141414;
-          color: white;
+          background: var(--bg, #141414);
+          color: var(--text, white);
           min-height: 100vh;
         }
 
@@ -213,8 +272,8 @@ export function SettingsPage({}: SettingsPageProps) {
           align-items: center;
           gap: 8px;
           padding: 10px 16px;
-          background: #333;
-          color: white;
+          background: var(--btn-secondary-bg, #333);
+          color: var(--text, white);
           border: none;
           border-radius: 4px;
           cursor: pointer;
@@ -226,8 +285,8 @@ export function SettingsPage({}: SettingsPageProps) {
         }
 
         .back-btn:hover {
-          background: #555;
-          color: #e50914;
+          background: rgba(255,255,255,0.04);
+          color: var(--accent, #e50914);
         }
 
         .back-btn svg {
@@ -239,7 +298,7 @@ export function SettingsPage({}: SettingsPageProps) {
         }
 
         .settings-section {
-          background: #222;
+          background: var(--section-bg, #222);
           border-radius: 8px;
           padding: 30px;
           margin-bottom: 30px;
@@ -248,7 +307,7 @@ export function SettingsPage({}: SettingsPageProps) {
         .section-title {
           font-size: 24px;
           margin-bottom: 20px;
-          color: #e50914;
+          color: var(--accent, #e50914);
         }
 
         .setting-item {
@@ -256,7 +315,7 @@ export function SettingsPage({}: SettingsPageProps) {
           justify-content: space-between;
           align-items: center;
           padding: 20px 0;
-          border-bottom: 1px solid #333;
+          border-bottom: 1px solid rgba(255,255,255,0.04);
         }
 
         .setting-item:last-child {
@@ -269,7 +328,7 @@ export function SettingsPage({}: SettingsPageProps) {
         }
 
         .setting-info p {
-          color: #b3b3b3;
+          color: var(--muted, #b3b3b3);
           font-size: 14px;
         }
 
@@ -283,14 +342,14 @@ export function SettingsPage({}: SettingsPageProps) {
           position: relative;
           width: 50px;
           height: 24px;
-          background: #333;
+          background: var(--btn-secondary-bg, #333);
           border-radius: 12px;
           cursor: pointer;
           transition: background 0.3s;
         }
 
         .toggle.active {
-          background: #e50914;
+          background: var(--accent, #e50914);
         }
 
         .toggle::after {
@@ -342,7 +401,7 @@ export function SettingsPage({}: SettingsPageProps) {
         }
 
         .modal-content {
-          background: #222;
+          background: var(--section-bg, #222);
           border-radius: 8px;
           padding: 30px;
           width: 90%;
@@ -369,7 +428,7 @@ export function SettingsPage({}: SettingsPageProps) {
 
         .modal-title {
           font-size: 24px;
-          color: #e50914;
+          color: var(--accent, #e50914);
           margin: 0;
         }
 
@@ -390,8 +449,8 @@ export function SettingsPage({}: SettingsPageProps) {
         }
 
         .modal-close:hover {
-          background: #333;
-          color: white;
+          background: rgba(255,255,255,0.04);
+          color: var(--text, white);
         }
 
         .modal-body {

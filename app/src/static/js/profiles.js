@@ -79,6 +79,8 @@ function renderProfiles() {
             editMode = false;
             editModeBtn.setAttribute('aria-pressed', 'false');
             editModeBtn.classList.remove('active');
+            // reflect visual state (icon, title, hidden buttons)
+            updateEditModeUI();
         }
     }
 }
@@ -373,6 +375,8 @@ document.addEventListener('DOMContentLoaded', () => {
             updateEditModeUI();
         });
     }
+    // Ensure the button shows the correct icon/state on initial load
+    updateEditModeUI();
 
     // Create profile button (visible only when no profiles or when in edit mode)
     if (createProfileBtn) {
@@ -408,20 +412,129 @@ document.addEventListener('DOMContentLoaded', () => {
 function updateEditModeUI() {
     const sectionTitle = document.getElementById('sectionTitle');
     const footerButtons = document.getElementById('footerButtons');
-    
+
     if (sectionTitle) {
         sectionTitle.textContent = editMode ? 'Select profile to edit:' : 'Who\'s watching?';
     }
-    
+
     if (footerButtons) {
         const buttons = footerButtons.querySelectorAll('button:not(#editModeBtn):not(#createProfileBtn)');
         buttons.forEach(button => {
             button.style.display = editMode ? 'none' : 'inline-flex';
         });
-        
+
         // Show/hide the create profile button when toggling edit mode
         if (createProfileBtn) {
             createProfileBtn.style.display = editMode ? 'inline-flex' : (profiles.length === 0 ? 'inline-flex' : 'none');
         }
     }
+
+    // Update the editMode button icon + accessible labels to indicate "leave edit mode"
+    if (editModeBtn) {
+        // Pencil icon (default)
+        const pencilSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.99-1.66z"/></svg>';
+
+        // Close / back icon (X)
+        const closeSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+
+        // Apply icon and titles
+        editModeBtn.innerHTML = editMode ? closeSvg : pencilSvg;
+        editModeBtn.setAttribute('title', editMode ? 'Exit edit mode' : 'Edit mode');
+        editModeBtn.setAttribute('aria-label', editMode ? 'Exit edit mode' : 'Toggle edit mode');
+    }
 }
+// Initialize Vanta background (load themes from server and respect local preferences)
+(function initVantaExternal() {
+    async function startVanta() {
+        const el = document.getElementById('vanta-bg');
+        if (!(window.VANTA && window.VANTA.FOG && el)) {
+            setTimeout(startVanta, 300);
+            return;
+        }
+
+        try {
+            // Load server-provided themes (if available)
+            let themes = [];
+            try {
+                const res = await fetch('/api/themes');
+                if (res.ok) themes = await res.json();
+            } catch (e) {
+                // ignore and fall back
+            }
+            window.__loadedThemes = themes;
+    
+            // Determine selected theme id (prefer localStorage)
+            const storedThemeId = (function () { try { return localStorage.getItem('zentrioTheme') || (themes[0] && themes[0].id) || null; } catch (e) { return null; } })();
+            const selectedTheme = (themes && themes.length > 0) ? (themes.find(t => t.id === storedThemeId) || themes[0]) : null;
+    
+            // Apply selected theme CSS variables so buttons, text and other components pick up colors
+            if (selectedTheme) {
+                try {
+                    document.documentElement.style.setProperty('--accent', selectedTheme.accent || '#e50914');
+                    document.documentElement.style.setProperty('--btn-primary-bg', selectedTheme.btnPrimary || selectedTheme.accent || '#e50914');
+                    document.documentElement.style.setProperty('--btn-primary-bg-hover', selectedTheme.btnPrimaryHover || selectedTheme.btnPrimary || selectedTheme.accent || '#f40612');
+                    document.documentElement.style.setProperty('--btn-secondary-bg', selectedTheme.btnSecondary || '#333');
+                    document.documentElement.style.setProperty('--text', selectedTheme.text || '#ffffff');
+                    document.documentElement.style.setProperty('--muted', selectedTheme.muted || '#b3b3b3');
+    
+                    if (selectedTheme.vanta) {
+                        document.documentElement.style.setProperty('--vanta-highlight', selectedTheme.vanta.highlight);
+                        document.documentElement.style.setProperty('--vanta-midtone', selectedTheme.vanta.midtone);
+                        document.documentElement.style.setProperty('--vanta-lowlight', selectedTheme.vanta.lowlight);
+                        document.documentElement.style.setProperty('--vanta-base', selectedTheme.vanta.base);
+                    }
+                } catch (e) { /* silent */ }
+            }
+    
+            const vantaColors = (selectedTheme && selectedTheme.vanta) ? selectedTheme.vanta : { highlight: '#222222', midtone: '#111111', lowlight: '#000000', base: '#000000' };
+
+            // Respect user's Vanta (animated background) preference
+            const vantaPref = (function () { try { return localStorage.getItem('zentrioVanta'); } catch (e) { return null; } })();
+            const vantaEnabled = (vantaPref === null) ? true : (vantaPref === 'true');
+
+            if (!vantaEnabled) {
+                if (window.__vantaProfilesInstance) {
+                    try { window.__vantaProfilesInstance.destroy(); } catch (e) {}
+                    window.__vantaProfilesInstance = null;
+                }
+                const bg = `linear-gradient(180deg, ${vantaColors.midtone} 0%, ${vantaColors.base} 100%)`;
+                el.style.background = bg;
+                const canv = el.querySelector('canvas');
+                if (canv) canv.remove();
+                return;
+            }
+
+            // destroy previous instance if exists to apply new colors
+            if (window.__vantaProfilesInstance) {
+                try { window.__vantaProfilesInstance.destroy(); } catch (e) {}
+                window.__vantaProfilesInstance = null;
+            }
+
+            function hexToInt(hex) { return parseInt((hex || '#000000').replace('#', ''), 16); }
+
+            window.__vantaProfilesInstance = window.VANTA.FOG({
+                el: "#vanta-bg",
+                mouseControls: false,
+                touchControls: false,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                highlightColor: hexToInt(vantaColors.highlight),
+                midtoneColor: hexToInt(vantaColors.midtone),
+                lowlightColor: hexToInt(vantaColors.lowlight),
+                baseColor: hexToInt(vantaColors.base),
+                blurFactor: 0.90,
+                speed: 0.50,
+                zoom: 0.30
+            });
+        } catch (e) {
+            console.error('Vanta init failed', e);
+        }
+    }
+
+    // start after DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startVanta);
+    } else {
+        startVanta();
+    }
+})();
