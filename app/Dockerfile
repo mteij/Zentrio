@@ -1,8 +1,10 @@
 FROM oven/bun:latest AS builder
 WORKDIR /app
 COPY package.json bun.lock tsconfig.json ./
-COPY src ./src
+# Avoid frozen lockfile mode inside Docker build (some CI environments set CI=true)
+ENV CI=false
 RUN bun install --production
+COPY src ./src
 RUN bun build src/index.ts --outdir ./dist --target bun
 
 FROM oven/bun:latest AS runtime
