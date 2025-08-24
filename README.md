@@ -143,4 +143,8 @@ Disclaimer: Zentrio is an independent project and is not affiliated with Stremio
 
 ## License
 
-MIT
+This project is licensed under the MIT License. See [LICENSE](LICENSE:1) for details.
+
+## Trademark and Affiliation Notice
+
+Zentrio is an independent project and is not affiliated with, endorsed by, or sponsored by Stremio. "Stremio" and associated trademarks are the property of their respective owners. Your use of this project must comply with Stremio’s Terms of Service and all applicable laws.

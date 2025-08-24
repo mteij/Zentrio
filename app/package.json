@@ -1,6 +1,7 @@
 {
   "name": "zentrio-app",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "Zentrio application built with Hono and Bun",
   "scripts": {
     "dev": "bun run --hot src/index.ts",
