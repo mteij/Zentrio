@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  zentrio:
+    # Build from the included Dockerfile in /app for reproducible production images
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-ghcr.io/michieleijpe/zentrio:latest}
+    env_file:
+      - .env
+    environment:
+      - PORT=${PORT:-3000}
+      # Default DATABASE_URL points to an SQLite file inside the container volume
+      - DATABASE_URL=${DATABASE_URL:-sqlite:/data/zentrio.db}
+    ports:
+      - "${HOST_PORT:-3000}:${PORT:-3000}"
+    volumes:
+      - zentrio_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:${PORT:-3000}/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  zentrio_data:

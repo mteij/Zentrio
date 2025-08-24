@@ -91,14 +91,21 @@ python3 -c "import uuid; print((uuid.uuid4().hex + uuid.uuid4().hex))"
 
 **Quick Setup:**
 ```bash
-# With included MongoDB
+# Build & run with included MongoDB (production-ready)
 docker-compose up -d
 
-# Or standalone container
-docker run -d -p 8000:8000 --env-file .env ghcr.io/michieleijpe/zentrio:latest
+# Or build and run standalone container
+# Builds the image using the included Dockerfile in ./app
+docker build -t ghcr.io/michieleijpe/zentrio:latest -f app/Dockerfile ./app
+docker run -d -p 3000:3000 --env-file .env ghcr.io/michieleijpe/zentrio:latest
 ```
 
-Includes health checks, MongoDB service, and production-ready configuration.
+Notes:
+- The application listens on port 3000 by default. Override the port with the PORT environment variable in your `.env` file or with `-e PORT=...` when running the container.
+- The project uses SQLite by default. The compose file mounts a persistent volume and sets DATABASE_URL to `sqlite:/data/zentrio.db` by default. You can override DATABASE_URL in your `.env` if you want to store the DB elsewhere.
+- A production-ready compose file is included: `./docker-compose.yml`. It provides a persistent data volume for SQLite, healthchecks and sensible restart policies.
+- A GitHub Actions workflow is included to build and push images to GitHub Container Registry (GHCR): `.github/workflows/docker-image.yml`. The workflow builds the image from `./app` (uses `app/Dockerfile`) and tags/pushes to `ghcr.io/${{ github.repository }}`; ensure your repository allows packages write and that your default branch is `main` for the `latest` tag to be applied.
+- Health checks and volumes are configured in `docker-compose.yml` for reliable production deployment.
 
 ---
 
