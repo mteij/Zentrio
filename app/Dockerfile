@@ -1,5 +1,6 @@
 FROM oven/bun:latest AS builder
 WORKDIR /app
+ENV BUN_INSTALL_FROZEN_LOCKFILE=false
 COPY package.json bun.lock tsconfig.json ./
 COPY src ./src
 RUN bun install --production

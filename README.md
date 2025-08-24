@@ -1,154 +1,146 @@
-<div align="center">
-  
-  # <img src="app/static/icons/icon-512.png" alt="Zentrio Icon" width="48" height="48" align="center"> **Zentrio**
-  
-  **A profile management system for Stremio Web**
-  
-  [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-  [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-  
-  **[🚀 Visit Zentrio.eu](https://zentrio.eu)** • **[🐛 Report Issues](https://github.com/MichielEijpe/Zentrio/issues)**
-  
-</div>
+<h1 align="center"><img src="app/src/static/logo/icon-512.png" alt="Zentrio Icon" width="48" height="48" /> Zentrio</h1>
+<p align="center"><strong>Profile management for Stremio Web</strong></p>
+
+<p align="center">
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
+  <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-FF6A00?style=for-the-badge&logo=hono&logoColor=white" alt="Hono"></a>
+  <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+</p>
+
+<p align="center">
+  <a href="https://zentrio.eu"><strong>Visit Zentrio.eu</strong></a> •
+  <a href="https://github.com/MichielEijpe/Zentrio/issues"><strong>Report Issues</strong></a>
+</p>
 
 ---
 
-<details>
-<summary>🛡️ Important Note & Disclaimer</summary>
-<div style="color: red;">
+## Features
 
-**Welcome to Zentrio! Before you proceed, please take a moment to read this.**
-
-**About Development:** This project has been largely developed with the help of AI assistants like GitHub Copilot and Claude. While I carefully review and test the code, it's important to know that a significant portion of the codebase has been generated or enhanced by AI.
-
-**Your Security:**
-*   **Use Unique Passwords:** For your own safety, please use a unique password for Zentrio that you don't use anywhere else.
-*   **New Stremio Profiles:** It is strongly recommended to create new, empty Stremio profiles when using this service, instead of linking your existing ones.
-
-**Legal Disclaimer:** This is a personal project and is not affiliated with, endorsed, or sponsored by Stremio. I acknowledge that this service may test the boundaries of Stremio's terms of service and will comply with any and all takedown or cease and desist notices from Stremio or its legal representatives. The official Stremio website can be found at [stremio.com](https://stremio.com).
-</div>
-</details>
+- Profiles: create unlimited profiles with custom avatars
+- Per-profile content settings (e.g., NSFW filtering)
+- Addon order management
+- Installable PWA
+- Secure email flows (magic link and OTP)
 
 ---
 
-## ✨ **Features**
+## Quick start (local development)
 
-- **Profile Management**: Unlimited profiles with custom avatars.
-- **Content Filtering**: Per-profile NSFW filtering.
-- **Addon Management**: Reorder and sync addons.
-- **PWA Support**: Installable as a web app.
+Prerequisites:
+- Bun 1.x (https://bun.sh)
+- Git
 
----
-
-## 🚀 **Quick Start**
-
+Setup:
 ```bash
-# Clone and setup
+# Clone and configure environment
 git clone https://github.com/MichielEijpe/Zentrio.git
 cd Zentrio
 cp .env.example .env
+# Edit .env (see "Configuration" below)
 
-# Edit .env with your credentials (see below)
-
-# Start development server
-cd app && deno task start
+# Install and run the app
+cd app
+bun install
+bun run dev          # hot reload
+# or: bun run src/index.ts
 ```
 
-<details>
-<summary>Environment Variables (`.env`)</summary>
+The app runs at:
+- http://localhost:3000 (default; configurable via PORT)
 
-Create a `.env` file in the root directory by copying the example: `cp .env.example .env`. Then, fill in the variables according to the new structure below.
-
-| Variable                | Description                                                                                                                              | Example                                                                          |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **Core Settings**       |                                                                                                                                          |                                                                                  |
-| `APP_DOMAIN`            | The public URL of your instance, used for generating links in emails.                                                                    | `"https://zentrio.yourdomain.com"`                                               |
-| **Database**            |                                                                                                                                          |                                                                                  |
-| `MONGO_URI`             | Your full MongoDB connection string.                                                                                                     | `"mongodb+srv://user:pass@cluster.mongodb.net/dbname"`                           |
-| **Security**            |                                                                                                                                          |                                                                                  |
-| `ENCRYPTION_MASTER_KEY` | **CRITICAL:** A 64-character hex key for encrypting data. **Back this up!**                                                              | `(generate one)`                                                                 |
-| **Email Configuration** |                                                                                                                                          |                                                                                  |
-| `EMAIL_PROVIDER`        | The service for sending emails. Can be `"resend"` or `"smtp"`.                                                                           | `"resend"`                                                                       |
-| `EMAIL_FROM_DOMAIN`     | The "From" address for emails. For Resend, use `onboarding@resend.dev` for testing.                                                      | `"noreply@yourdomain.com"`                                                       |
-| `RESEND_API_KEY`        | Your API key from Resend. (Required if `EMAIL_PROVIDER` is `"resend"`)                                                                   | `"re_xxxxxxxx_xxxxxxxx"`                                                         |
-| `SMTP_HOST`             | Your SMTP server address. (Required if `EMAIL_PROVIDER` is `"smtp"`)                                                                     | `"smtp.example.com"`                                                             |
-| `SMTP_PORT`             | The port for your SMTP server.                                                                                                           | `"587"`                                                                          |
-| `SMTP_USER`             | The username for your SMTP server.                                                                                                       | `"your_smtp_user"`                                                               |
-| `SMTP_PASS`             | The password for your SMTP server.                                                                                                       | `"your_smtp_password"`                                                           |
-| `SMTP_SECURE`           | Use `"true"` for SSL/TLS (port 465) or `"false"` for STARTTLS (port 587).                                                                | `"false"`                                                                        |
-| `SMTP_FALLBACK_ENABLED` | If enabled, Resend will be used as a fallback if the primary SMTP provider fails. This requires `RESEND_API_KEY` to be set.                | `"false"`                                                                        |
-
-</details>
-
-**Generate `ENCRYPTION_MASTER_KEY`:**
-```bash
-python3 -c "import uuid; print((uuid.uuid4().hex + uuid.uuid4().hex))"
-```
+Environment loading:
+- The app reads .env from the repository root (one level above /app). Keep .env at project root for both dev and Docker.
 
 ---
 
-## 🐳 **Docker Deployment**
+## Docker
 
-**Quick Setup:**
+Option A: Compose (recommended)
 ```bash
-# Build & run with included MongoDB (production-ready)
 docker-compose up -d
+```
+- Builds from ./app/Dockerfile
+- Exposes port 3000 by default (override HOST_PORT and PORT if needed)
+- Persists data in a named volume (SQLite at /data/zentrio.db by default)
+- Includes a healthcheck
 
-# Or build and run standalone container
-# Builds the image using the included Dockerfile in ./app
+Option B: Standalone image
+```bash
+# Build
 docker build -t ghcr.io/michieleijpe/zentrio:latest -f app/Dockerfile ./app
-docker run -d -p 3000:3000 --env-file .env ghcr.io/michieleijpe/zentrio:latest
+
+# Run
+docker run -d \
+  -p 3000:3000 \
+  --env-file .env \
+  ghcr.io/michieleijpe/zentrio:latest
 ```
 
 Notes:
-- The application listens on port 3000 by default. Override the port with the PORT environment variable in your `.env` file or with `-e PORT=...` when running the container.
-- The project uses SQLite by default. The compose file mounts a persistent volume and sets DATABASE_URL to `sqlite:/data/zentrio.db` by default. You can override DATABASE_URL in your `.env` if you want to store the DB elsewhere.
-- A production-ready compose file is included: `./docker-compose.yml`. It provides a persistent data volume for SQLite, healthchecks and sensible restart policies.
-- A GitHub Actions workflow is included to build and push images to GitHub Container Registry (GHCR): `.github/workflows/docker-image.yml`. The workflow builds the image from `./app` (uses `app/Dockerfile`) and tags/pushes to `ghcr.io/${{ github.repository }}`; ensure your repository allows packages write and that your default branch is `main` for the `latest` tag to be applied.
-- Health checks and volumes are configured in `docker-compose.yml` for reliable production deployment.
+- Default port is 3000. Override with PORT in .env or -e PORT=3000
+- Default database is SQLite. docker-compose sets DATABASE_URL=sqlite:/data/zentrio.db and mounts a persistent volume
+- A GitHub Actions workflow builds and pushes images to GHCR from ./app using app/Dockerfile
 
 ---
 
-## 📊 **Project Stats**
+## Configuration
 
-<div align="center">
-  
-  ![GitHub stars](https://img.shields.io/github/stars/MichielEijpe/Zentrio?style=social)
-  ![GitHub forks](https://img.shields.io/github/forks/MichielEijpe/Zentrio?style=social)
-  ![GitHub issues](https://img.shields.io/github/issues/MichielEijpe/Zentrio)
-  ![GitHub license](https://img.shields.io/github/license/MichielEijpe/Zentrio)
-  
-</div>
+Create .env at the repository root (cp .env.example .env). Important keys:
 
----
+- Core
+  - PORT: default 3000
+  - APP_URL: default http://localhost:PORT
+  - NODE_ENV: set to production in Docker
 
-## 🌐 **Public Instance**
+- Security
+  - AUTH_SECRET: required (random string)
+  - ENCRYPTION_KEY: required (random string)
 
-You can try Zentrio without setting up anything at **[zentrio.eu](https://zentrio.eu)** - our free public instance that's always up-to-date with the latest features.
+- Database
+  - DATABASE_URL:
+    - default fallback inside the app: sqlite://./zentrio.db (local file)
+    - docker-compose default: sqlite:/data/zentrio.db (persistent volume)
 
----
+- Email (SMTP via Nodemailer)
+  - EMAIL_HOST (e.g., smtp.gmail.com)
+  - EMAIL_PORT (e.g., 587)
+  - EMAIL_SECURE (true for 465, false for STARTTLS/587)
+  - EMAIL_USER, EMAIL_PASS
+  - EMAIL_FROM (e.g., noreply@zentrio.app)
 
-## 💖 **Acknowledgments**
+- Rate limiting
+  - RATE_LIMIT_WINDOW_MS: default 900000 (15 minutes)
+  - RATE_LIMIT_LIMIT: default 100
 
-Special thanks to:
-
-- **[pancake3000](https://github.com/pancake3000/stremio-addon-manager)** - Original addon manager concept
-- **[Stremio Team](https://www.stremio.com/)** - Amazing streaming platform
-- **[Deno Team](https://deno.land/)** - Revolutionary JavaScript runtime
-- **Our Contributors** - Making Zentrio better every day
-
----
-
-## 📄 **License**
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+See .env.example for a complete list and defaults.
 
 ---
 
-<div align="center">
-  
-  **Made with ❤️ for the Stremio Community**
-  
-  ⭐ **Star this repo if you found it helpful!** ⭐
-  
-</div>
+## Health
+
+- GET /api/health: JSON status including basic env configuration
+- Root page (/) serves the web UI
+
+---
+
+## Public instance
+
+Try Zentrio at https://zentrio.eu
+
+---
+
+## Acknowledgments
+
+- Stremio Team — streaming platform
+- Bun team — fast JavaScript runtime
+- Community contributors
+
+Disclaimer: Zentrio is an independent project and is not affiliated with Stremio. Use unique credentials and consider creating new Stremio profiles when testing.
+
+---
+
+## License
+
+MIT
