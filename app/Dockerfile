@@ -1,9 +1,8 @@
 FROM oven/bun:latest AS builder
 WORKDIR /app
 COPY package.json bun.lock tsconfig.json ./
-# Ensure install proceeds even if a CI environment enforces frozen lockfile
-# Use Bun's env to disable frozen mode specifically for this step
-RUN BUN_INSTALL_FROZEN_LOCKFILE=0 bun install --production
+# Enforce frozen lockfile: use the committed bun.lock exactly
+RUN bun install --production --frozen-lockfile
 COPY src ./src
 RUN bun build src/index.ts --outdir ./dist --target bun
 
