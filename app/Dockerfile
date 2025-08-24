@@ -2,7 +2,7 @@ FROM oven/bun:latest AS builder
 WORKDIR /app
 COPY package.json bun.lock tsconfig.json ./
 COPY src ./src
-RUN bun install -f --production
+RUN bun install --production
 RUN bun build src/index.ts --outdir ./dist --target bun
 
 FROM oven/bun:latest AS runtime
