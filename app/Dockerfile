@@ -3,7 +3,7 @@ WORKDIR /app
 ENV BUN_INSTALL_FROZEN_LOCKFILE=false
 COPY package.json bun.lock tsconfig.json ./
 COPY src ./src
-RUN bun install --production
+RUN bun install --production --frozen-lockfile=false
 RUN bun build src/index.ts --outdir ./dist --target bun
 
 FROM oven/bun:latest AS runtime
