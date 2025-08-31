@@ -399,7 +399,77 @@
         inlineAuth.classList.remove('step-hidden');
         inlineAuth.classList.add('fade-in');
         
-        // Add event handlers...
+        const form = document.getElementById('registerInlineForm');
+        const usernameInput = document.getElementById('regUsername');
+        const passwordInput = document.getElementById('regPassword');
+        const msg = document.getElementById('regMessage');
+        const backBtn = document.getElementById('registerBackBtn');
+
+        backBtn?.addEventListener('click', () => {
+            showEmailStep();
+            inlineAuth.classList.add('step-hidden');
+            inlineAuth.innerHTML = '';
+            clearGlobalMessage();
+            emailInput.focus();
+        });
+
+        usernameInput.focus();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearFieldError(usernameInput);
+            clearFieldError(passwordInput);
+            msg.style.display = 'none';
+
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+
+            if (!username) {
+                setFieldError(usernameInput, 'Please enter a nickname');
+                return;
+            }
+            if (!password) {
+                setFieldError(passwordInput, 'Please enter a password');
+                return;
+            }
+            if (password.length < 6) {
+                setFieldError(passwordInput, 'Password must be at least 6 characters');
+                return;
+            }
+
+            try {
+                form.querySelector('button[type="submit"]').disabled = true;
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    msg.textContent = 'Account created! Redirecting...';
+                    msg.className = 'message success';
+                    msg.style.display = 'block';
+                    // BUG: This is a race condition. The redirect should happen *after* the server confirms success.
+                    // The server now sends a `redirect` URL in the response. We should use it.
+                    msg.textContent = 'Account created! Redirecting...';
+                    msg.className = 'message success';
+                    msg.style.display = 'block';
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '/'; // Fallback to homepage
+                    }, 800);
+                } else {
+                    msg.textContent = data.error || 'Registration failed';
+                    msg.className = 'message error';
+                    msg.style.display = 'block';
+                }
+            } catch (err) {
+                msg.textContent = 'Network error, try again';
+                msg.className = 'message error';
+                msg.style.display = 'block';
+            } finally {
+                form.querySelector('button[type="submit"]').disabled = false;
+            }
+        });
     }
 
     async function identifyAndRender(email) {

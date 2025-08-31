@@ -16,6 +16,14 @@
 
 ---
 
+## Status — Pre-Alpha (Do Not Use in Production)
+
+- Under heavy development; interfaces, APIs, and database schema may change without notice.
+- Do not use with real accounts or personal data.
+- No stability, security, or data-loss guarantees; expect bugs and incomplete features.
+
+---
+
 ## Features
 
 - Profiles: create unlimited profiles with custom avatars

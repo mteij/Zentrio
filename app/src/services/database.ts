@@ -3,9 +3,10 @@ import * as bcrypt from 'bcryptjs'
 import { join } from 'path'
 import { randomBytes, randomInt, createHash } from 'crypto'
 import { encrypt } from './encryption'
+import { getConfig } from './envParser'
 
 // Initialize SQLite database
-const db = new Database(join(process.cwd(), 'zentrio.db'))
+const db = new Database(join(process.cwd(), 'data', 'zentrio.db'))
 
 // Enable foreign keys
 db.exec('PRAGMA foreign_keys = ON')

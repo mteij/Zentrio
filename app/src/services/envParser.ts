@@ -53,7 +53,7 @@ export async function initEnv(): Promise<void> {
  */
 export function getConfig() {
   const PORT = Number(process.env.PORT ?? 3000)
-  const DATABASE_URL = process.env.DATABASE_URL ?? 'sqlite://./zentrio.db'
+  const DATABASE_URL = process.env.DATABASE_URL ?? './data/zentrio.db'
   const AUTH_SECRET = process.env.AUTH_SECRET ?? 'super-secret-key-change-in-production'
   const APP_URL = process.env.APP_URL ?? `http://localhost:${PORT}`
   const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY ?? 'super-secret-key-change-in-production'

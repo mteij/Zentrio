@@ -112,7 +112,9 @@ app.post('/register', async (c) => {
     
     return c.json({
       message: 'Account created successfully',
-      user: { id: user.id, email: user.email, username: user.username }
+      user: { id: user.id, email: user.email, username: user.username },
+      // The redirect URL is now correctly sent to the client
+      redirect: '/profiles'
     })
   } catch (error) {
     return c.json({ error: 'Failed to create account' }, 500)

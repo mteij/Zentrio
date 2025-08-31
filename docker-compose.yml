@@ -11,8 +11,8 @@ services:
       - .env
     environment:
       - PORT=${PORT:-3000}
-      # Default DATABASE_URL points to an SQLite file inside the container volume
-      - DATABASE_URL=${DATABASE_URL:-sqlite:/data/zentrio.db}
+      # Database in the mounted volume
+      - DATABASE_URL=/data/zentrio.db
     ports:
       - "${HOST_PORT:-3000}:${PORT:-3000}"
     volumes:

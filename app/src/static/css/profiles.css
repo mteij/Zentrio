@@ -253,11 +253,6 @@
         font-size: 14px;
     }
 
-    .modal-content {
-        margin: 10% auto;
-        padding: 30px 20px;
-        width: 95%;
-    }
 
     .avatar-preview {
         width: 80px;
@@ -345,6 +340,8 @@
     gap: 15px;
     max-width: 600px;
     margin: 0 auto;
+    flex-wrap: nowrap;
+    overflow-x: auto;
 }
 
 /* Mobile footer adjustments */
@@ -361,13 +358,11 @@
 
 @media (max-width: 480px) {
     .footer-buttons {
-        flex-direction: column;
         gap: 8px;
     }
     
     .footer-buttons .btn {
-        width: 100%;
-        max-width: 200px;
+        width: auto;
         text-align: center;
     }
 }
@@ -437,23 +432,6 @@
 /* Profile edit modal layout and avatar picker (scoped to profiles page/modal) */
 .profile-edit-form { width: 100%; }
 
-.profile-edit-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-
-@media (min-width: 768px) {
-  .profile-edit-grid {
-    grid-template-columns: 1fr 1.5fr;
-    align-items: start;
-  }
-}
-
-/* Increase modal content width on this page to support 2-column layout */
-.modal .modal-content {
-  max-width: 900px;
-}
 
 .profile-left,
 .profile-right {
@@ -623,49 +601,63 @@
   display: none !important;
 }
 
-/* Slimmer, modern profile modal */
 #profileModal .modal-content {
-  max-width: 520px;
-  padding: 24px;
-}
-#profileModal .profile-edit-container {
-  gap: 16px;
-  max-width: 360px;
-}
-#profileModal .avatar-preview {
-  max-width: 120px;
-  border-radius: 10px;
-}
-#profileModal .form-group {
-  margin-bottom: 12px;
-}
-#profileModal label {
-  font-size: 14px;
-}
-#profileModal input {
-  padding: 10px 12px;
-  font-size: 14px;
-}
-#profileModal .shuffle-btn {
-  min-width: 120px;
-  padding: 8px 12px;
-  font-size: 13px;
-}
-#profileModal .save-btn {
-  padding: 10px 16px;
-  font-size: 15px;
+    max-width: 400px; /* Further reduced max-width */
+    padding: 20px; /* Reduced padding */
+    border-radius: 10px;
+    overflow-y: auto; /* Add vertical scroll on overflow */
+    max-height: 90vh; /* Set a max height relative to viewport */
 }
 
-/* Responsive fine-tuning */
+#profileModal .profile-edit-container {
+    gap: 16px; /* Reduced gap */
+    max-width: 100%;
+}
+
+#profileModal .avatar-preview {
+    max-width: 100px; /* Smaller avatar preview */
+    border-radius: 50%;
+}
+
+#profileModal .form-group {
+    margin-bottom: 12px; /* Reduced margin */
+}
+
+#profileModal label {
+    font-size: 13px; /* Smaller font size */
+    font-weight: 500;
+}
+
+#profileModal input {
+    padding: 10px 12px; /* Reduced padding */
+    font-size: 14px; /* Smaller font size */
+}
+
+#profileModal .shuffle-btn {
+    min-width: 110px; /* Smaller button */
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+#profileModal .save-btn {
+    padding: 10px 16px; /* Smaller button */
+    font-size: 15px;
+}
+
+/* Responsive adjustments for mobile */
 @media (max-width: 480px) {
-  #profileModal .modal-content {
-    padding: 20px;
-    max-width: 95%;
-  }
-  #profileModal .profile-edit-container {
-    max-width: 320px;
-    gap: 14px;
-  }
+    #profileModal .modal-content {
+        padding: 16px;
+        max-width: 95%;
+    }
+
+    #profileModal .profile-edit-container {
+        gap: 12px;
+    }
+
+    #profileModal .avatar-preview {
+        max-width: 90px;
+    }
 }
 /* Ensure Vanta canvas sits behind the overlay and is non-interactive */
 #vanta-bg {
