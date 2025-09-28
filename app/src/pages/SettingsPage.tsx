@@ -1,11 +1,28 @@
-import { SimpleLayout, Button, Modal, FormGroup, Input, Message, ModalWithFooter } from '../components/index'
+import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter } from '../components/index'
+import { OTPModal } from '../components/auth/OTPModal'
 
 interface SettingsPageProps {}
 
 export function SettingsPage({}: SettingsPageProps) {
+
   return (
     <SimpleLayout title="Settings">
-      {/* VANTA background container */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            document.addEventListener('show-toast', (event) => {
+              const { text, type, error } = event.detail;
+              
+              let toastType = 'message';
+              if (type === 'success') toastType = 'message';
+              if (type === 'error') toastType = 'error';
+              if (type === 'info') toastType = 'warning';
+
+              window.showToast(toastType, text, undefined, error);
+            });
+          `,
+        }}
+      />
       <div id="vanta-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, width: '100vw', height: '100vh' }}></div>
       <div className="container" style={{ position: 'relative', zIndex: 1 }}>
         <h1 className="page-title">Settings</h1>
@@ -30,7 +47,7 @@ export function SettingsPage({}: SettingsPageProps) {
             </div>
             <div className="setting-control">
               <span id="currentEmail">Loading...</span>
-              <Button variant="secondary" onClick={() => console.log('Toggle email form')}>
+              <Button variant="secondary" id="openEmailModalBtn">
                 Change
               </Button>
             </div>
@@ -42,7 +59,7 @@ export function SettingsPage({}: SettingsPageProps) {
               <p>Update your account password</p>
             </div>
             <div className="setting-control">
-              <Button variant="secondary" onClick={() => console.log('Toggle password form')}>
+              <Button variant="secondary" id="openPasswordModalBtn">
                 Change Password
               </Button>
             </div>
@@ -81,6 +98,16 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="toggle" id="hideAddonsButtonToggle"></div>
             </div>
           </div>
+
+          <div className="setting-item">
+            <div className="setting-info">
+              <h3>Enable Downloads Manager</h3>
+              <p>Shows a download button for each stream and a downloads panel within Stremio (requires page refresh after changing).</p>
+            </div>
+            <div className="setting-control">
+              <div className="toggle" id="downloadsManagerEnabledToggle"></div>
+            </div>
+          </div>
         </div>
  
         {/* Appearance (local-only theme selection) */}
@@ -97,63 +124,20 @@ export function SettingsPage({}: SettingsPageProps) {
               <div id="themeGallery" style={{ display: 'flex', gap: 12 }}>
                 {/* Previews will be rendered by client JS */}
               </div>
+            </div>
+          </div>
 
-              <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-                <label htmlFor="vantaToggle" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted, #b3b3b3)' }}>
-                  <input id="vantaToggle" type="checkbox" />
-                  Enable animated background
-                </label>
-    
-                <button id="customizeThemeBtn" className="btn btn-secondary btn-small" type="button" onClick={() => {
-                  try {
-                    const top = (window as any);
-                    const ev = new CustomEvent('openThemeCustomize');
-                    document.dispatchEvent(ev);
-                  } catch (e) {}
-                }}>
-                  Customize
-                </button>
-              </div>
-
+          <div className="setting-item">
+            <div className="setting-info">
+              <h3>Enable animated background</h3>
+              <p>Toggle the animated Vanta background effect on/off</p>
+            </div>
+            <div className="setting-control">
+              <div className="toggle" id="vantaToggle"></div>
             </div>
           </div>
         </div>
 
-        {/* Theme customization modal */}
-        <ModalWithFooter
-          id="themeCustomizeModal"
-          title="Customize Theme"
-          footer={
-            <>
-              <Button variant="secondary" onClick={() => {
-                try { document.getElementById('themeCustomizeModal')?.classList.remove('active'); document.body.classList.remove('modal-open'); } catch (e) {}
-              }}>
-                Cancel
-              </Button>
-              <Button variant="primary" onClick={() => {
-                try { document.getElementById('themeCustomizeModal')?.classList.remove('active'); document.body.classList.remove('modal-open'); } catch (e) {}
-                // save handled by client JS event listener
-                const saveEv = new CustomEvent('saveThemeCustomizations');
-                document.dispatchEvent(saveEv);
-              }}>
-                Save
-              </Button>
-            </>
-          }
-        >
-          <FormGroup>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input id="customVantaToggle" type="checkbox" defaultChecked />
-              Animated background
-            </label>
-            <p style={{ color: 'var(--muted,#b3b3b3)', fontSize: 13 }}>Enable or disable the animated Vanta background.</p>
-          </FormGroup>
-
-          <FormGroup label="Grain size" htmlFor="grainSizeInput">
-            <input type="number" id="grainSizeInput" defaultValue={0.6} step={0.1} min={0} max={5} className="form-control" />
-            <p style={{ color: 'var(--muted,#b3b3b3)', fontSize: 13 }}>Smaller values = finer grain. Default is 0.6 for a subtle effect.</p>
-          </FormGroup>
-        </ModalWithFooter>
 
         {/* Danger Zone */}
         <div className="danger-zone">
@@ -170,25 +154,32 @@ export function SettingsPage({}: SettingsPageProps) {
             </div>
           </div>
         </div>
-
-        <Message id="message" />
       </div>
 
       {/* Email Change Modal */}
       <ModalWithFooter
         id="emailModal"
-        title="Change Email Address"
+        title="Change email"
         footer={
           <>
-            <Button variant="secondary" onClick={() => console.log('Close email modal')}>
+            <Button variant="secondary" id="emailCancelBtn">
               Cancel
             </Button>
-            <Button variant="primary" onClick={() => console.log('Update email')}>
-              Update Email
+            <Button variant="primary" id="emailContinueBtn">
+              Continue
             </Button>
           </>
         }
       >
+        <FormGroup label="Current Email Address" htmlFor="oldEmail">
+          <Input
+            type="email"
+            id="oldEmail"
+            placeholder="Current email"
+            disabled
+            value=""
+          />
+        </FormGroup>
         <FormGroup label="New Email Address" htmlFor="newEmail">
           <Input
             type="email"
@@ -199,16 +190,28 @@ export function SettingsPage({}: SettingsPageProps) {
         </FormGroup>
       </ModalWithFooter>
 
+      {/* OTP Modal */}
+      <Modal id="otpModal" title="Verify email">
+        <OTPModal
+          email=""
+          onBack={() => {}}
+          onVerify={() => {}}
+          onResend={() => {}}
+          resendSeconds={30}
+          message=""
+        />
+      </Modal>
+
       {/* Password Change Modal */}
       <ModalWithFooter
         id="passwordModal"
         title="Change Password"
         footer={
           <>
-            <Button variant="secondary" onClick={() => console.log('Close password modal')}>
+            <Button variant="secondary" id="passwordCancelBtn">
               Cancel
             </Button>
-            <Button variant="primary" onClick={() => console.log('Update password')}>
+            <Button variant="primary" id="passwordUpdateBtn">
               Update Password
             </Button>
           </>
@@ -226,7 +229,7 @@ export function SettingsPage({}: SettingsPageProps) {
           <Input
             type="password"
             id="newPassword"
-            placeholder="Enter new password (min 8 characters)"
+            placeholder="Enter new password (min 12 characters)"
             required
           />
         </FormGroup>
@@ -240,6 +243,376 @@ export function SettingsPage({}: SettingsPageProps) {
         </FormGroup>
       </ModalWithFooter>
 
+      {/* Settings wiring script */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+(function(){
+  // Toast shim
+  if (!window.addToast) {
+    window.addToast = function(type, title, message, error){ console.log('[toast]', type, title, message||'', error||''); };
+  }
+  if (!window.showToast && window.addToast) {
+    window.showToast = window.addToast;
+  }
+
+  // Fallback modal helpers if not provided by settings.js
+  if (typeof window.openModal !== 'function') {
+    window.openModal = function(modalId) {
+      var modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.classList.add('active');
+      document.body.classList.add('modal-open');
+      // focus first input
+      var firstInput = modal.querySelector('input');
+      if (firstInput) setTimeout(function(){ firstInput.focus(); }, 50);
+    };
+  }
+  if (typeof window.closeModal !== 'function') {
+    window.closeModal = function(modalId) {
+      var modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.classList.remove('active');
+      document.body.classList.remove('modal-open');
+    };
+  }
+
+  const headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'xmlhttprequest' };
+  let cachedEmail = '';
+
+  async function fetchProfileEmail() {
+    try {
+      const res = await fetch('/api/user/profile');
+      if (!res.ok) return '';
+      const data = await res.json();
+      const email = (data && data.email) || (data && data.data && data.data.email) || '';
+      if (email) {
+        cachedEmail = email;
+        const span = document.getElementById('currentEmail');
+        if (span) span.textContent = email;
+        const oldInput = document.getElementById('oldEmail');
+        if (oldInput) oldInput.value = email;
+      }
+      return email;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getCurrentEmailFromUI() {
+    const span = document.getElementById('currentEmail');
+    const v = span ? (span.textContent || '').trim() : '';
+    return v;
+  }
+
+  function setInlineOtpError(msg) {
+    const box = document.getElementById('otpContainerMessage');
+    if (box) {
+      box.textContent = msg || '';
+      box.className = 'message ' + (msg ? 'error' : 'info');
+      box.style.display = msg ? 'block' : 'none';
+    }
+  }
+
+  function disable(el, flag) {
+    if (!el) return;
+    el.setAttribute('disabled', flag ? 'true' : '');
+    if (!flag) el.removeAttribute('disabled');
+  }
+
+  // Email change + OTP flow
+  let otpNewEmail = '';
+  let resendSeconds = 0;
+  let resendTimer = null;
+
+  function startResendCooldown(sec) {
+    resendSeconds = sec;
+    updateResendText();
+    if (resendTimer) clearInterval(resendTimer);
+    resendTimer = setInterval(() => {
+      resendSeconds -= 1;
+      updateResendText();
+      if (resendSeconds <= 0) {
+        clearInterval(resendTimer);
+        resendTimer = null;
+      }
+    }, 1000);
+  }
+
+  function updateResendText() {
+    const el = document.getElementById('resendOtpText');
+    if (el) {
+      const s = resendSeconds > 0 ? resendSeconds : 0;
+      el.textContent = 'Resend OTP (' + s + 's)';
+      el.style.pointerEvents = s > 0 ? 'none' : 'auto';
+      el.style.opacity = s > 0 ? '0.6' : '1';
+    }
+  }
+
+  function openEmailModal() {
+    const old = cachedEmail || getCurrentEmailFromUI();
+    const oldInput = document.getElementById('oldEmail');
+    if (oldInput) oldInput.value = old || '';
+    openModal('emailModal');
+    setTimeout(() => {
+      const el = document.getElementById('newEmail');
+      if (el) el.focus();
+    }, 100);
+  }
+
+  async function initiateEmailChange() {
+    const btn = document.getElementById('emailContinueBtn');
+    disable(btn, true);
+    try {
+      const old = cachedEmail || getCurrentEmailFromUI();
+      const newInput = document.getElementById('newEmail');
+      const newEmail = newInput ? newInput.value.trim().toLowerCase() : '';
+      if (!newEmail || newEmail.indexOf('@') === -1 || (old && newEmail === old)) {
+        window.addToast('error', 'Invalid email', 'Enter a different valid email.');
+        return;
+      }
+
+      const res = await fetch('/api/user/email/initiate', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ newEmail })
+      });
+
+      if (res.status === 401) {
+        window.addToast('info', 'Session expired', 'Redirecting to sign in...');
+        setTimeout(() => { window.location.href = '/'; }, 800);
+        return;
+      }
+
+      if (res.ok) {
+        openOtpModalFor(newEmail);
+        startResendCooldown(30);
+        return;
+      }
+
+      let code = '';
+      try { const j = await res.json(); code = j?.error?.code || ''; } catch(_){}
+
+      if (res.status === 409 || code === 'EMAIL_IN_USE') {
+        window.addToast('error', 'Email already in use');
+        return;
+      }
+      if (res.status === 429 || code === 'RATE_LIMITED') {
+        window.addToast('error', 'Too many requests, try later.');
+        return;
+      }
+      window.addToast('error', 'Could not start verification');
+    } catch (e) {
+      window.addToast('error', 'Network error', 'Please try again later.');
+    } finally {
+      disable(btn, false);
+    }
+  }
+
+  function openOtpModalFor(newEmail) {
+    otpNewEmail = newEmail;
+    const p = document.getElementById('otpEmailText');
+    if (p) p.textContent = "We've sent a 6-digit code to " + newEmail;
+    setInlineOtpError('');
+    openModal('otpModal');
+    setTimeout(() => {
+      const codeInput = document.getElementById('otpCodeInput');
+      if (codeInput) codeInput.focus();
+    }, 100);
+  }
+
+  async function verifyOtp() {
+    const btn = document.getElementById('verifyOtpCodeBtn');
+    const input = document.getElementById('otpCodeInput');
+    const code = input ? (input.value || '').replace(/\\D/g, '') : '';
+    if (!/^[0-9]{6}$/.test(code)) {
+      setInlineOtpError('Please enter a valid 6-digit code.');
+      if (input) input.focus();
+      return;
+    }
+    disable(btn, true);
+    try {
+      const res = await fetch('/api/user/email/verify', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ newEmail: otpNewEmail, code })
+      });
+
+      if (res.status === 401) {
+        window.addToast('info', 'Session expired', 'Redirecting to sign in...');
+        setTimeout(() => { window.location.href = '/'; }, 800);
+        return;
+      }
+
+      let codeStr = '';
+      let data = null;
+      try { const j = await res.json(); codeStr = j?.error?.code || ''; data = j?.data || j; } catch(_){}
+
+      if (res.ok) {
+        const email = (data && (data.email || (data.data && data.data.email))) || otpNewEmail;
+        cachedEmail = email;
+        const span = document.getElementById('currentEmail');
+        if (span) span.textContent = email;
+        const oldInput = document.getElementById('oldEmail');
+        if (oldInput) oldInput.value = email;
+        closeModal('otpModal');
+        closeModal('emailModal');
+        window.addToast('success', 'Email updated. You may need to sign in again.');
+        return;
+      }
+
+      if (res.status === 400 && codeStr === 'INVALID_CODE') {
+        setInlineOtpError('Invalid verification code.');
+        if (input) { input.focus(); input.select && input.select(); }
+        return;
+      }
+
+      if (res.status === 409 || codeStr === 'EMAIL_IN_USE') {
+        window.addToast('error', 'Email already in use');
+        return;
+      }
+
+      if (res.status === 429 || codeStr === 'RATE_LIMITED') {
+        window.addToast('error', 'Too many requests, try later.');
+        return;
+      }
+
+      window.addToast('error', 'Verification failed');
+    } catch (e) {
+      window.addToast('error', 'Network error', 'Please try again later.');
+    } finally {
+      disable(btn, false);
+    }
+  }
+
+  async function resendOtp() {
+    if (resendSeconds > 0) return;
+    if (!otpNewEmail) return;
+    try {
+      const res = await fetch('/api/user/email/initiate', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ newEmail: otpNewEmail })
+      });
+      if (res.status === 401) {
+        window.addToast('info', 'Session expired', 'Redirecting to sign in...');
+        setTimeout(() => { window.location.href = '/'; }, 800);
+        return;
+      }
+      if (res.ok) {
+        window.addToast('info', 'Code resent');
+        startResendCooldown(30);
+        return;
+      }
+      let code = '';
+      try { const j = await res.json(); code = j?.error?.code || ''; } catch(_){}
+      if (res.status === 429 || code === 'RATE_LIMITED') {
+        window.addToast('error', 'Too many requests, try later.');
+        return;
+      }
+      window.addToast('error', 'Could not resend code');
+    } catch (e) {
+      window.addToast('error', 'Network error', 'Please try again later.');
+    }
+  }
+
+  // Password flow
+  async function submitPassword() {
+    const btn = document.getElementById('passwordUpdateBtn');
+    disable(btn, true);
+    try {
+      const oldPwEl = document.getElementById('currentPassword');
+      const newPwEl = document.getElementById('newPassword');
+      const confirmEl = document.getElementById('confirmPassword');
+      const oldPassword = oldPwEl ? oldPwEl.value : '';
+      const newPassword = newPwEl ? newPwEl.value : '';
+      const confirmPassword = confirmEl ? confirmEl.value : '';
+
+      if (!oldPassword) {
+        window.addToast('error', 'Enter your current password');
+        return;
+      }
+      if (!newPassword || newPassword.length < 12) {
+        window.addToast('error', 'Password too short', 'Minimum length is 12 characters.');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        window.addToast('error', 'Passwords do not match');
+        return;
+      }
+
+      const res = await fetch('/api/user/password', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ oldPassword, newPassword })
+      });
+
+      if (res.status === 401) {
+        window.addToast('info', 'Unable to update password');
+        return;
+      }
+
+      if (res.ok) {
+        closeModal('passwordModal');
+        window.addToast('success', 'Password updated; please sign in again.');
+        setTimeout(() => { window.location.href = '/'; }, 1000);
+        return;
+      }
+
+      let code = '';
+      try { const j = await res.json(); code = j?.error?.code || ''; } catch(_){}
+      if (res.status === 429 || code === 'RATE_LIMITED') {
+        window.addToast('error', 'Too many requests, try later.');
+        return;
+      }
+      window.addToast('error', 'Unable to update password');
+    } catch (e) {
+      window.addToast('error', 'Network error', 'Please try again later.');
+    } finally {
+      disable(btn, false);
+    }
+  }
+
+  function wire() {
+    // Prefill current email
+    fetchProfileEmail();
+
+    // Email modal
+    const btnEmailOpen = document.getElementById('openEmailModalBtn');
+    if (btnEmailOpen) btnEmailOpen.addEventListener('click', openEmailModal);
+
+    const btnEmailCancel = document.getElementById('emailCancelBtn');
+    if (btnEmailCancel) btnEmailCancel.addEventListener('click', () => closeModal('emailModal'));
+
+    const btnEmailContinue = document.getElementById('emailContinueBtn');
+    if (btnEmailContinue) btnEmailContinue.addEventListener('click', initiateEmailChange);
+
+    // Password modal
+    const btnPwdOpen = document.getElementById('openPasswordModalBtn');
+    if (btnPwdOpen) btnPwdOpen.addEventListener('click', () => openModal('passwordModal'));
+
+    const btnPwdCancel = document.getElementById('passwordCancelBtn');
+    if (btnPwdCancel) btnPwdCancel.addEventListener('click', () => closeModal('passwordModal'));
+
+    const btnPwdUpdate = document.getElementById('passwordUpdateBtn');
+    if (btnPwdUpdate) btnPwdUpdate.addEventListener('click', submitPassword);
+
+    // OTP modal
+    const otpBack = document.getElementById('otpBackBtn');
+    if (otpBack) otpBack.addEventListener('click', () => closeModal('otpModal'));
+
+    const otpVerify = document.getElementById('verifyOtpCodeBtn');
+    if (otpVerify) otpVerify.addEventListener('click', verifyOtp);
+
+    const otpResend = document.getElementById('resendOtpText');
+    if (otpResend) otpResend.addEventListener('click', resendOtp);
+  }
+
+  document.addEventListener('DOMContentLoaded', wire);
+})();
+          `
+        }}
+      />
       {/* Settings page styles */}
       <style>{`
         * {

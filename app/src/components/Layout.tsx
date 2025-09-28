@@ -1,3 +1,6 @@
+
+
+
 interface LayoutProps {
   title: string
   children: any
@@ -32,7 +35,9 @@ export function Layout({
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title} - Zentrio</title>
+        <script dangerouslySetInnerHTML={{__html: `(function(){try{var d=localStorage.getItem('zentrioThemeData');if(!d)return;var t=JSON.parse(d),doc=document.documentElement;var set=function(k,v){if(v)doc.style.setProperty(k,v)};set('--accent',t.accent);set('--btn-primary-bg',t.btnPrimary||t.accent);set('--btn-primary-bg-hover',t.btnPrimaryHover||t.btnPrimary||t.accent);set('--btn-secondary-bg',t.btnSecondary||t.accent);}catch(e){}})();`}} />
         <link rel="stylesheet" href="/static/css/styles.css" />
+        <link rel="stylesheet" href="/static/css/toast.css" />
         {additionalCSS.map(css => <link rel="stylesheet" href={css} />)}
         <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon/favicon-32x32.png" />
@@ -47,6 +52,7 @@ export function Layout({
           {children}
         </main>
         {showFooter && <PageFooter />}
+        <script src="/static/js/toast.js"></script>
       </body>
     </html>
   )
@@ -78,7 +84,9 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title} - Zentrio</title>
+        <script dangerouslySetInnerHTML={{__html: `(function(){try{var d=localStorage.getItem('zentrioThemeData');if(!d)return;var t=JSON.parse(d),doc=document.documentElement;var set=function(k,v){if(v)doc.style.setProperty(k,v)};set('--accent',t.accent);set('--btn-primary-bg',t.btnPrimary||t.accent);set('--btn-primary-bg-hover',t.btnPrimaryHover||t.btnPrimary||t.accent);set('--btn-secondary-bg',t.btnSecondary||t.accent);}catch(e){}})();`}} />
         <link rel="stylesheet" href="/static/css/styles.css" />
+        <link rel="stylesheet" href="/static/css/toast.css" />
         {additionalCSS.map(css => <link rel="stylesheet" href={css} />)}
         <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon/favicon-32x32.png" />
@@ -89,6 +97,7 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
       </head>
       <body className={className}>
         {children}
+        <script src="/static/js/toast.js"></script>
       </body>
     </html>
   )

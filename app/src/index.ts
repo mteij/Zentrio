@@ -13,14 +13,14 @@ import stremioRoutes from './routes/stremio'
 import apiRoutes from './routes/api/index'
 
 // Initialize environment variables before starting the app
-await initEnv()
+initEnv()
 
 // Create app instance
 const app = new Hono()
 
 // Load runtime config
 const cfg = getConfig()
-const { PORT, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY } = cfg
+const { PORT, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY, PROXY_LOGS } = cfg
 
 // Console helpers for a fancy startup display
 const color = (code: string, text: string) => `\x1b[${code}m${text}\x1b[0m`
@@ -76,7 +76,9 @@ info('Preparing middleware and routes...')
 
 // Basic Middleware
 app.use('*', corsMiddleware())
-app.use('*', logger())
+if (PROXY_LOGS) {
+  app.use('*', logger())
+}
 app.use('*', securityHeaders)
 app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
 

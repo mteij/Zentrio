@@ -34,6 +34,13 @@ async function loadProfiles() {
         }
         profiles = await response.json();
         renderProfiles();
+
+        // Auto-open create profile modal if no profiles exist
+        if (profiles.length === 0) {
+            if (profileModal && profileModal.style.display !== 'block') {
+                createProfile();
+            }
+        }
     } catch (error) {
         console.error('Failed to load profiles:', error);
         showMessage('Failed to load profiles. Please refresh the page.', 'error');
@@ -68,10 +75,7 @@ function renderProfiles() {
         loadAvatar(profile.avatar, `avatar-${profile.id}`);
     });
 
-    // Toggle visibility of Create Profile button and Edit Mode availability
-    if (createProfileBtn) {
-        createProfileBtn.style.display = profiles.length === 0 ? 'inline-flex' : 'none';
-    }
+    // Toggle visibility of Edit Mode availability (Add Profile button only shown in edit mode)
     if (editModeBtn) {
         editModeBtn.disabled = profiles.length === 0;
         if (profiles.length === 0 && editMode) {
@@ -348,13 +352,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Handle downloads button
+    // Handle downloads button (navigate to /downloads + feature flag hide)
     const downloadsBtn = document.getElementById('downloadsBtn');
-    if (downloadsBtn) {
+    (async function initDownloadsButton() {
+        if (!downloadsBtn) return;
+        try {
+            const r = await fetch('/api/user/settings');
+            if (r.ok) {
+                const settings = await r.json();
+                if (settings && settings.downloadsManagerEnabled === false) {
+                    downloadsBtn.style.display = 'none';
+                    return;
+                }
+            }
+        } catch(e) { /* silent */ }
         downloadsBtn.addEventListener('click', () => {
-            alert('Downloads feature coming soon!');
+            window.location.href = '/downloads';
         });
-    }
+    })();
     
     // Handle settings button (navigate to settings). Added for non-hydrated pages.
     const settingsBtn = document.getElementById('settingsBtn');
@@ -425,7 +440,8 @@ function updateEditModeUI() {
 
         // Show/hide the create profile button when toggling edit mode
         if (createProfileBtn) {
-            createProfileBtn.style.display = editMode ? 'inline-flex' : (profiles.length === 0 ? 'inline-flex' : 'none');
+            // Only show Add Profile button while in edit mode
+            createProfileBtn.style.display = editMode ? 'inline-flex' : 'none';
         }
     }
 
@@ -470,6 +486,7 @@ function updateEditModeUI() {
             // Apply selected theme CSS variables so buttons, text and other components pick up colors
             if (selectedTheme) {
                 try {
+                    try { localStorage.setItem('zentrioThemeData', JSON.stringify(selectedTheme)); } catch (e) {}
                     document.documentElement.style.setProperty('--accent', selectedTheme.accent || '#e50914');
                     document.documentElement.style.setProperty('--btn-primary-bg', selectedTheme.btnPrimary || selectedTheme.accent || '#e50914');
                     document.documentElement.style.setProperty('--btn-primary-bg-hover', selectedTheme.btnPrimaryHover || selectedTheme.btnPrimary || selectedTheme.accent || '#f40612');

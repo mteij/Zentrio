@@ -644,6 +644,26 @@
     font-size: 15px;
 }
 
+#profileModal .profile-action-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    align-items: stretch;
+    margin-top: 4px;
+}
+
+#profileModal .profile-action-row .save-btn {
+    flex: 1;
+    width: auto;
+    margin-top: 0;
+}
+
+#profileModal .profile-action-row #deleteProfileBtn {
+    flex: 1;
+    width: auto;
+    margin-top: 0;
+}
+
 /* Responsive adjustments for mobile */
 @media (max-width: 480px) {
     #profileModal .modal-content {

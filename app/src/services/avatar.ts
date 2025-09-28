@@ -1,15 +1,25 @@
-import { createAvatar } from '@dicebear/core'
-import { avataaarsNeutral } from '@dicebear/collection'
+let dicebearCore: any
+let dicebearCollection: any
+let dicebearLoaded = false
 
-export function generateAvatar(seed: string): string {
-  const avatar = createAvatar(avataaarsNeutral, {
-    seed: seed
-  })
+async function ensureDicebear() {
+  if (!dicebearLoaded) {
+    dicebearCore = await import('@dicebear/core')
+    dicebearCollection = await import('@dicebear/collection')
+    dicebearLoaded = true
+  }
+}
+
+export async function generateAvatar(seed: string): Promise<string> {
+  await ensureDicebear()
+  const { createAvatar } = dicebearCore
+  const { avataaarsNeutral } = dicebearCollection
+  const avatar = createAvatar(avataaarsNeutral, { seed })
   return avatar.toString()
 }
 
-export function generateRandomAvatar(): { svg: string, seed: string } {
+export async function generateRandomAvatar(): Promise<{ svg: string; seed: string }> {
   const randomSeed = Math.random().toString(36).substring(2, 15) + Date.now().toString(36)
-  const svg = generateAvatar(randomSeed)
+  const svg = await generateAvatar(randomSeed)
   return { svg, seed: randomSeed }
 }

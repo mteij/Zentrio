@@ -107,6 +107,24 @@ body {
 .btn-danger:hover {
     background: var(--btn-danger-bg-hover, #c82333);
 }
+/* CTA button style (used for OTP verify button) */
+.cta-button {
+    background: var(--btn-primary-bg);
+    color: var(--text);
+    padding: 16px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.cta-button:hover {
+    background: var(--btn-primary-bg-hover);
+}
 
 .btn-small {
     padding: 8px 16px;
@@ -269,17 +287,18 @@ input[type="range"]:active::-moz-range-thumb {
 .pulsing-dots .dot {
     width: 15px;
     height: 15px;
-    background-color: var(--accent);
+    /* Force white dots regardless of theme/accent */
+    background-color: #ffffff !important;
     border-radius: 50%;
-    animation: pulse 1.4s infinite ease-in-out both;
+    animation: dotPulse 1s ease-in-out infinite;
 }
 
 .pulsing-dots .dot:nth-child(1) {
-    animation-delay: -0.32s;
+    animation-delay: 0s;
 }
 
 .pulsing-dots .dot:nth-child(2) {
-    animation-delay: -0.16s;
+    animation-delay: 0.15s;
 }
 
 @keyframes pulse {
@@ -290,6 +309,26 @@ input[type="range"]:active::-moz-range-thumb {
     40% {
         transform: scale(1.0);
         opacity: 1;
+    }
+}
+
+/* New dotPulse animation for loading dots */
+@keyframes dotPulse {
+    0% {
+        transform: scale(0.4);
+        opacity: 0.25;
+    }
+    30% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    60% {
+        transform: scale(0.4);
+        opacity: 0.25;
+    }
+    100% {
+        transform: scale(0.4);
+        opacity: 0.25;
     }
 }
 

@@ -1,6 +1,7 @@
 import { getSessionScript } from './scripts/session'
 import { getAddonManagerScript } from './scripts/addonManager'
 import { getNsfwFilterScript } from './scripts/nsfwFilter'
+import { getDownloadsManagerScript } from './scripts/downloadsManager'
 
 const STREMIO_WEB_URL = "https://web.stremio.com/";
 const STREMIO_API_URL = "https://api.strem.io/";
@@ -105,7 +106,8 @@ export const proxyRequestHandler = async (req: Request, path: string, sessionDat
 
         const addonManagerScript = getAddonManagerScript();
         const nsfwFilterScript = getNsfwFilterScript();
-        body = body.replace(/<\/head>/i, `<script>${addonManagerScript}</script><script>${nsfwFilterScript}</script>$&`);
+        const downloadsManagerScript = getDownloadsManagerScript();
+        body = body.replace(/<\/head>/i, `<script>${addonManagerScript}</script><script>${nsfwFilterScript}</script><script>${downloadsManagerScript}</script>$&`);
       }
 
       responseHeaders.delete("content-encoding");

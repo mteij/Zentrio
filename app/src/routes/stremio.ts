@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { proxyRequestHandler } from '../services/stremio/proxy'
-
+import { getConfig } from '../services/envParser'
 const app = new Hono()
 
 app.all('*', async (c) => {
@@ -18,7 +18,10 @@ app.all('*', async (c) => {
     const fullPath = queryString ? `${path}?${queryString}` : path;
 
     // Debug trace
-    console.log('[Zentrio][stremio route] incoming:', url.pathname, '-> forwarding:', fullPath);
+    const { STREMIO_LOGS } = getConfig()
+    if (STREMIO_LOGS) {
+        console.log('[Zentrio][stremio route] incoming:', url.pathname, '-> forwarding:', fullPath);
+    }
 
     return proxyRequestHandler(c.req.raw, fullPath, sessionData);
 })

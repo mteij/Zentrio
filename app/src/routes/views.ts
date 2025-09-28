@@ -6,6 +6,7 @@ import { sessionDb } from '../services/database'
 import { LandingPage } from '../pages/LandingPage'
 import { ProfilesPage } from '../pages/ProfilesPage'
 import { SettingsPage } from '../pages/SettingsPage'
+import { DownloadsPage } from '../pages/DownloadsPage'
  
 const app = new Hono()
 
@@ -56,6 +57,13 @@ app.get('/settings', async (c) => {
   return c.html(SettingsPage({}))
 })
 
+
+app.get('/downloads', async (c) => {
+  if (!isAuthenticated(c)) return c.redirect('/')
+  return c.html(DownloadsPage({}))
+})
+
+ 
 // Auth modal routes (keep for compatibility)
 app.get('/views/auth/otp-modal.html', async (c) => {
   return serveHTML('auth/otp-modal.html')
@@ -64,5 +72,6 @@ app.get('/views/auth/otp-modal.html', async (c) => {
 app.get('/views/auth/magic-link-modal.html', async (c) => {
   return serveHTML('auth/magic-link-modal.html')
 })
+
  
 export default app

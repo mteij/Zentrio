@@ -9,9 +9,12 @@ async function loadSettings() {
     try {
         const response = await fetch('/api/user/settings');
         if (response.ok) {
-            const userSettings = await response.json();
-            Object.assign(settings, userSettings);
-            updateUI();
+            const payload = await response.json();
+            const userSettings = (payload && (payload.data || payload)) || {};
+            if (userSettings && typeof userSettings === 'object') {
+                Object.assign(settings, userSettings);
+                updateUI();
+            }
         }
     } catch (error) {
         console.error('Failed to load settings:', error);
@@ -23,18 +26,17 @@ async function loadUserInfo() {
     try {
         const response = await fetch('/api/user/profile');
         if (response.ok) {
-            const user = await response.json();
-            const el = document.getElementById('currentEmail');
-            if (el) el.textContent = user.email || 'Email not available';
+            const payload = await response.json();
+            const email = (payload && (payload.email || (payload.data && payload.data.email))) || '';
+            if (email) {
+                const el = document.getElementById('currentEmail');
+                if (el) el.textContent = email;
+            }
         } else {
             console.error('Failed to load user info: HTTP', response.status);
-            const el = document.getElementById('currentEmail');
-            if (el) el.textContent = 'Error loading email';
         }
     } catch (error) {
         console.error('Failed to load user info:', error);
-        const el = document.getElementById('currentEmail');
-        if (el) el.textContent = 'Error loading email';
     }
 }
 
@@ -62,11 +64,12 @@ async function saveSettings() {
         const response = await fetch('/api/user/settings', {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'xmlhttprequest'
             },
             body: JSON.stringify(settings)
         });
-
+ 
         if (response.ok) {
             showMessage('Settings saved successfully', 'success');
         } else {
@@ -203,16 +206,14 @@ function deleteAccount() {
 }
 
 // Show message
-function showMessage(text, type) {
-    const message = document.getElementById('message');
-    if (message) {
-        message.textContent = text;
-        message.className = `message ${type}`;
-        message.style.display = 'block';
-        setTimeout(() => {
-            message.style.display = 'none';
-        }, 5000);
-    }
+function showMessage(text, type, errorDetails) {
+  console.log('showMessage called:', { text, type, errorDetails });
+  if (window.addToast) {
+    console.log('window.addToast is defined. Calling it now.');
+    window.addToast(type, text, undefined, errorDetails);
+  } else {
+    console.error('window.addToast is NOT defined. Toast will not be shown.');
+  }
 }
 
 // Go back to profiles page
@@ -248,6 +249,7 @@ function hexToInt(hex) {
 
 function applyThemeObject(theme) {
     if (!theme) return;
+    try { localStorage.setItem('zentrioThemeData', JSON.stringify(theme)); } catch (e) {}
     // Set CSS variables
     document.documentElement.style.setProperty('--accent', theme.accent || '#e50914');
     document.documentElement.style.setProperty('--btn-primary-bg', theme.btnPrimary || theme.accent || '#e50914');
@@ -540,17 +542,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // wire Vanta toggle and persist preference
         const vantaToggle = document.getElementById('vantaToggle');
         if (vantaToggle) {
-            // default true unless explicitly disabled
+            // Set initial state
             const stored = (function () { try { return localStorage.getItem('zentrioVanta'); } catch (e) { return null; } })();
-            vantaToggle.checked = (stored === null) ? true : (stored === 'true');
- 
-            vantaToggle.addEventListener('change', () => {
-                try { localStorage.setItem('zentrioVanta', vantaToggle.checked ? 'true' : 'false'); } catch (e) {}
+            const initialState = (stored === null) ? true : (stored === 'true');
+            settings.vantaEnabled = initialState;
+            vantaToggle.classList.toggle('active', initialState);
+
+            vantaToggle.addEventListener('click', () => {
+                settings.vantaEnabled = !settings.vantaEnabled;
+                vantaToggle.classList.toggle('active', settings.vantaEnabled);
+                try { localStorage.setItem('zentrioVanta', settings.vantaEnabled ? 'true' : 'false'); } catch (e) {}
+
                 // reapply currently selected theme to enforce Vanta on/off
                 const current = (function () { try { return localStorage.getItem('zentrioTheme') || ''; } catch (e) { return ''; } })();
                 const themesRef = window.__loadedThemes || loaded;
                 const theme = themesRef ? themesRef.find(t => t.id === current) : null;
-                if (vantaToggle.checked) {
+                if (settings.vantaEnabled) {
                     if (theme) applyThemeObject(theme);
                 } else {
                     if (window.__vantaSettingsInstance) {
@@ -570,39 +577,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
  
-        // Theme customize modal wiring: open, populate and save preferences
-        document.addEventListener('openThemeCustomize', () => {
-            try {
-                const modal = document.getElementById('themeCustomizeModal');
-                if (!modal) return;
-                // populate controls from localStorage
-                const storedVanta = (function () { try { return localStorage.getItem('zentrioVanta'); } catch (e) { return null; } })();
-                const customVantaToggle = document.getElementById('customVantaToggle');
-                if (customVantaToggle) customVantaToggle.checked = (storedVanta === null) ? true : (storedVanta === 'true');
- 
-                modal.classList.add('active');
-                document.body.classList.add('modal-open');
-            } catch (e) {
-                console.error('Failed to open theme customize modal', e);
-            }
-        });
- 
-        document.addEventListener('saveThemeCustomizations', () => {
-            try {
-                const customVantaToggle = document.getElementById('customVantaToggle');
-                if (customVantaToggle) {
-                    try { localStorage.setItem('zentrioVanta', customVantaToggle.checked ? 'true' : 'false'); } catch (e) {}
-                }
- 
-                // reapply current theme to pick up changes (zoom is fixed)
-                const current = (function () { try { return localStorage.getItem('zentrioTheme') || ''; } catch (e) { return ''; } })();
-                const themesRef = window.__loadedThemes || loaded;
-                const theme = themesRef ? themesRef.find(t => t.id === current) : null;
-                if (theme) applyThemeObject(theme);
-            } catch (e) {
-                console.error('Failed to save theme customizations', e);
-            }
-        });
     })();
 
     loadSettings();

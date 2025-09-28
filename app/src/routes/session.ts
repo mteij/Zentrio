@@ -33,6 +33,7 @@ app.get('/:profileId', async (c) => {
             addonManagerEnabled: user.addon_manager_enabled,
             hideCalendarButton: user.hide_calendar_button,
             hideAddonsButton: user.hide_addons_button,
+            downloadsManagerEnabled: user.downloads_manager_enabled ?? true,
         }
     }
 

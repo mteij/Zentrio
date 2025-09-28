@@ -98,6 +98,7 @@
             hideCalendarButton: !!(user && user.hideCalendarButton),
             hideAddonsButton: !!(user && user.hideAddonsButton),
             addonManagerEnabled: !!(user && user.addonManagerEnabled),
+            downloadsManagerEnabled: (user && typeof user.downloadsManagerEnabled !== 'undefined') ? !!user.downloadsManagerEnabled : true,
             tmdbApiKey: profile.tmdb_api_key || null,
             installation_id: result.installation_id || generateInstallationId(),
             schema_version: result.schema_version || 18,

@@ -70,23 +70,25 @@ export function ProfileModal() {
               />
             </FormGroup>
 
-            <Button
-              type="submit"
-              className="btn-primary save-btn"
-              id="saveProfileBtn"
-            >
-              Save Profile
-            </Button>
-            
-            <Button
-              type="button"
-              variant="danger"
-              size="small"
-              id="deleteProfileBtn"
-              style={{ display: 'none', marginTop: '8px' }}
-            >
-              Delete Profile
-            </Button>
+            <div className="profile-action-row">
+              <Button
+                type="submit"
+                className="btn-primary save-btn"
+                id="saveProfileBtn"
+              >
+                Save Profile
+              </Button>
+              
+              <Button
+                type="button"
+                variant="danger"
+                size="small"
+                id="deleteProfileBtn"
+                style={{ display: 'none' }}
+              >
+                Delete Profile
+              </Button>
+            </div>
           </div>
         </form>
         

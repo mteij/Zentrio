@@ -1,0 +1,121 @@
+:root {
+    --message-bg-color: rgba(46, 125, 50, 0.2);
+    --message-border-color: #2e7d32;
+    --warning-bg-color: rgba(255, 165, 0, 0.2);
+    --warning-border-color: #ffa500;
+    --error-bg-color: rgba(211, 47, 47, 0.2);
+    --error-border-color: #d32f2f;
+    --text-color: #ffffff;
+    --input-bg-color: #333;
+}
+
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.toast-notification {
+  max-width: 350px;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  animation: slide-in 0.3s ease-out;
+  color: var(--text-color);
+}
+
+.toast-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid transparent;
+}
+
+.toast-title {
+  font-weight: bold;
+  margin: 0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.toast-message {
+  padding: 0.5rem 1rem;
+  margin: 0;
+}
+
+.toast-error-details {
+  padding: 0.5rem 1rem;
+}
+
+.toast-error-summary {
+  cursor: pointer;
+  font-weight: bold;
+  outline: none;
+}
+
+.summary-text {
+  text-decoration: underline;
+}
+
+.toast-error-pre {
+  background-color: var(--input-bg-color);
+  color: var(--error-color);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-top: 0.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+/* Message Type */
+.toast-notification.message {
+  background-color: var(--message-bg-color);
+  border-left: 5px solid var(--message-border-color);
+}
+
+.toast-notification.message .toast-header {
+  border-bottom-color: var(--message-border-color);
+}
+
+/* Warning Type */
+.toast-notification.warning {
+  background-color: var(--warning-bg-color);
+  border-left: 5px solid var(--warning-border-color);
+}
+
+.toast-notification.warning .toast-header {
+  border-bottom-color: var(--warning-border-color);
+}
+
+/* Error Type */
+.toast-notification.error {
+  background-color: var(--error-bg-color);
+  border-left: 5px solid var(--error-border-color);
+}
+
+.toast-notification.error .toast-header {
+  border-bottom-color: var(--error-border-color);
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

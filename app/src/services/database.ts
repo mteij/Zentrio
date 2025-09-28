@@ -8,8 +8,15 @@ import { getConfig } from './envParser'
 // Initialize SQLite database
 const db = new Database(join(process.cwd(), 'data', 'zentrio.db'))
 
-// Enable foreign keys
-db.exec('PRAGMA foreign_keys = ON')
+ // Enable foreign keys
+ db.exec('PRAGMA foreign_keys = ON')
+
+ // Lightweight migrations (idempotent)
+ try {
+   db.exec('ALTER TABLE users ADD COLUMN downloads_manager_enabled BOOLEAN DEFAULT TRUE')
+ } catch (e) {
+   // ignore if column already exists
+ }
 
 // Create tables
 db.exec(`
@@ -23,6 +30,7 @@ db.exec(`
     addon_manager_enabled BOOLEAN DEFAULT FALSE,
     hide_calendar_button BOOLEAN DEFAULT FALSE,
     hide_addons_button BOOLEAN DEFAULT FALSE,
+    downloads_manager_enabled BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -165,6 +173,7 @@ export interface User {
   addon_manager_enabled: boolean
   hide_calendar_button: boolean
   hide_addons_button: boolean
+  downloads_manager_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -355,6 +364,10 @@ export const userDb = {
     if (updates.hide_addons_button !== undefined) {
         fields.push('hide_addons_button = ?')
         values.push(updates.hide_addons_button)
+    }
+    if (updates.downloads_manager_enabled !== undefined) {
+        fields.push('downloads_manager_enabled = ?')
+        values.push(updates.downloads_manager_enabled)
     }
     
     if (fields.length === 0) return userDb.findById(id)

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { db, profileDb, profileProxySettingsDb, User } from '../../services/database'
+import { db, profileDb, profileProxySettingsDb, User, Profile } from '../../services/database'
 import { sessionMiddleware } from '../../middleware/session'
  
  const app = new Hono<{
@@ -15,10 +15,10 @@ import { sessionMiddleware } from '../../middleware/session'
    const user = c.get('user')
    const profiles = profileDb.findByUserId(user.id)
    // Remove password from profiles
-   const sanitizedProfiles = profiles.map(p => {
-     const { stremio_password, ...rest } = p;
-     return rest;
-   });
+   const sanitizedProfiles = profiles.map((p: Profile & { settings?: any }) => {
+     const { stremio_password, ...rest } = p
+     return rest
+   })
    return c.json(sanitizedProfiles)
  })
  
@@ -30,35 +30,29 @@ import { sessionMiddleware } from '../../middleware/session'
      return c.json({ error: 'Profile name, Stremio email, and password are required' }, 400)
    }
  
-   const transaction = db.transaction(async () => {
-    const profile = await profileDb.create({
-      user_id: user.id,
-      name,
-      avatar: avatar || name,
-      avatar_type: avatarType || 'initials',
-      is_default: false,
-      stremio_email: stremioEmail,
-      stremio_password: stremioPassword,
-    })
+  const profile = await profileDb.create({
+    user_id: user.id,
+    name,
+    avatar: avatar || name,
+    avatar_type: avatarType || 'initials',
+    is_default: false,
+    stremio_email: stremioEmail,
+    stremio_password: stremioPassword,
+  })
 
-    await profileProxySettingsDb.create({
-        profile_id: profile.id,
-        nsfw_filter_enabled: nsfwFilterEnabled,
-        nsfw_age_rating: ageRating,
-        hide_calendar_button: hideCalendarButton,
-        hide_addons_button: hideAddonsButton,
-    })
+  await profileProxySettingsDb.create({
+    profile_id: profile.id,
+    nsfw_filter_enabled: nsfwFilterEnabled,
+    nsfw_age_rating: ageRating,
+    hide_calendar_button: hideCalendarButton,
+    hide_addons_button: hideAddonsButton,
+  })
 
-    return profile;
-  });
+  // Don't return password
+  const { stremio_password, ...safeProfile } = profile
 
-  const profile = transaction();
- 
-   // Don't return password
-   const { stremio_password, ...safeProfile } = profile;
-
-   return c.json(safeProfile)
- })
+  return c.json(safeProfile)
+})
  
  app.put('/:id', async (c) => {
    const user = c.get('user')
@@ -74,51 +68,41 @@ import { sessionMiddleware } from '../../middleware/session'
      return c.json({ error: 'Forbidden' }, 403)
    }
  
-   const transaction = db.transaction(async () => {
-    const updates: {
-        name?: string
-        avatar?: string
-        avatar_type?: 'initials' | 'avatar'
-        stremio_email?: string
-        stremio_password?: string
-      } = {
-        name,
-        avatar: avatar || name,
-        avatar_type: avatarType,
-        stremio_email: stremioEmail,
-      }
+  const updates: {
+      name?: string
+      avatar?: string
+      avatar_type?: 'initials' | 'avatar'
+      stremio_email?: string
+      stremio_password?: string
+    } = {
+      name,
+      avatar: avatar || name,
+      avatar_type: avatarType,
+      stremio_email: stremioEmail,
+    }
 
-      if (stremioPassword) {
-        updates.stremio_password = stremioPassword;
-      }
+  if (stremioPassword) {
+    updates.stremio_password = stremioPassword
+  }
 
-      const updatedProfile = await profileDb.update(profileId, updates)
+  const updatedProfile = await profileDb.update(profileId, updates)
 
-      if (!updatedProfile) {
-        return null;
-      }
+  if (!updatedProfile) {
+    return c.json({ error: 'Profile not found' }, 404)
+  }
 
-      await profileProxySettingsDb.update(profileId, {
-        nsfw_filter_enabled: nsfwFilterEnabled,
-        nsfw_age_rating: ageRating,
-        hide_calendar_button: hideCalendarButton,
-        hide_addons_button: hideAddonsButton,
-      })
+  await profileProxySettingsDb.update(profileId, {
+    nsfw_filter_enabled: nsfwFilterEnabled,
+    nsfw_age_rating: ageRating,
+    hide_calendar_button: hideCalendarButton,
+    hide_addons_button: hideAddonsButton,
+  })
 
-      return updatedProfile;
-  });
+  // Don't return password
+  const { stremio_password, ...safeProfile } = updatedProfile
 
-  const updatedProfile = transaction();
- 
-   if (!updatedProfile) {
-     return c.json({ error: 'Profile not found' }, 404)
-   }
- 
-   // Don't return password
-   const { stremio_password, ...safeProfile } = updatedProfile;
-
-   return c.json(safeProfile)
- })
+  return c.json(safeProfile)
+})
  
  app.delete('/:id', async (c) => {
    const user = c.get('user')

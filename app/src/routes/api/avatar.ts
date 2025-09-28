@@ -6,7 +6,7 @@ const app = new Hono()
 // Generate random avatar
 app.get('/random', async (c) => {
   try {
-    const { svg, seed } = generateRandomAvatar()
+    const { svg, seed } = await generateRandomAvatar()
     
     return c.json({
       svg,
@@ -22,7 +22,7 @@ app.get('/random', async (c) => {
 app.get('/:seed', async (c) => {
   try {
     const seed = c.req.param('seed')
-    const svg = generateAvatar(seed)
+    const svg = await generateAvatar(seed)
     
     return new Response(svg, {
       headers: {

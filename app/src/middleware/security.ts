@@ -45,6 +45,8 @@ export const securityHeaders = async (c: Context, next: Next) => {
 
   // Defaults for first-party pages
   c.header('X-Frame-Options', 'DENY')
+  // TODO: Tighten CSP: remove 'unsafe-inline' by adopting nonces/hashes after extracting inline scripts into external files.
+  // Reference: [securityHeaders()](app/src/middleware/security.ts:27)
   c.header(
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"
