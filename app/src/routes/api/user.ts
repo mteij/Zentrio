@@ -75,21 +75,39 @@ async function csrfLikeGuard(c: any, next: any) {
     return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
   }
 
-  const expectedOrigin = new URL(c.req.url).origin.toLowerCase()
+  // Reconstruct expected origin honoring reverse proxy headers (TLS termination etc.)
+  const rawUrl = c.req.url
+  const url = new URL(rawUrl)
+  const xfProto =
+    (c.req.header('x-forwarded-proto') ||
+      c.req.header('x-forwarded-scheme') ||
+      url.protocol.replace(':', '')).toLowerCase()
+  const xfHost =
+    (c.req.header('x-forwarded-host') ||
+      c.req.header('host') ||
+      url.host).toLowerCase()
+  const expectedOrigin = `${xfProto}://${xfHost}`
+
+  const checkSameHost = (candidate: string): boolean => {
+    try {
+      const cand = new URL(candidate)
+      const exp = new URL(expectedOrigin)
+      // Accept when host matches even if scheme differs (common behind HTTPS-terminating proxy)
+      return cand.host.toLowerCase() === exp.host.toLowerCase()
+    } catch {
+      return false
+    }
+  }
+
   const hdrOrigin = (c.req.header('origin') || '').toLowerCase()
   if (hdrOrigin) {
-    if (hdrOrigin !== expectedOrigin) {
+    if (!checkSameHost(hdrOrigin)) {
       return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
     }
   } else {
-    const referer = c.req.header('referer')
+    const referer = c.req.header('referer') || ''
     if (referer) {
-      try {
-        const refOrigin = new URL(referer).origin.toLowerCase()
-        if (refOrigin !== expectedOrigin) {
-          return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
-        }
-      } catch {
+      if (!checkSameHost(referer)) {
         return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
       }
     }
