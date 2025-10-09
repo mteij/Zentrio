@@ -1,17 +1,10 @@
-version: "3.8"
-
 services:
   zentrio:
-    # Build from the included Dockerfile in /app for reproducible production images
-    build:
-      context: ./app
-      dockerfile: Dockerfile
     image: ${IMAGE_NAME:-ghcr.io/michieleijpe/zentrio:latest}
     env_file:
       - .env
     environment:
       - PORT=${PORT:-3000}
-      # Database in the mounted volume
       - DATABASE_URL=/data/zentrio.db
     ports:
       - "${HOST_PORT:-3000}:${PORT:-3000}"

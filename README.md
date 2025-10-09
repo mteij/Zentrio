@@ -71,6 +71,8 @@ bun run dev          # hot reload
 ### Docker
 Option A: Docker Compose (recommended)
 
+See the [`docker-compose.yml`](docker-compose.yml).
+
 ```bash
 docker-compose up -d
 ```
@@ -84,6 +86,7 @@ docker run -d \
     ghcr.io/michieleijpe/zentrio:latest
 ```
 ## Configuration
+Zentrio is fairly straightforward to setup. It is recommened to atleast configure the AUTH_SECRET, ENCRYPTION_KEY and EMAIL environment variables. For a complete list of all variables, look below:
 
 <details>
 <summary>Environment Variables</summary>
