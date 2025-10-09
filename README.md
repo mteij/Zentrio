@@ -16,31 +16,31 @@
 </div>
 
 <details>
-<summary>#<red><bold>Disclaimer: Zentrio's Story and AI Development</bold></red></summary>
+<summary># <font size="+1"><b>Disclaimer: Built with AI</b></font></summary>
 
-Zentrio is primarily an AI-coded project. Almost all of its codebase was generated with the assistance of AI models, demonstrating the potential of artificial intelligence in software development.
+Hey there! Just so you know, Zentrio was built mostly with AI assistance — it's been a fun experiment in what's possible when you combine AI tools with a curious engineering student.
 
-This project aims to provide profile management capabilities for Stremio Web, allowing users to create and manage multiple profiles with custom settings and avatars.
-
-While in pre-alpha stage, Zentrio represents an innovative approach to building applications using AI tools for development.
+While I'm proud of what we've created, I'm also being honest: this is an experimental vibe-coded project, and I can't guarantee everything is perfect. **Please use at your own risk**, and I'd recommend using unique credentials rather than your main Stremio account — better safe than sorry!
 </details>
 
 ## About Zentrio
 
-Zentrio is a profile management tool for Stremio Web, allowing users to create and manage multiple profiles with custom settings and avatars.
+Zentrio started as a weekend project to solve [this community issue](https://github.com/Stremio/stremio-features/issues/622) regarding Stremio profiles, but it's grown into something I'm genuinely excited about. Now everyone in your household can have their own space, no more "why is my continue watching full of (insert random movie)?"
 
 ## Features
 
--   Profiles: create unlimited profiles with custom avatars
--   Per-profile content settings (e.g., NSFW filtering)
--   Addon order management
--   Installable PWA
--   Secure email flows (magic link and OTP)
+-   Profiles: create profiles with unique stremio credentials
+-   Additional Features/Plugins:
+  - Addon order management
+  - Hide calendar/addons button
+  - NSFW Filter (Soon™)
+  - Downloads manager (Soon™): The ability to download media and watch later
+-   Installable PWA: Zentrio can be installed as a PWA
 
 ## How-to-use
 
 <details>
-<summary>Local installation</summary>
+<summary>Local installation (for development)</summary>
 
 Prerequisites:
 
