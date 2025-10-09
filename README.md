@@ -16,7 +16,7 @@
 </div>
 
 <details>
-<summary>Disclaimer: Zentrio's Story and AI Development</summary>
+<summary>#<red><bold>Disclaimer: Zentrio's Story and AI Development</bold></red></summary>
 
 Zentrio is primarily an AI-coded project. Almost all of its codebase was generated with the assistance of AI models, demonstrating the potential of artificial intelligence in software development.
 
