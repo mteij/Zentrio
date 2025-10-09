@@ -1,5 +1,20 @@
 # Zentrio
 
+<div align="center">
+  <img src="app/src/static/logo/icon-512.png" alt="Zentrio Icon" width="128" height="128" />
+
+  <strong>Profile management for Stremio Web</strong>
+
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
+  <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-FF6A00?style=for-the-badge&logo=hono&logoColor=white" alt="Hono"></a>
+  <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+
+  <a href="https://zentrio.eu"><strong>Visit Zentrio.eu</strong></a> •
+  <a href="https://github.com/MichielEijpe/Zentrio/issues"><strong>Report Issues</strong></a>
+</div>
+
 <details>
 <summary>Disclaimer: Zentrio's Story and AI Development</summary>
 
@@ -22,10 +37,10 @@ Zentrio is a profile management tool for Stremio Web, allowing users to create a
 -   Installable PWA
 -   Secure email flows (magic link and OTP)
 
-## Quick Start (Local Development)
+## How-to-use
 
 <details>
-<summary>Setup Instructions</summary>
+<summary>Local installation</summary>
 
 Prerequisites:
 
@@ -47,91 +62,48 @@ bun install
 bun run dev          # hot reload
 # or: bun run src/index.ts
 ```
-
-The app runs at:
-
--   http://localhost:3000 (default; configurable via PORT)
-
-Environment loading:
-
--   The app reads .env from the repository root (one level above /app). Keep .env at project root for both dev and Docker.
 </details>
 
-## Docker
-
-Option A: Compose (recommended)
+### Docker
+Option A: Docker Compose (recommended)
 
 ```bash
 docker-compose up -d
 ```
 
--   Builds from ./app/Dockerfile
--   Exposes port 3000 by default (override HOST_PORT and PORT if needed)
--   Persists data in a named volume (SQLite at /data/zentrio.db by default)
--   Includes a healthcheck
-
-Option B: Standalone image
+Option B: Docker Run
 
 ```bash
-# Build
-docker build -t ghcr.io/michieleijpe/zentrio:latest -f app/Dockerfile ./app
-
-# Run
 docker run -d \
     -p 3000:3000 \
     --env-file .env \
     ghcr.io/michieleijpe/zentrio:latest
 ```
-
-Notes:
-
--   Default port is 3000. Override with PORT in .env or -e PORT=3000
--   Default database is SQLite. docker-compose sets DATABASE_URL=sqlite:/data/zentrio.db and mounts a persistent volume
--   A GitHub Actions workflow builds and pushes images to GHCR from ./app using app/Dockerfile
-
 ## Configuration
 
-Create .env at the repository root (cp .env.example .env). Important keys:
+<details>
+<summary>Environment Variables</summary>
 
--   Core
-    -   PORT: default 3000
-    -   APP\_URL: default http://localhost:PORT
-    -   NODE\_ENV: set to production in Docker
--   Security
-    -   AUTH\_SECRET: required (random string)
-    -   ENCRYPTION\_KEY: required (random string)
--   Database
-    -   DATABASE\_URL:
-        -   default fallback inside the app: sqlite://./zentrio.db (local file)
-        -   docker-compose default: sqlite:/data/zentrio.db (persistent volume)
--   Email (SMTP via Nodemailer)
-    -   EMAIL\_HOST (e.g., smtp.gmail.com)
-    -   EMAIL\_PORT (e.g., 587)
-    -   EMAIL\_SECURE (true for 465, false for STARTTLS/587)
-    -   EMAIL\_USER, EMAIL\_PASS
-    -   EMAIL\_FROM (e.g., noreply@zentrio.app)
--   Rate limiting
-    -   RATE\_LIMIT\_WINDOW\_MS: default 900000 (15 minutes)
-    -   RATE\_LIMIT\_LIMIT: default 100
+| Variable | Description | Default |
+|---|---|---|
+| DATABASE\_URL | URL for the SQLite database. | ./data/zentrio.db |
+| AUTH\_SECRET | Secret key for authentication.  | your-super-secret-auth-key-change-this-in-production |
+| ENCRYPTION\_KEY | Secret key for encryption. | your-super-secret-encryption-key-change-this-in-production |
+| PORT | Port the server listens on. | 3000 |
+| NODE\_ENV | Environment the server is running in. | production |
+| APP\_URL | URL of the application. | http://localhost:3000 |
+| EMAIL\_HOST | Hostname of the SMTP server. | smtp.gmail.com |
+| EMAIL\_PORT | Port of the SMTP server. | 587 |
+| EMAIL\_SECURE | Whether the SMTP connection is secure. | false |
+| EMAIL\_USER | Username for the SMTP server. | your-email@gmail.com |
+| EMAIL\_PASS | Password for the SMTP server. | your-app-password |
+| EMAIL\_FROM | Email address to send emails from. | noreply@zentrio.app |
+| RATE\_LIMIT\_WINDOW\_MS | Time window for rate limiting in milliseconds. | 900000 |
+| RATE\_LIMIT\_LIMIT | Maximum number of requests per IP in the rate limiting window. | 100 |
+| PROXY\_LOGS | Controls the request/proxy logger middleware. | true |
+| STREMIO\_LOGS | Controls verbose logs for the /stremio route. | false |
 
-See .env.example for a complete list and defaults.
-
-## Health
-
--   GET /api/health: JSON status including basic env configuration
--   Root page (/) serves the web UI
-
-## Public Instance
-
-Try Zentrio at https://zentrio.eu
-
-## Acknowledgments
-
--   Stremio Team — streaming platform
--   Bun team — fast JavaScript runtime
--   Community contributors
-
-Disclaimer: Zentrio is an independent project and is not affiliated with Stremio. Use unique credentials and consider creating new Stremio profiles when testing.
+</details>
 
 ## License
 
