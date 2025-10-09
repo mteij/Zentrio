@@ -210,6 +210,13 @@
     return (n >= 10 ? n.toFixed(1) : n.toFixed(2)) + ' ' + units[i];
   }
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   function render() {
     if (!els.list || !els.empty) return;
     if (!queue.length) {
@@ -225,11 +232,15 @@
         const recStr = item.bytesReceived ? formatBytes(item.bytesReceived) : '';
         const etaStr = (typeof item.eta === 'number' && item.eta >= 0) ? `ETA ${item.eta}s` : '';
         const status = item.status || 'initiated';
+        const safeTitle = escapeHtml(item.title || 'Untitled');
+        const safeFileName = escapeHtml(item.fileName || '');
+        const safeId = escapeHtml(item.id);
+        const safeStatus = escapeHtml(status);
         return `
-          <div class="download-item" data-id="${item.id}">
+          <div class="download-item" data-id="${safeId}">
             <div class="download-item-header">
-              <h3 class="download-title" title="${(item.title || '').replace(/"/g,'"')}">${item.title || 'Untitled'}</h3>
-              <div class="download-status ${status}">${status}</div>
+              <h3 class="download-title" title="${safeTitle}">${safeTitle}</h3>
+              <div class="download-status ${safeStatus}">${safeStatus}</div>
             </div>
             <div class="download-progress-wrap">
               <div class="download-progress-bar" style="width:${pct.toFixed(2)}%;"></div>
@@ -238,12 +249,12 @@
               ${sizeStr ? `<span>${sizeStr}</span>` : ''}
               ${recStr ? `<span>${recStr}</span>` : ''}
               ${etaStr ? `<span>${etaStr}</span>` : ''}
-              ${item.fileName ? `<span>${item.fileName}</span>` : ''}
+              ${safeFileName ? `<span>${safeFileName}</span>` : ''}
             </div>
             <div class="download-actions">
-              ${status === 'downloading' ? `<button data-action="cancel" data-id="${item.id}">Cancel</button>` : ''}
-              ${status === 'failed' ? `<button data-action="retry" data-id="${item.id}">Retry</button>` : ''}
-              ${status === 'completed' && item.openable ? `<button data-action="open" data-id="${item.id}">Open</button>` : ''}
+              ${status === 'downloading' ? `<button data-action="cancel" data-id="${safeId}">Cancel</button>` : ''}
+              ${status === 'failed' ? `<button data-action="retry" data-id="${safeId}">Retry</button>` : ''}
+              ${status === 'completed' && item.openable ? `<button data-action="open" data-id="${safeId}">Open</button>` : ''}
             </div>
           </div>
         `;
