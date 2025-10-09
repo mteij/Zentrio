@@ -27,6 +27,10 @@ While I'm proud of what we've created, I'm also being honest: this is an experim
 
 Zentrio started as a weekend project to solve [this community issue](https://github.com/Stremio/stremio-features/issues/622) regarding Stremio profiles, but it's grown into something I'm genuinely excited about. Now everyone in your household can have their own space, no more "why is my continue watching full of (insert random movie)?"
 
+<div align="center">
+  <img src="app/src/static/media/profiles.png" alt="Zentrio Profiles" width="800" />
+</div>
+
 ## Features
 
 -   Profiles: create profiles with unique stremio credentials
