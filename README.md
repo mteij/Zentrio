@@ -16,11 +16,11 @@
 </div>
 
 <details>
-<summary><font size="+5"><b>Disclaimer: Built with AI</b></font></summary>
+<summary><font size="+7"><b>Disclaimer: Built with AI</b></font></summary>
 
-Hey there! Just so you know, Zentrio was built mostly with AI assistance — it's been a fun experiment in what's possible when you combine AI tools with a curious engineering student.
+Zentrio was built with substantial assistance from AI tooling, guided by an engineering student exploring what these tools make possible.
 
-While I'm proud of what we've created, I'm also being honest: this is an experimental vibe-coded project, and I can't guarantee everything is perfect. **Please use at your own risk**, and I'd recommend using unique credentials rather than your main Stremio account — better safe than sorry!
+Although the project is maintained with care, it remains experimental and may contain imperfections. **Please use it at your own risk**, and consider using unique credentials instead of your primary Stremio account for additional safety.
 </details>
 
 ## About Zentrio
