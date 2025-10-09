@@ -16,7 +16,7 @@
 </div>
 
 <details>
-<summary># <font size="+1"><b>Disclaimer: Built with AI</b></font></summary>
+<summary><font size="+5"><b>Disclaimer: Built with AI</b></font></summary>
 
 Hey there! Just so you know, Zentrio was built mostly with AI assistance — it's been a fun experiment in what's possible when you combine AI tools with a curious engineering student.
 
