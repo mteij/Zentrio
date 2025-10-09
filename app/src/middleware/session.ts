@@ -19,5 +19,13 @@ export const sessionMiddleware = createMiddleware(async (c, next) => {
   }
 
   c.set('user', user)
+
+  // Update last activity for non-remembered sessions to enforce idle timeout
+  try {
+    sessionDb.touch(sessionId)
+  } catch (_) {
+    // touching is best-effort; ignore errors
+  }
+
   await next()
 })

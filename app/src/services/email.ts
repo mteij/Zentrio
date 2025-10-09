@@ -11,10 +11,51 @@ interface EmailConfig {
 }
 
 class EmailService {
-  private transporter: nodemailer.Transporter
+  private transporter?: nodemailer.Transporter
+  private config?: EmailConfig
 
-  constructor(config: EmailConfig) {
-    this.transporter = nodemailer.createTransport(config)
+  constructor(config?: EmailConfig) {
+    this.config = config
+  }
+
+  private buildConfigFromEnv(): EmailConfig {
+    const host = process.env.EMAIL_HOST || 'smtp.gmail.com'
+    const port = parseInt(process.env.EMAIL_PORT || '587', 10)
+    // If EMAIL_SECURE is not set, infer from port (465 => secure)
+    const secure = process.env.EMAIL_SECURE !== undefined
+      ? process.env.EMAIL_SECURE === 'true'
+      : (port === 465)
+    const user = process.env.EMAIL_USER || ''
+    const pass = process.env.EMAIL_PASS || ''
+    return {
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+    }
+  }
+
+  private ensureTransporter(): nodemailer.Transporter {
+    if (!this.transporter) {
+      const smtpUrl = (process.env.SMTP_URL || process.env.EMAIL_URL || '').trim()
+      if (smtpUrl) {
+        // Explicit SMTP URL configuration takes precedence
+        this.transporter = nodemailer.createTransport(smtpUrl)
+      } else {
+        const cfg = this.config || this.buildConfigFromEnv()
+        const hasAuth = !!(cfg?.auth?.user && cfg?.auth?.pass)
+        if (hasAuth) {
+          // Use configured host/port/auth when credentials are available
+          this.transporter = nodemailer.createTransport(cfg)
+        } else {
+          // Dev fallback: avoid network and hard failures when email is not configured.
+          // jsonTransport resolves sendMail() with the message serialized to JSON.
+          this.transporter = nodemailer.createTransport({ jsonTransport: true })
+          console.warn('[email] No SMTP configured; using jsonTransport (emails will not be sent).')
+        }
+      }
+    }
+    return this.transporter!
   }
 
   async sendMagicLink(email: string, magicLink: string): Promise<boolean> {
@@ -48,11 +89,10 @@ class EmailService {
     </div>
   </div>`
       }
-  
-      await this.transporter.sendMail(mailOptions)
+      await this.ensureTransporter().sendMail(mailOptions)
       return true
-    } catch (error) {
-      console.error('Failed to send magic link:', error)
+    } catch (error: any) {
+      console.error('Failed to send magic link:', error?.response || error?.message || error)
       return false
     }
   }
@@ -86,11 +126,10 @@ class EmailService {
     </div>
   </div>`
       }
-  
-      await this.transporter.sendMail(mailOptions)
+      await this.ensureTransporter().sendMail(mailOptions)
       return true
-    } catch (error) {
-      console.error('Failed to send OTP:', error)
+    } catch (error: any) {
+      console.error('Failed to send OTP:', error?.response || error?.message || error)
       return false
     }
   }
@@ -124,25 +163,14 @@ class EmailService {
     </div>
   </div>`
       }
-  
-      await this.transporter.sendMail(mailOptions)
+      await this.ensureTransporter().sendMail(mailOptions)
       return true
-    } catch (error) {
-      console.error('Failed to send welcome email:', error)
+    } catch (error: any) {
+      console.error('Failed to send welcome email:', error?.response || error?.message || error)
       return false
     }
   }
 }
 
-// Create email service instance
-const emailConfig: EmailConfig = {
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT || '587'),
-  secure: process.env.EMAIL_SECURE === 'true',
-  auth: {
-    user: process.env.EMAIL_USER || '',
-    pass: process.env.EMAIL_PASS || ''
-  }
-}
-
-export const emailService = new EmailService(emailConfig)
+// Create lazy email service singleton (reads env at first use)
+export const emailService = new EmailService()

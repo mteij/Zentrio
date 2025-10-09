@@ -42,13 +42,21 @@ async function loadUserInfo() {
 
 // Update UI with current settings
 function updateUI() {
-    // Update toggles
+    // Update server-backed toggles
     Object.keys(settings).forEach(key => {
         const toggle = document.getElementById(`${key}Toggle`);
         if (toggle) {
             toggle.classList.toggle('active', settings[key]);
         }
     });
+
+    // Update local-only "Stay signed in" toggle
+    const rememberToggle = document.getElementById('rememberMeLocalToggle');
+    if (rememberToggle) {
+        let pref = false;
+        try { pref = localStorage.getItem('zentrioRememberMe') === 'true'; } catch (e) {}
+        rememberToggle.classList.toggle('active', !!pref);
+    }
 }
 
 // Toggle setting
@@ -605,11 +613,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add toggle event listeners
     const toggles = document.querySelectorAll('.toggle');
     toggles.forEach(toggle => {
+        // Skip local-only "remember me" toggle from server saves
+        if (toggle.id === 'rememberMeLocalToggle') return;
         toggle.addEventListener('click', () => {
             const settingName = toggle.id.replace('Toggle', '');
             toggleSetting(settingName);
         });
     });
+
+    // Local-only "Stay signed in" toggle wiring
+    const rememberToggle = document.getElementById('rememberMeLocalToggle');
+    if (rememberToggle) {
+        // Initialize from localStorage
+        let pref = false;
+        try { pref = localStorage.getItem('zentrioRememberMe') === 'true'; } catch (e) {}
+        rememberToggle.classList.toggle('active', pref);
+
+        rememberToggle.addEventListener('click', () => {
+            let cur = false;
+            try { cur = localStorage.getItem('zentrioRememberMe') === 'true'; } catch (e) {}
+            const next = !cur;
+            try { localStorage.setItem('zentrioRememberMe', next ? 'true' : 'false'); } catch (e) {}
+            rememberToggle.classList.toggle('active', next);
+            if (window.showToast) {
+                window.showToast('message', next ? 'Stay signed in enabled on this device' : 'Stay signed in disabled on this device');
+            }
+        });
+    }
     
     // Enhance range inputs to reflect filled track with theme accent
     function updateRangeBackground(el) {

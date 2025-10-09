@@ -1,4 +1,4 @@
-import { Button, FormGroup, Input, Message } from './index'
+import { Button, FormGroup, Input } from './index'
 
 export function ProfileModal() {
   return (
@@ -50,24 +50,16 @@ export function ProfileModal() {
               />
             </FormGroup>
 
-            <div className="form-group setting-item">
-              <div className="setting-info">
-                <label htmlFor="nsfwFilterEnabledToggle">Enable NSFW Filter</label>
-                <p>Censor content based on age rating.</p>
-              </div>
-              <div className="setting-control">
-                <div className="toggle" id="nsfwFilterEnabledToggle"></div>
-              </div>
-            </div>
 
-            <FormGroup label="Age Rating" htmlFor="ageRatingInput" className="step-hidden" id="ageRatingGroup">
-              <Input
-                type="number"
-                id="ageRatingInput"
-                name="ageRating"
-                min="0"
-                max="18"
-              />
+            <FormGroup label="Age Rating" htmlFor="ageRatingInput" id="ageRatingGroup">
+              <select id="ageRatingInput" name="ageRating" defaultValue="18">
+                <option value="6">6+</option>
+                <option value="9">9+</option>
+                <option value="12">12+</option>
+                <option value="14">14+</option>
+                <option value="16">16+</option>
+                <option value="18">18+</option>
+              </select>
             </FormGroup>
 
             <div className="profile-action-row">
@@ -92,7 +84,6 @@ export function ProfileModal() {
           </div>
         </form>
         
-        <Message id="modalMessage" />
       </div>
     </div>
   )

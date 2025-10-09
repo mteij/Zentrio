@@ -6,19 +6,41 @@
     const emailInput = document.getElementById('email');
     const submitBtn = document.getElementById('submitBtn');
     const loading = document.getElementById('loading');
+    // Keep reference for legacy markup but stop using inline message boxes; use toasts instead.
     const globalMessage = document.getElementById('message');
     const inlineAuth = document.getElementById('inlineAuth');
 
+    // Toast helpers — unify usage across auth flow
+    function toast(type, title, message) {
+        try {
+            // Map common synonyms to our toast types: message | warning | error
+            const t = type === 'success' ? 'message' : (type === 'info' ? 'message' : type);
+            const defaultTitle =
+                t === 'error' ? 'Error' :
+                t === 'warning' ? 'Warning' :
+                'Notice';
+            window.addToast(t, title || defaultTitle, message || '');
+        } catch (e) {
+            // Soft fallback for environments without toast.js loaded
+            console.warn('[Toast]', type, title, message);
+        }
+    }
+
+    // Backward-compatible API (no-op visually except via toast)
     function showGlobalMessage(text, type = 'error') {
-        globalMessage.textContent = text;
-        globalMessage.className = `message ${type}`;
-        globalMessage.style.display = 'block';
+        toast(type, type === 'error' ? 'Error' : (type === 'success' ? 'Success' : 'Notice'), text);
+        if (globalMessage) {
+            globalMessage.style.display = 'none';
+            globalMessage.textContent = '';
+        }
     }
     
     function clearGlobalMessage() {
-        globalMessage.textContent = '';
-        globalMessage.className = 'message';
-        globalMessage.style.display = 'none';
+        if (globalMessage) {
+            globalMessage.textContent = '';
+            globalMessage.className = 'message';
+            globalMessage.style.display = 'none';
+        }
     }
     
     function setFieldError(inputEl, text) {
@@ -49,8 +71,10 @@
         emailForm.classList.add('step-hidden');
         const heroContent = document.querySelector('.hero-content h1, .hero-content p');
         if (heroContent) {
-            document.querySelector('.hero-content h1').style.display = 'none';
-            document.querySelector('.hero-content p').style.display = 'none';
+            const h1 = document.querySelector('.hero-content h1');
+            const p = document.querySelector('.hero-content p');
+            if (h1) h1.style.display = 'none';
+            if (p) p.style.display = 'none';
         }
     }
     
@@ -72,7 +96,15 @@
         submitBtn.disabled = false;
     }
 
-    // Helper function to load modal templates
+    // Remember-me preference (local only)
+    function getRememberPref() {
+        try { return localStorage.getItem('zentrioRememberMe') === 'true'; } catch (e) { return false; }
+    }
+    function setRememberPref(val) {
+        try { localStorage.setItem('zentrioRememberMe', val ? 'true' : 'false'); } catch (e) {}
+    }
+
+    // Helper function to load modal templates (kept for compatibility if needed later)
     async function loadModalTemplate(templatePath) {
         try {
             const response = await fetch(templatePath);
@@ -87,7 +119,7 @@
     }
 
     function renderLoginForm(email, nickname = null) {
-        const welcomeMessage = nickname ? `<div class="welcome-message" style="text-align:center;margin-bottom:20px;color:#e50914;font-size:1.2rem;font-weight:bold;">Welcome back, ${nickname.replace(/"/g, '&quot;')}!</div>` : '';
+        const welcomeMessage = nickname ? `<div class="welcome-message" style="text-align:center;margin-bottom:20px;color:#e50914;font-size:1.2rem;font-weight:bold;">Welcome back, ${nickname.replace(/"/g, '"')}!</div>` : '';
         
         inlineAuth.innerHTML = `
           <form id="loginForm" class="fade-in" novalidate>
@@ -103,13 +135,18 @@
               <label for="loginPassword">Password</label>
               <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter your password" />
             </div>
+            <div class="form-group remember-row">
+              <label class="remember-checkbox" for="rememberMe">
+                <input id="rememberMe" type="checkbox" />
+                <span>Stay signed in on this device</span>
+              </label>
+            </div>
             <button type="submit" class="cta-button">Sign in</button>
             <div class="divider" style="text-align:center;margin:16px 0;color:#b3b3b3;">or</div>
             <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
               <button id="magicLinkBtn" type="button" class="cta-button" style="background:#333;border:1px solid #555;">Send Magic Link</button>
               <button id="otpBtn" type="button" class="cta-button" style="background:#333;border:1px solid #555;">Get OTP Code</button>
             </div>
-            <div id="loginMessage" class="message" aria-live="polite"></div>
           </form>
         `;
         
@@ -119,9 +156,13 @@
         const form = document.getElementById('loginForm');
         const backBtn = document.getElementById('loginBackBtn');
         const pwd = document.getElementById('loginPassword');
-        const msg = document.getElementById('loginMessage');
         const magicLinkBtn = document.getElementById('magicLinkBtn');
         const otpBtn = document.getElementById('otpBtn');
+        const rememberEl = document.getElementById('rememberMe');
+        if (rememberEl) {
+          rememberEl.checked = getRememberPref();
+          rememberEl.addEventListener('change', () => setRememberPref(rememberEl.checked));
+        }
 
         // Back to email step
         backBtn?.addEventListener('click', () => {
@@ -138,10 +179,10 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             clearFieldError(pwd);
-            msg.style.display = 'none';
 
             if (!pwd.value) {
                 setFieldError(pwd, 'Please enter your password');
+                toast('warning', 'Missing password', 'Please enter your password');
                 return;
             }
 
@@ -150,25 +191,23 @@
                 const res = await fetch('/api/auth/signin-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password: pwd.value })
+                    body: JSON.stringify({ email, password: pwd.value, remember: getRememberPref() })
                 });
-                const data = await res.json();
+                const data = await res.json().catch(() => ({}));
                 if (res.ok) {
-                    msg.textContent = 'Success! Redirecting...';
-                    msg.className = 'message success';
-                    msg.style.display = 'block';
+                    toast('success', 'Signed in', 'Success! Redirecting...');
                     setTimeout(() => { window.location.href = '/profiles'; }, 800);
                 } else {
-                    setFieldError(pwd, data.error || 'Invalid email or password');
-                    msg.textContent = data.error || 'Invalid email or password';
-                    msg.className = 'message error';
-                    msg.style.display = 'block';
+                    if (res.status === 429) {
+                        toast('error', 'Too many requests', 'Please try again later.');
+                    } else {
+                        setFieldError(pwd, data.error || 'Invalid email or password');
+                        toast('error', 'Sign in failed', data.error || 'Invalid email or password');
+                    }
                 }
             } catch (err) {
                 setFieldError(pwd, 'Network error, try again');
-                msg.textContent = 'Network error, try again';
-                msg.className = 'message error';
-                msg.style.display = 'block';
+                toast('error', 'Network error', 'Please try again.');
             } finally {
                 form.querySelector('button[type="submit"]').disabled = false;
             }
@@ -182,20 +221,21 @@
                 const res = await fetch('/api/auth/magic-link', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
+                    body: JSON.stringify({ email, remember: getRememberPref() })
                 });
-                const data = await res.json();
+                const data = await res.json().catch(() => ({}));
                 if (res.ok) {
                     renderMagicLinkSent(email);
+                    toast('success', 'Magic link sent', 'Check your inbox to sign in.');
                 } else {
-                    msg.textContent = data.error || 'Failed to send magic link.';
-                    msg.className = 'message error';
-                    msg.style.display = 'block';
+                    if (res.status === 429) {
+                        toast('error', 'Too many requests', 'Please try again later.');
+                    } else {
+                        toast('error', 'Magic link failed', data.error || 'Failed to send magic link.');
+                    }
                 }
             } catch (err) {
-                msg.textContent = 'Network error, try again.';
-                msg.className = 'message error';
-                msg.style.display = 'block';
+                toast('error', 'Network error', 'Please try again.');
             } finally {
                 magicLinkBtn.disabled = false;
                 magicLinkBtn.textContent = 'Send Magic Link';
@@ -209,20 +249,21 @@
                 const res = await fetch('/api/auth/send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
+                    body: JSON.stringify({ email, remember: getRememberPref() })
                 });
-                const data = await res.json();
+                const data = await res.json().catch(() => ({}));
                 if (res.ok) {
                     renderOtpForm(email);
+                    toast('success', 'OTP sent', 'We sent a 6-digit code to your email.');
                 } else {
-                    msg.textContent = data.error || 'Failed to send OTP.';
-                    msg.className = 'message error';
-                    msg.style.display = 'block';
+                    if (res.status === 429) {
+                        toast('error', 'Too many requests', 'Please try again later.');
+                    } else {
+                        toast('error', 'OTP send failed', data.error || 'Failed to send OTP.');
+                    }
                 }
             } catch (err) {
-                msg.textContent = 'Network error, try again.';
-                msg.className = 'message error';
-                msg.style.display = 'block';
+                toast('error', 'Network error', 'Please try again.');
             } finally {
                 otpBtn.disabled = false;
                 otpBtn.textContent = 'Get OTP Code';
@@ -242,7 +283,7 @@
                     Magic Link Sent
                 </h3>
                 <div class="magic-link-sent">
-                    <p>A magic link has been sent to <strong>${email.replace(/"/g, '&quot;')}</strong>. Check your inbox and click the link to sign in.</p>
+                    <p>A magic link has been sent to <strong>${email.replace(/"/g, '"')}</strong>. Check your inbox and click the link to sign in.</p>
                 </div>
                 <p class="resend-text" id="resendMagicLink">Didn't receive it? Resend link</p>
             </div>
@@ -258,11 +299,23 @@
             resendBtn.textContent = 'Sending...';
             resendBtn.classList.add('disabled');
             try {
-                await fetch('/api/auth/magic-link', {
+                const res = await fetch('/api/auth/magic-link', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
+                    body: JSON.stringify({ email, remember: getRememberPref() })
                 });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    toast('success', 'Magic link sent', 'Check your inbox.');
+                } else {
+                    if (res.status === 429) {
+                        toast('error', 'Too many requests', 'Please try again later.');
+                    } else {
+                        toast('error', 'Magic link failed', data.error || 'Failed to send magic link.');
+                    }
+                }
+            } catch {
+                toast('error', 'Network error', 'Please try again.');
             } finally {
                 setTimeout(() => {
                     resendBtn.textContent = "Didn't receive it? Resend link";
@@ -280,14 +333,13 @@
                     Back
                 </button>
                 <h3>Enter OTP Code</h3>
-                <p>An OTP code has been sent to <strong>${email.replace(/"/g, '&quot;')}</strong>. Please enter it below.</p>
+                <p>An OTP code has been sent to <strong>${email.replace(/"/g, '"')}</strong>. Please enter it below.</p>
                 <form id="otpForm" novalidate>
                     <div class="form-group">
                         <label for="otpInput" class="sr-only">OTP Code</label>
                         <input id="otpInput" type="text" class="otp-input" placeholder="_ _ _ _ _ _" required pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
                     </div>
                     <button type="submit" class="cta-button">Verify & Sign In</button>
-                    <div id="otpMessage" class="message" aria-live="polite"></div>
                 </form>
                 <p class="resend-text" id="resendOtp">Resend OTP</p>
             </div>
@@ -300,21 +352,17 @@
 
         const otpForm = document.getElementById('otpForm');
         const otpInput = document.getElementById('otpInput');
-        const otpMessage = document.getElementById('otpMessage');
         const submitBtn = otpForm.querySelector('button[type="submit"]');
 
         otpInput.focus();
 
         otpForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            otpMessage.style.display = 'none';
             const otp = otpInput.value;
 
             if (!otp || otp.length !== 6) {
-                otpMessage.textContent = 'Please enter a valid 6-digit OTP.';
-                otpMessage.className = 'message error';
-                otpMessage.style.display = 'block';
                 otpInput.classList.add('error');
+                toast('warning', 'Invalid OTP', 'Please enter a valid 6-digit OTP.');
                 return;
             }
             otpInput.classList.remove('error');
@@ -325,27 +373,25 @@
                 const res = await fetch('/api/auth/verify-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, otp })
+                    body: JSON.stringify({ email, otp, remember: getRememberPref() })
                 });
 
                 if (res.ok) {
-                    otpMessage.textContent = 'Success! Redirecting...';
-                    otpMessage.className = 'message success';
-                    otpMessage.style.display = 'block';
                     otpInput.classList.add('success');
+                    toast('success', 'Verified', 'Success! Redirecting...');
                     setTimeout(() => { window.location.href = '/profiles'; }, 800);
                 } else {
-                    const data = await res.json();
-                    otpMessage.textContent = data.error || 'Invalid or expired OTP.';
-                    otpMessage.className = 'message error';
-                    otpMessage.style.display = 'block';
+                    const data = await res.json().catch(() => ({}));
                     otpInput.classList.add('error');
                     otpInput.value = '';
+                    if (res.status === 429) {
+                        toast('error', 'Too many requests', 'Please try again later.');
+                    } else {
+                        toast('error', 'Verification failed', data.error || 'Invalid or expired OTP.');
+                    }
                 }
             } catch (err) {
-                otpMessage.textContent = 'Network error, please try again.';
-                otpMessage.className = 'message error';
-                otpMessage.style.display = 'block';
+                toast('error', 'Network error', 'Please try again.');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Verify & Sign In';
@@ -357,11 +403,23 @@
             resendBtn.textContent = 'Sending...';
             resendBtn.classList.add('disabled');
             try {
-                await fetch('/api/auth/send-otp', {
+                const res = await fetch('/api/auth/send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
+                    body: JSON.stringify({ email, remember: getRememberPref() })
                 });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    toast('success', 'OTP sent', 'Check your inbox for the new code.');
+                } else {
+                    if (res.status === 429) {
+                        toast('error', 'Too many requests', 'Please try again later.');
+                    } else {
+                        toast('error', 'OTP send failed', data.error || 'Failed to resend OTP.');
+                    }
+                }
+            } catch {
+                toast('error', 'Network error', 'Please try again.');
             } finally {
                 setTimeout(() => {
                     resendBtn.textContent = "Resend OTP";
@@ -391,8 +449,13 @@
               <label for="regPassword">Password</label>
               <input id="regPassword" type="password" placeholder="Enter your password" minlength="6" autocomplete="new-password" />
             </div>
+            <div class="form-group remember-row">
+              <label class="remember-checkbox" for="rememberMe">
+                <input id="rememberMe" type="checkbox" />
+                <span>Stay signed in on this device</span>
+              </label>
+            </div>
             <button type="submit" class="cta-button">Create account</button>
-            <div id="regMessage" class="message" aria-live="polite"></div>
           </form>
         `;
         
@@ -402,7 +465,6 @@
         const form = document.getElementById('registerInlineForm');
         const usernameInput = document.getElementById('regUsername');
         const passwordInput = document.getElementById('regPassword');
-        const msg = document.getElementById('regMessage');
         const backBtn = document.getElementById('registerBackBtn');
 
         backBtn?.addEventListener('click', () => {
@@ -413,27 +475,35 @@
             emailInput.focus();
         });
 
+        const rememberEl = document.getElementById('rememberMe');
+        if (rememberEl) {
+            rememberEl.checked = getRememberPref();
+            rememberEl.addEventListener('change', () => setRememberPref(rememberEl.checked));
+        }
+
         usernameInput.focus();
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             clearFieldError(usernameInput);
             clearFieldError(passwordInput);
-            msg.style.display = 'none';
 
             const username = usernameInput.value.trim();
             const password = passwordInput.value;
 
             if (!username) {
                 setFieldError(usernameInput, 'Please enter a nickname');
+                toast('warning', 'Missing nickname', 'Please enter a nickname');
                 return;
             }
             if (!password) {
                 setFieldError(passwordInput, 'Please enter a password');
+                toast('warning', 'Missing password', 'Please enter a password');
                 return;
             }
             if (password.length < 6) {
                 setFieldError(passwordInput, 'Password must be at least 6 characters');
+                toast('warning', 'Weak password', 'Password must be at least 6 characters');
                 return;
             }
 
@@ -442,30 +512,23 @@
                 const res = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, username, password })
+                    body: JSON.stringify({ email, username, password, remember: getRememberPref() })
                 });
-                const data = await res.json();
+                const data = await res.json().catch(() => ({}));
                 if (res.ok) {
-                    msg.textContent = 'Account created! Redirecting...';
-                    msg.className = 'message success';
-                    msg.style.display = 'block';
-                    // BUG: This is a race condition. The redirect should happen *after* the server confirms success.
-                    // The server now sends a `redirect` URL in the response. We should use it.
-                    msg.textContent = 'Account created! Redirecting...';
-                    msg.className = 'message success';
-                    msg.style.display = 'block';
+                    toast('success', 'Account created', 'Redirecting...');
                     setTimeout(() => {
-                        window.location.href = data.redirect || '/'; // Fallback to homepage
+                        window.location.href = data.redirect || '/';
                     }, 800);
                 } else {
-                    msg.textContent = data.error || 'Registration failed';
-                    msg.className = 'message error';
-                    msg.style.display = 'block';
+                    if (res.status === 429) {
+                        toast('error', 'Too many requests', 'Please try again later.');
+                    } else {
+                        toast('error', 'Registration failed', data.error || 'Registration failed');
+                    }
                 }
             } catch (err) {
-                msg.textContent = 'Network error, try again';
-                msg.className = 'message error';
-                msg.style.display = 'block';
+                toast('error', 'Network error', 'Please try again');
             } finally {
                 form.querySelector('button[type="submit"]').disabled = false;
             }
@@ -482,11 +545,16 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
 
-            // Handle validation (4xx) explicitly: inline error + focus email
+            // Handle validation (4xx) explicitly: field error + toast
+            if (res.status === 429) {
+                toast('error', 'Too many requests', 'Please try again later.');
+                return;
+            }
             if (res.status >= 400 && res.status < 500) {
                 setFieldError(emailInput, data.error || 'Invalid email');
+                toast('warning', 'Invalid email', data.error || 'Please enter a valid email address');
                 emailInput.focus();
                 return;
             }
@@ -513,7 +581,7 @@
         e.preventDefault();
         const email = emailInput.value.trim();
         if (!email) {
-            showGlobalMessage('Please enter a valid email address', 'error');
+            showGlobalMessage('Please enter a valid email address', 'warning');
             emailInput.focus();
             return;
         }

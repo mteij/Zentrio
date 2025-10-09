@@ -696,3 +696,137 @@
   height: 100% !important;
   object-fit: cover;
 }
+
+/* Profile Modal: Minimal age slider styling */
+#profileModal .age-slider {
+  position: relative;
+  margin-top: 4px;
+}
+
+#profileModal .age-slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px; /* thinner */
+  border-radius: 999px;
+  background: rgba(255,255,255,0.35); /* white track */
+  outline: none;
+}
+
+/* Tracks */
+#profileModal .age-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px; /* thinner */
+  background: transparent;
+}
+#profileModal .age-slider input[type="range"]::-moz-range-track {
+  height: 2px; /* thinner */
+  background: transparent;
+}
+
+/* Thumb */
+#profileModal .age-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;   /* smaller */
+  height: 12px;  /* smaller */
+  border-radius: 50%;
+  background: #ffffff; /* white */
+  border: 2px solid rgba(0,0,0,0.25);
+  margin-top: -5px; /* center on 2px track */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  cursor: pointer;
+}
+#profileModal .age-slider input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff; /* white */
+  border: 2px solid rgba(0,0,0,0.25);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  cursor: pointer;
+}
+
+/* Ticks as dots aligned to available options */
+#profileModal .age-slider-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1px; /* align over the 2px track */
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  pointer-events: none;
+  z-index: 1;
+}
+#profileModal .age-slider-ticks span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff; /* white dots */
+  opacity: 0.9;
+  justify-self: center;
+  transform: translateY(-2px);
+}
+
+/* Labels under the slider */
+#profileModal .age-slider-labels {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  font-size: 11px;
+  color: #ffffff;
+  opacity: 0.7;
+}
+#profileModal .age-slider-labels span {
+  justify-self: center;
+}
+
+#profileModal #ageRatingValue {
+  display: inline-block;
+  margin-top: 6px;
+}
+
+/* Profile Modal: Action buttons unified look */
+#profileModal .profile-action-row .save-btn,
+#profileModal .profile-action-row #deleteProfileBtn {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+/* Save = green */
+#profileModal .profile-action-row .save-btn {
+  background: #16a34a;         /* green */
+  border-color: #16a34a;
+  color: #ffffff;
+}
+#profileModal .profile-action-row .save-btn:hover {
+  background: #22c55e;         /* lighter green */
+  border-color: #22c55e;
+}
+
+/* Delete = Zentrio red (accent) */
+#profileModal .profile-action-row #deleteProfileBtn {
+  background: var(--accent);              /* Zentrio red */
+  border-color: var(--accent);
+  color: var(--text);
+}
+#profileModal .profile-action-row #deleteProfileBtn:hover {
+  background: var(--btn-primary-bg-hover);
+  border-color: var(--btn-primary-bg-hover);
+}
+
+/* Profile Modal: center button text and tighten bottom spacing */
+#profileModal .modal-content {
+  padding-bottom: 12px; /* reduce bottom padding to remove extra space */
+}
+#profileModal .profile-action-row {
+  margin-bottom: 0; /* no extra spacing at bottom */
+}
+#profileModal .profile-action-row .save-btn,
+#profileModal .profile-action-row #deleteProfileBtn {
+  display: inline-flex;            /* ensure proper centering */
+  align-items: center;             /* vertical center */
+  justify-content: center;         /* horizontal center */
+  text-align: center;              /* text centering fallback */
+}

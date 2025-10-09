@@ -1,4 +1,4 @@
-import { Button, Message } from '../index'
+import { Button } from '../index'
 
 interface OTPModalProps {
   email: string
@@ -11,8 +11,7 @@ interface OTPModalProps {
 
 export function OTPModal({
   email,
-  resendSeconds,
-  message
+  resendSeconds
 }: OTPModalProps) {
   return (
     <div id="otpContainer" className="otp-container fade-in">
@@ -59,9 +58,6 @@ export function OTPModal({
           Resend OTP ({resendSeconds}s)
         </span>
       </div>
-      <Message id="otpContainerMessage" show={!!message} type="error" ariaLive="polite">
-        {message}
-      </Message>
     </div>
   )
 }

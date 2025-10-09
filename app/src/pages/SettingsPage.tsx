@@ -64,6 +64,16 @@ export function SettingsPage({}: SettingsPageProps) {
               </Button>
             </div>
           </div>
+
+          <div className="setting-item">
+            <div className="setting-info">
+              <h3>Stay signed in on this device</h3>
+              <p>When enabled, you will remain signed in indefinitely. When disabled, you will be signed out after 3 hours of inactivity. This preference is stored only on this device.</p>
+            </div>
+            <div className="setting-control">
+              <div className="toggle" id="rememberMeLocalToggle" aria-label="Stay signed in on this device"></div>
+            </div>
+          </div>
         </div>
 
         {/* Plugins */}
@@ -198,7 +208,6 @@ export function SettingsPage({}: SettingsPageProps) {
           onVerify={() => {}}
           onResend={() => {}}
           resendSeconds={30}
-          message=""
         />
       </Modal>
 
@@ -306,11 +315,9 @@ export function SettingsPage({}: SettingsPageProps) {
   }
 
   function setInlineOtpError(msg) {
-    const box = document.getElementById('otpContainerMessage');
-    if (box) {
-      box.textContent = msg || '';
-      box.className = 'message ' + (msg ? 'error' : 'info');
-      box.style.display = msg ? 'block' : 'none';
+    // Use toast-only notifications for OTP errors (no inline messages)
+    if (msg && typeof window.addToast === 'function') {
+      window.addToast('error', 'Verification error', msg);
     }
   }
 
@@ -379,7 +386,7 @@ export function SettingsPage({}: SettingsPageProps) {
       });
 
       if (res.status === 401) {
-        window.addToast('info', 'Session expired', 'Redirecting to sign in...');
+        window.addToast('warning', 'Session expired', 'Redirecting to sign in...');
         setTimeout(() => { window.location.href = '/'; }, 800);
         return;
       }
@@ -439,7 +446,7 @@ export function SettingsPage({}: SettingsPageProps) {
       });
 
       if (res.status === 401) {
-        window.addToast('info', 'Session expired', 'Redirecting to sign in...');
+        window.addToast('warning', 'Session expired', 'Redirecting to sign in...');
         setTimeout(() => { window.location.href = '/'; }, 800);
         return;
       }
@@ -495,12 +502,12 @@ export function SettingsPage({}: SettingsPageProps) {
         body: JSON.stringify({ newEmail: otpNewEmail })
       });
       if (res.status === 401) {
-        window.addToast('info', 'Session expired', 'Redirecting to sign in...');
+        window.addToast('warning', 'Session expired', 'Redirecting to sign in...');
         setTimeout(() => { window.location.href = '/'; }, 800);
         return;
       }
       if (res.ok) {
-        window.addToast('info', 'Code resent');
+        window.addToast('warning', 'Code resent');
         startResendCooldown(30);
         return;
       }
@@ -548,7 +555,7 @@ export function SettingsPage({}: SettingsPageProps) {
       });
 
       if (res.status === 401) {
-        window.addToast('info', 'Unable to update password');
+        window.addToast('warning', 'Unable to update password');
         return;
       }
 
@@ -711,21 +718,24 @@ export function SettingsPage({}: SettingsPageProps) {
           gap: 10px;
         }
 
-        .toggle {
+        /* Settings-page toggle: OFF is darker; thumb always white */
+        .setting-control .toggle {
           position: relative;
           width: 50px;
           height: 24px;
-          background: var(--btn-secondary-bg, #333);
+          background: var(--toggle-off-bg, #0d0f12);
           border-radius: 12px;
           cursor: pointer;
-          transition: background 0.3s;
+          transition: background 0.2s ease, box-shadow 0.2s ease;
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
         }
-
-        .toggle.active {
+        
+        .setting-control .toggle.active {
           background: var(--accent, #e50914);
+          box-shadow: none;
         }
-
-        .toggle::after {
+        
+        .setting-control .toggle::after {
           content: '';
           position: absolute;
           top: 2px;
@@ -734,10 +744,10 @@ export function SettingsPage({}: SettingsPageProps) {
           height: 20px;
           background: white;
           border-radius: 50%;
-          transition: transform 0.3s;
+          transition: transform 0.2s ease;
         }
-
-        .toggle.active::after {
+        
+        .setting-control .toggle.active::after {
           transform: translateX(26px);
         }
 

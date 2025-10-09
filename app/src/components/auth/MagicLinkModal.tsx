@@ -1,24 +1,22 @@
-import { Button, Message } from '../index'
+import { Button } from '../index'
 
 interface MagicLinkModalProps {
   email: string
   onBack: () => void
   onResend: () => void
   resendSeconds: number
-  message?: string
 }
 
 export function MagicLinkModal({
   email,
   onBack,
   onResend,
-  resendSeconds,
-  message
+  resendSeconds
 }: MagicLinkModalProps) {
   return (
-    <div id="magicLinkContainer" className="fade-in" style={{ textAlign: 'center' }}>
+    <div id="magicLinkContainer" className="magic-link-container fade-in">
       <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8 }}>
-        <Button id="magicLinkBackBtn" variant="secondary" onClick={onBack} style={{ background: '#000', border: '1px solid #333', padding: '8px 12px' }}>
+        <Button id="magicLinkBackBtn" variant="secondary" onClick={onBack} className="back-button">
           ←
         </Button>
       </div>
@@ -35,22 +33,12 @@ export function MagicLinkModal({
       <div style={{ margin: '16px 0' }}>
         <span
           id="resendMagicText"
-          style={{
-            color: '#b3b3b3',
-            cursor: 'pointer',
-            textDecoration: 'underline',
-            fontSize: '0.9rem'
-          }}
+          className="resend-text"
           onClick={onResend}
-          onMouseOver={e => ((e.currentTarget as HTMLElement).style.color = '#e50914')}
-          onMouseOut={e => ((e.currentTarget as HTMLElement).style.color = '#b3b3b3')}
         >
           Resend Magic Link ({resendSeconds}s)
         </span>
       </div>
-      <Message id="magicLinkContainerMessage" show={!!message} type="error" ariaLive="polite">
-        {message}
-      </Message>
     </div>
   )
 }

@@ -14,7 +14,6 @@ const avatarPreview = document.getElementById('avatarPreview');
 const modalMessage = document.getElementById('modalMessage');
 const logoutBtn = document.getElementById('logoutBtn');
 const shuffleBtn = document.getElementById('shuffleBtn');
-const nsfwFilterEnabledToggle = document.getElementById('nsfwFilterEnabledToggle');
 const ageRatingGroup = document.getElementById('ageRatingGroup');
 const ageRatingInput = document.getElementById('ageRatingInput');
 const editModeBtn = document.getElementById('editModeBtn');
@@ -111,9 +110,7 @@ function createProfile() {
     passwordInput.placeholder = 'Enter Stremio password';
     passwordInput.required = true;
 
-    nsfwFilterEnabledToggle.classList.remove('active');
-    ageRatingGroup.style.display = 'none';
-    ageRatingInput.value = 0;
+    ageRatingInput.value = '18';
 
     if (deleteProfileBtn) deleteProfileBtn.style.display = 'none';
 
@@ -142,10 +139,7 @@ function editProfile(profileId) {
     passwordInput.placeholder = 'Leave blank to keep current password';
     passwordInput.required = false;
 
-    const nsfwEnabled = profile.nsfw_filter_enabled || false;
-    nsfwFilterEnabledToggle.classList.toggle('active', nsfwEnabled);
-    ageRatingGroup.style.display = nsfwEnabled ? 'block' : 'none';
-    ageRatingInput.value = profile.nsfw_age_rating || 0;
+    const initialAge = (profile.nsfw_filter_enabled === false ? 18 : (profile.nsfw_age_rating || 18));
 
     currentAvatarSeed = profile.avatar;
     updateAvatarPreview(profile.avatar);
@@ -257,13 +251,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveBtn.textContent = 'Saving...';
                 saveBtn.disabled = true;
                 
+                const selectedAgeRaw = parseInt(ageRatingInput.value || '18', 10);
+                const selectedAge = isNaN(selectedAgeRaw) ? 18 : selectedAgeRaw;
                 const formData = {
                     name: document.getElementById('profileName').value,
                     avatar: currentAvatarSeed || document.getElementById('profileName').value,
                     stremioEmail: document.getElementById('stremioEmail').value,
                     stremioPassword: document.getElementById('stremioPassword').value,
-                    nsfwFilterEnabled: nsfwFilterEnabledToggle.classList.contains('active'),
-                    ageRating: parseInt(ageRatingInput.value, 10)
+                    nsfwFilterEnabled: selectedAge < 18,
+                    ageRating: selectedAge
                 };
                 
                 const url = editingProfileId ? `/api/profiles/${editingProfileId}` : '/api/profiles';
@@ -322,6 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
 
     // Handle modal close
     const closeBtn = document.querySelector('.close');
@@ -414,14 +411,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // NSFW toggle handler
-    if (nsfwFilterEnabledToggle) {
-        nsfwFilterEnabledToggle.addEventListener('click', () => {
-            nsfwFilterEnabledToggle.classList.toggle('active');
-            const isEnabled = nsfwFilterEnabledToggle.classList.contains('active');
-            ageRatingGroup.style.display = isEnabled ? 'block' : 'none';
-        });
-    }
 });
 // Update UI for edit mode
 function updateEditModeUI() {

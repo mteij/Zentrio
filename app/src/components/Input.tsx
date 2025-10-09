@@ -1,5 +1,5 @@
 interface InputProps {
-  type?: 'text' | 'email' | 'password' | 'number'
+  type?: 'text' | 'email' | 'password' | 'number' | 'range'
   id?: string
   name?: string
   placeholder?: string
@@ -10,6 +10,8 @@ interface InputProps {
   style?: Record<string, string>
   min?: string
   max?: string
+  step?: string
+  list?: string
   maxLength?: string
   inputMode?: string
   pattern?: string
@@ -37,6 +39,8 @@ export function Input({
   style,
   min,
   max,
+  step,
+  list,
   maxLength,
   inputMode,
   pattern,
@@ -56,6 +60,8 @@ export function Input({
       style={style}
       min={min}
       max={max}
+      step={step}
+      list={list}
       maxLength={maxLength}
       inputMode={inputMode}
       pattern={pattern}

@@ -17,6 +17,17 @@ const db = new Database(join(process.cwd(), 'data', 'zentrio.db'))
  } catch (e) {
    // ignore if column already exists
  }
+ // Add idle session tracking columns if missing
+ try {
+   db.exec('ALTER TABLE user_sessions ADD COLUMN last_activity DATETIME')
+ } catch (e) {
+   // ignore if column already exists
+ }
+ try {
+   db.exec('ALTER TABLE user_sessions ADD COLUMN max_idle_minutes INTEGER')
+ } catch (e) {
+   // ignore if column already exists
+ }
 
 // Create tables
 db.exec(`
@@ -54,6 +65,8 @@ db.exec(`
     user_id INTEGER NOT NULL,
     session_token TEXT UNIQUE NOT NULL,
     expires_at DATETIME NOT NULL,
+    last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
+    max_idle_minutes INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
   );
@@ -197,6 +210,8 @@ export interface UserSession {
   session_token: string
   expires_at: string
   created_at: string
+  last_activity?: string
+  max_idle_minutes?: number
 }
 
 export interface ProxySession {
@@ -521,15 +536,18 @@ export const profileDb = {
 
 // Session operations
 export const sessionDb = {
-  create: (userId: number, expiresInHours: number = 24): UserSession => {
-    const stmt = db.prepare(`
-      INSERT INTO user_sessions (user_id, session_token, expires_at)
-      VALUES (?, ?, datetime('now', '+${expiresInHours} hours'))
-    `)
-    
+  create: (userId: number, remember: boolean = false): UserSession => {
     const sessionToken = generateSessionToken()
-    const result = stmt.run(userId, sessionToken)
-    
+    // Long-lived absolute expiry for remembered sessions, sliding idle timeout for non-remembered
+    const expiresExpr = remember ? '+36500 days' : '+30 days'
+    const maxIdle = remember ? null : 180 // minutes
+
+    const stmt = db.prepare(`
+      INSERT INTO user_sessions (user_id, session_token, expires_at, last_activity, max_idle_minutes)
+      VALUES (?, ?, datetime('now', ?), CURRENT_TIMESTAMP, ?)
+    `)
+
+    const result = stmt.run(userId, sessionToken, expiresExpr, maxIdle)
     return sessionDb.findById(result.lastInsertRowid as number)!
   },
 
@@ -539,10 +557,26 @@ export const sessionDb = {
   },
 
   findByToken: (token: string): UserSession | undefined => {
-    const stmt = db.prepare('SELECT * FROM user_sessions WHERE session_token = ? AND expires_at > datetime("now")')
+    const stmt = db.prepare(`
+      SELECT * FROM user_sessions
+      WHERE session_token = ?
+        AND expires_at > datetime('now')
+        AND (max_idle_minutes IS NULL OR last_activity > datetime('now', printf('-%d minutes', max_idle_minutes)))
+    `)
     return stmt.get(token) as UserSession | undefined
   },
 
+  // Touch last_activity for non-remembered sessions (those with a max_idle_minutes)
+  touch: (token: string): boolean => {
+    const stmt = db.prepare(`
+      UPDATE user_sessions
+      SET last_activity = CURRENT_TIMESTAMP
+      WHERE session_token = ? AND max_idle_minutes IS NOT NULL
+    `)
+    const result = stmt.run(token)
+    return result.changes > 0
+  },
+  
   delete: (token: string): boolean => {
     const stmt = db.prepare('DELETE FROM user_sessions WHERE session_token = ?')
     const result = stmt.run(token)
@@ -550,7 +584,11 @@ export const sessionDb = {
   },
 
   deleteExpired: (): number => {
-    const stmt = db.prepare('DELETE FROM user_sessions WHERE expires_at <= datetime("now")')
+    const stmt = db.prepare(`
+      DELETE FROM user_sessions
+      WHERE expires_at <= datetime('now')
+         OR (max_idle_minutes IS NOT NULL AND (last_activity IS NULL OR last_activity <= datetime('now', printf('-%d minutes', max_idle_minutes))))
+    `)
     const result = stmt.run()
     return result.changes
   },

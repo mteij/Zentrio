@@ -71,7 +71,7 @@ app.post('/identify', async (c) => {
 
 app.post('/register', async (c) => {
   try {
-    const { email, username, password } = await c.req.json()
+    const { email, username, password, remember } = await c.req.json()
     
     const normEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
     if (!normEmail || !username || !password) {
@@ -95,18 +95,23 @@ app.post('/register', async (c) => {
       last_name: ''
     })
     
-    // Send welcome email
-    await emailService.sendWelcomeEmail(normEmail, username)
+    // Send welcome email (non-blocking/failure-tolerant)
+    try {
+      await emailService.sendWelcomeEmail(normEmail, username)
+    } catch (e) {
+      console.warn('[register] sendWelcomeEmail failed (continuing):', (e as any)?.message || e)
+    }
     
     // Create session to automatically log in the user
-    const session = sessionDb.create(user.id)
+    const session = sessionDb.create(user.id, !!remember)
     
-    // Set session cookie
+    // Set session cookie (10y for remembered, 30d otherwise)
+    const cookieMaxAge = !!remember ? 60 * 60 * 24 * 400 : 60 * 60 * 24 * 30
     setCookie(c, 'sessionId', session.session_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: cookieMaxAge,
       path: '/'
     })
     
@@ -123,9 +128,13 @@ app.post('/register', async (c) => {
 
 app.post('/signin-password', async (c) => {
   try {
-    const { email, password } = await c.req.json()
-    
-    const normEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+    // Safer body parsing to avoid 500s on malformed JSON
+    const body = await c.req.json().catch(() => null)
+    const rawEmail = typeof body?.email === 'string' ? body.email : ''
+    const password = typeof body?.password === 'string' ? body.password : ''
+    const remember = !!body?.remember
+
+    const normEmail = rawEmail.trim().toLowerCase()
     if (!normEmail || !password) {
       return c.json({ error: 'Email and password are required' }, 400)
     }
@@ -139,20 +148,28 @@ app.post('/signin-password', async (c) => {
       return c.json({ error: 'Password authentication not available for this account' }, 401)
     }
     
-    const isValidPassword = await verifyPassword(password, user.password_hash)
+    // Guard against malformed hashes: treat compare errors as invalid credentials instead of 500
+    let isValidPassword = false
+    try {
+      isValidPassword = await verifyPassword(password, user.password_hash)
+    } catch (e: any) {
+      console.warn('[signin-password] bcrypt compare failed:', e?.message || e)
+      isValidPassword = false
+    }
     if (!isValidPassword) {
       return c.json({ error: 'Invalid email or password' }, 401)
     }
     
     // Create session
-    const session = sessionDb.create(user.id)
+    const session = sessionDb.create(user.id, !!remember)
     
-    // Set session cookie
+    // Set session cookie (10y for remembered, 30d otherwise)
+    const cookieMaxAge = !!remember ? 60 * 60 * 24 * 400 : 60 * 60 * 24 * 30
     setCookie(c, 'sessionId', session.session_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: cookieMaxAge,
       path: '/'
     })
     
@@ -160,14 +177,15 @@ app.post('/signin-password', async (c) => {
       message: 'Authentication successful',
       user: { id: user.id, email: user.email, username: user.username, firstName: user.first_name, lastName: user.last_name }
     })
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[signin-password] unexpected error:', error?.message || error)
     return c.json({ error: 'Failed to authenticate' }, 500)
   }
 })
 
 app.post('/magic-link', async (c) => {
   try {
-    const { email } = await c.req.json()
+    const { email, remember } = await c.req.json()
     const normEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
     
     if (!normEmail || !userDb.exists(normEmail)) {
@@ -177,7 +195,7 @@ app.post('/magic-link', async (c) => {
     // Create a one-time, database-backed magic link token (15 minutes)
     const token = magicLinkDb.create(normEmail, 15)
     const { APP_URL } = getConfig()
-    const magicLink = `${APP_URL}/api/auth/verify-magic?token=${token}`
+    const magicLink = `${APP_URL}/api/auth/verify-magic?token=${token}${remember ? '&remember=1' : ''}`
     
     // Send magic link email
     await emailService.sendMagicLink(normEmail, magicLink)
@@ -217,7 +235,7 @@ app.post('/send-otp', async (c) => {
 
 app.post('/verify-otp', async (c) => {
   try {
-    const { email, otp } = await c.req.json()
+    const { email, otp, remember } = await c.req.json()
     
     const normEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
     if (!normEmail || !otp) {
@@ -236,14 +254,15 @@ app.post('/verify-otp', async (c) => {
     }
     
     // Create session
-    const session = sessionDb.create(user.id)
+    const session = sessionDb.create(user.id, !!remember)
     
-    // Set session cookie
+    // Set session cookie (10y for remembered, 30d otherwise)
+    const cookieMaxAge = !!remember ? 60 * 60 * 24 * 400 : 60 * 60 * 24 * 30
     setCookie(c, 'sessionId', session.session_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: cookieMaxAge,
       path: '/'
     })
     
@@ -259,6 +278,8 @@ app.post('/verify-otp', async (c) => {
 app.get('/verify-magic', async (c) => {
   try {
     const token = c.req.query('token')
+    const rememberStr = c.req.query('remember') || ''
+    const remember = rememberStr === '1' || rememberStr.toLowerCase() === 'true'
     
     if (!token) {
       return c.redirect('/?error=invalid-token')
@@ -276,14 +297,15 @@ app.get('/verify-magic', async (c) => {
       return c.redirect('/?error=user-not-found')
     }
     
-    const session = sessionDb.create(user.id)
+    const session = sessionDb.create(user.id, !!remember)
     
-    // Set session cookie
+    // Set session cookie (10y for remembered, 30d otherwise)
+    const cookieMaxAge = !!remember ? 60 * 60 * 24 * 400 : 60 * 60 * 24 * 30
     setCookie(c, 'sessionId', session.session_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: cookieMaxAge,
       path: '/'
     })
     

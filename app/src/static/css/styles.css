@@ -164,6 +164,91 @@ body {
     background: #222;
     color: #666;
 }
+
+/* Auth "Stay signed in" checkbox */
+.remember-row {
+    margin: 10px 0 0;
+    text-align: left;
+}
+
+.remember-checkbox {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    color: var(--muted, #b3b3b3);
+    gap: 8px;
+    position: relative;
+}
+
+/* Visually hide the native input but keep it accessible */
+.remember-checkbox input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* Use the span to render the custom checkbox */
+.remember-checkbox span {
+    position: relative;
+    padding-left: 28px;
+    font-size: 14px;
+    line-height: 20px;
+}
+
+/* Box */
+.remember-checkbox span::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid rgba(255,255,255,0.35);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+/* Checkmark */
+.remember-checkbox span::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 50%;
+    width: 6px;
+    height: 10px;
+    border: solid #000;
+    border-width: 0 2px 2px 0;
+    transform: translateY(-58%) rotate(45deg);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+/* Hover state */
+.remember-checkbox:hover span::before {
+    border-color: var(--accent);
+}
+
+/* Focus state */
+.remember-checkbox input:focus + span::before {
+    box-shadow: 0 0 0 3px rgba(229,9,20,0.25);
+    border-color: var(--accent);
+}
+
+/* Checked state */
+.remember-checkbox input:checked + span::before {
+    border-color: var(--accent);
+    background: var(--accent);
+}
+
+.remember-checkbox input:checked + span::after {
+    opacity: 1;
+}
  
 /* Subtitle labels and preview elements — use theme accent where appropriate.
    Matches elements with 'subtitle' in class/id/for/name to keep selector broad
@@ -615,13 +700,13 @@ input[type="range"]:active::-moz-range-thumb {
 
 /* OTP Container Styling */
 .otp-container {
-    background: rgba(0, 0, 0, 0.8);
-    border: 1px solid rgba(229, 9, 20, 0.3);
+    background: transparent;
+    border: 0;
     border-radius: 12px;
     padding: 32px 24px;
     margin: 16px auto 0;
     max-width: 500px;
-    box-shadow: 0 10px 40px rgba(229, 9, 20, 0.15);
+    box-shadow: none;
     animation: fadeIn 300ms ease-out;
 }
 
@@ -710,13 +795,13 @@ input[type="range"]:active::-moz-range-thumb {
 
 /* Magic Link Container Styling */
 .magic-link-container {
-    background: rgba(0, 0, 0, 0.8);
-    border: 1px solid rgba(229, 9, 20, 0.3);
+    background: transparent;
+    border: 0;
     border-radius: 12px;
     padding: 32px 24px;
     margin: 16px auto 0;
     max-width: 500px;
-    box-shadow: 0 10px 40px rgba(229, 9, 20, 0.15);
+    box-shadow: none;
     animation: fadeIn 300ms ease-out;
     text-align: center;
 }
@@ -746,18 +831,18 @@ input[type="range"]:active::-moz-range-thumb {
 
 /* Magic Link Sent Message */
 .magic-link-sent {
-    background: rgba(76, 175, 80, 0.1);
-    border: 1px solid rgba(76, 175, 80, 0.3);
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 24px;
-    color: #4caf50;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 16px;
+    color: #b3b3b3;
     font-size: 14px;
     line-height: 1.5;
 }
 
 .magic-link-sent strong {
-    color: #66bb6a;
+    color: var(--accent, #e50914);
     font-weight: 600;
 }
 

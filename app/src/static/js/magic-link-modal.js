@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
   const backBtn = document.getElementById('magicLinkBackBtn');
   const resendText = document.getElementById('resendMagicText');
-  const messageBox = document.getElementById('magicLinkContainerMessage');
+  // Using toast notifications instead of inline messages
 
   if (backBtn) {
     backBtn.addEventListener('click', function () {
@@ -12,11 +12,9 @@ document.addEventListener('DOMContentLoaded', function () {
   if (resendText) {
     resendText.addEventListener('click', function () {
       // TODO: Implement resend magic link logic here
-      messageBox.textContent = 'Resending magic link...';
-      messageBox.className = 'message info';
+      if (window.addToast) window.addToast('message', 'Resending magic link', 'Please wait...');
       setTimeout(() => {
-        messageBox.textContent = 'Magic link resent (demo)';
-        messageBox.className = 'message success';
+        if (window.addToast) window.addToast('message', 'Magic link resent', '(demo)');
       }, 1000);
     });
   }
