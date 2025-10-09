@@ -1,12 +1,24 @@
 import { Database } from 'bun:sqlite'
 import * as bcrypt from 'bcryptjs'
-import { join } from 'path'
+import { join, dirname, isAbsolute } from 'path'
+import { mkdirSync, existsSync } from 'fs'
 import { randomBytes, randomInt, createHash } from 'crypto'
 import { encrypt } from './encryption'
 import { getConfig } from './envParser'
 
-// Initialize SQLite database
-const db = new Database(join(process.cwd(), 'data', 'zentrio.db'))
+// Initialize SQLite database (honor DATABASE_URL to support Docker volume persistence)
+const cfg = getConfig()
+let dbPath = cfg.DATABASE_URL || './data/zentrio.db'
+// Normalize relative paths to be under current working dir
+if (!isAbsolute(dbPath)) {
+  dbPath = join(process.cwd(), dbPath)
+}
+// Ensure parent directory exists to avoid ephemeral failures and data loss
+try {
+  const dir = dirname(dbPath)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+} catch (_) { /* best-effort */ }
+const db = new Database(dbPath)
 
  // Enable foreign keys
  db.exec('PRAGMA foreign_keys = ON')

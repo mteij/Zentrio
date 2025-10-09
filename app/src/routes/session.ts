@@ -22,7 +22,9 @@ app.get('/:profileId', async (c) => {
         return c.html('Profile not found or access denied', 404)
     }
 
-    const decryptedPassword = profile.stremio_password ? decrypt(profile.stremio_password) : ''
+    const hadEncrypted = !!profile.stremio_password
+    const decryptedPassword = hadEncrypted ? (decrypt(profile.stremio_password as string) || '') : ''
+    const decryptionError = hadEncrypted && !decryptedPassword
 
     const sessionData = {
         profile: {
@@ -34,7 +36,9 @@ app.get('/:profileId', async (c) => {
             hideCalendarButton: user.hide_calendar_button,
             hideAddonsButton: user.hide_addons_button,
             downloadsManagerEnabled: user.downloads_manager_enabled ?? true,
-        }
+        },
+        // Signal to the client when we failed to decrypt an existing password (likely ENCRYPTION_KEY change)
+        decryptionError,
     }
 
     // This is a simplified way to pass data to a static HTML file.
