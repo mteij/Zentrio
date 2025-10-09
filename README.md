@@ -1,7 +1,7 @@
 # Zentrio
 
 <div align="center">
-  <img src="app/src/static/logo/icon-512.png" alt="Zentrio Icon" width="512" height="512" />
+  <img src="app/src/static/logo/icon-512.png" alt="Zentrio Icon" width="256" height="256" />
 
   <strong>Profile management for Stremio Web</strong>
 
