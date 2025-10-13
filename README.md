@@ -35,10 +35,10 @@ Zentrio started as a weekend project to solve [this community issue](https://git
 
 -   Profiles: create profiles with unique stremio credentials
 -   Additional Features/Plugins:
-  - Addon order management
-  - Hide calendar/addons button
-  - NSFW Filter (Soon™)
-  - Downloads manager (Soon™): The ability to download media and watch later
+    - Addon order management
+    - Hide calendar/addons button
+    - NSFW Filter (Soon™)
+    - Downloads manager (Soon™): The ability to download media and watch later
 -   Installable PWA: Zentrio can be installed as a PWA
 
 ## How-to-use
