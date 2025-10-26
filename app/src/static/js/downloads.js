@@ -248,7 +248,7 @@
             <div class="download-meta">
               ${sizeStr ? `<span>${sizeStr}</span>` : ''}
               ${recStr ? `<span>${recStr}</span>` : ''}
-              ${etaStr ? `<span>${etaStr}</span>` : ''}
+              ${etaStr ? `<span>${escapeHtml(etaStr)}</span>` : ''}
               ${safeFileName ? `<span>${safeFileName}</span>` : ''}
             </div>
             <div class="download-actions">
