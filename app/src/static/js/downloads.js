@@ -217,6 +217,36 @@
     return div.innerHTML;
   }
 
+  // Validate URLs before opening to avoid untrusted redirection
+  function isSafeSameOriginUrl(u) {
+    try {
+      if (typeof u !== 'string') return false;
+      const s = u.trim();
+      const l = s.toLowerCase();
+      // Block dangerous schemes outright
+      if (l.startsWith('javascript:') || l.startsWith('data:') || l.startsWith('vbscript:')) return false;
+      // Allow same-origin blob URLs only
+      if (l.startsWith('blob:')) {
+        const expectedPrefix = 'blob:' + window.location.origin;
+        return s.startsWith(expectedPrefix);
+      }
+      // Resolve relative URLs and require same-origin
+      const parsed = new URL(s, window.location.origin);
+      return parsed.origin === window.location.origin;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function openInNewTabSafe(u) {
+    try {
+      const w = window.open(u, '_blank', 'noopener,noreferrer');
+      if (w && typeof w === 'object') {
+        try { w.opener = null; } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
   function render() {
     if (!els.list || !els.empty) return;
     if (!queue.length) {
@@ -301,8 +331,8 @@
         } else if (action === 'open') {
           // Opening: if we stored blobUrl (future), use it. For now just notify.
           const item = queue.find(i => i.id === id);
-          if (item && item.blobUrl) {
-            try { window.open(item.blobUrl, '_blank'); } catch(e){}
+          if (item && item.blobUrl && isSafeSameOriginUrl(item.blobUrl)) {
+            openInNewTabSafe(item.blobUrl);
           } else {
             showMessage('Open not available yet', 'info');
           }
@@ -313,13 +343,16 @@
 
   function upsert(item) {
     const idx = queue.findIndex(i => i.id === item.id);
+    let targetIndex = idx;
     if (idx === -1) {
       queue.unshift(item);
+      targetIndex = 0;
     } else {
       queue[idx] = { ...queue[idx], ...item };
+      targetIndex = idx;
     }
-    if (item.status === 'completed') {
-      queue[idx].completedAt = queue[idx].completedAt || Date.now();
+    if (item.status === 'completed' && targetIndex >= 0 && targetIndex < queue.length) {
+      queue[targetIndex].completedAt = queue[targetIndex].completedAt || Date.now();
     }
     queue = autoPrune(queue);
     saveQueue(queue);
