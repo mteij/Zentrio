@@ -32,7 +32,8 @@ jobs:
 
       - name: Read app version
         id: ver
-        run: echo "VERSION=$(node -p \"require('./app/package.json').version\")" >> $GITHUB_ENV
+        run: |
+          node -e "require('fs').appendFileSync(process.env.GITHUB_ENV, 'VERSION=' + require('./app/package.json').version + '\n')"
 
 
       - name: Log in to the Container registry
