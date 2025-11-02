@@ -61,8 +61,6 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
     : ['- Initial release'];
   const since = prevTag ? `since ${prevTag}` : 'initial release';
   return [
-    `# Zentrio v${version}`,
-    '',
     `Changes ${since}:`,
     '',
     ...lines,
@@ -127,6 +125,7 @@ async function main() {
     `- Group changes into sections such as Features, Fixes, Improvements, Docs, Chore when possible based on commit subjects.`,
     `- Keep it under 300 lines. Use bullet lists.`,
     `- Do not invent changes. Base content strictly on provided commits.`,
+    `- Do not include a top-level title or heading; the GitHub release title already includes the version.`,
   ].join('\n');
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
@@ -145,6 +144,8 @@ async function main() {
   if (!notes) {
     notes = basicMarkdownNotes(version, prevTag, commitLog);
   }
+  // Remove redundant top-level title; GitHub release already has one
+  notes = notes.replace(/^\s*#{1,6}\s.*\r?\n+/, '').trimStart();
 
   const disclaimer = "\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.";
 writeFileSync('RELEASE_NOTES.md', notes + disclaimer, 'utf8');
@@ -161,7 +162,7 @@ main().catch(err => {
   try {
     const v = getVersion();
     const disclaimer = "\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.";
-writeFileSync('RELEASE_NOTES.md', `# Zentrio v${v}\n\n- Automated release notes generation failed. See commit history for details.\n` + disclaimer, 'utf8');
+writeFileSync('RELEASE_NOTES.md', `- Automated release notes generation failed. See commit history for details.\n` + disclaimer, 'utf8');
   } catch {}
   process.exit(0);
 });
