@@ -26,6 +26,16 @@
         }
     }
 
+    // Safely escape text for HTML contexts (text nodes and attribute values)
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     // Backward-compatible API (no-op visually except via toast)
     function showGlobalMessage(text, type = 'error') {
         toast(type, type === 'error' ? 'Error' : (type === 'success' ? 'Success' : 'Notice'), text);
@@ -119,7 +129,7 @@
     }
 
     function renderLoginForm(email, nickname = null) {
-        const welcomeMessage = nickname ? `<div class="welcome-message" style="text-align:center;margin-bottom:20px;color:#e50914;font-size:1.2rem;font-weight:bold;">Welcome back, ${nickname.replace(/"/g, '"')}!</div>` : '';
+        const welcomeMessage = nickname ? `<div class="welcome-message" style="text-align:center;margin-bottom:20px;color:#e50914;font-size:1.2rem;font-weight:bold;">Welcome back, ${escapeHtml(nickname)}!</div>` : '';
         
         inlineAuth.innerHTML = `
           <form id="loginForm" class="fade-in" novalidate>
@@ -129,7 +139,7 @@
             ${welcomeMessage}
             <div class="form-group">
               <label for="loginEmail">Email</label>
-              <input id="loginEmail" type="email" value="${email.replace(/"/g,'"')}" disabled aria-readonly="true" />
+              <input id="loginEmail" type="email" value="${escapeHtml(email)}" disabled aria-readonly="true" />
             </div>
             <div class="form-group">
               <label for="loginPassword">Password</label>
@@ -283,7 +293,7 @@
                     Magic Link Sent
                 </h3>
                 <div class="magic-link-sent">
-                    <p>A magic link has been sent to <strong>${email.replace(/"/g, '"')}</strong>. Check your inbox and click the link to sign in.</p>
+                    <p>A magic link has been sent to <strong>${escapeHtml(email)}</strong>. Check your inbox and click the link to sign in.</p>
                 </div>
                 <p class="resend-text" id="resendMagicLink">Didn't receive it? Resend link</p>
             </div>
@@ -333,7 +343,7 @@
                     Back
                 </button>
                 <h3>Enter OTP Code</h3>
-                <p>An OTP code has been sent to <strong>${email.replace(/"/g, '"')}</strong>. Please enter it below.</p>
+                <p>An OTP code has been sent to <strong>${escapeHtml(email)}</strong>. Please enter it below.</p>
                 <form id="otpForm" novalidate>
                     <div class="form-group">
                         <label for="otpInput" class="sr-only">OTP Code</label>
@@ -439,7 +449,7 @@
             </div>
             <div class="form-group">
               <label for="regEmail">Email</label>
-              <input id="regEmail" type="email" value="${email.replace(/"/g,'"')}" disabled aria-readonly="true" />
+              <input id="regEmail" type="email" value="${escapeHtml(email)}" disabled aria-readonly="true" />
             </div>
             <div class="form-group">
               <label for="regUsername">Nickname</label>
