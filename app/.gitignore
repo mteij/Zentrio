@@ -12,3 +12,6 @@ node_modules/
 *.db
 *.sqlite
 *.sqlite3
+ 
+# Lockfiles (Bun only) 
+package-lock.json 

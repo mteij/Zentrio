@@ -31,4 +31,6 @@ yarn-error.log*
 # Database
 *.db
 *.sqlite
-*.sqlite3
+*.sqlite3 
+# Ignore npm lockfile in app 
+app/package-lock.json 
