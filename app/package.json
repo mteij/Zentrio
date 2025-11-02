@@ -1,6 +1,6 @@
 {
-  "name": "zentrio-app",
-  "version": "1.0.0",
+  "name": "zentrio",
+  "version": "1.1.0",
   "license": "MIT",
   "description": "Zentrio application built with Hono and Bun",
   "scripts": {

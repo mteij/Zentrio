@@ -82,13 +82,24 @@ if (PROXY_LOGS) {
 app.use('*', securityHeaders)
 app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
 
-// Service Worker explicit route (headers)
+// Service Worker explicit route (headers + version injection)
 app.get('/static/sw.js', async (c) => {
   try {
-    const filePath = join(process.cwd(), 'src', 'static', 'sw.js')
-    const file = Bun.file(filePath)
-    const buf = await file.arrayBuffer()
-    return new Response(new Uint8Array(buf), {
+    const swPath = join(process.cwd(), 'src', 'static', 'sw.js')
+    const swFile = Bun.file(swPath)
+    let swText = await swFile.text()
+
+    // Read app version from package.json and inject into SW (%%APP_VERSION%%)
+    let version = '0.0.0'
+    try {
+      const pkgPath = join(process.cwd(), 'package.json')
+      const pkg = await Bun.file(pkgPath).json()
+      version = (pkg && pkg.version) ? String(pkg.version) : version
+    } catch {}
+
+    swText = swText.replace(/%%APP_VERSION%%/g, version)
+
+    return new Response(swText, {
       headers: {
         'Content-Type': 'text/javascript; charset=utf-8',
         'Cache-Control': 'no-cache',

@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = 'v1';
+const VERSION = '%%APP_VERSION%%';
 const CACHE_NAME = `zentrio-pwa-${VERSION}`;
 const ASSETS = [
   '/static/downloads-offline.html',
@@ -39,12 +39,16 @@ self.addEventListener('activate', (event) => {
 });
 
 function staleWhileRevalidate(request) {
+  const url = new URL(request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return fetch(request);
+  }
   return caches.open(CACHE_NAME).then((cache) =>
     cache.match(request).then((cached) => {
       const fetchPromise = fetch(request)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            cache.put(request, networkResponse.clone());
+          if (networkResponse && networkResponse.ok) {
+            cache.put(request, networkResponse.clone()).catch(() => {});
           }
           return networkResponse;
         })
@@ -55,17 +59,20 @@ function staleWhileRevalidate(request) {
 }
 
 async function networkFirst(request) {
+  const url = new URL(request.url);
   try {
     const res = await fetch(request);
-    if (res && res.status === 200) {
+    if ((url.protocol === 'http:' || url.protocol === 'https:') && res && res.ok) {
       const cache = await caches.open(CACHE_NAME);
-      cache.put(request, res.clone());
+      await cache.put(request, res.clone()).catch(() => {});
     }
     return res;
   } catch (e) {
-    const cache = await caches.open(CACHE_NAME);
-    const cached = await cache.match(request);
-    if (cached) return cached;
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match(request);
+      if (cached) return cached;
+    }
     throw e;
   }
 }
@@ -82,6 +89,11 @@ async function notifyClients(type, title, message) {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
+
+// Ignore extension and non-HTTP(S) schemes (e.g., chrome-extension://)
+if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+  return;
+}
 
   if (req.method !== 'GET') return;
 
