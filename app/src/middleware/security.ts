@@ -49,7 +49,7 @@ export const securityHeaders = async (c: Context, next: Next) => {
   // Reference: [securityHeaders()](app/src/middleware/security.ts:27)
   c.header(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; worker-src 'self'; manifest-src 'self';"
   )
 }
 

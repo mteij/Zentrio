@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Offline - Zentrio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141414">
+  <link rel="manifest" href="/static/logo/favicon/site.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon/favicon-16x16.png">
+  <link rel="icon" href="/static/logo/favicon/favicon.ico">
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/toast.css">
+  <style>
+    body { background:#0f0f10; color:#e5e7eb; display:flex; min-height:100vh; align-items:center; justify-content:center; }
+    .wrap { max-width:640px; padding:24px; text-align:center; }
+    h1 { font-size:34px; margin:0 0 10px; }
+    p { color:#9ca3af; margin:0 0 18px; }
+    .btn { background:#1f2937; border:1px solid #374151; color:#d1d5db; font-size:12px; padding:8px 14px; border-radius:6px; cursor:pointer; }
+    .btn:disabled { opacity:.6; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>You're offline</h1>
+    <p>Some features are unavailable. Downloads can still be managed from the downloads page.</p>
+    <div style="display:flex; gap:12px; justify-content:center;">
+      <button class="btn" onclick="location.href='/downloads'">Open Downloads</button>
+      <button class="btn" data-online-required>Go Home</button>
+    </div>
+  </div>
+  <div id="toast-container" class="toast-container"></div>
+  <script src="/static/js/toast.js"></script>
+  <script>
+    (function(){
+      function updateOnlineUI(){
+        var online = navigator.onLine;
+        document.querySelectorAll('[data-online-required]').forEach(function(el){
+          el.toggleAttribute('disabled', !online);
+          if (online) el.onclick = function(){ location.href='/'; };
+          else el.onclick = null;
+        });
+      }
+      if (!navigator.onLine && window.addToast) window.addToast('info', 'Offline', 'Some features are disabled.');
+      window.addEventListener('online', function(){ if (window.addToast) window.addToast('success','Online','Back online.'); updateOnlineUI(); });
+      window.addEventListener('offline', function(){ if (window.addToast) window.addToast('info','Offline','Some features are disabled.'); updateOnlineUI(); });
+      updateOnlineUI();
+    })();
+  </script>
+</body>
+</html>

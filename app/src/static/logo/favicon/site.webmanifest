@@ -1,1 +1,19 @@
-{"name":"Zentrio","short_name":"Zentrio","icons":[{"src":"/static/logo/favicon/android-chrome-192x192.png","sizes":"192x192","type":"image/png"},{"src":"/static/logo/favicon/android-chrome-512x512.png","sizes":"512x512","type":"image/png"}],"theme_color":"#141414","background_color":"#141414","display":"standalone"}
+{
+  "name": "Zentrio",
+  "short_name": "Zentrio",
+  "description": "Zentrio — media companion.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#141414",
+  "theme_color": "#141414",
+  "icons": [
+    { "src": "/static/logo/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/logo/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/logo/favicon/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/logo/favicon/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/logo/favicon/favicon-32x32.png", "sizes": "32x32", "type": "image/png", "purpose": "any" },
+    { "src": "/static/logo/favicon/favicon-16x16.png", "sizes": "16x16", "type": "image/png", "purpose": "any" },
+    { "src": "/static/logo/favicon/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "maskable any" }
+  ]
+}

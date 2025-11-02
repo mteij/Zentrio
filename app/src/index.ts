@@ -82,6 +82,24 @@ if (PROXY_LOGS) {
 app.use('*', securityHeaders)
 app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
 
+// Service Worker explicit route (headers)
+app.get('/static/sw.js', async (c) => {
+  try {
+    const filePath = join(process.cwd(), 'src', 'static', 'sw.js')
+    const file = Bun.file(filePath)
+    const buf = await file.arrayBuffer()
+    return new Response(new Uint8Array(buf), {
+      headers: {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Service-Worker-Allowed': '/'
+      }
+    })
+  } catch {
+    return new Response('Not Found', { status: 404 })
+  }
+})
+
 // Static file serving (explicit, to avoid path mismatches)
 app.get('/static/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/static\//, '')
@@ -90,6 +108,7 @@ app.get('/static/*', async (c) => {
     const file = Bun.file(filePath)
     const buf = await file.arrayBuffer()
     const typeMap: Record<string, string> = {
+      '.html': 'text/html; charset=utf-8',
       '.css': 'text/css; charset=utf-8',
       '.js': 'text/javascript; charset=utf-8',
       '.json': 'application/json; charset=utf-8',
