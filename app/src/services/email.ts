@@ -58,12 +58,44 @@ class EmailService {
     return this.transporter!
   }
 
+  // Strict, conservative recipient validation to avoid quoted local-parts with embedded '@'
+  // - Reject CRLF/header injection, commas (lists), and quoted local-parts entirely
+  // - Accept simple addr-spec only: local@domain (RFC-lite)
+  private validateRecipient(raw: string): string {
+    const s = (raw || '').trim()
+    if (!s || /[\r\n]/.test(s) || s.includes(',')) {
+      throw new Error('Invalid recipient address')
+    }
+    // Extract from angle brackets if present: Name <addr> or <addr>
+    const angle = s.match(/<([^>]+)>/)
+    const addr = (angle ? angle[1] : s).trim()
+    // Disallow quoted local-parts to prevent embedded '@' tricks
+    if (addr.startsWith('"')) {
+      throw new Error('Quoted local-parts are not allowed')
+    }
+    const SIMPLE = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/
+    if (!SIMPLE.test(addr)) {
+      throw new Error('Invalid recipient address')
+    }
+    const [local, domain] = addr.split('@')
+    return `${local}@${domain.toLowerCase()}`
+  }
+ 
   async sendMagicLink(email: string, magicLink: string): Promise<boolean> {
     try {
       const appUrl = process.env.APP_URL || 'http://localhost:3000'
+      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
+      let to: string
+      try {
+        to = this.validateRecipient(email)
+      } catch (e: any) {
+        console.error('Invalid recipient for magic link:', e?.message || e)
+        return false
+      }
       const mailOptions = {
-        from: process.env.EMAIL_FROM || 'noreply@zentrio.app',
-        to: email,
+        from,
+        to,
+        envelope: { from, to },
         subject: 'Your secure sign-in link • Zentrio',
         html: `
   <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -100,9 +132,18 @@ class EmailService {
   async sendOTP(email: string, otp: string): Promise<boolean> {
     try {
       const appUrl = process.env.APP_URL || 'http://localhost:3000'
+      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
+      let to: string
+      try {
+        to = this.validateRecipient(email)
+      } catch (e: any) {
+        console.error('Invalid recipient for OTP:', e?.message || e)
+        return false
+      }
       const mailOptions = {
-        from: process.env.EMAIL_FROM || 'noreply@zentrio.app',
-        to: email,
+        from,
+        to,
+        envelope: { from, to },
         subject: 'Your verification code • Zentrio',
         html: `
   <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -137,9 +178,18 @@ class EmailService {
   async sendWelcomeEmail(email: string, name: string): Promise<boolean> {
     try {
       const appUrl = process.env.APP_URL || 'http://localhost:3000'
+      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
+      let to: string
+      try {
+        to = this.validateRecipient(email)
+      } catch (e: any) {
+        console.error('Invalid recipient for welcome email:', e?.message || e)
+        return false
+      }
       const mailOptions = {
-        from: process.env.EMAIL_FROM || 'noreply@zentrio.app',
-        to: email,
+        from,
+        to,
+        envelope: { from, to },
         subject: 'Welcome to Zentrio 🎬',
         html: `
   <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
