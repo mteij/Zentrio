@@ -303,6 +303,59 @@ export const getAddonManagerScript = () => `
 
       let currentAddons = [];
 
+      // Helpers to avoid corrupting Stremio account by sending only the allowed fields
+      const sanitizeAddonsForSet = (addons) => {
+        const seen = new Set();
+        const out = [];
+        for (const a of addons || []) {
+          const url = a && typeof a.transportUrl === 'string' ? a.transportUrl : '';
+          if (!url || seen.has(url)) continue;
+          seen.add(url);
+          const flags = a && a.flags ? { official: !!a.flags.official, protected: !!a.flags.protected } : undefined;
+          if (flags) out.push({ transportUrl: url, flags });
+          else out.push({ transportUrl: url });
+        }
+        return out;
+      };
+
+      // Fallback format used by some Stremio API versions: array of transportUrl strings
+      const sanitizeAddonsAsStrings = (addons) => {
+        const seen = new Set();
+        const out = [];
+        for (const a of addons || []) {
+          const url = a && typeof a.transportUrl === 'string' ? a.transportUrl : '';
+          if (!url || seen.has(url)) continue;
+          seen.add(url);
+          out.push(url);
+        }
+        return out;
+      };
+
+      const tryAddonCollectionSet = async (authKey, addonsPayload) => {
+        return fetch('/stremio/api/addonCollectionSet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify({ type: 'AddonCollectionSet', authKey, addons: addonsPayload })
+        });
+      };
+
+      const safeSaveAddons = async (authKey, addons) => {
+        // Prefer object form with flags
+        let res = await tryAddonCollectionSet(authKey, sanitizeAddonsForSet(addons));
+        let json = null;
+        try { json = await res.clone().json(); } catch (_e) {}
+        let failed = !res.ok || (json && json.result && json.result.success === false);
+
+        if (failed) {
+          // Retry with string array fallback
+          res = await tryAddonCollectionSet(authKey, sanitizeAddonsAsStrings(addons));
+          json = null; try { json = await res.clone().json(); } catch (_e) {}
+          failed = !res.ok || (json && json.result && json.result.success === false);
+        }
+
+        return { res, json, failed };
+      };
+
       // Load and display addons
       const loadAddons = async () => {
         const authKey = getKey();
@@ -314,7 +367,7 @@ export const getAddonManagerScript = () => `
         try {
           const response = await fetch('/stremio/api/addonCollectionGet', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({
               type: 'AddonCollectionGet',
               authKey,
@@ -328,7 +381,13 @@ export const getAddonManagerScript = () => `
 
           const data = await response.json();
           if (data.result && Array.isArray(data.result.addons)) {
-            currentAddons = data.result.addons;
+            const rawAddons = data.result.addons;
+            currentAddons = rawAddons.map(a => {
+              if (typeof a === 'string') {
+                return { transportUrl: a, manifest: { name: a, description: '', logo: '' }, flags: {} };
+              }
+              return a;
+            });
             displayAddons(currentAddons);
           } else {
             throw new Error('Invalid response format');
@@ -446,7 +505,7 @@ export const getAddonManagerScript = () => `
         });
       };
 
-      // Save changes
+      // Save changes (safe: only send minimal payload to avoid account corruption)
       saveBtn.addEventListener('click', async () => {
         const authKey = getKey();
         if (!authKey) {
@@ -458,23 +517,13 @@ export const getAddonManagerScript = () => `
         saveBtn.textContent = 'Saving...';
 
         try {
-          const response = await fetch('/stremio/api/addonCollectionSet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'AddonCollectionSet',
-              authKey,
-              addons: currentAddons
-            })
-          });
+          const { res, json, failed } = await safeSaveAddons(authKey, currentAddons);
 
-          if (!response.ok) {
-            throw new Error(\`Failed to save: \${response.statusText}\`);
-          }
-
-          const data = await response.json();
-          if (data.result?.success === false) {
-            throw new Error(data.result.error || 'Failed to save changes');
+          if (failed) {
+            const statusText = res ? (res.status + ' ' + (res.statusText || '')) : '';
+            const apiMsg = json && json.result && json.result.error ? String(json.result.error) : '';
+            const msg = apiMsg || (statusText || 'Failed to save changes');
+            throw new Error(msg);
           }
 
           // Show success and refresh the iframe to update addon order
@@ -492,10 +541,10 @@ export const getAddonManagerScript = () => `
               // Fallback to simple reload if no parent window
               window.location.reload();
             }
-          }, 1000);
-
+          }, 800);
         } catch (err) {
-          showError(err.message);
+          const msg = err && err.message ? err.message : 'Failed to save changes';
+          showError(msg);
           saveBtn.disabled = false;
           saveBtn.textContent = 'Save Changes';
         }
