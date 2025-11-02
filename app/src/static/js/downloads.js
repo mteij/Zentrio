@@ -240,11 +240,14 @@
 
   function openInNewTabSafe(u) {
     try {
+      // Validate URL inside the opener to avoid unvalidated redirection
+      if (!isSafeSameOriginUrl(u)) return false;
       const w = window.open(u, '_blank', 'noopener,noreferrer');
       if (w && typeof w === 'object') {
         try { w.opener = null; } catch (_) {}
       }
-    } catch (_) {}
+      return true;
+    } catch (_) { return false; }
   }
 
   function render() {
