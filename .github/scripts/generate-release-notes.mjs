@@ -38,7 +38,7 @@ function getPrevTag(currentTag) {
   if (prev) return prev;
 
   // Fallback to describe
-  const d = sh('git describe --tags --abbrev=0 2>/dev/null', '');
+  const d = sh('git describe --abbrev=0 --tags HEAD~1 2>/dev/null', '');
   if (d && d !== currentTag) return d;
   return '';
 }
@@ -58,10 +58,10 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
         const msg = (rest.join('\t') || '').trim();
         return `- ${msg} (${date}, ${hash?.slice(0, 7)})`;
       })
-    : ['- Initial release'];
-  const since = prevTag ? `since ${prevTag}` : 'initial release';
+    : ['- Welcome to the first release of Zentrio! This release includes the initial set of features and functionality.'];
+  const since = prevTag ? `since ${prevTag}` : `for the initial release`;
   return [
-    `Changes ${since}:`,
+    `Release notes ${since}:`,
     '',
     ...lines,
     '',
