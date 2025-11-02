@@ -25,7 +25,7 @@ Although the project is maintained with care, it remains experimental and may co
 
 ## About Zentrio
 
-Zentrio started as a weekend project to solve [this community issue](https://github.com/Stremio/stremio-features/issues/622) regarding Stremio profiles, but it's grown into something I'm genuinely excited about. Now everyone in your household can have their own space, no more "why is my continue watching full of (insert random movie)?"
+Zentrio started as a weekend project to solve [this community issue](https://github.com/Stremio/stremio-features/issues/622) regarding Stremio profiles, but it's grown into something bigger. Not only does Zentrio create a seperate space but its also bundled with a lot of QoL features that hope to make the already awesome Stremio experience even better!
 
 <div align="center">
   <img src="app/src/static/media/profiles.png" alt="Zentrio Profiles" width="800" />
