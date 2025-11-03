@@ -226,13 +226,18 @@
       // Block dangerous schemes outright
       if (l.startsWith('javascript:') || l.startsWith('data:') || l.startsWith('vbscript:')) return false;
       // Allow same-origin blob URLs only
+      // Allow same-origin blob URLs only
       if (l.startsWith('blob:')) {
-        const expectedPrefix = 'blob:' + window.location.origin;
-        return s.startsWith(expectedPrefix);
+        try {
+          // Re-parse to ensure it's a valid Blob URL structure relative to current origin
+          const parsed = new URL(s);
+          return parsed.protocol === 'blob:' && parsed.origin === window.location.origin;
+        } catch (_) {
+          return false;
+        }
       }
-      // Resolve relative URLs and require same-origin
-      const parsed = new URL(s, window.location.origin);
-      return parsed.origin === window.location.origin;
+      // Disallow other URL types to prevent open redirection
+      return false;
     } catch (_) {
       return false;
     }
