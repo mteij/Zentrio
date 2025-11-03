@@ -148,11 +148,19 @@ export const getSessionScript = (base64: string) => `
                   'a[href*="cinemeta"], a[href*="v3-cinemeta"], a[href*="cinemeta.strem.io"], a[href*="v3-cinemeta.strem.io"]'
                 );
                 for (var k = 0; k < links.length; k++) {
+                  var link = links[k];
+                  // Do NOT touch anything inside the Addon Manager modal
+                  if (link.closest('#stremio-addon-manager-modal')) continue;
+
                   // Climb up to the row container (class names are hashed, so match by partials)
                   var row =
-                    links[k].closest('div[class*="board-row"], div[class*="meta-row-container"], section[class*="board-row"], div[class*="row-container"]') ||
-                    links[k].closest('div[class*="board-row"]') ||
-                    links[k].closest('div[class*="meta-row"]');
+                    link.closest('div[class*="board-row"], div[class*="meta-row-container"], section[class*="board-row"], div[class*="row-container"]') ||
+                    link.closest('div[class*="board-row"]') ||
+                    link.closest('div[class*="meta-row"]');
+
+                  // Also skip removal if the found row itself is inside the Addon Manager modal
+                  if (row && row.closest && row.closest('#stremio-addon-manager-modal')) continue;
+
                   if (row) {
                     if (typeof row.remove === 'function') row.remove();
                     else if (row.parentNode) row.parentNode.removeChild(row);

@@ -141,17 +141,19 @@
                 stremioContainer.appendChild(iframe);
 
                 // Listen for requests from inner scripts to reload the Stremio iframe (e.g. after addon changes)
+                // Always reload with sessionData so our injected scripts are preserved
                 window.addEventListener('message', (e) => {
                     const d = e && e.data;
                     if (d && d.type === 'reload-stremio-iframe') {
                         try {
-                            if (iframe && iframe.contentWindow) {
-                                iframe.contentWindow.location.reload();
-                            } else {
-                                iframe.src = `/stremio/?sessionData=${sessionDataString}`;
-                            }
+                            // Preserve the current hash route (e.g. #/addons) to stay on the same page after reload
+                            let hash = '';
+                            try { hash = (iframe && iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.hash) || ''; } catch (_ignore) {}
+                            const bust = Date.now();
+                            iframe.src = `/stremio/?sessionData=${sessionDataString}&_=${bust}${hash}`;
                         } catch (_e) {
-                            iframe.src = `/stremio/?sessionData=${sessionDataString}`;
+                            const bust = Date.now();
+                            iframe.src = `/stremio/?sessionData=${sessionDataString}&_=${bust}`;
                         }
                     }
                 });
