@@ -7,12 +7,56 @@ export const getSessionScript = (base64: string) => `
     // expose globals
     window.session = session;
     window.zentrioSession = session;
-    // IMPORTANT: Do NOT persist Zentrio session keys into localStorage under generic names.
-    // Writing keys like "profile" here can clobber Stremio's own localStorage schema
-    // (e.g., profile.auth.key) and lead to account corruption. Keep data in-memory only,
-    // mirroring pancake3000/stremio-addon-manager behavior.
-    // If persistence is ever needed, only use a namespaced key (commented out below).
-    // try { localStorage.setItem('zentrio:session', JSON.stringify(session)); } catch (e) { console.warn('Zentrio store fail (namespaced)', e); }
+    // Minimal bootstrap for Stremio Web to recognize the logged-in state.
+    // Provide a strictly-shaped "profile" and a small whitelist of known keys Stremio reads.
+    try {
+      var authKey = (session && session.profile && session.profile.auth && session.profile.auth.key) || null;
+      var authUser = (session && session.profile && session.profile.auth && session.profile.auth.user) || null;
+
+      // Strictly shaped profile object as Stremio expects (avoid dumping arbitrary app state)
+      var profileLS = {
+        auth: { key: authKey, user: authUser },
+        addons: (session && session.profile && Array.isArray(session.profile.addons)) ? session.profile.addons : [],
+        addonsLocked: !!(session && session.profile && session.profile.addonsLocked),
+        settings: (session && session.profile && session.profile.settings) || null
+      };
+
+      // Persist only if we actually have an auth key
+      if (profileLS.auth && profileLS.auth.key) {
+        localStorage.setItem('profile', JSON.stringify(profileLS));
+      }
+
+      // Whitelist-persist other well-known Stremio keys often read at startup.
+      var safeTopLevel = {
+        installation_id: (session && session.installation_id) || null,
+        schema_version: (session && session.schema_version) || 18,
+        library: (session && session.library) || null,
+        library_recent: (session && session.library_recent) || null,
+        notifications: (session && session.notifications) || null,
+        search_history: (session && session.search_history) || null,
+        streaming_server_urls: (session && session.streaming_server_urls) || null,
+        streams: (session && session.streams) || null
+      };
+      for (var k in safeTopLevel) {
+        if (safeTopLevel[k] !== null && typeof safeTopLevel[k] !== 'undefined') {
+          try { localStorage.setItem(k, JSON.stringify(safeTopLevel[k])); } catch(_) {}
+        }
+      }
+
+      // Some builds expect "settings" at top level as well.
+      var settingsObj = session && session.profile && session.profile.settings;
+      if (settingsObj) {
+        try { localStorage.setItem('settings', JSON.stringify(settingsObj)); } catch(_) {}
+      }
+
+      // Some builds read top-level "user"
+      var userObj = (session && session.profile && session.profile.auth && session.profile.auth.user) || (session && session.user) || null;
+      if (userObj) {
+        try { localStorage.setItem('user', JSON.stringify(userObj)); } catch(_) {}
+      }
+    } catch (e) {
+      console.warn('Zentrio session minimal bootstrap failed', e);
+    }
     // clean URL
     try {
       if (String(location.search).indexOf('sessionData=') !== -1) {

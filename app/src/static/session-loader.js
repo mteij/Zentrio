@@ -139,6 +139,22 @@
 
                 stremioContainer.appendChild(iframe);
 
+                // Listen for requests from inner scripts to reload the Stremio iframe (e.g. after addon changes)
+                window.addEventListener('message', (e) => {
+                    const d = e && e.data;
+                    if (d && d.type === 'reload-stremio-iframe') {
+                        try {
+                            if (iframe && iframe.contentWindow) {
+                                iframe.contentWindow.location.reload();
+                            } else {
+                                iframe.src = `/stremio/?sessionData=${sessionDataString}`;
+                            }
+                        } catch (_e) {
+                            iframe.src = `/stremio/?sessionData=${sessionDataString}`;
+                        }
+                    }
+                });
+
                 // Debug bridge + queue recorder: mirror downloads debug messages, allow forcing scans, and persist queue
                 try {
                     const LS_KEY = 'zentrioDownloadsQueue';
