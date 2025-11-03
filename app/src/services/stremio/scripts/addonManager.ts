@@ -11,7 +11,19 @@ export const getAddonManagerScript = () => `
     const modalId = "stremio-addon-manager-modal";
 
     function getKey() {
-      return JSON.parse(localStorage.getItem("profile"))?.auth?.key;
+      try {
+        var s = (typeof window !== 'undefined' ? (window['session'] || window['zentrioSession'] || null) : null);
+        var k = s && s.profile && s.profile.auth && s.profile.auth.key;
+        if (k) return k;
+      } catch (_e) {}
+      try {
+        var p = localStorage.getItem("profile");
+        if (p) {
+          var parsed = JSON.parse(p) || {};
+          if (parsed && parsed.auth && parsed.auth.key) return parsed.auth.key;
+        }
+      } catch (_e2) {}
+      return null;
     }
 
     // Create and inject the modal component
@@ -39,6 +51,7 @@ export const getAddonManagerScript = () => `
               <div class="addon-count"></div>
               <div class="modal-actions">
                 <button class="btn-cancel">Cancel</button>
+                <button class="btn-restore" title="Restore only default addons (Cinemeta and Local Files)">Restore Defaults</button>
                 <button class="btn-save">Save Changes</button>
               </div>
             </div>
@@ -138,6 +151,22 @@ export const getAddonManagerScript = () => `
           }
           .btn-cancel:hover {
             color: white;
+          }
+          .btn-restore {
+            padding: 8px 16px;
+            background: none;
+            border: 1px solid #6b7280;
+            color: #e5e7eb;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+          .btn-restore:hover {
+            border-color: #ffffff;
+            color: #ffffff;
+          }
+          .btn-restore:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
           }
           .btn-save {
             padding: 8px 24px;
@@ -290,6 +319,7 @@ export const getAddonManagerScript = () => `
       const modal = document.getElementById(modalId);
       const closeBtn = modal.querySelector('.modal-close');
       const cancelBtn = modal.querySelector('.btn-cancel');
+      const restoreBtn = modal.querySelector('.btn-restore');
       const saveBtn = modal.querySelector('.btn-save');
       const backdrop = modal.querySelector('.modal-backdrop');
 
@@ -302,6 +332,12 @@ export const getAddonManagerScript = () => `
       backdrop.addEventListener('click', closeModal);
 
       let currentAddons = [];
+
+      // Default addons (official protected) — restore target
+      const DEFAULT_ADDONS = [
+        { transportUrl: 'https://v3-cinemeta.strem.io/manifest.json', flags: { official: true, protected: true } },
+        { transportUrl: 'http://127.0.0.1:11470/local-addon/manifest.json', flags: { official: true, protected: true } },
+      ];
 
       // Follow pancake3000/stremio-addon-manager behavior: send the addons array exactly as returned by AddonCollectionGet
       const saveAddons = async (authKey, addons) => {
@@ -362,7 +398,24 @@ export const getAddonManagerScript = () => `
         const addonsList = modal.querySelector('.addons-list');
         const addonCount = modal.querySelector('.addon-count');
 
-        addonsList.innerHTML = addons.map((addon, index) => \`
+        // Normalize only for rendering to avoid crashes if API returns strings.
+        const normalized = (addons || []).map(a => {
+          if (typeof a === 'string') {
+            return { transportUrl: a, manifest: { name: a, description: '', logo: '' }, flags: {} };
+          }
+          const name = (a && a.manifest && a.manifest.name) ? a.manifest.name : (a && a.transportUrl) || 'Addon';
+          return {
+            transportUrl: a?.transportUrl || String(a || ''),
+            manifest: {
+              name,
+              description: (a?.manifest?.description) || '',
+              logo: (a?.manifest?.logo) || ''
+            },
+            flags: a?.flags || {}
+          };
+        });
+
+        addonsList.innerHTML = normalized.map((addon, index) => \`
           <div class="addon-item" draggable="true" data-index="\${index}">
             <div class="drag-handle">⋮⋮</div>
             <div class="addon-logo">
@@ -371,7 +424,7 @@ export const getAddonManagerScript = () => `
                 : ''
               }
               <div class="addon-logo-fallback" style="display: \${addon.manifest.logo ? 'none' : 'flex'}">
-                \${addon.manifest.name.slice(0, 2).toUpperCase()}
+                \${(addon.manifest.name || '').slice(0, 2).toUpperCase()}
               </div>
             </div>
             <div class="addon-info">
@@ -454,6 +507,51 @@ export const getAddonManagerScript = () => `
           });
         });
       };
+
+      // Restore defaults: keep only Cinemeta + Local Files (official, protected)
+      restoreBtn.addEventListener('click', async () => {
+        const authKey = getKey();
+        if (!authKey) {
+          showError('Unable to get auth key');
+          return;
+        }
+        if (!confirm('Restore defaults? This will remove all addons except the two built-in ones.')) return;
+
+        restoreBtn.disabled = true;
+        restoreBtn.textContent = 'Restoring...';
+
+        try {
+          const res = await saveAddons(authKey, DEFAULT_ADDONS);
+          let json = null; try { json = await res.clone().json(); } catch (_e) {}
+          if (!res.ok || (json && json.result && json.result.success === false)) {
+            const statusText = res ? (res.status + ' ' + (res.statusText || '')) : '';
+            const apiMsg = json && json.result && json.result.error ? String(json.result.error) : '';
+            const msg = apiMsg || (statusText || 'Failed to restore defaults');
+            throw new Error(msg);
+          }
+
+          // Update local state for immediate UI feedback
+          currentAddons = DEFAULT_ADDONS.slice();
+          displayAddons(currentAddons);
+
+          restoreBtn.textContent = 'Restored!';
+          setTimeout(() => {
+            closeModal();
+            restoreBtn.disabled = false;
+            restoreBtn.textContent = 'Restore Defaults';
+            if (window.parent !== window) {
+              window.parent.postMessage({ type: 'reload-stremio-iframe' }, '*');
+            } else {
+              window.location.reload();
+            }
+          }, 800);
+        } catch (err) {
+          const msg = err && err.message ? err.message : 'Failed to restore defaults';
+          showError(msg);
+          restoreBtn.disabled = false;
+          restoreBtn.textContent = 'Restore Defaults';
+        }
+      });
 
       // Save changes (safe: only send minimal payload to avoid account corruption)
       saveBtn.addEventListener('click', async () => {
