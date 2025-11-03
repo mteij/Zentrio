@@ -7,10 +7,12 @@ export const getSessionScript = (base64: string) => `
     // expose globals
     window.session = session;
     window.zentrioSession = session;
-    // persist to localStorage
-    for (var k in session) {
-      try { localStorage.setItem(k, JSON.stringify(session[k])); } catch (e) { console.warn('Zentrio store fail', k, e); }
-    }
+    // IMPORTANT: Do NOT persist Zentrio session keys into localStorage under generic names.
+    // Writing keys like "profile" here can clobber Stremio's own localStorage schema
+    // (e.g., profile.auth.key) and lead to account corruption. Keep data in-memory only,
+    // mirroring pancake3000/stremio-addon-manager behavior.
+    // If persistence is ever needed, only use a namespaced key (commented out below).
+    // try { localStorage.setItem('zentrio:session', JSON.stringify(session)); } catch (e) { console.warn('Zentrio store fail (namespaced)', e); }
     // clean URL
     try {
       if (String(location.search).indexOf('sessionData=') !== -1) {

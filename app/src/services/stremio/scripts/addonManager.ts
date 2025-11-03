@@ -303,57 +303,13 @@ export const getAddonManagerScript = () => `
 
       let currentAddons = [];
 
-      // Helpers to avoid corrupting Stremio account by sending only the allowed fields
-      const sanitizeAddonsForSet = (addons) => {
-        const seen = new Set();
-        const out = [];
-        for (const a of addons || []) {
-          const url = a && typeof a.transportUrl === 'string' ? a.transportUrl : '';
-          if (!url || seen.has(url)) continue;
-          seen.add(url);
-          const flags = a && a.flags ? { official: !!a.flags.official, protected: !!a.flags.protected } : undefined;
-          if (flags) out.push({ transportUrl: url, flags });
-          else out.push({ transportUrl: url });
-        }
-        return out;
-      };
-
-      // Fallback format used by some Stremio API versions: array of transportUrl strings
-      const sanitizeAddonsAsStrings = (addons) => {
-        const seen = new Set();
-        const out = [];
-        for (const a of addons || []) {
-          const url = a && typeof a.transportUrl === 'string' ? a.transportUrl : '';
-          if (!url || seen.has(url)) continue;
-          seen.add(url);
-          out.push(url);
-        }
-        return out;
-      };
-
-      const tryAddonCollectionSet = async (authKey, addonsPayload) => {
+      // Follow pancake3000/stremio-addon-manager behavior: send the addons array exactly as returned by AddonCollectionGet
+      const saveAddons = async (authKey, addons) => {
         return fetch('/stremio/api/addonCollectionSet', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          body: JSON.stringify({ type: 'AddonCollectionSet', authKey, addons: addonsPayload })
+          // Intentionally omit Content-Type to mirror reference implementation
+          body: JSON.stringify({ type: 'AddonCollectionSet', authKey, addons })
         });
-      };
-
-      const safeSaveAddons = async (authKey, addons) => {
-        // Prefer object form with flags
-        let res = await tryAddonCollectionSet(authKey, sanitizeAddonsForSet(addons));
-        let json = null;
-        try { json = await res.clone().json(); } catch (_e) {}
-        let failed = !res.ok || (json && json.result && json.result.success === false);
-
-        if (failed) {
-          // Retry with string array fallback
-          res = await tryAddonCollectionSet(authKey, sanitizeAddonsAsStrings(addons));
-          json = null; try { json = await res.clone().json(); } catch (_e) {}
-          failed = !res.ok || (json && json.result && json.result.success === false);
-        }
-
-        return { res, json, failed };
       };
 
       // Load and display addons
@@ -367,7 +323,7 @@ export const getAddonManagerScript = () => `
         try {
           const response = await fetch('/stremio/api/addonCollectionGet', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            
             body: JSON.stringify({
               type: 'AddonCollectionGet',
               authKey,
@@ -381,13 +337,7 @@ export const getAddonManagerScript = () => `
 
           const data = await response.json();
           if (data.result && Array.isArray(data.result.addons)) {
-            const rawAddons = data.result.addons;
-            currentAddons = rawAddons.map(a => {
-              if (typeof a === 'string') {
-                return { transportUrl: a, manifest: { name: a, description: '', logo: '' }, flags: {} };
-              }
-              return a;
-            });
+            currentAddons = data.result.addons;
             displayAddons(currentAddons);
           } else {
             throw new Error('Invalid response format');
@@ -517,9 +467,9 @@ export const getAddonManagerScript = () => `
         saveBtn.textContent = 'Saving...';
 
         try {
-          const { res, json, failed } = await safeSaveAddons(authKey, currentAddons);
-
-          if (failed) {
+          const res = await saveAddons(authKey, currentAddons);
+          let json = null; try { json = await res.clone().json(); } catch (_e) {}
+          if (!res.ok || (json && json.result && json.result.success === false)) {
             const statusText = res ? (res.status + ' ' + (res.statusText || '')) : '';
             const apiMsg = json && json.result && json.result.error ? String(json.result.error) : '';
             const msg = apiMsg || (statusText || 'Failed to save changes');
