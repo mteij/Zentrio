@@ -369,6 +369,8 @@
 
   // message events from downloadsManager script inside session iframe or same context
   window.addEventListener('message', (e) => {
+    // Only accept messages from same origin
+    if (e.origin !== window.location.origin) return;
     const data = e.data;
     if (!data || typeof data !== 'object' || !data.type) return;
 
