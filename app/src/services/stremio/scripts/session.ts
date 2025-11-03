@@ -139,6 +139,29 @@ export const getSessionScript = (base64: string) => `
             };
             hideAddonsButtons();
           }
+          // remove Cinemeta content rows if enabled
+          if (window.session && window.session.hideCinemetaContent) {
+            var removeCinemetaRows = function() {
+              try {
+                // Match any anchor that references the Cinemeta manifest in discover links
+                var links = document.querySelectorAll(
+                  'a[href*="cinemeta"], a[href*="v3-cinemeta"], a[href*="cinemeta.strem.io"], a[href*="v3-cinemeta.strem.io"]'
+                );
+                for (var k = 0; k < links.length; k++) {
+                  // Climb up to the row container (class names are hashed, so match by partials)
+                  var row =
+                    links[k].closest('div[class*="board-row"], div[class*="meta-row-container"], section[class*="board-row"], div[class*="row-container"]') ||
+                    links[k].closest('div[class*="board-row"]') ||
+                    links[k].closest('div[class*="meta-row"]');
+                  if (row) {
+                    if (typeof row.remove === 'function') row.remove();
+                    else if (row.parentNode) row.parentNode.removeChild(row);
+                  }
+                }
+              } catch (_e) {}
+            };
+            removeCinemetaRows();
+          }
         } catch (e) {
           console.warn('Zentrio [Script]: observer tick failed', e);
         }

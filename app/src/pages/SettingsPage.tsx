@@ -111,6 +111,16 @@ export function SettingsPage({}: SettingsPageProps) {
 
           <div className="setting-item">
             <div className="setting-info">
+              <h3>Hide Cinemeta Content</h3>
+              <p>Removes rows from the Stremio home/discover screens that originate from Cinemeta.</p>
+            </div>
+            <div className="setting-control">
+              <div className="toggle" id="hideCinemetaContentToggle"></div>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <div className="setting-info">
               <h3>Enable Downloads Manager</h3>
               <p>Shows a download button for each stream and a downloads panel within Stremio (requires page refresh after changing).</p>
             </div>

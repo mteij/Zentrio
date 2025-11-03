@@ -184,6 +184,7 @@ app.get('/settings', async (c) => {
       addonManagerEnabled: fresh.addon_manager_enabled,
       hideCalendarButton: fresh.hide_calendar_button ?? true,
       hideAddonsButton: fresh.hide_addons_button ?? false,
+      hideCinemetaContent: fresh.hide_cinemeta_content ?? false,
       downloadsManagerEnabled: fresh.downloads_manager_enabled ?? true,
     })
   } catch (_e) {
@@ -201,6 +202,7 @@ app.put('/settings', async (c) => {
       addon_manager_enabled: body.addonManagerEnabled,
       hide_calendar_button: body.hideCalendarButton,
       hide_addons_button: body.hideAddonsButton,
+      hide_cinemeta_content: body.hideCinemetaContent,
       downloads_manager_enabled: body.downloadsManagerEnabled,
     })
     if (!updated) {

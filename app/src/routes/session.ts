@@ -35,6 +35,7 @@ app.get('/:profileId', async (c) => {
             addonManagerEnabled: user.addon_manager_enabled,
             hideCalendarButton: user.hide_calendar_button,
             hideAddonsButton: user.hide_addons_button,
+            hideCinemetaContent: user.hide_cinemeta_content,
             downloadsManagerEnabled: user.downloads_manager_enabled ?? true,
         },
         // Signal to the client when we failed to decrypt an existing password (likely ENCRYPTION_KEY change)

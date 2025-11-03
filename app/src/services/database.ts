@@ -29,6 +29,12 @@ const db = new Database(dbPath)
  } catch (e) {
    // ignore if column already exists
  }
+ // New setting: hide_cinemeta_content (idempotent)
+ try {
+   db.exec('ALTER TABLE users ADD COLUMN hide_cinemeta_content BOOLEAN DEFAULT FALSE')
+ } catch (e) {
+   // ignore if column already exists
+ }
  // Add idle session tracking columns if missing
  try {
    db.exec('ALTER TABLE user_sessions ADD COLUMN last_activity DATETIME')
@@ -53,6 +59,7 @@ db.exec(`
     addon_manager_enabled BOOLEAN DEFAULT FALSE,
     hide_calendar_button BOOLEAN DEFAULT FALSE,
     hide_addons_button BOOLEAN DEFAULT FALSE,
+    hide_cinemeta_content BOOLEAN DEFAULT FALSE,
     downloads_manager_enabled BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -198,6 +205,7 @@ export interface User {
   addon_manager_enabled: boolean
   hide_calendar_button: boolean
   hide_addons_button: boolean
+  hide_cinemeta_content: boolean
   downloads_manager_enabled: boolean
   created_at: string
   updated_at: string
@@ -391,6 +399,10 @@ export const userDb = {
     if (updates.hide_addons_button !== undefined) {
         fields.push('hide_addons_button = ?')
         values.push(updates.hide_addons_button)
+    }
+    if (updates.hide_cinemeta_content !== undefined) {
+        fields.push('hide_cinemeta_content = ?')
+        values.push(updates.hide_cinemeta_content)
     }
     if (updates.downloads_manager_enabled !== undefined) {
         fields.push('downloads_manager_enabled = ?')

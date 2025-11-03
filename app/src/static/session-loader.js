@@ -107,6 +107,7 @@
             ageRating: profile.nsfw_age_rating || 0,
             hideCalendarButton: !!(user && user.hideCalendarButton),
             hideAddonsButton: !!(user && user.hideAddonsButton),
+            hideCinemetaContent: !!(user && user.hideCinemetaContent),
             addonManagerEnabled: !!(user && user.addonManagerEnabled),
             downloadsManagerEnabled: (user && typeof user.downloadsManagerEnabled !== 'undefined') ? !!user.downloadsManagerEnabled : true,
             tmdbApiKey: profile.tmdb_api_key || null,
