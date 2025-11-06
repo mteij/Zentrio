@@ -33,7 +33,6 @@ export function decrypt(encryptedText: string): string {
     return decrypted.toString('utf8')
   } catch (error) {
     console.error('Decryption failed:', error)
-    // Return an empty string or handle the error as appropriate
     return ''
   }
 }

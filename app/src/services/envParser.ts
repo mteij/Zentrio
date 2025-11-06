@@ -46,7 +46,10 @@ export function initEnv(): void {
     loaded = true
   }
 }
-
+ 
+// Auto-initialize env on module import (idempotent)
+initEnv()
+ 
 /**
  * Access typed config with sensible defaults.
  * Call initEnv() early in app startup to ensure process.env is hydrated.

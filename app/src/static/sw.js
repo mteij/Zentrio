@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 const VERSION = '%%APP_VERSION%%';
 const CACHE_NAME = `zentrio-pwa-${VERSION}`;
@@ -15,7 +15,7 @@ const ASSETS = [
   '/static/logo/favicon/favicon-32x32.png',
   '/static/logo/favicon/favicon-16x16.png',
   '/static/logo/favicon/favicon.ico',
-  '/static/logo/favicon/site.webmanifest'
+  '/static/site.webmanifest'
 ];
 
 self.addEventListener('install', (event) => {
@@ -38,24 +38,25 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-function staleWhileRevalidate(request) {
+async function staleWhileRevalidate(request) {
   const url = new URL(request.url);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     return fetch(request);
   }
-  return caches.open(CACHE_NAME).then((cache) =>
-    cache.match(request).then((cached) => {
-      const fetchPromise = fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.ok) {
-            cache.put(request, networkResponse.clone()).catch(() => {});
-          }
-          return networkResponse;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
-  );
+
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
+
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse && networkResponse.ok) {
+      await cache.put(request, networkResponse.clone()).catch(() => {});
+    }
+    return networkResponse;
+  } catch (_) {
+    // Always return a Response so event.respondWith never receives undefined
+    return cached || new Response('', { status: 504, statusText: 'Gateway Timeout' });
+  }
 }
 
 async function networkFirst(request) {
@@ -73,7 +74,8 @@ async function networkFirst(request) {
       const cached = await cache.match(request);
       if (cached) return cached;
     }
-    throw e;
+    // Ensure a valid Response is always returned
+    return new Response('', { status: 504, statusText: 'Gateway Timeout' });
   }
 }
 
@@ -92,6 +94,11 @@ self.addEventListener('fetch', (event) => {
 
 // Ignore extension and non-HTTP(S) schemes (e.g., chrome-extension://)
 if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+  return;
+}
+
+// Bypass cross-origin requests to honor strict CSP (let the browser handle them)
+if (url.origin !== self.location.origin) {
   return;
 }
 
@@ -134,7 +141,7 @@ if (url.protocol !== 'http:' && url.protocol !== 'https:') {
   }
 
   event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req).catch(() => cached))
+    caches.match(req).then((cached) => cached || fetch(req).catch(() => cached || new Response('', { status: 504 })))
   );
 });
 

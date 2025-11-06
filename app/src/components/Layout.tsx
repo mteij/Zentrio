@@ -42,7 +42,7 @@ export function Layout({
         <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon/favicon-16x16.png" />
-        <link rel="manifest" href="/static/logo/favicon/site.webmanifest" />
+        <link rel="manifest" href="/static/site.webmanifest" />
         <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
       </head>
@@ -92,7 +92,7 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon/favicon-16x16.png" />
-        <link rel="manifest" href="/static/logo/favicon/site.webmanifest" />
+        <link rel="manifest" href="/static/site.webmanifest" />
         <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
       </head>

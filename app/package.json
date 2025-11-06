@@ -22,6 +22,8 @@
     "nodemailer": "^7.0.10"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
   }
 }

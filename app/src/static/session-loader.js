@@ -3,9 +3,10 @@
     const stremioContainer = document.getElementById('stremio-container');
     const loadingContainer = document.querySelector('.loading-container');
 
+    try {
+
     if (!window.sessionData) {
-        loadingMessage.textContent = 'Error: Session data not found.';
-        return;
+        throw new Error('Session data not found.');
     }
 
     const { profile, user, decryptionError } = window.sessionData;
@@ -25,7 +26,7 @@
         return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
     };
 
-    try {
+    /* try moved to top */
     loadingMessage.textContent = `Logging in as ${profile.name}...`;
 
         const loginRes = await fetch("/stremio/api/login", {
@@ -226,12 +227,22 @@
 
     } catch (error) {
         console.error("Session loading failed:", error);
+        // Ensure loading UI reflects error state
+        try {
+            const dots = document.querySelector('.pulsing-dots');
+            if (dots) dots.style.display = 'none';
+            if (loadingContainer) loadingContainer.style.display = 'block';
+            if (stremioContainer) stremioContainer.style.display = 'none';
+        } catch (_) {}
+        // Safely determine if decryption tip should be shown even if sessionData wasn't set
+        let showTip = false;
+        try { showTip = !!(window.sessionData && window.sessionData.decryptionError); } catch (_) {}
         document.title = 'Zentrio - Error';
         loadingMessage.innerHTML = `
             <div class="message error" style="display: block; margin: 0 auto; max-width: 400px;">
                 <p style="margin-bottom: 15px;"><strong>Error</strong></p>
-                <p>${error.message}</p>
-                ${decryptionError ? '<p style="margin-top:10px; color:#bbb;">Tip: Ensure the server ENCRYPTION_KEY stays the same across restarts; otherwise saved passwords can\'t be decrypted.</p>' : ''}
+                <p>${error && error.message ? error.message : 'Unexpected error'}</p>
+                ${showTip ? '<p style="margin-top:10px; color:#bbb;">Tip: Ensure the server ENCRYPTION_KEY stays the same across restarts; otherwise saved passwords can\'t be decrypted.</p>' : ''}
                 <button
                     onclick="window.history.back()"
                     class="btn btn-secondary"

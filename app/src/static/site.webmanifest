@@ -1,0 +1,48 @@
+{
+  "id": "/",
+  "name": "Zentrio",
+  "short_name": "Zentrio",
+  "description": "Zentrio — Stream Your Way",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#141414",
+  "theme_color": "#141414",
+  "categories": ["entertainment", "video", "media"],
+  "icons": [
+    { "src": "/static/logo/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/static/logo/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/static/logo/favicon/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/logo/favicon/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/logo/favicon/favicon-32x32.png", "sizes": "32x32", "type": "image/png", "purpose": "any" },
+    { "src": "/static/logo/favicon/favicon-16x16.png", "sizes": "16x16", "type": "image/png", "purpose": "any" },
+    { "src": "/static/logo/favicon/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "maskable any" }
+  ],
+  "screenshots": [
+    { "src": "/static/media/profiles.png", "type": "image/png", "form_factor": "wide", "label": "Profiles" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open Profiles",
+      "short_name": "Profiles",
+      "url": "/profiles",
+      "icons": [{ "src": "/static/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Downloads",
+      "short_name": "Downloads",
+      "url": "/downloads",
+      "icons": [{ "src": "/static/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Settings",
+      "short_name": "Settings",
+      "url": "/settings",
+      "icons": [{ "src": "/static/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "prefer_related_applications": false
+}
