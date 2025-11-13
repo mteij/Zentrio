@@ -59,10 +59,7 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
         return `- ${msg} (${date}, ${hash?.slice(0, 7)})`;
       })
     : ['- Welcome to the first release of Zentrio! This release includes the initial set of features and functionality.'];
-  const since = prevTag ? `since ${prevTag}` : `for the initial release`;
   return [
-    `Release notes ${since}:`,
-    '',
     ...lines,
     '',
   ].join('\n');
