@@ -27,7 +27,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+        with:
+          fetch-depth: 0  # Fetch full history for proper build
+          
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -41,12 +43,23 @@ jobs:
       - name: Install dependencies
         run: |
           cd docs
-          npm ci
+          npm ci --prefer-offline --no-audit
+          
+      - name: Clean build directory
+        run: |
+          cd docs
+          rm -rf .vitepress/dist
+          rm -rf node_modules/.cache
           
       - name: Build with VitePress
         run: |
           cd docs
           npm run build
+          
+      - name: Verify build output
+        run: |
+          cd docs
+          ls -la .vitepress/dist/
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

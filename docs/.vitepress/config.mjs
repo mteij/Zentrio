@@ -20,38 +20,89 @@ export default defineConfig({
 
   themeConfig: {
     nav: [
-      { text: '🏠 Home', link: '/' },
-      { text: '🚀 Try Zentrio.eu', link: 'https://zentrio.eu' },
-      { text: '🏠 Self-Host', link: '/self-hosting' },
-      { text: '📱 Mobile', link: '/mobile' },
-      { text: '⚙️ Config', link: '/configuration' },
-      { text: '👨‍💻 Dev', link: '/development' }
+      { text: 'Home', link: '/' },
+      { text: 'Try Zentrio.eu', link: 'https://zentrio.eu' },
+      { 
+        text: 'Documentation', 
+        items: [
+          { text: 'Getting Started', link: '/getting-started/' },
+          { text: 'User Guide', link: '/user-guide/' },
+          { text: 'Deployment', link: '/deployment/' },
+          { text: 'Mobile', link: '/mobile/' },
+          { text: 'Development', link: '/development/' },
+          { text: 'API', link: '/api/' },
+          { text: 'Reference', link: '/reference/' }
+        ]
+      }
     ],
 
     sidebar: [
       {
         text: 'Getting Started',
         items: [
-          { text: '🏠 Introduction', link: '/' },
-          { text: '🚀 Try Public Instance', link: 'https://zentrio.eu' },
-          { text: '🏠 Self-Hosting', link: '/self-hosting' },
-          { text: '⚙️ Configuration', link: '/configuration' }
+          { text: 'Overview', link: '/getting-started/' },
+          { text: 'Public Instance', link: '/getting-started/public-instance' },
+          { text: 'Self-Hosting', link: '/getting-started/self-hosting' },
+          { text: 'Quick Start', link: '/getting-started/quick-start' }
+        ]
+      },
+      {
+        text: 'User Guide',
+        items: [
+          { text: 'Overview', link: '/user-guide/' },
+          { text: 'Profiles', link: '/user-guide/profiles' },
+          { text: 'Settings', link: '/user-guide/settings' },
+          { text: 'Themes', link: '/user-guide/themes' },
+          { text: 'Troubleshooting', link: '/user-guide/troubleshooting' }
+        ]
+      },
+      {
+        text: 'Deployment',
+        items: [
+          { text: 'Overview', link: '/deployment/' },
+          { text: 'Docker', link: '/deployment/docker' },
+          { text: 'Manual Installation', link: '/deployment/manual' },
+          { text: 'Reverse Proxy', link: '/deployment/reverse-proxy' },
+          { text: 'Production', link: '/deployment/production' }
+        ]
+      },
+      {
+        text: 'Mobile',
+        items: [
+          { text: 'Overview', link: '/mobile/' },
+          { text: 'Setup', link: '/mobile/setup' },
+          { text: 'Android', link: '/mobile/android' },
+          { text: 'iOS', link: '/mobile/ios' },
+          { text: 'Deployment', link: '/mobile/deployment' }
         ]
       },
       {
         text: 'Development',
         items: [
-          { text: '👨‍💻 Development Guide', link: '/development' },
-          { text: '📚 API Reference', link: '/api' },
-          { text: '📱 Mobile Apps', link: '/mobile' }
+          { text: 'Overview', link: '/development/' },
+          { text: 'Architecture', link: '/development/architecture' },
+          { text: 'Setup', link: '/development/setup' },
+          { text: 'Contributing', link: '/development/contributing' },
+          { text: 'Testing', link: '/development/testing' },
+          { text: 'Debugging', link: '/development/debugging' }
         ]
       },
       {
-        text: 'Platform Setup',
+        text: 'API',
         items: [
-          { text: '📖 Android Setup', link: '/android-setup' },
-          { text: '🔌 Capacitor Integration', link: '/capacitor' },
-          { text: '🚀 Quick Start Android', link: '/quick-start-android' }
+          { text: 'Overview', link: '/api/' },
+          { text: 'Authentication', link: '/api/authentication' },
+          { text: 'Endpoints', link: '/api/endpoints' },
+          { text: 'Examples', link: '/api/examples' }
+        ]
+      },
+      {
+        text: 'Reference',
+        items: [
+          { text: 'Overview', link: '/reference/' },
+          { text: 'Configuration', link: '/reference/configuration' },
+          { text: 'Environment', link: '/reference/environment' },
+          { text: 'Changelog', link: '/reference/changelog' }
         ]
       }
     ],
@@ -61,7 +112,7 @@ export default defineConfig({
     ],
 
     footer: {
-      message: 'Built with ❤️ for the Stremio community',
+      message: 'Built for the Stremio community',
       copyright: `Copyright © ${new Date().getFullYear()} Zentrio`
     },
 
@@ -84,10 +135,10 @@ export default defineConfig({
     },
     lineNumbers: true,
     container: {
-      tipLabel: '💡 Tip',
-      warningLabel: '⚠️ Warning',
-      dangerLabel: '🚨 Danger',
-      infoLabel: 'ℹ️ Info',
+      tipLabel: 'Tip',
+      warningLabel: 'Warning',
+      dangerLabel: 'Danger',
+      infoLabel: 'Info',
       detailsLabel: 'Details'
     }
   },
@@ -95,25 +146,11 @@ export default defineConfig({
   vite: {
     define: {
       __VUE_OPTIONS_API__: false
+    },
+    ssr: {
+      noExternal: ['prismjs']
     }
   },
 
-  ignoreDeadLinks: [
-    // Ignore external links
-    /^https?:\/\//,
-    // Ignore links to directories (they're valid references)
-    /\/$/,
-    // Ignore specific patterns that might be false positives
-    /^mailto:/,
-    /^tel:/,
-    // Ignore relative links to files outside docs directory
-    /^\.\.\/\.\./,
-    // Ignore root-relative links to files outside docs directory
-    /^\/[^/]/,
-    // Ignore specific file patterns that are referenced but not in docs
-    /\.env\.example$/,
-    /\/app\/src\//,
-    /\/app\/android\//,
-    /\/app\/ios\//
-  ]
+  ignoreDeadLinks: true
 })
