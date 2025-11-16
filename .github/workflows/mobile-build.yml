@@ -151,6 +151,8 @@ jobs:
             -configuration Release \
             -destination generic/platform=iOS \
             -archivePath $PWD/build/App.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
             archive
 
       - name: Create ExportOptions.plist
@@ -173,6 +175,13 @@ jobs:
               <false/>
               <key>signingStyle</key>
               <string>automatic</string>
+              <key>signingCertificate</key>
+              <string></string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.zentrio.app</key>
+                  <string></string>
+              </dict>
               <key>destination</key>
               <string>export</string>
               <key>stripSwiftSymbols</key>
