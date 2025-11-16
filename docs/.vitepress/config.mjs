@@ -67,9 +67,11 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/MichielEijpe/Zentrio/edit/main/documentation/:path',
+      pattern: 'https://github.com/MichielEijpe/Zentrio/edit/main/docs/:path',
       text: 'Edit this page on GitHub'
-    }
+    },
+
+    appearance: 'dark'
   },
 
   markdown: {

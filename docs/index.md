@@ -18,6 +18,9 @@ hero:
     - theme: alt
       text: 📚 Documentation
       link: /self-hosting
+    - theme: alt
+      text: 💻 GitHub
+      link: https://github.com/MichielEijpe/Zentrio
 
 features:
   - icon: 👥
@@ -106,9 +109,21 @@ Zentrio transforms your Stremio experience by giving you **complete control over
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 30px 0;">
 
 <div style="padding: 20px; background: var(--vp-c-bg-soft); border-radius: 8px; text-align: center;">
-  <h4 style="margin-top: 0;">🏠 Self-Hosting</h4>
+  <h4 style="margin-top: 0;">🌐 Public Instance</h4>
+  <p>Try Zentrio instantly without setup</p>
+  <a href="https://zentrio.eu" style="color: var(--vp-c-brand-1);">Visit Zentrio.eu →</a>
+</div>
+
+<div style="padding: 20px; background: var(--vp-c-bg-soft); border-radius: 8px; text-align: center;">
+  <h4 style="margin-top: 0;"> Self-Hosting</h4>
   <p>Deploy Zentrio on your own server</p>
   <a href="/self-hosting" style="color: var(--vp-c-brand-1);">Get Started →</a>
+</div>
+
+<div style="padding: 20px; background: var(--vp-c-bg-soft); border-radius: 8px; text-align: center;">
+  <h4 style="margin-top: 0;">💻 GitHub Repository</h4>
+  <p>View source code and contribute</p>
+  <a href="https://github.com/MichielEijpe/Zentrio" style="color: var(--vp-c-brand-1);">View on GitHub →</a>
 </div>
 
 <div style="padding: 20px; background: var(--vp-c-bg-soft); border-radius: 8px; text-align: center;">

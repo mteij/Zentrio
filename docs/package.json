@@ -2,6 +2,7 @@
   "name": "zentrio-docs",
   "version": "1.0.0",
   "description": "Zentrio Documentation",
+  "type": "module",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
