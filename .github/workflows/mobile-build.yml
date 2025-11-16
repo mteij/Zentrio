@@ -69,6 +69,10 @@ jobs:
         working-directory: ./app
         run: bunx cap sync android
 
+      - name: Make gradlew executable
+        working-directory: ./app/android
+        run: chmod +x ./gradlew
+
       - name: Build Android APK
         working-directory: ./app/android
         run: ./gradlew assembleDebug
