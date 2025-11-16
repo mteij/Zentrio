@@ -6,7 +6,7 @@ hero:
   text: Profile Management for Stremio Web
   tagline: Multiple profiles, enhanced features, complete control
   image:
-    src: /icon-512.png
+    src: /Zentrio/icon-512.png
     alt: Zentrio Logo
   actions:
     - theme: brand
