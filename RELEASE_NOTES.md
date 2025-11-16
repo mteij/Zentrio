@@ -1,12 +1,22 @@
+🎉 **What's new in version 1.1.14**
+
+This release brings **exciting new features** and **important bug fixes** to improve your Zentrio experience. We've carefully reviewed and implemented 17 changes based on your feedback and our ongoing commitment to excellence.
+
+
+
+### 🚀 Features
+
 - Lets see the new docs (2025-11-16, 3a3a4d2)
 - Add APK to release notes (2025-11-16, b1a827c)
 
 ### 🐛 Bug Fixes
 
 - Fix 404 errors (2025-11-16, 55b126c)
-- Fix github workflow errors (hopefully) (2025-11-16, 7d450d4)
-- Fix workflow 2 (2025-11-16, b38eaf0)
-- Fix workflow (2025-11-16, d23f305)
+
+### 💄 Improvements
+
+- Improve docs (2025-11-17, 3773570)
+- Improve release notes (2025-11-17, c04a86b)
 
 ### 📝 Documentation
 
@@ -28,12 +38,10 @@
 - Merge branch 'main' of https://github.com/mteij/Zentrio (2025-11-16, 2f3bf97)
 - Create CNAME (2025-11-16, ef96c27)
 - Create CNAME (2025-11-16, 8f7dc46)
-- Test mobile app building (2025-11-16, 461b3d1)
-- Another try to fix (2025-11-16, 09bec12)
-- Hopefully final fix (2025-11-16, 69e798c)
-- Remove file (2025-11-16, 4c4d770)
-- Android and IOS builds using capacitorjs (2025-11-16, ff88bae)
-- Small change to release notes (2025-11-13, 60bc7ba)
+
+---
+
+🙏 **Thank you for using Zentrio!** Your continued support and feedback help us improve every day. If you encounter any issues or have suggestions, please don't hesitate to reach out.
 
 
 > Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.

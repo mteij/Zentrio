@@ -53,7 +53,14 @@ function getCommitRange(prevTag) {
 
 function basicMarkdownNotes(version, prevTag, commitLog) {
   if (!commitLog) {
-    return ['- Welcome to the first release of Zentrio! This release includes the initial set of features and functionality.', ''].join('\n');
+    return [
+      '🎉 **Welcome to the first release of Zentrio!**',
+      '',
+      'We\'re excited to launch Zentrio with this initial release that brings you a powerful and feature-rich experience. This version includes the core functionality and features we\'ve been working hard to build.',
+      '',
+      'Thank you for being part of our early community! Your feedback and support help us shape the future of Zentrio.',
+      ''
+    ].join('\n');
   }
 
   const commits = commitLog.split('\n').map(l => {
@@ -100,8 +107,26 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
     grouped[category].push(`- ${commit.message} (${commit.date}, ${commit.hash})`);
   });
 
+  // Count total changes
+  const totalChanges = commits.length;
+  const hasFeatures = grouped['🚀 Features'].length > 0;
+  const hasFixes = grouped['🐛 Bug Fixes'].length > 0;
+
+  // Build engaging summary
+  let summary = `🎉 **What\'s new in version ${version}**\n\n`;
+  
+  if (hasFeatures && hasFixes) {
+    summary += `This release brings **exciting new features** and **important bug fixes** to improve your Zentrio experience. We\'ve carefully reviewed and implemented ${totalChanges} changes based on your feedback and our ongoing commitment to excellence.\n\n`;
+  } else if (hasFeatures) {
+    summary += `This release introduces **exciting new features** to enhance your Zentrio experience! We\'ve added ${totalChanges} improvements to make the platform even more powerful and user-friendly.\n\n`;
+  } else if (hasFixes) {
+    summary += `This release focuses on **stability and reliability** with important bug fixes and optimizations. We've addressed ${totalChanges} issues to ensure a smoother experience.\n\n`;
+  } else {
+    summary += `This release includes ${totalChanges} improvements and optimizations to make Zentrio even better. We've been working hard to enhance the platform based on your feedback.\n\n`;
+  }
+
   // Build the final notes
-  const sections = [];
+  const sections = [summary];
   Object.entries(grouped).forEach(([title, items]) => {
     if (items.length > 0) {
       sections.push(`\n### ${title}\n`);
@@ -109,7 +134,10 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
     }
   });
 
-  return sections.join('\n') + '\n';
+  sections.push('\n---\n');
+  sections.push('🙏 **Thank you for using Zentrio!** Your continued support and feedback help us improve every day. If you encounter any issues or have suggestions, please don\'t hesitate to reach out.\n');
+
+  return sections.join('\n');
 }
 
 async function generateWithGemini(prompt, apiKey) {
@@ -155,8 +183,8 @@ async function main() {
 
   const prompt = [
     `You are an expert release notes writer for a developer tool web application (Zentrio).`,
-    `Write comprehensive, well-structured GitHub release notes in Markdown for version ${tag}.`,
-    prevTag ? `Changes since ${prevTag}.` : `This is the first release.`,
+    `Write engaging, comprehensive, and user-friendly GitHub release notes in Markdown for version ${tag}.`,
+    prevTag ? `This release includes changes since ${prevTag}.` : `This is the first release of Zentrio!`,
     ``,
     `Inputs:`,
     `- Version: ${tag}`,
@@ -165,16 +193,20 @@ async function main() {
     commitLog || '(no commits detected)',
     ``,
     `Guidelines:`,
-    `- Include a brief summary paragraph at the start.`,
-    `- Group changes into logical sections: Features, Bug Fixes, Improvements, Documentation, Configuration, etc.`,
-    `- Process ALL commits provided - don't skip any important changes.`,
-    `- Use commit bodies for additional context when available.`,
-    `- Use bullet points for individual changes.`,
-    `- Include commit hashes and dates for reference.`,
-    `- Keep it concise but comprehensive - aim for quality over brevity.`,
-    `- Do not invent changes. Base content strictly on provided commits.`,
-    `- Do not include a top-level title or heading; the GitHub release title already includes the version.`,
-    `- Take your time to analyze each commit properly.`,
+    `- Start with an engaging summary paragraph that highlights the most important changes`,
+    `- Group changes into logical sections with emoji headers: 🚀 Features, 🐛 Bug Fixes, 💄 Improvements, 📝 Documentation, 🔧 Configuration, ⚙️ Chore`,
+    `- Process ALL commits provided - every commit deserves attention`,
+    `- Use commit bodies for additional context and technical details`,
+    `- Write descriptive, user-friendly bullet points that explain the benefit of each change`,
+    `- Include commit hashes and dates at the end of each bullet point for reference`,
+    `- Use formatting like **bold** for emphasis and \`code\` for technical terms`,
+    `- Add emojis and personality to make it more engaging`,
+    `- If there are many similar commits, group them into a single meaningful point`,
+    `- End with a friendly closing statement`,
+    `- Do not invent changes - base everything strictly on provided commits`,
+    `- Do not include a top-level title; the GitHub release title already includes the version`,
+    `- Make it sound like it was written by a human who cares about the users`,
+    `- Take your time to analyze each commit and understand its impact`,
   ].join('\n');
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';

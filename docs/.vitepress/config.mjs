@@ -21,14 +21,12 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Try Zentrio.eu', link: 'https://zentrio.eu' },
-      { 
-        text: 'Documentation', 
+      {
+        text: 'Documentation',
         items: [
           { text: 'Getting Started', link: '/getting-started/' },
           { text: 'User Guide', link: '/user-guide/' },
           { text: 'Deployment', link: '/deployment/' },
-          { text: 'Mobile', link: '/mobile/' },
-          { text: 'Development', link: '/development/' },
           { text: 'API', link: '/api/' },
           { text: 'Reference', link: '/reference/' }
         ]
@@ -48,50 +46,32 @@ export default defineConfig({
         text: 'User Guide',
         items: [
           { text: 'Overview', link: '/user-guide/' },
-          { text: 'Profiles', link: '/user-guide/profiles' },
-          { text: 'Settings', link: '/user-guide/settings' },
-          { text: 'Themes', link: '/user-guide/themes' },
-          { text: 'Troubleshooting', link: '/user-guide/troubleshooting' }
+          { text: 'Profiles', link: '/user-guide/profiles' }
         ]
       },
       {
         text: 'Deployment',
         items: [
-          { text: 'Overview', link: '/deployment/' },
-          { text: 'Docker', link: '/deployment/docker' },
-          { text: 'Manual Installation', link: '/deployment/manual' },
-          { text: 'Reverse Proxy', link: '/deployment/reverse-proxy' },
-          { text: 'Production', link: '/deployment/production' }
+          { text: 'Overview', link: '/deployment/' }
         ]
       },
       {
         text: 'Mobile',
         items: [
-          { text: 'Overview', link: '/mobile/' },
-          { text: 'Setup', link: '/mobile/setup' },
-          { text: 'Android', link: '/mobile/android' },
-          { text: 'iOS', link: '/mobile/ios' },
-          { text: 'Deployment', link: '/mobile/deployment' }
+          { text: 'Overview', link: '/mobile/' }
         ]
       },
       {
         text: 'Development',
         items: [
-          { text: 'Overview', link: '/development/' },
-          { text: 'Architecture', link: '/development/architecture' },
-          { text: 'Setup', link: '/development/setup' },
-          { text: 'Contributing', link: '/development/contributing' },
-          { text: 'Testing', link: '/development/testing' },
-          { text: 'Debugging', link: '/development/debugging' }
+          { text: 'Overview', link: '/development/' }
         ]
       },
       {
         text: 'API',
         items: [
           { text: 'Overview', link: '/api/' },
-          { text: 'Authentication', link: '/api/authentication' },
-          { text: 'Endpoints', link: '/api/endpoints' },
-          { text: 'Examples', link: '/api/examples' }
+          { text: 'Endpoints', link: '/api/endpoints' }
         ]
       },
       {
