@@ -14,6 +14,7 @@ on:
 
 env:
   NODE_VERSION: 20
+  BUN_VERSION: latest
 
 jobs:
   build-android:
@@ -24,10 +25,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -52,21 +53,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('app/package-lock.json') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('app/bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-node-
+            ${{ runner.os }}-bun-
 
       - name: Install dependencies
         working-directory: ./app
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build web assets
         working-directory: ./app
-        run: npm run build
+        run: bun run build
 
       - name: Sync Capacitor
         working-directory: ./app
-        run: npx cap sync android
+        run: bunx cap sync android
 
       - name: Build Android APK
         working-directory: ./app/android
@@ -89,10 +90,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Get version
         id: version
@@ -108,13 +109,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('app/package-lock.json') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('app/bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-node-
+            ${{ runner.os }}-bun-
 
       - name: Install dependencies
         working-directory: ./app
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Install CocoaPods
         working-directory: ./app/ios/App
@@ -122,11 +123,11 @@ jobs:
 
       - name: Build web assets
         working-directory: ./app
-        run: npm run build
+        run: bun run build
 
       - name: Sync Capacitor
         working-directory: ./app
-        run: npx cap sync ios
+        run: bunx cap sync ios
 
       - name: Build iOS Archive
         working-directory: ./app/ios/App
