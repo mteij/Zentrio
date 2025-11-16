@@ -39,6 +39,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Set JAVA_HOME
+        run: echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
       - name: Get version
         id: version
         run: |
@@ -72,6 +75,13 @@ jobs:
       - name: Make gradlew executable
         working-directory: ./app/android
         run: chmod +x ./gradlew
+
+      - name: Clean Gradle cache
+        working-directory: ./app/android
+        run: |
+          rm -rf ~/.gradle/caches/
+          rm -rf ~/.gradle/daemon/
+          ./gradlew clean
 
       - name: Build Android APK
         working-directory: ./app/android
@@ -146,13 +156,50 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="${{ secrets.IOS_PROVISIONING_PROFILE_SPECIFIER }}" \
             archive
 
+      - name: Create ExportOptions.plist
+        working-directory: ./app/ios/App
+        run: |
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>teamID</key>
+              <string>${{ secrets.IOS_DEVELOPMENT_TEAM }}</string>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.zentrio.app</key>
+                  <string>${{ secrets.IOS_PROVISIONING_PROFILE_SPECIFIER }}</string>
+              </dict>
+              <key>signingCertificate</key>
+              <string>${{ secrets.IOS_CODE_SIGN_IDENTITY }}</string>
+              <key>destination</key>
+              <string>export</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>thinning</key>
+              <string><none></string>
+          </dict>
+          </plist>
+          EOF
+
       - name: Export IPA
         working-directory: ./app/ios/App
         run: |
           xcodebuild -exportArchive \
             -archivePath $PWD/build/App.xcarchive \
             -exportPath $PWD/build \
-            -exportOptionsPlist $GITHUB_WORKSPACE/.github/secrets/ExportOptions.plist
+            -exportOptionsPlist ExportOptions.plist
 
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4
