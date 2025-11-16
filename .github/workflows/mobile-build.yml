@@ -151,9 +151,6 @@ jobs:
             -configuration Release \
             -destination generic/platform=iOS \
             -archivePath $PWD/build/App.xcarchive \
-            DEVELOPMENT_TEAM="${{ secrets.IOS_DEVELOPMENT_TEAM }}" \
-            CODE_SIGN_IDENTITY="${{ secrets.IOS_CODE_SIGN_IDENTITY }}" \
-            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.IOS_PROVISIONING_PROFILE_SPECIFIER }}" \
             archive
 
       - name: Create ExportOptions.plist
@@ -175,14 +172,7 @@ jobs:
               <key>compileBitcode</key>
               <false/>
               <key>signingStyle</key>
-              <string>manual</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>com.zentrio.app</key>
-                  <string>${{ secrets.IOS_PROVISIONING_PROFILE_SPECIFIER }}</string>
-              </dict>
-              <key>signingCertificate</key>
-              <string>${{ secrets.IOS_CODE_SIGN_IDENTITY }}</string>
+              <string>automatic</string>
               <key>destination</key>
               <string>export</string>
               <key>stripSwiftSymbols</key>

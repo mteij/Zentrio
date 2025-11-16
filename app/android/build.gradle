@@ -21,7 +21,7 @@ allprojects {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
         options.fork = true
-        options.forkOptions.executable = 'C:\\Program Files\\Java\\jdk-17\\bin\\javac.exe'
+        // Let Gradle use the system Java compiler
     }
 }
 
