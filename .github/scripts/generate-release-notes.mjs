@@ -45,24 +45,71 @@ function getPrevTag(currentTag) {
 
 function getCommitRange(prevTag) {
   if (prevTag) {
-    return sh(`git log --pretty=format:%H%x09%ad%x09%s --date=short ${prevTag}..HEAD`, '');
+    return sh(`git log --pretty=format:%H%x09%ad%x09%s%x09%b --date=short ${prevTag}..HEAD`, '');
   }
   // First release: collect last 100 commits
-  return sh('git log -n 100 --pretty=format:%H%x09%ad%x09%s --date=short', '');
+  return sh('git log -n 100 --pretty=format:%H%x09%ad%x09%s%x09%b --date=short', '');
 }
 
 function basicMarkdownNotes(version, prevTag, commitLog) {
-  const lines = commitLog
-    ? commitLog.split('\n').map(l => {
-        const [hash, date, ...rest] = l.split('\t');
-        const msg = (rest.join('\t') || '').trim();
-        return `- ${msg} (${date}, ${hash?.slice(0, 7)})`;
-      })
-    : ['- Welcome to the first release of Zentrio! This release includes the initial set of features and functionality.'];
-  return [
-    ...lines,
-    '',
-  ].join('\n');
+  if (!commitLog) {
+    return ['- Welcome to the first release of Zentrio! This release includes the initial set of features and functionality.', ''].join('\n');
+  }
+
+  const commits = commitLog.split('\n').map(l => {
+    const [hash, date, subject, body] = l.split('\t');
+    const cleanSubject = (subject || '').trim();
+    const cleanBody = (body || '').trim();
+    const fullMessage = cleanBody ? `${cleanSubject}\n\n${cleanBody}` : cleanSubject;
+    return {
+      hash: hash?.slice(0, 7) || '',
+      date: date || '',
+      message: fullMessage
+    };
+  }).filter(c => c.message);
+
+  // Group commits by type (conventional commits)
+  const grouped = {
+    '🚀 Features': [],
+    '🐛 Bug Fixes': [],
+    '💄 Improvements': [],
+    '📝 Documentation': [],
+    '🔧 Configuration': [],
+    '⚙️ Chore': [],
+    '🔄 Other': []
+  };
+
+  commits.forEach(commit => {
+    const msg = commit.message.toLowerCase();
+    let category = '🔄 Other';
+    
+    if (msg.startsWith('feat') || msg.includes('add') || msg.includes('new') || msg.includes('implement')) {
+      category = '🚀 Features';
+    } else if (msg.startsWith('fix') || msg.includes('bug') || msg.includes('issue') || msg.includes('resolve')) {
+      category = '🐛 Bug Fixes';
+    } else if (msg.startsWith('refactor') || msg.startsWith('perf') || msg.includes('improve') || msg.includes('optimize')) {
+      category = '💄 Improvements';
+    } else if (msg.startsWith('docs') || msg.includes('documentation') || msg.includes('readme')) {
+      category = '📝 Documentation';
+    } else if (msg.includes('config') || msg.includes('setting') || msg.includes('env')) {
+      category = '🔧 Configuration';
+    } else if (msg.startsWith('chore') || msg.startsWith('build') || msg.startsWith('ci') || msg.includes('update')) {
+      category = '⚙️ Chore';
+    }
+
+    grouped[category].push(`- ${commit.message} (${commit.date}, ${commit.hash})`);
+  });
+
+  // Build the final notes
+  const sections = [];
+  Object.entries(grouped).forEach(([title, items]) => {
+    if (items.length > 0) {
+      sections.push(`\n### ${title}\n`);
+      sections.push(...items);
+    }
+  });
+
+  return sections.join('\n') + '\n';
 }
 
 async function generateWithGemini(prompt, apiKey) {
@@ -75,10 +122,10 @@ async function generateWithGemini(prompt, apiKey) {
       },
     ],
     generationConfig: {
-      temperature: 0.2,
+      temperature: 0.3,
       topK: 40,
       topP: 0.95,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,
     },
   };
 
@@ -108,21 +155,26 @@ async function main() {
 
   const prompt = [
     `You are an expert release notes writer for a developer tool web application (Zentrio).`,
-    `Write concise, well-structured GitHub release notes in Markdown for version ${tag}.`,
+    `Write comprehensive, well-structured GitHub release notes in Markdown for version ${tag}.`,
     prevTag ? `Changes since ${prevTag}.` : `This is the first release.`,
     ``,
     `Inputs:`,
     `- Version: ${tag}`,
     prevTag ? `- Previous tag: ${prevTag}` : `- Previous tag: (none)`,
-    `- Commits (tab-separated: hash, date, subject):`,
+    `- Commits (tab-separated: hash, date, subject, body):`,
     commitLog || '(no commits detected)',
     ``,
     `Guidelines:`,
-    `- Include a brief summary paragraph.`,
-    `- Group changes into sections such as Features, Fixes, Improvements, Docs, Chore when possible based on commit subjects.`,
-    `- Keep it under 300 lines. Use bullet lists.`,
+    `- Include a brief summary paragraph at the start.`,
+    `- Group changes into logical sections: Features, Bug Fixes, Improvements, Documentation, Configuration, etc.`,
+    `- Process ALL commits provided - don't skip any important changes.`,
+    `- Use commit bodies for additional context when available.`,
+    `- Use bullet points for individual changes.`,
+    `- Include commit hashes and dates for reference.`,
+    `- Keep it concise but comprehensive - aim for quality over brevity.`,
     `- Do not invent changes. Base content strictly on provided commits.`,
     `- Do not include a top-level title or heading; the GitHub release title already includes the version.`,
+    `- Take your time to analyze each commit properly.`,
   ].join('\n');
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
