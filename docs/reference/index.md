@@ -118,7 +118,7 @@ NODE_OPTIONS=--max-old-space-size=512
 
 **I'm setting up Zentrio for the first time:**
 - [Getting Started Guide](../getting-started/)
-- [Quick Start](../getting-started/quick-start.md)
+- [Self-Hosting Guide](../getting-started/self-hosting.md)
 - [Environment Variables](environment.md)
 
 **I'm configuring a production instance:**

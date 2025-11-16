@@ -4,7 +4,6 @@ export default defineConfig({
   title: 'Zentrio',
   description: 'Profile management for Stremio Web',
   lang: 'en-US',
-  base: '/Zentrio/',
   
   head: [
     ['link', { rel: 'icon', href: '/Zentrio/favicon/favicon.ico' }],
@@ -42,8 +41,7 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/getting-started/' },
           { text: 'Public Instance', link: '/getting-started/public-instance' },
-          { text: 'Self-Hosting', link: '/getting-started/self-hosting' },
-          { text: 'Quick Start', link: '/getting-started/quick-start' }
+          { text: 'Self-Hosting', link: '/getting-started/self-hosting' }
         ]
       },
       {
