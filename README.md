@@ -8,6 +8,7 @@
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
   <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-FF6A00?style=for-the-badge&logo=hono&logoColor=white" alt="Hono"></a>
+  <a href="https://capacitorjs.com/"><img src="https://img.shields.io/badge/Capacitor-119EFF?style=for-the-badge&logo=capacitor&logoColor=white" alt="Capacitor"></a>
   <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
 
@@ -40,6 +41,18 @@ Zentrio started as a weekend project to solve [this community issue](https://git
     - NSFW Filter (Soon™)
     - Downloads manager (Soon™): The ability to download media and watch later
 -   Installable PWA: Zentrio can be installed as a PWA
+-   **Cross-platform support**: Built with Capacitor for native iOS, Android, and Web deployment
+
+## Cross-Platform Support
+
+Zentrio now supports multiple platforms through [Capacitor](https://capacitorjs.com/):
+
+- **Web**: Run in any modern browser
+- **iOS**: Native iOS app with App Store support
+- **Android**: Native Android app with Google Play support
+- **PWA**: Installable Progressive Web App
+
+See [`app/CAPACITOR.md`](app/CAPACITOR.md) for detailed Capacitor setup and deployment instructions.
 
 ## How-to-use
 

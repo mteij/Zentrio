@@ -32,5 +32,41 @@ yarn-error.log*
 *.db
 *.sqlite
 *.sqlite3 
-# Ignore npm lockfile in app 
-app/package-lock.json 
+# Ignore npm lockfile in app
+app/package-lock.json
+
+# Capacitor
+# Copied web assets
+app/android/app/src/main/assets/public
+app/ios/App/App/public
+
+# Generated Config files
+app/android/app/src/main/assets/capacitor.config.json
+app/android/app/src/main/assets/capacitor.plugins.json
+app/android/app/src/main/res/xml/config.xml
+app/ios/App/App/capacitor.config.json
+app/ios/App/App/config.xml
+
+# Cordova plugins for Capacitor
+app/android/capacitor-cordova-android-plugins
+app/ios/capacitor-cordova-ios-plugins
+
+# Android build artifacts
+app/android/app/build/
+app/android/.gradle/
+app/android/local.properties
+app/android/captures/
+app/android/.externalNativeBuild
+app/android/.cxx/
+
+# iOS build artifacts
+app/ios/App/build/
+app/ios/App/Pods/
+app/ios/App/output/
+app/ios/DerivedData/
+app/ios/xcuserdata/
+
+# Generated packages
+packages/google-play/*.apk
+packages/google-play/*.aab
+packages/windows/*.appxbundle

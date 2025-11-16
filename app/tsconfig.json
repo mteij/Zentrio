@@ -8,6 +8,11 @@
     "moduleResolution": "node16",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "types": ["@capacitor/core"]
+  },
+  "include": [
+    "src/**/*",
+    "capacitor.config.ts"
+  ]
 }

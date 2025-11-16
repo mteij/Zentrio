@@ -1,0 +1,243 @@
+name: Build Mobile Apps
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(node -e "console.log(require('./app/package.json').version)")
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: app/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('app/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        working-directory: ./app
+        run: npm ci
+
+      - name: Build web assets
+        working-directory: ./app
+        run: npm run build
+
+      - name: Sync Capacitor
+        working-directory: ./app
+        run: npx cap sync android
+
+      - name: Build Android APK
+        working-directory: ./app/android
+        run: ./gradlew assembleDebug
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-builds
+          path: |
+            app/android/app/build/outputs/apk/debug/*.apk
+            app/android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
+
+  build-ios:
+    runs-on: macos-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(node -e "console.log(require('./app/package.json').version)")
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: app/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('app/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        working-directory: ./app
+        run: npm ci
+
+      - name: Install CocoaPods
+        working-directory: ./app/ios/App
+        run: pod install
+
+      - name: Build web assets
+        working-directory: ./app
+        run: npm run build
+
+      - name: Sync Capacitor
+        working-directory: ./app
+        run: npx cap sync ios
+
+      - name: Build iOS Archive
+        working-directory: ./app/ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination generic/platform=iOS \
+            -archivePath $PWD/build/App.xcarchive \
+            archive
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.IOS_DEVELOPMENT_TEAM }}
+          CODE_SIGN_IDENTITY: ${{ secrets.IOS_CODE_SIGN_IDENTITY }}
+          PROVISIONING_PROFILE_SPECIFIER: ${{ secrets.IOS_PROVISIONING_PROFILE_SPECIFIER }}
+
+      - name: Export IPA
+        working-directory: ./app/ios/App
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/App.xcarchive \
+            -exportPath $PWD/build \
+            -exportOptionsPlist $GITHUB_WORKSPACE/.github/secrets/ExportOptions.plist
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.IOS_DEVELOPMENT_TEAM }}
+          CODE_SIGN_IDENTITY: ${{ secrets.IOS_CODE_SIGN_IDENTITY }}
+          PROVISIONING_PROFILE_SPECIFIER: ${{ secrets.IOS_PROVISIONING_PROFILE_SPECIFIER }}
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-builds
+          path: app/ios/App/build/*.ipa
+          retention-days: 30
+
+  upload-to-release:
+    runs-on: ubuntu-latest
+    needs: [build-android, build-ios]
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(node -e "console.log(require('./app/package.json').version)")
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-builds
+          path: ./android-artifacts
+
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-builds
+          path: ./ios-artifacts
+
+      - name: Create release directory
+        run: |
+          mkdir -p release-assets
+          cp android-artifacts/*.apk release-assets/ 2>/dev/null || echo "No APK files found"
+          cp android-artifacts/*.aab release-assets/ 2>/dev/null || echo "No AAB files found"
+          cp ios-artifacts/*.ipa release-assets/ 2>/dev/null || echo "No IPA files found"
+
+      - name: List release assets
+        run: ls -la release-assets/
+
+      - name: Upload assets to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for file in release-assets/*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file to release v${{ steps.version.outputs.VERSION }}"
+              gh release upload "v${{ steps.version.outputs.VERSION }}" "$file" --clobber
+            fi
+          done
+
+      - name: Update release notes with mobile download links
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get current release notes
+          gh release view "v${{ steps.version.outputs.VERSION }}" --json body -q '.body' > current-notes.md
+          
+          # Add mobile download section
+          cat >> mobile-section.md << 'EOF'
+          
+          ## 📱 Mobile Downloads
+          
+          ### Android
+          - **APK (Debug)**: [Download APK](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$(ls release-assets/*.apk 2>/dev/null | head -1 | xargs -n1 basename))
+          - **AAB (Release)**: [Download AAB](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$(ls release-assets/*.aab 2>/dev/null | head -1 | xargs -n1 basename))
+          
+          ### iOS
+          - **IPA**: [Download IPA](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$(ls release-assets/*.ipa 2>/dev/null | head -1 | xargs -n1 basename))
+          
+          ---
+          
+          EOF
+          
+          # Combine notes
+          cat current-notes.md mobile-section.md > updated-notes.md
+          
+          # Update release
+          gh release edit "v${{ steps.version.outputs.VERSION }}" --notes-file updated-notes.md

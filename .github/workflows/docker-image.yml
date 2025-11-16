@@ -111,9 +111,8 @@ jobs:
         run: |
           gh release create "v${{ env.VERSION }}" -F RELEASE_NOTES.md -t "Zentrio v${{ env.VERSION }}" --latest
 
-      - name: Upload APK to release
+      - name: Trigger mobile build workflow
         if: steps.check_tag.outputs.exists != 'true' && steps.rel.outputs.exists != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "v${{ env.VERSION }}" packages/google-play/Zentrio.apk --clobber
+          echo "Triggering mobile build for version ${{ env.VERSION }}"
+          # The mobile build workflow will automatically trigger on workflow completion
