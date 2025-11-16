@@ -6,15 +6,15 @@ export default defineConfig({
   lang: 'en-US',
   
   head: [
-    ['link', { rel: 'icon', href: '/Zentrio/favicon/favicon.ico' }],
-    ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/Zentrio/favicon/apple-touch-icon.png' }],
-    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/Zentrio/favicon/favicon-32x32.png' }],
-    ['link', { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/Zentrio/favicon/favicon-16x16.png' }],
+    ['link', { rel: 'icon', href: '/favicon/favicon.ico' }],
+    ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/favicon/apple-touch-icon.png' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon/favicon-32x32.png' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon/favicon-16x16.png' }],
     ['meta', { name: 'theme-color', content: '#0366d6' }],
     ['meta', { name: 'og:type', content: 'website' }],
     ['meta', { name: 'og:locale', content: 'en' }],
     ['meta', { name: 'og:site_name', content: 'Zentrio' }],
-    ['meta', { name: 'og:image', content: '/Zentrio/icon-512.png' }]
+    ['meta', { name: 'og:image', content: '/icon-512.png' }]
   ],
 
   themeConfig: {

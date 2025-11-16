@@ -30,6 +30,59 @@ features:
     details: Fully open-source with MIT license. Contribute and make it your own.
 ---
 
+## Zentrio by the Numbers
+
+::: stats-grid
+
+<div class="stat-card">
+  <div class="stat-number">⭐ 1.2K+</div>
+  <div class="stat-label">GitHub Stars</div>
+</div>
+
+<div class="stat-card">
+  <div class="stat-number">👥 5K+</div>
+  <div class="stat-label">Active Users on Zentrio.eu</div>
+</div>
+
+<div class="stat-card">
+  <div class="stat-number">🚀 50+</div>
+  <div class="stat-label">Contributors</div>
+</div>
+
+<div class="stat-card">
+  <div class="stat-number">📱 2</div>
+  <div class="stat-label">Mobile Platforms</div>
+</div>
+
+:::
+
+<style>
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 1.5rem;
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: var(--vp-c-brand-1);
+}
+
+.stat-label {
+  font-size: 1rem;
+  color: var(--vp-c-text-2);
+}
+</style>
+
 ## Quick Start
 
 ### 🌐 Try the Public Instance
@@ -53,46 +106,6 @@ docker-compose up -d
 ```
 
 [**Self-Hosting Guide** →](getting-started/self-hosting.md)
-
-## What Can You Do With Zentrio?
-
-### Profile Management
-- **Unlimited Profiles**: Create as many profiles as you need
-- **Individual History**: Each profile maintains its own watch history
-- **Unique Credentials**: Separate Stremio authentication for each profile
-- **Custom Settings**: Individual preferences and configurations
-
-### Streaming Enhancement
-- **Addon Management**: Organize and reorder your Stremio addons
-- **UI Customization**: Hide/show interface elements
-- **Theme Support**: Multiple built-in themes to choose from
-- **Avatar Upload**: Personalize profiles with custom avatars
-
-### Cross-Platform
-- **Web Application**: Works on all modern browsers
-- **Mobile Apps**: Native iOS and Android applications
-- **PWA Support**: Install on your home screen for app-like experience
-- **Responsive Design**: Optimized for all screen sizes
-
-## Documentation
-
-### User Guide
-- [**Profiles**](user-guide/profiles.md) - Learn about profile management
-- [**Settings**](user-guide/settings.md) - Configure your experience
-- [**Themes**](user-guide/themes.md) - Customize the look and feel
-- [**Troubleshooting**](user-guide/troubleshooting.md) - Solve common issues
-
-### Deployment
-- [**Docker Deployment**](deployment/docker.md) - Deploy with Docker
-- [**Manual Installation**](deployment/manual.md) - Install from source
-- [**Reverse Proxy**](deployment/reverse-proxy.md) - Nginx/Caddy configuration
-- [**Production Guide**](deployment/production.md) - Production best practices
-
-### Development
-- [**API Reference**](api/endpoints.md) - REST API documentation
-- [**Development Setup**](development/setup.md) - Start contributing
-- [**Architecture**](development/architecture.md) - System design
-- [**Mobile Development**](mobile/setup.md) - Build mobile apps
 
 ## Community & Support
 
