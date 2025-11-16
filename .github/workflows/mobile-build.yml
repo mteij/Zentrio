@@ -12,6 +12,10 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+  actions: read
+
 env:
   NODE_VERSION: 20
   BUN_VERSION: latest
@@ -158,15 +162,13 @@ jobs:
       - name: Create ExportOptions.plist
         working-directory: ./app/ios/App
         run: |
-          cat > ExportOptions.plist << EOF
+          cat > ExportOptions.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
               <string>development</string>
-              <key>teamID</key>
-              <string>${{ secrets.IOS_DEVELOPMENT_TEAM }}</string>
               <key>uploadBitcode</key>
               <false/>
               <key>uploadSymbols</key>
@@ -175,13 +177,6 @@ jobs:
               <false/>
               <key>signingStyle</key>
               <string>automatic</string>
-              <key>signingCertificate</key>
-              <string></string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>com.zentrio.app</key>
-                  <string></string>
-              </dict>
               <key>destination</key>
               <string>export</string>
               <key>stripSwiftSymbols</key>
@@ -211,6 +206,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-android, build-ios]
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout repository
@@ -241,23 +238,34 @@ jobs:
       - name: Create release directory
         run: |
           mkdir -p release-assets
+          echo "Checking Android artifacts:"
+          ls -la android-artifacts/ || echo "No android-artifacts directory"
+          echo "Checking iOS artifacts:"
+          ls -la ios-artifacts/ || echo "No ios-artifacts directory"
           cp android-artifacts/*.apk release-assets/ 2>/dev/null || echo "No APK files found"
           cp android-artifacts/*.aab release-assets/ 2>/dev/null || echo "No AAB files found"
           cp ios-artifacts/*.ipa release-assets/ 2>/dev/null || echo "No IPA files found"
 
       - name: List release assets
-        run: ls -la release-assets/
+        run: |
+          echo "Release assets directory:"
+          ls -la release-assets/ || echo "No release-assets directory"
 
       - name: Upload assets to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for file in release-assets/*; do
-            if [ -f "$file" ]; then
-              echo "Uploading $file to release v${{ steps.version.outputs.VERSION }}"
-              gh release upload "v${{ steps.version.outputs.VERSION }}" "$file" --clobber
-            fi
-          done
+          echo "Attempting to upload files to release v${{ steps.version.outputs.VERSION }}"
+          if [ -d "release-assets" ] && [ "$(ls -A release-assets)" ]; then
+            for file in release-assets/*; do
+              if [ -f "$file" ]; then
+                echo "Uploading $file to release v${{ steps.version.outputs.VERSION }}"
+                gh release upload "v${{ steps.version.outputs.VERSION }}" "$file" --clobber || echo "Failed to upload $file"
+              fi
+            done
+          else
+            echo "No files to upload - release-assets directory is empty or doesn't exist"
+          fi
 
       - name: Update release notes with mobile download links
         env:
@@ -266,24 +274,42 @@ jobs:
           # Get current release notes
           gh release view "v${{ steps.version.outputs.VERSION }}" --json body -q '.body' > current-notes.md
           
-          # Add mobile download section
-          cat >> mobile-section.md << 'EOF'
+          # Create mobile download section
+          cat > mobile-section.md << EOF
           
           ## 📱 Mobile Downloads
           
-          ### Android
-          - **APK (Debug)**: [Download APK](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$(ls release-assets/*.apk 2>/dev/null | head -1 | xargs -n1 basename))
-          - **AAB (Release)**: [Download AAB](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$(ls release-assets/*.aab 2>/dev/null | head -1 | xargs -n1 basename))
-          
-          ### iOS
-          - **IPA**: [Download IPA](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$(ls release-assets/*.ipa 2>/dev/null | head -1 | xargs -n1 basename))
-          
-          ---
-          
           EOF
+          
+          # Add Android links if files exist
+          if [ -f "release-assets"/*.apk ]; then
+            APK_FILE=$(ls release-assets/*.apk 2>/dev/null | head -1 | xargs -n1 basename)
+            echo "### Android" >> mobile-section.md
+            echo "- **APK (Debug)**: [Download APK](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$APK_FILE)" >> mobile-section.md
+          fi
+          
+          if [ -f "release-assets"/*.aab ]; then
+            AAB_FILE=$(ls release-assets/*.aab 2>/dev/null | head -1 | xargs -n1 basename)
+            if ! grep -q "### Android" mobile-section.md; then
+              echo "### Android" >> mobile-section.md
+            fi
+            echo "- **AAB (Release)**: [Download AAB](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$AAB_FILE)" >> mobile-section.md
+          fi
+          
+          # Add iOS link if file exists
+          if [ -f "release-assets"/*.ipa ]; then
+            IPA_FILE=$(ls release-assets/*.ipa 2>/dev/null | head -1 | xargs -n1 basename)
+            echo "### iOS" >> mobile-section.md
+            echo "- **IPA**: [Download IPA](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$IPA_FILE)" >> mobile-section.md
+          fi
+          
+          echo "" >> mobile-section.md
+          echo "---" >> mobile-section.md
           
           # Combine notes
           cat current-notes.md mobile-section.md > updated-notes.md
           
           # Update release
           gh release edit "v${{ steps.version.outputs.VERSION }}" --notes-file updated-notes.md
+          
+          echo "Release notes updated with mobile download links"
