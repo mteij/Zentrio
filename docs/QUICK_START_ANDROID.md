@@ -1,3 +1,8 @@
+---
+layout: default
+title: Quick Start Android
+---
+
 # Quick Start: Running Zentrio on Android Emulator
 
 ## 🚀 One-Click Setup

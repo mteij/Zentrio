@@ -1,8 +1,0 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "eu.zentrio",
-        "sha256_cert_fingerprints": ["F8:ED:BB:21:AE:F4:CE:47:88:C7:0D:8D:88:0F:A7:A9:8B:97:BE:69:02:A3:86:17:03:C5:53:9A:D3:0E:6A:07"]
-      }
-    }]

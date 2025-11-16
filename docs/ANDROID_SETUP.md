@@ -1,3 +1,8 @@
+---
+layout: default
+title: Android Development Setup
+---
+
 # Android Development Setup for Zentrio
 
 This guide will help you set up the Android development environment to run Zentrio on an Android emulator.

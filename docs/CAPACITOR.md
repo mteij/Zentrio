@@ -1,3 +1,8 @@
+---
+layout: default
+title: Capacitor Integration
+---
+
 # Capacitor Integration for Zentrio
 
 This document explains how Capacitor has been integrated into Zentrio to enable cross-platform compatibility.

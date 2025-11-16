@@ -1,0 +1,40 @@
+# Minimal Jekyll configuration for GitHub Pages
+title: Zentrio Documentation
+description: Profile management for Stremio Web
+theme: jekyll-theme-minimal
+baseurl: "" # Empty since using custom domain
+url: "https://docs.zentrio.eu" # Your custom domain
+
+# Enable navigation
+navigation:
+  - title: Home
+    url: /
+  - title: Android Setup
+    url: ANDROID_SETUP
+  - title: Capacitor
+    url: CAPACITOR
+  - title: Quick Start Android
+    url: QUICK_START_ANDROID
+
+# Markdown settings
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# Plugins
+plugins:
+  - jekyll-sitemap
+  - jekyll-feed
+
+# Exclude from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - README.md
