@@ -4,7 +4,7 @@ This guide covers all configuration options available in Zentrio, from basic set
 
 ## 📋 Environment Variables
 
-Zentrio uses environment variables for configuration. Copy [`.env.example`](../.env.example) to `.env` and modify as needed.
+Zentrio uses environment variables for configuration. Copy [`.env.example`](/.env.example) to `.env` and modify as needed.
 
 ### Required Configuration
 
@@ -210,7 +210,7 @@ CORS_CREDENTIALS=true
 
 ### Custom Themes
 
-Create custom themes in the [`src/themes/`](../app/src/themes/) directory:
+Create custom themes in the [`src/themes/`](../app/src/themes) directory:
 
 ```json
 {

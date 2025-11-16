@@ -88,7 +88,7 @@ The development server will start on `http://localhost:3000` with hot reload ena
 
 ### Core Components
 
-#### [`src/components/`](../app/src/components/)
+#### [`src/components/`](../app/src/components)
 Reusable UI components used across the application:
 
 - **Button.tsx** - Styled button component
@@ -101,7 +101,7 @@ Reusable UI components used across the application:
   - **MagicLinkModal.tsx** - Magic link authentication
   - **OTPModal.tsx** - One-time password input
 
-#### [`src/pages/`](../app/src/pages/)
+#### [`src/pages/`](../app/src/pages)
 Main application pages:
 
 - **LandingPage.tsx** - Home page with feature overview
@@ -109,7 +109,7 @@ Main application pages:
 - **SettingsPage.tsx** - Application settings
 - **DownloadsPage.tsx** - Download management (upcoming)
 
-#### [`src/routes/`](../app/src/routes/)
+#### [`src/routes/`](../app/src/routes)
 API route handlers:
 
 - **session.ts** - Session management
@@ -122,7 +122,7 @@ API route handlers:
   - **themes.ts** - Theme management
   - **user.ts** - User management
 
-#### [`src/services/`](../app/src/services/)
+#### [`src/services/`](../app/src/services)
 Business logic and external integrations:
 
 - **avatar.ts** - Avatar generation and management
@@ -142,7 +142,7 @@ Business logic and external integrations:
 
 ### Middleware
 
-#### [`src/middleware/`](../app/src/middleware/)
+#### [`src/middleware/`](../app/src/middleware)
 Request processing middleware:
 
 - **proxy-logger.ts** - Request/response logging

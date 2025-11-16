@@ -134,7 +134,7 @@ android {
 
 #### App Icons and Splash
 
-Replace icons in [`app/android/app/src/main/res/`](../app/android/app/src/main/res/):
+Replace icons in [`app/android/app/src/main/res`](../app/android/app/src/main/res):
 
 - `mipmap-*/ic_launcher.png` - App icons
 - `drawable-*/splash.png` - Splash screens
@@ -217,7 +217,7 @@ Edit [`app/ios/App/App/Info.plist`](../app/ios/App/App/Info.plist):
 
 #### App Icons and Splash
 
-Replace assets in [`app/ios/App/App/Assets.xcassets/`](../app/ios/App/App/Assets.xcassets/):
+Replace assets in [`app/ios/App/App/Assets.xcassets`](../app/ios/App/App/Assets.xcassets):
 
 - `AppIcon.appiconset/` - App icons
 - `Splash.imageset/` - Splash screens
