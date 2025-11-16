@@ -149,6 +149,15 @@ export default defineConfig({
     },
     ssr: {
       noExternal: ['prismjs']
+    },
+    build: {
+      assetsInlineLimit: 4096,
+      chunkSizeWarningLimit: 1000
+    },
+    server: {
+      fs: {
+        allow: ['..']
+      }
     }
   },
 
