@@ -1,8 +1,3 @@
----
-layout: default
-title: Mobile Apps
----
-
 # 📱 Mobile Apps
 
 Zentrio supports native mobile applications for iOS and Android using Capacitor. This guide covers building, configuring, and deploying mobile apps.

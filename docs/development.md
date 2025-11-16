@@ -1,8 +1,3 @@
----
-layout: default
-title: Development Guide
----
-
 # 👨‍💻 Development Guide
 
 Welcome to the Zentrio development documentation! This guide covers everything you need to know about contributing to, extending, or understanding the Zentrio codebase.

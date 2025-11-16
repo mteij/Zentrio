@@ -1,8 +1,3 @@
----
-layout: default
-title: Self-Hosting Guide
----
-
 # 🏠 Self-Hosting Zentrio
 
 Self-hosting Zentrio gives you complete control over your data, privacy, and configuration. This guide will walk you through various deployment methods.
@@ -20,7 +15,7 @@ Self-hosting Zentrio gives you complete control over your data, privacy, and con
 - **Docker** (recommended) or **Node.js 18+**
 - **Git** to clone the repository
 - **Domain name** (optional, for HTTPS)
-- **Basic command line knowledge**
+- **Basic command line knowledge]
 
 ---
 

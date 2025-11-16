@@ -1,8 +1,3 @@
----
-layout: default
-title: Configuration Guide
----
-
 # ⚙️ Configuration Guide
 
 This guide covers all configuration options available in Zentrio, from basic setup to advanced customization.

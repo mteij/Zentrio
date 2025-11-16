@@ -1,8 +1,3 @@
----
-layout: default
-title: API Reference
----
-
 # 📚 API Reference
 
 This document provides comprehensive API documentation for Zentrio, including all endpoints, request/response formats, and authentication methods.
