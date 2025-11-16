@@ -8,6 +8,13 @@
 # Dependencies
 node_modules/
 
+# VitePress build output
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# VitePress temp files
+docs/.vitepress/.temp
+
 # Build outputs
 dist/
 build/

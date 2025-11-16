@@ -105,6 +105,15 @@ export default defineConfig({
     /\/$/,
     // Ignore specific patterns that might be false positives
     /^mailto:/,
-    /^tel:/
+    /^tel:/,
+    // Ignore relative links to files outside docs directory
+    /^\.\.\/\.\./,
+    // Ignore root-relative links to files outside docs directory
+    /^\/[^/]/,
+    // Ignore specific file patterns that are referenced but not in docs
+    /\.env\.example$/,
+    /\/app\/src\//,
+    /\/app\/android\//,
+    /\/app\/ios\//
   ]
 })
