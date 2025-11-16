@@ -9,11 +9,19 @@ url: "https://docs.zentrio.eu" # Your custom domain
 navigation:
   - title: Home
     url: /
-  - title: Android Setup
+  - title: 🏠 Self-Hosting
+    url: self-hosting
+  - title: 📱 Mobile Apps
+    url: mobile
+  - title: ⚙️ Configuration
+    url: configuration
+  - title: 👨‍💻 Development
+    url: development
+  - title: 📖 Android Setup
     url: ANDROID_SETUP
-  - title: Capacitor
+  - title: 🔌 Capacitor
     url: CAPACITOR
-  - title: Quick Start Android
+  - title: 🚀 Quick Start Android
     url: QUICK_START_ANDROID
 
 # Markdown settings
