@@ -1,0 +1,3 @@
+[submodule "app/vendor/stremio-web"]
+	path = app/vendor/stremio-web
+	url = https://github.com/Stremio/stremio-web.git
