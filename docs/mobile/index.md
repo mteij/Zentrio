@@ -1,23 +1,39 @@
 # 📱 Mobile Apps Guide
 
-Zentrio supports native mobile applications for iOS and Android, allowing you to take your profile management on the go. This guide covers everything you need to know about mobile development and deployment.
+Take your Zentrio experience anywhere with native mobile apps and Progressive Web App (PWA) support. This guide covers everything you need to know about mobile usage, setup, and development.
 
-## 🎯 Mobile Options
+::: tip 🚀 Quick Mobile Setup
+**Want to use Zentrio on your phone right now?** Visit [zentrio.eu](https://zentrio.eu) and add it to your home screen for an app-like experience - no download required!
+:::
 
-### 📲 Native Apps (Recommended)
-- **iOS App**: Native iOS application via App Store
-- **Android App**: Native Android application via Play Store
-- **Features**: Full native experience, offline support, push notifications
+## 🎯 Choose Your Mobile Experience
 
-### 🌐 Progressive Web App (PWA)
-- **Platform**: All modern browsers
-- **Features**: Installable, works offline, app-like experience
-- **Setup**: No installation required, just visit zentrio.eu
+### 🌐 Progressive Web App (PWA) - **Recommended for Most Users**
+**Instant app-like experience without app stores**
 
-### 🔧 Custom Builds
-- **Platform**: Build your own mobile apps
-- **Features**: Custom branding, additional features
-- **Requirements**: Development setup and platform accounts
+- ✅ **No download required** - works in any modern browser
+- ✅ **Installable** - add to home screen for quick access
+- ✅ **Offline support** - works without internet connection
+- ✅ **Auto-updates** - always latest version
+- 🚀 **Get started**: Visit [zentrio.eu](https://zentrio.eu) → Menu → "Add to Home Screen"
+
+### 📲 Native Apps - **Coming Soon**
+**Full native experience with enhanced features**
+
+- ✅ **App Store distribution** - iOS App Store and Google Play
+- ✅ **Push notifications** - profile updates and alerts
+- ✅ **Biometric authentication** - Face ID and fingerprint
+- ✅ **Native performance** - optimized for each platform
+- 🔄 **Status**: In development - [join our community](https://github.com/MichielEijpe/Zentrio/discussions) for updates
+
+### 🔧 Custom Builds - **For Advanced Users**
+**Build your own branded mobile apps**
+
+- ✅ **Custom branding** and white-label options
+- ✅ **Additional features** and integrations
+- ✅ **Full control** over app distribution
+- ⚠️ **Requires**: Development setup and platform accounts
+- 🚀 **Get started**: [Development Guide →](../development/setup.md#mobile-development-setup)
 
 ## 📋 What You'll Learn
 

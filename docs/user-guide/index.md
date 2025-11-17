@@ -1,116 +1,166 @@
 # 📖 Zentrio User Guide
 
-Welcome to the comprehensive user guide for Zentrio! This section will help you master all the features and capabilities of Zentrio.
+Welcome to your comprehensive guide to mastering Zentrio! Whether you're a new user or looking to unlock advanced features, this guide will help you get the most out of your profile management system.
 
 ## 🎯 What You'll Learn
 
 This guide covers everything you need to know as a Zentrio user:
 
-- **Profile Management**: Create, switch, and manage multiple profiles
-- **Settings & Customization**: Personalize your Zentrio experience
-- **Themes**: Change the look and feel of your interface
-- **Troubleshooting**: Solve common issues quickly
+::: tip 🚀 Quick Start
+New to Zentrio? Start with [Profile Management](profiles.md) to create your first profile!
+:::
 
-## 📋 Table of Contents
+## 📋 Core Features
 
-### 1. [Profile Management](profiles.md)
-- Creating new profiles
-- Switching between profiles
-- Profile settings and preferences
-- Managing profile data
+### 👥 [Profile Management](profiles.md)
+Learn to create, switch, and manage multiple profiles with unique Stremio credentials.
 
-### 2. [Settings & Customization](settings.md)
-- General settings overview
-- Addon management
+**What you'll learn:**
+- Creating your first profile
+- Switching between profiles instantly
+- Managing profile settings and preferences
+- Organizing profiles for different use cases
+
+### ⚙️ [Settings & Customization](settings.md)
+Personalize every aspect of your Zentrio experience.
+
+**What you'll learn:**
+- Configuring addon management
 - UI customization options
 - Privacy and security settings
+- Performance optimization
 
-### 3. [Themes](themes.md)
-- Available themes
-- Switching themes
-- Theme customization
-- Creating custom themes
+### 🎨 [Themes](themes.md)
+Transform the look and feel of your interface with beautiful themes.
 
-### 4. [Troubleshooting](troubleshooting.md)
-- Common issues and solutions
-- Performance tips
-- Getting help and support
+**What you'll learn:**
+- Available built-in themes
+- Switching and customizing themes
+- Creating your own themes
+- Theme recommendations for different scenarios
 
-## 🚀 Quick Links
+### 📱 [Mobile Apps](../mobile/)
+Take Zentrio anywhere with native mobile apps and PWA support.
 
-### New to Zentrio?
-- [Getting Started](../getting-started/) - Set up Zentrio
-- [Public Instance](../getting-started/public-instance.md) - Try Zentrio instantly
-
-### Advanced Features
-- [Mobile Apps](../mobile/) - Use Zentrio on your phone
-- [Self-Hosting](../getting-started/self-hosting.md) - Host your own instance
-
-### For Developers
-- [API Documentation](../api/) - Integrate with Zentrio
-- [Development Guide](../development/) - Contribute to Zentrio
-
-## 🎨 Key Features Overview
-
-### 👥 Multiple Profiles
-Create separate profiles for different users or use cases:
-- Family members
-- Different content preferences
-- Testing and experimentation
-
-### 🔒 Privacy & Security
-- Encrypted credential storage
-- No tracking or analytics
-- Local data options when self-hosting
-
-### ⚡ Performance
-- Instant profile switching
-- Optimized for speed
-- Mobile-responsive design
-
-### 🛠️ Customization
-- Multiple built-in themes
-- Addon reordering
-- UI element hiding
-- Custom avatars
-
-## 💡 Pro Tips
-
-1. **Profile Organization**: Use descriptive names for your profiles
-2. **Theme Switching**: Try different themes for different viewing conditions
-3. **Addon Management**: Reorder addons based on usage frequency
-4. **Mobile Experience**: Add Zentrio to your home screen for app-like access
-
-## 🔄 Getting Help
-
-### Self-Service
-- **Troubleshooting Guide**: [Common issues](troubleshooting.md)
-- **FAQ**: Check our frequently asked questions
-- **Search**: Use the search bar to find specific topics
-
-### Community Support
-- **GitHub Discussions**: [Ask questions](https://github.com/MichielEijpe/Zentrio/discussions)
-- **Issues**: [Report bugs](https://github.com/MichielEijpe/Zentrio/issues)
-- **Community**: Join our community discussions
-
-### Documentation Feedback
-Found something unclear or missing? Help us improve:
-- **Edit on GitHub**: Suggest improvements directly
-- **Report Issues**: Report documentation problems
-- **Contact Us**: Reach out with suggestions
+**What you'll learn:**
+- Setting up mobile apps
+- PWA installation
+- Mobile-specific features
+- Cross-device synchronization
 
 ---
 
-## 📊 Feature Matrix
+## 🎯 Use Case Guides
 
-| Feature | Description | Where to Learn More |
-|---------|-------------|---------------------|
-| **Profile Creation** | Create unlimited profiles | [Profile Management](profiles.md) |
-| **Profile Switching** | Instant switching between profiles | [Profile Management](profiles.md) |
-| **Theme Support** | Multiple built-in themes | [Themes](themes.md) |
-| **Addon Management** | Reorder and organize addons | [Settings](settings.md) |
-| **Avatar Upload** | Custom profile avatars | [Profile Management](profiles.md) |
-| **Settings Sync** | Per-profile settings | [Settings](settings.md) |
-| **Mobile Support** | Works on all devices | [Mobile Apps](../mobile/) |
+### 👨‍👩‍👧‍👦 **For Families**
+Create separate profiles for each family member:
+- Age-appropriate content filtering
+- Individual watch histories
+- Personalized recommendations
 
-Ready to dive in? Start with [Profile Management](profiles.md) to learn about creating and managing your profiles!
+### 👤 **For Personal Use**
+Optimize your viewing experience:
+- Separate profiles for different moods
+- Content type preferences (movies vs series)
+- Testing new addon configurations
+
+### 🧪 **For Power Users**
+Advanced customization and control:
+- Custom theme creation
+- Advanced addon management
+- Performance optimization
+
+### 🔒 **For Privacy-Conscious Users**
+Maximum data control:
+- Self-hosting setup
+- Local data storage
+- Security best practices
+
+---
+
+## 🚀 Quick Links
+
+### 🆕 **New to Zentrio?**
+- [🚀 Getting Started](../getting-started/) - Set up Zentrio in 5 minutes
+- [🌐 Try Public Instance](../getting-started/public-instance.md) - No setup required
+
+### 🔧 **Advanced Features**
+- [📱 Mobile Setup](../mobile/) - Use Zentrio on your phone
+- [🏠 Self-Hosting](../getting-started/self-hosting.md) - Host your own instance
+- [🔧 Development](../development/) - Contribute to Zentrio
+
+### ❓ **Need Help?**
+- [❓ FAQ](../help/faq.md) - Find answers to common questions
+- [🔧 Troubleshooting](../help/troubleshooting.md) - Solve common issues
+- [💬 Community](https://github.com/MichielEijpe/Zentrio/discussions) - Ask questions
+
+---
+
+## 💡 Pro Tips & Tricks
+
+### 🎯 **Profile Organization**
+- Use descriptive names (e.g., "Kids Movies", "Documentaries", "Test Profile")
+- Set different themes for different profiles
+- Organize addons based on content type
+
+### 🎨 **Theme Optimization**
+- Use dark themes for night viewing
+- Light themes for daytime use
+- Custom themes for accessibility needs
+
+### 📱 **Mobile Experience**
+- Add Zentrio to your home screen for app-like access
+- Enable offline mode for uninterrupted viewing
+- Use biometric authentication for quick access
+
+### ⚡ **Performance Tips**
+- Regularly clean up unused profiles
+- Optimize addon order for faster loading
+- Use appropriate quality settings for your connection
+
+---
+
+## 🔄 Getting Help
+
+### 🆘 **Immediate Help**
+- **🔧 Troubleshooting**: [Common issues and solutions](../help/troubleshooting.md)
+- **❓ FAQ**: [Frequently asked questions](../help/faq.md)
+- **🔍 Search**: Use the search bar to find specific topics
+
+### 💬 **Community Support**
+- **💬 Discussions**: [Ask questions on GitHub](https://github.com/MichielEijpe/Zentrio/discussions)
+- **🐛 Issues**: [Report bugs or request features](https://github.com/MichielEijpe/Zentrio/issues)
+- **📖 Documentation**: [Browse all documentation](../)
+
+### 📝 **Documentation Feedback**
+Found something unclear or missing? Help us improve:
+- **✏️ Edit on GitHub**: Suggest improvements directly
+- **📋 Report Issues**: Report documentation problems
+- **💡 Contact Us**: Reach out with suggestions
+
+---
+
+## 📊 Feature Overview
+
+| Feature | Description | Learn More |
+|---------|-------------|------------|
+| **👥 Profile Creation** | Create unlimited profiles | [Profile Management](profiles.md) |
+| **⚡ Instant Switching** | Switch between profiles instantly | [Profile Management](profiles.md) |
+| **🎨 Theme Support** | Multiple built-in themes | [Themes](themes.md) |
+| **🔌 Addon Management** | Reorder and organize addons | [Settings](settings.md) |
+| **🖼️ Avatar Upload** | Custom profile avatars | [Profile Management](profiles.md) |
+| **⚙️ Settings Sync** | Per-profile settings | [Settings](settings.md) |
+| **📱 Mobile Support** | Works on all devices | [Mobile Apps](../mobile/) |
+| **🔒 Privacy First** | No tracking or analytics | [Privacy Guide](../help/faq.md#privacy--security) |
+
+---
+
+<div style="text-align: center; margin: 2rem 0;">
+
+**🌟 Ready to master Zentrio?**
+
+<br>
+
+[👥 Start with Profiles](profiles.md) &nbsp;&nbsp;|&nbsp;&nbsp; [🎨 Explore Themes](themes.md) &nbsp;&nbsp;|&nbsp;&nbsp; [⚙️ Configure Settings](settings.md)
+
+</div>

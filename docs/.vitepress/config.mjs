@@ -19,67 +19,62 @@ export default defineConfig({
 
   themeConfig: {
     nav: [
-      { text: 'Home', link: '/' },
-      { text: 'Try Zentrio.eu', link: 'https://zentrio.eu' },
+      { text: '🏠 Home', link: '/' },
+      { text: '🚀 Try Now', link: 'https://zentrio.eu' },
       {
-        text: 'Documentation',
+        text: '📚 Docs',
         items: [
-          { text: 'Getting Started', link: '/getting-started/' },
-          { text: 'User Guide', link: '/user-guide/' },
-          { text: 'Deployment', link: '/deployment/' },
-          { text: 'API', link: '/api/' },
-          { text: 'Reference', link: '/reference/' }
+          { text: '🚀 Quick Start', link: '/getting-started/' },
+          { text: '📖 User Guide', link: '/user-guide/' },
+          { text: '🛠️ Self-Hosting', link: '/deployment/' },
+          { text: '🔧 Development', link: '/development/' },
+          { text: '❓ FAQ', link: '/help/faq' }
         ]
       }
     ],
 
     sidebar: [
       {
-        text: 'Getting Started',
+        text: '🚀 Quick Start',
         items: [
-          { text: 'Overview', link: '/getting-started/' },
-          { text: 'Public Instance', link: '/getting-started/public-instance' },
-          { text: 'Self-Hosting', link: '/getting-started/self-hosting' }
+          { text: '⚡ Quick Start Guide', link: '/getting-started/quick-start' },
+          { text: '🌐 Try Zentrio Now', link: '/getting-started/public-instance' },
+          { text: '🏠 5-Minute Setup', link: '/getting-started/self-hosting' },
+          { text: '📖 What is Zentrio?', link: '/getting-started/' }
         ]
       },
       {
-        text: 'User Guide',
+        text: '📖 User Guide',
         items: [
-          { text: 'Overview', link: '/user-guide/' },
-          { text: 'Profiles', link: '/user-guide/profiles' }
+          { text: 'Profile Management', link: '/user-guide/profiles' },
+          { text: 'Settings & Customization', link: '/user-guide/settings' },
+          { text: 'Themes', link: '/user-guide/themes' },
+          { text: 'Mobile Apps', link: '/mobile/' }
         ]
       },
       {
-        text: 'Deployment',
+        text: '🛠️ Self-Hosting',
         items: [
-          { text: 'Overview', link: '/deployment/' }
-        ]
-      },
-      {
-        text: 'Mobile',
-        items: [
-          { text: 'Overview', link: '/mobile/' }
-        ]
-      },
-      {
-        text: 'Development',
-        items: [
-          { text: 'Overview', link: '/development/' }
-        ]
-      },
-      {
-        text: 'API',
-        items: [
-          { text: 'Overview', link: '/api/' },
-          { text: 'Endpoints', link: '/api/endpoints' }
-        ]
-      },
-      {
-        text: 'Reference',
-        items: [
-          { text: 'Overview', link: '/reference/' },
+          { text: 'Installation Guide', link: '/deployment/' },
+          { text: 'Docker Setup', link: '/deployment/docker' },
           { text: 'Configuration', link: '/reference/configuration' },
-          { text: 'Environment', link: '/reference/environment' },
+          { text: 'Environment Variables', link: '/reference/environment' }
+        ]
+      },
+      {
+        text: '🔧 Development',
+        items: [
+          { text: 'Contributing', link: '/development/' },
+          { text: 'Setup Guide', link: '/development/setup' },
+          { text: 'Architecture', link: '/development/architecture' },
+          { text: 'API Reference', link: '/api/' }
+        ]
+      },
+      {
+        text: '❓ Help & Support',
+        items: [
+          { text: 'FAQ', link: '/help/faq' },
+          { text: 'Troubleshooting', link: '/help/troubleshooting' },
           { text: 'Changelog', link: '/reference/changelog' }
         ]
       }

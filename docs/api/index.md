@@ -2,18 +2,33 @@
 
 Welcome to the Zentrio API documentation! This comprehensive reference covers all endpoints, authentication methods, and integration examples for working with the Zentrio API.
 
+::: tip 🚀 Quick API Start
+**New to the Zentrio API?** Start with our [Authentication Guide](#-authentication-overview) to understand the magic link flow, then explore [API Endpoints](#-available-endpoints) for available operations.
+:::
+
 ## 🎯 What You'll Learn
 
-This API reference covers:
+This API reference covers everything you need to integrate with Zentrio:
 
-1. **[Authentication](authentication.md)** - Authentication flow and methods
-2. **[API Endpoints](endpoints.md)** - Complete endpoint documentation
-3. **[Code Examples](examples.md)** - Integration examples in multiple languages
+1. **🔐 Authentication** - Magic link flow and JWT tokens
+2. **📡 API Endpoints** - Complete REST API documentation
+3. **💻 Code Examples** - Integration examples in multiple languages
+4. **🔧 SDK & Tools** - Helper libraries and development tools
 
 ## 🔐 Authentication Overview
 
-Zentrio uses JWT-based authentication with magic link email authentication:
+Zentrio uses a **secure, passwordless authentication system** with magic links:
 
+```mermaid
+graph LR
+    A[User Email] --> B[Request Magic Link]
+    B --> C[Email with Link]
+    C --> D[Verify Token]
+    D --> E[JWT Token]
+    E --> F[API Access]
+```
+
+**Authentication Flow:**
 1. **Request Magic Link**: Send email to receive authentication link
 2. **Verify Token**: Exchange magic link token for JWT
 3. **Use JWT**: Include token in subsequent requests
