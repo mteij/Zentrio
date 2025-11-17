@@ -1,43 +1,26 @@
-🎉 **What's new in version 1.1.14**
+🎉 **What's new in version 1.1.15**
 
-This release brings **exciting new features** and **important bug fixes** to improve your Zentrio experience. We've carefully reviewed and implemented 17 changes based on your feedback and our ongoing commitment to excellence.
+This release introduces **exciting new features** to enhance your Zentrio experience! We've added 6 improvements to make the platform even more powerful and user-friendly.
 
 
 
 ### 🚀 Features
 
-- Lets see the new docs (2025-11-16, 3a3a4d2)
-- Add APK to release notes (2025-11-16, b1a827c)
-
-### 🐛 Bug Fixes
-
-- Fix 404 errors (2025-11-16, 55b126c)
+- Add Buy Me a Coffee username for sponsorship (2025-11-17, 4a39420)
 
 ### 💄 Improvements
 
 - Improve docs (2025-11-17, 3773570)
-- Improve release notes (2025-11-17, c04a86b)
 
 ### 📝 Documentation
 
-- Docs update (2025-11-16, f4aeeb7)
-- Docs (2025-11-16, c911390)
-- Update documentation (2025-11-16, 634449f)
-- Docs (2025-11-16, 90b1680)
-
-### ⚙️ Chore
-
-- Possible fix + Git ignore update (2025-11-16, d083ea5)
+- Better release notes generation, clean up readme, documentation (2025-11-17, 7e279e8)
 
 ### 🔄 Other
 
-- Some possible fixes (2025-11-17, 6ed6441)
-- Logo+Fix docs (2025-11-16, 4080709)
-- Remove some files (2025-11-16, dd043b4)
-- Vitepress docs (2025-11-16, 89cc18d)
-- Merge branch 'main' of https://github.com/mteij/Zentrio (2025-11-16, 2f3bf97)
-- Create CNAME (2025-11-16, ef96c27)
-- Create CNAME (2025-11-16, 8f7dc46)
+- Disable ios builds (2025-11-17, 05ba25a)
+- Changes to docs (2025-11-17, ff59bf5)
+- Merge branch 'main' of https://github.com/mteij/Zentrio (2025-11-17, f0ec883)
 
 ---
 

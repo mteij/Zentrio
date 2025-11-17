@@ -111,6 +111,14 @@ jobs:
         run: |
           gh release create "v${{ env.VERSION }}" -F RELEASE_NOTES.md -t "Zentrio v${{ env.VERSION }}" --latest
 
+      - name: Update GitHub release notes (if release exists)
+        if: steps.rel.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Updating existing release v${{ env.VERSION }} with new release notes"
+          gh release edit "v${{ env.VERSION }}" --notes-file RELEASE_NOTES.md
+
       - name: Trigger mobile build workflow
         if: steps.check_tag.outputs.exists != 'true' && steps.rel.outputs.exists != 'true'
         run: |
