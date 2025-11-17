@@ -74,6 +74,7 @@ app.get('/:profileId', async (c) => {
             <script>
                 window.sessionData = ${raw(JSON.stringify(sessionData))};
             </script>
+            <script src="/static/js/mobile-session-handler.js"></script>
             <script src="/static/session-loader.js"></script>
         </body>
         </html>

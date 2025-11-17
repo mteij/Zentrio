@@ -1,3 +1,35 @@
+def packageJsonFile = file('../../package.json')
+def packageVersion = '1.0.0'
+if (packageJsonFile.exists()) {
+    def text = packageJsonFile.text
+    def matcher = (text =~ /"version"\s*:\s*"([^"]+)"/)
+    if (matcher.find()) {
+        packageVersion = matcher.group(1)
+    }
+}
+ // Compute a monotonically increasing versionCode from semantic version (major.minor.patch)
+ // Supports tags like 1.2.3-alpha.1 by deriving the numeric base (1.2.3) for versionCode.
+def major = 1
+def minor = 0
+def patch = 0
+
+def baseMatch = (packageVersion =~ /^(\d+)\.(\d+)\.(\d+)/)
+if (baseMatch.find()) {
+    major = baseMatch.group(1) as int
+    minor = baseMatch.group(2) as int
+    patch = baseMatch.group(3) as int
+} else {
+    // Fallback: strip non-digits from dot-separated parts
+    def parts = packageVersion.tokenize('.').collect { it.replaceAll('\\D', '') ?: '0' }.collect { it as int }
+    while (parts.size() < 3) {
+        parts << 0
+    }
+    major = parts[0]
+    minor = parts[1]
+    patch = parts[2]
+}
+def computedVersionCode = major * 10000 + minor * 100 + patch
+
 apply plugin: 'com.android.application'
 
 android {
@@ -11,8 +43,8 @@ android {
         applicationId "com.zentrio.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode computedVersionCode
+        versionName packageVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

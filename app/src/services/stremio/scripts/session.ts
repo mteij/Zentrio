@@ -80,6 +80,24 @@ export const getSessionScript = (base64: string) => `
   (function(){
     function startObserver() {
       if (!document.body) return;
+
+      // In the native Zentrio mobile app, add safe-area padding at the top so the Stremio header
+      // does not collide with the Android/iOS status bar. Detection is via the custom UA token
+      // appended by the Capacitor config (" ZentrioMobile").
+      try {
+        var ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+        if (ua.indexOf('ZentrioMobile') !== -1) {
+          if (!document.getElementById('zentrio-safe-area-style')) {
+            var style = document.createElement('style');
+            style.id = 'zentrio-safe-area-style';
+            style.textContent =
+              'body { padding-top: env(safe-area-inset-top, 0px); }' +
+              ' @supports(padding: max(0px)) { body { padding-top: max(env(safe-area-inset-top, 0px), 0px); } }';
+            (document.head || document.documentElement).appendChild(style);
+          }
+        }
+      } catch (_e) {}
+
       var observer = new MutationObserver(function() {
         try {
           // remove warning

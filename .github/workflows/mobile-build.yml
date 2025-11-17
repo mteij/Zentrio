@@ -56,6 +56,25 @@ jobs:
             echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           fi
 
+      - name: Cancel if mobile assets for this version already exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          echo "Checking if mobile assets already exist for v$VERSION"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            # Check for the main release APK as marker that mobile build is done
+            if gh release view "v$VERSION" --json assets -q '.assets[].name' | grep -q "Zentrio-v$VERSION.apk"; then
+              echo "Mobile assets for v$VERSION already exist. Cancelling this workflow run."
+              gh run cancel "$GITHUB_RUN_ID" || { echo "Cancel not available, failing the job."; exit 1; }
+              gh run watch "$GITHUB_RUN_ID"
+            else
+              echo "Release v$VERSION exists but no mobile assets found yet. Continuing."
+            fi
+          else
+            echo "Release v$VERSION does not exist yet or cannot be fetched; continuing."
+          fi
+
       - name: Cache node modules
         uses: actions/cache@v4
         with:

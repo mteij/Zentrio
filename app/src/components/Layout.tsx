@@ -45,6 +45,7 @@ export function Layout({
         <link rel="manifest" href="/static/site.webmanifest" />
         <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
+        <script src="/static/js/mobile-session-handler.js"></script>
       </head>
       <body className={className}>
         {showHeader && <PageHeader />}
@@ -95,6 +96,7 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <link rel="manifest" href="/static/site.webmanifest" />
         <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
+        <script src="/static/js/mobile-session-handler.js"></script>
       </head>
       <body className={className}>
         {children}
