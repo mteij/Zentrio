@@ -105,7 +105,7 @@ export const getSessionScript = (base64: string) => `
     (function(){
       var inject = function() {
         var errorContainer = document.createElement('div');
-        errorContainer.innerHTML = '<div style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #141414; color: #fff; z-index: 99999;"><p style="margin: 0 0 20px;">An error occurred while loading the session.</p><button onclick="window.top.location.href=\\'/profiles\\'" style="background: #007bff; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Back to Profiles</button></div>';
+        errorContainer.innerHTML = '<div style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #141414; color: #fff; z-index: 99999;"><p style="margin: 0 0 20px;">An error occurred while loading the session.</p><button onclick="window.top.location.href=\\\'/profiles\\\'" style="background: #007bff; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Back to Profiles</button></div>';
         (document.body || document.documentElement).appendChild(errorContainer);
       };
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject);
@@ -235,15 +235,15 @@ export const getSessionScript = (base64: string) => `
     else startObserver();
   })();
 `;
-
-export const getSessionBootstrapOnlyScript = (base64: string) =&gt; {
+ 
+export const getSessionBootstrapOnlyScript = (base64) => {
   const full = getSessionScript(base64);
   const marker = '\n  // UI observers after DOM is ready';
   const idx = full.indexOf(marker);
   return idx === -1 ? full : full.slice(0, idx);
 };
-
-export const getUiTweaksScript = () =&gt; {
+ 
+export const getUiTweaksScript = () => {
   const full = getSessionScript('');
   const marker = '\n  // UI observers after DOM is ready';
   const idx = full.indexOf(marker);
