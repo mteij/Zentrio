@@ -7,8 +7,8 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     iosScheme: 'https',
-    cleartext: true,
-    allowNavigation: ['*.zentrio.eu', 'zentrio.eu', 'localhost', '127.0.0.1'],
+    cleartext: false,
+    allowNavigation: ['*.zentrio.eu', 'zentrio.eu'],
     url: 'https://zentrio.eu'
   },
   plugins: {

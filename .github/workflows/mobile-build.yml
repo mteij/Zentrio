@@ -14,7 +14,7 @@ on:
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 env:
   NODE_VERSION: 20
@@ -66,8 +66,11 @@ jobs:
             # Check for the main release APK as marker that mobile build is done
             if gh release view "v$VERSION" --json assets -q '.assets[].name' | grep -q "Zentrio-v$VERSION.apk"; then
               echo "Mobile assets for v$VERSION already exist. Cancelling this workflow run."
-              gh run cancel "$GITHUB_RUN_ID" || { echo "Cancel not available, failing the job."; exit 1; }
-              gh run watch "$GITHUB_RUN_ID"
+              if gh run cancel "$GITHUB_RUN_ID"; then
+                gh run watch "$GITHUB_RUN_ID"
+              else
+                echo "Cancel not available in this context (likely due to token permissions). Continuing without failing the job."
+              fi
             else
               echo "Release v$VERSION exists but no mobile assets found yet. Continuing."
             fi

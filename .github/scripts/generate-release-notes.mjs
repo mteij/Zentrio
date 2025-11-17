@@ -209,17 +209,28 @@ async function main() {
     `- Take your time to analyze each commit and understand its impact`,
   ].join('\n');
 
+  const apiKeySource =
+    process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' :
+    (process.env.GOOGLE_API_KEY ? 'GOOGLE_API_KEY' : '');
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
   let notes = '';
+  let usedAi = false;
 
   if (apiKey) {
+    console.log(`[release-notes] Using Gemini via ${apiKeySource}`);
     try {
       const ai = await generateWithGemini(prompt, apiKey);
-      notes = ai && ai.length > 20 ? ai : '';
+      if (ai && ai.length > 20) {
+        notes = ai.trim();
+        usedAi = true;
+      } else {
+        console.log('[release-notes] Gemini returned empty or too-short output, falling back to conventional notes.');
+      }
     } catch (e) {
-      // Fallback to basic notes if AI fails
-      notes = '';
+      console.error('[release-notes] Gemini API call failed, falling back to conventional notes:', e?.message || e);
     }
+  } else {
+    console.log('[release-notes] No Gemini API key found (GEMINI_API_KEY / GOOGLE_API_KEY), using conventional notes.');
   }
 
   if (!notes) {
@@ -229,10 +240,10 @@ async function main() {
   notes = notes.replace(/^\s*#{1,6}\s.*\r?\n+/, '').trimStart();
 
   const disclaimer = "\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.";
-writeFileSync('RELEASE_NOTES.md', notes + disclaimer, 'utf8');
-  // Emit a small marker file if AI was used
-  if (apiKey) {
-    writeFileSync('.release_notes_ai.txt', 'gemini', 'utf8');
+  writeFileSync('RELEASE_NOTES.md', notes + disclaimer, 'utf8');
+  // Emit a small marker file if AI was actually used
+  if (usedAi) {
+    writeFileSync('.release_notes_ai.txt', apiKeySource.toLowerCase() || 'gemini', 'utf8');
   }
   console.log('Release notes written to RELEASE_NOTES.md');
 }
