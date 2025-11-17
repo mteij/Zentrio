@@ -893,6 +893,9 @@ export function SettingsPage({}: SettingsPageProps) {
         }
       `}</style>
 
+      {/* Mobile session handler */}
+      <script src="/static/js/mobile-session-handler.js"></script>
+      
       {/* Settings page JavaScript */}
       {/* Vanta.js and Three.js */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>

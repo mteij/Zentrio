@@ -110,6 +110,9 @@ export function ProfilesPage({ profiles = [] }: ProfilesPageProps) {
       {/* Profile Modal */}
       <ProfileModal />
 
+      {/* Mobile session handler */}
+      <script src="/static/js/mobile-session-handler.js"></script>
+      
       {/* Add the client-side JavaScript */}
       {/* Vanta.js and Three.js for background visuals */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>

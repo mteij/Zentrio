@@ -87,9 +87,25 @@ jobs:
           rm -rf ~/.gradle/daemon/
           ./gradlew clean
 
-      - name: Build Android APK
+      - name: Build Android Debug APK
         working-directory: ./app/android
         run: ./gradlew assembleDebug
+
+      - name: Build Android Release APK
+        working-directory: ./app/android
+        run: ./gradlew assembleRelease
+
+      - name: Build Android Release Bundle (AAB)
+        working-directory: ./app/android
+        run: ./gradlew bundleRelease
+
+      - name: Find and list APK files
+        working-directory: ./app/android
+        run: |
+          echo "Finding APK files..."
+          find . -name "*.apk" -type f
+          echo "Finding AAB files..."
+          find . -name "*.aab" -type f
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
@@ -97,6 +113,7 @@ jobs:
           name: android-builds
           path: |
             app/android/app/build/outputs/apk/debug/*.apk
+            app/android/app/build/outputs/apk/release/*.apk
             app/android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
 
@@ -235,13 +252,15 @@ jobs:
           mkdir -p release-assets
           echo "Checking Android artifacts:"
           ls -la android-artifacts/ || echo "No android-artifacts directory"
-          cp android-artifacts/*.apk release-assets/ 2>/dev/null || echo "No APK files found"
-          cp android-artifacts/*.aab release-assets/ 2>/dev/null || echo "No AAB files found"
+          find android-artifacts/ -name "*.apk" -exec cp {} release-assets/ \; 2>/dev/null || echo "No APK files found"
+          find android-artifacts/ -name "*.aab" -exec cp {} release-assets/ \; 2>/dev/null || echo "No AAB files found"
 
       - name: List release assets
         run: |
           echo "Release assets directory:"
           ls -la release-assets/ || echo "No release-assets directory"
+          echo "File details:"
+          file release-assets/* || echo "No files to analyze"
 
       - name: Upload assets to GitHub release
         env:
@@ -274,10 +293,18 @@ jobs:
           EOF
           
           # Add Android links if files exist
-          if [ -f "release-assets"/*.apk ]; then
-            APK_FILE=$(ls release-assets/*.apk 2>/dev/null | head -1 | xargs -n1 basename)
+          if ls release-assets/*debug*.apk 1> /dev/null 2>&1; then
+            DEBUG_APK_FILE=$(ls release-assets/*debug*.apk 2>/dev/null | head -1 | xargs -n1 basename)
             echo "### Android" >> mobile-section.md
-            echo "- **APK (Debug)**: [Download APK](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$APK_FILE)" >> mobile-section.md
+            echo "- **APK (Debug)**: [Download Debug APK](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$DEBUG_APK_FILE)" >> mobile-section.md
+          fi
+          
+          if ls release-assets/*release*.apk 1> /dev/null 2>&1; then
+            RELEASE_APK_FILE=$(ls release-assets/*release*.apk 2>/dev/null | head -1 | xargs -n1 basename)
+            if ! grep -q "### Android" mobile-section.md; then
+              echo "### Android" >> mobile-section.md
+            fi
+            echo "- **APK (Release)**: [Download Release APK](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$RELEASE_APK_FILE)" >> mobile-section.md
           fi
           
           if [ -f "release-assets"/*.aab ]; then

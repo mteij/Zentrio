@@ -304,6 +304,9 @@ export function LandingPage({}: LandingPageProps) {
         }
       `}</style>
 
+      {/* Mobile session handler */}
+      <script src="/static/js/mobile-session-handler.js"></script>
+      
       {/* Landing page JavaScript */}
       <script src="/static/js/landing.js"></script>
 

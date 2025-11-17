@@ -7,19 +7,34 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     iosScheme: 'https',
-    cleartext: false,
-    allowNavigation: ['*.zentrio.eu', 'zentrio.eu'],
+    cleartext: true,
+    allowNavigation: ['*.zentrio.eu', 'zentrio.eu', 'localhost', '127.0.0.1'],
     url: 'https://zentrio.eu'
   },
   plugins: {
-    App: {
+    SplashScreen: {
+      launchShowDuration: 2000,
+      launchAutoHide: true,
+      backgroundColor: "#141414",
+      androidSplashResourceName: "splash",
+      androidScaleType: "CENTER_CROP",
+      showSpinner: false,
+      spinnerStyle: "large",
+      spinnerColor: "#e50914"
     }
   },
   android: {
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: false,
+    allowMixedContent: false,
+    captureInput: true,
+    appendUserAgent: " ZentrioMobile"
   },
   ios: {
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: false,
+    appendUserAgent: " ZentrioMobile",
+    // iOS WebView settings
+    scrollEnabled: true
+    // Enable scrolling for better UX
   }
 };
 
