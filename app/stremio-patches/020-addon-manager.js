@@ -1,25 +1,3 @@
-'use strict';
-
-// Zentrio Addon Manager patch for vendored Stremio Web.
-//
-// This patch injects the addon manager functionality directly into the main entrypoint
-// instead of injecting it at runtime via DOM manipulation.
-
-module.exports.applyPatch = async function applyPatch(ctx) {
-  const { vendorRoot, fs, path, console } = ctx;
-
-  console.log('[StremioPatcher] 020-addon-manager.js: starting');
-
-  const targetFile = path.join(vendorRoot, 'src', 'index.js');
-  if (!fs.existsSync(targetFile)) {
-    console.warn('[StremioPatcher] 020-addon-manager.js: target not found, skipping');
-    return;
-  }
-
-  let source = fs.readFileSync(targetFile, 'utf8');
-
-  // Inject Zentrio Addon Manager code after the UI tweaks
-  const addonManagerCode = `
 // Zentrio Addon Manager - patched in at build-time
 (function() {
   // Ensure a local reference to the global session
@@ -621,7 +599,7 @@ module.exports.applyPatch = async function applyPatch(ctx) {
   }
 
   function pageIsAddons() {
-    return /#\\/addons.*/.test(window.location.href);
+    return /#\/addons.*/.test(window.location.href);
   }
 
   function insertButton() {
@@ -650,25 +628,3 @@ module.exports.applyPatch = async function applyPatch(ctx) {
 
   // No need to watch for localStorage changes since we're using session data
 })();
-
-`;
-
-  // Insert the addon manager code after the UI tweaks code
-  const uiTweaksEndIndex = source.indexOf('})();', source.indexOf('UI tweaks - patched in at build-time'));
-  if (uiTweaksEndIndex !== -1) {
-    source = source.slice(0, uiTweaksEndIndex + 4) + addonManagerCode + source.slice(uiTweaksEndIndex + 4);
-  } else {
-    // Fallback: insert before the first require statement
-    const requireIndex = source.indexOf('const Bowser = require');
-    if (requireIndex !== -1) {
-      source = source.slice(0, requireIndex) + addonManagerCode + source.slice(requireIndex);
-    } else {
-      // Last resort: insert at the beginning
-      source = addonManagerCode + source;
-    }
-  }
-
-  fs.writeFileSync(targetFile, source, 'utf8');
-  console.log('[StremioPatcher] 020-addon-manager.js: patched', targetFile);
-  console.log('[StremioPatcher] 020-addon-manager.js: finished');
-};

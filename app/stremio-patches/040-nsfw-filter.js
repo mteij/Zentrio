@@ -1,25 +1,3 @@
-'use strict';
-
-// Zentrio NSFW Filter patch for vendored Stremio Web.
-//
-// This patch injects the NSFW filter functionality directly into the main entrypoint
-// instead of injecting it at runtime via DOM manipulation.
-
-module.exports.applyPatch = async function applyPatch(ctx) {
-  const { vendorRoot, fs, path, console } = ctx;
-
-  console.log('[StremioPatcher] 040-nsfw-filter.js: starting');
-
-  const targetFile = path.join(vendorRoot, 'src', 'index.js');
-  if (!fs.existsSync(targetFile)) {
-    console.warn('[StremioPatcher] 040-nsfw-filter.js: target not found, skipping');
-    return;
-  }
-
-  let source = fs.readFileSync(targetFile, 'utf8');
-
-  // Inject Zentrio NSFW Filter code after the downloads manager
-  const nsfwFilterCode = `
 // Zentrio NSFW Filter - patched in at build-time
 (function() {
   // Resolve session safely from globals to avoid ReferenceError
@@ -45,16 +23,16 @@ module.exports.applyPatch = async function applyPatch(ctx) {
 
     extractTitleInfo(text) {
       let cleanTitle = text
-        .replace(/^(HD|4K|3D|CAM|TS|TC|DVDRip|BRRip|WEB-DL|WEBRip)\\\\s*/i, '')
-        .replace(/\\\\s*(HD|4K|3D|CAM|TS|TC|DVDRip|BRRip|WEB-DL|WEBRip)$/i, '')
-        .replace(/\\\\s*\\\\([^)]*\\\\)$/, '')
+        .replace(/^(HD|4K|3D|CAM|TS|TC|DVDRip|BRRip|WEB-DL|WEBRip)\\s*/i, '')
+        .replace(/\\s*(HD|4K|3D|CAM|TS|TC|DVDRip|BRRip|WEB-DL|WEBRip)$/i, '')
+        .replace(/\s*\([^)]*\)$/, '')
         .trim();
 
-      const yearMatch = text.match(/\\\\((\\\\d{4})\\\\)|\\\\b(\\\\d{4})\\\\b/);
+      const yearMatch = text.match(/\((\d{4})\)|\b(\d{4})\b/);
       const year = yearMatch ? (yearMatch[1] || yearMatch[2]) : undefined;
 
       if (year) {
-        cleanTitle = cleanTitle.replace(new RegExp('\\\\b' + year + '\\\\b|\\\\(' + year + '\\\\)'), '').trim();
+        cleanTitle = cleanTitle.replace(new RegExp('\\b' + year + '\\b|\\(' + year + '\\)'), '').trim();
       }
 
       return { title: cleanTitle, year };
@@ -155,7 +133,7 @@ module.exports.applyPatch = async function applyPatch(ctx) {
                       ratingValue = 18;
                   } else {
                       // Try to parse a number from ratings like "PG-13"
-                      const ageMatch = certification.match(/\\d+/);
+                      const ageMatch = certification.match(/\d+/);
                       if (ageMatch) {
                           ratingValue = parseInt(ageMatch[0], 10);
                       }
@@ -309,11 +287,11 @@ module.exports.applyPatch = async function applyPatch(ctx) {
   function extractIdInfo(element) {
       const href = element.getAttribute('href');
       if (href) {
-          const tmdbMatch = href.match(/\\/detail\\/(movie|series)\\/tmdb%3A(\\d+)/);
+          const tmdbMatch = href.match(/\/detail\/(movie|series)\/tmdb%3A(\d+)/);
           if (tmdbMatch) {
               return { source: 'tmdb', type: tmdbMatch[1] === 'series' ? 'tv' : 'movie', id: tmdbMatch[2] };
           }
-          const imdbMatch = href.match(/\\/detail\\/(movie|series)\\/(tt\\d+)/);
+          const imdbMatch = href.match(/\/detail\/(movie|series)\/(tt\d+)/);
           if (imdbMatch) {
               return { source: 'imdb', type: imdbMatch[1] === 'series' ? 'tv' : 'movie', id: imdbMatch[2] };
           }
@@ -321,11 +299,11 @@ module.exports.applyPatch = async function applyPatch(ctx) {
 
       const idAttr = element.getAttribute('id');
       if (idAttr) {
-          const tmdbMatch = idAttr.match(/tmdb:(\\d+)/);
+          const tmdbMatch = idAttr.match(/tmdb:(\d+)/);
           if (tmdbMatch) {
               return { source: 'tmdb', id: tmdbMatch[1], type: null };
           }
-          const imdbMatch = idAttr.match(/(tt\\d+)/);
+          const imdbMatch = idAttr.match(/(tt\d+)/);
           if (imdbMatch) {
               return { source: 'imdb', id: imdbMatch[1], type: null };
           }
@@ -464,25 +442,3 @@ module.exports.applyPatch = async function applyPatch(ctx) {
   // Periodic scan for missed content
   setInterval(scanForContent, 5000);
 })();
-
-`;
-
-  // Insert the NSFW filter code after the downloads manager code
-  const downloadsManagerEndIndex = source.indexOf('})();', source.indexOf('Downloads Manager - patched in at build-time'));
-  if (downloadsManagerEndIndex !== -1) {
-    source = source.slice(0, downloadsManagerEndIndex + 4) + nsfwFilterCode + source.slice(downloadsManagerEndIndex + 4);
-  } else {
-    // Fallback: insert before the first require statement
-    const requireIndex = source.indexOf('const Bowser = require');
-    if (requireIndex !== -1) {
-      source = source.slice(0, requireIndex) + nsfwFilterCode + source.slice(requireIndex);
-    } else {
-      // Last resort: insert at the beginning
-      source = nsfwFilterCode + source;
-    }
-  }
-
-  fs.writeFileSync(targetFile, source, 'utf8');
-  console.log('[StremioPatcher] 040-nsfw-filter.js: patched', targetFile);
-  console.log('[StremioPatcher] 040-nsfw-filter.js: finished');
-};

@@ -2,12 +2,11 @@
 
 // Zentrio - Stremio Web patch runner
 //
-// This script discovers and runs patch modules from "app/stremio-patches"
-// against the vendored "app/vendor/stremio-web" project.
+// This script discovers and injects patch modules from "app/stremio-patches"
+// into the vendored "app/vendor/stremio-web" project.
 //
-// Each patch module should export a function:
-//   module.exports.applyPatch = async (ctx) => { ... }
-// where ctx = { vendorRoot, patchesDir, fs, path, console }.
+// Each patch file should be client-side JavaScript that will be injected
+// into the Stremio Web build.
 
 const fs = require('fs');
 const path = require('path');
@@ -37,23 +36,35 @@ async function main() {
     return;
   }
 
+  const targetFile = path.join(vendorRoot, 'src', 'index.js');
+
+  if (!fs.existsSync(targetFile)) {
+    console.warn(`[StremioPatcher] Target file not found: ${targetFile}, skipping patching.`);
+    return;
+  }
+
   console.log('[StremioPatcher] Applying patches to vendor/stremio-web...');
 
-  const ctx = { vendorRoot, patchesDir, fs, path, console };
-
-  for (const file of patchFiles) {
-    const fullPath = path.join(patchesDir, file);
-    console.log(`[StremioPatcher] -> ${file}`);
-
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    const mod = require(fullPath);
-    if (!mod || typeof mod.applyPatch !== 'function') {
-      console.warn(`[StremioPatcher]   Skipping ${file} (no applyPatch export)`);
-      continue;
+  try {
+    // Concatenate all patch files into a single string
+    let allPatches = '\n\n// === ZENTRIO PATCHES START ===\n';
+    for (const file of patchFiles) {
+      const codeFilePath = path.join(patchesDir, file);
+      const content = fs.readFileSync(codeFilePath, 'utf8');
+      allPatches += `\n// Injected from: ${file}\n`;
+      allPatches += content;
+      allPatches += '\n';
     }
+    allPatches += '// === ZENTRIO PATCHES END ===\n';
 
-    // Allow patches to be async or sync
-    await Promise.resolve(mod.applyPatch(ctx));
+    // Append the combined patches to the end of the target file
+    fs.appendFileSync(targetFile, allPatches, 'utf8');
+
+    console.log(`[StremioPatcher] Successfully applied ${patchFiles.length} patches to ${path.relative(vendorRoot, targetFile)}`);
+
+  } catch (error) {
+    console.error(`[StremioPatcher] Error applying patches:`, error);
+    return;
   }
 
   console.log('[StremioPatcher] All patches applied');

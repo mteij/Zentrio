@@ -1,25 +1,3 @@
-'use strict';
-
-// Zentrio bootstrap patch for vendored Stremio Web.
-//
-// This patch injects the session bootstrap code directly into the main entrypoint
-// instead of injecting it at runtime via DOM manipulation.
-
-module.exports.applyPatch = async function applyPatch(ctx) {
-  const { vendorRoot, fs, path, console } = ctx;
-
-  console.log('[StremioPatcher] 001-zentrio-bootstrap.js: starting');
-
-  const targetFile = path.join(vendorRoot, 'src', 'index.js');
-  if (!fs.existsSync(targetFile)) {
-    console.warn('[StremioPatcher] 001-zentrio-bootstrap.js: target not found, skipping');
-    return;
-  }
-
-  let source = fs.readFileSync(targetFile, 'utf8');
-
-  // Inject Zentrio session bootstrap code at the beginning of the file
-  const bootstrapCode = `
 // Zentrio session bootstrap - patched in at build-time
 (function() {
   try {
@@ -134,7 +112,7 @@ module.exports.applyPatch = async function applyPatch(ctx) {
     (function(){
       var inject = function() {
         var errorContainer = document.createElement('div');
-        errorContainer.innerHTML = '<div style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #141414; color: #fff; z-index: 99999;"><p style="margin: 0 0 20px;">An error occurred while loading the session.</p><button onclick="window.top.location.href=\\'/profiles\\\'" style="background: #007bff; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Back to Profiles</button></div>';
+        errorContainer.innerHTML = '<div style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #141414; color: #fff; z-index: 99999;"><p style="margin: 0 0 20px;">An error occurred while loading the session.</p><button onclick="window.top.location.href=\'/profiles\'" style="background: #007bff; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Back to Profiles</button></div>';
         (document.body || document.documentElement).appendChild(errorContainer);
       };
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject);
@@ -142,19 +120,3 @@ module.exports.applyPatch = async function applyPatch(ctx) {
     })();
   }
 })();
-
-`;
-
-  // Insert the bootstrap code after the copyright comment but before any other code
-  const copyrightEndIndex = source.indexOf('*/');
-  if (copyrightEndIndex !== -1) {
-    source = source.slice(0, copyrightEndIndex + 2) + bootstrapCode + source.slice(copyrightEndIndex + 2);
-  } else {
-    // Fallback: insert at the very beginning
-    source = bootstrapCode + source;
-  }
-
-  fs.writeFileSync(targetFile, source, 'utf8');
-  console.log('[StremioPatcher] 001-zentrio-bootstrap.js: patched', targetFile);
-  console.log('[StremioPatcher] 001-zentrio-bootstrap.js: finished');
-};

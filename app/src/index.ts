@@ -85,14 +85,14 @@ app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIM
 // Service Worker explicit route (headers + version injection)
 app.get('/static/sw.js', async (c) => {
   try {
-    const swPath = join(process.cwd(), 'src', 'static', 'sw.js')
+    const swPath = join(import.meta.dir, 'static', 'sw.js')
     const swFile = Bun.file(swPath)
     let swText = await swFile.text()
 
     // Read app version from package.json and inject into SW (%%APP_VERSION%%)
     let version = '0.0.0'
     try {
-      const pkgPath = join(process.cwd(), 'package.json')
+      const pkgPath = join(import.meta.dir, '..', 'package.json')
       const pkg = await Bun.file(pkgPath).json()
       version = (pkg && pkg.version) ? String(pkg.version) : version
     } catch {}
@@ -114,7 +114,7 @@ app.get('/static/sw.js', async (c) => {
 // Static file serving (explicit, to avoid path mismatches)
 app.get('/static/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/static\//, '')
-  const filePath = join(process.cwd(), 'src', 'static', reqPath)
+  const filePath = join(import.meta.dir, 'static', reqPath)
   try {
     const file = Bun.file(filePath)
     const buf = await file.arrayBuffer()
@@ -147,7 +147,7 @@ app.get('/static/*', async (c) => {
 // Favicon at root for browser defaults
 app.get('/favicon.ico', async (c) => {
   try {
-    const filePath = join(process.cwd(), 'src', 'static', 'logo', 'favicon', 'favicon.ico')
+    const filePath = join(import.meta.dir, 'static', 'logo', 'favicon', 'favicon.ico')
     const file = Bun.file(filePath)
     const buf = await file.arrayBuffer()
     return new Response(new Uint8Array(buf), {
