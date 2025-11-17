@@ -158,12 +158,12 @@ export const getSessionScript = (base64: string) => `
                     link.closest('div[class*="board-row"]') ||
                     link.closest('div[class*="meta-row"]');
 
-                  // Also skip removal if the found row itself is inside the Addon Manager modal
+                  // Also skip hiding if the found row itself is inside the Addon Manager modal
                   if (row && row.closest && row.closest('#stremio-addon-manager-modal')) continue;
 
-                  if (row) {
-                    if (typeof row.remove === 'function') row.remove();
-                    else if (row.parentNode) row.parentNode.removeChild(row);
+                  // Avoid removing DOM nodes React owns; just hide the row instead
+                  if (row && row.style) {
+                    row.style.display = 'none';
                   }
                 }
               } catch (_e) {}

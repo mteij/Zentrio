@@ -87,6 +87,23 @@ jobs:
           rm -rf ~/.gradle/daemon/
           ./gradlew clean
 
+      - name: Configure Android keystore for signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "ANDROID_KEYSTORE_BASE64 not set; release APK/AAB will be unsigned."
+            exit 0
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/android/app/release.keystore
+          echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/app/android/app/release.keystore" >> $GITHUB_ENV
+          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> $GITHUB_ENV
+          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> $GITHUB_ENV
+          echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> $GITHUB_ENV
+
       - name: Build Android Debug APK
         working-directory: ./app/android
         run: ./gradlew assembleDebug
@@ -252,8 +269,19 @@ jobs:
           mkdir -p release-assets
           echo "Checking Android artifacts:"
           ls -la android-artifacts/ || echo "No android-artifacts directory"
+          # Copy all APKs/AABs into release-assets
           find android-artifacts/ -name "*.apk" -exec cp {} release-assets/ \; 2>/dev/null || echo "No APK files found"
           find android-artifacts/ -name "*.aab" -exec cp {} release-assets/ \; 2>/dev/null || echo "No AAB files found"
+
+          # Rename the main release APK to a stable name like Zentrio-v(version).apk
+          RELEASE_APK=$(find release-assets -maxdepth 1 -type f -name "*release*.apk" | head -1 || true)
+          if [ -n "$RELEASE_APK" ]; then
+            NEW_NAME="Zentrio-v${{ steps.version.outputs.VERSION }}.apk"
+            echo "Renaming release APK $RELEASE_APK to release-assets/$NEW_NAME"
+            mv "$RELEASE_APK" "release-assets/$NEW_NAME"
+          else
+            echo "No release APK found to rename"
+          fi
 
       - name: List release assets
         run: |
@@ -299,8 +327,8 @@ jobs:
             echo "- **APK (Debug)**: [Download Debug APK](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$DEBUG_APK_FILE)" >> mobile-section.md
           fi
           
-          if ls release-assets/*release*.apk 1> /dev/null 2>&1; then
-            RELEASE_APK_FILE=$(ls release-assets/*release*.apk 2>/dev/null | head -1 | xargs -n1 basename)
+          RELEASE_APK_FILE="Zentrio-v${{ steps.version.outputs.VERSION }}.apk"
+          if [ -f "release-assets/$RELEASE_APK_FILE" ]; then
             if ! grep -q "### Android" mobile-section.md; then
               echo "### Android" >> mobile-section.md
             fi
