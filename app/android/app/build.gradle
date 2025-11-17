@@ -27,14 +27,14 @@ android {
         release {
             def keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
             def keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            def keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-            def keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            def envKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            def envKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
 
-            if (keystorePath && keystorePassword && keyAlias && keyPassword) {
+            if (keystorePath && keystorePassword && envKeyAlias && envKeyPassword) {
                 storeFile file(keystorePath)
                 storePassword keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
+                keyAlias envKeyAlias
+                keyPassword envKeyPassword
             } else {
                 println("WARNING: Release signing config is not fully configured. ANDROID_KEYSTORE_* env vars are missing.")
             }
