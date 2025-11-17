@@ -12,7 +12,7 @@
   <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
 
-  <a href="https://zentrio.eu"><strong>🌐 Live Demo</strong></a> •
+  <a href="https://zentrio.eu"><strong>🌐 Public Instance</strong></a> •
   <a href="https://docs.zentrio.eu"><strong>📚 Documentation</strong></a> •
   <a href="https://github.com/MichielEijpe/Zentrio/issues"><strong>🐛 Report Issues</strong></a>
 </div>
@@ -50,16 +50,6 @@ Zentrio enhances your Stremio experience with:
 ## About Zentrio
 
 Zentrio started as a weekend project to solve [this community issue](https://github.com/Stremio/stremio-features/issues/622) regarding Stremio profiles, but it's grown into something bigger. Not only does Zentrio create a seperate space but its also bundled with a lot of QoL features that hope to make the already awesome Stremio experience even better!
-
-## 📚 Complete Documentation
-
-For detailed information, visit our comprehensive documentation at **[docs.zentrio.eu](https://docs.zentrio.eu)**:
-
-- 🏠 **Getting Started** - Installation, setup, and first steps
-- 📱 **Mobile Apps** - iOS and Android deployment
-- ⚙️ **Configuration** - Environment variables and settings
-- 🔧 **Development** - Contributing and architecture
-- 📋 **API Reference** - Endpoints and integration
 
 
 ## 📄 License
