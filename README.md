@@ -25,27 +25,14 @@ Zentrio was built with substantial assistance from AI tooling, guided by an engi
 Although the project is maintained with care, it remains experimental and may contain imperfections. **Please use it at your own risk**, and consider using unique credentials instead of your primary Stremio account for additional safety.
 </details>
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
-### 🌐 Try it now
-Visit [**zentrio.eu**](https://zentrio.eu) to use Zentrio immediately - no installation required!
+Zentrio is easiest to explore via the public instance and hosted documentation:
 
-### 🐳 Docker (Recommended)
-```bash
-docker-compose up -d
-```
+- 🌐 Public instance: [**zentrio.eu**](https://zentrio.eu)
+- 📚 Documentation: [**docs.zentrio.eu**](https://docs.zentrio.eu)
 
-### 🔧 Local Development
-```bash
-git clone https://github.com/MichielEijpe/Zentrio.git
-cd Zentrio
-cp .env.example .env
-# Edit .env with your settings
-
-cd app
-bun install
-bun run dev
-```
+For deployment, self-hosting, and development setup instructions, refer to the documentation.
 
 ## 📖 What is Zentrio?
 
@@ -74,13 +61,6 @@ For detailed information, visit our comprehensive documentation at **[docs.zentr
 - 🔧 **Development** - Contributing and architecture
 - 📋 **API Reference** - Endpoints and integration
 
-## 🛠️ Tech Stack
-
-- **Backend**: [Bun](https://bun.sh) + [Hono](https://hono.dev)
-- **Frontend**: TypeScript + PWA
-- **Database**: SQLite
-- **Mobile**: [Capacitor](https://capacitorjs.com)
-- **Deployment**: Docker
 
 ## 📄 License
 
