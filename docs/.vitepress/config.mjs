@@ -19,85 +19,54 @@ export default defineConfig({
 
   themeConfig: {
     nav: [
-      { text: '🏠 Home', link: '/' },
-      { text: '🚀 Try Now', link: 'https://zentrio.eu' },
+      { text: 'Home', link: '/' },
       {
-        text: '📚 Docs',
+        text: 'Docs',
         items: [
-          { text: '🚀 Quick Start', link: '/getting-started/' },
-          { text: '📖 User Guide', link: '/user-guide/' },
-          { text: '🛠️ Self-Hosting', link: '/deployment/' },
-          { text: '🔧 Development', link: '/development/' },
-          { text: '❓ FAQ', link: '/help/faq' }
+          { text: 'Getting started', link: '/getting-started' },
+          { text: 'Self hosting with Docker', link: '/self-hosting-docker' },
+          { text: 'Usage', link: '/usage' },
+          { text: 'Development', link: '/development' },
+          { text: 'FAQ', link: '/faq' },
+          { text: 'Environment variables', link: '/environment' }
         ]
-      }
+      },
+      { text: 'Releases', link: '/releases' },
+      { text: 'Try Zentrio', link: 'https://zentrio.eu' }
     ],
-
+ 
     sidebar: [
       {
-        text: '🚀 Quick Start',
+        text: 'Documentation',
         items: [
-          { text: '⚡ Quick Start Guide', link: '/getting-started/quick-start' },
-          { text: '🌐 Try Zentrio Now', link: '/getting-started/public-instance' },
-          { text: '🏠 5-Minute Setup', link: '/getting-started/self-hosting' },
-          { text: '📖 What is Zentrio?', link: '/getting-started/' }
-        ]
-      },
-      {
-        text: '📖 User Guide',
-        items: [
-          { text: 'Profile Management', link: '/user-guide/profiles' },
-          { text: 'Settings & Customization', link: '/user-guide/settings' },
-          { text: 'Themes', link: '/user-guide/themes' },
-          { text: 'Mobile Apps', link: '/mobile/' }
-        ]
-      },
-      {
-        text: '🛠️ Self-Hosting',
-        items: [
-          { text: 'Installation Guide', link: '/deployment/' },
-          { text: 'Docker Setup', link: '/deployment/docker' },
-          { text: 'Configuration', link: '/reference/configuration' },
-          { text: 'Environment Variables', link: '/reference/environment' }
-        ]
-      },
-      {
-        text: '🔧 Development',
-        items: [
-          { text: 'Contributing', link: '/development/' },
-          { text: 'Setup Guide', link: '/development/setup' },
-          { text: 'Architecture', link: '/development/architecture' },
-          { text: 'API Reference', link: '/api/' }
-        ]
-      },
-      {
-        text: '❓ Help & Support',
-        items: [
-          { text: 'FAQ', link: '/help/faq' },
-          { text: 'Troubleshooting', link: '/help/troubleshooting' },
-          { text: 'Changelog', link: '/reference/changelog' }
+          { text: 'Getting started', link: '/getting-started' },
+          { text: 'Self hosting with Docker', link: '/self-hosting-docker' },
+          { text: 'Usage', link: '/usage' },
+          { text: 'Development', link: '/development' },
+          { text: 'FAQ', link: '/faq' },
+          { text: 'Environment variables', link: '/environment' }
         ]
       }
     ],
-
+ 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/MichielEijpe/Zentrio' }
     ],
-
+ 
     footer: {
       message: 'Built for the Stremio community',
       copyright: `Copyright © ${new Date().getFullYear()} Zentrio`
     },
-
+ 
     search: {
       provider: 'local'
     },
-
+ 
     editLink: {
       pattern: 'https://github.com/MichielEijpe/Zentrio/edit/main/docs/:path',
       text: 'Edit this page on GitHub'
     },
-
+ 
     appearance: 'dark'
   },
 

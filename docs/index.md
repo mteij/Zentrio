@@ -3,39 +3,29 @@ layout: home
 hero:
   name: Zentrio
   text: Profile management for Stremio Web
-  tagline: Create multiple profiles, maintain individual watch history, and customize your streaming experience
+  tagline: Minimal self-hosted profile manager for Stremio Web.
   image:
     src: /icon-512.png
     alt: Zentrio
   actions:
     - theme: brand
-      text: 🚀 Try Zentrio Now
+      text: Try Zentrio
       link: https://zentrio.eu
     - theme: alt
-      text: 📖 Quick Start Guide
-      link: /getting-started/
+      text: Get started
+      link: /getting-started
     - theme: alt
-      text: 🐳 Self-Host in 5 Minutes
-      link: /getting-started/self-hosting
+      text: Self host with Docker
+      link: /self-hosting-docker
 
 features:
   - icon: 👥
-    title: Multiple Profiles
-    details: Create and manage unlimited profiles with unique Stremio credentials. Each profile maintains its own watch history, preferences, and settings.
+    title: Multiple profiles
+    details: Separate profiles with individual Stremio credentials, watch history, and addon configuration.
   - icon: 🔒
-    title: Privacy First
-    details: No tracking or analytics. Your data stays private and secure, especially when self-hosting. Full control over your streaming experience.
+    title: Privacy & control
+    details: Run Zentrio yourself with Docker and keep all data on your own infrastructure.
   - icon: 📱
-    title: Cross-Platform
-    details: Works seamlessly on web, iOS, and Android. Native mobile apps with offline support and PWA capabilities.
-  - icon: 🎨
-    title: Customizable
-    details: Personalize with themes, addon management, UI customization, and avatar uploads. Make Zentrio truly yours.
-  - icon: 🏠
-    title: Self-Hosting
-    details: Deploy on your own infrastructure with Docker or manual setup. Complete control over your data and customization.
-  - icon: 🔓
-    title: Open Source
-    details: Fully open-source with MIT license. Contribute, fork, and make it your own. Built by the community, for the community.
+    title: Cross‑platform & themed
+    details: Works on web and mobile, with themes to match your setup.
 ---
-
