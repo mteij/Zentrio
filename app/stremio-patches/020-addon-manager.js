@@ -416,7 +416,7 @@ module.exports.applyPatch = async function applyPatch(ctx) {
 
       addonsList.innerHTML = normalized.map((addon, index) => {
         const logoHtml = addon.manifest.logo
-          ? '<img src="' + addon.manifest.logo + '" alt="' + addon.manifest.name + '" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\'">'
+          ? '<img src="' + addon.manifest.logo + '" alt="' + addon.manifest.name + '" onerror="this.style.display=\\\'none\\\'; this.nextElementSibling.style.display=\\\'flex\\\'">'
           : '';
         const logoFallback = '<div class="addon-logo-fallback" style="display: ' + (addon.manifest.logo ? 'none' : 'flex') + '">' +
           (addon.manifest.name || '').slice(0, 2).toUpperCase() +

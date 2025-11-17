@@ -39,7 +39,20 @@ async function main() {
 
   console.log('[StremioPatcher] Applying patches to vendor/stremio-web...');
 
-  const ctx = { vendorRoot, patchesDir, fs, path, console };
+  const ctx = {
+    vendorRoot,
+    patchesDir,
+    fs,
+    path,
+    console,
+    helpers: {
+      readPatchFile: (patchFile, file) => {
+        const patchDir = path.dirname(path.join(patchesDir, patchFile));
+        const filePath = path.join(patchDir, file);
+        return fs.readFileSync(filePath, 'utf8');
+      }
+    }
+  };
 
   for (const file of patchFiles) {
     const fullPath = path.join(patchesDir, file);
