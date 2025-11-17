@@ -19,11 +19,53 @@ fs.mkdirSync('dist', { recursive: true });
 console.log('📁 Copying static assets...');
 execSync('cpx "src/static/**/*" "dist/static"', { stdio: 'inherit' });
 
-// Build the server
-console.log('🔧 Building server...');
-execSync('bun build src/index.ts --outdir ./dist --target bun --minify', { stdio: 'inherit' });
-
-// Create a simple index.html for Capacitor
+  // Build the server
+ console.log('🔧 Building server...');
+ execSync('bun build src/index.ts --outdir ./dist --target bun --minify', { stdio: 'inherit' });
+ 
+ // Optionally build embedded Stremio Web frontend (vendor/stremio-web)
+ try {
+   const stremioWebDir = path.join(__dirname, '..', 'vendor', 'stremio-web');
+   if (fs.existsSync(stremioWebDir)) {
+     console.log('📦 Building embedded Stremio Web (vendor/stremio-web)...');
+     execSync('npm install', { cwd: stremioWebDir, stdio: 'inherit' });
+ 
+     // Apply Zentrio-specific patches to the vendored Stremio Web source
+     const appRoot = path.join(__dirname, '..');
+     try {
+       console.log('🩹 Applying Zentrio Stremio Web patches...');
+       execSync('node scripts/apply-stremio-patches.js', { cwd: appRoot, stdio: 'inherit' });
+     } catch (patchErr) {
+       console.error('⚠️ Failed to apply Stremio Web patches. Continuing with unpatched sources.', patchErr);
+     }
+ 
+     execSync('npm run build', { cwd: stremioWebDir, stdio: 'inherit' });
+ 
+     // Stremio Web outputs to "build" (see webpack.config.js -> output.path)
+     const srcDir = path.join(stremioWebDir, 'build');
+     const outDir = path.join(__dirname, '..', 'data', 'stremio-web-build');
+ 
+     if (fs.existsSync(outDir)) {
+       fs.rmSync(outDir, { recursive: true, force: true });
+     }
+     fs.mkdirSync(outDir, { recursive: true });
+ 
+     // Copy built Stremio Web assets into data/stremio-web-build for the server to serve
+     try {
+       fs.cpSync(srcDir, outDir, { recursive: true });
+       console.log('✅ Stremio Web build copied to data/stremio-web-build');
+     } catch (copyErr) {
+       console.error('⚠️ Failed to copy Stremio Web build into data/stremio-web-build', copyErr);
+       throw copyErr;
+     }
+   } else {
+     console.log('ℹ️ Skipping Stremio Web build: vendor/stremio-web not found');
+   }
+ } catch (err) {
+   console.error('⚠️ Failed to build embedded Stremio Web. Continuing without it.', err);
+ }
+ 
+ // Create a simple index.html for Capacitor
 const indexHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>

@@ -1,92 +1,94 @@
-import { getSessionScript } from './scripts/session'
+import { getSessionBootstrapOnlyScript, getUiTweaksScript } from './scripts/session'
 import { getAddonManagerScript } from './scripts/addonManager'
 import { getNsfwFilterScript } from './scripts/nsfwFilter'
 import { getDownloadsManagerScript } from './scripts/downloadsManager'
+import { join } from 'path'
+import { promises as fs } from 'fs'
 
-const STREMIO_WEB_URL = "https://web.stremio.com/";
 const STREMIO_API_URL = "https://api.strem.io/";
 
-export const proxyRequestHandler = async (req: Request, path: string, sessionData: string | null) => {
-  const stremioPath = `/${path || ""}`;
-  const isApiCall = stremioPath.startsWith("/api/");
-  const baseUrl = isApiCall ? STREMIO_API_URL : STREMIO_WEB_URL;
-  const targetUrl = new URL(stremioPath, baseUrl);
+export const proxyRequestHandler = async (req: Request, path: string, _sessionData: string | null) => {
+  const stremioPath = `/${path || ''}`;
 
-  const body = req.method === "HEAD" ? null : (req.method === "POST" || req.method === "PUT" ? await req.blob() : null);
+  // Hard-limit this proxy to Stremio API calls only.
+  if (!stremioPath.startsWith('/api/')) {
+    return new Response('Stremio proxy only supports /api/* paths', { status: 400 });
+  }
+
+  const targetUrl = new URL(stremioPath, STREMIO_API_URL);
+  const body =
+    req.method === 'HEAD'
+      ? null
+      : (req.method === 'POST' || req.method === 'PUT'
+          ? await req.blob()
+          : null);
 
   try {
     const requestHeaders = new Headers(req.headers);
-    requestHeaders.set("Host", new URL(baseUrl).host);
-    requestHeaders.delete("if-modified-since");
-    requestHeaders.delete("if-none-match");
+    requestHeaders.set('Host', new URL(STREMIO_API_URL).host);
+    requestHeaders.delete('if-modified-since');
+    requestHeaders.delete('if-none-match');
 
     const response = await fetch(targetUrl.href, {
       method: req.method,
       headers: requestHeaders,
-      body: body,
-      redirect: "manual",
+      body,
+      redirect: 'manual',
     });
 
-    if (response.status >= 300 && response.status < 400 && response.headers.has("location")) {
-      const location = response.headers.get("location")!;
-      const newLocation = location.replace(STREMIO_WEB_URL, "/stremio/");
-      const headers = new Headers(response.headers);
-      headers.set("location", newLocation);
-      return new Response(null, { status: response.status, headers });
-    }
-
     const responseHeaders = new Headers(response.headers);
-    responseHeaders.set("Access-Control-Allow-Origin", "*");
-    responseHeaders.set("Access-Control-Allow-Credentials", "true");
-    const requestHeadersHeader = req.headers.get("Access-Control-Request-Headers");
+    responseHeaders.set('Access-Control-Allow-Origin', '*');
+    responseHeaders.set('Access-Control-Allow-Credentials', 'true');
+    const requestHeadersHeader = req.headers.get('Access-Control-Request-Headers');
     if (requestHeadersHeader) {
-      responseHeaders.set("Access-Control-Allow-Headers", requestHeadersHeader);
+      responseHeaders.set('Access-Control-Allow-Headers', requestHeadersHeader);
     }
 
-    responseHeaders.delete("content-security-policy");
-    responseHeaders.delete("Content-Security-Policy");
-    
-    responseHeaders.delete("x-frame-options");
-    responseHeaders.delete("X-Frame-Options");
-
-    responseHeaders.set("Content-Security-Policy",
+    // Relax CSP/X-Frame for proxied API responses; Stremio frontend controls framing & CSP.
+    responseHeaders.delete('content-security-policy');
+    responseHeaders.delete('Content-Security-Policy');
+    responseHeaders.delete('x-frame-options');
+    responseHeaders.delete('X-Frame-Options');
+    responseHeaders.set(
+      'Content-Security-Policy',
       "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
-      "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
-      "style-src * 'unsafe-inline' data: blob:; " +
-      "img-src * data: blob:; " +
-      "font-src * data:; " +
-      "connect-src * data: blob:; " +
-      "media-src * blob:; " +
-      "object-src *; " +
-      "child-src *; " +
-      "frame-src *; " +
-      "frame-ancestors *; " +
-      "worker-src * blob:; " +
-      "manifest-src *;"
+        "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+        "style-src * 'unsafe-inline' data: blob:; " +
+        "img-src * data: blob:; " +
+        "font-src * data:; " +
+        "connect-src * data: blob:; " +
+        "media-src * blob:; " +
+        "object-src *; " +
+        "child-src *; " +
+        "frame-src *; " +
+        "frame-ancestors *; " +
+        "worker-src * blob:; " +
+        "manifest-src *;"
     );
 
-    responseHeaders.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-    responseHeaders.set("Pragma", "no-cache");
-    responseHeaders.set("Expires", "0");
+    responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    responseHeaders.set('Pragma', 'no-cache');
+    responseHeaders.set('Expires', '0');
 
-    const setCookieHeader = response.headers.get("set-cookie");
+    const setCookieHeader = response.headers.get('set-cookie');
     if (setCookieHeader) {
       const cookies = setCookieHeader.split(/,(?=[^;]+=[^;]+;)/g);
-      responseHeaders.delete("set-cookie");
+      responseHeaders.delete('set-cookie');
       for (const cookie of cookies) {
-        let rewrittenCookie = cookie.trim()
-          .replace(/; domain=[^;]+(?=;|$)/gi, "")
-          .replace(/; samesite=(strict|lax|none)(?=;|$)/gi, "");
+        let rewrittenCookie = cookie
+          .trim()
+          .replace(/; domain=[^;]+(?=;|$)/gi, '')
+          .replace(/; samesite=(strict|lax|none)(?=;|$)/gi, '');
 
-        if (new URL(req.url).protocol !== "https:") {
-          rewrittenCookie = rewrittenCookie.replace(/; secure/gi, "");
+        if (new URL(req.url).protocol !== 'https:') {
+          rewrittenCookie = rewrittenCookie.replace(/; secure/gi, '');
         }
 
-        responseHeaders.append("set-cookie", rewrittenCookie);
+        responseHeaders.append('set-cookie', rewrittenCookie);
       }
     }
 
-    if (req.method === "HEAD") {
+    if (req.method === 'HEAD') {
       return new Response(null, {
         status: response.status,
         statusText: response.statusText,
@@ -94,48 +96,80 @@ export const proxyRequestHandler = async (req: Request, path: string, sessionDat
       });
     }
 
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("text/html")) {
-      let body = await response.text();
-      body = body.replace(/<head[^>]*>/i, `$&<base href="/stremio/">`);
-
-
-      if (sessionData) {
-        const sessionScript = getSessionScript(sessionData);
-        body = body.replace(/<head[^>]*>/i, `$&<script>${sessionScript}</script>`);
-
-        const addonManagerScript = getAddonManagerScript();
-        const nsfwFilterScript = getNsfwFilterScript();
-        const downloadsManagerScript = getDownloadsManagerScript();
-        body = body.replace(/<\/head>/i, `<script>${addonManagerScript}</script><script>${nsfwFilterScript}</script><script>${downloadsManagerScript}</script>$&`);
-      }
-
-      responseHeaders.delete("content-encoding");
-      responseHeaders.delete("Content-Encoding");
-      responseHeaders.delete("content-length");
-      responseHeaders.delete("Content-Length");
-      return new Response(body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: responseHeaders,
-      });
-    }
-
     const buffer = await response.arrayBuffer();
-    responseHeaders.delete("content-encoding");
-    responseHeaders.delete("Content-Encoding");
-    responseHeaders.delete("content-length");
-    responseHeaders.delete("Content-Length");
+    responseHeaders.delete('content-encoding');
+    responseHeaders.delete('Content-Encoding');
+    responseHeaders.delete('content-length');
+    responseHeaders.delete('Content-Length');
+
     return new Response(buffer, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders,
     });
   } catch (error) {
-    console.error("Proxy error:", error);
-    const errorMessage = typeof error === "object" && error !== null && "message" in error
-      ? (error as { message: string }).message
-      : String(error);
+    console.error('Proxy error:', error);
+    const errorMessage =
+      typeof error === 'object' && error !== null && 'message' in error
+        ? (error as { message: string }).message
+        : String(error);
     return new Response(`Proxy error: ${errorMessage}`, { status: 502 });
+  }
+};
+ 
+export const hasLocalStremioBuild = async (): Promise<boolean> => {
+  try {
+    const filePath = join(process.cwd(), 'data', 'stremio-web-build', 'index.html');
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+ 
+/**
+ * Serve the locally built Stremio Web index.html from data/stremio-web-build,
+ * injecting the same Zentrio scripts (session/addon manager/NSFW/downloads)
+ * that we would inject when proxying the remote web.stremio.com HTML.
+ */
+export const renderLocalStremioHtml = async (sessionData: string | null) => {
+  try {
+    const filePath = join(process.cwd(), 'data', 'stremio-web-build', 'index.html');
+    let body = await fs.readFile(filePath, 'utf8');
+ 
+    // Ensure a base href so that bundled assets resolve correctly under /stremio/
+    body = body.replace(/<head[^>]*>/i, `$&<base href="/stremio/">`);
+ 
+    if (sessionData) {
+      // Inject only the session/bootstrap portion into <head> so Stremio sees the logged-in state,
+      // but keep UI tweaks and DOM observers as a separate script for clarity.
+      const sessionBootstrapScript = getSessionBootstrapOnlyScript(sessionData);
+      body = body.replace(/<head[^>]*>/i, `$&<script>${sessionBootstrapScript}</script>`);
+ 
+      // getUiTweaksScript() is defined in scripts/session.ts but TS currently infers it as Number in this module;
+      // cast to a callable to keep type-checking happy without changing runtime behaviour.
+      const uiTweaksScript = (getUiTweaksScript as unknown as () => string)();
+      const addonManagerScript = getAddonManagerScript();
+      const nsfwFilterScript = getNsfwFilterScript();
+      const downloadsManagerScript = getDownloadsManagerScript();
+      body = body.replace(
+        /<\/head>/i,
+        `<script>${uiTweaksScript}</script>` +
+        `<script>${addonManagerScript}</script>` +
+        `<script>${nsfwFilterScript}</script>` +
+        `<script>${downloadsManagerScript}</script>$&`,
+      );
+    }
+ 
+    const headers = new Headers();
+    headers.set('Content-Type', 'text/html; charset=utf-8');
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
+ 
+    return new Response(body, { status: 200, headers });
+  } catch (err) {
+    console.error('Failed to serve local Stremio index.html', err);
+    return new Response('Failed to load Stremio', { status: 500 });
   }
 };

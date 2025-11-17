@@ -7,6 +7,43 @@ export const getSessionScript = (base64: string) => `
     // expose globals
     window.session = session;
     window.zentrioSession = session;
+
+    // Patch Stremio network calls to always use the local /stremio API proxy (avoids CORS to https://api.strem.io)
+    try {
+      // fetch()
+      if (typeof window.fetch === 'function') {
+        var __zdm_origFetch = window.fetch;
+        window.fetch = function(input, init) {
+          try {
+            var url = (typeof input === 'string')
+              ? input
+              : (input && typeof input.url === 'string' ? input.url : '');
+            if (url && url.indexOf('https://api.strem.io/api/') === 0) {
+              var u = new URL(url);
+              var rewritten = '/stremio' + u.pathname + u.search + u.hash;
+              return __zdm_origFetch.call(this, rewritten, init);
+            }
+          } catch (_e) {}
+          return __zdm_origFetch.call(this, input, init);
+        };
+      }
+      // XMLHttpRequest
+      if (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype && XMLHttpRequest.prototype.open) {
+        var __zdm_origOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+          try {
+            if (typeof url === 'string' && url.indexOf('https://api.strem.io/api/') === 0) {
+              var u2 = new URL(url);
+              url = '/stremio' + u2.pathname + u2.search + u2.hash;
+            }
+          } catch (_e2) {}
+          return __zdm_origOpen.call(this, method, url, async, user, password);
+        };
+      }
+    } catch (_patchErr) {
+      try { console.warn('Zentrio [Script]: failed to patch Stremio API URLs', _patchErr); } catch(_) {}
+    }
+
     // Minimal bootstrap for Stremio Web to recognize the logged-in state.
     // Provide a strictly-shaped "profile" and a small whitelist of known keys Stremio reads.
     try {
@@ -198,3 +235,18 @@ export const getSessionScript = (base64: string) => `
     else startObserver();
   })();
 `;
+
+export const getSessionBootstrapOnlyScript = (base64: string) =&gt; {
+  const full = getSessionScript(base64);
+  const marker = '\n  // UI observers after DOM is ready';
+  const idx = full.indexOf(marker);
+  return idx === -1 ? full : full.slice(0, idx);
+};
+
+export const getUiTweaksScript = () =&gt; {
+  const full = getSessionScript('');
+  const marker = '\n  // UI observers after DOM is ready';
+  const idx = full.indexOf(marker);
+  if (idx === -1) return '';
+  return full.slice(idx);
+};

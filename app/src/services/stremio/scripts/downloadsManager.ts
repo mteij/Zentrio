@@ -6,8 +6,21 @@ export const getDownloadsManagerScript = () => `
         ? (window['session'] || window['zentrioSession'] || null)
         : null);
 
+      // Debug bootstrap info for downloads manager
+      try {
+        console.log('[ZDM] bootstrap', {
+          hasSession: !!session,
+          downloadsManagerEnabled: session ? session.downloadsManagerEnabled : undefined,
+          userAgent: (typeof navigator !== 'undefined' && navigator.userAgent) || null,
+          locationHref: (typeof location !== 'undefined' && location.href) || null,
+        });
+      } catch (_) {}
+
       // Feature flag (enabled by default)
-      if (session && session.downloadsManagerEnabled === false) return;
+      if (session && session.downloadsManagerEnabled === false) {
+        try { console.log('[ZDM] disabled via session flag, aborting init'); } catch (_) {}
+        return;
+      }
 
       // Broaden selector: some streams may not retain 'stream-container' class consistently
       // Original single selector replaced by a broadened set to adapt to DOM variations
@@ -435,6 +448,122 @@ function markProbing(id, anchorHash) {
         el.id = STYLE_ID;
         el.textContent = css;
         document.head.appendChild(el);
+      }
+
+      function injectBannerStyles() {
+        if (document.getElementById('zdm-setup-banner-style')) return;
+        const css = \`
+          #zdm-setup-banner {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 10px;
+            z-index: 10060;
+            background: rgba(15,23,42,0.98);
+            color: #e5e7eb;
+            padding: 8px 14px;
+            border-radius: 9999px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+          }
+          #zdm-setup-banner button {
+            border: none;
+            border-radius: 9999px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+          }
+          #zdm-setup-banner button.zdm-primary {
+            background: #dc2626;
+            color: #fff;
+          }
+          #zdm-setup-banner button.zdm-secondary {
+            background: transparent;
+            color: #9ca3af;
+          }
+          #zdm-setup-banner button.zdm-secondary:hover {
+            background: rgba(148,163,184,0.12);
+          }
+        \`;
+        const el = document.createElement('style');
+        el.id = 'zdm-setup-banner-style';
+        el.textContent = css;
+        document.head.appendChild(el);
+      }
+
+      const BANNER_DISMISS_LS_KEY = 'zentrioDownloadsDirBannerDismissed';
+
+      function shouldShowSetupBanner() {
+        if (!('showDirectoryPicker' in window)) return false;
+        try {
+          const raw = localStorage.getItem(BANNER_DISMISS_LS_KEY);
+          if (raw === '1') return false;
+        } catch (_) {}
+        return true;
+      }
+
+      async function maybeShowSetupBanner() {
+        if (!shouldShowSetupBanner()) return;
+        try {
+          const persisted = await loadPersistedHandle();
+          if (persisted) {
+            window.__zentrioSaveRootHandle = persisted;
+            return;
+          }
+        } catch (_) {}
+        createSetupBanner();
+      }
+
+      function createSetupBanner() {
+        if (document.getElementById('zdm-setup-banner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'zdm-setup-banner';
+
+        const text = document.createElement('span');
+        text.textContent = 'Choose a default folder for Zentrio downloads?';
+        banner.appendChild(text);
+
+        const primary = document.createElement('button');
+        primary.className = 'zdm-primary';
+        primary.textContent = 'Choose folder';
+
+        const secondary = document.createElement('button');
+        secondary.className = 'zdm-secondary';
+        secondary.textContent = 'Not now';
+
+        banner.appendChild(primary);
+        banner.appendChild(secondary);
+        document.body.appendChild(banner);
+
+        const close = () => { try { banner.remove(); } catch (_) {} };
+
+        primary.addEventListener('click', async () => {
+          try {
+            if (!('showDirectoryPicker' in window)) {
+              close();
+              return;
+            }
+            const handle = await window.showDirectoryPicker({ id: 'zentrio-downloads', mode: 'readwrite', startIn: 'videos' });
+            if (handle) {
+              window.__zentrioSaveRootHandle = handle;
+              persistHandle(handle);
+              try { localStorage.setItem(BANNER_DISMISS_LS_KEY, '1'); } catch (_) {}
+              try { window.postMessage({ type: 'zentrio-download-root-handle', handle }, '*'); } catch (_) {}
+            }
+          } catch (_) {
+            // user cancelled; leave banner so they can try again or dismiss
+            return;
+          }
+          close();
+        });
+
+        secondary.addEventListener('click', () => {
+          try { localStorage.setItem(BANNER_DISMISS_LS_KEY, '1'); } catch (_) {}
+          close();
+        });
       }
 
       function ensureRelative(el) {
@@ -1394,6 +1523,8 @@ async function startRealDownload(item) {
         zdmLog('Downloads Manager init start');
 patchFetchAndXHR(window);
         injectStyles();
+        injectBannerStyles();
+        maybeShowSetupBanner();
         requestExternalRootHandleRetries();
         // expose manual trigger
         window.zdmForceScan = () => { zdmLog('Manual force scan'); scan(true); };

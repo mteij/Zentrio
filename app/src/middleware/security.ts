@@ -32,12 +32,12 @@ export const securityHeaders = async (c: Context, next: Next) => {
   c.header('X-XSS-Protection', '1; mode=block')
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
 
-  // Avoid overriding proxy responses (Stremio and generic proxy)
+  // Avoid overriding proxy responses (Stremio API/local bundle)
   const path = c.req.path || ''
-  const isProxyPath = path.startsWith('/stremio') || path.startsWith('/api/proxy')
+  const isStremioPath = path.startsWith('/stremio')
   const alreadyProxied = c.res?.headers?.get('X-Zentrio-Proxy')
-
-  if (isProxyPath || alreadyProxied) {
+ 
+  if (isStremioPath || alreadyProxied) {
     // Do not set global X-Frame-Options/CSP on proxied content.
     // These are managed by the proxy header manipulators.
     return

@@ -134,6 +134,38 @@
             loadingContainer.style.display = 'none';
             stremioContainer.style.display = 'block';
             document.title = 'Zentrio';
+
+            // Debug: verify that our injected Stremio scripts (session + downloads manager) are present
+            try {
+                const doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document) || null;
+                if (doc) {
+                    const scripts = Array.from(doc.querySelectorAll('script'));
+                    let hasSessionBootstrap = false;
+                    let hasDownloadsManager = false;
+
+                    for (const s of scripts) {
+                        const txt = s.textContent || '';
+                        if (!hasSessionBootstrap && txt.indexOf('Zentrio session bootstrap') !== -1) {
+                            hasSessionBootstrap = true;
+                        }
+                        if (!hasDownloadsManager && txt.indexOf('Zentrio Downloads Manager') !== -1) {
+                            hasDownloadsManager = true;
+                        }
+                        if (hasSessionBootstrap && hasDownloadsManager) break;
+                    }
+
+                    console.log('[ZDM-Top] iframe loaded', {
+                        src: iframe.src,
+                        scriptsCount: scripts.length,
+                        hasSessionBootstrap,
+                        hasDownloadsManager
+                    });
+                } else {
+                    console.log('[ZDM-Top] iframe onload: no accessible document to scan');
+                }
+            } catch (e) {
+                console.log('[ZDM-Top] iframe script-scan error', e);
+            }
         };
 
         const sessionDataString = btoa(JSON.stringify(sessionObject));
