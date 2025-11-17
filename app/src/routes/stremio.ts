@@ -34,7 +34,7 @@ app.all('*', async (c) => {
   }
 
   // HTML entry: serve the locally built Stremio Web index.html,
-  // with Zentrio session/addon/NSFW/download scripts injected.
+  // with session data injected for the build-time patches to use.
   if (path === '' || path === '/' || path.toLowerCase() === 'index.html') {
     return renderLocalStremioHtml(sessionData)
   }

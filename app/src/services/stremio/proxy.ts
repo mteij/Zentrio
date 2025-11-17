@@ -1,7 +1,3 @@
-import { getSessionBootstrapOnlyScript, getUiTweaksScript } from './scripts/session'
-import { getAddonManagerScript } from './scripts/addonManager'
-import { getNsfwFilterScript } from './scripts/nsfwFilter'
-import { getDownloadsManagerScript } from './scripts/downloadsManager'
 import { join } from 'path'
 import { promises as fs } from 'fs'
 
@@ -129,8 +125,8 @@ export const hasLocalStremioBuild = async (): Promise<boolean> => {
  
 /**
  * Serve the locally built Stremio Web index.html from data/stremio-web-build,
- * injecting the same Zentrio scripts (session/addon manager/NSFW/downloads)
- * that we would inject when proxying the remote web.stremio.com HTML.
+ * with session data injected for the build-time patches to consume.
+ * The patches (bootstrap/addon manager/NSFW/downloads) are applied at build time.
  */
 export const renderLocalStremioHtml = async (sessionData: string | null) => {
   try {
@@ -141,23 +137,11 @@ export const renderLocalStremioHtml = async (sessionData: string | null) => {
     body = body.replace(/<head[^>]*>/i, `$&<base href="/stremio/">`);
  
     if (sessionData) {
-      // Inject only the session/bootstrap portion into <head> so Stremio sees the logged-in state,
-      // but keep UI tweaks and DOM observers as a separate script for clarity.
-      const sessionBootstrapScript = getSessionBootstrapOnlyScript(sessionData);
-      body = body.replace(/<head[^>]*>/i, `$&<script>${sessionBootstrapScript}</script>`);
- 
-      // getUiTweaksScript() is defined in scripts/session.ts but TS currently infers it as Number in this module;
-      // cast to a callable to keep type-checking happy without changing runtime behaviour.
-      const uiTweaksScript = (getUiTweaksScript as unknown as () => string)();
-      const addonManagerScript = getAddonManagerScript();
-      const nsfwFilterScript = getNsfwFilterScript();
-      const downloadsManagerScript = getDownloadsManagerScript();
+      // Inject session data as a hidden element that the build-time patched bootstrap code can read
+      // This approach is cleaner than runtime script injection
       body = body.replace(
-        /<\/head>/i,
-        `<script>${uiTweaksScript}</script>` +
-        `<script>${addonManagerScript}</script>` +
-        `<script>${nsfwFilterScript}</script>` +
-        `<script>${downloadsManagerScript}</script>$&`,
+        /<head[^>]*>/i,
+        `$&<script id="zentrio-session-data" type="application/json" data-session="${sessionData}"></script>`
       );
     }
  
