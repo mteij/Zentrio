@@ -11,6 +11,21 @@
 
     const { profile, user, decryptionError } = window.sessionData;
 
+    // Fetch TMDB API key from profile proxy settings if not already available
+    if (!profile.tmdb_api_key) {
+        try {
+            const response = await fetch('/api/user/tmdb-api-key');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.ok && data.data && data.data.tmdb_api_key) {
+                    profile.tmdb_api_key = data.data.tmdb_api_key;
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to fetch TMDB API key:', error);
+        }
+    }
+
     // Early validation: ensure we have credentials to log into Stremio
     if (!profile || !profile.stremio_email || !profile.stremio_password) {
         const reason = !profile ? 'Missing profile data' : (!profile.stremio_email ? 'Missing Stremio email' : 'Missing Stremio password');
@@ -112,6 +127,7 @@
             addonManagerEnabled: !!(user && user.addonManagerEnabled),
             downloadsManagerEnabled: (user && typeof user.downloadsManagerEnabled !== 'undefined') ? !!user.downloadsManagerEnabled : true,
             tmdbApiKey: profile.tmdb_api_key || null,
+            imdbApiKey: profile.imdb_api_key || null,
             installation_id: result.installation_id || generateInstallationId(),
             schema_version: result.schema_version || 18,
             library: result.library || { uid: result.user._id, items: {} },

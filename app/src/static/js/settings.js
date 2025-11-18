@@ -3,6 +3,7 @@
 
 // Settings state
 const settings = {};
+let tmdbApiKey = '';
 
 // Load user settings
 async function loadSettings() {
@@ -19,6 +20,60 @@ async function loadSettings() {
     } catch (error) {
         console.error('Failed to load settings:', error);
     }
+}
+
+// Load TMDB API key
+async function loadTmdbApiKey() {
+    try {
+        const response = await fetch('/api/user/tmdb-api-key');
+        if (response.ok) {
+            const data = await response.json();
+            tmdbApiKey = data.tmdb_api_key || '';
+            const tmdbInput = document.getElementById('tmdbApiKeyInput');
+            if (tmdbInput) {
+                tmdbInput.value = tmdbApiKey || '';
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load TMDB API key:', error);
+    }
+}
+
+// Auto-save TMDB API key with debounce
+let tmdbSaveTimeout;
+async function autoSaveTmdbApiKey() {
+    const tmdbInput = document.getElementById('tmdbApiKeyInput');
+    if (!tmdbInput) return;
+    
+    const newApiKey = tmdbInput.value.trim();
+    
+    // Clear existing timeout
+    if (tmdbSaveTimeout) {
+        clearTimeout(tmdbSaveTimeout);
+    }
+    
+    // Set new timeout for auto-save (1 second debounce)
+    tmdbSaveTimeout = setTimeout(async () => {
+        try {
+            const response = await fetch('/api/user/tmdb-api-key', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'xmlhttprequest'
+                },
+                body: JSON.stringify({ tmdb_api_key: newApiKey })
+            });
+            
+            if (response.ok) {
+                tmdbApiKey = newApiKey;
+                showMessage('TMDB API key saved automatically', 'success');
+            } else {
+                throw new Error('Failed to save TMDB API key');
+            }
+        } catch (error) {
+            showMessage(error.message, 'error');
+        }
+    }, 1000);
 }
 
 // Load user info
@@ -57,6 +112,12 @@ function updateUI() {
         try { pref = localStorage.getItem('zentrioRememberMe') === 'true'; } catch (e) {}
         rememberToggle.classList.toggle('active', !!pref);
     }
+
+// Update TMDB API key input
+const tmdbInput = document.getElementById('tmdbApiKeyInput');
+if (tmdbInput) {
+    tmdbInput.value = tmdbApiKey || '';
+}
 }
 
 // Toggle setting
@@ -589,6 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadSettings();
     loadUserInfo();
+    loadTmdbApiKey();
 
     // Add modal event listeners
     const emailModal = document.getElementById('emailModal');
@@ -640,7 +702,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
+
+    // Add TMDB API key auto-save listener
+    const tmdbInput = document.getElementById('tmdbApiKeyInput');
+    if (tmdbInput) {
+        tmdbInput.addEventListener('input', autoSaveTmdbApiKey);
+        tmdbInput.addEventListener('blur', () => {
+            // Save immediately when user leaves the input
+            if (tmdbSaveTimeout) {
+                clearTimeout(tmdbSaveTimeout);
+            }
+            autoSaveTmdbApiKey();
+        });
+    }
+
     // Enhance range inputs to reflect filled track with theme accent
     function updateRangeBackground(el) {
         if (!el) return;

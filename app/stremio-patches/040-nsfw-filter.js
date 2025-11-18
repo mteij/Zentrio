@@ -57,6 +57,7 @@
       try {
         await this.rateLimit();
 
+        // Using TMDB API to search for titles
         const searchUrl = 'https://api.themoviedb.org/3/search/multi?api_key=' + this.tmdbApiKey + '&query=' + encodeURIComponent(title) + (year ? '&year=' + year : '');
         const response = await fetch(searchUrl);
         if (!response.ok) {

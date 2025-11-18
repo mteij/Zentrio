@@ -46,6 +46,33 @@ async function loadProfiles() {
     }
 }
 
+// Load TMDB API key
+async function loadTmdbApiKey() {
+    try {
+        const response = await fetch('/api/user/tmdb-api-key');
+        if (response.ok) {
+            const data = await response.json();
+            const tmdbApiKey = data.tmdb_api_key || '';
+            
+            // Show/hide age rating group based on TMDB API key
+            if (ageRatingGroup) {
+                ageRatingGroup.style.display = tmdbApiKey ? 'block' : 'none';
+            }
+            
+            // If no TMDB API key, set age rating to 18 (disabled)
+            if (!tmdbApiKey && ageRatingInput) {
+                ageRatingInput.value = '18';
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load TMDB API key:', error);
+        // Hide age rating group on error
+        if (ageRatingGroup) {
+            ageRatingGroup.style.display = 'none';
+        }
+    }
+}
+
 // Render profiles grid
 function renderProfiles() {
     profilesGrid.innerHTML = '';
@@ -140,6 +167,7 @@ function editProfile(profileId) {
     passwordInput.required = false;
 
     const initialAge = (profile.nsfw_filter_enabled === false ? 18 : (profile.nsfw_age_rating || 18));
+    ageRatingInput.value = String(initialAge);
 
     currentAvatarSeed = profile.avatar;
     updateAvatarPreview(profile.avatar);
@@ -237,6 +265,7 @@ function showMessage(text, type) {
 // Initialize page when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     loadProfiles();
+    loadTmdbApiKey();
     
     // Handle form submission (enhanced with better error handling and loading states)
     if (profileForm) {

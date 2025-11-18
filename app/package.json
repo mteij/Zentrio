@@ -36,6 +36,7 @@
     "nodemailer": "^7.0.10"
   },
   "devDependencies": {
+    "@iconify-json/material-symbols": "^1.2.46",
     "@types/bun": "latest",
     "@types/node": "^24.10.0",
     "cpx": "^1.5.0",

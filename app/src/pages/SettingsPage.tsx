@@ -128,6 +128,30 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="toggle" id="downloadsManagerEnabledToggle"></div>
             </div>
           </div>
+
+          <div className="setting-item">
+            <div className="setting-info">
+              <h3>TMDB API Key</h3>
+              <p>Required for NSFW filter functionality. Get your free key from <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">TMDB</a>. When set, enables NSFW content filtering in profiles.</p>
+            </div>
+            <div className="setting-control">
+              <Input
+                type="password"
+                id="tmdbApiKeyInput"
+                placeholder="Enter TMDB API key"
+                style={{
+                  width: '300px',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.1)',
+                  color: 'var(--text, white)',
+                  fontSize: '14px',
+                  transition: 'all 0.3s ease'
+                }}
+              />
+            </div>
+          </div>
         </div>
  
         {/* Appearance (local-only theme selection) */}
