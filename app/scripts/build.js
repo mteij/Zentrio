@@ -17,7 +17,21 @@ fs.mkdirSync('dist', { recursive: true });
 
 // Copy static assets
 console.log('📁 Copying static assets...');
-execSync('cpx "src/static/**/*" "dist/static"', { stdio: 'inherit' });
+const staticSrc = path.join(__dirname, '..', 'src', 'static');
+const staticDest = path.join(__dirname, '..', 'dist', 'static');
+
+if (fs.existsSync(staticDest)) {
+  fs.rmSync(staticDest, { recursive: true, force: true });
+}
+fs.mkdirSync(staticDest, { recursive: true });
+
+try {
+  fs.cpSync(staticSrc, staticDest, { recursive: true });
+  console.log('✅ Static assets copied');
+} catch (err) {
+  console.error('❌ Failed to copy static assets:', err);
+  process.exit(1);
+}
 
   // Build the server
  console.log('🔧 Building server...');
