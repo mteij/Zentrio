@@ -13,6 +13,8 @@ RUN bun install --production --frozen-lockfile
 # Copy scripts and patches needed for stremio-web build
 COPY scripts ./scripts
 COPY stremio-patches ./stremio-patches
+# Copy source code including static assets
+COPY src ./src
 
 # Build stremio-web and main application
 RUN bun run build
