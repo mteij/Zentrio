@@ -32,12 +32,18 @@ function getVersion() {
 }
 
 function getPrevTag(currentTag) {
-  // Prefer semantic tags sorted descending, then pick first not equal to current.
+  // Prefer semantic tags sorted descending, then pick the one after current in the list
   const tags = sh('git tag --list --sort=-version:refname', '').split('\n').map(s => s.trim()).filter(Boolean);
+  const currentIndex = tags.findIndex(t => t === currentTag);
+  if (currentIndex !== -1 && currentIndex < tags.length - 1) {
+    return tags[currentIndex + 1];
+  }
+
+  // Fallback: try to find any tag that's not the current one
   const prev = tags.find(t => t !== currentTag);
   if (prev) return prev;
 
-  // Fallback to describe
+  // Final fallback to describe
   const d = sh('git describe --abbrev=0 --tags HEAD~1 2>/dev/null', '');
   if (d && d !== currentTag) return d;
   return '';

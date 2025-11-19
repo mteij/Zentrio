@@ -47,7 +47,7 @@ try {
      execSync('node scripts/setup-stremio-web.js', { cwd: appRoot, stdio: 'inherit' });
    } catch (setupErr) {
      console.error('⚠️ Failed to setup Stremio Web. Continuing without it.', setupErr);
-     throw setupErr;
+     // Don't throw - continue without stremio-web
    }
    
    const stremioWebDir = path.join(__dirname, '..', 'vendor', 'stremio-web');

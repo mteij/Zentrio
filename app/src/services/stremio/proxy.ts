@@ -154,6 +154,68 @@ export const renderLocalStremioHtml = async (sessionData: string | null) => {
     return new Response(body, { status: 200, headers });
   } catch (err) {
     console.error('Failed to serve local Stremio index.html', err);
-    return new Response('Failed to load Stremio', { status: 500 });
+    
+    // Fallback HTML when Stremio Web build is not available
+    const fallbackHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stremio Not Available - Zentrio</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #141414;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            text-align: center;
+            max-width: 500px;
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #ff6b6b;
+        }
+        p {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            opacity: 0.8;
+        }
+        a {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: #4a9eff;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        a:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚠️ Stremio Not Available</h1>
+        <p>The Stremio web interface could not be loaded. This might be due to a build issue or missing dependencies.</p>
+        <p>You can still use Zentrio's profile management features.</p>
+        <a href="/">Return to Zentrio Home</a>
+    </div>
+</body>
+</html>`;
+    
+    const headers = new Headers();
+    headers.set('Content-Type', 'text/html; charset=utf-8');
+    
+    return new Response(fallbackHtml, { status: 200, headers });
   }
 };
