@@ -28,10 +28,8 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist/index.html ./index.html
 COPY --from=builder /app/package.json ./package.json
-# Copy data directory if it exists (stremio-web build artifacts)
-COPY --from=builder /app/data ./data
 
-# Create data directory if it doesn't exist (for stremio-web build artifacts)
+# Create data directory for stremio-web build artifacts (will be empty if build failed)
 RUN mkdir -p ./data
 
 ENV NODE_ENV=production
