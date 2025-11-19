@@ -1,84 +1,66 @@
-# Scripts for Zentrio Development
+# Zentrio Build Scripts
 
-This folder contains scripts to help with the development and deployment of Zentrio on different platforms.
+This directory contains scripts for building and setting up the Zentrio application.
 
-## Available Scripts
+## Scripts Overview
 
-### Build Script
-- **`build.js`** - Main build script that creates the dist folder with all necessary assets for Capacitor
-  - Cleans the dist directory
-  - Copies static assets
-  - Builds the server with Bun
-  - Creates an index.html entry point for Capacitor
+### `build.js`
+Main build script that:
+- Cleans and creates the dist directory
+- Copies static assets
+- Builds the server with Bun
+- Sets up and builds Stremio Web with patches applied
 
-### iOS Scripts
-- **`run-ios-simulator.sh`** - (macOS only) Builds and runs Zentrio on iOS Simulator
-  - Checks for Xcode and CocoaPods installation
-  - Builds the web app
-  - Installs iOS dependencies
-  - Syncs with Capacitor
-  - Runs on iOS Simulator
+### `setup-stremio-web.js`
+New script that replaces the git submodule approach:
+- Downloads a fresh copy of stremio-web from GitHub
+- Can use specific versions via environment variable `STREMIO_WEB_VERSION`
+- Applies patches in a clean, idempotent way
+- Installs dependencies
 
-- **`run-ios.bat`** - (Windows) Prepares the iOS project and opens Xcode
-  - Note: iOS development requires a Mac with Xcode
-  - This script helps prepare the project on Windows before transferring to Mac
+### `apply-stremio-patches.js` (Legacy)
+Old patch application script that:
+- Appends patches to the vendored stremio-web source
+- Is no longer used in the main build process
+- Kept for reference and potential manual use
 
-## Usage
+## New Stremio Web Integration
 
-### Standard Capacitor Commands (Recommended)
-Instead of using the platform-specific scripts, you can use the standard Capacitor commands defined in package.json:
+We've moved away from git submodules to a cleaner approach:
+
+1. **Fresh Download**: Each build downloads a fresh copy of stremio-web
+2. **Version Control**: Use `STREMIO_WEB_VERSION` environment variable to target specific versions
+3. **Clean Patching**: Patches are applied idempotently - running multiple times won't duplicate patches
+4. **No Git History**: The downloaded copy is a clean extraction without git history
+
+### Usage
 
 ```bash
-# Build the app
-bun run build
+# Build with default version
+npm run build
 
-# Sync with native platforms
-bun run cap:sync
+# Build with specific stremio-web version
+STREMIO_WEB_VERSION=v5.0.0 npm run build
 
-# Open Android Studio
-bun run cap:open:android
-
-# Open Xcode
-bun run cap:open:ios
-
-# Run on Android
-bun run cap:run:android
-
-# Run on iOS
-bun run cap:run:ios
+# Setup stremio-web manually (without full build)
+node scripts/setup-stremio-web.js
 ```
 
-### Platform-Specific Scripts
-If you prefer the convenience scripts:
+### Benefits
 
-**On macOS:**
-```bash
-# Run on iOS Simulator
-./scripts/run-ios-simulator.sh
-```
+- **No Submodule Issues**: No more git submodule complexity
+- **Clean State**: Always starts with a fresh, unmodified stremio-web
+- **Idempotent Patches**: Patches can be applied multiple times without issues
+- **Version Flexibility**: Easy to test different stremio-web versions
+- **Simplified Workflow**: No need to manage submodule updates
 
-**On Windows (for Android):**
-```bash
-# Note: Android scripts have been removed in favor of standard Capacitor commands
-# Use: bun run cap:run:android
-```
+## Patch System
 
-**On Windows (preparing for iOS):**
-```bash
-# Prepare iOS project (then transfer to Mac)
-scripts\run-ios.bat
-```
+Patches are stored in `../stremio-patches/` and are applied in numerical order:
+- `001-zentrio-bootstrap.js` - Core session and API proxy setup
+- `010-ui-header-integration.js` - UI modifications and profile integration
+- `020-addon-manager.js` - Addon Manager integration
+- `030-downloads-manager.js` - Downloads Manager feature
+- `040-nsfw-filter.js` - NSFW content filtering
 
-## Removed Scripts
-
-The following Android batch scripts have been removed as they're redundant with the standard Capacitor CLI commands:
-- `run-android-studio.bat` - Use `bun run cap:open:android` instead
-- `run-android.bat` - Use `bun run cap:run:android` instead
-- `run-zentrio-android.bat` - Use `bun run cap:run:android` instead
-
-## Notes
-
-- The standard Capacitor commands (`bun run cap:*`) are the recommended approach
-- Platform-specific scripts are provided for convenience but may not cover all use cases
-- iOS development requires a Mac with Xcode installed
-- Android development requires Android Studio and SDK
+Each patch is client-side JavaScript that gets injected into the Stremio Web build.

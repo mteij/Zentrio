@@ -473,6 +473,31 @@
     }
   })();
 
+  // Initialize Lucide icons
+  function initLucideIcons() {
+    if (typeof window.lucide !== 'undefined' && window.lucide.createIcons) {
+      window.lucide.createIcons();
+    }
+  }
+
+  // Check if Lucide is loaded, otherwise wait for it
+  if (typeof window.lucide !== 'undefined') {
+    initLucideIcons();
+  } else {
+    // Wait for Lucide to load
+    var checkInterval = setInterval(function() {
+      if (typeof window.lucide !== 'undefined') {
+        clearInterval(checkInterval);
+        initLucideIcons();
+      }
+    }, 100);
+    
+    // Stop checking after 5 seconds
+    setTimeout(function() {
+      clearInterval(checkInterval);
+    }, 5000);
+  }
+
   // Initial render
   render();
 })();

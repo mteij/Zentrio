@@ -45,6 +45,7 @@ export function Layout({
         <link rel="manifest" href="/static/site.webmanifest" />
         <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
+        <script src="https://unpkg.com/lucide@latest"></script>
         <script src="/static/js/mobile-session-handler.js"></script>
       </head>
       <body className={className}>
@@ -96,12 +97,40 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <link rel="manifest" href="/static/site.webmanifest" />
         <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
+        <script src="https://unpkg.com/lucide@latest"></script>
         <script src="/static/js/mobile-session-handler.js"></script>
       </head>
       <body className={className}>
         {children}
         <script src="/static/js/toast.js"></script>
-        <script dangerouslySetInnerHTML={{__html: `(function(){try{function u(){var o=navigator.onLine;document.querySelectorAll('[data-online-required]').forEach(function(el){if(o){el.removeAttribute('disabled');el.classList.remove('is-offline');}else{el.setAttribute('disabled','true');el.classList.add('is-offline');}});}window.addEventListener('online',function(){if(window.addToast)window.addToast('success','Online','Back online.');u();});window.addEventListener('offline',function(){if(window.addToast)window.addToast('info','Offline','Some features are disabled.');u();});u();if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js',{scope:'/'}).catch(function(){});navigator.serviceWorker.addEventListener('message',function(e){var d=e.data;if(!d||typeof d!=='object')return;if(d.type==='zentrio-sw-toast'&&window.addToast){var p=d.payload||{};window.addToast(p.toastType||'info',p.title||'Notice',p.message||'');}});} }catch(e){}})();`}} />
+        <script dangerouslySetInnerHTML={{__html: `
+          (function(){try{function u(){var o=navigator.onLine;document.querySelectorAll('[data-online-required]').forEach(function(el){if(o){el.removeAttribute('disabled');el.classList.remove('is-offline');}else{el.setAttribute('disabled','true');el.classList.add('is-offline');}});}window.addEventListener('online',function(){if(window.addToast)window.addToast('success','Online','Back online.');u();});window.addEventListener('offline',function(){if(window.addToast)window.addToast('info','Offline','Some features are disabled.');u();});u();if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js',{scope:'/'}).catch(function(){});navigator.serviceWorker.addEventListener('message',function(e){var d=e.data;if(!d||typeof d!=='object')return;if(d.type==='zentrio-sw-toast'&&window.addToast){var p=d.payload||{};window.addToast(p.toastType||'info',p.title||'Notice',p.message||'');}});} }catch(e){}})();
+          
+          // Initialize Lucide icons when loaded
+          function initLucide() {
+            if (typeof window.lucide !== 'undefined' && window.lucide.createIcons) {
+              window.lucide.createIcons();
+            }
+          }
+          
+          // Check if Lucide is loaded, otherwise wait for it
+          if (typeof window.lucide !== 'undefined') {
+            initLucide();
+          } else {
+            // Wait for Lucide to load
+            var checkInterval = setInterval(function() {
+              if (typeof window.lucide !== 'undefined') {
+                clearInterval(checkInterval);
+                initLucide();
+              }
+            }, 100);
+            
+            // Stop checking after 5 seconds
+            setTimeout(function() {
+              clearInterval(checkInterval);
+            }, 5000);
+          }
+        `}} />
       </body>
     </html>
   )

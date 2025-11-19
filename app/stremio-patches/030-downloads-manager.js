@@ -153,6 +153,22 @@
 
     function injectStyles() {
       if (document.getElementById(STYLE_ID)) return;
+      
+      // Inject Lucide script if not already present
+      if (!document.querySelector('script[src*="lucide"]')) {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/lucide@latest/dist/umd/lucide.js';
+        script.onload = () => {
+          zdmLog('Lucide script loaded');
+          // Initialize icons immediately after script loads
+          initializeLucideIcons();
+        };
+        script.onerror = () => {
+          zdmLog('Failed to load Lucide script');
+        };
+        document.head.appendChild(script);
+      }
+      
       const css = '.zentrio-dl-btn {' +
         'position: absolute;' +
         'top: 6px;' +
@@ -164,7 +180,7 @@
         'height: 28px;' +
         'border-radius: 6px;' +
         'cursor: pointer;' +
-        'font-size: 15px;' +
+        'font-size: 16px;' +
         'line-height: 1;' +
         'display: flex;' +
         'align-items: center;' +
@@ -206,6 +222,10 @@
         'border-radius: 50%;' +
         'animation: zentrio-spin 0.8s linear infinite;' +
         '}' +
+        '.zentrio-dl-btn i[data-lucide] {' +
+        'display: inline-block;' +
+        'vertical-align: middle;' +
+        '}' +
         '@keyframes zentrio-spin {' +
         'from { transform: rotate(0deg); }' +
         'to { transform: rotate(360deg); }' +
@@ -228,8 +248,15 @@
         'margin: 0;' +
         '}' +
         'svg.icon-rAZvO {' +
-        'opacity: 1 !important;' +
-        'visibility: visible !important;' +
+        'display: none !important;' +
+        'visibility: hidden !important;' +
+        'width: 0 !important;' +
+        'height: 0 !important;' +
+        '}' +
+        '.zentrio-stream-actions i[data-lucide="play"] {' +
+        'color: #fff;' +
+        'display: inline-block;' +
+        'vertical-align: middle;' +
         '}';
       const el = document.createElement('style');
       el.id = STYLE_ID;
@@ -251,7 +278,7 @@
       btn.type = 'button';
       btn.className = 'zentrio-dl-btn';
       btn.title = 'Download';
-      btn.textContent = '⬇';
+      btn.innerHTML = '<i data-lucide="download" style="width: 16px; height: 16px;"></i>';
 
       const playIcon = anchor.querySelector('svg.icon-rAZvO');
       if (playIcon) {
@@ -261,9 +288,16 @@
           actions.className = 'zentrio-stream-actions';
           anchor.classList.add('zentrio-has-actions');
           anchor.appendChild(actions);
-          if (playIcon.parentElement !== actions) {
-            actions.appendChild(playIcon);
-          }
+          
+          // Replace the existing SVG play icon with Lucide play icon
+          const lucidePlayIcon = document.createElement('i');
+          lucidePlayIcon.setAttribute('data-lucide', 'play');
+          lucidePlayIcon.style.width = '16px';
+          lucidePlayIcon.style.height = '16px';
+          actions.appendChild(lucidePlayIcon);
+          
+          // Initialize Lucide icons after adding the play icon
+          setTimeout(() => initializeLucideIcons(), 100);
         } else {
           anchor.classList.add('zentrio-has-actions');
         }
@@ -288,9 +322,16 @@
         actions.className = 'zentrio-stream-actions';
         anchor.classList.add('zentrio-has-actions');
         anchor.appendChild(actions);
-        if (playIcon.parentElement !== actions) {
-          actions.appendChild(playIcon);
-        }
+        
+        // Replace the existing SVG play icon with Lucide play icon
+        const lucidePlayIcon = document.createElement('i');
+        lucidePlayIcon.setAttribute('data-lucide', 'play');
+        lucidePlayIcon.style.width = '16px';
+        lucidePlayIcon.style.height = '16px';
+        actions.appendChild(lucidePlayIcon);
+        
+        // Initialize Lucide icons after adding the play icon
+        setTimeout(() => initializeLucideIcons(), 100);
       }
       const btn = anchor.querySelector('.zentrio-dl-btn');
       if (btn && btn.parentElement !== actions) {
@@ -320,10 +361,13 @@
         btn.innerHTML = '<div class="spinner"></div>';
       } else if (state === 'complete') {
         btn.classList.add('is-complete');
-        btn.textContent = '✅';
+        btn.innerHTML = '<i data-lucide="check-circle" style="width: 16px; height: 16px;"></i>';
       } else {
-        btn.textContent = '⬇';
+        btn.innerHTML = '<i data-lucide="download" style="width: 16px; height: 16px;"></i>';
       }
+      
+      // Re-initialize Lucide icons if available
+      initializeLucideIcons();
     }
 
     function generateId() {
@@ -531,9 +575,25 @@
       };
     }
 
+    function initializeLucideIcons() {
+      if (typeof window.lucide !== 'undefined' && window.lucide.createIcons) {
+        try {
+          window.lucide.createIcons();
+          zdmLog('Lucide icons initialized successfully');
+        } catch (e) {
+          zdmLog('Error initializing Lucide icons:', e);
+        }
+      } else {
+        zdmLog('Lucide not available yet, will retry');
+        // Retry after a short delay
+        setTimeout(() => initializeLucideIcons(), 500);
+      }
+    }
+
     function init() {
       zdmLog('Downloads Manager init start');
       injectStyles();
+      
       // expose manual trigger
       window.zdmForceScan = () => { zdmLog('Manual force scan'); scan(true); };
       scan();

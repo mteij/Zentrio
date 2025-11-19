@@ -466,15 +466,20 @@ function updateEditModeUI() {
     // Update the editMode button icon + accessible labels to indicate "leave edit mode"
     if (editModeBtn) {
         // Pencil icon (default)
-        const pencilSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.99-1.66z"/></svg>';
+        const pencilIcon = '<i data-lucide="edit" style="width: 20px; height: 20px;"></i>';
 
         // Close / back icon (X)
-        const closeSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+        const closeIcon = '<i data-lucide="x" style="width: 20px; height: 20px;"></i>';
 
         // Apply icon and titles
-        editModeBtn.innerHTML = editMode ? closeSvg : pencilSvg;
+        editModeBtn.innerHTML = editMode ? closeIcon : pencilIcon;
         editModeBtn.setAttribute('title', editMode ? 'Exit edit mode' : 'Edit mode');
         editModeBtn.setAttribute('aria-label', editMode ? 'Exit edit mode' : 'Toggle edit mode');
+        
+        // Re-initialize Lucide icons
+        if (typeof window.lucide !== 'undefined' && window.lucide.createIcons) {
+            window.lucide.createIcons();
+        }
     }
 }
 // Initialize Vanta background (load themes from server and respect local preferences)

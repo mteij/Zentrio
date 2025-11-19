@@ -23,33 +23,35 @@ execSync('cpx "src/static/**/*" "dist/static"', { stdio: 'inherit' });
  console.log('🔧 Building server...');
  execSync('bun build src/index.ts --outdir ./dist --target bun --minify', { stdio: 'inherit' });
  
- // Optionally build embedded Stremio Web frontend (vendor/stremio-web)
+ // Optionally build embedded Stremio Web frontend
  try {
+   const appRoot = path.join(__dirname, '..');
+   
+   // Setup fresh stremio-web and apply patches
+   console.log('🔄 Setting up fresh Stremio Web...');
+   try {
+     execSync('node scripts/setup-stremio-web.js', { cwd: appRoot, stdio: 'inherit' });
+   } catch (setupErr) {
+     console.error('⚠️ Failed to setup Stremio Web. Continuing without it.', setupErr);
+     throw setupErr;
+   }
+   
    const stremioWebDir = path.join(__dirname, '..', 'vendor', 'stremio-web');
+   
    if (fs.existsSync(stremioWebDir)) {
-     console.log('📦 Building embedded Stremio Web (vendor/stremio-web)...');
-     execSync('npm install', { cwd: stremioWebDir, stdio: 'inherit' });
- 
-     // Apply Zentrio-specific patches to the vendored Stremio Web source
-     const appRoot = path.join(__dirname, '..');
-     try {
-       console.log('🩹 Applying Zentrio Stremio Web patches...');
-       execSync('node scripts/apply-stremio-patches.js', { cwd: appRoot, stdio: 'inherit' });
-     } catch (patchErr) {
-       console.error('⚠️ Failed to apply Stremio Web patches. Continuing with unpatched sources.', patchErr);
-     }
- 
+     console.log('📦 Building embedded Stremio Web...');
+     
      execSync('npm run build', { cwd: stremioWebDir, stdio: 'inherit' });
- 
+
      // Stremio Web outputs to "build" (see webpack.config.js -> output.path)
      const srcDir = path.join(stremioWebDir, 'build');
      const outDir = path.join(__dirname, '..', 'data', 'stremio-web-build');
- 
+
      if (fs.existsSync(outDir)) {
        fs.rmSync(outDir, { recursive: true, force: true });
      }
      fs.mkdirSync(outDir, { recursive: true });
- 
+
      // Copy built Stremio Web assets into data/stremio-web-build for the server to serve
      try {
        fs.cpSync(srcDir, outDir, { recursive: true });
@@ -59,7 +61,7 @@ execSync('cpx "src/static/**/*" "dist/static"', { stdio: 'inherit' });
        throw copyErr;
      }
    } else {
-     console.log('ℹ️ Skipping Stremio Web build: vendor/stremio-web not found');
+     console.log('ℹ️ Skipping Stremio Web build: vendor/stremio-web not found after setup');
    }
  } catch (err) {
    console.error('⚠️ Failed to build embedded Stremio Web. Continuing without it.', err);

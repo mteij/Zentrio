@@ -77,3 +77,8 @@ app/ios/xcuserdata/
 packages/google-play/*.apk
 packages/google-play/*.aab
 packages/windows/*.appxbundle
+
+# Stremio Web vendor and build artifacts
+app/vendor/
+app/data/stremio-web-build/
+app/.temp-stremio-web/

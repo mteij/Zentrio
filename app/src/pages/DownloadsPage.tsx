@@ -17,7 +17,8 @@ export function DownloadsPage({}: DownloadsPageProps) {
             ariaLabel="Back to profiles"
             title="Back to Profiles"
           >
-            ← Back
+            <i data-lucide="arrow-left" style={{ width: 20, height: 20 }}></i>
+            <span style={{ marginLeft: 6 }}>Back</span>
           </Button>
           <Button
             id="setDownloadFolderBtn"
@@ -27,7 +28,8 @@ export function DownloadsPage({}: DownloadsPageProps) {
             ariaLabel="Select download folder"
             title="Select Download Folder (choose once)"
           >
-            Set Download Folder
+            <i data-lucide="folder" style={{ width: 20, height: 20 }}></i>
+            <span style={{ marginLeft: 6 }}>Set Download Folder</span>
           </Button>
           <span id="downloadFolderStatus" className="download-folder-status" style={{ fontSize: 12, color: '#9ca3af' }}>
             No folder selected
@@ -60,7 +62,7 @@ export function DownloadsPage({}: DownloadsPageProps) {
 
         <div id="downloadsContainer" className="downloads-container">
           <div id="downloadsEmpty" className="downloads-empty">
-            No downloads yet. Start a stream and click the ⬇ button.
+            No downloads yet. Start a stream and click the <i data-lucide="download" style={{ width: 16, height: 16, verticalAlign: 'middle' }}></i> button.
           </div>
           <div id="downloadsList" className="downloads-list"></div>
         </div>
