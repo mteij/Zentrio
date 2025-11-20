@@ -272,21 +272,9 @@ async function applyWebpackGitFix(vendorDir) {
   
   let webpackConfig = fs.readFileSync(webpackConfigPath, 'utf8');
   
-  // Replace the git commit hash logic with a more robust version
-  const originalGitLogic = `let COMMIT_HASH;
-try {
-  COMMIT_HASH = execSync('git rev-parse HEAD').toString().trim();
-} catch (e) {
-  // Fallback to reading from .git-info file if .git directory is not available
-  try {
-    const fs = require('fs');
-    COMMIT_HASH = fs.readFileSync('.git-info', 'utf8').trim();
-  } catch (fsError) {
-    // Ultimate fallback
-    COMMIT_HASH = 'unknown';
-  }
-}`;
-
+  // Replace the direct git command with a try-catch version
+  const originalLine = `const COMMIT_HASH = execSync('git rev-parse HEAD').toString().trim();`;
+  
   const newGitLogic = `let COMMIT_HASH;
 try {
   COMMIT_HASH = execSync('git rev-parse HEAD').toString().trim();
@@ -301,8 +289,8 @@ try {
 }`;
 
   // Replace the logic in the config
-  if (webpackConfig.includes(originalGitLogic)) {
-    webpackConfig = webpackConfig.replace(originalGitLogic, newGitLogic);
+  if (webpackConfig.includes(originalLine)) {
+    webpackConfig = webpackConfig.replace(originalLine, newGitLogic);
     fs.writeFileSync(webpackConfigPath, webpackConfig);
     console.log('[StremioSetup] Applied webpack git fix');
   } else {
