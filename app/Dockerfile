@@ -29,13 +29,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist/index.html ./index.html
 COPY --from=builder /app/package.json ./package.json
 
-# Copy stremio-web build artifacts if they exist
-RUN mkdir -p ./data && \
-    if [ -d "/app/data" ]; then \
-        cp -r /app/data/. ./data/; \
-    else \
-        echo "Warning: /app/data directory not found in builder stage"; \
-    fi
+# Copy local data directory if it exists
+COPY data/ ./data/
 
 ENV NODE_ENV=production
 # Default port is 3000; can be overridden via .env or docker run --env PORT=...
