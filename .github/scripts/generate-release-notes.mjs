@@ -147,8 +147,8 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
 }
 
 async function generateWithGemini(prompt, apiKey) {
-  // Gemini 1.5 Flash REST API
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+  // Gemini 2.5 Flash REST API
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
   const body = {
     contents: [
       {
