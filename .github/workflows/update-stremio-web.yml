@@ -8,7 +8,6 @@ on:
 jobs:
   update-stremio-web:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
@@ -22,14 +21,6 @@ jobs:
         with:
           bun-version: '1.1.x'
 
-      - name: Cache Bun dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
       - name: Configure git author
         run: |
           git config user.name "github-actions[bot]"
@@ -40,23 +31,16 @@ jobs:
           cd app
           echo "Setting up fresh stremio-web..."
           node scripts/setup-stremio-web.js
-        timeout-minutes: 15
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
 
       - name: Install dependencies
         run: |
           cd app
-          bun install --frozen-lockfile
-        timeout-minutes: 5
+          bun install
 
       - name: Build Zentrio (including embedded Stremio Web)
         run: |
           cd app
           bun run build
-        timeout-minutes: 15
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
 
       - name: Check for changes
         id: git_diff
@@ -66,19 +50,6 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
-        timeout-minutes: 1
-
-      - name: Validate build artifacts
-        if: steps.git_diff.outputs.changed == 'true'
-        run: |
-          if [ ! -f "app/dist/index.js" ]; then
-            echo "❌ Build artifact missing: app/dist/index.js"
-            exit 1
-          fi
-          if [ ! -d "app/data/stremio-web-build" ]; then
-            echo "⚠️ Stremio Web build directory missing (non-fatal)"
-          fi
-          echo "✅ Build validation completed"
 
       - name: Create Pull Request
         if: steps.git_diff.outputs.changed == 'true'
@@ -93,24 +64,3 @@ jobs:
             - Runs bun run build to ensure the embedded build still succeeds.
           branch: chore/update-stremio-web
           base: main
-          delete-branch: true
-
-      - name: Notify on failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = {
-              title: `Stremio Web update failed`,
-              body: `Automated stremio-web update failed. Check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.`,
-              labels: ['bug', 'stremio-web', 'automated']
-            };
-            
-            try {
-              await github.rest.issues.create({
-                ...context.repo,
-                ...issue
-              });
-            } catch (error) {
-              console.log('Failed to create issue:', error.message);
-            }
