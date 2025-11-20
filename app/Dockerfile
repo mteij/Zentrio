@@ -32,7 +32,9 @@ COPY --from=builder /app/package.json ./package.json
 # Copy stremio-web build artifacts if they exist
 RUN mkdir -p ./data && \
     if [ -d "/app/data" ]; then \
-        (cd /app/data && tar -cf - .) | (cd ./data && tar -xf -); \
+        cp -r /app/data/. ./data/; \
+    else \
+        echo "Warning: /app/data directory not found in builder stage"; \
     fi
 
 ENV NODE_ENV=production
