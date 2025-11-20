@@ -31,6 +31,7 @@ COPY --from=builder /app/package.json ./package.json
 
 # Copy local data directory if it exists
 COPY data/ ./data/
+COPY --from=builder /app/data/stremio-web-build ./data/stremio-web-build
 
 ENV NODE_ENV=production
 # Default port is 3000; can be overridden via .env or docker run --env PORT=...
