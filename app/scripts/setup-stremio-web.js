@@ -260,6 +260,56 @@ async function applyPatchesCleanly(vendorDir, patchesDir) {
   console.log(`[StremioSetup] Successfully applied ${patchFiles.length} patches`);
 }
 
+async function applyWebpackGitFix(vendorDir) {
+  console.log('[StremioSetup] Applying webpack git fix...');
+  
+  const webpackConfigPath = path.join(vendorDir, 'webpack.config.js');
+  
+  if (!fs.existsSync(webpackConfigPath)) {
+    console.log('[StremioSetup] webpack.config.js not found, skipping git fix');
+    return;
+  }
+  
+  let webpackConfig = fs.readFileSync(webpackConfigPath, 'utf8');
+  
+  // Replace the git commit hash logic with a more robust version
+  const originalGitLogic = `let COMMIT_HASH;
+try {
+  COMMIT_HASH = execSync('git rev-parse HEAD').toString().trim();
+} catch (e) {
+  // Fallback to reading from .git-info file if .git directory is not available
+  try {
+    const fs = require('fs');
+    COMMIT_HASH = fs.readFileSync('.git-info', 'utf8').trim();
+  } catch (fsError) {
+    // Ultimate fallback
+    COMMIT_HASH = 'unknown';
+  }
+}`;
+
+  const newGitLogic = `let COMMIT_HASH;
+try {
+  COMMIT_HASH = execSync('git rev-parse HEAD').toString().trim();
+} catch (e) {
+  // Fallback to reading from .git-info file if .git directory is not available
+  try {
+    COMMIT_HASH = fs.readFileSync('.git-info', 'utf8').trim();
+  } catch (fsError) {
+    // Ultimate fallback - use a deterministic hash for builds
+    COMMIT_HASH = 'zentrio-build-' + Date.now().toString(36);
+  }
+}`;
+
+  // Replace the logic in the config
+  if (webpackConfig.includes(originalGitLogic)) {
+    webpackConfig = webpackConfig.replace(originalGitLogic, newGitLogic);
+    fs.writeFileSync(webpackConfigPath, webpackConfig);
+    console.log('[StremioSetup] Applied webpack git fix');
+  } else {
+    console.log('[StremioSetup] webpack git logic not found or already patched');
+  }
+}
+
 async function main() {
   const appRoot = path.join(__dirname, '..');
   const vendorDir = path.join(appRoot, 'vendor', 'stremio-web');
@@ -303,6 +353,10 @@ async function main() {
       console.error('[StremioSetup] Failed to install dependencies:', error.message);
       throw error;
     }
+    
+    // Apply webpack git fix
+    console.log('[StremioSetup] Applying webpack git fix...');
+    await applyWebpackGitFix(vendorDir);
     
     // Apply patches cleanly
     await applyPatchesCleanly(vendorDir, patchesDir);
