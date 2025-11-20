@@ -154,6 +154,18 @@ async function cloneOrUpdateRepo(repoUrl, targetDir, version = null) {
       execSync(`git checkout ${version}`, { cwd: tempCloneDir, stdio: 'inherit' });
     }
     
+    // Get commit hash before removing .git directory
+    let commitHash = 'unknown';
+    try {
+      commitHash = execSync('git rev-parse HEAD', { cwd: tempCloneDir }).toString().trim();
+    } catch (e) {
+      console.log('[StremioSetup] Could not get commit hash, using fallback');
+    }
+    
+    // Create a .git-info file to preserve commit hash for webpack
+    const gitInfoFile = path.join(tempCloneDir, '.git-info');
+    fs.writeFileSync(gitInfoFile, commitHash, 'utf8');
+    
     // Remove .git directory to make it a clean copy
     const gitDir = path.join(tempCloneDir, '.git');
     if (fs.existsSync(gitDir)) {
