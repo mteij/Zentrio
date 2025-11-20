@@ -32,7 +32,7 @@ COPY --from=builder /app/package.json ./package.json
 # Copy stremio-web build artifacts if they exist
 RUN mkdir -p ./data && \
     if [ -d "/app/data" ]; then \
-        find /app/data -mindepth 1 -maxdepth 1 -exec cp -r {} ./data/ \; ; \
+        (cd /app/data && tar -cf - .) | (cd ./data && tar -xf -); \
     fi
 
 ENV NODE_ENV=production
