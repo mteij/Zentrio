@@ -43,8 +43,8 @@ export const securityHeaders = async (c: Context, next: Next) => {
     return
   }
 
-  // Defaults for first-party pages
-  c.header('X-Frame-Options', 'DENY')
+  // Defaults for first-party pages - allow same origin framing
+  c.header('X-Frame-Options', 'SAMEORIGIN')
   // TODO: Tighten CSP: remove 'unsafe-inline' by adopting nonces/hashes after extracting inline scripts into external files.
   // Reference: [securityHeaders()](app/src/middleware/security.ts:27)
   c.header(
