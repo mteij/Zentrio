@@ -46,12 +46,6 @@ const db = new Database(dbPath)
  } catch (e) {
    // ignore if column already exists
  }
- // Add IMDB API key column to profile_proxy_settings if missing
- try {
-   db.exec('ALTER TABLE profile_proxy_settings ADD COLUMN imdb_api_key TEXT')
- } catch (e) {
-   // ignore if column already exists
- }
 
 // Create tables
 db.exec(`
@@ -174,7 +168,6 @@ db.exec(`
     downloads_enabled BOOLEAN DEFAULT FALSE,
     mobile_click_to_hover BOOLEAN DEFAULT FALSE,
     tmdb_api_key TEXT,
-    imdb_api_key TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
@@ -284,7 +277,6 @@ export interface ProfileProxySettings {
   downloads_enabled: boolean
   mobile_click_to_hover: boolean
   tmdb_api_key?: string
-  imdb_api_key?: string
   created_at: string
   updated_at: string
 }
@@ -846,11 +838,10 @@ export const profileProxySettingsDb = {
     downloads_enabled?: boolean
     mobile_click_to_hover?: boolean
     tmdb_api_key?: string | null
-    imdb_api_key?: string | null
   }): ProfileProxySettings => {
     const stmt = db.prepare(`
-      INSERT INTO profile_proxy_settings (profile_id, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, downloads_enabled, mobile_click_to_hover, tmdb_api_key, imdb_api_key)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO profile_proxy_settings (profile_id, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, downloads_enabled, mobile_click_to_hover, tmdb_api_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `)
     
     const result = stmt.run(
@@ -861,8 +852,7 @@ export const profileProxySettingsDb = {
       settingsData.hide_addons_button || false,
       settingsData.downloads_enabled || false,
       settingsData.mobile_click_to_hover || false,
-      settingsData.tmdb_api_key || null,
-      settingsData.imdb_api_key || null
+      settingsData.tmdb_api_key || null
     )
     
     return profileProxySettingsDb.findById(result.lastInsertRowid as number)!
@@ -878,7 +868,7 @@ export const profileProxySettingsDb = {
     return stmt.get(profileId) as ProfileProxySettings | undefined
   },
 
-  update: (profileId: number, updates: Partial<ProfileProxySettings>): ProfileProxySettings | undefined => {
+  update: (profileId: number, updates: Partial<ProfileProxySettings> | { tmdb_api_key?: string | null }): ProfileProxySettings | undefined => {
     const fields: string[] = []
     const values: any[] = []
     

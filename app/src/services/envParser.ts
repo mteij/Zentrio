@@ -77,6 +77,7 @@ export function getConfig() {
   // STREMIO_LOGS controls verbose logs inside the /stremio route; defaults to false.
   const PROXY_LOGS = parseBoolean(process.env.PROXY_LOGS ?? process.env.REQUEST_LOGS, true)
   const STREMIO_LOGS = parseBoolean(process.env.STREMIO_LOGS, false)
+  const LOG_LEVEL = process.env.LOG_LEVEL || 'info'
  
   return {
     PORT,
@@ -87,7 +88,8 @@ export function getConfig() {
     RATE_LIMIT_WINDOW_MS,
     RATE_LIMIT_LIMIT,
     PROXY_LOGS,
-    STREMIO_LOGS
+    STREMIO_LOGS,
+    LOG_LEVEL
   }
 }
 

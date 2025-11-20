@@ -66,12 +66,19 @@ app.all('*', async (c) => {
     const ext = extname(filePath).toLowerCase()
     const contentType = typeMap[ext] || 'application/octet-stream'
 
-    return new Response(buf, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600'
-      }
+    const headers = new Headers({
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin'
     })
+
+    if (contentType.includes('javascript')) {
+      headers.set('Service-Worker-Allowed', '/')
+    }
+
+    return new Response(buf, { headers })
   } catch (err) {
     if (STREMIO_LOGS) {
       console.warn('[Zentrio][stremio route] static asset not found:', path, err instanceof Error ? err.message : String(err))

@@ -29,7 +29,7 @@ export const proxyRequestHandler = async (req: Request, path: string, _sessionDa
       method: req.method,
       headers: requestHeaders,
       body,
-      redirect: 'manual',
+      redirect: 'follow',
     });
 
     const responseHeaders = new Headers(response.headers);
@@ -53,7 +53,7 @@ export const proxyRequestHandler = async (req: Request, path: string, _sessionDa
         "img-src * data: blob:; " +
         "font-src * data:; " +
         "connect-src * data: blob:; " +
-        "media-src * blob:; " +
+        "media-src * blob: mediastream:; " +
         "object-src *; " +
         "child-src *; " +
         "frame-src *; " +
@@ -150,7 +150,11 @@ export const renderLocalStremioHtml = async (sessionData: string | null) => {
     headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     headers.set('Pragma', 'no-cache');
     headers.set('Expires', '0');
- 
+
+    // Required for SharedArrayBuffer, which Stremio Web uses for its player (audio/video)
+    headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+    headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+
     return new Response(body, { status: 200, headers });
   } catch (err) {
     console.error('Failed to serve local Stremio index.html', err);

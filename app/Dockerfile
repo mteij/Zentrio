@@ -29,6 +29,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist/index.html ./index.html
 COPY --from=builder /app/package.json ./package.json
 
+# Copy themes directory
+COPY --from=builder /app/src/themes ./src/themes
+
 # Copy local data directory if it exists
 COPY data/ ./data/
 COPY --from=builder /app/stremio-web-build ./stremio-web-build

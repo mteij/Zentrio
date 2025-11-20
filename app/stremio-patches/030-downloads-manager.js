@@ -54,7 +54,7 @@
     const STYLE_ID = 'zentrio-downloads-style-core';
 
     // Debug / logging utilities
-    const DEBUG = true;
+    const DEBUG = false;
     function zdmLog(...a) { try { if (DEBUG) console.log('[ZDM]', ...a); } catch(_) {} }
 
     // In-memory structures
@@ -176,9 +176,9 @@
         'background: rgba(0,0,0,0.55);' +
         'border: 1px solid rgba(255,255,255,0.25);' +
         'color: #fff;' +
-        'width: 28px;' +
-        'height: 28px;' +
-        'border-radius: 6px;' +
+        'width: 42px;' +
+        'height: 42px;' +
+        'border-radius: 8px;' +
         'cursor: pointer;' +
         'font-size: 16px;' +
         'line-height: 1;' +
@@ -215,8 +215,8 @@
         'border-color: #059669;' +
         '}' +
         '.zentrio-dl-btn .spinner {' +
-        'width: 14px;' +
-        'height: 14px;' +
+        'width: 22px;' +
+        'height: 22px;' +
         'border: 2px solid rgba(255,255,255,0.4);' +
         'border-top-color: #fff;' +
         'border-radius: 50%;' +
@@ -236,10 +236,12 @@
         '}' +
         '.zentrio-stream-actions {' +
         'position: absolute;' +
-        'top: 6px;' +
-        'right: 6px;' +
+        'top: 50%;' +
+        'left: 50%;' +
+        'transform: translate(-50%, -50%);' +
         'display: flex;' +
-        'gap: 6px;' +
+        'flex-direction: column;' +
+        'gap: 12px;' +
         'align-items: center;' +
         'z-index: 3;' +
         '}' +
@@ -253,10 +255,22 @@
         'width: 0 !important;' +
         'height: 0 !important;' +
         '}' +
-        '.zentrio-stream-actions i[data-lucide="play"] {' +
+        '.zentrio-play-btn {' +
+        'background: rgba(0,0,0,0.55);' +
+        'border: 1px solid rgba(255,255,255,0.25);' +
         'color: #fff;' +
-        'display: inline-block;' +
-        'vertical-align: middle;' +
+        'width: 42px;' +
+        'height: 42px;' +
+        'border-radius: 8px;' +
+        'display: flex;' +
+        'align-items: center;' +
+        'justify-content: center;' +
+        'backdrop-filter: blur(4px);' +
+        '-webkit-backdrop-filter: blur(4px);' +
+        '}' +
+        '.zentrio-play-btn svg {' +
+        'width: 24px;' +
+        'height: 24px;' +
         '}';
       const el = document.createElement('style');
       el.id = STYLE_ID;
@@ -278,7 +292,7 @@
       btn.type = 'button';
       btn.className = 'zentrio-dl-btn';
       btn.title = 'Download';
-      btn.innerHTML = '<i data-lucide="download" style="width: 16px; height: 16px;"></i>';
+      btn.innerHTML = '<i data-lucide="download" style="width: 24px; height: 24px;"></i>';
 
       const playIcon = anchor.querySelector('svg.icon-rAZvO');
       if (playIcon) {
@@ -290,11 +304,14 @@
           anchor.appendChild(actions);
           
           // Replace the existing SVG play icon with Lucide play icon
+          const playBtn = document.createElement('div');
+          playBtn.className = 'zentrio-play-btn';
           const lucidePlayIcon = document.createElement('i');
           lucidePlayIcon.setAttribute('data-lucide', 'play');
-          lucidePlayIcon.style.width = '16px';
-          lucidePlayIcon.style.height = '16px';
-          actions.appendChild(lucidePlayIcon);
+          lucidePlayIcon.style.width = '24px';
+          lucidePlayIcon.style.height = '24px';
+          playBtn.appendChild(lucidePlayIcon);
+          actions.appendChild(playBtn);
           
           // Initialize Lucide icons after adding the play icon
           setTimeout(() => initializeLucideIcons(), 100);
@@ -324,11 +341,14 @@
         anchor.appendChild(actions);
         
         // Replace the existing SVG play icon with Lucide play icon
+        const playBtn = document.createElement('div');
+        playBtn.className = 'zentrio-play-btn';
         const lucidePlayIcon = document.createElement('i');
         lucidePlayIcon.setAttribute('data-lucide', 'play');
-        lucidePlayIcon.style.width = '16px';
-        lucidePlayIcon.style.height = '16px';
-        actions.appendChild(lucidePlayIcon);
+        lucidePlayIcon.style.width = '24px';
+        lucidePlayIcon.style.height = '24px';
+        playBtn.appendChild(lucidePlayIcon);
+        actions.appendChild(playBtn);
         
         // Initialize Lucide icons after adding the play icon
         setTimeout(() => initializeLucideIcons(), 100);
@@ -361,9 +381,9 @@
         btn.innerHTML = '<div class="spinner"></div>';
       } else if (state === 'complete') {
         btn.classList.add('is-complete');
-        btn.innerHTML = '<i data-lucide="check-circle" style="width: 16px; height: 16px;"></i>';
+        btn.innerHTML = '<i data-lucide="check-circle" style="width: 24px; height: 24px;"></i>';
       } else {
-        btn.innerHTML = '<i data-lucide="download" style="width: 16px; height: 16px;"></i>';
+        btn.innerHTML = '<i data-lucide="download" style="width: 24px; height: 24px;"></i>';
       }
       
       // Re-initialize Lucide icons if available

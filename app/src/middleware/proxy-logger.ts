@@ -1,4 +1,5 @@
 import type { Context, Next } from 'hono'
+import { logger } from '../services/logger'
 
 export interface ProxyLogEntry {
   profileId?: number
@@ -174,7 +175,7 @@ export const proxyLoggerMiddleware = (options: ProxyLoggerOptions = {}) => {
           
           // Note: Cannot recreate request in Hono, body is consumed
         } catch (error) {
-          console.warn('Failed to capture request body:', error)
+          logger.warn('Failed to capture request body:', error)
         }
       }
     }
@@ -211,7 +212,7 @@ export const proxyLoggerMiddleware = (options: ProxyLoggerOptions = {}) => {
       responseStatus = 500
       
       if (logErrors) {
-        console.error(`Proxy request error [${method} ${path}]:`, error)
+        logger.error(`Proxy request error [${method} ${path}]:`, error)
       }
       
       // Re-throw the error
@@ -257,7 +258,7 @@ export const proxyLoggerMiddleware = (options: ProxyLoggerOptions = {}) => {
 
       // Console logging based on level
       if (logLevel === 'debug') {
-        console.log(`[PROXY] ${method} ${path} - ${responseStatus || 'ERROR'} (${durationMs}ms)`, {
+        logger.debug(`[PROXY] ${method} ${path} - ${responseStatus || 'ERROR'} (${durationMs}ms)`, {
           profileId,
           sessionId,
           requestSize,
@@ -265,9 +266,9 @@ export const proxyLoggerMiddleware = (options: ProxyLoggerOptions = {}) => {
           error: errorMessage
         })
       } else if (logLevel === 'detailed') {
-        console.log(`[PROXY] ${method} ${path} - ${responseStatus || 'ERROR'} (${durationMs}ms)`)
+        logger.info(`[PROXY] ${method} ${path} - ${responseStatus || 'ERROR'} (${durationMs}ms)`)
       } else if (isError) {
-        console.warn(`[PROXY ERROR] ${method} ${path} - ${responseStatus} (${durationMs}ms): ${errorMessage}`)
+        logger.warn(`[PROXY ERROR] ${method} ${path} - ${responseStatus} (${durationMs}ms): ${errorMessage}`)
       }
     }
   }
@@ -291,7 +292,7 @@ export const requestTimingMiddleware = () => {
     
     // Log slow requests (> 1 second)
     if (duration > 1000) {
-      console.warn(`Slow request detected: ${c.req.method} ${c.req.url} took ${duration.toFixed(2)}ms`)
+      logger.warn(`Slow request detected: ${c.req.method} ${c.req.url} took ${duration.toFixed(2)}ms`)
     }
   }
 }
@@ -306,7 +307,7 @@ export const errorTrackingMiddleware = () => {
     } catch (error) {
       const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       
-      console.error(`[${errorId}] Unhandled error in ${c.req.method} ${c.req.url}:`, error)
+      logger.error(`[${errorId}] Unhandled error in ${c.req.method} ${c.req.url}:`, error)
       
       // Add error ID to response for debugging
       c.res.headers.set('X-Error-ID', errorId)

@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { logger } from 'hono/logger'
+import { logger as honoLogger } from 'hono/logger'
 import { corsMiddleware, securityHeaders, rateLimiter } from './middleware/security'
 import { join, extname } from 'path'
 import { initEnv, getConfig } from './services/envParser'
+import { logger } from './services/logger'
 
 // Import route modules
 import viewRoutes from './routes/views'
@@ -22,62 +23,67 @@ const app = new Hono()
 const cfg = getConfig()
 const { PORT, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY, PROXY_LOGS } = cfg
 
-// Console helpers for a fancy startup display
-const color = (code: string, text: string) => `\x1b[${code}m${text}\x1b[0m`
-const ok = (text: string) => console.log(`${color('32', '✔')} ${text}`)
-const fail = (text: string) => console.log(`${color('31', '✖')} ${text}`)
-const info = (text: string) => console.log(color('36', `ℹ ${text}`))
-const warn = (text: string) => console.log(color('33', `⚠ ${text}`))
-
-const banner = color('1;31', ` _____          _        _
+const banner = logger.colors.bold + logger.colors.error + `
+ _____          _        _
 |__  /___ _ __ | |_ _ __(_) ___
   / // _ \\ '_ \\| __| '__| |/ _ \\
  / /|  __/ | | | |_| |  | | (_) |
-/____\\___|_| |_|\\__|_|  |_|\\___/`)
+/____\\___|_| |_|\\__|_|  |_|\\___/` + logger.colors.reset
 
-console.log(banner)
-info('Starting Zentrio — performing startup checks...')
+logger.raw(banner)
+
+// Get version from package.json
+let version = 'unknown'
+try {
+  // @ts-ignore
+  const pkgPath = join(import.meta.dir, '..', 'package.json')
+  // @ts-ignore
+  const pkg = await Bun.file(pkgPath).json()
+  version = pkg.version || 'unknown'
+} catch {}
+
+logger.info(`Starting Zentrio v${version} — performing startup checks...`)
 
 // Basic checks & status output
 try {
-  ok(`Environment loaded (PORT=${PORT})`)
+  logger.success(`Environment loaded (PORT=${PORT})`)
 } catch (e) {
-  fail('Failed to read environment configuration')
+  logger.error('Failed to read environment configuration')
 }
 
 if (!AUTH_SECRET || AUTH_SECRET === 'super-secret-key-change-in-production') {
-  fail('AUTH_SECRET is not configured or uses the default.')
+  logger.error('AUTH_SECRET is not configured or uses the default.')
 } else {
-  ok('AUTH_SECRET loaded')
+  logger.success('AUTH_SECRET loaded')
 }
 
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY === 'super-secret-key-change-in-production') {
-  fail('ENCRYPTION_KEY is not configured or uses the default.')
+  logger.error('ENCRYPTION_KEY is not configured or uses the default.')
 } else {
-  ok('ENCRYPTION_KEY loaded')
+  logger.success('ENCRYPTION_KEY loaded')
 }
 
 if (DATABASE_URL && DATABASE_URL.includes('sqlite')) {
-  ok(`Database: using sqlite at ${DATABASE_URL}`)
-  ok('Database configured')
+  logger.success(`Database: using sqlite at ${DATABASE_URL}`)
+  logger.success('Database configured')
 } else if (DATABASE_URL) {
-  ok(`Database configured: ${DATABASE_URL}`)
+  logger.success(`Database configured: ${DATABASE_URL}`)
 } else {
-  fail('DATABASE_URL not configured')
+  logger.error('DATABASE_URL not configured')
 }
 
 if (!RATE_LIMIT_LIMIT || RATE_LIMIT_LIMIT <= 0 || !RATE_LIMIT_WINDOW_MS || RATE_LIMIT_WINDOW_MS <= 0) {
-  info('Rate limiter: disabled')
+  logger.info('Rate limiter: disabled')
 } else {
-  ok(`Rate limiter: ${RATE_LIMIT_LIMIT} requests / ${RATE_LIMIT_WINDOW_MS}ms`)
+  logger.success(`Rate limiter: ${RATE_LIMIT_LIMIT} requests / ${RATE_LIMIT_WINDOW_MS}ms`)
 }
 
-info('Preparing middleware and routes...')
+logger.info('Preparing middleware and routes...')
 
 // Basic Middleware
 app.use('*', corsMiddleware())
 if (PROXY_LOGS) {
-  app.use('*', logger())
+  app.use('*', honoLogger())
 }
 app.use('*', securityHeaders)
 app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
@@ -85,14 +91,18 @@ app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIM
 // Service Worker explicit route (headers + version injection)
 app.get('/static/sw.js', async (c) => {
   try {
+    // @ts-ignore
     const swPath = join(import.meta.dir, 'static', 'sw.js')
+    // @ts-ignore
     const swFile = Bun.file(swPath)
     let swText = await swFile.text()
 
     // Read app version from package.json and inject into SW (%%APP_VERSION%%)
     let version = '0.0.0'
     try {
+      // @ts-ignore
       const pkgPath = join(import.meta.dir, '..', 'package.json')
+      // @ts-ignore
       const pkg = await Bun.file(pkgPath).json()
       version = (pkg && pkg.version) ? String(pkg.version) : version
     } catch {}
@@ -103,7 +113,7 @@ app.get('/static/sw.js', async (c) => {
       headers: {
         'Content-Type': 'text/javascript; charset=utf-8',
         'Cache-Control': 'no-cache',
-        'Service-Worker-Allowed': '/'
+        'Service-Worker-Allowed': '/',
       }
     })
   } catch {
@@ -114,8 +124,10 @@ app.get('/static/sw.js', async (c) => {
 // Static file serving (explicit, to avoid path mismatches)
 app.get('/static/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/static\//, '')
+  // @ts-ignore
   const filePath = join(import.meta.dir, 'static', reqPath)
   try {
+    // @ts-ignore
     const file = Bun.file(filePath)
     const buf = await file.arrayBuffer()
     const typeMap: Record<string, string> = {
@@ -130,6 +142,7 @@ app.get('/static/*', async (c) => {
       '.jpeg': 'image/jpeg',
       '.webp': 'image/webp',
       '.ico': 'image/x-icon',
+      '.wasm': 'application/wasm',
     }
     const ext = extname(filePath).toLowerCase()
     const contentType = typeMap[ext] || 'application/octet-stream'
@@ -147,7 +160,9 @@ app.get('/static/*', async (c) => {
 // Favicon at root for browser defaults
 app.get('/favicon.ico', async (c) => {
   try {
+    // @ts-ignore
     const filePath = join(import.meta.dir, 'static', 'logo', 'favicon', 'favicon.ico')
+    // @ts-ignore
     const file = Bun.file(filePath)
     const buf = await file.arrayBuffer()
     return new Response(new Uint8Array(buf), {

@@ -144,7 +144,8 @@
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';
-        iframe.allow = "autoplay; fullscreen; picture-in-picture";
+        iframe.allow = "autoplay; fullscreen; picture-in-picture; cross-origin-isolated";
+        iframe.credentialless = true;
 
         iframe.onload = () => {
             loadingContainer.style.display = 'none';

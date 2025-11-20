@@ -11,10 +11,91 @@ const app = new Hono<{
   }
 }>()
 
+// [GET /ping] Test route
+app.get('/ping', (c) => c.json({ pong: true }))
+
 // Enforce session on all routes for this router
 app.use('/*', sessionMiddleware)
 // CSRF-like guard mounted after session middleware
 app.use('*', csrfLikeGuard)
+
+// ========== TMDB API Key Management ==========
+
+// [GET /tmdb-api-key] Get current user's TMDB API key
+app.get('/tmdb-api-key', sessionMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    
+    // Find the user's default profile
+    const defaultProfile = profileDb.getDefault(user.id)
+    if (!defaultProfile) {
+      return ok(c, { tmdb_api_key: null })
+    }
+    
+    // Get the profile's settings
+    const settings = profileProxySettingsDb.findByProfileId(defaultProfile.id)
+    
+    let tmdbApiKey = null
+    if (settings?.tmdb_api_key) {
+      try {
+        tmdbApiKey = decrypt(settings.tmdb_api_key)
+      } catch (error) {
+        console.error('Failed to decrypt TMDB API key:', error)
+        tmdbApiKey = null
+      }
+    }
+    
+    return ok(c, {
+      tmdb_api_key: tmdbApiKey
+    })
+  } catch (error) {
+    console.error('Failed to get TMDB API key:', error)
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
+
+// [PUT /tmdb-api-key] Update current user's TMDB API key
+app.put('/tmdb-api-key', sessionMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { tmdb_api_key } = await c.req.json().catch(() => ({}))
+    
+    // Find the user's default profile
+    const defaultProfile = profileDb.getDefault(user.id)
+    if (!defaultProfile) {
+      return err(c, 404, 'NOT_FOUND', 'No default profile found')
+    }
+    
+    // Encrypt the API key if provided
+    let encryptedApiKey = null
+    if (tmdb_api_key && tmdb_api_key.trim()) {
+      try {
+        encryptedApiKey = encrypt(tmdb_api_key.trim())
+      } catch (error) {
+        console.error('Failed to encrypt TMDB API key:', error)
+        return err(c, 500, 'SERVER_ERROR', 'Failed to encrypt API key')
+      }
+    }
+    
+    // Update the profile's TMDB API key
+    const updated = profileProxySettingsDb.update(defaultProfile.id, {
+      tmdb_api_key: encryptedApiKey || null
+    })
+    
+    if (!updated) {
+      // Create settings if they don't exist
+      await profileProxySettingsDb.create({
+        profile_id: defaultProfile.id,
+        tmdb_api_key: encryptedApiKey || null
+      })
+    }
+    
+    return ok(c, { tmdb_api_key: tmdb_api_key || null }, 'TMDB API key updated successfully')
+  } catch (error) {
+    console.error('Failed to update TMDB API key:', error)
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
 
 // JSON response helpers (standard envelope for new/deprecated endpoints)
 const ok = (c: any, data?: any, message?: string) =>
@@ -401,140 +482,6 @@ app.put('/password', async (c) => {
   }
 })
 
-// ========== IMDB API Key Management ==========
-
-// [GET /imdb-api-key] Get current user's IMDB API key
-app.get('/imdb-api-key', async (c) => {
-  try {
-    const user = c.get('user')
-    
-    // Find the user's default profile
-    const defaultProfile = profileDb.getDefault(user.id)
-    if (!defaultProfile) {
-      return ok(c, { imdbApiKey: null })
-    }
-    
-    // Get the profile's settings
-    const settings = profileProxySettingsDb.findByProfileId(defaultProfile.id)
-    
-    return ok(c, {
-      imdbApiKey: settings?.imdb_api_key || null
-    })
-  } catch (error) {
-    console.error('Failed to get IMDB API key:', error)
-    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
-  }
-})
-
-// [PUT /imdb-api-key] Update current user's IMDB API key
-app.put('/imdb-api-key', async (c) => {
-  try {
-    const user = c.get('user')
-    const { imdbApiKey } = await c.req.json().catch(() => ({}))
-    
-    // Find the user's default profile
-    const defaultProfile = profileDb.getDefault(user.id)
-    if (!defaultProfile) {
-      return err(c, 404, 'NOT_FOUND', 'No default profile found')
-    }
-    
-    // Update the profile's IMDB API key
-    const updated = profileProxySettingsDb.update(defaultProfile.id, {
-      imdb_api_key: imdbApiKey || null
-    })
-    
-    if (!updated) {
-      // Create settings if they don't exist
-      await profileProxySettingsDb.create({
-        profile_id: defaultProfile.id,
-        imdb_api_key: imdbApiKey || null
-      })
-    }
-    
-    return ok(c, undefined, 'IMDB API key updated successfully')
-  } catch (error) {
-    console.error('Failed to update IMDB API key:', error)
-    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
-  }
-})
-
-// ========== TMDB API Key Management ==========
-
-// [GET /tmdb-api-key] Get current user's TMDB API key
-app.get('/tmdb-api-key', async (c) => {
-  try {
-    const user = c.get('user')
-    
-    // Find the user's default profile
-    const defaultProfile = profileDb.getDefault(user.id)
-    if (!defaultProfile) {
-      return ok(c, { tmdb_api_key: null })
-    }
-    
-    // Get the profile's settings
-    const settings = profileProxySettingsDb.findByProfileId(defaultProfile.id)
-    
-    let tmdbApiKey = null
-    if (settings?.tmdb_api_key) {
-      try {
-        tmdbApiKey = decrypt(settings.tmdb_api_key)
-      } catch (error) {
-        console.error('Failed to decrypt TMDB API key:', error)
-        tmdbApiKey = null
-      }
-    }
-    
-    return ok(c, {
-      tmdb_api_key: tmdbApiKey
-    })
-  } catch (error) {
-    console.error('Failed to get TMDB API key:', error)
-    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
-  }
-})
-
-// [PUT /tmdb-api-key] Update current user's TMDB API key
-app.put('/tmdb-api-key', async (c) => {
-  try {
-    const user = c.get('user')
-    const { tmdb_api_key } = await c.req.json().catch(() => ({}))
-    
-    // Find the user's default profile
-    const defaultProfile = profileDb.getDefault(user.id)
-    if (!defaultProfile) {
-      return err(c, 404, 'NOT_FOUND', 'No default profile found')
-    }
-    
-    // Encrypt the API key if provided
-    let encryptedApiKey = null
-    if (tmdb_api_key && tmdb_api_key.trim()) {
-      try {
-        encryptedApiKey = encrypt(tmdb_api_key.trim())
-      } catch (error) {
-        console.error('Failed to encrypt TMDB API key:', error)
-        return err(c, 500, 'SERVER_ERROR', 'Failed to encrypt API key')
-      }
-    }
-    
-    // Update the profile's TMDB API key
-    const updated = profileProxySettingsDb.update(defaultProfile.id, {
-      tmdb_api_key: encryptedApiKey || undefined
-    })
-    
-    if (!updated) {
-      // Create settings if they don't exist
-      await profileProxySettingsDb.create({
-        profile_id: defaultProfile.id,
-        tmdb_api_key: encryptedApiKey || undefined
-      })
-    }
-    
-    return ok(c, undefined, 'TMDB API key updated successfully')
-  } catch (error) {
-    console.error('Failed to update TMDB API key:', error)
-    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
-  }
-})
 
 // TMDB API Key endpoints added - v2
 export default app

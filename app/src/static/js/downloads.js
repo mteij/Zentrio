@@ -41,27 +41,8 @@
   };
 
   // Optional debug panel (add <pre id="downloadsDebug"></pre> in HTML to view)
-  const debugEl = document.getElementById('downloadsDebug');
-  const DEBUG = true;
   function debugLog(...args) {
-    if (!DEBUG) return;
-    try {
-      console.log('[DownloadsUI]', ...args);
-      if (debugEl) {
-        const line = document.createElement('div');
-        line.textContent = '[' + new Date().toISOString().slice(11,19) + '] ' + args.map(a => {
-          if (typeof a === 'object') {
-            try { return JSON.stringify(a); } catch(_) { return String(a); }
-          }
-          return String(a);
-        }).join(' ');
-        debugEl.appendChild(line);
-        // cap lines
-        while (debugEl.childNodes.length > 400) {
-          debugEl.removeChild(debugEl.firstChild);
-        }
-      }
-    } catch(_) {}
+    // Logging disabled
   }
 
   // --- Persistent Root Directory Handle Management (shared with iframe) ---
@@ -376,11 +357,9 @@
 
     // Debug / probe side-channel events (not part of queue state)
     if (data.type === 'zentrio-download-media-probe') {
-      debugLog('media-probe', data.url, data.contentType, data.status);
       return;
     }
     if (data.type === 'zentrio-download-debug') {
-      debugLog('debug', data);
       return;
     }
 

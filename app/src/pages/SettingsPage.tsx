@@ -139,6 +139,8 @@ export function SettingsPage({}: SettingsPageProps) {
                 type="password"
                 id="tmdbApiKeyInput"
                 placeholder="Enter TMDB API key"
+                autoComplete="new-password"
+                name="tmdb_api_key_field"
                 style={{
                   width: '300px',
                   padding: '8px 12px',
@@ -158,14 +160,14 @@ export function SettingsPage({}: SettingsPageProps) {
         <div className="settings-section">
           <h2 className="section-title">Appearance</h2>
 
-          <div className="setting-item" style={{ alignItems: 'flex-start', gap: 16 }}>
+          <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 16 }}>
             <div className="setting-info">
               <h3>Theme</h3>
               <p>Choose a subtle, modern theme for button colors, accents and the background. Use previews to pick a look; selection is stored locally on this device.</p>
             </div>
 
-            <div className="setting-control" style={{ flexDirection: 'column', alignItems: 'flex-end' }}>
-              <div id="themeGallery" style={{ display: 'flex', gap: 12 }}>
+            <div className="setting-control" style={{ width: '100%' }}>
+              <div id="themeGallery" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 {/* Previews will be rendered by client JS */}
               </div>
             </div>
