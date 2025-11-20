@@ -115,7 +115,7 @@ export const proxyRequestHandler = async (req: Request, path: string, _sessionDa
  
 export const hasLocalStremioBuild = async (): Promise<boolean> => {
   try {
-    const filePath = join(process.cwd(), 'data', 'stremio-web-build', 'index.html');
+    const filePath = join(process.cwd(), 'stremio-web-build', 'index.html');
     await fs.access(filePath);
     return true;
   } catch {
@@ -130,7 +130,7 @@ export const hasLocalStremioBuild = async (): Promise<boolean> => {
  */
 export const renderLocalStremioHtml = async (sessionData: string | null) => {
   try {
-    const filePath = join(process.cwd(), 'data', 'stremio-web-build', 'index.html');
+    const filePath = join(process.cwd(), 'stremio-web-build', 'index.html');
     let body = await fs.readFile(filePath, 'utf8');
  
     // Ensure a base href so that bundled assets resolve correctly under /stremio/

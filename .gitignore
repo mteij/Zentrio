@@ -28,7 +28,7 @@ docs/.vitepress/.temp
 
 # Stremio Web vendor and build artifacts
 app/vendor/
-app/data/stremio-web-build/
+app/stremio-web-build/
 app/.temp-stremio-web/
 
 # Capacitor - Copied web assets

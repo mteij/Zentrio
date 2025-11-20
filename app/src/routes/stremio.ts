@@ -42,7 +42,7 @@ app.all('*', async (c) => {
   // Static assets from the local Stremio Web build under data/stremio-web-build
   try {
     const assetPath = path.replace(/^\/+/, '')
-    const filePath = join(process.cwd(), 'data', 'stremio-web-build', assetPath)
+    const filePath = join(process.cwd(), 'stremio-web-build', assetPath)
     const buf = await fs.readFile(filePath)
 
     const typeMap: Record<string, string> = {

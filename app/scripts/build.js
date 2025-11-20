@@ -59,19 +59,19 @@ try {
 
      // Stremio Web outputs to "build" (see webpack.config.js -> output.path)
      const srcDir = path.join(stremioWebDir, 'build');
-     const outDir = path.join(__dirname, '..', 'data', 'stremio-web-build');
+     const outDir = path.join(__dirname, '..', 'stremio-web-build');
 
      if (fs.existsSync(outDir)) {
        fs.rmSync(outDir, { recursive: true, force: true });
      }
      fs.mkdirSync(outDir, { recursive: true });
 
-     // Copy built Stremio Web assets into data/stremio-web-build for the server to serve
+     // Copy built Stremio Web assets into stremio-web-build for the server to serve
      try {
        fs.cpSync(srcDir, outDir, { recursive: true });
-       console.log('✅ Stremio Web build copied to data/stremio-web-build');
+       console.log('✅ Stremio Web build copied to stremio-web-build');
      } catch (copyErr) {
-       console.error('⚠️ Failed to copy Stremio Web build into data/stremio-web-build', copyErr);
+       console.error('⚠️ Failed to copy Stremio Web build into stremio-web-build', copyErr);
        throw copyErr;
      }
    } else {
