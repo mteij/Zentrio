@@ -1,4 +1,5 @@
 import { Database } from 'bun:sqlite'
+import { auth } from './auth'
 import * as bcrypt from 'bcryptjs'
 import { join, dirname, isAbsolute } from 'path'
 import { mkdirSync, existsSync } from 'fs'
@@ -25,49 +26,94 @@ const db = new Database(dbPath)
 
  // Lightweight migrations (idempotent)
  try {
-   db.exec('ALTER TABLE users ADD COLUMN downloads_manager_enabled BOOLEAN DEFAULT TRUE')
+   db.exec('ALTER TABLE user ADD COLUMN downloadsManagerEnabled BOOLEAN DEFAULT TRUE')
  } catch (e) {
    // ignore if column already exists
  }
- // New setting: hide_cinemeta_content (idempotent)
+ // New setting: hideCinemetaContent (idempotent)
  try {
-   db.exec('ALTER TABLE users ADD COLUMN hide_cinemeta_content BOOLEAN DEFAULT FALSE')
+   db.exec('ALTER TABLE user ADD COLUMN hideCinemetaContent BOOLEAN DEFAULT FALSE')
  } catch (e) {
    // ignore if column already exists
  }
  // Add idle session tracking columns if missing
  try {
-   db.exec('ALTER TABLE user_sessions ADD COLUMN last_activity DATETIME')
+   db.exec('ALTER TABLE session ADD COLUMN lastActivity DATETIME')
  } catch (e) {
    // ignore if column already exists
  }
  try {
-   db.exec('ALTER TABLE user_sessions ADD COLUMN max_idle_minutes INTEGER')
+   db.exec('ALTER TABLE session ADD COLUMN maxIdleMinutes INTEGER')
  } catch (e) {
    // ignore if column already exists
  }
 
 // Create tables
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+  CREATE TABLE IF NOT EXISTS user (
+    id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
-    username TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    first_name TEXT,
-    last_name TEXT,
-    addon_manager_enabled BOOLEAN DEFAULT FALSE,
-    hide_calendar_button BOOLEAN DEFAULT FALSE,
-    hide_addons_button BOOLEAN DEFAULT FALSE,
-    hide_cinemeta_content BOOLEAN DEFAULT FALSE,
-    downloads_manager_enabled BOOLEAN DEFAULT TRUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    name TEXT NOT NULL,
+    emailVerified BOOLEAN NOT NULL,
+    image TEXT,
+    createdAt DATETIME NOT NULL,
+    updatedAt DATETIME NOT NULL,
+    username TEXT,
+    firstName TEXT,
+    lastName TEXT,
+    addonManagerEnabled BOOLEAN DEFAULT FALSE,
+    hideCalendarButton BOOLEAN DEFAULT FALSE,
+    hideAddonsButton BOOLEAN DEFAULT FALSE,
+    hideCinemetaContent BOOLEAN DEFAULT FALSE,
+    downloadsManagerEnabled BOOLEAN DEFAULT TRUE,
+    twoFactorEnabled BOOLEAN DEFAULT FALSE
+  );
+
+  CREATE TABLE IF NOT EXISTS session (
+    id TEXT PRIMARY KEY,
+    expiresAt DATETIME NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    createdAt DATETIME NOT NULL,
+    updatedAt DATETIME NOT NULL,
+    ipAddress TEXT,
+    userAgent TEXT,
+    userId TEXT NOT NULL REFERENCES user(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS account (
+    id TEXT PRIMARY KEY,
+    accountId TEXT NOT NULL,
+    providerId TEXT NOT NULL,
+    userId TEXT NOT NULL REFERENCES user(id),
+    accessToken TEXT,
+    refreshToken TEXT,
+    idToken TEXT,
+    accessTokenExpiresAt DATETIME,
+    refreshTokenExpiresAt DATETIME,
+    scope TEXT,
+    password TEXT,
+    createdAt DATETIME NOT NULL,
+    updatedAt DATETIME NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS verification (
+    id TEXT PRIMARY KEY,
+    identifier TEXT NOT NULL,
+    value TEXT NOT NULL,
+    expiresAt DATETIME NOT NULL,
+    createdAt DATETIME,
+    updatedAt DATETIME
+  );
+  CREATE TABLE IF NOT EXISTS twoFactor (
+    id TEXT PRIMARY KEY,
+    secret TEXT NOT NULL,
+    backupCodes TEXT NOT NULL,
+    userId TEXT NOT NULL REFERENCES user(id)
   );
 
   CREATE TABLE IF NOT EXISTS profiles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
+      user_id TEXT NOT NULL,
       name TEXT NOT NULL,
       avatar TEXT NOT NULL,
       avatar_type TEXT DEFAULT 'initials',
@@ -76,49 +122,10 @@ db.exec(`
       stremio_password TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
   );
 
-  CREATE TABLE IF NOT EXISTS user_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    session_token TEXT UNIQUE NOT NULL,
-    expires_at DATETIME NOT NULL,
-    last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
-    max_idle_minutes INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-  );
-
-  -- OTP storage (hash at rest), one-time use
-  CREATE TABLE IF NOT EXISTS auth_otp_codes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL,
-    code_hash TEXT NOT NULL,
-    expires_at DATETIME NOT NULL,
-    consumed_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- Magic link storage (token SHA-256 hash at rest), one-time use
-  CREATE TABLE IF NOT EXISTS auth_magic_links (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL,
-    token_hash TEXT UNIQUE NOT NULL,
-    expires_at DATETIME NOT NULL,
-    consumed_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-  CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
   CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
-  CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(session_token);
-
-  CREATE INDEX IF NOT EXISTS idx_otp_email ON auth_otp_codes(email);
-  CREATE INDEX IF NOT EXISTS idx_otp_expires ON auth_otp_codes(expires_at);
-  CREATE INDEX IF NOT EXISTS idx_magic_token_hash ON auth_magic_links(token_hash);
-  CREATE INDEX IF NOT EXISTS idx_magic_expires ON auth_magic_links(expires_at);
   -- Proxy sessions for enhanced security tracking
   CREATE TABLE IF NOT EXISTS proxy_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,7 +140,7 @@ db.exec(`
     last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
     FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE SET NULL
   );
 
@@ -196,24 +203,27 @@ db.exec(`
 `)
 
 export interface User {
-  id: number
+  id: string
   email: string
-  username: string
-  password_hash: string
-  first_name?: string
-  last_name?: string
-  addon_manager_enabled: boolean
-  hide_calendar_button: boolean
-  hide_addons_button: boolean
-  hide_cinemeta_content: boolean
-  downloads_manager_enabled: boolean
-  created_at: string
-  updated_at: string
+  name: string
+  emailVerified: boolean
+  image?: string
+  createdAt: Date
+  updatedAt: Date
+  username?: string
+  firstName?: string
+  lastName?: string
+  addonManagerEnabled: boolean
+  hideCalendarButton: boolean
+  hideAddonsButton: boolean
+  hideCinemetaContent: boolean
+  downloadsManagerEnabled: boolean
+  twoFactorEnabled: boolean
 }
 
 export interface Profile {
   id: number
-  user_id: number
+  user_id: string
   name: string
   avatar: string
   avatar_type: 'initials' | 'avatar'
@@ -236,7 +246,7 @@ export interface UserSession {
 
 export interface ProxySession {
   id: number
-  user_id: number
+  user_id: string
   profile_id?: number
   session_token: string
   stremio_auth_key?: string
@@ -319,117 +329,77 @@ export function generateSessionToken(): string {
 
 // User operations
 export const userDb = {
-  create: async (userData: { email: string; username: string; password: string; first_name?: string; last_name?: string }): Promise<User> => {
-    const stmt = db.prepare(`
-      INSERT INTO users (email, username, password_hash, first_name, last_name)
-      VALUES (?, ?, ?, ?, ?)
-    `)
-    
-    const passwordHash = await hashPassword(userData.password)
-    const result = stmt.run(userData.email, userData.username, passwordHash, userData.first_name || null, userData.last_name || null)
-    
-    return userDb.findById(result.lastInsertRowid as number)!
-  },
-
   findByEmail: (email: string): User | undefined => {
-    const stmt = db.prepare('SELECT * FROM users WHERE email = ?')
+    const stmt = db.prepare('SELECT * FROM user WHERE email = ?')
     return stmt.get(email) as User | undefined
   },
 
-  findById: (id: number): User | undefined => {
-    const stmt = db.prepare('SELECT * FROM users WHERE id = ?')
+  findById: (id: string): User | undefined => {
+    const stmt = db.prepare('SELECT * FROM user WHERE id = ?')
     return stmt.get(id) as User | undefined
   },
 
-  findByUsername: (username: string): User | undefined => {
-    const stmt = db.prepare('SELECT * FROM users WHERE username = ?')
-    return stmt.get(username) as User | undefined
-  },
-
   exists: (email: string): boolean => {
-    const stmt = db.prepare('SELECT 1 FROM users WHERE email = ? LIMIT 1')
+    const stmt = db.prepare('SELECT 1 FROM user WHERE email = ? LIMIT 1')
     return !!stmt.get(email)
   },
 
-  updatePassword: async (userId: number, newPassword: string): Promise<boolean> => {
-    const stmt = db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    const passwordHash = await hashPassword(newPassword)
-    const result = stmt.run(passwordHash, userId)
-    return result.changes > 0
-  },
-
-  updateEmail: (userId: number, newEmail: string): boolean => {
-    const stmt = db.prepare('UPDATE users SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    const result = stmt.run(newEmail, userId)
-    return result.changes > 0
-  },
-
-  update: (id: number, updates: Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>): User | undefined => {
+  update: async (id: string, updates: Partial<User>): Promise<User | undefined> => {
+    // We'll use Better Auth's internal adapter for updates where possible,
+    // but for custom fields we might need direct DB access if Better Auth doesn't expose a generic update
+    // For now, let's implement a direct DB update for our custom fields
     const fields: string[] = []
     const values: any[] = []
 
-    if (updates.email) {
-        fields.push('email = ?')
-        values.push(updates.email)
-    }
-    if (updates.username) {
+    if (updates.username !== undefined) {
         fields.push('username = ?')
         values.push(updates.username)
     }
-    if (updates.password_hash) {
-        fields.push('password_hash = ?')
-        values.push(updates.password_hash)
+    if (updates.firstName !== undefined) {
+        fields.push('firstName = ?')
+        values.push(updates.firstName)
     }
-    if (updates.first_name) {
-        fields.push('first_name = ?')
-        values.push(updates.first_name)
+    if (updates.lastName !== undefined) {
+        fields.push('lastName = ?')
+        values.push(updates.lastName)
     }
-    if (updates.last_name) {
-        fields.push('last_name = ?')
-        values.push(updates.last_name)
+    if (updates.addonManagerEnabled !== undefined) {
+        fields.push('addonManagerEnabled = ?')
+        values.push(updates.addonManagerEnabled)
     }
-    if (updates.addon_manager_enabled !== undefined) {
-        fields.push('addon_manager_enabled = ?')
-        values.push(updates.addon_manager_enabled)
+    if (updates.hideCalendarButton !== undefined) {
+        fields.push('hideCalendarButton = ?')
+        values.push(updates.hideCalendarButton)
     }
-    if (updates.hide_calendar_button !== undefined) {
-        fields.push('hide_calendar_button = ?')
-        values.push(updates.hide_calendar_button)
+    if (updates.hideAddonsButton !== undefined) {
+        fields.push('hideAddonsButton = ?')
+        values.push(updates.hideAddonsButton)
     }
-    if (updates.hide_addons_button !== undefined) {
-        fields.push('hide_addons_button = ?')
-        values.push(updates.hide_addons_button)
+    if (updates.hideCinemetaContent !== undefined) {
+        fields.push('hideCinemetaContent = ?')
+        values.push(updates.hideCinemetaContent)
     }
-    if (updates.hide_cinemeta_content !== undefined) {
-        fields.push('hide_cinemeta_content = ?')
-        values.push(updates.hide_cinemeta_content)
-    }
-    if (updates.downloads_manager_enabled !== undefined) {
-        fields.push('downloads_manager_enabled = ?')
-        values.push(updates.downloads_manager_enabled)
+    if (updates.downloadsManagerEnabled !== undefined) {
+        fields.push('downloadsManagerEnabled = ?')
+        values.push(updates.downloadsManagerEnabled)
     }
     
     if (fields.length === 0) return userDb.findById(id)
 
-    fields.push('updated_at = CURRENT_TIMESTAMP')
+    fields.push('updatedAt = CURRENT_TIMESTAMP')
     values.push(id)
 
-    const stmt = db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`)
+    const stmt = db.prepare(`UPDATE user SET ${fields.join(', ')} WHERE id = ?`)
     const result = stmt.run(...values)
 
     return result.changes > 0 ? userDb.findById(id) : undefined
-  },
-
-  getAll: (): User[] => {
-    const stmt = db.prepare('SELECT * FROM users ORDER BY created_at DESC')
-    return stmt.all() as User[]
   }
 }
 
 // Profile operations
 export const profileDb = {
   create: async (profileData: {
-      user_id: number
+      user_id: string
       name: string
       avatar: string
       avatar_type?: 'initials' | 'avatar'
@@ -462,7 +432,7 @@ export const profileDb = {
     return stmt.get(id) as Profile | undefined
   },
 
-  findByUserId: (userId: number): (Profile & { settings?: ProfileProxySettings })[] => {
+  findByUserId: (userId: string): (Profile & { settings?: ProfileProxySettings })[] => {
     const stmt = db.prepare(`
         SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating, s.hide_calendar_button, s.hide_addons_button
         FROM profiles p
@@ -536,7 +506,7 @@ export const profileDb = {
     return result.changes > 0
   },
 
-  setDefault: (userId: number, profileId: number): boolean => {
+  setDefault: (userId: string, profileId: number): boolean => {
     const transaction = db.transaction(() => {
       // Remove default from all user profiles
       const clearStmt = db.prepare('UPDATE profiles SET is_default = FALSE WHERE user_id = ?')
@@ -551,166 +521,18 @@ export const profileDb = {
     return transaction()
   },
 
-  getDefault: (userId: number): Profile | undefined => {
+  getDefault: (userId: string): Profile | undefined => {
     const stmt = db.prepare('SELECT * FROM profiles WHERE user_id = ? AND is_default = TRUE LIMIT 1')
     return stmt.get(userId) as Profile | undefined
   },
 
 }
 
-// Session operations
-export const sessionDb = {
-  create: (userId: number, remember: boolean = false): UserSession => {
-    const sessionToken = generateSessionToken()
-    // Long-lived absolute expiry for remembered sessions, sliding idle timeout for non-remembered
-    const expiresExpr = remember ? '+36500 days' : '+30 days'
-    const maxIdle = remember ? null : 180 // minutes
-
-    const stmt = db.prepare(`
-      INSERT INTO user_sessions (user_id, session_token, expires_at, last_activity, max_idle_minutes)
-      VALUES (?, ?, datetime('now', ?), CURRENT_TIMESTAMP, ?)
-    `)
-
-    const result = stmt.run(userId, sessionToken, expiresExpr, maxIdle)
-    return sessionDb.findById(result.lastInsertRowid as number)!
-  },
-
-  findById: (id: number): UserSession | undefined => {
-    const stmt = db.prepare('SELECT * FROM user_sessions WHERE id = ?')
-    return stmt.get(id) as UserSession | undefined
-  },
-
-  findByToken: (token: string): UserSession | undefined => {
-    const stmt = db.prepare(`
-      SELECT * FROM user_sessions
-      WHERE session_token = ?
-        AND expires_at > datetime('now')
-        AND (max_idle_minutes IS NULL OR last_activity > datetime('now', printf('-%d minutes', max_idle_minutes)))
-    `)
-    return stmt.get(token) as UserSession | undefined
-  },
-
-  // Touch last_activity for non-remembered sessions (those with a max_idle_minutes)
-  touch: (token: string): boolean => {
-    const stmt = db.prepare(`
-      UPDATE user_sessions
-      SET last_activity = CURRENT_TIMESTAMP
-      WHERE session_token = ? AND max_idle_minutes IS NOT NULL
-    `)
-    const result = stmt.run(token)
-    return result.changes > 0
-  },
-  
-  delete: (token: string): boolean => {
-    const stmt = db.prepare('DELETE FROM user_sessions WHERE session_token = ?')
-    const result = stmt.run(token)
-    return result.changes > 0
-  },
-
-  deleteExpired: (): number => {
-    const stmt = db.prepare(`
-      DELETE FROM user_sessions
-      WHERE expires_at <= datetime('now')
-         OR (max_idle_minutes IS NOT NULL AND (last_activity IS NULL OR last_activity <= datetime('now', printf('-%d minutes', max_idle_minutes))))
-    `)
-    const result = stmt.run()
-    return result.changes
-  },
-
-  deleteAllForUser: (userId: number): number => {
-    const stmt = db.prepare('DELETE FROM user_sessions WHERE user_id = ?')
-    const result = stmt.run(userId)
-    return result.changes
-  }
-}
-
-// OTP operations
-export const otpDb = {
-  issue: async (email: string, ttlMinutes: number = 10): Promise<string> => {
-    // Basic per-email rate limit: 1 per 30s, max 5 per hour
-    const last = db.prepare("SELECT created_at FROM auth_otp_codes WHERE email = ? ORDER BY id DESC LIMIT 1").get(email) as { created_at: string } | undefined
-    if (last) {
-      const lastTs = new Date(last.created_at).getTime()
-      if (Date.now() - lastTs < 30_000) {
-        throw new Error('RATE_LIMITED')
-      }
-    }
-    const countRow = db.prepare("SELECT COUNT(*) as cnt FROM auth_otp_codes WHERE email = ? AND created_at >= datetime('now','-1 hour')").get(email) as { cnt: number }
-    if (countRow && (countRow.cnt as number) >= 5) {
-      throw new Error('RATE_LIMITED')
-    }
-
-    const otp = String(randomInt(0, 1_000_000)).padStart(6, '0')
-    const codeHash = await bcrypt.hash(otp, 12)
-    const stmt = db.prepare("INSERT INTO auth_otp_codes (email, code_hash, expires_at) VALUES (?, ?, datetime('now', ?))")
-    stmt.run(email, codeHash, `+${ttlMinutes} minutes`)
-    return otp
-  },
-
-  verifyAndConsume: async (email: string, otp: string): Promise<boolean> => {
-    const row = db.prepare("SELECT id, code_hash, expires_at FROM auth_otp_codes WHERE email = ? AND consumed_at IS NULL AND expires_at > datetime('now') ORDER BY id DESC LIMIT 1").get(email) as { id: number, code_hash: string, expires_at: string } | undefined
-    if (!row) return false
-    const ok = await bcrypt.compare(otp, row.code_hash)
-    if (!ok) return false
-    const update = db.prepare("UPDATE auth_otp_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?")
-    update.run(row.id)
-    // Optionally, remove older pending codes for this email
-    db.prepare("DELETE FROM auth_otp_codes WHERE email = ? AND (expires_at <= datetime('now') OR consumed_at IS NOT NULL) AND id != ?").run(email, row.id)
-    return true
-  },
-
-  deleteExpired: (): number => {
-    const stmt = db.prepare("DELETE FROM auth_otp_codes WHERE expires_at <= datetime('now')")
-    const result = stmt.run()
-    return result.changes
-  }
-}
-
-// Magic link operations
-export const magicLinkDb = {
-  create: (email: string, ttlMinutes: number = 15): string => {
-    // Basic per-email rate limit: 1 per 30s, max 5 per hour
-    const last = db.prepare("SELECT created_at FROM auth_magic_links WHERE email = ? ORDER BY id DESC LIMIT 1").get(email) as { created_at: string } | undefined
-    if (last) {
-      const lastTs = new Date(last.created_at).getTime()
-      if (Date.now() - lastTs < 30_000) {
-        throw new Error('RATE_LIMITED')
-      }
-    }
-    const countRow = db.prepare("SELECT COUNT(*) as cnt FROM auth_magic_links WHERE email = ? AND created_at >= datetime('now','-1 hour')").get(email) as { cnt: number }
-    if (countRow && (countRow.cnt as number) >= 5) {
-      throw new Error('RATE_LIMITED')
-    }
-
-    const token = randomToken(32)
-    const tokenHash = sha256Hex(token)
-    const stmt = db.prepare("INSERT INTO auth_magic_links (email, token_hash, expires_at) VALUES (?, ?, datetime('now', ?))")
-    stmt.run(email, tokenHash, `+${ttlMinutes} minutes`)
-    return token
-  },
-
-  consume: (token: string): string | null => {
-    const tokenHash = sha256Hex(token)
-    const row = db.prepare("SELECT id, email FROM auth_magic_links WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > datetime('now') LIMIT 1").get(tokenHash) as { id: number, email: string } | undefined
-    if (!row) return null
-    const update = db.prepare("UPDATE auth_magic_links SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?")
-    update.run(row.id)
-    // Clean old entries
-    db.prepare("DELETE FROM auth_magic_links WHERE consumed_at IS NOT NULL OR expires_at <= datetime('now')").run()
-    return row.email
-  },
-
-  deleteExpired: (): number => {
-    const stmt = db.prepare("DELETE FROM auth_magic_links WHERE expires_at <= datetime('now')")
-    const result = stmt.run()
-    return result.changes
-  }
-}
 
 // Proxy session operations
 export const proxySessionDb = {
   create: (sessionData: {
-    user_id: number
+    user_id: string
     profile_id?: number
     session_token: string
     stremio_auth_key?: string
@@ -945,9 +767,6 @@ export const proxyRateLimitDb = {
 
 // Periodic cleanup
 setInterval(() => {
-  sessionDb.deleteExpired()
-  otpDb.deleteExpired()
-  magicLinkDb.deleteExpired()
   proxySessionDb.deleteExpired()
 }, 60 * 60 * 1000) // Every hour
 

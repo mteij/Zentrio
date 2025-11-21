@@ -1,13 +1,11 @@
 // Client-side JavaScript for landing page functionality
-// This replaces the massive inline script from landing.html
+// Uses fetch for authentication (vanilla JS compatible)
 
 (function () {
     const emailForm = document.getElementById('emailForm');
     const emailInput = document.getElementById('email');
     const submitBtn = document.getElementById('submitBtn');
     const loading = document.getElementById('loading');
-    // Keep reference for legacy markup but stop using inline message boxes; use toasts instead.
-    const globalMessage = document.getElementById('message');
     const inlineAuth = document.getElementById('inlineAuth');
 
     // Toast helpers — unify usage across auth flow
@@ -26,33 +24,18 @@
         }
     }
 
-    // Safely escape text for HTML contexts (text nodes and attribute values)
+    // Safely escape text for HTML contexts
     function escapeHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        };
+        return String(str).replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
-    // Backward-compatible API (no-op visually except via toast)
-    function showGlobalMessage(text, type = 'error') {
-        toast(type, type === 'error' ? 'Error' : (type === 'success' ? 'Success' : 'Notice'), text);
-        if (globalMessage) {
-            globalMessage.style.display = 'none';
-            globalMessage.textContent = '';
-        }
-    }
-    
-    function clearGlobalMessage() {
-        if (globalMessage) {
-            globalMessage.textContent = '';
-            globalMessage.className = 'message';
-            globalMessage.style.display = 'none';
-        }
-    }
-    
     function setFieldError(inputEl, text) {
         if (!inputEl) return;
         inputEl.setAttribute('aria-invalid', 'true');
@@ -114,20 +97,6 @@
         try { localStorage.setItem('zentrioRememberMe', val ? 'true' : 'false'); } catch (e) {}
     }
 
-    // Helper function to load modal templates (kept for compatibility if needed later)
-    async function loadModalTemplate(templatePath) {
-        try {
-            const response = await fetch(templatePath);
-            if (!response.ok) {
-                throw new Error(`Failed to load template: ${templatePath}`);
-            }
-            return await response.text();
-        } catch (error) {
-            console.error('Error loading modal template:', error);
-            return null;
-        }
-    }
-
     function renderLoginForm(email, nickname = null) {
         const welcomeMessage = nickname ? `<div class="welcome-message" style="text-align:center;margin-bottom:20px;color:#e50914;font-size:1.2rem;font-weight:bold;">Welcome back, ${escapeHtml(nickname)}!</div>` : '';
         
@@ -157,6 +126,9 @@
               <button id="magicLinkBtn" type="button" class="cta-button" style="background:#333;border:1px solid #555;">Send Magic Link</button>
               <button id="otpBtn" type="button" class="cta-button" style="background:#333;border:1px solid #555;">Get OTP Code</button>
             </div>
+            <div style="text-align:center;margin-top:16px;">
+                <a href="#" id="forgotPasswordLink" style="color:#b3b3b3;text-decoration:underline;font-size:0.9rem;">Forgot Password?</a>
+            </div>
           </form>
         `;
         
@@ -168,7 +140,9 @@
         const pwd = document.getElementById('loginPassword');
         const magicLinkBtn = document.getElementById('magicLinkBtn');
         const otpBtn = document.getElementById('otpBtn');
+        const forgotPasswordLink = document.getElementById('forgotPasswordLink');
         const rememberEl = document.getElementById('rememberMe');
+        
         if (rememberEl) {
           rememberEl.checked = getRememberPref();
           rememberEl.addEventListener('change', () => setRememberPref(rememberEl.checked));
@@ -179,7 +153,6 @@
           showEmailStep();
           inlineAuth.classList.add('step-hidden');
           inlineAuth.innerHTML = '';
-          clearGlobalMessage();
           emailInput.focus();
         });
 
@@ -198,21 +171,30 @@
 
             try {
                 form.querySelector('button[type="submit"]').disabled = true;
-                const res = await fetch('/api/auth/signin-password', {
+                
+                const res = await fetch('/api/auth/sign-in/email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password: pwd.value, remember: getRememberPref() })
+                    body: JSON.stringify({
+                        email,
+                        password: pwd.value,
+                        rememberMe: getRememberPref(),
+                        callbackURL: '/profiles'
+                    })
                 });
+                
                 const data = await res.json().catch(() => ({}));
+
                 if (res.ok) {
                     toast('success', 'Signed in', 'Success! Redirecting...');
                     setTimeout(() => { window.location.href = '/profiles'; }, 800);
                 } else {
-                    if (res.status === 429) {
-                        toast('error', 'Too many requests', 'Please try again later.');
+                    if (data.code === 'EMAIL_NOT_VERIFIED' || (data.message && data.message.toLowerCase().includes('verif'))) {
+                        renderUnverifiedEmail(email);
                     } else {
-                        setFieldError(pwd, data.error || 'Invalid email or password');
-                        toast('error', 'Sign in failed', data.error || 'Invalid email or password');
+                        const msg = data.message || data.error || 'Invalid email or password';
+                        setFieldError(pwd, msg);
+                        toast('error', 'Sign in failed', msg);
                     }
                 }
             } catch (err) {
@@ -223,26 +205,29 @@
             }
         });
 
-        // Magic link and OTP handlers
+        // Magic link handler
         magicLinkBtn.addEventListener('click', async () => {
             try {
                 magicLinkBtn.disabled = true;
                 magicLinkBtn.textContent = 'Sending...';
-                const res = await fetch('/api/auth/magic-link', {
+                
+                const res = await fetch('/api/auth/sign-in/magic-link', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, remember: getRememberPref() })
+                    body: JSON.stringify({
+                        email,
+                        callbackURL: '/profiles',
+                        rememberMe: getRememberPref()
+                    })
                 });
+                
                 const data = await res.json().catch(() => ({}));
+
                 if (res.ok) {
                     renderMagicLinkSent(email);
                     toast('success', 'Magic link sent', 'Check your inbox to sign in.');
                 } else {
-                    if (res.status === 429) {
-                        toast('error', 'Too many requests', 'Please try again later.');
-                    } else {
-                        toast('error', 'Magic link failed', data.error || 'Failed to send magic link.');
-                    }
+                    toast('error', 'Magic link failed', data.message || data.error || 'Failed to send magic link.');
                 }
             } catch (err) {
                 toast('error', 'Network error', 'Please try again.');
@@ -252,31 +237,96 @@
             }
         });
 
+        // OTP handler
         otpBtn.addEventListener('click', async () => {
             try {
                 otpBtn.disabled = true;
                 otpBtn.textContent = 'Sending...';
-                const res = await fetch('/api/auth/send-otp', {
+                
+                const res = await fetch('/api/auth/email-otp/send-verification-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, remember: getRememberPref() })
+                    body: JSON.stringify({ email, type: 'sign-in' })
                 });
+                
                 const data = await res.json().catch(() => ({}));
+
                 if (res.ok) {
                     renderOtpForm(email);
                     toast('success', 'OTP sent', 'We sent a 6-digit code to your email.');
                 } else {
-                    if (res.status === 429) {
-                        toast('error', 'Too many requests', 'Please try again later.');
-                    } else {
-                        toast('error', 'OTP send failed', data.error || 'Failed to send OTP.');
-                    }
+                    toast('error', 'OTP send failed', data.message || data.error || 'Failed to send OTP.');
                 }
             } catch (err) {
                 toast('error', 'Network error', 'Please try again.');
             } finally {
                 otpBtn.disabled = false;
                 otpBtn.textContent = 'Get OTP Code';
+            }
+        });
+
+        // Forgot Password handler
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            renderForgotPassword(email);
+        });
+    }
+
+    function renderForgotPassword(email) {
+        inlineAuth.innerHTML = `
+            <div class="fade-in">
+                <button id="forgotBackBtn" type="button" class="back-button">
+                    <svg class="back-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+                    Back
+                </button>
+                <h3>Reset Password</h3>
+                <p>Enter your email to receive a password reset link.</p>
+                <form id="forgotPasswordForm" novalidate>
+                    <div class="form-group">
+                        <label for="forgotEmail">Email</label>
+                        <input id="forgotEmail" type="email" value="${escapeHtml(email)}" disabled aria-readonly="true" />
+                    </div>
+                    <button type="submit" class="cta-button">Send Reset Link</button>
+                </form>
+            </div>
+        `;
+
+        document.getElementById('forgotBackBtn').addEventListener('click', () => {
+            renderLoginForm(email);
+        });
+
+        const form = document.getElementById('forgotPasswordForm');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button[type="submit"]');
+            
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
+
+                const res = await fetch('/api/auth/forget-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email,
+                        redirectTo: window.location.origin + '/reset-password'
+                    })
+                });
+                
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    toast('success', 'Email sent', 'Check your inbox for the reset link.');
+                    // Optionally go back to login or show a success state
+                    renderLoginForm(email); 
+                } else {
+                    toast('error', 'Failed', data.message || data.error || 'Failed to send reset link.');
+                }
+            } catch (err) {
+                toast('error', 'Network error', 'Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send Reset Link';
             }
         });
     }
@@ -309,20 +359,22 @@
             resendBtn.textContent = 'Sending...';
             resendBtn.classList.add('disabled');
             try {
-                const res = await fetch('/api/auth/magic-link', {
+                const res = await fetch('/api/auth/sign-in/magic-link', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, remember: getRememberPref() })
+                    body: JSON.stringify({
+                        email,
+                        callbackURL: '/profiles',
+                        rememberMe: getRememberPref()
+                    })
                 });
+                
                 const data = await res.json().catch(() => ({}));
+
                 if (res.ok) {
                     toast('success', 'Magic link sent', 'Check your inbox.');
                 } else {
-                    if (res.status === 429) {
-                        toast('error', 'Too many requests', 'Please try again later.');
-                    } else {
-                        toast('error', 'Magic link failed', data.error || 'Failed to send magic link.');
-                    }
+                    toast('error', 'Magic link failed', data.message || data.error || 'Failed to send magic link.');
                 }
             } catch {
                 toast('error', 'Network error', 'Please try again.');
@@ -330,7 +382,7 @@
                 setTimeout(() => {
                     resendBtn.textContent = "Didn't receive it? Resend link";
                     resendBtn.classList.remove('disabled');
-                }, 5000); // Prevent spamming
+                }, 5000);
             }
         });
     }
@@ -380,25 +432,23 @@
             try {
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Verifying...';
-                const res = await fetch('/api/auth/verify-otp', {
+                
+                const res = await fetch('/api/auth/sign-in/email-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, otp, remember: getRememberPref() })
+                    body: JSON.stringify({ email, otp })
                 });
+                
+                const data = await res.json().catch(() => ({}));
 
                 if (res.ok) {
                     otpInput.classList.add('success');
                     toast('success', 'Verified', 'Success! Redirecting...');
                     setTimeout(() => { window.location.href = '/profiles'; }, 800);
                 } else {
-                    const data = await res.json().catch(() => ({}));
                     otpInput.classList.add('error');
                     otpInput.value = '';
-                    if (res.status === 429) {
-                        toast('error', 'Too many requests', 'Please try again later.');
-                    } else {
-                        toast('error', 'Verification failed', data.error || 'Invalid or expired OTP.');
-                    }
+                    toast('error', 'Verification failed', data.message || data.error || 'Invalid or expired OTP.');
                 }
             } catch (err) {
                 toast('error', 'Network error', 'Please try again.');
@@ -413,20 +463,18 @@
             resendBtn.textContent = 'Sending...';
             resendBtn.classList.add('disabled');
             try {
-                const res = await fetch('/api/auth/send-otp', {
+                const res = await fetch('/api/auth/email-otp/send-verification-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, remember: getRememberPref() })
+                    body: JSON.stringify({ email, type: 'sign-in' })
                 });
+                
                 const data = await res.json().catch(() => ({}));
+
                 if (res.ok) {
                     toast('success', 'OTP sent', 'Check your inbox for the new code.');
                 } else {
-                    if (res.status === 429) {
-                        toast('error', 'Too many requests', 'Please try again later.');
-                    } else {
-                        toast('error', 'OTP send failed', data.error || 'Failed to resend OTP.');
-                    }
+                    toast('error', 'OTP send failed', data.message || data.error || 'Failed to resend OTP.');
                 }
             } catch {
                 toast('error', 'Network error', 'Please try again.');
@@ -440,8 +488,6 @@
     }
 
     function renderRegisterForm(email) {
-        // Registration form implementation
-        // Simplified for brevity
         inlineAuth.innerHTML = `
           <form id="registerInlineForm" class="fade-in" novalidate>
             <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
@@ -457,7 +503,7 @@
             </div>
             <div class="form-group">
               <label for="regPassword">Password</label>
-              <input id="regPassword" type="password" placeholder="Enter your password" minlength="6" autocomplete="new-password" />
+              <input id="regPassword" type="password" placeholder="Enter your password" minlength="8" autocomplete="new-password" />
             </div>
             <div class="form-group remember-row">
               <label class="remember-checkbox" for="rememberMe">
@@ -481,7 +527,6 @@
             showEmailStep();
             inlineAuth.classList.add('step-hidden');
             inlineAuth.innerHTML = '';
-            clearGlobalMessage();
             emailInput.focus();
         });
 
@@ -511,31 +556,35 @@
                 toast('warning', 'Missing password', 'Please enter a password');
                 return;
             }
-            if (password.length < 6) {
-                setFieldError(passwordInput, 'Password must be at least 6 characters');
-                toast('warning', 'Weak password', 'Password must be at least 6 characters');
+            if (password.length < 8) {
+                setFieldError(passwordInput, 'Password must be at least 8 characters');
+                toast('warning', 'Weak password', 'Password must be at least 8 characters');
                 return;
             }
 
             try {
                 form.querySelector('button[type="submit"]').disabled = true;
-                const res = await fetch('/api/auth/register', {
+                
+                const res = await fetch('/api/auth/sign-up/email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, username, password, remember: getRememberPref() })
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        name: username,
+                        username,
+                        rememberMe: getRememberPref(),
+                        callbackURL: '/profiles'
+                    })
                 });
+                
                 const data = await res.json().catch(() => ({}));
+
                 if (res.ok) {
-                    toast('success', 'Account created', 'Redirecting...');
-                    setTimeout(() => {
-                        window.location.href = data.redirect || '/';
-                    }, 800);
+                    renderUnverifiedEmail(email);
+                    toast('success', 'Account created', 'Please verify your email.');
                 } else {
-                    if (res.status === 429) {
-                        toast('error', 'Too many requests', 'Please try again later.');
-                    } else {
-                        toast('error', 'Registration failed', data.error || 'Registration failed');
-                    }
+                    toast('error', 'Registration failed', data.message || data.error || 'Registration failed');
                 }
             } catch (err) {
                 toast('error', 'Network error', 'Please try again');
@@ -545,11 +594,67 @@
         });
     }
 
+    function renderUnverifiedEmail(email) {
+        inlineAuth.innerHTML = `
+            <div class="magic-link-container fade-in">
+                <button id="unverifiedBackBtn" type="button" class="back-button">
+                    <svg class="back-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+                    Back
+                </button>
+                <h3>
+                    <svg class="email-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path></svg>
+                    Verify your email
+                </h3>
+                <div class="magic-link-sent">
+                    <p>We've sent a verification link to <strong>${escapeHtml(email)}</strong>. Please check your inbox and click the link to activate your account.</p>
+                </div>
+                <p class="resend-text" id="resendVerification">Didn't receive it? Resend email</p>
+            </div>
+        `;
+        inlineAuth.classList.remove('step-hidden');
+
+        document.getElementById('unverifiedBackBtn').addEventListener('click', () => {
+            renderLoginForm(email);
+        });
+
+        const resendBtn = document.getElementById('resendVerification');
+        resendBtn.addEventListener('click', async () => {
+            resendBtn.textContent = 'Sending...';
+            resendBtn.classList.add('disabled');
+            try {
+                const res = await fetch('/api/auth/send-verification-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email,
+                        callbackURL: '/profiles'
+                    })
+                });
+                
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    toast('success', 'Email sent', 'Check your inbox.');
+                } else {
+                    toast('error', 'Failed to send', data.message || data.error || 'Failed to send verification email.');
+                }
+            } catch {
+                toast('error', 'Network error', 'Please try again.');
+            } finally {
+                setTimeout(() => {
+                    resendBtn.textContent = "Didn't receive it? Resend email";
+                    resendBtn.classList.remove('disabled');
+                }, 5000);
+            }
+        });
+    }
+
     async function identifyAndRender(email) {
-        clearGlobalMessage();
+        // clearGlobalMessage(); // Removed as we use toasts
         clearFieldError(emailInput);
         showLoading();
         try {
+            // We still use our custom endpoint for identification as Better Auth doesn't have a direct "check if user exists" public endpoint without trying to sign in/up
             const res = await fetch('/api/auth/identify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -557,7 +662,6 @@
             });
             const data = await res.json().catch(() => ({}));
 
-            // Handle validation (4xx) explicitly: field error + toast
             if (res.status === 429) {
                 toast('error', 'Too many requests', 'Please try again later.');
                 return;
@@ -579,7 +683,7 @@
                 renderRegisterForm(email);
             }
         } catch (err) {
-            showGlobalMessage(err.message || 'Something went wrong', 'error');
+            toast('error', 'Error', err.message || 'Something went wrong');
             emailInput.focus();
         } finally {
             hideLoading();
@@ -591,7 +695,7 @@
         e.preventDefault();
         const email = emailInput.value.trim();
         if (!email) {
-            showGlobalMessage('Please enter a valid email address', 'warning');
+            toast('warning', 'Invalid email', 'Please enter a valid email address');
             emailInput.focus();
             return;
         }

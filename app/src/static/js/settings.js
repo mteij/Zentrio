@@ -82,10 +82,18 @@ async function loadUserInfo() {
         const response = await fetch('/api/user/profile');
         if (response.ok) {
             const payload = await response.json();
-            const email = (payload && (payload.email || (payload.data && payload.data.email))) || '';
+            const data = payload.data || payload;
+            
+            const email = data.email || '';
             if (email) {
                 const el = document.getElementById('currentEmail');
                 if (el) el.textContent = email;
+            }
+
+            const username = data.username || '';
+            if (username) {
+                const el = document.getElementById('currentUsername');
+                if (el) el.textContent = username;
             }
         } else {
             console.error('Failed to load user info: HTTP', response.status);
@@ -174,6 +182,53 @@ function closeModal(modalId) {
     inputs.forEach(input => input.value = '');
 }
 
+// Username modal functions
+function toggleUsernameForm() {
+    const currentUsername = document.getElementById('currentUsername').textContent;
+    const input = document.getElementById('newUsername');
+    if (input && currentUsername && currentUsername !== 'Loading...') {
+        input.value = currentUsername;
+    }
+    openModal('usernameModal');
+}
+
+function closeUsernameModal() {
+    closeModal('usernameModal');
+}
+
+async function updateUsername() {
+    const newUsername = document.getElementById('newUsername').value.trim();
+    
+    if (!newUsername || newUsername.length < 3) {
+        showMessage('Username must be at least 3 characters long', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/user/username', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'xmlhttprequest'
+            },
+            body: JSON.stringify({ username: newUsername })
+        });
+
+        if (response.ok) {
+            const el = document.getElementById('currentUsername');
+            if (el) el.textContent = newUsername;
+            closeUsernameModal();
+            showMessage('Username updated successfully', 'success');
+        } else {
+            const error = await response.json();
+            showMessage(error.error || 'Failed to update username', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to update username:', error);
+        showMessage('Failed to update username. Please try again.', 'error');
+    }
+}
+
 // Email modal functions
 function toggleEmailForm() {
     openModal('emailModal');
@@ -192,22 +247,24 @@ async function updateEmail() {
     }
 
     try {
-        const response = await fetch('/api/user/email', {
-            method: 'PUT',
+        const response = await fetch('/api/auth/change-email', {
+            method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'xmlhttprequest'
             },
-            body: JSON.stringify({ email: newEmail })
+            body: JSON.stringify({
+                newEmail,
+                callbackURL: '/settings'
+            })
         });
 
         if (response.ok) {
-            const el = document.getElementById('currentEmail');
-            if (el) el.textContent = newEmail;
             closeEmailModal();
-            showMessage('Email updated successfully', 'success');
+            showMessage('Confirmation email sent. Please check your inbox.', 'success');
         } else {
             const error = await response.json();
-            showMessage(error.error || 'Failed to update email', 'error');
+            showMessage(error.message || error.error || 'Failed to initiate email change', 'error');
         }
     } catch (error) {
         console.error('Failed to update email:', error);
@@ -653,9 +710,13 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTmdbApiKey();
 
     // Add modal event listeners
+    const usernameModal = document.getElementById('usernameModal');
     const emailModal = document.getElementById('emailModal');
     const passwordModal = document.getElementById('passwordModal');
     
+    if (usernameModal) {
+        usernameModal.addEventListener('click', (e) => handleModalClick(e, 'usernameModal'));
+    }
     if (emailModal) {
         emailModal.addEventListener('click', (e) => handleModalClick(e, 'emailModal'));
     }
@@ -672,6 +733,16 @@ document.addEventListener('DOMContentLoaded', () => {
         backButton.addEventListener('click', goBack);
     }
     
+    // Username modal wiring
+    const btnUsernameOpen = document.getElementById('openUsernameModalBtn');
+    if (btnUsernameOpen) btnUsernameOpen.addEventListener('click', toggleUsernameForm);
+
+    const btnUsernameCancel = document.getElementById('usernameCancelBtn');
+    if (btnUsernameCancel) btnUsernameCancel.addEventListener('click', closeUsernameModal);
+
+    const btnUsernameUpdate = document.getElementById('usernameUpdateBtn');
+    if (btnUsernameUpdate) btnUsernameUpdate.addEventListener('click', updateUsername);
+
     // Add toggle event listeners
     const toggles = document.querySelectorAll('.toggle');
     toggles.forEach(toggle => {
@@ -736,4 +807,148 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('themeApplied', () => {
         ranges.forEach(r => updateRangeBackground(r));
     });
+
+    // 2FA Logic
+    const enable2faBtn = document.getElementById('enable2faBtn');
+    const disable2faBtn = document.getElementById('disable2faBtn');
+    const backupCodesContainer = document.getElementById('backupCodesContainer');
+    const backupCodesList = document.getElementById('backupCodesList');
+    
+    // Modal elements
+    const twoFactorModal = document.getElementById('twoFactorModal');
+    const twoFactorCancelBtn = document.getElementById('twoFactorCancelBtn');
+    const twoFactorVerifyBtn = document.getElementById('twoFactorVerifyBtn');
+    const twoFactorCodeInput = document.getElementById('twoFactorCode');
+    const qrCodeContainer = document.getElementById('qrCodeContainer');
+    const qrCodeSecret = document.getElementById('qrCodeSecret');
+
+    // Check 2FA status
+    async function check2FAStatus() {
+        try {
+            const res = await fetch('/api/user/profile');
+            if (res.ok) {
+                const data = await res.json();
+                const user = data.data || data;
+                if (user.twoFactorEnabled) {
+                    enable2faBtn.style.display = 'none';
+                    disable2faBtn.style.display = 'inline-block';
+                } else {
+                    enable2faBtn.style.display = 'inline-block';
+                    disable2faBtn.style.display = 'none';
+                }
+            }
+        } catch (e) {
+            console.error('Failed to check 2FA status', e);
+        }
+    }
+    check2FAStatus();
+
+    if (enable2faBtn) {
+        enable2faBtn.addEventListener('click', async () => {
+            const password = prompt('Enter your password to enable 2FA:');
+            if (!password) return;
+
+            try {
+                const res = await fetch('/api/auth/two-factor/enable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    // Show modal
+                    openModal('twoFactorModal');
+                    
+                    // Render QR Code
+                    qrCodeContainer.innerHTML = '';
+                    const img = document.createElement('img');
+                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.totpURI)}`;
+                    img.style.display = 'block';
+                    img.style.width = '200px';
+                    img.style.height = '200px';
+                    qrCodeContainer.appendChild(img);
+                    
+                    // Show secret (optional, but good for manual entry)
+                    // Extract secret from URI if possible, or just show URI?
+                    // URI format: otpauth://totp/Issuer:Account?secret=SECRET&...
+                    const secretMatch = data.totpURI.match(/secret=([^&]+)/);
+                    if (secretMatch && secretMatch[1]) {
+                        qrCodeSecret.textContent = `Secret: ${secretMatch[1]}`;
+                    } else {
+                        qrCodeSecret.textContent = '';
+                    }
+
+                    // Store backup codes for later display
+                    if (data.backupCodes) {
+                        backupCodesList.textContent = data.backupCodes.join('\n');
+                    }
+                } else {
+                    showMessage(data.message || 'Failed to enable 2FA', 'error');
+                }
+            } catch (e) {
+                showMessage('Network error', 'error');
+            }
+        });
+    }
+
+    if (twoFactorCancelBtn) {
+        twoFactorCancelBtn.addEventListener('click', () => closeModal('twoFactorModal'));
+    }
+
+    if (twoFactorVerifyBtn) {
+        twoFactorVerifyBtn.addEventListener('click', async () => {
+            const code = twoFactorCodeInput.value;
+            if (!code || code.length !== 6) {
+                showMessage('Please enter a valid 6-digit code', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/two-factor/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    closeModal('twoFactorModal');
+                    showMessage('Two-factor authentication enabled!', 'success');
+                    check2FAStatus();
+                    
+                    // Show backup codes
+                    if (backupCodesList.textContent) {
+                        backupCodesContainer.style.display = 'block';
+                    }
+                } else {
+                    showMessage(data.message || 'Invalid code', 'error');
+                }
+            } catch (e) {
+                showMessage('Network error', 'error');
+            }
+        });
+    }
+
+    if (disable2faBtn) {
+        disable2faBtn.addEventListener('click', async () => {
+            const password = prompt('Enter your password to disable 2FA:');
+            if (!password) return;
+
+            try {
+                const res = await fetch('/api/auth/two-factor/disable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showMessage('Two-factor authentication disabled!', 'success');
+                    check2FAStatus();
+                } else {
+                    showMessage(data.message || 'Failed to disable 2FA', 'error');
+                }
+            } catch (e) {
+                showMessage('Network error', 'error');
+            }
+        });
+    }
 });

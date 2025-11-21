@@ -4,7 +4,6 @@ import { OTPModal } from '../components/auth/OTPModal'
 interface SettingsPageProps {}
 
 export function SettingsPage({}: SettingsPageProps) {
-
   return (
     <SimpleLayout title="Settings">
       <script
@@ -42,6 +41,19 @@ export function SettingsPage({}: SettingsPageProps) {
           
           <div className="setting-item">
             <div className="setting-info">
+              <h3>Username</h3>
+              <p>Change your account username</p>
+            </div>
+            <div className="setting-control">
+              <span id="currentUsername">Loading...</span>
+              <Button variant="secondary" id="openUsernameModalBtn">
+                Change
+              </Button>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <div className="setting-info">
               <h3>Email Address</h3>
               <p>Change your account email address</p>
             </div>
@@ -73,6 +85,31 @@ export function SettingsPage({}: SettingsPageProps) {
             <div className="setting-control">
               <div className="toggle" id="rememberMeLocalToggle" aria-label="Stay signed in on this device"></div>
             </div>
+          </div>
+
+          <div className="setting-item">
+            <div className="setting-info">
+              <h3>Two-Factor Authentication</h3>
+              <p>Add an extra layer of security to your account.</p>
+            </div>
+            <div className="setting-control">
+                <div id="twoFactorControl">
+                    {/* Will be populated by JS */}
+                    <Button variant="primary" id="enable2faBtn">Enable 2FA</Button>
+                    <Button variant="danger" id="disable2faBtn" style={{ display: 'none' }}>Disable 2FA</Button>
+                </div>
+            </div>
+          </div>
+          
+          <div id="backupCodesContainer" style={{ display: 'none', marginTop: '20px' }} className="setting-item">
+              <div style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
+                  <h3>Backup Codes</h3>
+                  <p>Save these codes in a safe place. You can use them to access your account if you lose your authenticator device.</p>
+                  <pre id="backupCodesList" style={{ background: '#333', padding: '15px', borderRadius: '8px', width: '100%', overflowX: 'auto', fontFamily: 'monospace', marginTop: '10px' }}></pre>
+                  <Button variant="secondary" style={{ marginTop: '15px' }} onClick={() => { const el = document.getElementById('backupCodesContainer'); if (el) el.style.display = 'none'; }}>
+                    Done
+                  </Button>
+              </div>
           </div>
         </div>
 
@@ -132,7 +169,7 @@ export function SettingsPage({}: SettingsPageProps) {
           <div className="setting-item">
             <div className="setting-info">
               <h3>TMDB API Key</h3>
-              <p>Required for NSFW filter functionality. Get your free key from <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">TMDB</a>. When set, enables NSFW content filtering in profiles.</p>
+              <p>Required for NSFW filter functionality. Get your free key from <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>TMDB</a>. When set, enables NSFW content filtering in profiles.</p>
             </div>
             <div className="setting-control">
               <Input
@@ -194,13 +231,38 @@ export function SettingsPage({}: SettingsPageProps) {
               <p>Permanently delete your account and all data</p>
             </div>
             <div className="setting-control">
-              <Button variant="danger" onClick={() => console.log('Delete account')}>
+              <Button variant="danger" id="deleteAccountBtn">
                 Delete Account
               </Button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Username Change Modal */}
+      <ModalWithFooter
+        id="usernameModal"
+        title="Change username"
+        footer={
+          <>
+            <Button variant="secondary" id="usernameCancelBtn">
+              Cancel
+            </Button>
+            <Button variant="primary" id="usernameUpdateBtn">
+              Update
+            </Button>
+          </>
+        }
+      >
+        <FormGroup label="New Username" htmlFor="newUsername">
+          <Input
+            type="text"
+            id="newUsername"
+            placeholder="Enter new username"
+            required
+          />
+        </FormGroup>
+      </ModalWithFooter>
 
       {/* Email Change Modal */}
       <ModalWithFooter
@@ -247,6 +309,39 @@ export function SettingsPage({}: SettingsPageProps) {
         />
       </Modal>
 
+      {/* 2FA Setup Modal */}
+      <ModalWithFooter
+        id="twoFactorModal"
+        title="Setup Two-Factor Authentication"
+        footer={
+          <>
+            <Button variant="secondary" id="twoFactorCancelBtn">
+              Cancel
+            </Button>
+            <Button variant="primary" id="twoFactorVerifyBtn">
+              Verify & Enable
+            </Button>
+          </>
+        }
+      >
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <p style={{ marginBottom: '15px', color: '#b3b3b3' }}>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+            <div id="qrCodeContainer" style={{ background: 'white', padding: '10px', display: 'inline-block', borderRadius: '8px' }}>
+                {/* QR Code will be injected here */}
+            </div>
+            <p id="qrCodeSecret" style={{ marginTop: '10px', fontSize: '12px', color: '#666', wordBreak: 'break-all' }}></p>
+        </div>
+        <FormGroup label="Verification Code" htmlFor="twoFactorCode">
+          <Input
+            type="text"
+            id="twoFactorCode"
+            placeholder="Enter 6-digit code"
+            maxLength="6"
+            style={{ textAlign: 'center', letterSpacing: '4px', fontSize: '18px' }}
+          />
+        </FormGroup>
+      </ModalWithFooter>
+
       {/* Password Change Modal */}
       <ModalWithFooter
         id="passwordModal"
@@ -274,8 +369,9 @@ export function SettingsPage({}: SettingsPageProps) {
           <Input
             type="password"
             id="newPassword"
-            placeholder="Enter new password (min 12 characters)"
+            placeholder="Enter new password (min 8 characters)"
             required
+            minLength={8}
           />
         </FormGroup>
         <FormGroup label="Confirm New Password" htmlFor="confirmPassword">
@@ -284,6 +380,7 @@ export function SettingsPage({}: SettingsPageProps) {
             id="confirmPassword"
             placeholder="Confirm new password"
             required
+            minLength={8}
           />
         </FormGroup>
       </ModalWithFooter>
@@ -575,8 +672,8 @@ export function SettingsPage({}: SettingsPageProps) {
         window.addToast('error', 'Enter your current password');
         return;
       }
-      if (!newPassword || newPassword.length < 12) {
-        window.addToast('error', 'Password too short', 'Minimum length is 12 characters.');
+      if (!newPassword || newPassword.length < 8) {
+        window.addToast('error', 'Password too short', 'Minimum length is 8 characters.');
         return;
       }
       if (newPassword !== confirmPassword) {
@@ -649,6 +746,25 @@ export function SettingsPage({}: SettingsPageProps) {
 
     const otpResend = document.getElementById('resendOtpText');
     if (otpResend) otpResend.addEventListener('click', resendOtp);
+    
+    // Delete account
+    const deleteBtn = document.getElementById('deleteAccountBtn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                try {
+                    const res = await fetch('/api/user/delete', { method: 'DELETE' });
+                    if (res.ok) {
+                        window.location.href = '/';
+                    } else {
+                        window.addToast('error', 'Failed to delete account');
+                    }
+                } catch (e) {
+                    window.addToast('error', 'Network error');
+                }
+            }
+        });
+    }
   }
 
   document.addEventListener('DOMContentLoaded', wire);

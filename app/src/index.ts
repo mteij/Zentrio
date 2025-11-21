@@ -17,7 +17,11 @@ import apiRoutes from './routes/api/index'
 initEnv()
 
 // Create app instance
+import { renderer } from './renderer'
 const app = new Hono()
+
+// Apply renderer only to view routes, not API or static
+app.get('*', renderer)
 
 // Load runtime config
 const cfg = getConfig()

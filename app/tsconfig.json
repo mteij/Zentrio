@@ -9,7 +9,7 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["@capacitor/core"]
+    "types": ["bun", "@capacitor/core"]
   },
   "include": [
     "src/**/*",

@@ -363,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!confirm('Are you sure you want to logout?')) return;
             logoutBtn.disabled = true;
             try {
-                await fetch('/api/auth/logout', {
+                await fetch('/api/auth/sign-out', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'same-origin'

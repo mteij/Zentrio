@@ -14,36 +14,27 @@ export function LandingPage({}: LandingPageProps) {
             <p>Experience unlimited streaming with Stremio integration. Create profiles, manage your content, and enjoy seamless entertainment.</p>
             
             <form className="email-form" id="emailForm">
-              <Input
-                type="email"
-                className="email-input"
-                id="email"
-                placeholder="Enter your email address"
-                required
-              />
-              <Button type="submit" variant="cta" id="submitBtn">
-                Get Started
-              </Button>
+                <Input
+                    type="email"
+                    id="email"
+                    className="email-input"
+                    placeholder="Enter your email address"
+                    required
+                />
+                <Button type="submit" variant="cta" id="submitBtn">
+                    Get Started
+                </Button>
             </form>
-            
-            <div className="loading" id="loading" style={{ display: 'none' }}>
-              <div className="pulsing-dots small">
-                <div className="dot"></div>
-                <div className="dot"></div>
-                <div className="dot"></div>
-              </div>
-              Checking your account...
+
+            <div id="loading" className="loading">
+                <div className="spinner"></div>
+                <p>Please wait...</p>
             </div>
+
+            <div id="inlineAuth" className="step-hidden inline-auth-container"></div>
+
+            <Message id="message" show={false} />
             
-            <Message id="message" role="alert" show={false} ariaLive="polite" />
-            <div id="inlineAuth" className="inline-auth-container step-hidden" aria-live="polite"></div>
-            <noscript>
-              <p style={{ marginTop: '12px' }}>
-                JavaScript is disabled. Continue to
-                <a href="/signin">Sign in</a> or
-                <a href="/register">Create an account</a>.
-              </p>
-            </noscript>
           </div>
         </div>
       </main>
@@ -62,254 +53,12 @@ export function LandingPage({}: LandingPageProps) {
         </div>
       </footer>
 
-      {/* Inline styles for the landing page */}
-      <style>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-
-        body {
-          font-family: 'Helvetica Neue', Arial, sans-serif;
-          background: #000000;
-          color: white;
-          height: 100vh;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-
-        #vanta-bg {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          z-index: -1;
-        }
-
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 0 20px;
-        }
-
-        .main-content {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px 0;
-        }
-
-        .hero-content {
-          text-align: center;
-          z-index: 1;
-          position: relative;
-        }
-
-        .hero-content h1 {
-          font-size: 3.5rem;
-          font-weight: bold;
-          margin-bottom: 15px;
-          background: linear-gradient(135deg, #e50914, #ff6b6b);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          line-height: 1.1;
-        }
-
-        .hero-content p {
-          font-size: 1.3rem;
-          margin-bottom: 30px;
-          color: #b3b3b3;
-          line-height: 1.4;
-        }
-
-        .email-form {
-          display: flex;
-          max-width: 500px;
-          margin: 0 auto;
-          gap: 15px;
-          background: rgba(0, 0, 0, 0.8);
-          backdrop-filter: blur(10px);
-          padding: 20px;
-          border-radius: 12px;
-          border: 1px solid rgba(229, 9, 20, 0.3);
-          box-shadow: 0 10px 40px rgba(229, 9, 20, 0.2);
-        }
-
-        .email-input {
-          flex: 1;
-          padding: 16px 20px;
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          border-radius: 8px;
-          color: white;
-          font-size: 16px;
-          outline: none;
-          transition: all 0.3s;
-        }
-
-        .email-input:focus {
-          border-color: #e50914;
-          background: rgba(255, 255, 255, 0.15);
-        }
-
-        .email-input::placeholder {
-          color: #888;
-        }
-
-        .cta-button {
-          padding: 16px 32px;
-          background: linear-gradient(135deg, #e50914, #ff1a1a);
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-size: 16px;
-          font-weight: bold;
-          cursor: pointer;
-          transition: all 0.3s;
-          white-space: nowrap;
-        }
-
-        .cta-button:hover {
-          background: linear-gradient(135deg, #ff1a1a, #e50914);
-          transform: translateY(-2px);
-          box-shadow: 0 10px 30px rgba(229, 9, 20, 0.4);
-        }
-
-        .cta-button:disabled {
-          background: #666;
-          cursor: not-allowed;
-          transform: none;
-          box-shadow: none;
-        }
-
-        .loading {
-          display: none;
-          text-align: center;
-          margin-top: 20px;
-        }
-
-
-        .footer {
-          padding: 15px 0;
-          background: transparent;
-        }
-
-        .footer-content {
-          text-align: center;
-          font-size: 0.75rem;
-          color: #666;
-          line-height: 1.3;
-          max-width: 600px;
-          margin: 0 auto;
-        }
-
-        .footer-content a {
-          color: #e50914;
-          text-decoration: none;
-        }
-
-        .footer-content a:hover {
-          text-decoration: underline;
-        }
-
-        .github-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          margin-top: 8px;
-          font-size: 0.8rem;
-          color: #888;
-          text-decoration: none;
-          transition: color 0.3s;
-        }
-
-        .github-link:hover {
-          color: #e50914;
-        }
-
-        .github-icon {
-          width: 16px;
-          height: 16px;
-          fill: currentColor;
-        }
-
-        @media (max-width: 768px) {
-          .hero-content h1 {
-            font-size: 2.2rem;
-            margin-bottom: 10px;
-          }
-
-          .hero-content p {
-            font-size: 1.1rem;
-            margin-bottom: 25px;
-          }
-
-          .email-form {
-            flex-direction: column;
-            max-width: 400px;
-            padding: 15px;
-          }
-
-          .container {
-            padding: 0 15px;
-          }
-
-          .footer-content {
-            font-size: 0.7rem;
-          }
-
-          .github-link {
-            font-size: 0.75rem;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .hero-content h1 {
-            font-size: 1.8rem;
-          }
-
-          .hero-content p {
-            font-size: 1rem;
-          }
-
-          .email-form {
-            max-width: 100%;
-          }
-
-          .footer-content {
-            font-size: 0.65rem;
-          }
-
-          .github-link {
-            font-size: 0.7rem;
-          }
-
-          .github-icon {
-            width: 14px;
-            height: 14px;
-          }
-        }
-
-        .step-hidden {
-          display: none !important;
-        }
-
-        .inline-auth-container {
-          margin-top: 20px;
-        }
-      `}</style>
-
       {/* Mobile session handler */}
       <script src="/static/js/mobile-session-handler.js"></script>
       
-      {/* Landing page JavaScript */}
+      {/* Landing page logic */}
       <script src="/static/js/landing.js"></script>
-
+      
       {/* Vanta.js Scripts */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>

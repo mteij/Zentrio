@@ -220,6 +220,101 @@ class EmailService {
       return false
     }
   }
+  async sendVerificationEmail(email: string, url: string): Promise<boolean> {
+    try {
+      const appUrl = process.env.APP_URL || 'http://localhost:3000'
+      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
+      let to: string
+      try {
+        to = this.validateRecipient(email)
+      } catch (e: any) {
+        console.error('Invalid recipient for verification email:', e?.message || e)
+        return false
+      }
+      const mailOptions = {
+        from,
+        to,
+        envelope: { from, to },
+        subject: 'Verify your email • Zentrio',
+        html: `
+  <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <div style="max-width:640px;margin:0 auto;background:#111;border:1px solid #222;border-radius:12px;overflow:hidden;">
+      <div style="padding:20px 24px;background:#1a1a1a;border-bottom:1px solid #222;">
+        <div style="color:#e50914;font-weight:700;font-size:20px;letter-spacing:-0.3px;">Zentrio</div>
+      </div>
+      <div style="padding:24px 24px 8px;color:#ddd;line-height:1.6;">
+        <h1 style="margin:0 0 8px;color:#fff;font-size:22px;letter-spacing:-0.2px;">Verify your email address</h1>
+        <p style="margin:0 0 16px;color:#b3b3b3;">Please verify your email address to continue using Zentrio.</p>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="${url}" target="_blank" rel="noopener" style="display:inline-block;background:#e50914;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;">
+            Verify Email
+          </a>
+        </div>
+        <p style="margin:16px 0;color:#8a8a8a;font-size:14px;">If the button doesn't work, copy and paste this URL into your browser:</p>
+        <p style="word-break:break-all;background:#0f0f0f;border:1px solid #262626;border-radius:8px;padding:12px 14px;color:#bdbdbd;font-size:12px;">${url}</p>
+        <p style="margin:20px 0 10px;color:#8a8a8a;font-size:13px;">If you didn't create an account, you can safely ignore this email.</p>
+      </div>
+      <div style="padding:16px 24px;border-top:1px solid #222;color:#666;text-align:center;font-size:12px;">
+        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//,'')}</a>
+      </div>
+    </div>
+  </div>`
+      }
+      await this.ensureTransporter().sendMail(mailOptions)
+      return true
+    } catch (error: any) {
+      console.error('Failed to send verification email:', error?.response || error?.message || error)
+      return false
+    }
+  }
+
+  async sendResetPasswordEmail(email: string, url: string): Promise<boolean> {
+    try {
+      const appUrl = process.env.APP_URL || 'http://localhost:3000'
+      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
+      let to: string
+      try {
+        to = this.validateRecipient(email)
+      } catch (e: any) {
+        console.error('Invalid recipient for reset password email:', e?.message || e)
+        return false
+      }
+      const mailOptions = {
+        from,
+        to,
+        envelope: { from, to },
+        subject: 'Reset your password • Zentrio',
+        html: `
+  <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <div style="max-width:640px;margin:0 auto;background:#111;border:1px solid #222;border-radius:12px;overflow:hidden;">
+      <div style="padding:20px 24px;background:#1a1a1a;border-bottom:1px solid #222;">
+        <div style="color:#e50914;font-weight:700;font-size:20px;letter-spacing:-0.3px;">Zentrio</div>
+      </div>
+      <div style="padding:24px 24px 8px;color:#ddd;line-height:1.6;">
+        <h1 style="margin:0 0 8px;color:#fff;font-size:22px;letter-spacing:-0.2px;">Reset your password</h1>
+        <p style="margin:0 0 16px;color:#b3b3b3;">We received a request to reset your password. Click the button below to choose a new one.</p>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="${url}" target="_blank" rel="noopener" style="display:inline-block;background:#e50914;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;">
+            Reset Password
+          </a>
+        </div>
+        <p style="margin:16px 0;color:#8a8a8a;font-size:14px;">If the button doesn't work, copy and paste this URL into your browser:</p>
+        <p style="word-break:break-all;background:#0f0f0f;border:1px solid #262626;border-radius:8px;padding:12px 14px;color:#bdbdbd;font-size:12px;">${url}</p>
+        <p style="margin:20px 0 10px;color:#8a8a8a;font-size:13px;">If you didn't ask to reset your password, you can safely ignore this email.</p>
+      </div>
+      <div style="padding:16px 24px;border-top:1px solid #222;color:#666;text-align:center;font-size:12px;">
+        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//,'')}</a>
+      </div>
+    </div>
+  </div>`
+      }
+      await this.ensureTransporter().sendMail(mailOptions)
+      return true
+    } catch (error: any) {
+      console.error('Failed to send reset password email:', error?.response || error?.message || error)
+      return false
+    }
+  }
 }
 
 // Create lazy email service singleton (reads env at first use)

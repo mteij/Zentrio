@@ -30,6 +30,39 @@
               var rewritten = '/stremio' + u.pathname + u.search + u.hash;
               return __zdm_origFetch.call(this, rewritten, init);
             }
+
+            // Fix for addons/streams that don't support HEAD requests (return 405)
+            var method = (init && init.method) || (input && input.method) || 'GET';
+            var finalInit = init;
+            var finalUrl = url;
+            var modified = false;
+
+            if (typeof method === 'string' && method.toUpperCase() === 'HEAD' && url && url.indexOf('/stremio/') === -1) {
+               finalInit = init ? Object.assign({}, init) : {};
+               finalInit.method = 'GET';
+               
+               var headers = new Headers(init ? init.headers : undefined);
+               if (input && typeof input === 'object' && input.headers) {
+                  if (typeof input.headers.forEach === 'function') {
+                     input.headers.forEach(function(v, k) {
+                        if (!headers.has(k)) headers.set(k, v);
+                     });
+                  }
+               }
+               headers.set('Range', 'bytes=0-0');
+               finalInit.headers = headers;
+               modified = true;
+            }
+
+            // Proxy local server and problematic addons
+            if (url && (url.indexOf('http://127.0.0.1') === 0 || url.indexOf('opensubtitles') !== -1)) {
+               finalUrl = '/stremio/proxy?url=' + encodeURIComponent(url);
+               modified = true;
+            }
+
+            if (modified) {
+               return __zdm_origFetch.call(this, finalUrl, finalInit);
+            }
           } catch (_e) {}
           return __zdm_origFetch.call(this, input, init);
         };

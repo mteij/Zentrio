@@ -33,6 +33,41 @@ app.all('*', async (c) => {
     return proxyRequestHandler(c.req.raw, fullPath, sessionData)
   }
 
+  // Generic proxy for local server (127.0.0.1) and problematic addons
+  if (path.startsWith('proxy')) {
+    const targetParam = url.searchParams.get('url')
+    if (!targetParam) return new Response('Missing url param', { status: 400 })
+
+    try {
+      const targetUrl = new URL(targetParam)
+      const requestHeaders = new Headers(c.req.header())
+      requestHeaders.set('Host', targetUrl.host)
+      requestHeaders.delete('origin')
+      requestHeaders.delete('referer')
+
+      const response = await fetch(targetUrl.href, {
+        method: c.req.method,
+        headers: requestHeaders,
+        body: c.req.raw.body,
+        redirect: 'follow'
+      })
+
+      const responseHeaders = new Headers(response.headers)
+      responseHeaders.set('Access-Control-Allow-Origin', '*')
+      responseHeaders.set('Access-Control-Allow-Credentials', 'true')
+      responseHeaders.delete('content-security-policy')
+      responseHeaders.delete('x-frame-options')
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders
+      })
+    } catch (err) {
+      return new Response(`Proxy error: ${String(err)}`, { status: 502 })
+    }
+  }
+
   // HTML entry: serve the locally built Stremio Web index.html,
   // with session data injected for the build-time patches to use.
   if (path === '' || path === '/' || path.toLowerCase() === 'index.html') {
@@ -60,7 +95,8 @@ app.all('*', async (c) => {
       '.woff': 'font/woff',
       '.woff2': 'font/woff2',
       '.ttf': 'font/ttf',
-      '.eot': 'application/vnd.ms-fontobject'
+      '.eot': 'application/vnd.ms-fontobject',
+      '.wasm': 'application/wasm'
     }
 
     const ext = extname(filePath).toLowerCase()
@@ -68,10 +104,7 @@ app.all('*', async (c) => {
 
     const headers = new Headers({
       'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=3600',
-      'Cross-Origin-Resource-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'credentialless',
-      'Cross-Origin-Opener-Policy': 'same-origin'
+      'Cache-Control': 'public, max-age=3600'
     })
 
     if (contentType.includes('javascript')) {

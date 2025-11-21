@@ -152,8 +152,8 @@ export const renderLocalStremioHtml = async (sessionData: string | null) => {
     headers.set('Expires', '0');
 
     // Required for SharedArrayBuffer, which Stremio Web uses for its player (audio/video)
-    headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-    headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+    // headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+    // headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
 
     return new Response(body, { status: 200, headers });
   } catch (err) {

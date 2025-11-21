@@ -13,10 +13,12 @@ interface InputProps {
   step?: string
   list?: string
   maxLength?: string
+  minLength?: number
   inputMode?: string
   pattern?: string
   autoComplete?: string
   ariaDescribedBy?: string
+  onChange?: (e: any) => void
 }
 
 interface FormGroupProps {
@@ -42,13 +44,16 @@ export function Input({
   step,
   list,
   maxLength,
+  minLength,
   inputMode,
   pattern,
   autoComplete,
-  ariaDescribedBy
+  ariaDescribedBy,
+  onChange
 }: InputProps) {
   return (
     <input
+      onChange={onChange}
       type={type}
       id={id}
       name={name}
@@ -63,6 +68,7 @@ export function Input({
       step={step}
       list={list}
       maxLength={maxLength}
+      minLength={minLength}
       inputMode={inputMode}
       pattern={pattern}
       autoComplete={autoComplete}

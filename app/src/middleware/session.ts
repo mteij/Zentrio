@@ -1,31 +1,17 @@
 import { createMiddleware } from 'hono/factory'
-import { getCookie } from 'hono/cookie'
-import { sessionDb, userDb } from '../services/database'
+import { auth } from '../services/auth'
 
 export const sessionMiddleware = createMiddleware(async (c, next) => {
-  const sessionId = getCookie(c, 'sessionId')
-  if (!sessionId) {
-    return c.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, 401)
-  }
+  const session = await auth.api.getSession({
+    headers: c.req.raw.headers
+  })
 
-  const session = sessionDb.findByToken(sessionId)
   if (!session) {
     return c.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, 401)
   }
 
-  const user = userDb.findById(session.user_id)
-  if (!user) {
-    return c.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, 401)
-  }
-
-  c.set('user', user)
-
-  // Update last activity for non-remembered sessions to enforce idle timeout
-  try {
-    sessionDb.touch(sessionId)
-  } catch (_) {
-    // touching is best-effort; ignore errors
-  }
+  c.set('user', session.user)
+  c.set('session', session.session)
 
   await next()
 })

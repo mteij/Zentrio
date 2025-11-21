@@ -65,7 +65,6 @@ app.get('/', (c) => {
     endpoints: {
       health: '/health',
       auth: {
-        checkUser: 'POST /api/auth/check-user',
         identify: 'POST /api/auth/identify',
         identifyInfo: {
           description: 'Email identification that returns only whether an account exists for the normalized email. Does not leak additional user information.',
@@ -76,11 +75,17 @@ app.get('/', (c) => {
             response: { exists: true }
           }
         },
-        signinPassword: 'POST /api/auth/signin-password',
-        register: 'POST /api/auth/register',
-        magicLink: 'POST /api/auth/magic-link',
-        sendOTP: 'POST /api/auth/send-otp',
-        verifyOTP: 'POST /api/auth/verify-otp',
+        signInEmail: 'POST /api/auth/sign-in/email',
+        signUpEmail: 'POST /api/auth/sign-up/email',
+        signInMagicLink: 'POST /api/auth/sign-in/magic-link',
+        signInEmailOTP: 'POST /api/auth/sign-in/email-otp',
+        twoFactor: {
+            enable: 'POST /api/auth/two-factor/enable',
+            verify: 'POST /api/auth/two-factor/verify',
+            disable: 'POST /api/auth/two-factor/disable'
+        },
+        changePassword: 'POST /api/auth/change-password',
+        changeEmail: 'POST /api/auth/change-email'
       },
       profiles: {
         list: 'GET /api/profiles',
@@ -92,7 +97,8 @@ app.get('/', (c) => {
         settings: 'GET /api/user/settings',
         updateSettings: 'PUT /api/user/settings',
         profile: 'GET /api/user/profile',
-        updateEmail: 'PUT /api/user/email',
+        tmdbApiKey: 'GET /api/user/tmdb-api-key',
+        updateTmdbApiKey: 'PUT /api/user/tmdb-api-key',
       },
       pages: {
         landing: '/',

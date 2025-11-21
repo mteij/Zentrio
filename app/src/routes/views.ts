@@ -2,32 +2,20 @@ import { Hono } from 'hono'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { getCookie } from 'hono/cookie'
-import { sessionDb } from '../services/database'
+import { auth } from '../services/auth'
 import { LandingPage } from '../pages/LandingPage'
 import { ProfilesPage } from '../pages/ProfilesPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { DownloadsPage } from '../pages/DownloadsPage'
+import { ResetPasswordPage } from '../pages/ResetPasswordPage'
  
 const app = new Hono()
 
-function isAuthenticated(c: any): boolean {
-  const cookies = getCookie(c)
-  
-  // Check for Better Auth session token
-  const betterAuthToken = Object.keys(cookies).find((k) => k === 'session_token' || k.endsWith('.session_token'))
-  if (betterAuthToken) {
-    return true // Trust Better Auth's session management
-  }
-  
-  // Check for our local session
-  const sessionId = cookies['sessionId']
-  if (sessionId) {
-    // Validate session in database
-    const session = sessionDb.findByToken(sessionId)
-    return !!session
-  }
-  
-  return false
+async function isAuthenticated(c: any): Promise<boolean> {
+  const session = await auth.api.getSession({
+    headers: c.req.raw.headers
+  })
+  return !!session
 }
  
 async function serveHTML(filePath: string) {
@@ -43,26 +31,29 @@ async function serveHTML(filePath: string) {
  
 // JSX Component Routes (New)
 app.get('/', async (c) => {
-  if (isAuthenticated(c)) return c.redirect('/profiles')
+  if (await isAuthenticated(c)) return c.redirect('/profiles')
   return c.html(LandingPage({}))
 })
  
 app.get('/profiles', async (c) => {
-  if (!isAuthenticated(c)) return c.redirect('/')
+  if (!await isAuthenticated(c)) return c.redirect('/')
   return c.html(ProfilesPage({}))
 })
  
 app.get('/settings', async (c) => {
-  if (!isAuthenticated(c)) return c.redirect('/')
+  if (!await isAuthenticated(c)) return c.redirect('/')
   return c.html(SettingsPage({}))
 })
 
 
 app.get('/downloads', async (c) => {
-  if (!isAuthenticated(c)) return c.redirect('/')
+  if (!await isAuthenticated(c)) return c.redirect('/')
   return c.html(DownloadsPage({}))
 })
 
+app.get('/reset-password', async (c) => {
+  return c.html(ResetPasswordPage({}))
+})
  
 // Auth modal routes (keep for compatibility)
 app.get('/views/auth/otp-modal.html', async (c) => {
