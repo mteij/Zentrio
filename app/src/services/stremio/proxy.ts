@@ -25,11 +25,19 @@ export const proxyRequestHandler = async (req: Request, path: string, _sessionDa
     requestHeaders.delete('if-modified-since');
     requestHeaders.delete('if-none-match');
 
+    // Bun's fetch implementation might have issues with some streams or redirects
+    // We need to ensure we handle redirects manually if needed, or let fetch handle it.
+    // 'follow' is the default, but explicit is better.
     const response = await fetch(targetUrl.href, {
       method: req.method,
       headers: requestHeaders,
       body,
       redirect: 'follow',
+      // @ts-ignore - Bun specific option to disable decompression if needed,
+      // but we want to handle it via headers.
+      // However, for proxying, we might want to disable automatic decompression
+      // to pass through the original stream if possible, but fetch usually decompresses.
+      // The issue with 502 might be upstream connection closure or timeout.
     });
 
     const responseHeaders = new Headers(response.headers);
@@ -92,13 +100,25 @@ export const proxyRequestHandler = async (req: Request, path: string, _sessionDa
       });
     }
 
-    const buffer = await response.arrayBuffer();
+    // For video streams and subtitles, we should stream the response body
+    // instead of buffering it all in memory. This fixes issues with large files
+    // and content decoding errors when the upstream server uses compression.
+    // We also need to be careful about which headers we forward.
+    
+    // Remove headers that might cause issues with the response body stream
     responseHeaders.delete('content-encoding');
     responseHeaders.delete('Content-Encoding');
     responseHeaders.delete('content-length');
     responseHeaders.delete('Content-Length');
+    responseHeaders.delete('transfer-encoding');
+    responseHeaders.delete('Transfer-Encoding');
 
-    return new Response(buffer, {
+    // Ensure Range headers are forwarded correctly for video seeking
+    if (response.status === 206) {
+      responseHeaders.set('Accept-Ranges', 'bytes');
+    }
+
+    return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders,
@@ -152,8 +172,9 @@ export const renderLocalStremioHtml = async (sessionData: string | null) => {
     headers.set('Expires', '0');
 
     // Required for SharedArrayBuffer, which Stremio Web uses for its player (audio/video)
-    // headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-    // headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+    // This enables software decoding for unsupported audio codecs (AC3, EAC3, DTS)
+    headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+    headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
 
     return new Response(body, { status: 200, headers });
   } catch (err) {

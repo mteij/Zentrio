@@ -41,10 +41,13 @@ app.all('*', async (c) => {
     try {
       const targetUrl = new URL(targetParam)
       const requestHeaders = new Headers(c.req.header())
-      requestHeaders.set('Host', targetUrl.host)
+      // Let fetch handle the Host header, especially for redirects
+      requestHeaders.delete('host')
       requestHeaders.delete('origin')
       requestHeaders.delete('referer')
 
+      // Follow redirects automatically to ensure we handle the final resource
+      // This proxies the traffic, ensuring CORS and headers are correct for the client
       const response = await fetch(targetUrl.href, {
         method: c.req.method,
         headers: requestHeaders,
@@ -57,6 +60,17 @@ app.all('*', async (c) => {
       responseHeaders.set('Access-Control-Allow-Credentials', 'true')
       responseHeaders.delete('content-security-policy')
       responseHeaders.delete('x-frame-options')
+      
+      // Handle Content-Encoding and Content-Length carefully
+      const contentEncoding = responseHeaders.get('content-encoding')
+      if (contentEncoding && contentEncoding !== 'identity') {
+        // If the response is compressed, fetch decodes it, so the original Content-Length is invalid
+        responseHeaders.delete('content-encoding')
+        responseHeaders.delete('content-length')
+      }
+      // If no compression (common for video), we keep Content-Length for seeking support
+
+      responseHeaders.delete('transfer-encoding')
 
       return new Response(response.body, {
         status: response.status,
@@ -64,6 +78,7 @@ app.all('*', async (c) => {
         headers: responseHeaders
       })
     } catch (err) {
+      console.error('[Zentrio][stremio proxy] error:', err)
       return new Response(`Proxy error: ${String(err)}`, { status: 502 })
     }
   }
@@ -104,11 +119,16 @@ app.all('*', async (c) => {
 
     const headers = new Headers({
       'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=3600'
+      'Cache-Control': 'public, max-age=3600',
+      // Required when the main page uses COOP/COEP (for SharedArrayBuffer/audio support)
+      'Cross-Origin-Resource-Policy': 'cross-origin'
     })
 
+    // Workers need to opt-in to COOP/COEP to be loaded by a COOP/COEP page
     if (contentType.includes('javascript')) {
       headers.set('Service-Worker-Allowed', '/')
+      headers.set('Cross-Origin-Embedder-Policy', 'credentialless')
+      headers.set('Cross-Origin-Opener-Policy', 'same-origin')
     }
 
     return new Response(buf, { headers })
