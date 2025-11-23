@@ -49,6 +49,7 @@ declare global {
             const db = await openDb();
             return new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(IDB_STORE_HANDLES, 'readwrite');
+                // FileSystemHandle can be stored directly in IndexedDB in modern browsers
                 tx.objectStore(IDB_STORE_HANDLES).put(handle, 'root');
                 tx.oncomplete = () => {
                     console.log('[ZDM-Core] Root handle saved successfully');
@@ -68,7 +69,23 @@ declare global {
             return new Promise((resolve, reject) => {
                 const tx = db.transaction(IDB_STORE_HANDLES, 'readonly');
                 const req = tx.objectStore(IDB_STORE_HANDLES).get('root');
-                req.onsuccess = () => resolve(req.result);
+                req.onsuccess = async () => {
+                    const handle = req.result;
+                    if (handle) {
+                        // Verify permission on load
+                        try {
+                            const mode = 'readwrite';
+                            if ((await handle.queryPermission({ mode })) !== 'granted') {
+                                // We can't request permission here without user gesture, so we just return the handle
+                                // and let the next operation trigger the request or fail gracefully
+                                console.log('[ZDM-Core] Loaded handle needs permission verification');
+                            }
+                        } catch (e) {
+                            console.warn('[ZDM-Core] Permission check on load failed', e);
+                        }
+                    }
+                    resolve(handle);
+                };
                 req.onerror = () => reject(req.error);
             });
         } catch (e) { console.error('[ZDM-Core] DB Handle Load Error', e); return null; }
@@ -96,6 +113,18 @@ declare global {
                 req.onerror = () => reject(req.error);
             });
         } catch (e) { return null; }
+    }
+
+    async function getAllItems(): Promise<any[]> {
+        try {
+            const db = await openDb();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(IDB_STORE_ITEMS, 'readonly');
+                const req = tx.objectStore(IDB_STORE_ITEMS).getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => reject(req.error);
+            });
+        } catch (e) { return []; }
     }
 
     // --- Messaging & Coordination ---
@@ -279,6 +308,9 @@ declare global {
             href: data.href,
             title: data.title,
             episodeInfo: data.episodeInfo,
+            fileName: data.fileName,
+            poster: data.poster,
+            duration: data.duration,
             url: data.url,
             createdAt: Date.now(),
             status: 'initiated',
@@ -292,15 +324,20 @@ declare global {
             startNativeDownload(item, data.url);
         } else {
             if (!worker) initWorker();
-            worker?.postMessage({
-                type: 'start',
-                payload: {
-                    item,
-                    url: data.url,
-                    rootHandle,
-                    resume: false
-                }
-            });
+            try {
+                worker?.postMessage({
+                    type: 'start',
+                    payload: {
+                        item,
+                        url: data.url,
+                        rootHandle,
+                        resume: false
+                    }
+                });
+            } catch (e) {
+                console.error('[ZDM-Core] Failed to post message to worker', e);
+                broadcast({ type: 'zentrio-download-error', id: data.id, error: 'Worker communication failed' });
+            }
         }
     }
 
@@ -355,11 +392,33 @@ declare global {
     }
 
     // Listen for messages from UI
+    const processedMessageIds = new Set<string>();
+
     async function handleMessage(data: any, source: any) {
         try {
             if (!data || typeof data !== 'object') return;
 
+            // Deduplicate by ID for requests that carry an ID
+            if (data.id && (data.type === 'zentrio-download-request' || data.type === 'zentrio-download-cancel')) {
+                const key = `${data.type}:${data.id}`;
+                if (processedMessageIds.has(key)) {
+                    // console.log('[ZDM-Core] Ignoring duplicate message', key);
+                    return;
+                }
+                processedMessageIds.add(key);
+                // Clear after 5 seconds to allow for re-tries later but block immediate duplicates from bridge+postMessage race
+                // Increased to 5s to prevent double-clicks or rapid re-sends
+                setTimeout(() => processedMessageIds.delete(key), 5000);
+            }
+
             switch (data.type) {
+                case 'zentrio-download-list-request':
+                    const allItems = await getAllItems();
+                    // Send back to source or broadcast
+                    const listMsg = { type: 'zentrio-download-list', items: allItems };
+                    if (source) source.postMessage(listMsg, '*');
+                    else broadcast(listMsg);
+                    break;
                 case 'zentrio-download-request':
                     handleDownloadRequest(data);
                     break;
@@ -368,6 +427,19 @@ declare global {
                         // TODO: Cancel native download
                     } else {
                         if (worker) worker.postMessage({ type: 'cancel', id: data.id });
+                    }
+                    break;
+                case 'zentrio-download-delete':
+                    const delItem = await getItem(data.id);
+                    if (delItem) {
+                        // If file exists, try to delete it (Native only for now, or if we have handle)
+                        // For now just remove from DB
+                        try {
+                            const db = await openDb();
+                            const tx = db.transaction(IDB_STORE_ITEMS, 'readwrite');
+                            tx.objectStore(IDB_STORE_ITEMS).delete(data.id);
+                            broadcast({ type: 'zentrio-download-deleted', id: data.id });
+                        } catch(e) { console.error('Delete failed', e); }
                     }
                     break;
                 case 'zentrio-download-retry':
@@ -386,7 +458,11 @@ declare global {
                     if (data.handle) {
                         rootHandle = data.handle;
                         await saveRootHandle(rootHandle);
-                        broadcast({ type: 'zentrio-download-root-handle', handle: rootHandle });
+                        // Broadcast only serializable parts of the handle (name, kind)
+                        broadcast({
+                            type: 'zentrio-download-root-handle',
+                            handle: { name: rootHandle.name, kind: rootHandle.kind }
+                        });
                     }
                     break;
                 case 'zentrio-download-root-request':
@@ -394,10 +470,11 @@ declare global {
                         // Native doesn't need root handle, send dummy or specific status
                         broadcast({ type: 'zentrio-download-root-handle', handle: { name: 'Device Storage' } });
                     } else if (rootHandle) {
+                        const safeHandle = { name: rootHandle.name, kind: rootHandle.kind };
                         if (source) {
-                            source.postMessage({ type: 'zentrio-download-root-handle', handle: rootHandle }, '*');
+                            source.postMessage({ type: 'zentrio-download-root-handle', handle: safeHandle }, '*');
                         } else {
-                            broadcast({ type: 'zentrio-download-root-handle', handle: rootHandle });
+                            broadcast({ type: 'zentrio-download-root-handle', handle: safeHandle });
                         }
                     }
                     break;
@@ -412,7 +489,7 @@ declare global {
 
     // --- Initialization ---
     async function init() {
-        console.log('[ZDM-Core] Initializing v3 (Hybrid)...');
+        console.log('[ZDM-Core] Initializing v3 (Hybrid)...', window.location.href);
         
         if (!isNative) {
             rootHandle = await loadRootHandle();

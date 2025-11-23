@@ -13,9 +13,10 @@ interface Profile {
 
 interface ProfilesPageProps {
   profiles?: Profile[]
+  user?: any
 }
 
-export function ProfilesPage({ profiles = [] }: ProfilesPageProps) {
+export function ProfilesPage({ profiles = [], user }: ProfilesPageProps) {
   return (
     <SimpleLayout title="Profiles" additionalCSS={['/static/css/profiles.css']}>
       {/* VANTA background container (same as Settings page) */}
@@ -42,15 +43,18 @@ export function ProfilesPage({ profiles = [] }: ProfilesPageProps) {
       {/* Footer with buttons */}
       <footer className="footer">
         <div className="footer-buttons" id="footerButtons">
-          <Button
-            id="downloadsBtn"
-            variant="secondary"
-            size="small"
-            ariaLabel="Downloads"
-            title="Downloads"
-          >
-            <i data-lucide="download" style={{ width: 20, height: 20 }}></i>
-          </Button>
+          {(!user || user.downloadsManagerEnabled !== false) && (
+            <Button
+              id="downloadsBtn"
+              variant="secondary"
+              size="small"
+              ariaLabel="Downloads"
+              title="Downloads"
+              href="/downloads"
+            >
+              <i data-lucide="download" style={{ width: 20, height: 20 }}></i>
+            </Button>
+          )}
           
           <Button
             id="settingsBtn"

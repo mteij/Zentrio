@@ -10,6 +10,7 @@ interface ButtonProps {
   ariaLabel?: string
   title?: string
   style?: Record<string, string>
+  href?: string
 }
 
 export function Button({
@@ -23,7 +24,8 @@ export function Button({
   id,
   ariaLabel,
   title,
-  style
+  style,
+  href
 }: ButtonProps) {
   const getClasses = () => {
     const base = variant === 'cta' ? 'cta-button' : 'btn'
@@ -33,6 +35,22 @@ export function Button({
     return [base, variantClass, sizeClass, className]
       .filter(Boolean)
       .join(' ')
+  }
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={getClasses()}
+        onClick={onClick}
+        id={id}
+        aria-label={ariaLabel}
+        title={title}
+        style={style}
+      >
+        {children}
+      </a>
+    )
   }
 
   return (

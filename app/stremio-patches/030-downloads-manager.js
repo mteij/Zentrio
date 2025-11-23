@@ -296,9 +296,11 @@
             items[data.id] = { ...items[data.id], status: 'completed', progress: 100 };
             renderPopupList();
         } else if (data.type === 'zentrio-download-failed' || data.type === 'zentrio-download-cancelled') {
-            updateButtonState(data.id, 'default');
+            updateButtonState(data.id, 'failed');
             items[data.id] = { ...items[data.id], status: 'failed' };
             renderPopupList();
+            // Reset button after delay
+            setTimeout(() => updateButtonState(data.id, 'default'), 3000);
         } else if (data.type === 'zentrio-download-init') {
             const item = data.payload;
             items[item.id] = item;
@@ -309,6 +311,13 @@
                 const btn = a.querySelector('.zentrio-dl-btn');
                 if (btn) setButtonState(btn, 'downloading');
             });
+        } else if (data.type === 'zentrio-download-list') {
+            if (data.items && Array.isArray(data.items)) {
+                data.items.forEach(item => {
+                    items[item.id] = item;
+                });
+                renderPopupList();
+            }
         } else if (data.type === 'zentrio-download-root-handle') {
             // Core has a handle, we can update UI if needed (e.g. hide modal warning)
             const modal = document.getElementById('zentrioFolderModal');
@@ -319,8 +328,19 @@
                  if (data.id && items[data.id]) {
                      window.__zentrioPendingDownloadItem = items[data.id];
                  }
-                 const modal = document.getElementById('zentrioFolderModal');
-                 if (modal) modal.style.display = 'block';
+                 let modal = document.getElementById('zentrioFolderModal');
+                 if (!modal) {
+                     console.warn('[ZDM] Folder modal not found, forcing re-injection...');
+                     injectStyles();
+                     modal = document.getElementById('zentrioFolderModal');
+                 }
+                 
+                 if (modal) {
+                     modal.style.display = 'block';
+                 } else {
+                     // Last ditch effort: create it immediately if injectStyles failed or was async
+                     console.error('[ZDM] Modal still missing after injection attempt');
+                 }
              }
         }
     });
@@ -330,11 +350,15 @@
       try {
         if (!hash || !hash.startsWith('#/player/')) return;
         const iframeId = 'zdm-probe-frame-' + btoa(hash).replace(/[^a-z0-9]/ig,'').slice(0,12);
-        if (document.getElementById(iframeId)) {
-          return;
+        const existing = document.getElementById(iframeId);
+        if (existing) {
+          return existing;
         }
         const ifr = document.createElement('iframe');
         ifr.id = iframeId;
+        // Add sandbox to prevent frame busting (top navigation) while allowing scripts and same-origin requests
+        ifr.sandbox = "allow-scripts allow-same-origin allow-forms allow-presentation";
+        
         const basePath = window.location.pathname.split('#')[0];
         // Ensure we pass sessionData to the probe iframe so it can actually load the stream
         const currentSearch = window.location.search;
@@ -438,6 +462,8 @@
         ifr.onload = () => {
             setTimeout(() => {
                 try {
+                    // Accessing contentDocument might fail with sandbox if allow-same-origin is not enough or if cross-origin redirect happens
+                    // But we need it to find the video element.
                     const doc = ifr.contentDocument || ifr.contentWindow.document;
                     
                     // Watch for video src changes
@@ -484,17 +510,32 @@
             }, 2000);
         };
 
+        // Auto-remove after 90s as safety net
         setTimeout(() => { try { ifr.remove(); } catch(_){} }, 90000);
+        
+        return ifr;
       } catch(e) { }
     }
 
     function markProbing(id, anchorHash) {
-      probing[id] = { startedAt: Date.now(), anchorHash };
-      openHiddenPlayer(anchorHash);
+      const ifr = openHiddenPlayer(anchorHash);
+      probing[id] = { startedAt: Date.now(), anchorHash, iframe: ifr };
     }
 
     function clearProbing(id) {
-      if (probing[id]) delete probing[id];
+      if (probing[id]) {
+        const { iframe, anchorHash } = probing[id];
+        // Remove the iframe to stop resource usage and potential frame busting
+        if (iframe) {
+            try { iframe.remove(); } catch(e) {}
+        } else if (anchorHash) {
+            // Fallback if iframe ref was lost
+            const iframeId = 'zdm-probe-frame-' + btoa(anchorHash).replace(/[^a-z0-9]/ig,'').slice(0,12);
+            const el = document.getElementById(iframeId);
+            if (el) try { el.remove(); } catch(e) {}
+        }
+        delete probing[id];
+      }
     }
 
     // Listen for probe results
@@ -529,6 +570,9 @@
                         href: item.href,
                         title: item.title,
                         episodeInfo: item.episodeInfo,
+                        fileName: item.fileName,
+                        poster: item.poster,
+                        duration: item.duration,
                         url: data.url
                     });
                 }
@@ -537,11 +581,92 @@
         }
     });
 
+    // --- Passive Network Discovery (Play to Detect) ---
+    function patchNetworkForDiscovery() {
+        if (window.__zdmDiscoveryPatched) return;
+        window.__zdmDiscoveryPatched = true;
+
+        // Patch fetch
+        const origFetch = window.fetch;
+        window.fetch = async function(...args) {
+            let url = '';
+            try { url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || ''); } catch(_) {}
+            
+            const res = await origFetch.apply(this, args);
+            
+            try {
+                // Check if this looks like a media stream
+                if (url && (/\.(m3u8|mpd|mp4|mkv|avi|mov|webm|flv|wmv)(\?|$)/i.test(url) ||
+                    /\bmpegurl|application\/dash|video|audio|octet-stream/i.test(res.headers.get('content-type') || ''))) {
+                    
+                    // Ignore non-media
+                    if (/\.(json|srt|vtt|js|css|html|svg|png|jpg|jpeg|gif|ico)($|\?)/i.test(url)) return res;
+                    if (/manifest\.json/i.test(url)) return res;
+
+                    console.log('[ZDM] Discovered media URL via fetch:', url);
+                    
+                    // Cache it in the integration layer if available
+                    if (window.__zentrioStreamCache) {
+                        // We need to associate this URL with the current player hash
+                        const hash = window.location.hash;
+                        if (hash && hash.includes('/player/')) {
+                            const cleanHash = hash.replace(/^#/, '');
+                            if (!window.__zentrioStreamCache[cleanHash]) {
+                                window.__zentrioStreamCache[cleanHash] = {};
+                            }
+                            window.__zentrioStreamCache[cleanHash].url = url;
+                            window.__zentrioStreamCache[cleanHash].discoveredAt = Date.now();
+                        }
+                    }
+                }
+            } catch(e) { console.error('[ZDM] Discovery error', e); }
+            
+            return res;
+        };
+
+        // Patch XHR
+        const origOpen = window.XMLHttpRequest.prototype.open;
+        window.XMLHttpRequest.prototype.open = function(method, url) {
+            this._zdmUrl = url;
+            return origOpen.apply(this, arguments);
+        };
+        
+        const origSend = window.XMLHttpRequest.prototype.send;
+        window.XMLHttpRequest.prototype.send = function() {
+            this.addEventListener('load', () => {
+                try {
+                    const url = this._zdmUrl || this.responseURL;
+                    const ct = this.getResponseHeader('content-type') || '';
+                    
+                    if (url && (/\.(m3u8|mpd|mp4|mkv|avi|mov|webm|flv|wmv)(\?|$)/i.test(url) ||
+                        /\bmpegurl|application\/dash|video|audio|octet-stream/i.test(ct))) {
+                        
+                        if (/\.(json|srt|vtt|js|css|html|svg|png|jpg|jpeg|gif|ico)($|\?)/i.test(url)) return;
+                        if (/manifest\.json/i.test(url)) return;
+
+                        console.log('[ZDM] Discovered media URL via XHR:', url);
+                        
+                        if (window.__zentrioStreamCache) {
+                            const hash = window.location.hash;
+                            if (hash && hash.includes('/player/')) {
+                                const cleanHash = hash.replace(/^#/, '');
+                                if (!window.__zentrioStreamCache[cleanHash]) {
+                                    window.__zentrioStreamCache[cleanHash] = {};
+                                }
+                                window.__zentrioStreamCache[cleanHash].url = url;
+                                window.__zentrioStreamCache[cleanHash].discoveredAt = Date.now();
+                            }
+                        }
+                    }
+                } catch(e) { console.error('[ZDM] XHR Discovery error', e); }
+            });
+            return origSend.apply(this, arguments);
+        };
+    }
+
     // --- UI Logic ---
 
     function injectStyles() {
-      if (document.getElementById(STYLE_ID)) return;
-      
       // Inject Lucide script if not already present
       if (!document.querySelector('script[src*="lucide"]')) {
         const script = document.createElement('script');
@@ -550,6 +675,7 @@
         document.head.appendChild(script);
       }
       
+      if (!document.getElementById(STYLE_ID)) {
       const css = '.zentrio-actions-column {' +
         'position: absolute;' +
         'top: 50%;' +
@@ -603,6 +729,10 @@
         '.zentrio-dl-btn.is-complete {' +
         'background: #059669;' +
         'border-color: #059669;' +
+        '}' +
+        '.zentrio-dl-btn.is-failed {' +
+        'background: #dc2626;' +
+        'border-color: #dc2626;' +
         '}' +
         '.zentrio-dl-btn .spinner {' +
         'width: 22px;' +
@@ -785,6 +915,7 @@
       el.id = STYLE_ID;
       el.textContent = css;
       document.head.appendChild(el);
+      }
       
       // Inject Downloads Popup HTML
       if (!document.getElementById('zentrioDownloadsPopup')) {
@@ -814,11 +945,16 @@
         });
         
         // Listen for toggle event from header integration
-        window.addEventListener('zentrioToggleDownloadsPopup', () => {
+        window.addEventListener('zentrioToggleDownloadsPopup', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const popup = document.getElementById('zentrioDownloadsPopup');
             if (popup) {
-                popup.style.display = popup.style.display === 'block' ? 'none' : 'block';
-                renderPopupList();
+                const isVisible = popup.style.display === 'block';
+                popup.style.display = isVisible ? 'none' : 'block';
+                if (!isVisible) {
+                    renderPopupList();
+                }
             }
         });
 
@@ -833,8 +969,10 @@
       }
 
       // Inject Modal HTML
-      if (!document.getElementById('zentrioFolderModal')) {
-        const modal = document.createElement('div');
+      // Always re-inject if missing, but check first to avoid duplicates
+      let modal = document.getElementById('zentrioFolderModal');
+      if (!modal) {
+        modal = document.createElement('div');
         modal.id = 'zentrioFolderModal';
         modal.className = 'zentrio-modal';
         modal.innerHTML = `
@@ -857,7 +995,16 @@
         const backBtn = document.getElementById('zentrioModalBackBtn');
         const selectBtn = document.getElementById('zentrioModalSelectBtn');
         
-        const hideModal = () => { modal.style.display = 'none'; };
+        const hideModal = () => {
+            modal.style.display = 'none';
+            // If we have a pending item and the user cancels, we should reset the button state
+            if (window.__zentrioPendingDownloadItem) {
+                const item = window.__zentrioPendingDownloadItem;
+                const btn = document.querySelector(`a[href="${item.href}"] .zentrio-dl-btn`);
+                if (btn) setButtonState(btn, 'default');
+                window.__zentrioPendingDownloadItem = null;
+            }
+        };
         
         if (closeBtn) closeBtn.onclick = hideModal;
         if (backBtn) backBtn.onclick = hideModal;
@@ -876,13 +1023,23 @@
             if (window.__zentrioPendingDownloadItem) {
                const item = window.__zentrioPendingDownloadItem;
                window.__zentrioPendingDownloadItem = null;
-               // Re-trigger download
-               const btn = document.querySelector(`a[href="${item.href}"] .zentrio-dl-btn`);
-               if (btn) {
-                   // Reset button state to allow re-download
-                   setButtonState(btn, 'default');
-                   startDownload(btn.closest('a'), btn);
-               }
+               
+               // Wait a tick for modal to fully close and UI to settle
+               setTimeout(() => {
+                   // Re-trigger download
+                   // Use a more robust selector or iteration to find the anchor
+                   const anchors = Array.from(document.querySelectorAll('a[href]'));
+                   const anchor = anchors.find(a => a.getAttribute('href') === item.href);
+                   if (anchor) {
+                       const btn = anchor.querySelector('.zentrio-dl-btn');
+                       if (btn) {
+                           // Reset button state to allow re-download
+                           setButtonState(btn, 'default');
+                           // Force start download again
+                           startDownload(anchor, btn);
+                       }
+                   }
+               }, 100);
             }
             
           } catch (e) {
@@ -893,6 +1050,9 @@
         window.onclick = (event) => {
           if (event.target == modal) hideModal();
         };
+      } else {
+          // Re-attach events if modal exists but listeners might be lost (e.g. if moved in DOM)
+          // Actually, it's safer to just leave it if it exists.
       }
     }
 
@@ -963,12 +1123,16 @@
       // Try to get the real content title from React metadata (most reliable)
       let contentTitle = '';
       let episodeInfo = '';
+      let poster = '';
+      let duration = '';
       
       if (window.getZentrioMetaData) {
           const meta = window.getZentrioMetaData();
           if (meta) {
               console.log('[ZDM] Found React metadata:', meta);
               if (meta.name) contentTitle = meta.name;
+              if (meta.poster) poster = meta.poster;
+              if (meta.runtime) duration = meta.runtime;
           } else {
               console.log('[ZDM] No React metadata found');
           }
@@ -992,10 +1156,28 @@
               
               // 3. Try common UI elements
               if (!contentTitle) {
-                  const uiTitle = document.querySelector('.meta-info .title, .title-container .title, [class*="MetaInfo"] h1');
-                  if (uiTitle) contentTitle = uiTitle.textContent.trim();
+                  // Try the specific meta preview container image title first (very reliable for movies/series)
+                  const metaImg = document.querySelector('.meta-info-container-ub8AH img[title], [class*="meta-info-container"] img[title]');
+                  if (metaImg) {
+                      contentTitle = metaImg.getAttribute('title');
+                  } else {
+                      const uiTitle = document.querySelector('.meta-info .title, .title-container .title, [class*="MetaInfo"] h1');
+                      if (uiTitle) contentTitle = uiTitle.textContent.trim();
+                  }
               }
           } catch(e) {}
+      }
+
+      // Scrape poster if missing
+      if (!poster) {
+          const img = document.querySelector('.meta-info-container-ub8AH img.logo-X3hTV, [class*="meta-info-container"] img[src]');
+          if (img) poster = img.getAttribute('src');
+      }
+
+      // Scrape duration if missing
+      if (!duration) {
+          const durEl = document.querySelector('.runtime-label-TzAGI, [class*="runtime-label"]');
+          if (durEl) duration = durEl.textContent.trim();
       }
       
       // Fallback to addon name if we really can't find anything
@@ -1014,25 +1196,67 @@
             episodeInfo = descMatch[0];
           }
       }
+      
+      // Clean up title if it contains the episode info
+      if (episodeInfo && contentTitle.includes(episodeInfo)) {
+          // Optional: remove episode info from title if desired, but usually keeping it is fine
+      }
+
+      // Generate Filename
+      // If contentTitle looks like an addon name (e.g. starts with "["), try to use document title instead
+      // or if we have episode info, try to construct a better name
+      let fileName = contentTitle;
+      
+      // Heuristic: if title starts with bracket or contains "1080p"/"720p" it might be the stream name
+      if (fileName.startsWith('[') || /1080p|720p|4k|hdr/i.test(fileName)) {
+          // Try to get a cleaner name from document title
+          try {
+             const docTitle = document.title.split(' - ')[0].trim();
+             if (docTitle && docTitle !== 'Stremio') {
+                 fileName = docTitle;
+             }
+          } catch(e) {}
+      }
+
+      if (episodeInfo && !fileName.includes(episodeInfo)) {
+          fileName += ' ' + episodeInfo;
+      }
+      // Sanitize
+      fileName = fileName.replace(/[<>:"/\\|?*]/g, '').trim();
+      if (!fileName) fileName = 'download_' + Date.now();
+      
+      // Ensure extension
+      if (!fileName.toLowerCase().endsWith('.mp4') &&
+          !fileName.toLowerCase().endsWith('.mkv') &&
+          !fileName.toLowerCase().endsWith('.avi') &&
+          !fileName.toLowerCase().endsWith('.webm')) {
+          fileName += '.mp4';
+      }
 
       return {
         href: anchor.getAttribute('href') || '',
         title: contentTitle,
         description: description,
         episodeInfo: episodeInfo,
+        fileName: fileName,
+        poster: poster,
+        duration: duration,
         addedAt: Date.now()
       };
     }
 
     function setButtonState(btn, state) {
       if (!btn) return;
-      btn.classList.remove('is-downloading', 'is-complete');
+      btn.classList.remove('is-downloading', 'is-complete', 'is-failed');
       if (state === 'downloading') {
         btn.classList.add('is-downloading');
         btn.innerHTML = '<div class="spinner"></div>';
       } else if (state === 'complete') {
         btn.classList.add('is-complete');
         btn.innerHTML = '<i data-lucide="check-circle" style="width: 24px; height: 24px;"></i>';
+      } else if (state === 'failed') {
+        btn.classList.add('is-failed');
+        btn.innerHTML = '<i data-lucide="alert-circle" style="width: 24px; height: 24px;"></i>';
       } else {
         btn.innerHTML = '<i data-lucide="download" style="width: 24px; height: 24px;"></i>';
       }
@@ -1049,7 +1273,19 @@
         });
     }
 
-    function generateId() {
+    function generateId(info) {
+      // Generate a deterministic ID based on the content to prevent duplicates
+      // Use title + episode info + href hash if available
+      if (info && info.title) {
+          const str = info.title + (info.episodeInfo || '') + (info.href || '');
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+              const char = str.charCodeAt(i);
+              hash = ((hash << 5) - hash) + char;
+              hash = hash & hash; // Convert to 32bit integer
+          }
+          return 'dl_' + Math.abs(hash).toString(36);
+      }
       return 'dl_' + Math.random().toString(36).slice(2);
     }
 
@@ -1135,7 +1371,13 @@
       if (btn.classList.contains('is-downloading')) return;
       
       let info = extractStreamInfo(anchor);
-      const id = generateId();
+      const id = generateId(info);
+      
+      // Check if already downloading
+      if (items[id] && (items[id].status === 'downloading' || items[id].status === 'completed')) {
+          console.log('[ZDM] Item already in list:', id);
+          return;
+      }
       
       // Try to get enhanced data from integration cache
       if (window.getZentrioStreamData) {
@@ -1149,14 +1391,40 @@
                   info.directUrl = cached.externalUrl;
               }
               
-              // Update metadata
-              if (cached.title) info.title = cached.title;
-              if (cached.name) info.episodeInfo = cached.name;
+              // Update metadata - Prioritize React metadata if available
+              // The cached.title is often the stream title (e.g. "1080p"), not the movie title
+              // We want the movie/show title.
+              
+              // Try to get global metadata first
+              if (window.getZentrioMetaData) {
+                  const meta = window.getZentrioMetaData();
+                  if (meta && meta.name) {
+                      info.title = meta.name;
+                  }
+              }
+              
+              // If we still don't have a good title, check if cached.title looks like a movie title
+              // (heuristic: longer than 10 chars or contains spaces)
+              // But usually cached.title from stream object is just the stream name (e.g. "Torrentio\n1080p")
+              
+              // cached.name is often the stream name too.
+              
               if (cached.addon && cached.addon.manifest && cached.addon.manifest.name) {
                   info.description = cached.addon.manifest.name;
               }
+            }
           }
-      }
+      
+          // Final fallback: if title is still generic (like "Torrentio" or "1080p"), try to parse from document title again
+          // This is needed because sometimes extractStreamInfo runs before React metadata is fully populated
+          if (!info.title || info.title === info.description || info.title.length < 3) {
+              try {
+                  const docTitle = document.title.split(' - ')[0].trim();
+                  if (docTitle && docTitle !== 'Stremio') {
+                      info.title = docTitle;
+                  }
+              } catch(e) {}
+          }
 
       const directUrl = info.directUrl || deriveRemoteUrlFromHref(info.href);
       
@@ -1187,6 +1455,9 @@
                   href: info.href,
                   title: info.title,
                   episodeInfo: info.episodeInfo,
+                  fileName: info.fileName,
+                  poster: info.poster,
+                  duration: info.duration,
                   url: directUrl
                });
             } else {
@@ -1200,11 +1471,43 @@
                       href: info.href,
                       title: info.title,
                       episodeInfo: info.episodeInfo,
+                      fileName: info.fileName,
+                      poster: info.poster,
+                      duration: info.duration,
                       url: lateDirectUrl
                    });
                } else {
                    console.warn('[ZDM] Could not extract media URL');
-                   alert('Could not extract media URL. Please try playing the video first.');
+                   // Instead of just alerting, we now guide the user to "Play to Detect"
+                   // We keep the button in a "waiting" state or reset it but show a toast
+                   
+                   // Create a toast notification if it doesn't exist
+                   let toast = document.getElementById('zentrio-toast');
+                   if (!toast) {
+                       toast = document.createElement('div');
+                       toast.id = 'zentrio-toast';
+                       Object.assign(toast.style, {
+                           position: 'fixed',
+                           bottom: '20px',
+                           left: '50%',
+                           transform: 'translateX(-50%)',
+                           backgroundColor: '#333',
+                           color: '#fff',
+                           padding: '12px 24px',
+                           borderRadius: '8px',
+                           zIndex: '100000',
+                           boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                           display: 'none',
+                           fontSize: '14px',
+                           textAlign: 'center'
+                       });
+                       document.body.appendChild(toast);
+                   }
+                   
+                   toast.textContent = 'Could not auto-detect stream. Please play the video briefly, then try downloading again.';
+                   toast.style.display = 'block';
+                   setTimeout(() => { toast.style.display = 'none'; }, 5000);
+                   
                    setButtonState(btn, 'default');
                }
             }
@@ -1217,6 +1520,9 @@
             href: info.href,
             title: info.title,
             episodeInfo: info.episodeInfo,
+            fileName: info.fileName,
+            poster: info.poster,
+            duration: info.duration,
             url: directUrl
         });
       } else {
@@ -1283,25 +1589,30 @@
             const ep = item.episodeInfo ? `<span style="color: #aaa; margin-left: 6px;">${item.episodeInfo}</span>` : '';
             
             let metaText = status;
+            let statusColor = '#888';
+            
             if (status === 'downloading') {
-                metaText = `${Math.round(pct)}%`;
+                metaText = `Downloading ${Math.round(pct)}%`;
+                statusColor = '#60a5fa';
             } else if (status === 'completed') {
-                metaText = 'Completed';
+                metaText = 'Download Complete';
+                statusColor = '#10b981';
             } else if (status === 'failed') {
-                metaText = 'Failed';
+                metaText = 'Download Failed';
+                statusColor = '#ef4444';
+            } else if (status === 'initiated') {
+                metaText = 'Starting...';
             }
             
             return `
                 <div class="zentrio-popup-item">
                     <div class="zentrio-item-title" title="${title}">${title}${ep}</div>
-                    <div class="zentrio-item-meta">
+                    <div class="zentrio-item-meta" style="color: ${statusColor}">
                         <span>${metaText}</span>
                     </div>
-                    ${status === 'downloading' ? `
-                    <div class="zentrio-item-progress">
-                        <div class="zentrio-item-bar" style="width: ${pct}%"></div>
+                    <div class="zentrio-item-progress" style="background: #333; height: 3px; margin-top: 6px; border-radius: 2px; overflow: hidden;">
+                        <div class="zentrio-item-bar" style="width: ${pct}%; height: 100%; background: ${status === 'failed' ? '#ef4444' : (status === 'completed' ? '#10b981' : '#e50914')}; transition: width 0.2s;"></div>
                     </div>
-                    ` : ''}
                 </div>
             `;
         }).join('');
@@ -1309,12 +1620,22 @@
 
     function init() {
       injectStyles();
+      patchNetworkForDiscovery();
       
       // Ask Core for root handle status to update modal if needed
       sendToCore({ type: 'zentrio-download-root-request' });
+      
+      // Ask Core for current list to populate popup
+      sendToCore({ type: 'zentrio-download-list-request' });
 
       scan();
-      const observer = new MutationObserver(debounce(() => scan(), 250));
+      const observer = new MutationObserver(debounce(() => {
+          scan();
+          // Also check if our modal is still there, React might have wiped the body
+          if (!document.getElementById('zentrioFolderModal')) {
+              injectStyles();
+          }
+      }, 250));
       observer.observe(document.body, { childList: true, subtree: true });
       
       setTimeout(() => scan(true), 800);

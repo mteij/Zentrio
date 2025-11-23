@@ -1127,6 +1127,19 @@ init_dist();
       return null;
     }
   }
+  async function getAllItems() {
+    try {
+      const db = await openDb();
+      return new Promise((resolve2, reject) => {
+        const tx = db.transaction(IDB_STORE_ITEMS, "readonly");
+        const req = tx.objectStore(IDB_STORE_ITEMS).getAll();
+        req.onsuccess = () => resolve2(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      return [];
+    }
+  }
   function broadcast(msg) {
     window.postMessage(msg, "*");
     const frames = document.querySelectorAll("iframe");
@@ -1264,6 +1277,9 @@ init_dist();
       href: data.href,
       title: data.title,
       episodeInfo: data.episodeInfo,
+      fileName: data.fileName,
+      poster: data.poster,
+      duration: data.duration,
       url: data.url,
       createdAt: Date.now(),
       status: "initiated",
@@ -1276,15 +1292,20 @@ init_dist();
     } else {
       if (!worker)
         initWorker();
-      worker?.postMessage({
-        type: "start",
-        payload: {
-          item,
-          url: data.url,
-          rootHandle,
-          resume: false
-        }
-      });
+      try {
+        worker?.postMessage({
+          type: "start",
+          payload: {
+            item,
+            url: data.url,
+            rootHandle,
+            resume: false
+          }
+        });
+      } catch (e) {
+        console.error("[ZDM-Core] Failed to post message to worker", e);
+        broadcast({ type: "zentrio-download-error", id: data.id, error: "Worker communication failed" });
+      }
     }
   }
   function setupDomBridge() {
@@ -1331,11 +1352,28 @@ init_dist();
     });
     parentObserver.observe(document.documentElement, { childList: true });
   }
+  const processedMessageIds = new Set;
   async function handleMessage(data, source) {
     try {
       if (!data || typeof data !== "object")
         return;
+      if (data.id && (data.type === "zentrio-download-request" || data.type === "zentrio-download-cancel")) {
+        const key = `${data.type}:${data.id}`;
+        if (processedMessageIds.has(key)) {
+          return;
+        }
+        processedMessageIds.add(key);
+        setTimeout(() => processedMessageIds.delete(key), 5000);
+      }
       switch (data.type) {
+        case "zentrio-download-list-request":
+          const allItems = await getAllItems();
+          const listMsg = { type: "zentrio-download-list", items: allItems };
+          if (source)
+            source.postMessage(listMsg, "*");
+          else
+            broadcast(listMsg);
+          break;
         case "zentrio-download-request":
           handleDownloadRequest(data);
           break;
@@ -1343,6 +1381,19 @@ init_dist();
           if (isNative) {} else {
             if (worker)
               worker.postMessage({ type: "cancel", id: data.id });
+          }
+          break;
+        case "zentrio-download-delete":
+          const delItem = await getItem(data.id);
+          if (delItem) {
+            try {
+              const db = await openDb();
+              const tx = db.transaction(IDB_STORE_ITEMS, "readwrite");
+              tx.objectStore(IDB_STORE_ITEMS).delete(data.id);
+              broadcast({ type: "zentrio-download-deleted", id: data.id });
+            } catch (e) {
+              console.error("Delete failed", e);
+            }
           }
           break;
         case "zentrio-download-retry":
@@ -1383,7 +1434,7 @@ init_dist();
   window.addEventListener("message", (e) => handleMessage(e.data, e.source), true);
   window.addEventListener("zentrio-message", (e) => handleMessage(e.detail, null));
   async function init() {
-    console.log("[ZDM-Core] Initializing v3 (Hybrid)...");
+    console.log("[ZDM-Core] Initializing v3 (Hybrid)...", window.location.href);
     if (!isNative) {
       rootHandle = await loadRootHandle();
       if (rootHandle) {

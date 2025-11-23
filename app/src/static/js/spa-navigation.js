@@ -72,7 +72,8 @@
                 if (node.tagName === 'TITLE') return;
                 if (node.tagName === 'SCRIPT') {
                     // Check if already exists
-                    if (node.src && document.head.querySelector(`script[src="${node.getAttribute('src')}"]`)) return;
+                    const src = node.getAttribute('src');
+                    if (src && document.head.querySelector(`script[src="${src}"]`)) return;
                 }
                 if (node.tagName === 'LINK') {
                     if (node.href && document.head.querySelector(`link[href="${node.getAttribute('href')}"]`)) return;

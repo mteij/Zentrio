@@ -123,7 +123,15 @@
                         dlBtn.addEventListener('click', function(e) {
                             e.preventDefault();
                             e.stopPropagation();
+                            // Dispatch to window and also try to find the popup directly if event fails
                             window.dispatchEvent(new CustomEvent('zentrioToggleDownloadsPopup'));
+                            
+                            // Fallback: direct toggle if event listener is missing or blocked
+                            var popup = document.getElementById('zentrioDownloadsPopup');
+                            if (popup) {
+                                popup.style.display = popup.style.display === 'block' ? 'none' : 'block';
+                                // Trigger render if function is available globally (it might not be, but worth a try or re-dispatch)
+                            }
                         });
 
                         // Listen for download activity to animate
@@ -132,10 +140,13 @@
                             if (e.data.type === 'zentrio-download-progress' || e.data.type === 'zentrio-download-init') {
                                 dlBtn.classList.add('zentrio-download-active');
                             } else if (e.data.type === 'zentrio-download-complete' || e.data.type === 'zentrio-download-failed') {
-                                var activeDownloads = window.__zentrioActiveDownloads ? Object.keys(window.__zentrioActiveDownloads.active || {}).length : 0;
-                                if (activeDownloads === 0) {
-                                    dlBtn.classList.remove('zentrio-download-active');
-                                }
+                                // We don't have direct access to active count here easily without tracking state
+                                // But we can rely on the fact that if a download fails/completes, we should check if others are running
+                                // For now, just remove the class if it was the last one (simplified)
+                                // Better: The Core could send a "zentrio-download-count" message
+                                
+                                // Temporary fix: remove active class on fail/complete, it will be re-added if another progress event comes in
+                                dlBtn.classList.remove('zentrio-download-active');
                             }
                         });
 

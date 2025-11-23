@@ -88,15 +88,8 @@
   function render() {
     if (!els.list || !els.empty) return;
     
-    // Get items from Core global if available, or local queue
-    let items = [];
-    if (window.__zentrioDownloads && window.__zentrioDownloads.items) {
-        items = Object.values(window.__zentrioDownloads.items);
-    } else {
-        // Fallback to trying to get from IDB if core not ready?
-        // Core should be ready.
-        items = queue;
-    }
+    // Get items from local cache populated by events
+    let items = window.__zentrioDownloadsItems || [];
     
     // Sort by date desc
     items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -116,39 +109,70 @@
         const safeFileName = escapeHtml(item.fileName || '');
         const safeId = escapeHtml(item.id);
         const safeStatus = escapeHtml(status);
-        
-        // Calculate speed if possible (not stored in item, but we can infer or just show size)
-        // Actually Core doesn't store speed.
+        const poster = item.poster || '';
+        const duration = item.duration || '';
         
         let meta = '';
+        let badgeClass = '';
+        let badgeText = status;
+
         if (status === 'downloading') {
-            meta = `${recStr} / ${sizeStr} • ${etaStr}`;
+            meta = `${recStr} / ${sizeStr}`;
+            badgeClass = 'status-downloading';
+            badgeText = `${Math.round(pct)}%`;
         } else if (status === 'completed') {
-            meta = `${sizeStr} • Completed`;
+            meta = sizeStr;
+            badgeClass = 'status-completed';
+            badgeText = 'Downloaded';
+        } else if (status === 'failed') {
+            meta = 'Failed';
+            badgeClass = 'status-failed';
+            badgeText = 'Failed';
         } else {
             meta = status;
         }
 
+        if (duration) {
+            meta = duration + (meta ? ' • ' + meta : '');
+        }
+
         return `
-          <div class="download-item" data-id="${safeId}">
-            <div class="download-icon">
-                <i data-lucide="${status === 'completed' ? 'check-circle' : (status === 'failed' ? 'alert-circle' : 'video')}" style="width: 24px; height: 24px; color: ${status === 'completed' ? '#10b981' : (status === 'failed' ? '#ef4444' : '#60a5fa')}"></i>
-            </div>
-            <div class="download-info">
-                <div class="download-header">
-                    <h3 class="download-title" title="${safeTitle}">${safeTitle}</h3>
-                    <div class="download-actions">
-                        ${status === 'downloading' ? `<button class="icon-btn" data-action="cancel" data-id="${safeId}" title="Cancel"><i data-lucide="x"></i></button>` : ''}
-                        ${status === 'failed' ? `<button class="icon-btn" data-action="retry" data-id="${safeId}" title="Retry"><i data-lucide="refresh-cw"></i></button>` : ''}
-                        ${status === 'completed' ? `<button class="icon-btn" data-action="open" data-id="${safeId}" title="Open Folder"><i data-lucide="folder-open"></i></button>` : ''}
+          <div class="download-card" data-id="${safeId}">
+            <div class="download-poster-container" style="position: relative; width: 100%; height: 100%;">
+                ${poster ? `<img src="${poster}" class="download-poster" alt="${safeTitle}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` : ''}
+                <div class="download-poster-placeholder" style="${poster ? 'display: none;' : ''}">
+                    <i data-lucide="film" style="width: 48px; height: 48px; opacity: 0.5;"></i>
+                </div>
+                
+                ${status === 'downloading' ? `<div class="download-progress-bar" style="width:${pct.toFixed(2)}%;"></div>` : ''}
+                
+                <div class="download-overlay">
+                    <div class="download-title" title="${safeTitle}">${safeTitle}</div>
+                    <div class="download-meta">
+                        <span>${meta}</span>
+                        <span class="download-status-badge ${badgeClass}">${badgeText}</span>
                     </div>
                 </div>
-                <div class="download-progress-container">
-                    <div class="download-progress-bar" style="width:${pct.toFixed(2)}%;"></div>
-                </div>
-                <div class="download-meta-row">
-                    <span class="download-meta-text">${meta}</span>
-                    <span class="download-percent">${Math.round(pct)}%</span>
+
+                <div class="download-actions-overlay">
+                    ${status === 'downloading' ? `
+                        <button class="action-btn" data-action="cancel" data-id="${safeId}" title="Cancel Download">
+                            <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+                        </button>
+                    ` : ''}
+                    ${status === 'failed' ? `
+                        <button class="action-btn" data-action="retry" data-id="${safeId}" title="Retry Download">
+                            <i data-lucide="refresh-cw" style="width: 20px; height: 20px;"></i>
+                        </button>
+                    ` : ''}
+                    ${status === 'completed' ? `
+                        <button class="action-btn" data-action="open" data-id="${safeId}" title="Open Folder">
+                            <i data-lucide="folder-open" style="width: 20px; height: 20px;"></i>
+                        </button>
+                    ` : ''}
+                    <button class="action-btn delete" data-action="delete" data-id="${safeId}" title="Delete">
+                        <i data-lucide="trash-2" style="width: 20px; height: 20px;"></i>
+                    </button>
                 </div>
             </div>
           </div>
@@ -175,7 +199,8 @@
   function wireActions() {
     if (!els.list) return;
     els.list.querySelectorAll('button[data-action]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent card click if we add one later
         const action = btn.getAttribute('data-action');
         const id = btn.getAttribute('data-id');
         if (!action || !id) return;
@@ -184,6 +209,10 @@
             window.postMessage({ type: 'zentrio-download-cancel', id }, '*');
         } else if (action === 'retry') {
             window.postMessage({ type: 'zentrio-download-retry', id }, '*');
+        } else if (action === 'delete') {
+            if (confirm('Are you sure you want to delete this download?')) {
+                window.postMessage({ type: 'zentrio-download-delete', id }, '*');
+            }
         } else if (action === 'open') {
             // Not supported yet
         }
@@ -198,16 +227,22 @@
     if (!data || typeof data !== 'object') return;
 
     // Listen for updates from Core
-    if (data.type === 'zentrio-download-progress' || 
-        data.type === 'zentrio-download-complete' || 
+    if (data.type === 'zentrio-download-progress' ||
+        data.type === 'zentrio-download-complete' ||
         data.type === 'zentrio-download-failed' ||
         data.type === 'zentrio-download-cancelled' ||
         data.type === 'zentrio-download-init' ||
-        data.type === 'zentrio-download-started') {
+        data.type === 'zentrio-download-started' ||
+        data.type === 'zentrio-download-deleted') {
         
-        // If we have direct access to core items, use them for consistency
-        // Otherwise we rely on events but that's harder to sync full list
-        render();
+        // Request full list to ensure we are in sync
+        window.postMessage({ type: 'zentrio-download-list-request' }, '*');
+        
+    } else if (data.type === 'zentrio-download-list') {
+        if (data.items && Array.isArray(data.items)) {
+            window.__zentrioDownloadsItems = data.items;
+            render();
+        }
     } else if (data.type === 'zentrio-download-root-handle') {
         if (data.handle) {
             setFolderStatus(`Folder: ${data.handle.name}`, true);
@@ -223,11 +258,16 @@
       // Ask Core for root handle status
       window.postMessage({ type: 'zentrio-download-root-request' }, '*');
       
+      // Ask Core for initial list
+      window.postMessage({ type: 'zentrio-download-list-request' }, '*');
+
       // Initial render
       render();
       
       // Poll occasionally to sync UI if messages missed
-      setInterval(render, 1000);
+      setInterval(() => {
+          window.postMessage({ type: 'zentrio-download-list-request' }, '*');
+      }, 2000);
   }
 
   // Wire folder button

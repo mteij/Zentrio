@@ -36,8 +36,9 @@ app.get('/', async (c) => {
 })
  
 app.get('/profiles', async (c) => {
-  if (!await isAuthenticated(c)) return c.redirect('/')
-  return c.html(ProfilesPage({}))
+  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+  if (!session) return c.redirect('/')
+  return c.html(ProfilesPage({ user: session.user }))
 })
  
 app.get('/settings', async (c) => {
