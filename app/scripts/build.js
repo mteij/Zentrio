@@ -53,26 +53,44 @@ try {
    const stremioWebDir = path.join(__dirname, '..', 'vendor', 'stremio-web');
    
    if (fs.existsSync(stremioWebDir)) {
-     console.log('📦 Building embedded Stremio Web...');
-     
-     execSync('npm run build', { cwd: stremioWebDir, stdio: 'inherit' });
-
-     // Stremio Web outputs to "build" (see webpack.config.js -> output.path)
-     const srcDir = path.join(stremioWebDir, 'build');
+     // Check if we can skip build
+     const buildVersionFile = path.join(stremioWebDir, '.zentrio-build-version');
+     const setupVersionFile = path.join(stremioWebDir, '.zentrio-setup-version');
      const outDir = path.join(__dirname, '..', 'stremio-web-build');
+     
+     let skipBuild = false;
+     
+     // Always build to ensure patches are applied
 
-     if (fs.existsSync(outDir)) {
-       fs.rmSync(outDir, { recursive: true, force: true });
-     }
-     fs.mkdirSync(outDir, { recursive: true });
+     if (!skipBuild) {
+       console.log('📦 Building embedded Stremio Web...');
+       
+       execSync('npm run build', { cwd: stremioWebDir, stdio: 'inherit' });
 
-     // Copy built Stremio Web assets into stremio-web-build for the server to serve
-     try {
-       fs.cpSync(srcDir, outDir, { recursive: true });
-       console.log('✅ Stremio Web build copied to stremio-web-build');
-     } catch (copyErr) {
-       console.error('⚠️ Failed to copy Stremio Web build into stremio-web-build', copyErr);
-       throw copyErr;
+       // Stremio Web outputs to "build" (see webpack.config.js -> output.path)
+       const srcDir = path.join(stremioWebDir, 'build');
+
+       if (fs.existsSync(outDir)) {
+         fs.rmSync(outDir, { recursive: true, force: true });
+       }
+       fs.mkdirSync(outDir, { recursive: true });
+
+       // Copy built Stremio Web assets into stremio-web-build for the server to serve
+       try {
+         fs.cpSync(srcDir, outDir, { recursive: true });
+         console.log('✅ Stremio Web build copied to stremio-web-build');
+         
+         // Mark build as complete for this version
+         if (fs.existsSync(setupVersionFile)) {
+           const version = fs.readFileSync(setupVersionFile, 'utf8').trim();
+           fs.writeFileSync(buildVersionFile, version);
+         }
+       } catch (copyErr) {
+         console.error('⚠️ Failed to copy Stremio Web build into stremio-web-build', copyErr);
+         throw copyErr;
+       }
+     } else {
+       console.log('✅ Using existing Stremio Web build');
      }
    } else {
      console.log('ℹ️ Skipping Stremio Web build: vendor/stremio-web not found after setup');

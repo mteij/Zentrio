@@ -96,40 +96,71 @@ export function DownloadsPage({}: DownloadsPageProps) {
           background: #111827;
           border: 1px solid #374151;
           border-radius: 8px;
-          padding: 12px 14px 12px;
+          padding: 16px;
+          display: flex;
+          gap: 16px;
+          align-items: center;
+        }
+        .download-icon {
+          flex-shrink: 0;
+          width: 40px;
+          height: 40px;
+          background: #1f2937;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .download-info {
+          flex: 1;
+          min-width: 0;
           display: flex;
           flex-direction: column;
           gap: 8px;
         }
-        .download-item-header {
+        .download-header {
           display: flex;
           justify-content: space-between;
-          gap: 14px;
-          align-items: flex-start;
+          align-items: center;
+          gap: 12px;
         }
         .download-title {
           font-size: 14px;
           font-weight: 600;
-          line-height: 1.3;
-          margin: 0;
           color: #f3f4f6;
-          word-break: break-word;
-          flex: 1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin: 0;
         }
-        .download-status {
-          font-size: 11px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: .6px;
+        .download-actions {
+          display: flex;
+          gap: 8px;
         }
-        .download-status.initiated { color: #9ca3af; }
-        .download-status.downloading { color: #60a5fa; }
-        .download-status.completed { color: #10b981; }
-        .download-status.failed { color: #f87171; }
-        .download-progress-wrap {
-          height: 8px;
+        .icon-btn {
+          background: transparent;
+          border: none;
+          color: #9ca3af;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: color 0.2s, background 0.2s;
+        }
+        .icon-btn:hover {
+          color: #fff;
           background: #374151;
-          border-radius: 5px;
+        }
+        .icon-btn i {
+          width: 18px;
+          height: 18px;
+        }
+        .download-progress-container {
+          height: 6px;
+          background: #374151;
+          border-radius: 3px;
           overflow: hidden;
           position: relative;
         }
@@ -139,37 +170,24 @@ export function DownloadsPage({}: DownloadsPageProps) {
           left: 0;
           height: 100%;
           width: 0%;
-          background: linear-gradient(90deg,#dc2626,#ef4444);
-          transition: width .3s ease;
+          background: #e50914;
+          transition: width 0.3s ease;
+          border-radius: 3px;
         }
-        .download-meta {
-          font-size: 11px;
+        .download-meta-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
           color: #9ca3af;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          line-height: 1.4;
         }
-        .download-actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
+        .download-meta-text {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
-        .download-actions button {
-          background: #1f2937;
-          border: 1px solid #374151;
+        .download-percent {
+          font-weight: 500;
           color: #d1d5db;
-          font-size: 11px;
-          padding: 4px 10px;
-          border-radius: 4px;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-        }
-        .download-actions button:hover {
-          background: #374151;
-          color: #fff;
         }
         .dl-metric {
           background: #111827;

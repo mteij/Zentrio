@@ -47,6 +47,8 @@ export function Layout({
         <meta name="theme-color" content="#141414" />
         <script src="https://unpkg.com/lucide@latest"></script>
         <script src="/static/js/mobile-session-handler.js"></script>
+        <script src="/static/js/downloads-core.js"></script>
+        <script src="/static/js/spa-navigation.js"></script>
       </head>
       <body className={className}>
         {showHeader && <PageHeader />}
@@ -55,7 +57,7 @@ export function Layout({
         </main>
         {showFooter && <PageFooter />}
         <script src="/static/js/toast.js"></script>
-        <script dangerouslySetInnerHTML={{__html: `(function(){try{function u(){var o=navigator.onLine;document.querySelectorAll('[data-online-required]').forEach(function(el){if(o){el.removeAttribute('disabled');el.classList.remove('is-offline');}else{el.setAttribute('disabled','true');el.classList.add('is-offline');}});}window.addEventListener('online',function(){if(window.addToast)window.addToast('success','Online','Back online.');u();});window.addEventListener('offline',function(){if(window.addToast)window.addToast('info','Offline','Some features are disabled.');u();});u();if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js',{scope:'/'}).catch(function(){});navigator.serviceWorker.addEventListener('message',function(e){var d=e.data;if(!d||typeof d!=='object')return;if(d.type==='zentrio-sw-toast'&&window.addToast){var p=d.payload||{};window.addToast(p.toastType||'info',p.title||'Notice',p.message||'');}});} }catch(e){}})();`}} />
+        <script dangerouslySetInnerHTML={{__html: `(function(){try{function u(){var o=navigator.onLine;document.querySelectorAll('[data-online-required]').forEach(function(el){if(o){el.removeAttribute('disabled');el.classList.remove('is-offline');}else{el.setAttribute('disabled','true');el.classList.add('is-offline');}});}window.addEventListener('online',function(){if(window.addToast)window.addToast('success','Online','Back online.');u();});window.addEventListener('offline',function(){if(window.addToast)window.addToast('info','Offline','Some features are disabled.');u();});u();if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js?v=2',{scope:'/'}).catch(function(){});navigator.serviceWorker.addEventListener('message',function(e){var d=e.data;if(!d||typeof d!=='object')return;if(d.type==='zentrio-sw-toast'&&window.addToast){var p=d.payload||{};window.addToast(p.toastType||'info',p.title||'Notice',p.message||'');}});} }catch(e){}})();`}} />
       </body>
     </html>
   )
@@ -99,12 +101,14 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <meta name="theme-color" content="#141414" />
         <script src="https://unpkg.com/lucide@latest"></script>
         <script src="/static/js/mobile-session-handler.js"></script>
+        <script src="/static/js/downloads-core.js"></script>
+        <script src="/static/js/spa-navigation.js"></script>
       </head>
       <body className={className}>
         {children}
         <script src="/static/js/toast.js"></script>
         <script dangerouslySetInnerHTML={{__html: `
-          (function(){try{function u(){var o=navigator.onLine;document.querySelectorAll('[data-online-required]').forEach(function(el){if(o){el.removeAttribute('disabled');el.classList.remove('is-offline');}else{el.setAttribute('disabled','true');el.classList.add('is-offline');}});}window.addEventListener('online',function(){if(window.addToast)window.addToast('success','Online','Back online.');u();});window.addEventListener('offline',function(){if(window.addToast)window.addToast('info','Offline','Some features are disabled.');u();});u();if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js',{scope:'/'}).catch(function(){});navigator.serviceWorker.addEventListener('message',function(e){var d=e.data;if(!d||typeof d!=='object')return;if(d.type==='zentrio-sw-toast'&&window.addToast){var p=d.payload||{};window.addToast(p.toastType||'info',p.title||'Notice',p.message||'');}});} }catch(e){}})();
+          (function(){try{function u(){var o=navigator.onLine;document.querySelectorAll('[data-online-required]').forEach(function(el){if(o){el.removeAttribute('disabled');el.classList.remove('is-offline');}else{el.setAttribute('disabled','true');el.classList.add('is-offline');}});}window.addEventListener('online',function(){if(window.addToast)window.addToast('success','Online','Back online.');u();});window.addEventListener('offline',function(){if(window.addToast)window.addToast('info','Offline','Some features are disabled.');u();});u();if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js?v=2',{scope:'/'}).then(function(reg){console.log('SW registered',reg);}).catch(function(err){console.error('SW registration failed',err);});navigator.serviceWorker.addEventListener('message',function(e){var d=e.data;if(!d||typeof d!=='object')return;if(d.type==='zentrio-sw-toast'&&window.addToast){var p=d.payload||{};window.addToast(p.toastType||'info',p.title||'Notice',p.message||'');}});} }catch(e){console.error('SW setup error',e);}})();
           
           // Initialize Lucide icons when loaded
           function initLucide() {

@@ -118,6 +118,8 @@ app.get('/static/sw.js', async (c) => {
         'Content-Type': 'text/javascript; charset=utf-8',
         'Cache-Control': 'no-cache',
         'Service-Worker-Allowed': '/',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'Cross-Origin-Opener-Policy': 'same-origin',
       }
     })
   } catch {
@@ -150,12 +152,21 @@ app.get('/static/*', async (c) => {
     }
     const ext = extname(filePath).toLowerCase()
     const contentType = typeMap[ext] || 'application/octet-stream'
-    return new Response(new Uint8Array(buf), {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600',
-      },
-    })
+
+    const headers: Record<string, string> = {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    }
+
+    // Relax CSP for download worker to allow connecting to arbitrary stream URLs
+    if (reqPath.includes('download-worker.js')) {
+      headers['Content-Security-Policy'] = "connect-src * data: blob:;"
+      headers['Cache-Control'] = 'no-cache'
+    }
+
+    return new Response(new Uint8Array(buf), { headers })
   } catch {
     return new Response('Not Found', { status: 404 })
   }

@@ -64,6 +64,93 @@
             }
           }
         }
+
+        // Handle Stremio's native profile section (top right usually)
+        // We want to replace it with downloads button if enabled
+        if (window.session && window.session.downloadsManagerEnabled) {
+            // Strategy: Find the profile icon SVG by its path globally
+            // Path provided by user for the profile icon
+            var profileIconPathStart = "M328.209";
+            
+            // Find all paths in the document
+            var paths = document.querySelectorAll('path');
+            var targetPath = null;
+            for (var i = 0; i < paths.length; i++) {
+                var d = paths[i].getAttribute('d');
+                if (d && d.startsWith(profileIconPathStart)) {
+                    targetPath = paths[i];
+                    break;
+                }
+            }
+            
+            if (targetPath) {
+                var svg = targetPath.closest('svg');
+                // The button container is the parent of the SVG
+                var profileBtn = svg ? svg.parentNode : null;
+                
+                if (profileBtn) {
+                    // Check if we already injected our button
+                    var existingBtn = document.getElementById('zentrio-downloads-action');
+                    
+                    // If our button exists but is not in the DOM (detached) or not in the right place
+                    if (existingBtn && !document.body.contains(existingBtn)) {
+                            existingBtn = null; // Re-create
+                    }
+                    
+                    if (!existingBtn) {
+                        // Create download button
+                        var dlBtn = document.createElement('div');
+                        dlBtn.id = 'zentrio-downloads-action';
+                        // Copy classes from original button to maintain layout/style
+                        dlBtn.className = profileBtn.className;
+                        dlBtn.style.cssText = 'display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; position: relative;';
+                        
+                        // Add styles for animation
+                        if (!document.getElementById('zentrio-downloads-anim-style')) {
+                            var style = document.createElement('style');
+                            style.id = 'zentrio-downloads-anim-style';
+                            style.textContent =
+                                '@keyframes zentrio-download-pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.92); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } } ' +
+                                '.zentrio-download-active svg { animation: zentrio-download-pulse 2s infinite ease-in-out; color: #4ade80 !important; }' +
+                                '.zentrio-download-badge { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background: #e50914; border-radius: 50%; display: none; }' +
+                                '.zentrio-download-active .zentrio-download-badge { display: block; }';
+                            document.head.appendChild(style);
+                        }
+
+                        dlBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>' +
+                            '<div class="zentrio-download-badge"></div>';
+                        
+                        dlBtn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent('zentrioToggleDownloadsPopup'));
+                        });
+
+                        // Listen for download activity to animate
+                        window.addEventListener('message', function(e) {
+                            if (!e.data) return;
+                            if (e.data.type === 'zentrio-download-progress' || e.data.type === 'zentrio-download-init') {
+                                dlBtn.classList.add('zentrio-download-active');
+                            } else if (e.data.type === 'zentrio-download-complete' || e.data.type === 'zentrio-download-failed') {
+                                var activeDownloads = window.__zentrioActiveDownloads ? Object.keys(window.__zentrioActiveDownloads.active || {}).length : 0;
+                                if (activeDownloads === 0) {
+                                    dlBtn.classList.remove('zentrio-download-active');
+                                }
+                            }
+                        });
+
+                        // Insert before the profile button
+                        profileBtn.parentNode.insertBefore(dlBtn, profileBtn);
+                    }
+                    
+                    // Always ensure profile button is hidden
+                    if (profileBtn.style.display !== 'none') {
+                        profileBtn.style.display = 'none';
+                    }
+                }
+            }
+        }
+
         // hide buttons based on settings
         if (window.session && window.session.hideCalendarButton) {
           var hideCalendarButtons = function() {

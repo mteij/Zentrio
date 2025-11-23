@@ -8,6 +8,7 @@
         "@capacitor/app": "^7.1.0",
         "@capacitor/cli": "^7.4.4",
         "@capacitor/core": "^7.4.4",
+        "@capacitor/filesystem": "^7.1.4",
         "@capacitor/ios": "^7.4.4",
         "@dicebear/collection": "^9.2.4",
         "@dicebear/core": "^9.2.4",
@@ -111,7 +112,11 @@
 
     "@capacitor/core": ["@capacitor/core@7.4.4", "", { "dependencies": { "tslib": "^2.1.0" } }, "sha512-xzjxpr+d2zwTpCaN0k+C6wKSZzWFAb9OVEUtmO72ihjr/NEDoLvsGl4WLfjWPcCO2zOy0b2X52tfRWjECFUjtw=="],
 
+    "@capacitor/filesystem": ["@capacitor/filesystem@7.1.4", "", { "dependencies": { "@capacitor/synapse": "^1.0.3" }, "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-BdUnOVulHAtruW2GeC9o7e9LO5aFcVYqNn3dLypJSOck/WipUFNfI0QWoUS0FVGeqBbDJgFGi3zjXJx0lzbDkA=="],
+
     "@capacitor/ios": ["@capacitor/ios@7.4.4", "", { "peerDependencies": { "@capacitor/core": "^7.4.0" } }, "sha512-Xp3bGWlSQAwsZGngRMWTdoD2agdMV12Whnm+/xsYPxfQSj+Tksbr7r/8Mso7VWkpnTKO4iMlx762g3PjW+wi4w=="],
+
+    "@capacitor/synapse": ["@capacitor/synapse@1.0.4", "", {}, "sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw=="],
 
     "@dicebear/adventurer": ["@dicebear/adventurer@9.2.4", "", { "peerDependencies": { "@dicebear/core": "^9.0.0" } }, "sha512-Xvboay3VH1qe7lH17T+bA3qPawf5EjccssDiyhCX/VT0P21c65JyjTIUJV36Nsv08HKeyDscyP0kgt9nPTRKvA=="],
 

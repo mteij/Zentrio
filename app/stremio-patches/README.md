@@ -97,7 +97,7 @@ module.exports.applyPatch = async function applyPatch(ctx) {
   - `001-zentrio-bootstrap.js` – core runtime/bootstrap wiring (session, querystring parsing, bridge entrypoints).
   - `010-ui-header-integration.js` – header/profile logo integration.
   - `020-addon-manager.js` – Addon Manager integration.
-  - `030-downloads-manager.js` – Downloads Manager integration.
+  - `030-downloads-manager.js` – Downloads Manager integration (includes stream data integration).
   - `040-nsfw-filter.js` – NSFW filter integration.
 
 This prefix controls patch execution order; keep gaps between numbers so future patches can be inserted without renaming everything.

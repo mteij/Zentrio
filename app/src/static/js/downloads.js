@@ -1,35 +1,8 @@
-// Zentrio Downloads Page Client Script (queue + rendering v1)
+// Zentrio Downloads Page Client Script (queue + rendering v2)
+// This script now relies on the global downloads-core.js for state and logic
 (function() {
-  const LS_KEY = 'zentrioDownloadsQueue';
-
-  function loadQueue() {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-      return [];
-    } catch(e) { return []; }
-  }
-
-  function autoPrune(q) {
-    const now = Date.now();
-    // Keep last 100 entries; remove completed older than 7 days automatically
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    return q
-      .filter((item, idx) => {
-        if (idx >= 200) return false; // hard cap
-        if (item.status === 'completed' && item.completedAt && (now - item.completedAt) > weekMs) return false;
-        return true;
-      });
-  }
-
-  function saveQueue(q) {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(q)); } catch(e) {}
-  }
-
-  let queue = loadQueue();
-
+  // Wait for core to be ready if needed, but it should be loaded before this script
+  
   const els = {
     list: document.getElementById('downloadsList'),
     empty: document.getElementById('downloadsEmpty'),
@@ -40,147 +13,12 @@
     message: document.getElementById('downloadsMessage')
   };
 
-  // Optional debug panel (add <pre id="downloadsDebug"></pre> in HTML to view)
-  function debugLog(...args) {
-    // Logging disabled
-  }
+  let queue = [];
 
-  // --- Persistent Root Directory Handle Management (shared with iframe) ---
-  const IDB_DB = 'zentrioDownloads';
-  const IDB_STORE = 'handles';
-
-  function openHandleDb() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(IDB_DB, 1);
-      req.onupgradeneeded = () => {
-        try {
-          const db = req.result;
-            if (!db.objectStoreNames.contains(IDB_STORE)) {
-              db.createObjectStore(IDB_STORE);
-            }
-        } catch (e) { /* ignore */ }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  async function loadPersistedRootHandle() {
-    try {
-      const db = await openHandleDb();
-      return await new Promise((resolve, reject) => {
-        const tx = db.transaction(IDB_STORE, 'readonly');
-        const store = tx.objectStore(IDB_STORE);
-        const g = store.get('root');
-        g.onsuccess = () => resolve(g.result || null);
-        g.onerror = () => reject(g.error);
-      });
-    } catch (_) {
-      return null;
-    }
-  }
-
-  async function persistRootHandle(handle) {
-    try {
-      const db = await openHandleDb();
-      return await new Promise((resolve, reject) => {
-        const tx = db.transaction(IDB_STORE, 'readwrite');
-        const store = tx.objectStore(IDB_STORE);
-        const p = store.put(handle, 'root');
-        p.onsuccess = () => resolve(true);
-        p.onerror = () => reject(p.error);
-      });
-    } catch (_) {
-      return false;
-    }
-  }
-
-  async function ensureHandlePermission(handle) {
-    if (!handle) return false;
-    try {
-      let perm = await handle.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') return true;
-      if (perm === 'prompt') {
-        perm = await handle.requestPermission({ mode: 'readwrite' });
-        return perm === 'granted';
-      }
-      return false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function setFolderStatus(text, ready) {
-    const st = document.getElementById('downloadFolderStatus');
-    if (!st) return;
-    st.textContent = text;
-    st.classList.toggle('ready', !!ready);
-  }
-
-  async function initRootHandleStatus() {
-    const existing = await loadPersistedRootHandle();
-    if (existing) {
-      const ok = await ensureHandlePermission(existing);
-      if (ok) {
-        window.__zentrioSaveRootHandle = existing;
-        setFolderStatus(`Folder: ${existing.name}`, true);
-        // Proactively broadcast persisted handle to any open iframe (downloads manager script)
-        try { window.postMessage({ type: 'zentrio-download-root-handle', handle: existing }, '*'); } catch(_) {}
-        // Retry once after a short delay in case iframe not yet loaded
-        setTimeout(() => {
-          try { window.postMessage({ type: 'zentrio-download-root-handle', handle: existing }, '*'); } catch(_) {}
-        }, 1000);
-        return;
-      }
-    }
-    setFolderStatus('No folder selected', false);
-  }
-
-  async function pickAndPersistRootFolder() {
-    if (!('showDirectoryPicker' in window)) {
-      setFolderStatus('Directory picker not supported', false);
-      return;
-    }
-    try {
-      const handle = await window.showDirectoryPicker({ id: 'zentrio-downloads', mode: 'readwrite', startIn: 'videos' });
-      const ok = await ensureHandlePermission(handle);
-      if (!ok) {
-        setFolderStatus('Permission denied', false);
-        return;
-      }
-      await persistRootHandle(handle);
-      window.__zentrioSaveRootHandle = handle;
-      setFolderStatus(`Folder: ${handle.name}`, true);
-      // Broadcast to any open iframes (share actual handle)
-      try { window.postMessage({ type: 'zentrio-download-root-handle', handle }, '*'); } catch (_) {}
-    } catch (e) {
-      setFolderStatus('No folder selected', false);
-    }
-  }
-
-  (function wireFolderButton(){
-    const btn = document.getElementById('setDownloadFolderBtn');
-    if (!btn) { setTimeout(wireFolderButton, 250); return; }
-    btn.addEventListener('click', () => {
-      pickAndPersistRootFolder();
-    });
-  })();
-
-  initRootHandleStatus();
-
-  // Respond to iframe (session) scripts asking for the persisted root directory handle
-  window.addEventListener('message', (e) => {
-    const d = e.data;
-    if (!d || typeof d !== 'object') return;
-    if (d.type === 'zentrio-download-root-request' && window.__zentrioSaveRootHandle) {
-      try {
-        window.postMessage({ type: 'zentrio-download-root-handle', handle: window.__zentrioSaveRootHandle }, '*');
-      } catch (_) {}
-    }
-  });
+  // --- UI Helpers ---
 
   function formatBytes(bytes) {
-    if (!bytes || isNaN(bytes)) return '0';
+    if (!bytes || isNaN(bytes)) return '0 B';
     const units = ['B','KB','MB','GB','TB'];
     let i = 0;
     let n = bytes;
@@ -198,111 +36,140 @@
     return div.innerHTML;
   }
 
-  // Validate URLs before opening to avoid untrusted redirection
-  function isSafeSameOriginUrl(u) {
-    try {
-      if (typeof u !== 'string') return false;
-      const s = u.trim();
-      const l = s.toLowerCase();
-      // Block dangerous schemes outright
-      if (l.startsWith('javascript:') || l.startsWith('data:') || l.startsWith('vbscript:')) return false;
-      // Allow same-origin blob URLs only
-      // Allow same-origin blob URLs only
-      if (l.startsWith('blob:')) {
-        try {
-          // Re-parse to ensure it's a valid Blob URL structure relative to current origin
-          const parsed = new URL(s);
-          return parsed.protocol === 'blob:' && parsed.origin === window.location.origin;
-        } catch (_) {
-          return false;
-        }
-      }
-      // Disallow other URL types to prevent open redirection
-      return false;
-    } catch (_) {
-      return false;
-    }
+  function setFolderStatus(text, ready) {
+    const st = document.getElementById('downloadFolderStatus');
+    if (!st) return;
+    st.textContent = text;
+    st.classList.toggle('ready', !!ready);
   }
 
-  function openInNewTabSafe(u) {
+  // --- Modal Logic ---
+  const modal = document.getElementById('folderModal');
+  const modalSelectBtn = document.getElementById('modalSelectBtn');
+  const modalBackBtn = document.getElementById('modalBackBtn');
+  const closeFolderModal = document.getElementById('closeFolderModal');
+
+  function showModal() { if (modal) modal.style.display = 'block'; }
+  function hideModal() { if (modal) modal.style.display = 'none'; }
+
+  if (closeFolderModal) closeFolderModal.onclick = hideModal;
+  if (modalBackBtn) modalBackBtn.onclick = () => {
+    hideModal();
     try {
-      // Validate URL inside the opener to avoid unvalidated redirection
-      if (!isSafeSameOriginUrl(u)) return false;
-      const w = window.open(u, '_blank', 'noopener,noreferrer');
-      if (w && typeof w === 'object') {
-        try { w.opener = null; } catch (_) {}
+      if (document.referrer && /\/profiles$/.test(new URL(document.referrer).pathname)) {
+        history.back();
+      } else {
+        window.location.href = '/profiles';
       }
-      return true;
-    } catch (_) { return false; }
+    } catch(e) { window.location.href = '/profiles'; }
+  };
+  
+  if (modalSelectBtn) modalSelectBtn.onclick = async () => {
+    if (!('showDirectoryPicker' in window)) {
+      setFolderStatus('Directory picker not supported', false);
+      return;
+    }
+    try {
+      const handle = await window.showDirectoryPicker({ id: 'zentrio-downloads', mode: 'readwrite', startIn: 'videos' });
+      // Send to Core
+      window.postMessage({ type: 'zentrio-download-root-set', handle }, '*');
+      hideModal();
+    } catch (e) {
+      setFolderStatus('No folder selected', false);
+    }
+  };
+
+  window.onclick = function(event) {
+    if (event.target == modal) hideModal();
   }
+
+  // --- Rendering ---
 
   function render() {
     if (!els.list || !els.empty) return;
-    if (!queue.length) {
+    
+    // Get items from Core global if available, or local queue
+    let items = [];
+    if (window.__zentrioDownloads && window.__zentrioDownloads.items) {
+        items = Object.values(window.__zentrioDownloads.items);
+    } else {
+        // Fallback to trying to get from IDB if core not ready?
+        // Core should be ready.
+        items = queue;
+    }
+    
+    // Sort by date desc
+    items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    if (!items.length) {
       els.empty.style.display = 'block';
       els.list.innerHTML = '';
     } else {
       els.empty.style.display = 'none';
-      els.list.innerHTML = queue.map(item => {
-        const pct = item.size && item.bytesReceived
-          ? Math.min(100, (item.bytesReceived / item.size) * 100)
-          : (item.progress || 0);
+      els.list.innerHTML = items.map(item => {
+        const pct = item.progress || 0;
         const sizeStr = item.size ? formatBytes(item.size) : '';
         const recStr = item.bytesReceived ? formatBytes(item.bytesReceived) : '';
-        const etaStr = (typeof item.eta === 'number' && item.eta >= 0) ? `ETA ${item.eta}s` : '';
+        const etaStr = (typeof item.eta === 'number' && item.eta > 0) ? `ETA ${item.eta}s` : '';
         const status = item.status || 'initiated';
         const safeTitle = escapeHtml(item.title || 'Untitled');
         const safeFileName = escapeHtml(item.fileName || '');
         const safeId = escapeHtml(item.id);
         const safeStatus = escapeHtml(status);
+        
+        // Calculate speed if possible (not stored in item, but we can infer or just show size)
+        // Actually Core doesn't store speed.
+        
+        let meta = '';
+        if (status === 'downloading') {
+            meta = `${recStr} / ${sizeStr} • ${etaStr}`;
+        } else if (status === 'completed') {
+            meta = `${sizeStr} • Completed`;
+        } else {
+            meta = status;
+        }
+
         return `
           <div class="download-item" data-id="${safeId}">
-            <div class="download-item-header">
-              <h3 class="download-title" title="${safeTitle}">${safeTitle}</h3>
-              <div class="download-status ${safeStatus}">${safeStatus}</div>
+            <div class="download-icon">
+                <i data-lucide="${status === 'completed' ? 'check-circle' : (status === 'failed' ? 'alert-circle' : 'video')}" style="width: 24px; height: 24px; color: ${status === 'completed' ? '#10b981' : (status === 'failed' ? '#ef4444' : '#60a5fa')}"></i>
             </div>
-            <div class="download-progress-wrap">
-              <div class="download-progress-bar" style="width:${pct.toFixed(2)}%;"></div>
-            </div>
-            <div class="download-meta">
-              ${sizeStr ? `<span>${sizeStr}</span>` : ''}
-              ${recStr ? `<span>${recStr}</span>` : ''}
-              ${etaStr ? `<span>${escapeHtml(etaStr)}</span>` : ''}
-              ${safeFileName ? `<span>${safeFileName}</span>` : ''}
-            </div>
-            <div class="download-actions">
-              ${status === 'downloading' ? `<button data-action="cancel" data-id="${safeId}">Cancel</button>` : ''}
-              ${status === 'failed' ? `<button data-action="retry" data-id="${safeId}">Retry</button>` : ''}
-              ${status === 'completed' && item.openable ? `<button data-action="open" data-id="${safeId}">Open</button>` : ''}
+            <div class="download-info">
+                <div class="download-header">
+                    <h3 class="download-title" title="${safeTitle}">${safeTitle}</h3>
+                    <div class="download-actions">
+                        ${status === 'downloading' ? `<button class="icon-btn" data-action="cancel" data-id="${safeId}" title="Cancel"><i data-lucide="x"></i></button>` : ''}
+                        ${status === 'failed' ? `<button class="icon-btn" data-action="retry" data-id="${safeId}" title="Retry"><i data-lucide="refresh-cw"></i></button>` : ''}
+                        ${status === 'completed' ? `<button class="icon-btn" data-action="open" data-id="${safeId}" title="Open Folder"><i data-lucide="folder-open"></i></button>` : ''}
+                    </div>
+                </div>
+                <div class="download-progress-container">
+                    <div class="download-progress-bar" style="width:${pct.toFixed(2)}%;"></div>
+                </div>
+                <div class="download-meta-row">
+                    <span class="download-meta-text">${meta}</span>
+                    <span class="download-percent">${Math.round(pct)}%</span>
+                </div>
             </div>
           </div>
         `;
       }).join('');
       wireActions();
+      initLucide();
     }
-    updateMetrics();
+    updateMetrics(items);
   }
 
-  function updateMetrics() {
+  function updateMetrics(items) {
     if (!els.metricActive) return;
-    const active = queue.filter(i => i.status === 'downloading').length;
-    const completed = queue.filter(i => i.status === 'completed').length;
-    const failed = queue.filter(i => i.status === 'failed').length;
-    const totalSize = queue.reduce((acc, i) => acc + (i.size || 0), 0);
+    const active = items.filter(i => i.status === 'downloading').length;
+    const completed = items.filter(i => i.status === 'completed').length;
+    const failed = items.filter(i => i.status === 'failed').length;
+    const totalSize = items.reduce((acc, i) => acc + (i.size || 0), 0);
     els.metricActive.textContent = String(active);
     els.metricCompleted.textContent = String(completed);
     els.metricFailed.textContent = String(failed);
     els.metricSize.textContent = formatBytes(totalSize);
-  }
-
-  function showMessage(text, type) {
-    if (!els.message) return;
-    els.message.textContent = text;
-    els.message.className = `message ${type || 'info'}`;
-    els.message.style.display = 'block';
-    setTimeout(() => {
-      if (els.message) els.message.style.display = 'none';
-    }, type === 'error' ? 6000 : 3500);
   }
 
   function wireActions() {
@@ -312,171 +179,98 @@
         const action = btn.getAttribute('data-action');
         const id = btn.getAttribute('data-id');
         if (!action || !id) return;
+        
         if (action === 'cancel') {
-          // send cancellation signal outward (iframe or same window)
             window.postMessage({ type: 'zentrio-download-cancel', id }, '*');
         } else if (action === 'retry') {
-          window.postMessage({ type: 'zentrio-download-retry', id }, '*');
+            window.postMessage({ type: 'zentrio-download-retry', id }, '*');
         } else if (action === 'open') {
-          // Opening: if we stored blobUrl (future), use it. For now just notify.
-          const item = queue.find(i => i.id === id);
-          if (item && item.blobUrl && isSafeSameOriginUrl(item.blobUrl)) {
-            openInNewTabSafe(item.blobUrl);
-          } else {
-            showMessage('Open not available yet', 'info');
-          }
+            // Not supported yet
         }
       });
     });
   }
 
-  function upsert(item) {
-    const idx = queue.findIndex(i => i.id === item.id);
-    let targetIndex = idx;
-    if (idx === -1) {
-      queue.unshift(item);
-      targetIndex = 0;
-    } else {
-      queue[idx] = { ...queue[idx], ...item };
-      targetIndex = idx;
+  // --- Listeners ---
+
+  window.addEventListener('message', (e) => {
+    const data = e.data;
+    if (!data || typeof data !== 'object') return;
+
+    // Listen for updates from Core
+    if (data.type === 'zentrio-download-progress' || 
+        data.type === 'zentrio-download-complete' || 
+        data.type === 'zentrio-download-failed' ||
+        data.type === 'zentrio-download-cancelled' ||
+        data.type === 'zentrio-download-init' ||
+        data.type === 'zentrio-download-started') {
+        
+        // If we have direct access to core items, use them for consistency
+        // Otherwise we rely on events but that's harder to sync full list
+        render();
+    } else if (data.type === 'zentrio-download-root-handle') {
+        if (data.handle) {
+            setFolderStatus(`Folder: ${data.handle.name}`, true);
+        } else {
+            setFolderStatus('No folder selected', false);
+            showModal();
+        }
     }
-    if (item.status === 'completed' && targetIndex >= 0 && targetIndex < queue.length) {
-      queue[targetIndex].completedAt = queue[targetIndex].completedAt || Date.now();
-    }
-    queue = autoPrune(queue);
-    saveQueue(queue);
-    render();
+  });
+
+  // Initial check
+  function init() {
+      // Ask Core for root handle status
+      window.postMessage({ type: 'zentrio-download-root-request' }, '*');
+      
+      // Initial render
+      render();
+      
+      // Poll occasionally to sync UI if messages missed
+      setInterval(render, 1000);
   }
 
-  // message events from downloadsManager script inside session iframe or same context
-  window.addEventListener('message', (e) => {
-    // Only accept messages from same origin
-    if (e.origin !== window.location.origin) return;
-    const data = e.data;
-    if (!data || typeof data !== 'object' || !data.type) return;
+  // Wire folder button
+  const folderBtn = document.getElementById('setDownloadFolderBtn');
+  if (folderBtn) {
+      folderBtn.addEventListener('click', async () => {
+        if (!('showDirectoryPicker' in window)) {
+            setFolderStatus('Directory picker not supported', false);
+            return;
+        }
+        try {
+            const handle = await window.showDirectoryPicker({ id: 'zentrio-downloads', mode: 'readwrite', startIn: 'videos' });
+            window.postMessage({ type: 'zentrio-download-root-set', handle }, '*');
+        } catch (e) {
+            // cancelled
+        }
+      });
+  }
 
-    // Debug / probe side-channel events (not part of queue state)
-    if (data.type === 'zentrio-download-media-probe') {
-      return;
-    }
-    if (data.type === 'zentrio-download-debug') {
-      return;
-    }
-
-    switch (data.type) {
-      case 'zentrio-download-init': {
-        upsert({
-          id: data.id,
-          title: data.payload?.title || data.title || 'Untitled',
-          href: data.payload?.href || data.href,
-          status: 'initiated',
-          progress: 0,
-          bytesReceived: 0,
-          size: 0,
-          eta: null,
-          fileName: data.fileName || null,
-          openable: false
-        });
-        break;
-      }
-      case 'zentrio-download-progress': {
-        upsert({
-          id: data.id,
-          status: 'downloading',
-          progress: data.progress,
-          bytesReceived: data.bytesReceived,
-          size: data.size || 0,
-          eta: data.eta
-        });
-        break;
-      }
-      case 'zentrio-download-complete': {
-        upsert({
-          id: data.id,
-          status: 'completed',
-          progress: 100,
-          bytesReceived: data.size || data.bytesReceived || 0,
-          size: data.size || data.bytesReceived || 0,
-          fileName: data.fileName || null,
-          openable: !!data.blobUrl,
-          blobUrl: data.blobUrl || null
-        });
-        showMessage('Download completed', 'success');
-        break;
-      }
-      case 'zentrio-download-failed': {
-        upsert({
-          id: data.id,
-          status: 'failed'
-        });
-        showMessage('Download failed', 'error');
-        break;
-      }
-      case 'zentrio-download-cancelled': {
-        upsert({
-          id: data.id,
-          status: 'failed'
-        });
-        showMessage('Download cancelled', 'info');
-        break;
-      }
-      default:
-        return;
-    }
-  });
-
-  // Legacy clear event no longer needed; keep listener for backward compatibility (soft refresh only)
-  document.addEventListener('zentrioDownloadsRefresh', () => {
-    queue = autoPrune(loadQueue());
-    render();
-  });
-
-  // Wire back button dynamically (fallback if JSX onClick not bound)
-  (function wireBack() {
-    const btn = document.getElementById('downloadsBackBtn');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        // Prefer history if came from profiles, else direct navigate
+  // Wire back button
+  const backBtn = document.getElementById('downloadsBackBtn');
+  if (backBtn) {
+      backBtn.addEventListener('click', () => {
         try {
           if (document.referrer && /\/profiles$/.test(new URL(document.referrer).pathname)) {
             history.back();
           } else {
             window.location.href = '/profiles';
           }
-        } catch(e) {
-          window.location.href = '/profiles';
-        }
-      }, { once: true });
-    } else {
-      setTimeout(wireBack, 300);
-    }
-  })();
+        } catch(e) { window.location.href = '/profiles'; }
+      });
+  }
 
-  // Initialize Lucide icons
-  function initLucideIcons() {
+  // Initialize Lucide
+  function initLucide() {
     if (typeof window.lucide !== 'undefined' && window.lucide.createIcons) {
       window.lucide.createIcons();
+    } else {
+      setTimeout(initLucide, 500);
     }
   }
+  initLucide();
 
-  // Check if Lucide is loaded, otherwise wait for it
-  if (typeof window.lucide !== 'undefined') {
-    initLucideIcons();
-  } else {
-    // Wait for Lucide to load
-    var checkInterval = setInterval(function() {
-      if (typeof window.lucide !== 'undefined') {
-        clearInterval(checkInterval);
-        initLucideIcons();
-      }
-    }, 100);
-    
-    // Stop checking after 5 seconds
-    setTimeout(function() {
-      clearInterval(checkInterval);
-    }, 5000);
-  }
+  init();
 
-  // Initial render
-  render();
 })();

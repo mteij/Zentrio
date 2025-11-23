@@ -319,27 +319,50 @@ async function main() {
     }
     console.log(`[StremioSetup] Using stremio-web version: ${version}`);
     
-    // Download/clone fresh stremio-web
-    await cloneOrUpdateRepo(STREMIO_WEB_REPO, vendorDir, version);
+    // Check if we can skip setup
+    const versionFile = path.join(vendorDir, '.zentrio-setup-version');
+    let skipSetup = false;
     
-    // Install dependencies
-    console.log('[StremioSetup] Installing dependencies...');
-    try {
-      execSync('npm install --legacy-peer-deps', { cwd: vendorDir, stdio: 'inherit' });
-      
-      // Try to install missing critical dependencies if they're still missing
-      const criticalDeps = ['@babel/core', '@nodelib/fs.walk', 'enhanced-resolve', 'fast-uri'];
-      for (const dep of criticalDeps) {
-        try {
-          require.resolve(path.join(vendorDir, 'node_modules', dep));
-        } catch (e) {
-          console.log(`[StremioSetup] Installing missing critical dependency: ${dep}`);
-          execSync(`npm install ${dep}`, { cwd: vendorDir, stdio: 'inherit' });
-        }
+    if (fs.existsSync(vendorDir) && fs.existsSync(versionFile) && !process.env.FORCE_STREMIO_SETUP) {
+      const installedVersion = fs.readFileSync(versionFile, 'utf8').trim();
+      if (installedVersion === version) {
+        console.log(`[StremioSetup] Version ${version} already installed. Skipping download and install.`);
+        skipSetup = true;
       }
-    } catch (error) {
-      console.error('[StremioSetup] Failed to install dependencies:', error.message);
-      throw error;
+    }
+
+    if (!skipSetup) {
+      // Download/clone fresh stremio-web
+      await cloneOrUpdateRepo(STREMIO_WEB_REPO, vendorDir, version);
+      
+      // Install dependencies
+      console.log('[StremioSetup] Installing dependencies...');
+      try {
+        execSync('npm install --legacy-peer-deps', { cwd: vendorDir, stdio: 'inherit' });
+        
+        // Try to install missing critical dependencies if they're still missing
+        const criticalDeps = ['@babel/core', '@nodelib/fs.walk', 'enhanced-resolve', 'fast-uri'];
+        for (const dep of criticalDeps) {
+          try {
+            require.resolve(path.join(vendorDir, 'node_modules', dep));
+          } catch (e) {
+            console.log(`[StremioSetup] Installing missing critical dependency: ${dep}`);
+            execSync(`npm install ${dep}`, { cwd: vendorDir, stdio: 'inherit' });
+          }
+        }
+      } catch (error) {
+        console.error('[StremioSetup] Failed to install dependencies:', error.message);
+        throw error;
+      }
+
+      // Save version info
+      fs.writeFileSync(versionFile, version);
+    } else {
+      // Verify node_modules exists even if we skipped setup
+      if (!fs.existsSync(path.join(vendorDir, 'node_modules'))) {
+        console.log('[StremioSetup] node_modules missing, running install...');
+        execSync('npm install --legacy-peer-deps', { cwd: vendorDir, stdio: 'inherit' });
+      }
     }
     
     // Apply webpack git fix

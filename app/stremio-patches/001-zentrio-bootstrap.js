@@ -134,6 +134,12 @@
     } catch (e) {
       console.warn('Zentrio session minimal bootstrap failed', e);
     }
+    // Global CSS overrides
+    try {
+      var style = document.createElement('style');
+      style.textContent = '.menu-container-B6cqK { display: none !important; }';
+      document.head.appendChild(style);
+    } catch (_) {}
     // clean URL
     try {
       if (String(location.search).indexOf('sessionData=') !== -1) {

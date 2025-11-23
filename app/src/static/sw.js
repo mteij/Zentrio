@@ -2,6 +2,8 @@
 
 const VERSION = '%%APP_VERSION%%';
 const CACHE_NAME = `zentrio-pwa-${VERSION}`;
+console.error('[SW] Script loaded/evaluated');
+
 const ASSETS = [
   '/static/downloads-offline.html',
   '/static/offline.html',
@@ -83,9 +85,21 @@ async function notifyClients(type, title, message) {
   try {
     const list = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
     for (const client of list) {
-      client.postMessage({ type: 'zentrio-sw-toast', payload: { toastType: type, title, message } });
+      if (type === 'zentrio-sw-toast') {
+          client.postMessage({ type: 'zentrio-sw-toast', payload: { toastType: type, title, message } });
+      } else if (type === 'zentrio-debug') {
+          client.postMessage({ type: 'zentrio-debug', message });
+      } else {
+          // Generic message
+          client.postMessage(message);
+      }
     }
   } catch (_) {}
+}
+
+function log(msg) {
+    console.log('[SW]', msg);
+    notifyClients('zentrio-debug', null, msg);
 }
 
 self.addEventListener('fetch', (event) => {
@@ -146,8 +160,20 @@ if (url.origin !== self.location.origin) {
 });
 
 self.addEventListener('message', (event) => {
-  if (!event.data) return;
-  if (event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+  try {
+      if (!event.data) return;
+      const data = event.data;
+
+      log(`Message received: ${data.type}`);
+
+      if (data.type === 'zentrio-ping') {
+          log('Pong!');
+          notifyClients('zentrio-pong', null, { type: 'zentrio-pong' });
+      } else if (data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+      }
+  } catch (e) {
+      console.error('[SW] Message handler error', e);
+      notifyClients('zentrio-debug', null, `Message handler error: ${e.message}`);
   }
 });

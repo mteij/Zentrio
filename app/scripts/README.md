@@ -60,7 +60,7 @@ Patches are stored in `../stremio-patches/` and are applied in numerical order:
 - `001-zentrio-bootstrap.js` - Core session and API proxy setup
 - `010-ui-header-integration.js` - UI modifications and profile integration
 - `020-addon-manager.js` - Addon Manager integration
-- `030-downloads-manager.js` - Downloads Manager feature
+- `030-downloads-manager.js` - Downloads Manager feature (includes stream data integration)
 - `040-nsfw-filter.js` - NSFW content filtering
 
 Each patch is client-side JavaScript that gets injected into the Stremio Web build.

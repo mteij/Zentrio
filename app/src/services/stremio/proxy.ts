@@ -156,6 +156,12 @@ export const renderLocalStremioHtml = async (sessionData: string | null) => {
     // Ensure a base href so that bundled assets resolve correctly under /stremio/
     body = body.replace(/<head[^>]*>/i, `$&<base href="/stremio/">`);
  
+    // Inject downloads core script so it runs in the main Stremio window context
+    body = body.replace(
+      /<head[^>]*>/i,
+      `$&<script src="/static/js/downloads-core.js"></script><script src="/static/js/spa-navigation.js"></script>`
+    );
+
     if (sessionData) {
       // Inject session data as a hidden element that the build-time patched bootstrap code can read
       // This approach is cleaner than runtime script injection
