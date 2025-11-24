@@ -156,10 +156,12 @@ export const renderLocalStremioHtml = async (sessionData: string | null) => {
     // Ensure a base href so that bundled assets resolve correctly under /stremio/
     body = body.replace(/<head[^>]*>/i, `$&<base href="/stremio/">`);
  
-    // Inject downloads core script so it runs in the main Stremio window context
+    // Inject spa navigation script and downloads core
+    // We inject downloads-core.js so that Stremio Web can handle downloads directly via OPFS
+    // even when running as a top-level page.
     body = body.replace(
       /<head[^>]*>/i,
-      `$&<script src="/static/js/downloads-core.js"></script><script src="/static/js/spa-navigation.js"></script>`
+      `$&<script src="/static/js/spa-navigation.js"></script><script src="/static/js/downloads-core.js"></script>`
     );
 
     if (sessionData) {

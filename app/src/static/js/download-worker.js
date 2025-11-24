@@ -62,8 +62,14 @@ async function startDownload({ item, url, rootHandle, resume }) {
     const signal = controller.signal;
 
     try {
-        if (!rootHandle) {
-            throw new Error('No download folder handle provided');
+        // If rootHandle is not provided, try to get OPFS root directly
+        let handle = rootHandle;
+        if (!handle) {
+            try {
+                handle = await navigator.storage.getDirectory();
+            } catch (e) {
+                throw new Error('Failed to access OPFS');
+            }
         }
 
         const fileName = item.fileName || deriveFileName(item.title, url);
@@ -71,7 +77,7 @@ async function startDownload({ item, url, rootHandle, resume }) {
         // Get file handle
         let fileHandle;
         try {
-            fileHandle = await rootHandle.getFileHandle(fileName, { create: true });
+            fileHandle = await handle.getFileHandle(fileName, { create: true });
         } catch (e) {
             throw new Error(`FileSystem Error: ${e.message}`);
         }
@@ -126,43 +132,56 @@ async function startDownload({ item, url, rootHandle, resume }) {
         const startTime = Date.now();
 
         // Notify start
-        self.postMessage({ 
-            type: 'started', 
-            id, 
+        self.postMessage({
+            type: 'started',
+            id,
             fileName,
-            size: total 
+            size: total
         });
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-            loaded += value.length;
-            await writable.write(value);
+                loaded += value.length;
+                await writable.write(value);
 
-            const now = Date.now();
-            if (now - lastUpdate > 1000) {
-                let pct = total ? (loaded / total) * 100 : 0;
-                if (pct > 100) pct = 100;
+                const now = Date.now();
+                if (now - lastUpdate > 1000) {
+                    let pct = total ? (loaded / total) * 100 : 0;
+                    if (pct > 100) pct = 100;
 
-                const elapsed = (now - startTime) / 1000;
-                const speed = (loaded - startOffset) / (elapsed || 1); // bytes per sec
-                const remaining = total ? total - loaded : 0;
-                const eta = (speed > 0 && remaining > 0) ? Math.round(remaining / speed) : 0;
+                    const elapsed = (now - startTime) / 1000;
+                    const speed = (loaded - startOffset) / (elapsed || 1); // bytes per sec
+                    const remaining = total ? total - loaded : 0;
+                    const eta = (speed > 0 && remaining > 0) ? Math.round(remaining / speed) : 0;
 
-                self.postMessage({
-                    type: 'progress',
-                    id,
-                    progress: pct,
-                    bytesReceived: loaded,
-                    size: total,
-                    eta
-                });
-                lastUpdate = now;
+                    self.postMessage({
+                        type: 'progress',
+                        id,
+                        progress: pct,
+                        bytesReceived: loaded,
+                        size: total,
+                        eta
+                    });
+                    lastUpdate = now;
+                }
+            }
+        } catch (writeErr) {
+            if (writeErr.name === 'QuotaExceededError') {
+                throw new Error('Disk full or quota exceeded');
+            }
+            throw writeErr;
+        } finally {
+            // Ensure we close the writable stream
+            try {
+                await writable.close();
+            } catch (closeErr) {
+                console.warn('[Worker] Failed to close writable:', closeErr);
             }
         }
 
-        await writable.close();
         activeDownloads.delete(id);
 
         self.postMessage({

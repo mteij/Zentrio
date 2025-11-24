@@ -219,6 +219,16 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="toggle" id="vantaToggle"></div>
             </div>
           </div>
+
+          <div className="setting-item">
+            <div className="setting-info">
+              <h3>Sync background to Stremio</h3>
+              <p>Apply the same animated background to the Stremio interface (requires refresh)</p>
+            </div>
+            <div className="setting-control">
+              <div className="toggle" id="vantaSyncToggle"></div>
+            </div>
+          </div>
         </div>
 
 

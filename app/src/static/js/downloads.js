@@ -36,52 +36,8 @@
     return div.innerHTML;
   }
 
-  function setFolderStatus(text, ready) {
-    const st = document.getElementById('downloadFolderStatus');
-    if (!st) return;
-    st.textContent = text;
-    st.classList.toggle('ready', !!ready);
-  }
-
   // --- Modal Logic ---
-  const modal = document.getElementById('folderModal');
-  const modalSelectBtn = document.getElementById('modalSelectBtn');
-  const modalBackBtn = document.getElementById('modalBackBtn');
-  const closeFolderModal = document.getElementById('closeFolderModal');
-
-  function showModal() { if (modal) modal.style.display = 'block'; }
-  function hideModal() { if (modal) modal.style.display = 'none'; }
-
-  if (closeFolderModal) closeFolderModal.onclick = hideModal;
-  if (modalBackBtn) modalBackBtn.onclick = () => {
-    hideModal();
-    try {
-      if (document.referrer && /\/profiles$/.test(new URL(document.referrer).pathname)) {
-        history.back();
-      } else {
-        window.location.href = '/profiles';
-      }
-    } catch(e) { window.location.href = '/profiles'; }
-  };
-  
-  if (modalSelectBtn) modalSelectBtn.onclick = async () => {
-    if (!('showDirectoryPicker' in window)) {
-      setFolderStatus('Directory picker not supported', false);
-      return;
-    }
-    try {
-      const handle = await window.showDirectoryPicker({ id: 'zentrio-downloads', mode: 'readwrite', startIn: 'videos' });
-      // Send to Core
-      window.postMessage({ type: 'zentrio-download-root-set', handle }, '*');
-      hideModal();
-    } catch (e) {
-      setFolderStatus('No folder selected', false);
-    }
-  };
-
-  window.onclick = function(event) {
-    if (event.target == modal) hideModal();
-  }
+  // Removed folder selection modal logic as we use OPFS
 
   // --- Rendering ---
 
@@ -166,8 +122,8 @@
                         </button>
                     ` : ''}
                     ${status === 'completed' ? `
-                        <button class="action-btn" data-action="open" data-id="${safeId}" title="Open Folder">
-                            <i data-lucide="folder-open" style="width: 20px; height: 20px;"></i>
+                        <button class="action-btn" data-action="export" data-id="${safeId}" title="Save to Disk">
+                            <i data-lucide="download" style="width: 20px; height: 20px;"></i>
                         </button>
                     ` : ''}
                     <button class="action-btn delete" data-action="delete" data-id="${safeId}" title="Delete">
@@ -213,8 +169,8 @@
             if (confirm('Are you sure you want to delete this download?')) {
                 window.postMessage({ type: 'zentrio-download-delete', id }, '*');
             }
-        } else if (action === 'open') {
-            // Not supported yet
+        } else if (action === 'export') {
+            window.postMessage({ type: 'zentrio-download-export', id }, '*');
         }
       });
     });
@@ -243,21 +199,11 @@
             window.__zentrioDownloadsItems = data.items;
             render();
         }
-    } else if (data.type === 'zentrio-download-root-handle') {
-        if (data.handle) {
-            setFolderStatus(`Folder: ${data.handle.name}`, true);
-        } else {
-            setFolderStatus('No folder selected', false);
-            showModal();
-        }
     }
   });
 
   // Initial check
   function init() {
-      // Ask Core for root handle status
-      window.postMessage({ type: 'zentrio-download-root-request' }, '*');
-      
       // Ask Core for initial list
       window.postMessage({ type: 'zentrio-download-list-request' }, '*');
 
@@ -268,23 +214,6 @@
       setInterval(() => {
           window.postMessage({ type: 'zentrio-download-list-request' }, '*');
       }, 2000);
-  }
-
-  // Wire folder button
-  const folderBtn = document.getElementById('setDownloadFolderBtn');
-  if (folderBtn) {
-      folderBtn.addEventListener('click', async () => {
-        if (!('showDirectoryPicker' in window)) {
-            setFolderStatus('Directory picker not supported', false);
-            return;
-        }
-        try {
-            const handle = await window.showDirectoryPicker({ id: 'zentrio-downloads', mode: 'readwrite', startIn: 'videos' });
-            window.postMessage({ type: 'zentrio-download-root-set', handle }, '*');
-        } catch (e) {
-            // cancelled
-        }
-      });
   }
 
   // Wire back button

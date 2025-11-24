@@ -23,72 +23,30 @@ declare global {
     
     // --- IndexedDB Helpers ---
     const IDB_NAME = 'zentrio_downloads_db';
-    const IDB_STORE_HANDLES = 'handles';
     const IDB_STORE_ITEMS = 'items';
 
     function openDb(): Promise<IDBDatabase> {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open(IDB_NAME, 2);
+            const req = indexedDB.open(IDB_NAME, 3); // Bump version for schema change if needed, though we just ignore handles store
             req.onupgradeneeded = (e: any) => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains(IDB_STORE_ITEMS)) {
                     db.createObjectStore(IDB_STORE_ITEMS, { keyPath: 'id' });
                 }
-                if (!db.objectStoreNames.contains(IDB_STORE_HANDLES)) {
-                    db.createObjectStore(IDB_STORE_HANDLES);
-                }
+                // We don't need handles store anymore
             };
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
         });
     }
 
-    async function saveRootHandle(handle: any) {
+    async function getOpfsRoot() {
         try {
-            console.log('[ZDM-Core] Saving root handle to DB...');
-            const db = await openDb();
-            return new Promise<void>((resolve, reject) => {
-                const tx = db.transaction(IDB_STORE_HANDLES, 'readwrite');
-                // FileSystemHandle can be stored directly in IndexedDB in modern browsers
-                tx.objectStore(IDB_STORE_HANDLES).put(handle, 'root');
-                tx.oncomplete = () => {
-                    console.log('[ZDM-Core] Root handle saved successfully');
-                    resolve();
-                };
-                tx.onerror = () => {
-                    console.error('[ZDM-Core] Root handle save failed', tx.error);
-                    reject(tx.error);
-                };
-            });
-        } catch (e) { console.error('[ZDM-Core] DB Handle Save Error', e); }
-    }
-
-    async function loadRootHandle() {
-        try {
-            const db = await openDb();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(IDB_STORE_HANDLES, 'readonly');
-                const req = tx.objectStore(IDB_STORE_HANDLES).get('root');
-                req.onsuccess = async () => {
-                    const handle = req.result;
-                    if (handle) {
-                        // Verify permission on load
-                        try {
-                            const mode = 'readwrite';
-                            if ((await handle.queryPermission({ mode })) !== 'granted') {
-                                // We can't request permission here without user gesture, so we just return the handle
-                                // and let the next operation trigger the request or fail gracefully
-                                console.log('[ZDM-Core] Loaded handle needs permission verification');
-                            }
-                        } catch (e) {
-                            console.warn('[ZDM-Core] Permission check on load failed', e);
-                        }
-                    }
-                    resolve(handle);
-                };
-                req.onerror = () => reject(req.error);
-            });
-        } catch (e) { console.error('[ZDM-Core] DB Handle Load Error', e); return null; }
+            return await navigator.storage.getDirectory();
+        } catch (e) {
+            console.error('[ZDM-Core] Failed to get OPFS root', e);
+            return null;
+        }
     }
 
     async function saveItem(item: any) {
@@ -283,24 +241,15 @@ declare global {
         
         if (!isNative) {
             if (!rootHandle) {
-                broadcast({ type: 'zentrio-download-error', id: data.id, error: 'No download folder selected' });
-                return;
+                rootHandle = await getOpfsRoot();
             }
 
-            // Verify permission
-            try {
-                const mode = 'readwrite';
-                if ((await rootHandle.queryPermission({ mode })) !== 'granted') {
-                    // Try to request (might fail if no gesture)
-                    if ((await rootHandle.requestPermission({ mode })) !== 'granted') {
-                        throw new Error('Permission denied');
-                    }
-                }
-            } catch (e) {
-                console.warn('[ZDM-Core] Permission check failed', e);
-                broadcast({ type: 'zentrio-download-error', id: data.id, error: 'Permission required' });
+            if (!rootHandle) {
+                console.error('[ZDM-Core] No OPFS root handle found');
+                broadcast({ type: 'zentrio-download-error', id: data.id, error: 'Storage access failed' });
                 return;
             }
+            // OPFS does not require permission checks
         }
 
         const item = {
@@ -346,6 +295,9 @@ declare global {
         const bridgeId = 'zentrio-comm-bridge';
         
         function attachObserver(el: HTMLElement) {
+            // Prevent double observation
+            if ((el as any)._zdmObserved) return;
+            
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'data-message') {
@@ -353,6 +305,10 @@ declare global {
                         if (raw) {
                             try {
                                 const data = JSON.parse(raw);
+                                // Clear attribute immediately to allow next message
+                                // el.removeAttribute('data-message');
+                                // Actually, let the sender clear it or just overwrite it.
+                                // But we should process it.
                                 handleMessage(data, null);
                             } catch (e) {
                                 console.error('[ZDM-Core] Bridge parse error', e);
@@ -362,6 +318,7 @@ declare global {
                 });
             });
             observer.observe(el, { attributes: true });
+            (el as any)._zdmObserved = true;
             return observer;
         }
 
@@ -372,17 +329,14 @@ declare global {
                 bridge.id = bridgeId;
                 bridge.style.display = 'none';
                 document.documentElement.appendChild(bridge);
-                attachObserver(bridge);
             }
+            attachObserver(bridge);
             return bridge;
         }
 
-        const bridge = ensureBridge();
-        if (bridge && !(bridge as any)._zdmObserved) {
-             attachObserver(bridge);
-             (bridge as any)._zdmObserved = true;
-        }
+        ensureBridge();
 
+        // Watch for removal
         const parentObserver = new MutationObserver((mutations) => {
             if (!document.getElementById(bridgeId)) {
                 ensureBridge();
@@ -406,9 +360,8 @@ declare global {
                     return;
                 }
                 processedMessageIds.add(key);
-                // Clear after 5 seconds to allow for re-tries later but block immediate duplicates from bridge+postMessage race
-                // Increased to 5s to prevent double-clicks or rapid re-sends
-                setTimeout(() => processedMessageIds.delete(key), 5000);
+                // Clear after 2 seconds - 5s is too long if user wants to retry quickly after failure
+                setTimeout(() => processedMessageIds.delete(key), 2000);
             }
 
             switch (data.type) {
@@ -454,27 +407,38 @@ declare global {
                         });
                     }
                     break;
-                case 'zentrio-download-root-set':
-                    if (data.handle) {
-                        rootHandle = data.handle;
-                        await saveRootHandle(rootHandle);
-                        // Broadcast only serializable parts of the handle (name, kind)
-                        broadcast({
-                            type: 'zentrio-download-root-handle',
-                            handle: { name: rootHandle.name, kind: rootHandle.kind }
-                        });
-                    }
-                    break;
-                case 'zentrio-download-root-request':
-                    if (isNative) {
-                        // Native doesn't need root handle, send dummy or specific status
-                        broadcast({ type: 'zentrio-download-root-handle', handle: { name: 'Device Storage' } });
-                    } else if (rootHandle) {
-                        const safeHandle = { name: rootHandle.name, kind: rootHandle.kind };
-                        if (source) {
-                            source.postMessage({ type: 'zentrio-download-root-handle', handle: safeHandle }, '*');
-                        } else {
-                            broadcast({ type: 'zentrio-download-root-handle', handle: safeHandle });
+                case 'zentrio-download-export':
+                    if (!isNative && rootHandle && data.id) {
+                        try {
+                            const itemToExport = await getItem(data.id);
+                            if (itemToExport && itemToExport.fileName) {
+                                const fileHandle = await rootHandle.getFileHandle(itemToExport.fileName);
+                                const file = await fileHandle.getFile();
+                                
+                                // Use showSaveFilePicker if available
+                                if ('showSaveFilePicker' in window) {
+                                    const saveHandle = await (window as any).showSaveFilePicker({
+                                        suggestedName: itemToExport.fileName,
+                                        types: [{
+                                            description: 'Video File',
+                                            accept: { 'video/*': ['.mp4', '.mkv', '.avi', '.webm'] }
+                                        }]
+                                    });
+                                    const writable = await saveHandle.createWritable();
+                                    await writable.write(file);
+                                    await writable.close();
+                                } else {
+                                    // Fallback to blob download
+                                    const url = URL.createObjectURL(file);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = itemToExport.fileName;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                }
+                            }
+                        } catch (e) {
+                            console.error('[ZDM-Core] Export failed', e);
                         }
                     }
                     break;
@@ -489,12 +453,12 @@ declare global {
 
     // --- Initialization ---
     async function init() {
-        console.log('[ZDM-Core] Initializing v3 (Hybrid)...', window.location.href);
+        console.log('[ZDM-Core] Initializing v3 (Hybrid - OPFS)...', window.location.href);
         
         if (!isNative) {
-            rootHandle = await loadRootHandle();
+            rootHandle = await getOpfsRoot();
             if (rootHandle) {
-                console.log('[ZDM-Core] Loaded root handle:', rootHandle.name);
+                console.log('[ZDM-Core] Loaded OPFS root handle');
             }
             initWorker();
         } else {
@@ -502,8 +466,17 @@ declare global {
         }
 
         window.__zentrioDownloads = {
-            setRoot: async (h: any) => { rootHandle = h; await saveRootHandle(h); },
-            worker: worker
+            worker: worker,
+            listFiles: async () => {
+                if (!rootHandle) rootHandle = await getOpfsRoot();
+                if (!rootHandle) return console.error('No root handle');
+                console.log('--- OPFS Files ---');
+                // @ts-ignore
+                for await (const [name, handle] of rootHandle.entries()) {
+                    console.log(name, handle.kind);
+                }
+                console.log('------------------');
+            }
         };
     }
 

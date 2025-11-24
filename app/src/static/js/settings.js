@@ -952,3 +952,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// Wire up the sync toggle
+(function() {
+    const SYNC_KEY = 'zentrio_enable_vanta_bg';
+    const toggle = document.getElementById('vantaSyncToggle');
+    
+    if (toggle) {
+        // Init state
+        const stored = localStorage.getItem(SYNC_KEY);
+        const active = stored === 'true'; // Default false
+        
+        if (active) toggle.classList.add('active');
+        
+        toggle.addEventListener('click', () => {
+            const newState = !toggle.classList.contains('active');
+            toggle.classList.toggle('active', newState);
+            localStorage.setItem(SYNC_KEY, String(newState));
+        });
+    }
+})();

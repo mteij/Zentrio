@@ -20,20 +20,6 @@ export function DownloadsPage({}: DownloadsPageProps) {
             <i data-lucide="arrow-left" style={{ width: 20, height: 20 }}></i>
             <span style={{ marginLeft: 6 }}>Back</span>
           </Button>
-          <Button
-            id="setDownloadFolderBtn"
-            type="button"
-            variant="primary"
-            size="small"
-            ariaLabel="Select download folder"
-            title="Select Download Folder (choose once)"
-          >
-            <i data-lucide="folder" style={{ width: 20, height: 20 }}></i>
-            <span style={{ marginLeft: 6 }}>Set Download Folder</span>
-          </Button>
-          <span id="downloadFolderStatus" className="download-folder-status" style={{ fontSize: 12, color: '#9ca3af' }}>
-            No folder selected
-          </span>
         </div>
 
         <div id="downloadsSummary" style={{
@@ -223,18 +209,6 @@ export function DownloadsPage({}: DownloadsPageProps) {
           font-size: 18px;
           font-weight: 600;
           color: #f9fafb;
-        }
-        .download-folder-status {
-          font-size: 12px;
-          color: #9ca3af;
-          line-height: 1.2;
-          max-width: 220px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .download-folder-status.ready {
-          color: #10b981;
         }
       `}</style>
 

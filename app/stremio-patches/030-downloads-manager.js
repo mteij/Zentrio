@@ -251,12 +251,12 @@
             }
             
             if (bridge) {
-                console.log('[ZDM] Writing to bridge...');
+                // console.log('[ZDM] Writing to bridge...');
                 bridge.setAttribute('data-message', JSON.stringify(msg));
                 // Clear it after a tick to allow re-sending same message if needed
                 setTimeout(() => bridge.removeAttribute('data-message'), 50);
             } else {
-                console.warn('[ZDM] Bridge not found');
+                // console.warn('[ZDM] Bridge not found');
                 // Retry once after a short delay if not found (maybe initialization race)
                 setTimeout(() => {
                     try {
@@ -270,11 +270,11 @@
                         }
                         
                         if (retryBridge) {
-                            console.log('[ZDM] Bridge found on retry, writing...');
+                            // console.log('[ZDM] Bridge found on retry, writing...');
                             retryBridge.setAttribute('data-message', JSON.stringify(msg));
                             setTimeout(() => retryBridge.removeAttribute('data-message'), 50);
                         } else {
-                            console.error('[ZDM] Bridge definitely not found');
+                            // console.error('[ZDM] Bridge definitely not found');
                         }
                     } catch(e) {}
                 }, 500);
@@ -318,30 +318,6 @@
                 });
                 renderPopupList();
             }
-        } else if (data.type === 'zentrio-download-root-handle') {
-            // Core has a handle, we can update UI if needed (e.g. hide modal warning)
-            const modal = document.getElementById('zentrioFolderModal');
-            if (modal) modal.style.display = 'none';
-        } else if (data.type === 'zentrio-download-error') {
-             if (data.error === 'No download folder selected' || data.error === 'Permission required') {
-                 // Store the pending item so we can retry
-                 if (data.id && items[data.id]) {
-                     window.__zentrioPendingDownloadItem = items[data.id];
-                 }
-                 let modal = document.getElementById('zentrioFolderModal');
-                 if (!modal) {
-                     console.warn('[ZDM] Folder modal not found, forcing re-injection...');
-                     injectStyles();
-                     modal = document.getElementById('zentrioFolderModal');
-                 }
-                 
-                 if (modal) {
-                     modal.style.display = 'block';
-                 } else {
-                     // Last ditch effort: create it immediately if injectStyles failed or was async
-                     console.error('[ZDM] Modal still missing after injection attempt');
-                 }
-             }
         }
     });
 
@@ -968,92 +944,7 @@
         }
       }
 
-      // Inject Modal HTML
-      // Always re-inject if missing, but check first to avoid duplicates
-      let modal = document.getElementById('zentrioFolderModal');
-      if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'zentrioFolderModal';
-        modal.className = 'zentrio-modal';
-        modal.innerHTML = `
-          <div class="zentrio-modal-content">
-            <span class="zentrio-close" id="zentrioCloseFolderModal">&times;</span>
-            <h2 style="margin-bottom: 20px; color: #fff; margin-top: 0;">Select Download Folder</h2>
-            <p style="color: #b3b3b3; margin-bottom: 24px; line-height: 1.5;">
-              Please select a folder where your downloads will be saved. This is required to store files on your device.
-            </p>
-            <div style="display: flex; justify-content: flex-end;">
-              <button id="zentrioModalBackBtn" class="zentrio-btn zentrio-btn-secondary">Cancel</button>
-              <button id="zentrioModalSelectBtn" class="zentrio-btn">Select Folder</button>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(modal);
-        
-        // Wire up modal events
-        const closeBtn = document.getElementById('zentrioCloseFolderModal');
-        const backBtn = document.getElementById('zentrioModalBackBtn');
-        const selectBtn = document.getElementById('zentrioModalSelectBtn');
-        
-        const hideModal = () => {
-            modal.style.display = 'none';
-            // If we have a pending item and the user cancels, we should reset the button state
-            if (window.__zentrioPendingDownloadItem) {
-                const item = window.__zentrioPendingDownloadItem;
-                const btn = document.querySelector(`a[href="${item.href}"] .zentrio-dl-btn`);
-                if (btn) setButtonState(btn, 'default');
-                window.__zentrioPendingDownloadItem = null;
-            }
-        };
-        
-        if (closeBtn) closeBtn.onclick = hideModal;
-        if (backBtn) backBtn.onclick = hideModal;
-        if (selectBtn) selectBtn.onclick = async () => {
-          if (!('showDirectoryPicker' in window)) {
-            alert('Directory picker not supported');
-            return;
-          }
-          try {
-            const handle = await window.showDirectoryPicker({ id: 'zentrio-downloads', mode: 'readwrite', startIn: 'videos' });
-            // Send handle to Core
-            sendToCore({ type: 'zentrio-download-root-set', handle });
-            hideModal();
-            
-            // Retry pending download if any
-            if (window.__zentrioPendingDownloadItem) {
-               const item = window.__zentrioPendingDownloadItem;
-               window.__zentrioPendingDownloadItem = null;
-               
-               // Wait a tick for modal to fully close and UI to settle
-               setTimeout(() => {
-                   // Re-trigger download
-                   // Use a more robust selector or iteration to find the anchor
-                   const anchors = Array.from(document.querySelectorAll('a[href]'));
-                   const anchor = anchors.find(a => a.getAttribute('href') === item.href);
-                   if (anchor) {
-                       const btn = anchor.querySelector('.zentrio-dl-btn');
-                       if (btn) {
-                           // Reset button state to allow re-download
-                           setButtonState(btn, 'default');
-                           // Force start download again
-                           startDownload(anchor, btn);
-                       }
-                   }
-               }, 100);
-            }
-            
-          } catch (e) {
-            console.error('Folder selection failed', e);
-          }
-        };
-        
-        window.onclick = (event) => {
-          if (event.target == modal) hideModal();
-        };
-      } else {
-          // Re-attach events if modal exists but listeners might be lost (e.g. if moved in DOM)
-          // Actually, it's safer to just leave it if it exists.
-      }
+      // Modal logic removed as we use OPFS
     }
 
     function ensureRelative(el) {
@@ -1622,19 +1513,12 @@
       injectStyles();
       patchNetworkForDiscovery();
       
-      // Ask Core for root handle status to update modal if needed
-      sendToCore({ type: 'zentrio-download-root-request' });
-      
       // Ask Core for current list to populate popup
       sendToCore({ type: 'zentrio-download-list-request' });
 
       scan();
       const observer = new MutationObserver(debounce(() => {
           scan();
-          // Also check if our modal is still there, React might have wiped the body
-          if (!document.getElementById('zentrioFolderModal')) {
-              injectStyles();
-          }
       }, 250));
       observer.observe(document.body, { childList: true, subtree: true });
       
