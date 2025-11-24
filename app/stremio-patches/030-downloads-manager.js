@@ -311,6 +311,10 @@
                 const btn = a.querySelector('.zentrio-dl-btn');
                 if (btn) setButtonState(btn, 'downloading');
             });
+        } else if (data.type === 'zentrio-download-started') {
+            updateButtonState(data.id, 'downloading', 0);
+            items[data.id] = { ...items[data.id], status: 'downloading', progress: 0, size: data.size };
+            renderPopupList();
         } else if (data.type === 'zentrio-download-list') {
             if (data.items && Array.isArray(data.items)) {
                 data.items.forEach(item => {
@@ -1486,7 +1490,7 @@
                 metaText = `Downloading ${Math.round(pct)}%`;
                 statusColor = '#60a5fa';
             } else if (status === 'completed') {
-                metaText = 'Download Complete';
+                metaText = 'Ready to Save';
                 statusColor = '#10b981';
             } else if (status === 'failed') {
                 metaText = 'Download Failed';

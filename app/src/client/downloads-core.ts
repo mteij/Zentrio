@@ -179,6 +179,8 @@ declare global {
         const msg = e.data;
         if (!msg || !msg.type) return;
 
+        console.log('[ZDM-Core] Worker message:', msg.type, msg.id);
+
         // Update local state and DB
         if (msg.id) {
             const item = await getItem(msg.id);

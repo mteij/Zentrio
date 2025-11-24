@@ -66,6 +66,7 @@ async function startDownload({ item, url, rootHandle, resume }) {
         let handle = rootHandle;
         if (!handle) {
             try {
+                console.log('[Worker] Acquiring OPFS root...');
                 handle = await navigator.storage.getDirectory();
             } catch (e) {
                 throw new Error('Failed to access OPFS');
@@ -73,11 +74,13 @@ async function startDownload({ item, url, rootHandle, resume }) {
         }
 
         const fileName = item.fileName || deriveFileName(item.title, url);
+        console.log('[Worker] Target filename:', fileName);
         
         // Get file handle
         let fileHandle;
         try {
             fileHandle = await handle.getFileHandle(fileName, { create: true });
+            console.log('[Worker] Got file handle');
         } catch (e) {
             throw new Error(`FileSystem Error: ${e.message}`);
         }
@@ -98,7 +101,9 @@ async function startDownload({ item, url, rootHandle, resume }) {
                 writable = await fileHandle.createWritable();
             }
         } else {
+            console.log('[Worker] Creating writable...');
             writable = await fileHandle.createWritable();
+            console.log('[Worker] Writable created');
         }
 
         // Prepare headers
@@ -110,7 +115,9 @@ async function startDownload({ item, url, rootHandle, resume }) {
         // Start Fetch
         let response;
         try {
+            console.log('[Worker] Fetching URL...');
             response = await fetch(url, { headers, signal });
+            console.log('[Worker] Fetch response:', response.status);
         } catch (e) {
             if (signal.aborted) throw new Error('Aborted');
             throw new Error(`Network Error: ${e.message}`);
@@ -126,12 +133,12 @@ async function startDownload({ item, url, rootHandle, resume }) {
             if (len) total = startOffset + parseInt(len, 10);
         }
 
-        const reader = response.body.getReader();
         let loaded = startOffset;
         let lastUpdate = 0;
         const startTime = Date.now();
 
         // Notify start
+        console.log('[Worker] Sending started event...');
         self.postMessage({
             type: 'started',
             id,
@@ -139,13 +146,11 @@ async function startDownload({ item, url, rootHandle, resume }) {
             size: total
         });
 
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                loaded += value.length;
-                await writable.write(value);
+        // Use TransformStream for progress monitoring and pipeTo for performance
+        const progressStream = new TransformStream({
+            transform(chunk, controller) {
+                loaded += chunk.length;
+                controller.enqueue(chunk);
 
                 const now = Date.now();
                 if (now - lastUpdate > 1000) {
@@ -168,18 +173,16 @@ async function startDownload({ item, url, rootHandle, resume }) {
                     lastUpdate = now;
                 }
             }
+        });
+
+        try {
+            await response.body.pipeThrough(progressStream).pipeTo(writable);
+            console.log('[Worker] Stream done');
         } catch (writeErr) {
             if (writeErr.name === 'QuotaExceededError') {
                 throw new Error('Disk full or quota exceeded');
             }
             throw writeErr;
-        } finally {
-            // Ensure we close the writable stream
-            try {
-                await writable.close();
-            } catch (closeErr) {
-                console.warn('[Worker] Failed to close writable:', closeErr);
-            }
         }
 
         activeDownloads.delete(id);

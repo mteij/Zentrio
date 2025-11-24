@@ -17,6 +17,33 @@
 
   // --- UI Helpers ---
 
+  function showToast(message) {
+    let toast = document.getElementById('zentrio-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'zentrio-toast';
+        Object.assign(toast.style, {
+            position: 'fixed',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#333',
+            color: '#fff',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            zIndex: '100000',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            display: 'none',
+            fontSize: '14px',
+            textAlign: 'center'
+        });
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 5000);
+  }
+
   function formatBytes(bytes) {
     if (!bytes || isNaN(bytes)) return '0 B';
     const units = ['B','KB','MB','GB','TB'];
@@ -77,9 +104,9 @@
             badgeClass = 'status-downloading';
             badgeText = `${Math.round(pct)}%`;
         } else if (status === 'completed') {
-            meta = sizeStr;
+            meta = sizeStr + ' - Click to Save';
             badgeClass = 'status-completed';
-            badgeText = 'Downloaded';
+            badgeText = 'Ready to Save';
         } else if (status === 'failed') {
             meta = 'Failed';
             badgeClass = 'status-failed';
@@ -183,8 +210,10 @@
     if (!data || typeof data !== 'object') return;
 
     // Listen for updates from Core
-    if (data.type === 'zentrio-download-progress' ||
-        data.type === 'zentrio-download-complete' ||
+    if (data.type === 'zentrio-download-complete') {
+        showToast('Download finished! Click the download button to save to your device.');
+        window.postMessage({ type: 'zentrio-download-list-request' }, '*');
+    } else if (data.type === 'zentrio-download-progress' ||
         data.type === 'zentrio-download-failed' ||
         data.type === 'zentrio-download-cancelled' ||
         data.type === 'zentrio-download-init' ||
