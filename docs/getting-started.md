@@ -10,7 +10,7 @@ This page helps you get up and running quickly, whether you use the public insta
 
 - Open `https://zentrio.eu` in your browser.
 - Create or open a profile.
-- Log in with your email using the magic link flow.
+- Log in with your email (Magic Link, Password) or Social Login.
 
 _Best if you just want to try Zentrio without running your own server._
 
@@ -39,9 +39,10 @@ For a deeper guide and all environment variables, see [Self hosting with Docker]
 ## 2. First-time setup
 
 1. Open Zentrio (hosted or self-hosted).
-2. Enter your email address to request a magic link.
-3. Click the link in your inbox to log in.
-4. Create your first profile with your Stremio credentials.
+2. Sign in using one of the available methods:
+   - **Email**: Enter your email to receive a Magic Link or use a password.
+   - **Social**: Use Google, GitHub, Discord, or OIDC (if configured).
+3. Create your first profile with your Stremio credentials.
 
 Profiles keep their own Stremio settings, watch history, and addons.
 

@@ -110,6 +110,8 @@ These are the most important variables for a typical Docker deployment.
 
 For a complete list and detailed explanations, see [Environment variables](/environment).
 
+For configuring Social Login (Google, GitHub, etc.), see [SSO & OIDC Configuration](/sso-oidc).
+
 ## 3. docker-compose.yml example
 
 A simple production‑ready compose file using the published GHCR image:

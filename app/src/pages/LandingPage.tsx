@@ -62,6 +62,10 @@ export function LandingPage({}: LandingPageProps) {
       {/* Vanta.js Scripts */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+      
+      {/* Iconify Script */}
+      <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
+
       <script
         dangerouslySetInnerHTML={{
           __html: `

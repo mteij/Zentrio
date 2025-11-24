@@ -202,6 +202,32 @@ EMAIL_TEMPLATE_WELCOME=templates/welcome.html
 
 ---
 
+## SSO & OIDC
+
+See [SSO & OIDC Configuration](/sso-oidc) for setup details.
+
+```bash
+# Google
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# GitHub
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+
+# Discord
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+
+# Generic OIDC
+OIDC_CLIENT_ID=
+OIDC_CLIENT_SECRET=
+OIDC_ISSUER=
+OIDC_DISPLAY_NAME=OpenID
+```
+
+---
+
 ## Feature flags
 
 ```bash

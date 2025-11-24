@@ -7,6 +7,74 @@
     const submitBtn = document.getElementById('submitBtn');
     const loading = document.getElementById('loading');
     const inlineAuth = document.getElementById('inlineAuth');
+    let authProviders = {};
+
+    // Fetch enabled providers
+    fetch('/api/auth/providers')
+        .then(res => res.json())
+        .then(data => {
+            authProviders = data;
+            renderSSOButtons();
+        })
+        .catch(err => console.error('Failed to fetch auth providers', err));
+
+    function renderSSOButtons() {
+        const container = document.createElement('div');
+        container.className = 'sso-container';
+        container.style.cssText = 'display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap;';
+
+        const createBtn = (provider, iconName, label) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'sso-button';
+            btn.style.cssText = 'background:#333;border:1px solid #555;padding:10px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:8px;color:white;';
+            btn.innerHTML = `<span class="iconify" data-icon="mdi:${iconName}" data-inline="false" style="font-size: 20px;"></span> <span>${label}</span>`;
+            btn.onclick = async () => {
+                try {
+                    const res = await fetch('/api/auth/sign-in/social', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            provider,
+                            callbackURL: '/profiles'
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.url) {
+                        window.location.href = data.url;
+                    } else if (data.error) {
+                        toast('error', 'Login failed', data.message || data.error);
+                    }
+                } catch (err) {
+                    console.error('Social login error:', err);
+                    toast('error', 'Login failed', 'Could not connect to server');
+                }
+            };
+            return btn;
+        };
+
+        if (authProviders.google) {
+            container.appendChild(createBtn('google', 'google', 'Google'));
+        }
+        if (authProviders.github) {
+            container.appendChild(createBtn('github', 'github', 'GitHub'));
+        }
+        if (authProviders.discord) {
+            container.appendChild(createBtn('discord', 'discord', 'Discord'));
+        }
+        if (authProviders.oidc) {
+            container.appendChild(createBtn('oidc', 'openid', authProviders.oidcName));
+        }
+
+        if (container.children.length > 0) {
+            const heroContent = document.querySelector('.hero-content');
+            const form = document.getElementById('emailForm');
+            if (heroContent && form) {
+                // Insert after the form
+                form.parentNode.insertBefore(container, form.nextSibling);
+            }
+        }
+    }
 
     // Toast helpers — unify usage across auth flow
     function toast(type, title, message) {

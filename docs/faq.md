@@ -53,11 +53,11 @@ See the full list in [Environment variables](/environment).
 
 ### How does login work?
 
-Zentrio uses a magic link flow:
+Zentrio supports multiple authentication methods:
 
-1. You enter your email.
-2. Zentrio sends a one‑time link.
-3. Clicking the link logs you in and creates a session.
+- **Magic Link**: Enter your email to receive a one-time login link.
+- **Password**: Set a password for your account.
+- **Social Login**: Sign in with Google, GitHub, Discord, or other OIDC providers (if configured).
 
 ### What is a profile?
 

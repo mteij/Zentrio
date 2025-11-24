@@ -3,8 +3,21 @@ import { z } from 'zod'
 import { auth } from '../../services/auth'
 import { userDb } from '../../services/database'
 import { validate, schemas } from '../../utils/api'
+import { getConfig } from '../../services/envParser'
 
 const app = new Hono()
+
+// [GET /providers] Get enabled auth providers
+app.get('/providers', (c) => {
+    const cfg = getConfig()
+    return c.json({
+        google: !!cfg.GOOGLE_CLIENT_ID && !!cfg.GOOGLE_CLIENT_SECRET,
+        github: !!cfg.GITHUB_CLIENT_ID && !!cfg.GITHUB_CLIENT_SECRET,
+        discord: !!cfg.DISCORD_CLIENT_ID && !!cfg.DISCORD_CLIENT_SECRET,
+        oidc: !!cfg.OIDC_CLIENT_ID && !!cfg.OIDC_CLIENT_SECRET && !!cfg.OIDC_ISSUER,
+        oidcName: cfg.OIDC_DISPLAY_NAME || 'OpenID'
+    })
+})
 
 // [POST /identify] Check if user exists
 app.post('/identify', async (c) => {

@@ -49,7 +49,7 @@ export const securityHeaders = async (c: Context, next: Next) => {
   // Reference: [securityHeaders()](app/src/middleware/security.ts:27)
   c.header(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.iconify.design https://unpkg.com; connect-src * data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; worker-src 'self' blob:; manifest-src 'self';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.iconify.design https://api.iconify.design https://unpkg.com; connect-src * data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; worker-src 'self' blob:; manifest-src 'self';"
   )
 }
 

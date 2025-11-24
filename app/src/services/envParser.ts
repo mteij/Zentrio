@@ -78,6 +78,20 @@ export function getConfig() {
   const PROXY_LOGS = parseBoolean(process.env.PROXY_LOGS ?? process.env.REQUEST_LOGS, true)
   const STREMIO_LOGS = parseBoolean(process.env.STREMIO_LOGS, false)
   const LOG_LEVEL = process.env.LOG_LEVEL || 'info'
+
+  // SSO Providers
+  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
+  const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
+  const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID
+  const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET
+  const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID
+  const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET
+  
+  // OpenID Connect
+  const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID
+  const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET
+  const OIDC_ISSUER = process.env.OIDC_ISSUER
+  const OIDC_DISPLAY_NAME = process.env.OIDC_DISPLAY_NAME || 'OpenID'
  
   return {
     PORT,
@@ -89,7 +103,17 @@ export function getConfig() {
     RATE_LIMIT_LIMIT,
     PROXY_LOGS,
     STREMIO_LOGS,
-    LOG_LEVEL
+    LOG_LEVEL,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET,
+    DISCORD_CLIENT_ID,
+    DISCORD_CLIENT_SECRET,
+    OIDC_CLIENT_ID,
+    OIDC_CLIENT_SECRET,
+    OIDC_ISSUER,
+    OIDC_DISPLAY_NAME
   }
 }
 

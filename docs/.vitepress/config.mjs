@@ -28,7 +28,8 @@ export default defineConfig({
           { text: 'Usage', link: '/usage' },
           { text: 'Development', link: '/development' },
           { text: 'FAQ', link: '/faq' },
-          { text: 'Environment variables', link: '/environment' }
+          { text: 'Environment variables', link: '/environment' },
+          { text: 'SSO & OIDC', link: '/sso-oidc' }
         ]
       },
       { text: 'Releases', link: '/releases' },
@@ -44,7 +45,8 @@ export default defineConfig({
           { text: 'Usage', link: '/usage' },
           { text: 'Development', link: '/development' },
           { text: 'FAQ', link: '/faq' },
-          { text: 'Environment variables', link: '/environment' }
+          { text: 'Environment variables', link: '/environment' },
+          { text: 'SSO & OIDC', link: '/sso-oidc' }
         ]
       }
     ],

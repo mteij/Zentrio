@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { Database } from "bun:sqlite";
-import { twoFactor, magicLink, emailOTP } from "better-auth/plugins";
+import { twoFactor, magicLink, emailOTP, openAPI, oidcProvider } from "better-auth/plugins";
 import { getConfig } from "./envParser";
 import { join, isAbsolute, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
@@ -37,6 +37,23 @@ export const auth = betterAuth({
             await emailService.sendVerificationEmail(user.email, url);
         },
     },
+    socialProviders: {
+        google: {
+            enabled: !!cfg.GOOGLE_CLIENT_ID && !!cfg.GOOGLE_CLIENT_SECRET,
+            clientId: cfg.GOOGLE_CLIENT_ID || "",
+            clientSecret: cfg.GOOGLE_CLIENT_SECRET || "",
+        },
+        github: {
+            enabled: !!cfg.GITHUB_CLIENT_ID && !!cfg.GITHUB_CLIENT_SECRET,
+            clientId: cfg.GITHUB_CLIENT_ID || "",
+            clientSecret: cfg.GITHUB_CLIENT_SECRET || "",
+        },
+        discord: {
+            enabled: !!cfg.DISCORD_CLIENT_ID && !!cfg.DISCORD_CLIENT_SECRET,
+            clientId: cfg.DISCORD_CLIENT_ID || "",
+            clientSecret: cfg.DISCORD_CLIENT_SECRET || "",
+        },
+    },
     plugins: [
         twoFactor({
             issuer: "Zentrio",
@@ -50,6 +67,10 @@ export const auth = betterAuth({
             async sendVerificationOTP({ email, otp, type }) {
                 await emailService.sendOTP(email, otp);
             },
+        }),
+        openAPI(),
+        oidcProvider({
+            loginPage: "/login",
         })
     ],
     user: {
@@ -59,7 +80,7 @@ export const auth = betterAuth({
         additionalFields: {
             username: {
                 type: "string",
-                required: true,
+                required: false,
             },
             firstName: {
                 type: "string",
@@ -89,6 +110,25 @@ export const auth = betterAuth({
                 type: "boolean",
                 defaultValue: true,
             },
+        }
+    },
+    databaseHooks: {
+        user: {
+            create: {
+                before: async (user) => {
+                    if (user.email) {
+                        const existingUser = db.prepare('SELECT * FROM user WHERE email = ?').get(user.email);
+                        if (existingUser) {
+                            // If user exists, we prevent creation to avoid duplicate accounts with different providers for now
+                            // In the future we can implement account linking
+                            return false;
+                        }
+                    }
+                    return {
+                        data: user
+                    }
+                }
+            }
         }
     }
 });
