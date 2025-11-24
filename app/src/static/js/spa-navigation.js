@@ -17,10 +17,12 @@
         const href = a.getAttribute('href');
         if (!href) return;
 
-        // Ignore anchors, external links, javascript:, mailto:
-        if (href.startsWith('#') || 
-            href.startsWith('javascript:') || 
-            href.startsWith('mailto:') || 
+        // Ignore anchors, external links, javascript:, mailto:, data:, vbscript:
+        if (href.startsWith('#') ||
+            href.startsWith('javascript:') ||
+            href.startsWith('mailto:') ||
+            href.startsWith('data:') ||
+            href.startsWith('vbscript:') ||
             a.target === '_blank') return;
 
         // Check if same origin

@@ -272,6 +272,7 @@ var ExceptionCode, CapacitorException, getPlatformId = (win) => {
   const originalKeys = Object.keys(headers);
   const loweredKeys = Object.keys(headers).map((k) => k.toLocaleLowerCase());
   const normalized = loweredKeys.reduce((acc, key, index) => {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return acc;
     acc[key] = headers[originalKeys[index]];
     return acc;
   }, {});
@@ -355,7 +356,9 @@ var init_dist = __esm(() => {
         let [key, value] = cookie.replace(/=/, "CAP_COOKIE").split("CAP_COOKIE");
         key = decode(key).trim();
         value = decode(value).trim();
-        cookieMap[key] = value;
+        if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+          cookieMap[key] = value;
+        }
       });
       return cookieMap;
     }

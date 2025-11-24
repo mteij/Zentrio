@@ -201,7 +201,7 @@ async function startDownload({ item, url, rootHandle, resume }) {
         if (isAbort) {
             self.postMessage({ type: 'cancelled', id });
         } else {
-            console.error(`[Worker] Download ${id} failed:`, err);
+            console.error('[Worker] Download failed:', id, err);
             self.postMessage({ type: 'error', id, error: err.message });
         }
     }

@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 const https = require('https');
 
 const STREMIO_WEB_VERSION = 'v5.0.0-beta.27'; // Fallback version if API fails
@@ -148,10 +148,10 @@ async function cloneOrUpdateRepo(repoUrl, targetDir, version = null) {
     
     // Always use git clone into temporary directory first
     console.log('[StremioSetup] Cloning from git repository...');
-    execSync(`git clone ${repoUrl} "${tempCloneDir}"`, { stdio: 'inherit' });
+    execFileSync('git', ['clone', repoUrl, tempCloneDir], { stdio: 'inherit' });
     
     if (version) {
-      execSync(`git checkout ${version}`, { cwd: tempCloneDir, stdio: 'inherit' });
+      execFileSync('git', ['checkout', version], { cwd: tempCloneDir, stdio: 'inherit' });
     }
     
     // Get commit hash before removing .git directory
