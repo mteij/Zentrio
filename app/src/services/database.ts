@@ -54,6 +54,12 @@ const db = new Database(dbPath)
  } catch (e) {
    // ignore if column already exists
  }
+ // Add hero_banner_enabled to profile_proxy_settings table
+ try {
+   db.exec('ALTER TABLE profile_proxy_settings ADD COLUMN hero_banner_enabled BOOLEAN DEFAULT TRUE')
+ } catch (e) {
+   // ignore if column already exists
+ }
 
 // Create tables
 db.exec(`
@@ -73,6 +79,7 @@ db.exec(`
     hideAddonsButton BOOLEAN DEFAULT FALSE,
     hideCinemetaContent BOOLEAN DEFAULT FALSE,
     twoFactorEnabled BOOLEAN DEFAULT FALSE,
+    heroBannerEnabled BOOLEAN DEFAULT TRUE,
     tmdbApiKey TEXT
   );
 
@@ -177,6 +184,7 @@ db.exec(`
     hide_calendar_button BOOLEAN DEFAULT FALSE,
     hide_addons_button BOOLEAN DEFAULT FALSE,
     mobile_click_to_hover BOOLEAN DEFAULT FALSE,
+    hero_banner_enabled BOOLEAN DEFAULT TRUE,
     tmdb_api_key TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -273,6 +281,7 @@ export interface User {
   hideAddonsButton: boolean
   hideCinemetaContent: boolean
   twoFactorEnabled: boolean
+  heroBannerEnabled: boolean
   tmdbApiKey?: string
 }
 
@@ -337,6 +346,7 @@ export interface ProfileProxySettings {
   hide_calendar_button: boolean
   hide_addons_button: boolean
   mobile_click_to_hover: boolean
+  hero_banner_enabled: boolean
   tmdb_api_key?: string
   created_at: string
   updated_at: string
@@ -477,6 +487,10 @@ export const userDb = {
         fields.push('hideCinemetaContent = ?')
         values.push(updates.hideCinemetaContent)
     }
+    if (updates.heroBannerEnabled !== undefined) {
+        fields.push('heroBannerEnabled = ?')
+        values.push(updates.heroBannerEnabled)
+    }
     if (updates.tmdbApiKey !== undefined) {
         fields.push('tmdbApiKey = ?')
         values.push(updates.tmdbApiKey)
@@ -526,7 +540,7 @@ export const profileDb = {
 
   findByUserId: (userId: string): (Profile & { settings?: ProfileProxySettings })[] => {
     const stmt = db.prepare(`
-        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating, s.hide_calendar_button, s.hide_addons_button
+        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating, s.hide_calendar_button, s.hide_addons_button, s.hero_banner_enabled
         FROM profiles p
         LEFT JOIN profile_proxy_settings s ON p.id = s.profile_id
         WHERE p.user_id = ?
@@ -537,7 +551,7 @@ export const profileDb = {
 
   findWithSettingsById: (id: number): (Profile & { settings?: ProfileProxySettings }) | undefined => {
     const stmt = db.prepare(`
-        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating, s.hide_calendar_button, s.hide_addons_button
+        SELECT p.*, s.nsfw_filter_enabled, s.nsfw_age_rating, s.hide_calendar_button, s.hide_addons_button, s.hero_banner_enabled
         FROM profiles p
         LEFT JOIN profile_proxy_settings s ON p.id = s.profile_id
         WHERE p.id = ?
@@ -737,11 +751,12 @@ export const profileProxySettingsDb = {
     hide_calendar_button?: boolean
     hide_addons_button?: boolean
     mobile_click_to_hover?: boolean
+    hero_banner_enabled?: boolean
     tmdb_api_key?: string | null
   }): ProfileProxySettings => {
     const stmt = db.prepare(`
-      INSERT INTO profile_proxy_settings (profile_id, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, mobile_click_to_hover, tmdb_api_key)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO profile_proxy_settings (profile_id, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, mobile_click_to_hover, hero_banner_enabled, tmdb_api_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `)
     
     const result = stmt.run(
@@ -751,6 +766,7 @@ export const profileProxySettingsDb = {
       settingsData.hide_calendar_button || false,
       settingsData.hide_addons_button || false,
       settingsData.mobile_click_to_hover || false,
+      settingsData.hero_banner_enabled !== undefined ? settingsData.hero_banner_enabled : true,
       settingsData.tmdb_api_key || null
     )
     

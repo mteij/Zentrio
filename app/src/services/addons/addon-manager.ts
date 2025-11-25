@@ -123,6 +123,28 @@ export class AddonManager {
     return results
   }
 
+  async getCatalogItems(profileId: number, manifestUrl: string, type: string, id: string): Promise<{ title: string, items: MetaPreview[] } | null> {
+    // Ensure clients are initialized for this profile
+    await this.getClientsForProfile(profileId)
+    
+    const client = this.clientCache.get(manifestUrl)
+    if (!client || !client.manifest) return null
+
+    const catalog = client.manifest.catalogs.find(c => c.type === type && c.id === id)
+    if (!catalog) return null
+
+    try {
+      const items = await client.getCatalog(type, id)
+      return {
+        title: `${client.manifest.name} - ${catalog.name || catalog.type}`,
+        items
+      }
+    } catch (e) {
+      console.error(`Failed to fetch catalog ${id} from ${manifestUrl}`, e)
+      return null
+    }
+  }
+
   async getStreams(type: string, id: string, profileId: number): Promise<{ addon: Manifest, streams: Stream[] }[]> {
     const clients = await this.getClientsForProfile(profileId)
     const results: { addon: Manifest, streams: Stream[] }[] = []

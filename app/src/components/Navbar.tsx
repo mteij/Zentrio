@@ -10,7 +10,9 @@ export const Navbar = ({ profileId, activePage, profile }: NavbarProps) => {
   return (
     <>
       <nav className="streaming-navbar" id="streamingNavbar">
-        <div className="logo"></div>
+        <div className="logo">
+          <span className="iconify" data-icon="lucide:play" data-width="20" data-height="20" style={{ marginLeft: '2px' }}></span>
+        </div>
         
         <div className="nav-left">
           <a href={`/streaming/${profileId}`} className={`nav-link ${activePage === 'home' ? 'active' : ''}`} title="Home">

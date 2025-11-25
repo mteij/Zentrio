@@ -3,7 +3,7 @@
 <div align="center">
   <img src="app/src/static/logo/icon-512.png" alt="Zentrio Icon" width="256" height="256" />
 
-  <strong>Your Personal Streaming Hub</strong>
+  <strong>Stream Your Way</strong>
 
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
@@ -44,9 +44,9 @@ Zentrio is a modern, self-hosted streaming hub that brings your content together
 - **📱 Cross-Platform Support** - Web, iOS, Android, and PWA.
 - **🔒 Privacy-Focused** - Your data stays local and secure.
 
-<div align="center">
+<!-- <div align="center">
   <img src="app/src/static/media/profiles.png" alt="Zentrio Profiles" width="800" />
-</div>
+</div> -->
 
 ## Origin Story
 

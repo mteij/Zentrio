@@ -253,6 +253,14 @@ app.put('/settings', async (c) => {
       hideCalendarButton: z.boolean().optional(),
       hideAddonsButton: z.boolean().optional(),
       hideCinemetaContent: z.boolean().optional(),
+      // Note: hero_banner_enabled is a profile setting, not a user setting.
+      // If we want to support it here for the current profile, we need to know the profile ID.
+      // But /settings endpoint is currently user-scoped.
+      // The frontend sends it to /api/user/settings, but it should probably go to a profile settings endpoint.
+      // However, for now, let's assume the frontend might send it here if we want to support a "default" or if we change the API.
+      // But wait, the database schema change I made was to `profile_proxy_settings`.
+      // So I should update the profile settings endpoint, not user settings.
+      // Let's check if there is a profile settings endpoint.
     }), body)
 
     if (!validation.success) {

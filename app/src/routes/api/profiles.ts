@@ -43,6 +43,7 @@ import { sessionMiddleware } from '../../middleware/session'
     nsfw_age_rating: ageRating,
     hide_calendar_button: hideCalendarButton,
     hide_addons_button: hideAddonsButton,
+    hero_banner_enabled: true, // Default to true
   })
 
   // Don't return password
@@ -84,6 +85,8 @@ import { sessionMiddleware } from '../../middleware/session'
     nsfw_age_rating: ageRating,
     hide_calendar_button: hideCalendarButton,
     hide_addons_button: hideAddonsButton,
+    // hero_banner_enabled is not currently sent by the profile edit modal, so we don't update it here yet
+    // unless we update the frontend to send it.
   })
 
   // Don't return password
@@ -126,6 +129,7 @@ app.get('/:id/settings', async (c) => {
     ageRating: settings?.nsfw_age_rating ?? 0,
     hideCalendarButton: settings?.hide_calendar_button ?? false,
     hideAddonsButton: settings?.hide_addons_button ?? false,
+    heroBannerEnabled: (settings as any)?.hero_banner_enabled ?? true,
   })
 })
 
@@ -143,6 +147,7 @@ app.put('/:id/settings', async (c) => {
       nsfw_age_rating: body.ageRating,
       hide_calendar_button: body.hideCalendarButton,
       hide_addons_button: body.hideAddonsButton,
+      hero_banner_enabled: body.heroBannerEnabled,
     })
     if (!updated) {
       return c.json({ error: 'Failed to save settings' }, 500)

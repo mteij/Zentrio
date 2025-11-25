@@ -153,6 +153,9 @@ function createProfile() {
     profileForm.reset();
     
     ageRatingInput.value = '18';
+    
+    const heroBannerCheckbox = document.getElementById('heroBannerEnabled');
+    if (heroBannerCheckbox) heroBannerCheckbox.checked = true;
 
     if (deleteProfileBtn) deleteProfileBtn.style.display = 'none';
 
@@ -177,6 +180,22 @@ function editProfile(profileId) {
 
     const initialAge = (profile.nsfw_filter_enabled === false ? 18 : (profile.nsfw_age_rating || 18));
     ageRatingInput.value = String(initialAge);
+
+    // Set hero banner checkbox
+    const heroBannerCheckbox = document.getElementById('heroBannerEnabled');
+    if (heroBannerCheckbox) {
+        // Check if settings exist on the profile object, otherwise default to true
+        // The profile object from /api/profiles might not have settings joined yet depending on the endpoint
+        // But we updated profileDb.findByUserId to include settings columns.
+        // Let's check if the property exists.
+        // Based on database.ts: findByUserId selects s.hero_banner_enabled
+        // So profile.hero_banner_enabled should be available if the API returns it.
+        // The API /api/profiles returns sanitized profiles.
+        // Let's check routes/api/profiles.ts. It returns p which includes joined columns.
+        // So profile.hero_banner_enabled should be there.
+        // Default to true if undefined.
+        heroBannerCheckbox.checked = profile.hero_banner_enabled !== 0 && profile.hero_banner_enabled !== false;
+    }
 
     currentAvatarSeed = profile.avatar;
     updateAvatarPreview(profile.avatar);
@@ -349,11 +368,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const selectedAgeRaw = parseInt(ageRatingInput.value || '18', 10);
                 const selectedAge = isNaN(selectedAgeRaw) ? 18 : selectedAgeRaw;
+                const heroBannerEnabled = document.getElementById('heroBannerEnabled').checked;
                 const formData = {
                     name: document.getElementById('profileName').value,
                     avatar: currentAvatarSeed || document.getElementById('profileName').value,
                     nsfwFilterEnabled: selectedAge < 18,
-                    ageRating: selectedAge
+                    ageRating: selectedAge,
+                    heroBannerEnabled: heroBannerEnabled
                 };
                 
                 const url = editingProfileId ? `/api/profiles/${editingProfileId}` : '/api/profiles';

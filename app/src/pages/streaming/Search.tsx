@@ -6,16 +6,17 @@ interface StreamingSearchProps {
   results: MetaPreview[]
   query: string
   profileId: number
+  profile?: any
 }
 
-export const StreamingSearch = ({ results, query, profileId }: StreamingSearchProps) => {
+export const StreamingSearch = ({ results, query, profileId, profile }: StreamingSearchProps) => {
   return (
     <Layout title="Search" additionalCSS={['/static/css/streaming.css']}>
-      <Navbar profileId={profileId} activePage="search" />
+      <Navbar profileId={profileId} activePage="search" profile={profile} />
       <div className="streaming-layout">
-        <div className="search-header">
+        <div className="search-header" style={{ paddingTop: '120px' }}>
           <div className="search-input-wrapper">
-            <i data-lucide="search" className="search-icon" style={{ width: 20, height: 20 }}></i>
+            <span className="iconify search-icon" data-icon="lucide:search" data-width="20" data-height="20"></span>
             <form action={`/streaming/${profileId}/search`} method="get">
               <input
                 type="text"
@@ -24,16 +25,17 @@ export const StreamingSearch = ({ results, query, profileId }: StreamingSearchPr
                 defaultValue={query}
                 autoFocus
                 className="search-input-glass"
+                autoComplete="off"
               />
             </form>
           </div>
         </div>
 
         {query && (
-          <div className="content-container">
-            <h1 style={{ padding: '0 40px', marginBottom: '30px', fontSize: '2rem', fontWeight: '600' }}>Results for "{query}"</h1>
+          <div className="content-container" style={{ marginTop: 0 }}>
+            <h1 style={{ padding: '0 60px', marginBottom: '30px', fontSize: '2rem', fontWeight: '600', color: '#fff' }}>Results for "{query}"</h1>
             {results.length === 0 ? (
-              <div className="loading" style={{ padding: '40px', textAlign: 'center' }}>No results found.</div>
+              <div className="loading" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>No results found.</div>
             ) : (
               <div className="media-grid">
                 {results.map(item => (

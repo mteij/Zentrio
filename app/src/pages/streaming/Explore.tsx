@@ -6,6 +6,7 @@ import { WatchHistoryItem } from '../../services/database'
 interface CatalogSection {
   title: string
   items: MetaPreview[]
+  seeAllUrl?: string
 }
 
 interface StreamingExploreProps {
@@ -21,7 +22,7 @@ export const StreamingExplore = ({ catalogs, history, profileId, profile }: Stre
     : (history.length > 0 ? history[0] : null);
 
   return (
-    <Layout title="Explore" additionalCSS={['/static/css/streaming.css']}>
+    <Layout title="Explore" additionalCSS={['/static/css/streaming.css']} additionalJS={['/static/js/streaming-ui.js']}>
       <Navbar profileId={profileId} activePage="explore" profile={profile} />
       
       <div className="streaming-layout">
@@ -43,11 +44,11 @@ export const StreamingExplore = ({ catalogs, history, profileId, profile }: Stre
                 <p className="hero-description">{(featuredItem as any).description || 'Start watching now on Zentrio.'}</p>
                 <div className="hero-actions">
                   <a href={`/streaming/${profileId}/${(featuredItem as any).meta_type || (featuredItem as any).type}/${(featuredItem as any).meta_id || (featuredItem as any).id}`} className="btn-hero btn-play">
-                    <span className="iconify" data-icon="lucide:play" data-width="20" data-height="20" style={{ fill: 'currentColor' }}></span>
+                    <span className="iconify" data-icon="lucide:play" data-width="24" data-height="24" style={{ fill: 'currentColor' }}></span>
                     Play Now
                   </a>
                   <a href={`/streaming/${profileId}/${(featuredItem as any).meta_type || (featuredItem as any).type}/${(featuredItem as any).meta_id || (featuredItem as any).id}`} className="btn-hero btn-more">
-                    <span className="iconify" data-icon="lucide:info" data-width="20" data-height="20"></span>
+                    <span className="iconify" data-icon="lucide:info" data-width="24" data-height="24"></span>
                     More Info
                   </a>
                 </div>
@@ -56,59 +57,78 @@ export const StreamingExplore = ({ catalogs, history, profileId, profile }: Stre
           </div>
         )}
 
-        <div className="content-container" style={{ marginTop: featuredItem ? '-100px' : '40px', position: 'relative', zIndex: 10 }}>
+        <div className="content-container" style={{ marginTop: featuredItem ? '-100px' : '120px' }}>
           {history.length > 0 && (
             <div className="content-row">
               <div className="row-header">
                 <h2 className="row-title">Continue Watching</h2>
               </div>
-              <div className="row-scroll-container">
-                {history.map(item => (
-                  <a key={item.meta_id} href={`/streaming/${profileId}/${item.meta_type}/${item.meta_id}`} className="media-card">
-                    <div className="poster-container">
-                      {item.poster ? (
-                        <img src={item.poster} alt={item.title} className="poster-image" loading="lazy" />
-                      ) : (
-                        <div className="no-poster">{item.title}</div>
-                      )}
-                      {item.duration && item.position && (
-                        <div className="progress-bar" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '4px', background: 'rgba(0,0,0,0.5)' }}>
-                          <div className="progress" style={{ height: '100%', background: '#e50914', width: `${(item.position / item.duration) * 100}%` }}></div>
+              <div className="row-wrapper">
+                <button className="scroll-btn left" onclick="this.parentElement.querySelector('.row-scroll-container').scrollBy({left: -300, behavior: 'smooth'})">
+                  <span className="iconify" data-icon="lucide:chevron-left" data-width="24" data-height="24"></span>
+                </button>
+                <div className="row-scroll-container">
+                  {history.map(item => (
+                    <a key={item.meta_id} href={`/streaming/${profileId}/${item.meta_type}/${item.meta_id}`} className="media-card">
+                      <div className="poster-container">
+                        {item.poster ? (
+                          <img src={item.poster} alt={item.title} className="poster-image" loading="lazy" />
+                        ) : (
+                          <div className="no-poster">{item.title}</div>
+                        )}
+                        {item.duration && item.position && (
+                          <div className="progress-bar" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '4px', background: 'rgba(255,255,255,0.3)' }}>
+                            <div className="progress" style={{ height: '100%', background: 'var(--accent)', width: `${(item.position / item.duration) * 100}%` }}></div>
+                          </div>
+                        )}
+                        <div className="card-overlay">
+                          <div className="card-title">{item.title}</div>
                         </div>
-                      )}
-                      <div className="card-overlay">
-                        <div className="card-title">{item.title}</div>
                       </div>
-                    </div>
-                  </a>
-                ))}
+                    </a>
+                  ))}
+                </div>
+                <button className="scroll-btn right" onclick="this.parentElement.querySelector('.row-scroll-container').scrollBy({left: 300, behavior: 'smooth'})">
+                  <span className="iconify" data-icon="lucide:chevron-right" data-width="24" data-height="24"></span>
+                </button>
               </div>
             </div>
           )}
 
           {catalogs.length === 0 ? (
-            <div className="loading" style={{ padding: '40px', textAlign: 'center' }}>No catalogs found.</div>
+            <div className="loading" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>No catalogs found.</div>
           ) : (
             catalogs.map((section, idx) => (
               <div key={idx} className="content-row">
                 <div className="row-header">
                   <h2 className="row-title">{section.title}</h2>
+                  {section.seeAllUrl && (
+                    <a href={section.seeAllUrl} className="see-all-link">See All</a>
+                  )}
                 </div>
-                <div className="row-scroll-container">
-                  {section.items.map(item => (
-                    <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
-                      <div className="poster-container">
-                        {item.poster ? (
-                          <img src={item.poster} alt={item.name} className="poster-image" loading="lazy" />
-                        ) : (
-                          <div className="no-poster">{item.name}</div>
-                        )}
-                        <div className="card-overlay">
-                          <div className="card-title">{item.name}</div>
+                <div className="row-wrapper">
+                  <button className="scroll-btn left" onclick="this.parentElement.querySelector('.row-scroll-container').scrollBy({left: -300, behavior: 'smooth'})">
+                    <span className="iconify" data-icon="lucide:chevron-left" data-width="24" data-height="24"></span>
+                  </button>
+                  <div className="row-scroll-container">
+                    {section.items.map(item => (
+                      <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
+                        <div className="poster-container">
+                          {item.poster ? (
+                            <img src={item.poster} alt={item.name} className="poster-image" loading="lazy" />
+                          ) : (
+                            <div className="no-poster">{item.name}</div>
+                          )}
+                          <div className="card-overlay">
+                            <div className="card-title">{item.name}</div>
+                          </div>
                         </div>
-                      </div>
-                    </a>
-                  ))}
+                      </a>
+                    ))}
+                  </div>
+                  <button className="scroll-btn right" onclick="this.parentElement.querySelector('.row-scroll-container').scrollBy({left: 300, behavior: 'smooth'})">
+                    <span className="iconify" data-icon="lucide:chevron-right" data-width="24" data-height="24"></span>
+                  </button>
                 </div>
               </div>
             ))

@@ -8,6 +8,7 @@ interface LayoutProps {
   showHeader?: boolean
   showFooter?: boolean
   additionalCSS?: string[]
+  additionalJS?: string[]
   disableThemeSync?: boolean
 }
 
@@ -29,6 +30,7 @@ export function Layout({
   showHeader = true,
   showFooter = true,
   additionalCSS = [],
+  additionalJS = [],
   disableThemeSync = false
 }: LayoutProps) {
   return (
@@ -61,6 +63,7 @@ export function Layout({
         </main>
         {showFooter && <PageFooter />}
         <script src="/static/js/toast.js"></script>
+        {additionalJS.map(js => <script src={js}></script>)}
         <script dangerouslySetInnerHTML={{__html: `(function(){try{function u(){var o=navigator.onLine;document.querySelectorAll('[data-online-required]').forEach(function(el){if(o){el.removeAttribute('disabled');el.classList.remove('is-offline');}else{el.setAttribute('disabled','true');el.classList.add('is-offline');}});}window.addEventListener('online',function(){if(window.addToast)window.addToast('success','Online','Back online.');u();});window.addEventListener('offline',function(){if(window.addToast)window.addToast('info','Offline','Some features are disabled.');u();});u();if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js?v=2',{scope:'/'}).catch(function(){});navigator.serviceWorker.addEventListener('message',function(e){var d=e.data;if(!d||typeof d!=='object')return;if(d.type==='zentrio-sw-toast'&&window.addToast){var p=d.payload||{};window.addToast(p.toastType||'info',p.title||'Notice',p.message||'');}});} }catch(e){}})();`}} />
       </body>
     </html>
@@ -86,7 +89,7 @@ export function PageFooter({ children, className = '' }: PageFooterProps) {
   )
 }
 
-export function SimpleLayout({ title, children, className = '', additionalCSS = [], disableThemeSync = false }: Omit<LayoutProps, 'showHeader' | 'showFooter'>) {
+export function SimpleLayout({ title, children, className = '', additionalCSS = [], additionalJS = [], disableThemeSync = false }: Omit<LayoutProps, 'showHeader' | 'showFooter'>) {
   return (
     <html lang="en">
       <head>
@@ -113,6 +116,7 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
       <body className={className}>
         {children}
         <script src="/static/js/toast.js"></script>
+        {additionalJS.map(js => <script src={js}></script>)}
         <script dangerouslySetInnerHTML={{__html: `
           (function(){try{function u(){var o=navigator.onLine;document.querySelectorAll('[data-online-required]').forEach(function(el){if(o){el.removeAttribute('disabled');el.classList.remove('is-offline');}else{el.setAttribute('disabled','true');el.classList.add('is-offline');}});}window.addEventListener('online',function(){if(window.addToast)window.addToast('success','Online','Back online.');u();});window.addEventListener('offline',function(){if(window.addToast)window.addToast('info','Offline','Some features are disabled.');u();});u();if('serviceWorker'in navigator){navigator.serviceWorker.register('/static/sw.js?v=2',{scope:'/'}).then(function(reg){console.log('SW registered',reg);}).catch(function(err){console.error('SW registration failed',err);});navigator.serviceWorker.addEventListener('message',function(e){var d=e.data;if(!d||typeof d!=='object')return;if(d.type==='zentrio-sw-toast'&&window.addToast){var p=d.payload||{};window.addToast(p.toastType||'info',p.title||'Notice',p.message||'');}});} }catch(e){console.error('SW setup error',e);}})();
           
