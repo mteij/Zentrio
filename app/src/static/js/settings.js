@@ -1521,3 +1521,137 @@ async function toggleAddon(addonId, enabled) {
     }
 }
 
+
+// Streaming settings
+let streamingSettings = {
+  qualities: ['4K', '1080p', '720p', '480p'],
+  preferredKeywords: [],
+  requiredKeywords: []
+};
+
+async function loadStreamingSettings() {
+  try {
+    const response = await fetch('/api/user/streaming-settings');
+    if (response.ok) {
+      const payload = await response.json();
+      const userSettings = (payload && (payload.data || payload)) || {};
+      if (userSettings && typeof userSettings === 'object') {
+        streamingSettings = { ...streamingSettings, ...userSettings };
+        updateStreamingUI();
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load streaming settings:', error);
+  }
+}
+
+function updateStreamingUI() {
+  renderQualityList();
+  renderKeywordList('preferredKeywords', streamingSettings.preferredKeywords);
+  renderKeywordList('requiredKeywords', streamingSettings.requiredKeywords);
+}
+
+function renderQualityList() {
+  const list = document.getElementById('qualityList');
+  if (!list) return;
+  list.innerHTML = '';
+  streamingSettings.qualities.forEach((quality, index) => {
+    const item = document.createElement('div');
+    item.className = 'reorder-item';
+    item.textContent = quality;
+    item.setAttribute('draggable', 'true');
+    item.setAttribute('data-index', index);
+    list.appendChild(item);
+  });
+}
+
+function renderKeywordList(id, keywords) {
+  const list = document.getElementById(id);
+  if (!list) return;
+  list.innerHTML = '';
+  keywords.forEach(keyword => {
+    const item = document.createElement('div');
+    item.className = 'keyword-item';
+    item.textContent = keyword;
+    const removeBtn = document.createElement('button');
+    removeBtn.innerHTML = '&times;';
+    removeBtn.onclick = () => {
+      streamingSettings[id] = streamingSettings[id].filter(k => k !== keyword);
+      saveStreamingSettings();
+      updateStreamingUI();
+    };
+    item.appendChild(removeBtn);
+    list.appendChild(item);
+  });
+}
+
+async function saveStreamingSettings() {
+  try {
+    const response = await fetch('/api/user/streaming-settings', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'xmlhttprequest'
+      },
+      body: JSON.stringify(streamingSettings)
+    });
+
+    if (response.ok) {
+      showMessage('Streaming settings saved', 'success');
+    } else {
+      throw new Error('Failed to save streaming settings');
+    }
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadStreamingSettings();
+
+  const addPreferredKeywordBtn = document.getElementById('addPreferredKeywordBtn');
+  if (addPreferredKeywordBtn) {
+    addPreferredKeywordBtn.addEventListener('click', () => {
+      const input = document.getElementById('preferredKeywordInput');
+      const keyword = input.value.trim();
+      if (keyword && !streamingSettings.preferredKeywords.includes(keyword)) {
+        streamingSettings.preferredKeywords.push(keyword);
+        input.value = '';
+        saveStreamingSettings();
+        updateStreamingUI();
+      }
+    });
+  }
+
+  const addRequiredKeywordBtn = document.getElementById('addRequiredKeywordBtn');
+  if (addRequiredKeywordBtn) {
+    addRequiredKeywordBtn.addEventListener('click', () => {
+      const input = document.getElementById('requiredKeywordInput');
+      const keyword = input.value.trim();
+      if (keyword && !streamingSettings.requiredKeywords.includes(keyword)) {
+        streamingSettings.requiredKeywords.push(keyword);
+        input.value = '';
+        saveStreamingSettings();
+        updateStreamingUI();
+      }
+    });
+  }
+
+  const qualityList = document.getElementById('qualityList');
+  if (qualityList) {
+    let dragStartIndex;
+    qualityList.addEventListener('dragstart', (e) => {
+      dragStartIndex = +e.target.getAttribute('data-index');
+    });
+    qualityList.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+    qualityList.addEventListener('drop', (e) => {
+      const dragEndIndex = +e.target.getAttribute('data-index');
+      const [removed] = streamingSettings.qualities.splice(dragStartIndex, 1);
+      streamingSettings.qualities.splice(dragEndIndex, 0, removed);
+      saveStreamingSettings();
+      updateStreamingUI();
+    });
+  }
+});

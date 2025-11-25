@@ -14,16 +14,17 @@ interface StreamingHomeProps {
   history: WatchHistoryItem[]
   profileId: number
   profile?: any
+  trending?: MetaPreview | null
 }
 
-export const StreamingHome = ({ catalogs, history, profileId, profile }: StreamingHomeProps) => {
+export const StreamingHome = ({ catalogs, history, profileId, profile, trending }: StreamingHomeProps) => {
   // Check if hero banner is enabled (default to true if settings not found)
   const showHero = profile?.settings?.hero_banner_enabled !== false;
 
-  // Find a featured item (first item from first catalog or history)
-  const featuredItem = catalogs.length > 0 && catalogs[0].items.length > 0
+  // Find a featured item (prioritize trending, then first item from first catalog or history)
+  const featuredItem = trending || (catalogs.length > 0 && catalogs[0].items.length > 0
     ? catalogs[0].items[0]
-    : (history.length > 0 ? history[0] : null);
+    : (history.length > 0 ? history[0] : null));
 
   return (
     <Layout title="Streaming" additionalCSS={['/static/css/streaming.css']} additionalJS={['/static/js/streaming-ui.js']}>
@@ -31,19 +32,43 @@ export const StreamingHome = ({ catalogs, history, profileId, profile }: Streami
       
       <div className={`streaming-layout ${!showHero ? 'no-hero' : ''}`}>
         {showHero && featuredItem && (
-          <div className="hero-section">
-            <div className="hero-backdrop">
-              {(featuredItem as any).background ? (
-                <img src={(featuredItem as any).background} alt="Hero Background" />
-              ) : featuredItem.poster ? (
-                <img src={featuredItem.poster} alt="Hero Background" style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', background: '#141414' }}></div>
-              )}
-            </div>
-            <div className="hero-overlay"></div>
-            <div className="hero-content">
+          <>
+            <div className="page-ambient-background" style={{
+              backgroundImage: `url(${(featuredItem as any).background || featuredItem.poster})`
+            }}></div>
+            
+            <div className="hero-section">
+              <div className="hero-backdrop">
+                {(featuredItem as any).background ? (
+                  <img src={(featuredItem as any).background} alt="Hero Background" />
+                ) : featuredItem.poster ? (
+                  <img src={featuredItem.poster} alt="Hero Background" style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', background: '#141414' }}></div>
+                )}
+              </div>
+              <div className="hero-overlay"></div>
+              <div className="hero-content">
               <div className="hero-info">
+                {trending && featuredItem === trending && (
+                  <div className="trending-chip" style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(10px)',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    marginBottom: '16px',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    color: '#fff',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <span className="iconify" data-icon="lucide:trending-up" data-width="16" data-height="16" style={{ color: '#e50914' }}></span>
+                    #1 Trending Today
+                  </div>
+                )}
                 <h1 className="hero-title">{(featuredItem as any).title || (featuredItem as any).name}</h1>
                 <p className="hero-description">{(featuredItem as any).description || 'Start watching now on Zentrio.'}</p>
                 <div className="hero-actions">
@@ -57,8 +82,9 @@ export const StreamingHome = ({ catalogs, history, profileId, profile }: Streami
                   </a>
                 </div>
               </div>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         <div className="content-container" style={{ marginTop: showHero && featuredItem ? '-100px' : '120px' }}>

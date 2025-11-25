@@ -39,6 +39,7 @@ export function SettingsPage({}: SettingsPageProps) {
           <button className="tab-btn active" data-tab="account">Account</button>
           <button className="tab-btn" data-tab="appearance">Appearance</button>
           <button className="tab-btn" data-tab="addons">Addons</button>
+          <button className="tab-btn" data-tab="streaming">Streaming</button>
           <button className="tab-btn" data-tab="danger">Danger Zone</button>
         </div>
 
@@ -212,6 +213,57 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="setting-control" style={{ width: '100%' }}>
                 <div id="addonsList" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ color: '#666' }}>Select a profile to manage addons.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Streaming Tab */}
+        <div id="tab-streaming" className="tab-content">
+          <div className="settings-card">
+            <h2 className="section-title">Streaming</h2>
+            
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div className="setting-info">
+                <h3>Preferred Quality</h3>
+                <p>Drag to reorder your preferred stream qualities.</p>
+              </div>
+              <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
+                <div id="qualityList" className="reorder-list">
+                  {/* Qualities will be rendered here */}
+                </div>
+              </div>
+            </div>
+
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div className="setting-info">
+                <h3>Preferred Keywords</h3>
+                <p>Add keywords to prioritize in stream titles (e.g., "HEVC", "x265").</p>
+              </div>
+              <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
+                <div id="preferredKeywords" className="keyword-list">
+                  {/* Keywords will be rendered here */}
+                </div>
+                <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
+                  <Input type="text" id="preferredKeywordInput" placeholder="Add a keyword" style={{ flex: '1' }} />
+                  <Button variant="secondary" id="addPreferredKeywordBtn">Add</Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div className="setting-info">
+                <h3>Required Keywords</h3>
+                <p>Add keywords that must be present in stream titles (e.g., "4K", "HDR").</p>
+              </div>
+              <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
+                <div id="requiredKeywords" className="keyword-list">
+                  {/* Keywords will be rendered here */}
+                </div>
+                <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
+                  <Input type="text" id="requiredKeywordInput" placeholder="Add a keyword" style={{ flex: '1' }} />
+                  <Button variant="secondary" id="addRequiredKeywordBtn">Add</Button>
                 </div>
               </div>
             </div>

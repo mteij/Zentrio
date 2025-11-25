@@ -110,7 +110,8 @@ export function getConfig() {
     OIDC_CLIENT_ID,
     OIDC_CLIENT_SECRET,
     OIDC_ISSUER,
-    OIDC_DISPLAY_NAME
+    OIDC_DISPLAY_NAME,
+    TMDB_API_KEY: process.env.TMDB_API_KEY
   }
 }
 

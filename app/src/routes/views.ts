@@ -75,6 +75,8 @@ app.get('/streaming/:profileId', async (c) => {
     const profile = profileDb.findWithSettingsById(profileId)
     const history = watchHistoryDb.getByProfileId(profileId)
     const results = await addonManager.getCatalogs(profileId)
+    const trending = await addonManager.getTrending(profileId)
+    
     const catalogs = results.map(r => {
       const typeName = r.catalog.type === 'movie' ? 'Movies' : (r.catalog.type === 'series' ? 'Series' : 'Other')
       const manifestUrl = (r.addon as any).manifest_url || (r.addon as any).id;
@@ -84,7 +86,7 @@ app.get('/streaming/:profileId', async (c) => {
         seeAllUrl: `/streaming/${profileId}/catalog/${encodeURIComponent(manifestUrl)}/${r.catalog.type}/${r.catalog.id}`
       }
     })
-    return c.html(StreamingHome({ catalogs, history, profileId, profile }))
+    return c.html(StreamingHome({ catalogs, history, profileId, profile, trending }))
   } catch (e) {
     console.error('Streaming home error:', e)
     return c.html(StreamingHome({ catalogs: [], history: [], profileId }))

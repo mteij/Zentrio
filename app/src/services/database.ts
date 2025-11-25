@@ -263,6 +263,16 @@ db.exec(`
     UNIQUE(profile_id, addon_id)
   );
   CREATE INDEX IF NOT EXISTS idx_profile_addons_profile ON profile_addons(profile_id);
+
+  CREATE TABLE IF NOT EXISTS stream_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    qualities TEXT,
+    preferred_keywords TEXT,
+    required_keywords TEXT,
+    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+    UNIQUE(profile_id)
+  );
 `)
 
 export interface User {
@@ -403,6 +413,12 @@ export interface ProfileAddon {
   enabled: boolean
   created_at: string
   addon?: Addon
+}
+
+export interface StreamSettings {
+  qualities: string[]
+  preferredKeywords: string[]
+  requiredKeywords: string[]
 }
 
 // Hash password utility
@@ -1086,6 +1102,43 @@ export const addonDb = {
     return stmt.all(profileId) as Addon[]
   }
 }
+
+// Stream settings operations
+export const streamDb = {
+  getSettings: (profileId: number): StreamSettings => {
+    const stmt = db.prepare('SELECT * FROM stream_settings WHERE profile_id = ?');
+    const row = stmt.get(profileId) as any;
+    if (row) {
+      return {
+        qualities: JSON.parse(row.qualities || '[]'),
+        preferredKeywords: JSON.parse(row.preferred_keywords || '[]'),
+        requiredKeywords: JSON.parse(row.required_keywords || '[]')
+      };
+    }
+    return {
+      qualities: ['4K', '1080p', '720p', '480p'],
+      preferredKeywords: [],
+      requiredKeywords: []
+    };
+  },
+
+  saveSettings: (profileId: number, settings: StreamSettings): void => {
+    const stmt = db.prepare(`
+      INSERT INTO stream_settings (profile_id, qualities, preferred_keywords, required_keywords)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(profile_id) DO UPDATE SET
+        qualities = excluded.qualities,
+        preferred_keywords = excluded.preferred_keywords,
+        required_keywords = excluded.required_keywords
+    `);
+    stmt.run(
+      profileId,
+      JSON.stringify(settings.qualities),
+      JSON.stringify(settings.preferredKeywords),
+      JSON.stringify(settings.requiredKeywords)
+    );
+  }
+};
 
 // Export database instance for advanced queries if needed
 export { db }
