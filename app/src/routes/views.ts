@@ -15,7 +15,8 @@ import { StreamingLibrary } from '../pages/streaming/Library'
 import { StreamingSearch } from '../pages/streaming/Search'
 import { StreamingCatalog } from '../pages/streaming/Catalog'
 import { addonManager } from '../services/addons/addon-manager'
-import { watchHistoryDb, libraryDb, profileDb } from '../services/database'
+import { watchHistoryDb, listDb, profileDb } from '../services/database'
+import { MetaPreview } from '../services/addons/types'
  
 const app = new Hono()
 
@@ -79,7 +80,7 @@ app.get('/streaming/:profileId', async (c) => {
     
     const catalogs = results.map(r => {
       const typeName = r.catalog.type === 'movie' ? 'Movies' : (r.catalog.type === 'series' ? 'Series' : 'Other')
-      const manifestUrl = (r.addon as any).manifest_url || (r.addon as any).id;
+      const manifestUrl = r.manifestUrl || (r.addon as any).manifest_url || (r.addon as any).id;
       return {
         title: `${typeName} - ${r.catalog.name || r.catalog.type}`,
         items: r.items,
@@ -89,7 +90,7 @@ app.get('/streaming/:profileId', async (c) => {
     return c.html(StreamingHome({ catalogs, history, profileId, profile, trending }))
   } catch (e) {
     console.error('Streaming home error:', e)
-    return c.html(StreamingHome({ catalogs: [], history: [], profileId }))
+    return c.html(StreamingHome({ catalogs: [], history: [], profileId, trending: [] }))
   }
 })
 
@@ -99,26 +100,55 @@ app.get('/streaming/:profileId/explore', async (c) => {
   const profileId = parseInt(c.req.param('profileId'))
   if (isNaN(profileId)) return c.redirect('/profiles')
 
+  const type = c.req.query('type')
+  const genre = c.req.query('genre')
+
   try {
     const profile = profileDb.findWithSettingsById(profileId)
     const history = watchHistoryDb.getByProfileId(profileId)
-    const results = await addonManager.getCatalogs(profileId)
-    const catalogs = results.map(r => {
-      const typeName = r.catalog.type === 'movie' ? 'Movies' : (r.catalog.type === 'series' ? 'Series' : 'Other')
-      // Use addon ID if manifest_url is not available on the type, but it should be there based on getCatalogs return type
-      // The issue is likely that Manifest type definition in types.ts doesn't have manifest_url, but the object returned by getCatalogs does.
-      // We'll cast to any to bypass for now or update types.
-      const manifestUrl = (r.addon as any).manifest_url || (r.addon as any).id;
-      return {
-        title: `${typeName} - ${r.catalog.name || r.catalog.type}`,
-        items: r.items,
-        seeAllUrl: `/streaming/${profileId}/catalog/${encodeURIComponent(manifestUrl)}/${r.catalog.type}/${r.catalog.id}`
-      }
-    })
-    return c.html(StreamingExplore({ catalogs, history, profileId, profile }))
+    
+    const filters = await addonManager.getAvailableFilters(profileId)
+    
+    let items: MetaPreview[] = []
+    let catalogs: any[] = []
+
+    if (type || genre) {
+       // If type is not provided but genre is, we might need to search across all types or default to movie
+       // For now, let's require type if genre is present, or default to 'movie' if only genre is present
+       const searchType = type || 'movie'
+       items = await addonManager.getFilteredItems(profileId, searchType, genre)
+    } else {
+       const results = await addonManager.getCatalogs(profileId)
+       catalogs = results.map(r => {
+        const typeName = r.catalog.type === 'movie' ? 'Movies' : (r.catalog.type === 'series' ? 'Series' : 'Other')
+        const manifestUrl = r.manifestUrl || (r.addon as any).manifest_url || (r.addon as any).id;
+        return {
+          title: `${typeName} - ${r.catalog.name || r.catalog.type}`,
+          items: r.items,
+          seeAllUrl: `/streaming/${profileId}/catalog/${encodeURIComponent(manifestUrl)}/${r.catalog.type}/${r.catalog.id}`
+        }
+      })
+    }
+
+    return c.html(StreamingExplore({
+      catalogs,
+      items,
+      filters,
+      activeFilters: { type, genre },
+      history,
+      profileId,
+      profile
+    }))
   } catch (e) {
     console.error('Streaming explore error:', e)
-    return c.html(StreamingExplore({ catalogs: [], history: [], profileId }))
+    return c.html(StreamingExplore({
+      catalogs: [],
+      items: [],
+      filters: { types: [], genres: [] },
+      activeFilters: {},
+      history: [],
+      profileId
+    }))
   }
 })
 
@@ -126,8 +156,34 @@ app.get('/streaming/:profileId/library', async (c) => {
   if (!await isAuthenticated(c)) return c.redirect('/')
   const profileId = parseInt(c.req.param('profileId'))
   const profile = profileDb.findWithSettingsById(profileId)
-  const items = libraryDb.getByProfileId(profileId)
-  return c.html(StreamingLibrary({ items, profileId, profile }))
+  
+  const lists = listDb.getAll(profileId)
+  if (lists.length === 0) {
+    // Should have been created by migration, but just in case
+    listDb.create(profileId, 'My List')
+    return c.redirect(c.req.url)
+  }
+  
+  const activeList = lists[0]
+  const items = listDb.getItems(activeList.id)
+  
+  return c.html(StreamingLibrary({ lists, activeList, items, profileId, profile }))
+})
+
+app.get('/streaming/:profileId/library/:listId', async (c) => {
+  if (!await isAuthenticated(c)) return c.redirect('/')
+  const profileId = parseInt(c.req.param('profileId'))
+  const listId = parseInt(c.req.param('listId'))
+  const profile = profileDb.findWithSettingsById(profileId)
+  
+  const lists = listDb.getAll(profileId)
+  const activeList = lists.find(l => l.id === listId)
+  
+  if (!activeList) return c.redirect(`/streaming/${profileId}/library`)
+  
+  const items = listDb.getItems(activeList.id)
+  
+  return c.html(StreamingLibrary({ lists, activeList, items, profileId, profile }))
 })
 
 app.get('/streaming/:profileId/search', async (c) => {
@@ -162,7 +218,10 @@ app.get('/streaming/:profileId/catalog/:manifestUrl/:type/:id', async (c) => {
       items: result.items,
       title: result.title,
       profileId,
-      profile
+      profile,
+      manifestUrl,
+      type,
+      id
     }))
   } catch (e) {
     console.error('Streaming catalog error:', e)
@@ -184,7 +243,7 @@ app.get('/streaming/:profileId/:type/:id', async (c) => {
     // Don't fetch streams server-side to avoid blocking the UI
     // Streams will be fetched client-side
     const streams: any[] = []
-    const inLibrary = libraryDb.isAdded(profileId, id)
+    const inLibrary = listDb.isInAnyList(profileId, id)
     
     return c.html(StreamingDetails({ meta, streams, profileId, inLibrary, profile }))
   } catch (e) {

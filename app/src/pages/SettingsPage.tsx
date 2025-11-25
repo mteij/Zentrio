@@ -26,7 +26,7 @@ export function SettingsPage({}: SettingsPageProps) {
       <div className="container" style={{ position: 'relative', zIndex: 1 }}>
         <button
           id="backButton"
-          className="back-btn"
+          className="zentrio-back-btn"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
@@ -157,6 +157,15 @@ export function SettingsPage({}: SettingsPageProps) {
               </div>
             </div>
 
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Show IMDb Ratings</h3>
+                <p>Display IMDb ratings on movie and series posters.</p>
+              </div>
+              <div className="setting-control">
+                <div className="toggle active" id="imdbRatingsToggle"></div>
+              </div>
+            </div>
 
             <div className="setting-item">
               <div className="setting-info">
@@ -1056,44 +1065,6 @@ export function SettingsPage({}: SettingsPageProps) {
           padding: 0 20px;
         }
 
-        .back-btn {
-          position: fixed;
-          top: 40px;
-          left: 40px;
-          z-index: 100;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 12px 24px;
-          background: rgba(20, 20, 20, 0.8);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          color: var(--text, white);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 100px;
-          cursor: pointer;
-          font-size: 15px;
-          font-weight: 500;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          text-decoration: none;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .back-btn:hover {
-          background: rgba(255, 255, 255, 0.1);
-          border-color: rgba(255, 255, 255, 0.2);
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-          color: white;
-        }
-
-        .back-btn svg {
-          transition: transform 0.3s ease;
-        }
-
-        .back-btn:hover svg {
-          transform: translateX(-4px);
-        }
 
         .settings-card {
           background: rgba(20, 20, 20, 0.5);
@@ -1275,13 +1246,6 @@ export function SettingsPage({}: SettingsPageProps) {
         }
 
         @media (max-width: 768px) {
-          .back-btn {
-            top: 20px;
-            left: 20px;
-            padding: 10px 16px;
-            font-size: 14px;
-          }
-
           .container {
             margin-top: 80px;
           }

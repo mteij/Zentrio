@@ -12,56 +12,79 @@ interface StreamingDetailsProps {
 
 export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile }: StreamingDetailsProps) => {
   const script = `
-    (function() {
+    document.addEventListener('DOMContentLoaded', function() {
       const btn = document.getElementById('libraryBtn');
       const profileId = ${profileId};
       const meta = ${JSON.stringify(meta).replace(new RegExp('`', 'g'), '\\`')};
-      const streamsContainer = document.getElementById('streamsContainer');
-      const streamsLoading = document.getElementById('streamsLoading');
-      const streamsList = document.getElementById('streamsList');
-      const noStreams = document.getElementById('noStreams');
       
-      if (btn) {
-        btn.addEventListener('click', async () => {
-          const inLibrary = btn.getAttribute('data-in-library') === 'true';
-          const action = inLibrary ? 'remove' : 'add';
-          
-          try {
-            btn.disabled = true;
-            const res = await fetch('/api/streaming/library', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                profileId,
-                metaId: meta.id,
-                type: meta.type,
-                title: meta.name,
-                poster: meta.poster,
-                action
-              })
+      // Initialize ListModal when available
+      function initListModal() {
+        if (typeof ListModal === 'undefined') {
+          setTimeout(initListModal, 50);
+          return;
+        }
+        
+        const listModal = new ListModal(profileId);
+        window.listModal = listModal;
+
+        if (btn) {
+          btn.addEventListener('click', () => {
+            listModal.open(meta, async () => {
+              // Update button state based on whether it's in ANY list
+              try {
+                const res = await fetch(\`/api/lists/check/\${meta.id}?profileId=\${profileId}\`);
+                const data = await res.json();
+                const inAnyList = data.listIds.length > 0;
+                
+                btn.setAttribute('data-in-library', String(inAnyList));
+                btn.innerHTML = inAnyList
+                  ? '<span class="iconify" data-icon="lucide:check" data-width="20" data-height="20"></span> In List'
+                  : '<span class="iconify" data-icon="lucide:plus" data-width="20" data-height="20"></span> Add to List';
+                btn.classList.toggle('active', inAnyList);
+              } catch (e) {
+                console.error('Failed to check list status', e);
+              }
             });
-            
-            if (res.ok) {
-              const newState = !inLibrary;
-              btn.setAttribute('data-in-library', String(newState));
-              btn.innerHTML = newState
-                ? '<span class="iconify" data-icon="lucide:check" data-width="20" data-height="20"></span> In My List'
-                : '<span class="iconify" data-icon="lucide:plus" data-width="20" data-height="20"></span> Add to List';
-              btn.classList.toggle('active', newState);
-            }
-          } catch (e) {
-            console.error('Library action failed', e);
-          } finally {
-            btn.disabled = false;
-          }
+          });
+        }
+      }
+      
+      initListModal();
+
+      // View switching logic for series
+      const episodesView = document.getElementById('episodesView');
+      const streamsView = document.getElementById('streamsView');
+      const backToEpisodesBtn = document.getElementById('backToEpisodesBtn');
+      const selectedEpisodeTitle = document.getElementById('selectedEpisodeTitle');
+
+      function showEpisodes() {
+        if (episodesView) episodesView.style.display = 'block';
+        if (streamsView) streamsView.style.display = 'none';
+      }
+
+      function showStreams(season, episode, title) {
+        if (episodesView) episodesView.style.display = 'none';
+        if (streamsView) streamsView.style.display = 'block';
+        if (selectedEpisodeTitle) selectedEpisodeTitle.textContent = \`S\${season}:E\${episode} - \${title || 'Episode ' + episode}\`;
+        loadStreams(season, episode);
+      }
+
+      if (backToEpisodesBtn) {
+        backToEpisodesBtn.addEventListener('click', () => {
+          showEpisodes();
         });
       }
 
       async function loadStreams(season, episode) {
-        streamsContainer.style.display = 'block';
-        streamsLoading.style.display = 'block';
-        streamsList.style.display = 'none';
-        noStreams.style.display = 'none';
+        const streamsContainer = document.getElementById('streamsContainer');
+        const streamsLoading = document.getElementById('streamsLoading');
+        const streamsList = document.getElementById('streamsList');
+        const noStreams = document.getElementById('noStreams');
+
+        if (streamsContainer) streamsContainer.style.display = 'block';
+        if (streamsLoading) streamsLoading.style.display = 'block';
+        if (streamsList) streamsList.style.display = 'none';
+        if (noStreams) noStreams.style.display = 'none';
 
         try {
           const fetchId = meta.imdb_id || meta.id;
@@ -70,24 +93,30 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
             url += \`&season=\${season}&episode=\${episode}\`;
           }
           const res = await fetch(url);
+          if (!res.ok) throw new Error(\`Request failed: \${res.status}\`);
           const data = await res.json();
           
           if (data.streams && data.streams.length > 0) {
             renderStreams(data.streams);
-            streamsList.style.display = 'block';
+            if (streamsList) streamsList.style.display = 'block';
           } else {
-            noStreams.style.display = 'block';
+            if (noStreams) noStreams.style.display = 'block';
           }
         } catch (e) {
           console.error('Failed to load streams', e);
-          noStreams.style.display = 'block';
-          noStreams.textContent = 'Error loading streams.';
+          if (noStreams) {
+            noStreams.style.display = 'block';
+            noStreams.textContent = 'Error loading streams.';
+          }
         } finally {
-          streamsLoading.style.display = 'none';
+          if (streamsLoading) streamsLoading.style.display = 'none';
         }
       }
 
       function renderStreams(streamGroups) {
+        const streamsList = document.getElementById('streamsList');
+        if (!streamsList) return;
+        
         streamsList.innerHTML = streamGroups.map((group, idx) => \`
           <div key="\${idx}" class="addon-group">
             <div class="addon-title">
@@ -122,27 +151,83 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
 
         function renderEpisodes(season) {
           const episodes = meta.videos.filter(v => v.season == season);
-          episodeList.innerHTML = episodes.map(ep => \`
-            <div class="episode-item">
-              <div class="episode-info">
-                <span class="episode-number">\${ep.number}.</span>
-                <span class="episode-title">\${ep.title}</span>
+          const now = new Date();
+          
+          episodeList.innerHTML = episodes.map(ep => {
+            const released = ep.released ? new Date(ep.released) : null;
+            const isUnreleased = released && released > now;
+            
+            return \`
+            <div class="episode-item" onclick="window.selectEpisode('\${ep.season}', '\${ep.number}', '\${(ep.title || ep.name || '').replace(/'/g, "\\'")}', event)" style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              padding: 16px;
+              background: rgba(255, 255, 255, 0.05);
+              border-radius: 8px;
+              margin-bottom: 8px;
+              cursor: pointer;
+              transition: background 0.2s;
+              opacity: \${isUnreleased ? '0.7' : '1'};
+            " onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'">
+              <div class="episode-info" style="display: flex; align-items: center; gap: 16px;">
+                \${ep.thumbnail ? \`<img src="\${ep.thumbnail}" alt="Thumbnail" style="width: 120px; height: 68px; object-fit: cover; border-radius: 4px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" /><div style="display:none; width: 120px; height: 68px; background: rgba(0, 0, 0, 0.3); border-radius: 4px;"></div>\` : \`<div style="width: 120px; height: 68px; background: rgba(0, 0, 0, 0.3); border-radius: 4px;"></div>\`}
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="episode-number" style="font-weight: bold; color: #aaa; min-width: 24px;">\${ep.number}.</span>
+                    <span class="episode-title" style="font-weight: 500;">\${ep.title || ep.name || 'Episode ' + ep.number}</span>
+                    \${isUnreleased ? '<span style="font-size: 0.7rem; background: rgba(255, 165, 0, 0.2); color: orange; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255, 165, 0, 0.3);">Unreleased</span>' : ''}
+                  </div>
+                  \${ep.released ? \`<span style="font-size: 0.8rem; color: #888;">\${new Date(ep.released).toLocaleDateString()}</span>\` : ''}
+                  \${ep.overview ? \`<span style="font-size: 0.85rem; color: #aaa; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">\${ep.overview}</span>\` : ''}
+                </div>
               </div>
-              <button class="play-episode-btn" data-season="\${ep.season}" data-episode="\${ep.number}">Play</button>
+              <div style="display: flex; gap: 8px;">
+                <button class="action-btn btn-secondary-glass" style="padding: 8px;" onclick="window.selectEpisode('\${ep.season}', '\${ep.number}', '\${(ep.title || ep.name || '').replace(/'/g, "\\'")}', event)">
+                  <span class="iconify" data-icon="lucide:list" data-width="16" data-height="16"></span>
+                </button>
+                <button class="action-btn btn-primary-glass" style="padding: 8px;" onclick="window.playEpisode('\${ep.season}', '\${ep.number}', event)">
+                  <span class="iconify" data-icon="lucide:play" data-width="16" data-height="16"></span>
+                </button>
+              </div>
             </div>
-          \`).join('');
+          \`}).join('');
         }
+
+        // Expose functions to global scope
+        window.selectEpisode = (season, number, title, event) => {
+          if (event) event.stopPropagation();
+          showStreams(season, number, title);
+        };
+
+        window.playEpisode = async (season, number, event) => {
+          if (event) event.stopPropagation();
+          const btn = event.currentTarget;
+          const originalHtml = btn.innerHTML;
+          btn.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>';
+          btn.disabled = true;
+
+          try {
+            const streams = await getStreams(season, number);
+            if (streams && streams.length > 0) {
+              // Find best stream (first one from first addon for now)
+              const bestStream = streams[0].streams[0];
+              window.location.href = \`/streaming/\${profileId}/player?stream=\${encodeURIComponent(JSON.stringify(bestStream))}&meta=\${encodeURIComponent(JSON.stringify({ id: meta.id, type: meta.type, name: meta.name, poster: meta.poster, season, episode: number }))}\`;
+            } else {
+              alert('No streams found');
+              btn.innerHTML = originalHtml;
+              btn.disabled = false;
+            }
+          } catch (e) {
+            console.error(e);
+            alert('Error finding streams');
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+          }
+        };
 
         seasonSelector.addEventListener('change', (e) => {
           renderEpisodes(e.target.value);
-        });
-
-        episodeList.addEventListener('click', (e) => {
-          if (e.target.classList.contains('play-episode-btn')) {
-            const season = e.target.dataset.season;
-            const episode = e.target.dataset.episode;
-            loadStreams(season, episode);
-          }
         });
 
         if (meta.videos && meta.videos.length > 0) {
@@ -181,23 +266,24 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
         }
       }
 
-    })();
+    });
   `;
 
   return (
-    <Layout title={meta.name} additionalCSS={['/static/css/streaming.css']}>
+    <Layout title={meta.name} additionalCSS={['/static/css/streaming.css']} additionalJS={['/static/js/list-modal.js']} showHeader={false} showFooter={false}>
       <Navbar profileId={profileId} profile={profile} />
       
+      <a href="javascript:history.back()" className="zentrio-back-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+        </svg>
+        Back
+      </a>
+
       <div className="details-container">
-        <div className="details-backdrop">
-          {meta.background ? (
-            <img src={meta.background} alt="Backdrop" />
-          ) : meta.poster ? (
-            <img src={meta.poster} alt="Backdrop" style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }} />
-          ) : (
-            <div style={{ width: '100%', height: '100%', background: '#141414' }}></div>
-          )}
-        </div>
+        <div className="page-ambient-background" style={{
+          backgroundImage: `url(${meta.background || meta.poster})`
+        }}></div>
 
         <div className="details-content">
           <div className="details-poster">
@@ -230,7 +316,7 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
                 data-in-library={String(inLibrary)}
               >
                 <span className="iconify" data-icon={inLibrary ? "lucide:check" : "lucide:plus"} data-width="20" data-height="20"></span>
-                {inLibrary ? 'In My List' : 'Add to List'}
+                {inLibrary ? 'In List' : 'Add to List'}
               </button>
             </div>
 
@@ -241,36 +327,71 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
               {meta.cast && <p><strong>Cast:</strong> {meta.cast.join(', ')}</p>}
             </div>
 
-            {meta.type === 'series' && meta.videos && (
-              <div className="series-episodes-container">
-                <div className="season-selector">
-                  <select id="seasonSelector">
-                    {Array.from(new Set(meta.videos.map(v => v.season))).map(season => (
-                      <option key={season} value={season}>Season {season}</option>
-                    ))}
-                  </select>
+            {meta.type === 'series' && meta.videos ? (
+              <>
+                <div id="episodesView">
+                  <div className="series-episodes-container">
+                    <div className="season-selector">
+                      <select id="seasonSelector" style={{ color: '#fff', background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '8px 16px', borderRadius: '8px', outline: 'none' }}>
+                        {(() => {
+                          const seasons = Array.from(new Set(meta.videos.map(v => v.season || 0))).sort((a, b) => a - b);
+                          // Filter out season 0 if there are other seasons
+                          const filteredSeasons = seasons.length > 1 ? seasons.filter(s => s !== 0) : seasons;
+                          
+                          return filteredSeasons.map(season => (
+                            <option key={season} value={season} style={{ color: '#000' }}>Season {season}</option>
+                          ));
+                        })()}
+                      </select>
+                    </div>
+                    <div id="episodeList" className="episode-list">
+                      {/* Episodes will be rendered here by script */}
+                    </div>
+                  </div>
                 </div>
-                <div id="episodeList" className="episode-list">
-                  {/* Episodes will be rendered here by script */}
+
+                <div id="streamsView" style={{ display: 'none' }}>
+                  <div className="streams-header-row" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+                    <button id="backToEpisodesBtn" className="action-btn btn-secondary-glass" style={{ padding: '8px 16px' }}>
+                      <span className="iconify" data-icon="lucide:arrow-left" data-width="16" data-height="16"></span>
+                      Back
+                    </button>
+                    <h2 id="selectedEpisodeTitle" style={{ margin: 0, fontSize: '1.2rem' }}></h2>
+                  </div>
+                  
+                  <div className="streams-container" id="streamsContainer">
+                    <div id="streamsLoading" className="loading" style={{ display: 'block', padding: '20px', textAlign: 'center' }}>
+                      <div className="spinner" style={{ margin: '0 auto 10px' }}></div>
+                      <p style={{ color: '#aaa' }}>Loading streams...</p>
+                    </div>
+                    
+                    <div id="streamsList" className="streams-list-wrapper" style={{ display: 'none' }}>
+                      {/* Streams will be rendered here */}
+                    </div>
+                    
+                    <div id="noStreams" style={{ display: 'none', padding: '20px', textAlign: 'center', color: '#aaa' }}>
+                      No streams found.
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="streams-container" id="streamsContainer">
+                <h2 className="streams-header">Streams</h2>
+                <div id="streamsLoading" className="loading" style={{ display: 'block', padding: '20px', textAlign: 'center' }}>
+                  <div className="spinner" style={{ margin: '0 auto 10px' }}></div>
+                  <p style={{ color: '#aaa' }}>Loading streams...</p>
+                </div>
+                
+                <div id="streamsList" className="streams-list-wrapper" style={{ display: 'none' }}>
+                  {/* Streams will be rendered here */}
+                </div>
+                
+                <div id="noStreams" style={{ display: 'none', padding: '20px', textAlign: 'center', color: '#aaa' }}>
+                  No streams found.
                 </div>
               </div>
             )}
-
-            <div className="streams-container" id="streamsContainer" style={{ display: meta.type === 'movie' ? 'block' : 'none' }}>
-              <h2 className="streams-header">Streams</h2>
-              <div id="streamsLoading" className="loading" style={{ display: 'block', padding: '20px', textAlign: 'center' }}>
-                <div className="spinner" style={{ margin: '0 auto 10px' }}></div>
-                <p style={{ color: '#aaa' }}>Loading streams...</p>
-              </div>
-              
-              <div id="streamsList" className="streams-list-wrapper" style={{ display: 'none' }}>
-                {/* Streams will be rendered here */}
-              </div>
-              
-              <div id="noStreams" style={{ display: 'none', padding: '20px', textAlign: 'center', color: '#aaa' }}>
-                No streams found.
-              </div>
-            </div>
           </div>
         </div>
       </div>

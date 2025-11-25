@@ -27,17 +27,27 @@ export const Navbar = ({ profileId, activePage, profile }: NavbarProps) => {
             <span className="iconify" data-icon="lucide:library" data-width="24" data-height="24"></span>
             <span>My List</span>
           </a>
-          <a href={`/streaming/${profileId}/search`} className={`nav-link ${activePage === 'search' ? 'active' : ''}`} title="Search">
+          <a href="#" className={`nav-link ${activePage === 'search' ? 'active' : ''}`} title="Search" id="navSearchBtn">
             <span className="iconify" data-icon="lucide:search" data-width="24" data-height="24"></span>
             <span>Search</span>
           </a>
         </div>
 
+        <div className="search-overlay" id="searchOverlay">
+          <button className="close-search" id="closeSearchBtn">
+            <span className="iconify" data-icon="lucide:x" data-width="24" data-height="24"></span>
+          </button>
+          <div className="search-container">
+            <span className="iconify search-icon" data-icon="lucide:search"></span>
+            <input type="text" id="searchInput" placeholder="Search movies & series..." autoComplete="off" />
+          </div>
+        </div>
+
         <div className="nav-right">
           <a href="/profiles" className="nav-profile" aria-label="Switch Profile" title="Switch Profile">
             <div className="nav-avatar">
-              {profile?.avatar && profile.avatar.startsWith('http') ? (
-                <img src={profile.avatar} alt={profile.name} />
+              {profile?.avatar ? (
+                <img src={profile.avatar.startsWith('http') || profile.avatar.startsWith('data:') ? profile.avatar : `/api/avatar/${encodeURIComponent(profile.avatar)}`} alt={profile.name} />
               ) : (
                 <span className="iconify" data-icon="lucide:user" data-width="20" data-height="20"></span>
               )}

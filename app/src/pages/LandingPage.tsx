@@ -4,9 +4,7 @@ interface LandingPageProps {}
 
 export function LandingPage({}: LandingPageProps) {
   return (
-    <SimpleLayout title="Stream Your Way" disableThemeSync={true}>
-      <div id="vanta-bg"></div>
-      
+    <SimpleLayout title="Stream Your Way" disableThemeSync={true} className="force-default-theme">
       <main className="main-content">
         <div className="container">
           <div className="hero-content" id="heroContent">
@@ -61,32 +59,6 @@ export function LandingPage({}: LandingPageProps) {
       {/* Vanta.js Scripts */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
-      <script dangerouslySetInnerHTML={{__html: `
-        document.addEventListener('DOMContentLoaded', function() {
-          try {
-            if (window.VANTA) {
-              window.VANTA.FOG({
-                el: "#vanta-bg",
-                mouseControls: true,
-                touchControls: true,
-                gyroControls: false,
-                minHeight: 200.00,
-                minWidth: 200.00,
-                highlightColor: 0xe50914,
-                midtoneColor: 0x111111,
-                lowlightColor: 0x000000,
-                baseColor: 0x000000,
-                blurFactor: 0.6,
-                speed: 1.5,
-                zoom: 1.2
-              });
-            }
-          } catch (e) {
-            console.error('Vanta init error:', e);
-          }
-        });
-      `}} />
-      <script src="/static/js/theme.js"></script>
     </SimpleLayout>
   )
 }

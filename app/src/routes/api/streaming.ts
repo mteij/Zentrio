@@ -11,6 +11,26 @@ streaming.get('/streams/:type/:id', async (c) => {
   return c.json({ streams })
 })
 
+streaming.get('/catalog', async (c) => {
+  const { profileId, manifestUrl, type, id, skip, genre } = c.req.query()
+  const pId = parseInt(profileId)
+  const skipNum = skip ? parseInt(skip) : 0
+
+  try {
+    let items: any[] = []
+    if (manifestUrl && type && id) {
+      const result = await addonManager.getCatalogItems(pId, decodeURIComponent(manifestUrl), type, id, skipNum)
+      items = result ? result.items : []
+    } else if (type) {
+      items = await addonManager.getFilteredItems(pId, type, genre, skipNum)
+    }
+    return c.json({ items })
+  } catch (e) {
+    console.error('Failed to fetch catalog items', e)
+    return c.json({ items: [] })
+  }
+})
+
 streaming.get('/settings', async (c) => {
   const { profileId } = c.req.query()
   const settings = streamDb.getSettings(parseInt(profileId))

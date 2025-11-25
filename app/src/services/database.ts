@@ -24,6 +24,64 @@ const db = new Database(dbPath)
  // Enable foreign keys
  db.exec('PRAGMA foreign_keys = ON')
 
+ // Migration for multiple lists
+ try {
+   const hasLists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lists'").get();
+   if (!hasLists) {
+     db.exec(`
+       CREATE TABLE IF NOT EXISTS lists (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         profile_id INTEGER NOT NULL,
+         name TEXT NOT NULL,
+         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+         FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+         UNIQUE(profile_id, name)
+       );
+       
+       CREATE TABLE IF NOT EXISTS list_items (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         list_id INTEGER NOT NULL,
+         meta_id TEXT NOT NULL,
+         type TEXT NOT NULL,
+         title TEXT,
+         poster TEXT,
+         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+         FOREIGN KEY (list_id) REFERENCES lists (id) ON DELETE CASCADE,
+         UNIQUE(list_id, meta_id)
+       );
+     `);
+
+     const hasLibrary = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='library'").get();
+     if (hasLibrary) {
+       const oldItems = db.prepare("SELECT * FROM library").all() as any[];
+       if (oldItems.length > 0) {
+         const profiles = [...new Set(oldItems.map(i => i.profile_id))];
+         const insertList = db.prepare("INSERT INTO lists (profile_id, name) VALUES (?, 'My List')");
+         const insertItem = db.prepare("INSERT INTO list_items (list_id, meta_id, type, title, poster, created_at) VALUES (?, ?, ?, ?, ?, ?)");
+         
+         const transaction = db.transaction(() => {
+           for (const pid of profiles) {
+             const result = insertList.run(pid);
+             const listId = result.lastInsertRowid;
+             const items = oldItems.filter(i => i.profile_id === pid);
+             for (const item of items) {
+               insertItem.run(listId, item.meta_id, item.type, item.title, item.poster, item.created_at);
+             }
+           }
+         });
+         transaction();
+       }
+       try {
+         db.exec("ALTER TABLE library RENAME TO library_backup");
+       } catch (e) {
+         // ignore
+       }
+     }
+   }
+ } catch (e) {
+   console.error("Migration for lists failed", e);
+ }
+
  // Lightweight migrations (idempotent)
  // New setting: hideCinemetaContent (idempotent)
  try {
@@ -227,18 +285,26 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_watch_history_profile ON watch_history(profile_id);
 
-  CREATE TABLE IF NOT EXISTS library (
+  CREATE TABLE IF NOT EXISTS lists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+    UNIQUE(profile_id, name)
+  );
+
+  CREATE TABLE IF NOT EXISTS list_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_id INTEGER NOT NULL,
     meta_id TEXT NOT NULL,
     type TEXT NOT NULL,
     title TEXT,
     poster TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
-    UNIQUE(profile_id, meta_id)
+    FOREIGN KEY (list_id) REFERENCES lists (id) ON DELETE CASCADE,
+    UNIQUE(list_id, meta_id)
   );
-  CREATE INDEX IF NOT EXISTS idx_library_profile ON library(profile_id);
 
   CREATE TABLE IF NOT EXISTS addons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -385,9 +451,16 @@ export interface WatchHistoryItem {
   updated_at: string
 }
 
-export interface LibraryItem {
+export interface List {
   id: number
   profile_id: number
+  name: string
+  created_at: string
+}
+
+export interface ListItem {
+  id: number
+  list_id: number
   meta_id: string
   type: string
   title?: string
@@ -915,42 +988,62 @@ export const watchHistoryDb = {
   }
 }
 
-// Library operations
-export const libraryDb = {
-  add: (data: {
-    profile_id: number
-    meta_id: string
-    type: string
-    title?: string
-    poster?: string
-  }): void => {
+// List operations
+export const listDb = {
+  create: (profileId: number, name: string): List => {
+    const stmt = db.prepare("INSERT INTO lists (profile_id, name) VALUES (?, ?)")
+    const res = stmt.run(profileId, name)
+    return listDb.getById(res.lastInsertRowid as number)!
+  },
+
+  getById: (id: number): List | undefined => {
+    return db.prepare("SELECT * FROM lists WHERE id = ?").get(id) as List | undefined
+  },
+
+  getAll: (profileId: number): List[] => {
+    return db.prepare("SELECT * FROM lists WHERE profile_id = ? ORDER BY created_at ASC").all(profileId) as List[]
+  },
+
+  delete: (id: number): void => {
+    db.prepare("DELETE FROM lists WHERE id = ?").run(id)
+  },
+
+  addItem: (data: { list_id: number, meta_id: string, type: string, title?: string, poster?: string }): void => {
     const stmt = db.prepare(`
-      INSERT INTO library (profile_id, meta_id, type, title, poster)
+      INSERT INTO list_items (list_id, meta_id, type, title, poster)
       VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(profile_id, meta_id) DO NOTHING
+      ON CONFLICT(list_id, meta_id) DO NOTHING
     `)
-    stmt.run(
-      data.profile_id,
-      data.meta_id,
-      data.type,
-      data.title || null,
-      data.poster || null
-    )
+    stmt.run(data.list_id, data.meta_id, data.type, data.title || null, data.poster || null)
   },
 
-  remove: (profileId: number, metaId: string): void => {
-    const stmt = db.prepare('DELETE FROM library WHERE profile_id = ? AND meta_id = ?')
-    stmt.run(profileId, metaId)
+  removeItem: (listId: number, metaId: string): void => {
+    db.prepare("DELETE FROM list_items WHERE list_id = ? AND meta_id = ?").run(listId, metaId)
   },
 
-  getByProfileId: (profileId: number): LibraryItem[] => {
-    const stmt = db.prepare('SELECT * FROM library WHERE profile_id = ? ORDER BY created_at DESC')
-    return stmt.all(profileId) as LibraryItem[]
+  getItems: (listId: number): ListItem[] => {
+    return db.prepare("SELECT * FROM list_items WHERE list_id = ? ORDER BY created_at DESC").all(listId) as ListItem[]
   },
 
-  isAdded: (profileId: number, metaId: string): boolean => {
-    const stmt = db.prepare('SELECT 1 FROM library WHERE profile_id = ? AND meta_id = ?')
+  // Check if item is in ANY list for a profile
+  isInAnyList: (profileId: number, metaId: string): boolean => {
+    const stmt = db.prepare(`
+      SELECT 1 FROM list_items li
+      JOIN lists l ON li.list_id = l.id
+      WHERE l.profile_id = ? AND li.meta_id = ?
+      LIMIT 1
+    `)
     return !!stmt.get(profileId, metaId)
+  },
+
+  // Get all lists containing the item
+  getListsForItem: (profileId: number, metaId: string): number[] => {
+    const stmt = db.prepare(`
+      SELECT l.id FROM lists l
+      JOIN list_items li ON l.id = li.list_id
+      WHERE l.profile_id = ? AND li.meta_id = ?
+    `)
+    return (stmt.all(profileId, metaId) as any[]).map(r => r.id)
   }
 }
 

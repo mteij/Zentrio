@@ -1634,3 +1634,52 @@ input[type="range"]:active::-moz-range-thumb {
 .theme-tile-wrapper:hover .theme-tile-actions {
     display: block;
 }
+
+/* Standard Back Button Style */
+.zentrio-back-btn {
+    position: fixed;
+    top: 40px;
+    left: 40px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    background: rgba(20, 20, 20, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--text, white);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 100px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.zentrio-back-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    color: white;
+}
+
+.zentrio-back-btn svg, .zentrio-back-btn .iconify, .zentrio-back-btn i {
+    transition: transform 0.3s ease;
+}
+
+.zentrio-back-btn:hover svg, .zentrio-back-btn:hover .iconify, .zentrio-back-btn:hover i {
+    transform: translateX(-4px);
+}
+
+@media (max-width: 768px) {
+    .zentrio-back-btn {
+        top: 20px;
+        left: 20px;
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+}

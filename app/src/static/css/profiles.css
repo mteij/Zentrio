@@ -815,7 +815,7 @@
     }
 }
 /* Ensure Vanta canvas sits behind the overlay and is non-interactive */
-#vanta-bg {
+#zentrio-vanta-bg {
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
@@ -825,7 +825,7 @@
 }
 
 /* If Vanta injects a canvas element, make sure it fills the container */
-#vanta-bg canvas {
+#zentrio-vanta-bg canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;

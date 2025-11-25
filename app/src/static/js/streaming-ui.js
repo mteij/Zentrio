@@ -61,23 +61,67 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('resize', updateUI);
 
         // Drag functionality
+        let velX = 0;
+        let momentumID;
+        let lastPageX;
+        let lastTime;
+
+        const beginMomentum = () => {
+            cancelAnimationFrame(momentumID);
+            container.style.scrollBehavior = 'auto';
+            
+            const momentumLoop = () => {
+                container.scrollLeft -= velX;
+                velX *= 0.95; // Friction
+                
+                if (Math.abs(velX) < 0.5) {
+                    container.style.scrollBehavior = '';
+                    return;
+                }
+                
+                momentumID = requestAnimationFrame(momentumLoop);
+            };
+            
+            momentumLoop();
+        };
+
         container.addEventListener('mousedown', (e) => {
             isDown = true;
             hasMoved = false;
             container.classList.add('active');
             startX = e.pageX - container.offsetLeft;
             scrollLeft = container.scrollLeft;
+            
+            // Reset momentum
+            cancelAnimationFrame(momentumID);
+            container.style.scrollBehavior = '';
+            velX = 0;
+            lastPageX = e.pageX;
+            lastTime = Date.now();
         });
 
-        container.addEventListener('mouseleave', () => {
-            isDown = false;
-            container.classList.remove('active');
+        // Stop momentum on wheel scroll to prevent fighting
+        container.addEventListener('wheel', () => {
+            cancelAnimationFrame(momentumID);
+            container.style.scrollBehavior = '';
         });
 
-        container.addEventListener('mouseup', () => {
+        const stopDragging = () => {
             isDown = false;
             container.classList.remove('active');
-        });
+            
+            // If user stopped moving before releasing (e.g. hold for 50ms), kill momentum
+            if (Date.now() - lastTime > 50) {
+                velX = 0;
+            }
+            
+            if (hasMoved && Math.abs(velX) > 1) {
+                beginMomentum();
+            }
+        };
+
+        container.addEventListener('mouseleave', stopDragging);
+        container.addEventListener('mouseup', stopDragging);
 
         container.addEventListener('mousemove', (e) => {
             if (!isDown) return;
@@ -85,6 +129,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const x = e.pageX - container.offsetLeft;
             const walk = (x - startX) * 1; // Scroll speed multiplier (1:1 movement)
             
+            // Calculate velocity
+            const now = Date.now();
+            const dt = now - lastTime;
+            const newPageX = e.pageX;
+            
+            if (dt > 0) {
+                const dx = newPageX - lastPageX;
+                // Calculate velocity in pixels per frame (assuming ~16ms frame)
+                velX = (dx / dt) * 16;
+            }
+            
+            lastPageX = newPageX;
+            lastTime = now;
+
             // Only consider it a move if we moved more than 5 pixels
             if (Math.abs(walk) > 5) {
                 hasMoved = true;
@@ -105,11 +163,367 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
+            // Prevent default drag behavior on the link itself to avoid dragging the URL
+            link.addEventListener('dragstart', (e) => {
+                e.preventDefault();
+            });
+
             // Also prevent default drag behavior on images to avoid ghost images
             const img = link.querySelector('img');
             if (img) {
                 img.addEventListener('dragstart', (e) => e.preventDefault());
             }
         });
+    });
+
+    // Search Overlay Logic
+    const searchBtn = document.getElementById('navSearchBtn');
+    const searchOverlay = document.getElementById('searchOverlay');
+    const closeSearchBtn = document.getElementById('closeSearchBtn');
+    const searchInput = document.getElementById('searchInput');
+
+    if (searchBtn && searchOverlay && searchInput) {
+        const toggleSearch = (e) => {
+            if (e) e.preventDefault();
+            const isActive = searchOverlay.classList.contains('active');
+            
+            if (isActive) {
+                searchOverlay.classList.remove('active');
+                searchBtn.classList.remove('active');
+                // Restore active state of current page link if needed
+                // But for now, just removing active from search btn is enough
+            } else {
+                searchOverlay.classList.add('active');
+                searchBtn.classList.add('active');
+                setTimeout(() => searchInput.focus(), 100);
+            }
+        };
+
+        searchBtn.addEventListener('click', toggleSearch);
+        
+        if (closeSearchBtn) {
+            closeSearchBtn.addEventListener('click', () => {
+                searchOverlay.classList.remove('active');
+                searchBtn.classList.remove('active');
+            });
+        }
+
+        // Close on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && searchOverlay.classList.contains('active')) {
+                searchOverlay.classList.remove('active');
+                searchBtn.classList.remove('active');
+            }
+        });
+
+        // Handle search submission
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const query = searchInput.value.trim();
+                if (query) {
+                    const profileId = window.location.pathname.split('/')[2];
+                    window.location.href = `/streaming/${profileId}/search?q=${encodeURIComponent(query)}`;
+                }
+            }
+        });
+    }
+
+    // Navigation Marker Animation
+    const navBar = document.querySelector('.streaming-navbar');
+    const navLinks = document.querySelectorAll('.nav-link, .nav-profile');
+    
+    if (navBar && navLinks.length > 0) {
+        // Create and append the marker
+        const marker = document.createElement('div');
+        marker.classList.add('nav-marker');
+        marker.style.opacity = '0'; // Start hidden to prevent initial jump
+        // Append to navBar directly so it can move between sections (nav-left and nav-right)
+        navBar.appendChild(marker);
+
+        function moveMarker(target, skipTransition = false) {
+            if (!target) return;
+            
+            if (skipTransition) {
+                marker.style.transition = 'none';
+            } else {
+                // Restore transition from CSS or set explicitly if needed
+                marker.style.transition = '';
+            }
+
+            // Check if we are in mobile view (horizontal layout)
+            const isMobile = window.innerWidth <= 1024;
+            const navRect = navBar.getBoundingClientRect();
+            const targetRect = target.getBoundingClientRect();
+
+            // Calculate position relative to the navbar container
+            const leftPosition = targetRect.left - navRect.left;
+            const topPosition = targetRect.top - navRect.top;
+
+            // Apply dimensions and position
+            marker.style.width = `${target.offsetWidth}px`;
+            marker.style.height = `${target.offsetHeight}px`;
+            
+            // Copy border radius to match target shape (circle for profile, rounded rect for links)
+            const targetStyle = window.getComputedStyle(target);
+            marker.style.borderRadius = targetStyle.borderRadius;
+
+            // Ensure marker is visible
+            marker.style.opacity = '1';
+
+            if (isMobile) {
+                // Mobile: Horizontal layout
+                marker.style.transform = `translateX(${leftPosition}px)`;
+                marker.style.top = `${topPosition}px`;
+                marker.style.left = '0';
+            } else {
+                // Desktop: Vertical layout
+                marker.style.transform = `translateY(${topPosition}px)`;
+                marker.style.top = '0';
+                marker.style.left = `${leftPosition}px`;
+            }
+            
+            // Force reflow if we skipped transition to ensure the position applies instantly
+            if (skipTransition) {
+                void marker.offsetWidth;
+                // We don't restore transition immediately here because the next frame might still be processing
+                // Instead, we let the next moveMarker call restore it, or restore it in a timeout
+                setTimeout(() => {
+                    marker.style.transition = '';
+                }, 50);
+            }
+
+            // Update active class
+            navLinks.forEach(link => link.classList.remove('active'));
+            target.classList.add('active');
+
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const activeLink = document.querySelector('.nav-link.active, .nav-profile.active');
+            if (activeLink) {
+                moveMarker(activeLink, true);
+            }
+        });
+
+        // Helper to find link for a path
+        function findLinkForPath(path) {
+            const pathBase = path.split('?')[0];
+            
+            // Try exact match first
+            for (const link of navLinks) {
+                const href = link.getAttribute('href');
+                if (!href) continue;
+                const hrefPath = href.split('?')[0];
+                if (hrefPath === pathBase) return link;
+            }
+            
+            // Try subpath match
+            for (const link of navLinks) {
+                const href = link.getAttribute('href');
+                if (!href) continue;
+                const hrefPath = href.split('?')[0];
+                
+                if (hrefPath !== '#' && pathBase.startsWith(hrefPath)) {
+                    const nextChar = pathBase.charAt(hrefPath.length);
+                    if (nextChar === '/' || nextChar === '') {
+                        const hrefParts = hrefPath.split('/').filter(Boolean);
+                        // Only allow subpath matching for non-root links (length > 2)
+                        // e.g. /streaming/1/library matches /streaming/1/library/123
+                        // but /streaming/1 should not match /streaming/1/library
+                        if (hrefParts.length > 2) {
+                            return link;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Initialize marker position
+        setTimeout(() => {
+            const currentPath = window.location.pathname;
+            const currentLink = findLinkForPath(currentPath);
+            
+            // Check if we came from another page in the app
+            const prevPath = sessionStorage.getItem('zentrio_nav_from');
+            sessionStorage.removeItem('zentrio_nav_from');
+            
+            let animated = false;
+
+            if (prevPath && currentLink) {
+                const prevLink = findLinkForPath(prevPath);
+                
+                // If we have a previous link and it's different from current, animate between them
+                if (prevLink && prevLink !== currentLink) {
+                    // 1. Start at previous position (no animation)
+                    moveMarker(prevLink, true);
+                    
+                    // 2. Force reflow
+                    void marker.offsetWidth;
+                    
+                    // 3. Animate to new position
+                    // We need to ensure transition is enabled. moveMarker(..., false) does this.
+                    // Use a slight delay to ensure the browser registers the starting position
+                    requestAnimationFrame(() => {
+                        moveMarker(currentLink, false);
+                    });
+                    animated = true;
+                }
+            }
+            
+            if (!animated) {
+                if (currentLink) {
+                    moveMarker(currentLink, true);
+                } else {
+                    marker.style.opacity = '0';
+                }
+            }
+        }, 50);
+
+        // Add click listeners
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                const href = link.getAttribute('href');
+                
+                // Prevent default if it's just a hash link
+                if (href === '#') {
+                    e.preventDefault();
+                }
+                
+                // Store current path for animation on next page
+                if (href && href !== '#' && link.getAttribute('target') !== '_blank') {
+                    sessionStorage.setItem('zentrio_nav_from', window.location.pathname);
+                }
+
+                // For hash links or external, move immediately
+                if (href === '#' || link.getAttribute('target') === '_blank') {
+                     moveMarker(e.currentTarget);
+                }
+            });
+        });
+    }
+});
+
+// Hero Banner Cycling
+document.addEventListener('DOMContentLoaded', () => {
+    const heroSection = document.getElementById('heroSection');
+    if (!heroSection) return;
+
+    const itemsData = heroSection.getAttribute('data-items');
+    if (!itemsData) return;
+
+    let items = [];
+    try {
+        items = JSON.parse(itemsData);
+    } catch (e) {
+        console.error('Failed to parse hero items', e);
+        return;
+    }
+
+    if (items.length <= 1) return;
+
+    // Randomize initial index
+    let currentIndex = Math.floor(Math.random() * items.length);
+    const intervalTime = 15000; // 15 seconds
+    let intervalId;
+
+    const ambientBackground = document.getElementById('ambientBackground');
+    const heroImage = document.getElementById('heroImage');
+    const heroTitle = document.getElementById('heroTitle');
+    const heroDescription = document.getElementById('heroDescription');
+    const heroPlayBtn = document.getElementById('heroPlayBtn');
+    const heroMoreBtn = document.getElementById('heroMoreBtn');
+    const trendingText = document.getElementById('trendingText');
+
+    // Initial render if random index is not 0
+    if (currentIndex !== 0) {
+        updateHero(currentIndex, true); // true = immediate update without fade out
+    }
+
+    // Preload images
+    items.forEach(item => {
+        if (item.background) {
+            const img = new Image();
+            img.src = item.background;
+        }
+        if (item.poster) {
+            const img = new Image();
+            img.src = item.poster;
+        }
+    });
+
+    function updateHero(index, immediate = false) {
+        const item = items[index];
+        if (!item) return;
+
+        if (!immediate) {
+            // Fade out content
+            heroSection.classList.add('fading');
+            if (ambientBackground) ambientBackground.classList.add('fading');
+        }
+
+        const delay = immediate ? 0 : 500;
+
+        setTimeout(() => {
+            // Update content
+            if (ambientBackground) {
+                ambientBackground.style.backgroundImage = `url(${item.background || item.poster})`;
+            }
+
+            if (heroImage) {
+                if (item.background) {
+                    heroImage.src = item.background;
+                    heroImage.style.filter = '';
+                    heroImage.style.transform = '';
+                } else if (item.poster) {
+                    heroImage.src = item.poster;
+                    heroImage.style.filter = 'blur(20px)';
+                    heroImage.style.transform = 'scale(1.1)';
+                } else {
+                    heroImage.src = '';
+                    heroImage.style.background = '#141414';
+                }
+            }
+
+            if (heroTitle) heroTitle.textContent = item.title || item.name;
+            if (heroDescription) heroDescription.textContent = item.description || '';
+            
+            if (trendingText) {
+                trendingText.textContent = `#${index + 1} Trending Today`;
+            }
+
+            const profileId = window.location.pathname.split('/')[2];
+            const playLink = `/streaming/${profileId}/${item.meta_type || item.type}/${item.meta_id || item.id}`;
+            
+            if (heroPlayBtn) heroPlayBtn.href = playLink;
+            if (heroMoreBtn) heroMoreBtn.href = playLink;
+
+            if (!immediate) {
+                // Force reflow to ensure the fade-in transition triggers
+                void heroSection.offsetWidth;
+                
+                // Fade in
+                heroSection.classList.remove('fading');
+                if (ambientBackground) ambientBackground.classList.remove('fading');
+            }
+        }, delay); // Wait for fade out
+    }
+
+    function nextHero() {
+        currentIndex = (currentIndex + 1) % items.length;
+        updateHero(currentIndex);
+    }
+
+    // Start cycling
+    intervalId = setInterval(nextHero, intervalTime);
+
+    // Pause on hover
+    heroSection.addEventListener('mouseenter', () => {
+        clearInterval(intervalId);
+    });
+
+    heroSection.addEventListener('mouseleave', () => {
+        intervalId = setInterval(nextHero, intervalTime);
     });
 });

@@ -41,23 +41,37 @@ export class AddonManager {
     }
 
     const clients: AddonClient[] = []
+    const initPromises: Promise<any>[] = []
+
     for (const addon of addons) {
       let client = this.clientCache.get(addon.manifest_url)
       if (!client) {
         client = new AddonClient(addon.manifest_url)
         this.clientCache.set(addon.manifest_url, client)
+        // Only init if new or not ready
+        initPromises.push(client.init().catch(e => console.warn(`Failed to init ${addon.name}`, e)))
+      } else if (!client.manifest) {
+         // Retry init if failed previously or incomplete
+         initPromises.push(client.init().catch(e => console.warn(`Failed to re-init ${addon.name}`, e)))
       }
       clients.push(client)
     }
     
-    await Promise.all(clients.map(c => c.init().catch(e => console.warn(`Failed to init ${c.manifest?.name}`, e))))
-    console.log(`[AddonManager] Initialized ${clients.length} clients`)
+    // Wait for all inits to complete or fail, but don't block if some fail
+    // Actually, we should probably race them or just wait for critical ones?
+    // For now, let's just wait for all, but with a timeout?
+    // The client.init() already has a timeout.
+    if (initPromises.length > 0) {
+        await Promise.allSettled(initPromises)
+    }
+    
+    // console.log(`[AddonManager] Initialized ${clients.length} clients`)
     return clients
   }
 
-  async getCatalogs(profileId: number): Promise<{ addon: Manifest, catalog: any, items: MetaPreview[] }[]> {
+  async getCatalogs(profileId: number): Promise<{ addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[]> {
     const clients = await this.getClientsForProfile(profileId)
-    const results: { addon: Manifest, catalog: any, items: MetaPreview[] }[] = []
+    const results: { addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[] = []
 
     for (const client of clients) {
       if (!client.manifest) continue
@@ -70,6 +84,7 @@ export class AddonManager {
           const items = await client.getCatalog(cat.type, cat.id)
           results.push({
             addon: client.manifest,
+            manifestUrl: client.manifestUrl,
             catalog: cat,
             items
           })
@@ -81,107 +96,7 @@ export class AddonManager {
     return results
   }
 
-  async getTrending(profileId: number): Promise<MetaPreview | null> {
-    const { TMDB_API_KEY } = getConfig()
-
-    // 1. Try direct TMDB API if key is present (Most accurate "Trending Today")
-    if (TMDB_API_KEY) {
-      try {
-        const res = await fetch(`https://api.themoviedb.org/3/trending/all/day?api_key=${TMDB_API_KEY}`)
-        if (res.ok) {
-          const data = await res.json()
-          const first = data.results?.[0]
-          if (first) {
-            const type = first.media_type === 'tv' ? 'series' : 'movie' // Stremio uses 'series' instead of 'tv'
-            let id = first.id.toString()
-            
-            // Try to get IMDB ID for better compatibility with Stremio addons
-            try {
-              const extRes = await fetch(`https://api.themoviedb.org/3/${first.media_type}/${first.id}/external_ids?api_key=${TMDB_API_KEY}`)
-              if (extRes.ok) {
-                const extData = await extRes.json()
-                if (extData.imdb_id) {
-                  id = extData.imdb_id
-                }
-              }
-            } catch (e) {
-              // ignore external id fetch error, fallback to TMDB ID (might need prefixing for some addons)
-            }
-
-            return {
-              id,
-              type,
-              name: first.title || first.name,
-              description: first.overview,
-              poster: first.poster_path ? `https://image.tmdb.org/t/p/w500${first.poster_path}` : undefined,
-              background: first.backdrop_path ? `https://image.tmdb.org/t/p/original${first.backdrop_path}` : undefined,
-              released: first.release_date || first.first_air_date,
-              imdbRating: first.vote_average ? first.vote_average.toFixed(1) : undefined
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch trending from TMDB API', e)
-      }
-    } else {
-      // 1b. Fallback to scraping TMDB trending page if no API key (as requested)
-      try {
-        const res = await fetch('https://www.themoviedb.org/remote/panel?panel=trending_scroller&group=today')
-        if (res.ok) {
-          const html = await res.text()
-          // Extract first item data using regex
-          // <div class="options" data-id="701387" data-object-id="..." data-media-type="movie">
-          const match = html.match(/data-id="(\d+)"[^>]*data-media-type="(movie|tv)"/)
-          if (match) {
-            const tmdbId = match[1]
-            const mediaType = match[2]
-            const type = mediaType === 'tv' ? 'series' : 'movie'
-            
-            // We need more details (title, poster, backdrop) which are hard to reliably regex from the partial HTML
-            // So we'll try to use the public API without key if possible, or just use the ID to fetch from our addons
-            
-            // Strategy: Use the ID found on the trending page to fetch details from our configured addons
-            const clients = await this.getClientsForProfile(profileId)
-            for (const client of clients) {
-              if (!client.manifest) continue
-              // Try to fetch meta from addon using TMDB ID (some support it directly or via prefix)
-              // Most Stremio addons use IMDB ID, but Cinemeta supports TMDB IDs often
-              try {
-                // Try fetching with tmdb prefix which is common convention
-                const meta = await client.getMeta(type, `tmdb:${tmdbId}`)
-                if (meta) return meta
-                
-                // Try raw ID
-                const metaRaw = await client.getMeta(type, tmdbId)
-                if (metaRaw) return metaRaw
-              } catch (e) {
-                // ignore
-              }
-            }
-
-            // If addons failed to resolve the item, try to extract basic info from the HTML directly
-            // <a class="image" href="/movie/701387-bugonia" title="Bugonia">
-            // <img ... src="https://media.themoviedb.org/t/p/w220_and_h330_face/..." ...>
-            const titleMatch = html.match(/class="image" href="\/[^"]+" title="([^"]+)"/)
-            const posterMatch = html.match(/src="(https:\/\/media\.themoviedb\.org\/t\/p\/[^"]+)"/)
-            
-            if (titleMatch) {
-              return {
-                id: `tmdb:${tmdbId}`,
-                type,
-                name: titleMatch[1],
-                poster: posterMatch ? posterMatch[1].replace('w220_and_h330_face', 'original') : undefined,
-                description: 'Trending on TMDB today',
-                background: posterMatch ? posterMatch[1].replace('w220_and_h330_face', 'original') : undefined
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to scrape trending from TMDB', e)
-      }
-    }
-
+  async getTrending(profileId: number): Promise<MetaPreview[]> {
     const clients = await this.getClientsForProfile(profileId)
     
     // 2. Try to find TMDB addon (Cinemeta)
@@ -194,7 +109,7 @@ export class AddonManager {
         if (cat) {
           const items = await tmdbClient.getCatalog(cat.type, cat.id)
           if (items && items.length > 0) {
-            return items[0]
+            return items.slice(0, 10)
           }
         }
       } catch (e) {
@@ -210,7 +125,7 @@ export class AddonManager {
         if (cat) {
           const items = await client.getCatalog(cat.type, cat.id)
           if (items && items.length > 0) {
-            return items[0]
+            return items.slice(0, 10)
           }
         }
       } catch (e) {
@@ -218,7 +133,7 @@ export class AddonManager {
       }
     }
     
-    return null
+    return []
   }
 
   async getMeta(type: string, id: string, profileId: number): Promise<MetaDetail | null> {
@@ -264,7 +179,7 @@ export class AddonManager {
     return results
   }
 
-  async getCatalogItems(profileId: number, manifestUrl: string, type: string, id: string): Promise<{ title: string, items: MetaPreview[] } | null> {
+  async getCatalogItems(profileId: number, manifestUrl: string, type: string, id: string, skip?: number): Promise<{ title: string, items: MetaPreview[] } | null> {
     // Ensure clients are initialized for this profile
     await this.getClientsForProfile(profileId)
     
@@ -275,7 +190,10 @@ export class AddonManager {
     if (!catalog) return null
 
     try {
-      const items = await client.getCatalog(type, id)
+      const extra: Record<string, string> = {}
+      if (skip) extra.skip = skip.toString()
+      
+      const items = await client.getCatalog(type, id, extra)
       return {
         title: `${client.manifest.name} - ${catalog.name || catalog.type}`,
         items
@@ -286,11 +204,86 @@ export class AddonManager {
     }
   }
 
+  async getAvailableFilters(profileId: number): Promise<{ types: string[], genres: string[] }> {
+    const clients = await this.getClientsForProfile(profileId)
+    const types = new Set<string>()
+    const genres = new Set<string>()
+
+    for (const client of clients) {
+      if (!client.manifest) continue
+      
+      // Collect types
+      if (client.manifest.types) {
+        client.manifest.types.forEach(t => types.add(t))
+      }
+
+      // Collect genres from catalogs
+      for (const cat of client.manifest.catalogs) {
+        if (cat.extra) {
+          const genreExtra = cat.extra.find(e => e.name === 'genre')
+          if (genreExtra && genreExtra.options) {
+            genreExtra.options.forEach(g => {
+              // Filter out years (4 digits)
+              if (!/^\d{4}$/.test(g)) {
+                genres.add(g)
+              }
+            })
+          }
+        }
+      }
+    }
+
+    return {
+      types: Array.from(types),
+      genres: Array.from(genres).sort()
+    }
+  }
+
+  async getFilteredItems(profileId: number, type: string, genre?: string, skip?: number): Promise<MetaPreview[]> {
+    const clients = await this.getClientsForProfile(profileId)
+    const results: MetaPreview[] = []
+
+    for (const client of clients) {
+      if (!client.manifest) continue
+      
+      // Find a catalog that supports this type and (optionally) genre
+      const catalog = client.manifest.catalogs.find(c => {
+        if (c.type !== type) return false
+        if (genre) {
+          return c.extra?.some(e => e.name === 'genre' && (!e.options || e.options.includes(genre)))
+        }
+        return true
+      })
+
+      if (catalog) {
+        try {
+          const extra: Record<string, string> = {}
+          if (genre) extra.genre = genre
+          if (skip) extra.skip = skip.toString()
+          
+          const items = await client.getCatalog(catalog.type, catalog.id, extra)
+          results.push(...items)
+        } catch (e) {
+          console.warn(`Failed to fetch filtered items from ${client.manifest.name}`, e)
+        }
+      }
+    }
+    
+    return results
+  }
+
   async getStreams(type: string, id: string, profileId: number, season?: number, episode?: number): Promise<{ addon: Manifest, streams: Stream[] }[]> {
     const clients = await this.getClientsForProfile(profileId)
     const results: { addon: Manifest, streams: Stream[] }[] = []
 
-    const videoId = (type === 'series' && season && episode) ? `${id}:${season}:${episode}` : id
+    // For series, we generally need season and episode.
+    // If they are missing, we might be requesting the whole series which some addons don't support and return 500.
+    if (type === 'series' && (season === undefined || episode === undefined)) {
+      console.warn(`[AddonManager] Skipping stream fetch for series ${id} without season/episode`)
+      return []
+    }
+
+    const videoId = (type === 'series' && season !== undefined && episode !== undefined) ? `${id}:${season}:${episode}` : id
 
     const promises = clients.map(async (client) => {
       if (!client.manifest) return

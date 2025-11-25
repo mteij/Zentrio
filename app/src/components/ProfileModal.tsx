@@ -42,13 +42,6 @@ export function ProfileModal() {
               </select>
             </FormGroup>
 
-            <div className="form-group">
-              <label className="checkbox-label">
-                <input type="checkbox" id="heroBannerEnabled" defaultChecked />
-                <span className="checkbox-text">Enable Hero Banner</span>
-              </label>
-            </div>
-
             <div className="profile-action-row">
               <Button
                 type="submit"

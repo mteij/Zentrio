@@ -23,8 +23,11 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
 
         <div className="player-overlay" id="playerOverlay">
           <div className="player-top-bar">
-            <a href="javascript:history.back()" className="back-btn">
-              <i data-lucide="arrow-left" style={{ width: 24, height: 24 }}></i>
+            <a href="javascript:history.back()" className="zentrio-back-btn" style={{ position: 'static', transform: 'none', margin: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+              </svg>
+              Back
             </a>
             <div className="stream-info">
               <div className="stream-title">{meta.name}</div>

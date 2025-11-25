@@ -874,6 +874,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // IMDb Ratings Toggle
+    const imdbToggle = document.getElementById('imdbRatingsToggle');
+    if (imdbToggle) {
+        const hide = localStorage.getItem('zentrioHideImdbRatings') === 'true';
+        imdbToggle.classList.toggle('active', !hide);
+
+        imdbToggle.addEventListener('click', () => {
+            const currentHide = localStorage.getItem('zentrioHideImdbRatings') === 'true';
+            const newHide = !currentHide;
+            localStorage.setItem('zentrioHideImdbRatings', newHide);
+            imdbToggle.classList.toggle('active', !newHide);
+            
+            // Apply immediately
+            if (window.ZentrioTheme && window.ZentrioTheme.applyImdbRatings) {
+                window.ZentrioTheme.applyImdbRatings();
+            }
+        });
+    }
+
     // Add TMDB API key auto-save listener
     const tmdbInput = document.getElementById('tmdbApiKeyInput');
     if (tmdbInput) {

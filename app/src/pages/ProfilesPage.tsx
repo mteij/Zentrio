@@ -18,6 +18,7 @@ interface ProfilesPageProps {
 export function ProfilesPage({ profiles = [], user }: ProfilesPageProps) {
   return (
     <SimpleLayout title="Profiles" additionalCSS={['/static/css/profiles.css']}>
+      <div id="zentrio-vanta-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, width: '100vw', height: '100vh' }}></div>
 
       <header className="header" style={{ background: 'transparent', boxShadow: 'none' }}>
         <nav className="nav">
