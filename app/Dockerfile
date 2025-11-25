@@ -34,7 +34,6 @@ COPY --from=builder /app/src/themes ./src/themes
 
 # Copy local data directory if it exists
 RUN if [ -d data ]; then cp -r data ./data; fi
-COPY --from=builder /app/stremio-web-build ./stremio-web-build
 
 ENV NODE_ENV=production
 # Default port is 3000; can be overridden via .env or docker run --env PORT=...
