@@ -60,7 +60,8 @@ app.get('/:profileId', async (c) => {
             <link rel="stylesheet" href="/static/css/styles.css">
         </head>
         <body style="margin: 0; overflow: hidden; background-color: #141414;">
-            <div class="loading-container">
+            <div id="vanta-bg" style="position: fixed; inset: 0; z-index: -1; width: 100vw; height: 100vh;"></div>
+            <div class="loading-container" style="background: transparent;">
                 <div class="pulsing-dots">
                     <div class="dot"></div>
                     <div class="dot"></div>
@@ -75,6 +76,46 @@ app.get('/:profileId', async (c) => {
                 window.sessionData = ${raw(JSON.stringify(sessionData))};
             </script>
             <script src="/static/js/mobile-session-handler.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+            <script>
+                // Initialize Vanta background
+                document.addEventListener('DOMContentLoaded', function() {
+                    try {
+                        // Check if Vanta is enabled (default to stremio/off if not set)
+                        var style = localStorage.getItem('zentrioBackgroundStyle');
+                        if (style !== 'vanta') return;
+
+                        var themeData = localStorage.getItem('zentrioThemeData');
+                        var theme = themeData ? JSON.parse(themeData) : null;
+                        var v = (theme && theme.vanta) || {};
+                        
+                        // Helper to convert hex to int
+                        function hexToInt(hex) {
+                            return parseInt(hex.replace('#', ''), 16);
+                        }
+
+                        if (window.VANTA) {
+                            window.VANTA.FOG({
+                                el: "#vanta-bg",
+                                mouseControls: false,
+                                touchControls: false,
+                                minHeight: 200.00,
+                                minWidth: 200.00,
+                                highlightColor: hexToInt(v.highlight || '#222222'),
+                                midtoneColor: hexToInt(v.midtone || '#111111'),
+                                lowlightColor: hexToInt(v.lowlight || '#000000'),
+                                baseColor: hexToInt(v.base || '#000000'),
+                                blurFactor: 0.90,
+                                speed: v.speed || 0.50,
+                                zoom: v.zoom || 0.30
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Failed to init Vanta on loading screen', e);
+                    }
+                });
+            </script>
             <script src="/static/session-loader.js"></script>
         </body>
         </html>

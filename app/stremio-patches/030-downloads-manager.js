@@ -203,7 +203,7 @@
     // Local state for UI updates only
     const items = {};
     const probing = {}; // id -> { startedAt, anchorHash }
-    const ALWAYS_PROBE = true; // proactively open hidden player iframe for every download to capture media requests early
+    const ALWAYS_PROBE = false; // proactively open hidden player iframe for every download to capture media requests early
 
     // --- Messaging with Core ---
     function sendToCore(msg) {
@@ -289,15 +289,26 @@
         // Handle updates from Core
         if (data.type === 'zentrio-download-progress') {
             updateButtonState(data.id, 'downloading', data.progress);
-            items[data.id] = { ...items[data.id], status: 'downloading', progress: data.progress };
-            renderPopupList();
+            items[data.id] = {
+                ...items[data.id],
+                status: 'downloading',
+                progress: data.progress,
+                bytesReceived: data.bytesReceived,
+                size: data.size,
+                eta: data.eta
+            };
+            // Only re-render if popup is visible to save resources
+            const popup = document.getElementById('zentrioDownloadsPopup');
+            if (popup && popup.style.display === 'block') {
+                renderPopupList();
+            }
         } else if (data.type === 'zentrio-download-complete') {
             updateButtonState(data.id, 'complete');
-            items[data.id] = { ...items[data.id], status: 'completed', progress: 100 };
+            items[data.id] = { ...items[data.id], status: 'completed', progress: 100, size: data.size, fileName: data.fileName };
             renderPopupList();
         } else if (data.type === 'zentrio-download-failed' || data.type === 'zentrio-download-cancelled') {
             updateButtonState(data.id, 'failed');
-            items[data.id] = { ...items[data.id], status: 'failed' };
+            items[data.id] = { ...items[data.id], status: 'failed', error: data.error };
             renderPopupList();
             // Reset button after delay
             setTimeout(() => updateButtonState(data.id, 'default'), 3000);
@@ -313,7 +324,7 @@
             });
         } else if (data.type === 'zentrio-download-started') {
             updateButtonState(data.id, 'downloading', 0);
-            items[data.id] = { ...items[data.id], status: 'downloading', progress: 0, size: data.size };
+            items[data.id] = { ...items[data.id], status: 'downloading', progress: 0, size: data.size, fileName: data.fileName };
             renderPopupList();
         } else if (data.type === 'zentrio-download-list') {
             if (data.items && Array.isArray(data.items)) {
@@ -807,10 +818,12 @@
         'top: 60px;' +
         'right: 20px;' +
         'width: 320px;' +
-        'background: #1a1a1a;' +
-        'border: 1px solid #333;' +
-        'border-radius: 8px;' +
-        'box-shadow: 0 4px 12px rgba(0,0,0,0.5);' +
+        'background: rgba(20, 20, 20, 0.85);' +
+        'backdrop-filter: blur(12px);' +
+        '-webkit-backdrop-filter: blur(12px);' +
+        'border: 1px solid rgba(255, 255, 255, 0.1);' +
+        'border-radius: 12px;' +
+        'box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);' +
         'z-index: 100001;' +
         'max-height: 400px;' +
         'overflow-y: auto;' +
@@ -818,12 +831,12 @@
         'font-family: sans-serif;' +
         '}' +
         '.zentrio-popup-header {' +
-        'padding: 12px 16px;' +
-        'border-bottom: 1px solid #333;' +
+        'padding: 16px;' +
+        'border-bottom: 1px solid rgba(255, 255, 255, 0.1);' +
         'display: flex;' +
         'justify-content: space-between;' +
         'align-items: center;' +
-        'background: #222;' +
+        'background: rgba(255, 255, 255, 0.03);' +
         'position: sticky;' +
         'top: 0;' +
         'z-index: 1;' +
@@ -848,10 +861,14 @@
         '}' +
         '.zentrio-popup-item {' +
         'padding: 12px 16px;' +
-        'border-bottom: 1px solid #2a2a2a;' +
+        'border-bottom: 1px solid rgba(255, 255, 255, 0.05);' +
         'display: flex;' +
         'flex-direction: column;' +
         'gap: 4px;' +
+        'transition: background 0.2s;' +
+        '}' +
+        '.zentrio-popup-item:hover {' +
+        'background: rgba(255, 255, 255, 0.05);' +
         '}' +
         '.zentrio-popup-item:last-child {' +
         'border-bottom: none;' +
@@ -871,7 +888,7 @@
         '}' +
         '.zentrio-item-progress {' +
         'height: 4px;' +
-        'background: #333;' +
+        'background: rgba(255, 255, 255, 0.1);' +
         'border-radius: 2px;' +
         'margin-top: 6px;' +
         'overflow: hidden;' +
@@ -932,7 +949,8 @@
             if (popup) {
                 const isVisible = popup.style.display === 'block';
                 popup.style.display = isVisible ? 'none' : 'block';
-                if (!isVisible) {
+                if (popup.style.display === 'block') {
+                    // Always render list when opening, even if empty
                     renderPopupList();
                 }
             }
@@ -943,7 +961,12 @@
         if (viewAllBtn) {
             viewAllBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                window.top.location.href = '/downloads';
+                // Use SPA navigation if available
+                if (window.__zentrioSpaInitialized) {
+                    window.postMessage({ type: 'zentrio-navigate', url: '/downloads' }, '*');
+                } else {
+                    window.top.location.href = '/downloads';
+                }
             });
         }
       }
@@ -1515,7 +1538,7 @@
 
     function init() {
       injectStyles();
-      patchNetworkForDiscovery();
+      // patchNetworkForDiscovery();
       
       // Ask Core for current list to populate popup
       sendToCore({ type: 'zentrio-download-list-request' });

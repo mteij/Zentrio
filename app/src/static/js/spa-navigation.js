@@ -48,10 +48,26 @@
         loadPage(window.location.href);
     });
 
+    window.addEventListener('message', (e) => {
+        if (e.data && e.data.type === 'zentrio-navigate') {
+            const url = e.data.url;
+            if (url) {
+                history.pushState({}, '', url);
+                loadPage(url);
+            }
+        }
+    });
+
     async function loadPage(url) {
         console.log('[SPA] Loading', url);
         try {
             // Show loading bar?
+            // Add a subtle loading indicator or keep current page visible until new one is ready
+            // to prevent white flash.
+            
+            // Optional: Add a loading class to body to show a spinner or progress bar
+            // document.body.classList.add('spa-loading');
+
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             
@@ -94,6 +110,11 @@
             });
 
             // Replace Body
+            // Use a transition if possible, but for now just swapping innerHTML is fast.
+            // The white flash usually comes from the browser clearing the page before painting the new one
+            // or from the fetch delay. Since we await fetch before touching DOM, the old page stays visible.
+            // The flash might be from styles being re-applied or missing for a frame.
+            
             document.body.innerHTML = doc.body.innerHTML;
             
             // Execute scripts in body

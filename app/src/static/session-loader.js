@@ -3,6 +3,13 @@
     const stremioContainer = document.getElementById('stremio-container');
     const loadingContainer = document.querySelector('.loading-container');
 
+    // Load background manager
+    try {
+        const script = document.createElement('script');
+        script.src = '/static/js/background-manager.js';
+        document.head.appendChild(script);
+    } catch(e) { console.error('Failed to load background manager', e); }
+
     try {
 
     if (!window.sessionData) {
@@ -136,6 +143,13 @@
             search_history: result.search_history || { uid: result.user._id, items: {} },
             streaming_server_urls: result.streaming_server_urls || { uid: result.user._id, items: { "http://127.0.0.1:11470/": new Date().toISOString() } },
             streams: result.streams || { uid: result.user._id, items: [] },
+            zentrio: {
+                enableVanta: localStorage.getItem('zentrio_enable_vanta_bg'),
+                backgroundStyle: localStorage.getItem('zentrioBackgroundStyle'),
+                theme: localStorage.getItem('zentrioTheme'),
+                themeData: localStorage.getItem('zentrioThemeData'),
+                customTheme: localStorage.getItem('zentrioCustomTheme')
+            }
         };
 
         loadingMessage.textContent = "Loading Stremio...";
@@ -287,15 +301,35 @@
         let showTip = false;
         try { showTip = !!(window.sessionData && window.sessionData.decryptionError); } catch (_) {}
         document.title = 'Zentrio - Error';
+        // Center the error message
+        loadingContainer.style.display = 'flex';
+        loadingContainer.style.flexDirection = 'column';
+        loadingContainer.style.justifyContent = 'center';
+        loadingContainer.style.alignItems = 'center';
+        loadingContainer.style.height = '100vh';
+        loadingContainer.style.width = '100vw';
+
         loadingMessage.innerHTML = `
-            <div class="message error" style="display: block; margin: 0 auto; max-width: 400px;">
+            <div class="message error" style="display: block; margin: 0 auto; max-width: 400px; text-align: center;">
                 <p style="margin-bottom: 15px;"><strong>Error</strong></p>
                 <p>${error && error.message ? error.message : 'Unexpected error'}</p>
                 ${showTip ? '<p style="margin-top:10px; color:#bbb;">Tip: Ensure the server ENCRYPTION_KEY stays the same across restarts; otherwise saved passwords can\'t be decrypted.</p>' : ''}
                 <button
                     onclick="window.history.back()"
                     class="btn btn-secondary"
-                    style="margin-top: 20px;"
+                    style="
+                        margin-top: 20px;
+                        background: rgba(255, 255, 255, 0.1);
+                        backdrop-filter: blur(10px);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        border-radius: 8px;
+                        padding: 10px 20px;
+                        color: white;
+                        transition: all 0.3s ease;
+                        cursor: pointer;
+                    "
+                    onmouseover="this.style.background='rgba(255, 255, 255, 0.2)'; this.style.transform='translateY(-2px)';"
+                    onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';"
                 >
                     Go Back
                 </button>

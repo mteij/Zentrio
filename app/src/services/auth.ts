@@ -53,6 +53,12 @@ export const auth = betterAuth({
             clientId: cfg.DISCORD_CLIENT_ID || "",
             clientSecret: cfg.DISCORD_CLIENT_SECRET || "",
         },
+        oidc: {
+            enabled: !!cfg.OIDC_CLIENT_ID && !!cfg.OIDC_CLIENT_SECRET && !!cfg.OIDC_ISSUER,
+            clientId: cfg.OIDC_CLIENT_ID || "",
+            clientSecret: cfg.OIDC_CLIENT_SECRET || "",
+            issuer: cfg.OIDC_ISSUER || "",
+        },
     },
     plugins: [
         twoFactor({
@@ -112,17 +118,19 @@ export const auth = betterAuth({
             },
         }
     },
+    account: {
+        accountLinking: {
+            enabled: true,
+            trustedProviders: ["google", "github", "discord", "oidc"],
+            allowDifferentEmails: true,
+        },
+    },
     databaseHooks: {
         user: {
             create: {
                 before: async (user) => {
-                    if (user.email) {
-                        const existingUser = db.prepare('SELECT * FROM user WHERE email = ?').get(user.email);
-                        if (existingUser) {
-                            // If user exists, we prevent creation to avoid duplicate accounts with different providers for now
-                            // In the future we can implement account linking
-                            return false;
-                        }
+                    if (!user.username && user.email) {
+                        user.username = user.email.split('@')[0];
                     }
                     return {
                         data: user

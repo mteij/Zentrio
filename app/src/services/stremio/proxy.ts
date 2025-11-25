@@ -159,9 +159,10 @@ export const renderLocalStremioHtml = async (sessionData: string | null) => {
     // Inject spa navigation script and downloads core
     // We inject downloads-core.js so that Stremio Web can handle downloads directly via OPFS
     // even when running as a top-level page.
+    // Also inject background manager for custom backgrounds
     body = body.replace(
       /<head[^>]*>/i,
-      `$&<script src="/static/js/spa-navigation.js"></script><script src="/static/js/downloads-core.js"></script>`
+      `$&<script src="/static/js/spa-navigation.js"></script><script src="/static/js/downloads-core.js"></script><script src="/static/js/background-manager.js"></script>`
     );
 
     if (sessionData) {

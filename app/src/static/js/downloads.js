@@ -68,6 +68,57 @@
 
   // --- Rendering ---
 
+  function updateItem(id, updates) {
+      const items = window.__zentrioDownloadsItems || [];
+      const idx = items.findIndex(i => i.id === id);
+      if (idx !== -1) {
+          items[idx] = { ...items[idx], ...updates };
+          window.__zentrioDownloadsItems = items;
+          
+          // Efficient DOM update for progress
+          if (updates.progress !== undefined || updates.bytesReceived !== undefined) {
+              updateCardProgress(id, items[idx]);
+          } else {
+              render(); // Full render for status changes
+          }
+          updateMetrics(items);
+      }
+  }
+
+  function updateCardProgress(id, item) {
+      const card = document.querySelector(`.download-card[data-id="${id}"]`);
+      if (!card) return;
+      
+      const pct = item.progress || 0;
+      const sizeStr = item.size ? formatBytes(item.size) : '';
+      const recStr = item.bytesReceived ? formatBytes(item.bytesReceived) : '';
+      
+      // Update progress bar
+      let bar = card.querySelector('.download-progress-bar');
+      if (!bar && item.status === 'downloading') {
+          // Create if missing (e.g. transition from init to downloading)
+          bar = document.createElement('div');
+          bar.className = 'download-progress-bar';
+          const posterContainer = card.querySelector('.download-poster-container');
+          if (posterContainer) posterContainer.insertBefore(bar, posterContainer.querySelector('.download-overlay'));
+      }
+      if (bar) bar.style.width = `${pct.toFixed(2)}%`;
+      
+      // Update meta text
+      const metaSpan = card.querySelector('.download-meta span:first-child');
+      if (metaSpan) {
+          let meta = `${recStr} / ${sizeStr}`;
+          if (item.duration) meta = item.duration + ' • ' + meta;
+          metaSpan.textContent = meta;
+      }
+      
+      // Update badge
+      const badge = card.querySelector('.download-status-badge');
+      if (badge) {
+          badge.textContent = `${Math.round(pct)}%`;
+      }
+  }
+
   function render() {
     if (!els.list || !els.empty) return;
     
@@ -86,12 +137,9 @@
         const pct = item.progress || 0;
         const sizeStr = item.size ? formatBytes(item.size) : '';
         const recStr = item.bytesReceived ? formatBytes(item.bytesReceived) : '';
-        const etaStr = (typeof item.eta === 'number' && item.eta > 0) ? `ETA ${item.eta}s` : '';
         const status = item.status || 'initiated';
         const safeTitle = escapeHtml(item.title || 'Untitled');
-        const safeFileName = escapeHtml(item.fileName || '');
         const safeId = escapeHtml(item.id);
-        const safeStatus = escapeHtml(status);
         const poster = item.poster || '';
         const duration = item.duration || '';
         
@@ -212,17 +260,36 @@
     // Listen for updates from Core
     if (data.type === 'zentrio-download-complete') {
         showToast('Download finished! Click the download button to save to your device.');
-        window.postMessage({ type: 'zentrio-download-list-request' }, '*');
-    } else if (data.type === 'zentrio-download-progress' ||
-        data.type === 'zentrio-download-failed' ||
-        data.type === 'zentrio-download-cancelled' ||
-        data.type === 'zentrio-download-init' ||
-        data.type === 'zentrio-download-started' ||
-        data.type === 'zentrio-download-deleted') {
-        
-        // Request full list to ensure we are in sync
-        window.postMessage({ type: 'zentrio-download-list-request' }, '*');
-        
+        updateItem(data.id, { status: 'completed', progress: 100, size: data.size, fileName: data.fileName });
+    } else if (data.type === 'zentrio-download-progress') {
+        updateItem(data.id, {
+            status: 'downloading',
+            progress: data.progress,
+            bytesReceived: data.bytesReceived,
+            size: data.size,
+            eta: data.eta
+        });
+    } else if (data.type === 'zentrio-download-failed') {
+        updateItem(data.id, { status: 'failed', error: data.error });
+    } else if (data.type === 'zentrio-download-cancelled') {
+        updateItem(data.id, { status: 'failed', error: 'Cancelled' });
+    } else if (data.type === 'zentrio-download-started') {
+        updateItem(data.id, { status: 'downloading', fileName: data.fileName, size: data.size });
+    } else if (data.type === 'zentrio-download-init') {
+        // New item, add to list
+        if (data.payload) {
+            const items = window.__zentrioDownloadsItems || [];
+            const exists = items.find(i => i.id === data.payload.id);
+            if (!exists) {
+                items.unshift(data.payload);
+                window.__zentrioDownloadsItems = items;
+                render();
+            }
+        }
+    } else if (data.type === 'zentrio-download-deleted') {
+        const items = window.__zentrioDownloadsItems || [];
+        window.__zentrioDownloadsItems = items.filter(i => i.id !== data.id);
+        render();
     } else if (data.type === 'zentrio-download-list') {
         if (data.items && Array.isArray(data.items)) {
             window.__zentrioDownloadsItems = data.items;

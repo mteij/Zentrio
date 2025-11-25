@@ -272,7 +272,6 @@ var ExceptionCode, CapacitorException, getPlatformId = (win) => {
   const originalKeys = Object.keys(headers);
   const loweredKeys = Object.keys(headers).map((k) => k.toLocaleLowerCase());
   const normalized = loweredKeys.reduce((acc, key, index) => {
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return acc;
     acc[key] = headers[originalKeys[index]];
     return acc;
   }, {});
@@ -356,9 +355,7 @@ var init_dist = __esm(() => {
         let [key, value] = cookie.replace(/=/, "CAP_COOKIE").split("CAP_COOKIE");
         key = decode(key).trim();
         value = decode(value).trim();
-        if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
-          cookieMap[key] = value;
-        }
+        cookieMap[key] = value;
       });
       return cookieMap;
     }
@@ -1174,6 +1171,7 @@ init_dist();
     const msg = e.data;
     if (!msg || !msg.type)
       return;
+    console.log("[ZDM-Core] Worker message:", msg.type, msg.id);
     if (msg.id) {
       const item = await getItem(msg.id);
       if (item) {

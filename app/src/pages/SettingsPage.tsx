@@ -24,7 +24,6 @@ export function SettingsPage({}: SettingsPageProps) {
       />
       <div id="vanta-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, width: '100vw', height: '100vh' }}></div>
       <div className="container" style={{ position: 'relative', zIndex: 1 }}>
-        <h1 className="page-title">Settings</h1>
         <button
           id="backButton"
           className="back-btn"
@@ -35,215 +34,254 @@ export function SettingsPage({}: SettingsPageProps) {
           Back to Profiles
         </button>
 
-        {/* Account Settings */}
-        <div className="settings-section">
-          <h2 className="section-title">Account</h2>
-          
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Username</h3>
-              <p>Change your account username</p>
-            </div>
-            <div className="setting-control">
-              <span id="currentUsername">Loading...</span>
-              <Button variant="secondary" id="openUsernameModalBtn">
-                Change
-              </Button>
-            </div>
-          </div>
+        {/* Tabs Navigation */}
+        <div className="settings-tabs">
+          <button className="tab-btn active" data-tab="account">Account</button>
+          <button className="tab-btn" data-tab="appearance">Appearance</button>
+          <button className="tab-btn" data-tab="plugins">Plugins</button>
+          <button className="tab-btn" data-tab="danger">Danger Zone</button>
+        </div>
 
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Email Address</h3>
-              <p>Change your account email address</p>
+        {/* Account Tab */}
+        <div id="tab-account" className="tab-content active">
+          <div className="settings-card">
+            <h2 className="section-title">Account</h2>
+            
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Username</h3>
+                <p>Change your account username</p>
+              </div>
+              <div className="setting-control">
+                <span id="currentUsername">Loading...</span>
+                <Button variant="secondary" id="openUsernameModalBtn">
+                  Change
+                </Button>
+              </div>
             </div>
-            <div className="setting-control">
-              <span id="currentEmail">Loading...</span>
-              <Button variant="secondary" id="openEmailModalBtn">
-                Change
-              </Button>
-            </div>
-          </div>
 
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Password</h3>
-              <p>Update your account password</p>
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Email Address</h3>
+                <p>Change your account email address</p>
+              </div>
+              <div className="setting-control">
+                <span id="currentEmail">Loading...</span>
+                <Button variant="secondary" id="openEmailModalBtn">
+                  Change
+                </Button>
+              </div>
             </div>
-            <div className="setting-control">
-              <Button variant="secondary" id="openPasswordModalBtn">
-                Change Password
-              </Button>
-            </div>
-          </div>
 
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Stay signed in on this device</h3>
-              <p>When enabled, you will remain signed in indefinitely. When disabled, you will be signed out after 3 hours of inactivity. This preference is stored only on this device.</p>
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Password</h3>
+                <p>Update your account password</p>
+              </div>
+              <div className="setting-control">
+                <Button variant="secondary" id="openPasswordModalBtn">
+                  Change Password
+                </Button>
+              </div>
             </div>
-            <div className="setting-control">
-              <div className="toggle" id="rememberMeLocalToggle" aria-label="Stay signed in on this device"></div>
-            </div>
-          </div>
 
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Two-Factor Authentication</h3>
-              <p>Add an extra layer of security to your account.</p>
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Stay signed in on this device</h3>
+                <p>When enabled, you will remain signed in indefinitely. When disabled, you will be signed out after 3 hours of inactivity. This preference is stored only on this device.</p>
+              </div>
+              <div className="setting-control">
+                <div className="toggle" id="rememberMeLocalToggle" aria-label="Stay signed in on this device"></div>
+              </div>
             </div>
-            <div className="setting-control">
-                <div id="twoFactorControl">
-                    {/* Will be populated by JS */}
-                    <Button variant="primary" id="enable2faBtn">Enable 2FA</Button>
-                    <Button variant="danger" id="disable2faBtn" style={{ display: 'none' }}>Disable 2FA</Button>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Two-Factor Authentication</h3>
+                <p>Add an extra layer of security to your account.</p>
+              </div>
+              <div className="setting-control">
+                  <div id="twoFactorControl">
+                      {/* Will be populated by JS */}
+                      <Button variant="primary" id="enable2faBtn">Enable 2FA</Button>
+                      <Button variant="danger" id="disable2faBtn" style={{ display: 'none' }}>Disable 2FA</Button>
+                  </div>
+              </div>
+            </div>
+            
+            <div id="backupCodesContainer" style={{ display: 'none', marginTop: '20px' }} className="setting-item">
+                <div style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
+                    <h3>Backup Codes</h3>
+                    <p>Save these codes in a safe place. You can use them to access your account if you lose your authenticator device.</p>
+                    <pre id="backupCodesList" style={{ background: '#333', padding: '15px', borderRadius: '8px', width: '100%', overflowX: 'auto', fontFamily: 'monospace', marginTop: '10px' }}></pre>
+                    <Button variant="secondary" style={{ marginTop: '15px' }} onClick={() => { const el = document.getElementById('backupCodesContainer'); if (el) el.style.display = 'none'; }}>
+                      Done
+                    </Button>
                 </div>
             </div>
           </div>
-          
-          <div id="backupCodesContainer" style={{ display: 'none', marginTop: '20px' }} className="setting-item">
-              <div style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
-                  <h3>Backup Codes</h3>
-                  <p>Save these codes in a safe place. You can use them to access your account if you lose your authenticator device.</p>
-                  <pre id="backupCodesList" style={{ background: '#333', padding: '15px', borderRadius: '8px', width: '100%', overflowX: 'auto', fontFamily: 'monospace', marginTop: '10px' }}></pre>
-                  <Button variant="secondary" style={{ marginTop: '15px' }} onClick={() => { const el = document.getElementById('backupCodesContainer'); if (el) el.style.display = 'none'; }}>
-                    Done
-                  </Button>
+
+          {/* Linked Accounts */}
+          <div className="settings-card">
+            <h2 className="section-title">Linked Accounts</h2>
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <div className="setting-info">
+                    <h3>Connected Providers</h3>
+                    <p>Manage your linked social accounts.</p>
+                </div>
+                <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
+                    <div id="linkedAccountsList" style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+                        <div style={{ color: '#666' }}>Loading...</div>
+                    </div>
+                </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Appearance Tab */}
+        <div id="tab-appearance" className="tab-content">
+          <div className="settings-card">
+            <h2 className="section-title">Appearance</h2>
+
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 16 }}>
+              <div className="setting-info">
+                <h3>Theme</h3>
+                <p>Choose a subtle, modern theme for button colors, accents and the background. Use previews to pick a look; selection is stored locally on this device.</p>
               </div>
-          </div>
-        </div>
 
-        {/* Plugins */}
-        <div className="settings-section">
-          <h2 className="section-title">Plugins</h2>
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Enable Addon Manager</h3>
-              <p>Adds an "Edit Order" button to the Stremio addons page to allow reordering and removing addons.</p>
-            </div>
-            <div className="setting-control">
-              <div className="toggle" id="addonManagerEnabledToggle"></div>
-            </div>
-          </div>
- 
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Hide Calendar Button</h3>
-              <p>Removes the Calendar button from the Stremio UI for all profiles</p>
-            </div>
-            <div className="setting-control">
-              <div className="toggle" id="hideCalendarButtonToggle"></div>
-            </div>
-          </div>
- 
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Hide Addons Button</h3>
-              <p>Removes the Addons button from the Stremio UI for all profiles</p>
-            </div>
-            <div className="setting-control">
-              <div className="toggle" id="hideAddonsButtonToggle"></div>
-            </div>
-          </div>
-
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Hide Cinemeta Content</h3>
-              <p>Removes rows from the Stremio home/discover screens that originate from Cinemeta.</p>
-            </div>
-            <div className="setting-control">
-              <div className="toggle" id="hideCinemetaContentToggle"></div>
-            </div>
-          </div>
-
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Enable Downloads Manager</h3>
-              <p>Shows a download button for each stream and a downloads panel within Stremio (requires page refresh after changing).</p>
-            </div>
-            <div className="setting-control">
-              <div className="toggle" id="downloadsManagerEnabledToggle"></div>
-            </div>
-          </div>
-
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>TMDB API Key</h3>
-              <p>Required for NSFW filter functionality. Get your free key from <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>TMDB</a>. When set, enables NSFW content filtering in profiles.</p>
-            </div>
-            <div className="setting-control">
-              <Input
-                type="password"
-                id="tmdbApiKeyInput"
-                placeholder="Enter TMDB API key"
-                autoComplete="new-password"
-                name="tmdb_api_key_field"
-                style={{
-                  width: '300px',
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  background: 'rgba(255,255,255,0.1)',
-                  color: 'var(--text, white)',
-                  fontSize: '14px',
-                  transition: 'all 0.3s ease'
-                }}
-              />
-            </div>
-          </div>
-        </div>
- 
-        {/* Appearance (local-only theme selection) */}
-        <div className="settings-section">
-          <h2 className="section-title">Appearance</h2>
-
-          <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 16 }}>
-            <div className="setting-info">
-              <h3>Theme</h3>
-              <p>Choose a subtle, modern theme for button colors, accents and the background. Use previews to pick a look; selection is stored locally on this device.</p>
+              <div className="setting-control" style={{ width: '100%' }}>
+                <div id="themeGallery" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {/* Previews will be rendered by client JS */}
+                </div>
+              </div>
             </div>
 
-            <div className="setting-control" style={{ width: '100%' }}>
-              <div id="themeGallery" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {/* Previews will be rendered by client JS */}
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Background Style</h3>
+                <p>Choose between the animated Vanta background or the official Stremio background.</p>
+              </div>
+              <div className="setting-control">
+                <select id="backgroundStyleSelect" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
+                  <option value="vanta">Animated (Vanta)</option>
+                  <option value="stremio">Stremio Official</option>
+                  <option value="none">Fade (Gradient)</option>
+                  <option value="solid">Solid Color</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Sync background to Stremio</h3>
+                <p>Apply the same animated background to the Stremio interface (requires refresh)</p>
+              </div>
+              <div className="setting-control">
+                <div className="toggle" id="vantaSyncToggle"></div>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Enable animated background</h3>
-              <p>Toggle the animated Vanta background effect on/off</p>
+        {/* Plugins Tab */}
+        <div id="tab-plugins" className="tab-content">
+          <div className="settings-card">
+            <h2 className="section-title">Plugins</h2>
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Enable Addon Manager</h3>
+                <p>Adds an "Edit Order" button to the Stremio addons page to allow reordering and removing addons.</p>
+              </div>
+              <div className="setting-control">
+                <div className="toggle" id="addonManagerEnabledToggle"></div>
+              </div>
             </div>
-            <div className="setting-control">
-              <div className="toggle" id="vantaToggle"></div>
+  
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Hide Calendar Button</h3>
+                <p>Removes the Calendar button from the Stremio UI for all profiles</p>
+              </div>
+              <div className="setting-control">
+                <div className="toggle" id="hideCalendarButtonToggle"></div>
+              </div>
             </div>
-          </div>
+  
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Hide Addons Button</h3>
+                <p>Removes the Addons button from the Stremio UI for all profiles</p>
+              </div>
+              <div className="setting-control">
+                <div className="toggle" id="hideAddonsButtonToggle"></div>
+              </div>
+            </div>
 
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Sync background to Stremio</h3>
-              <p>Apply the same animated background to the Stremio interface (requires refresh)</p>
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Hide Cinemeta Content</h3>
+                <p>Removes rows from the Stremio home/discover screens that originate from Cinemeta.</p>
+              </div>
+              <div className="setting-control">
+                <div className="toggle" id="hideCinemetaContentToggle"></div>
+              </div>
             </div>
-            <div className="setting-control">
-              <div className="toggle" id="vantaSyncToggle"></div>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Enable Downloads Manager</h3>
+                <p>Shows a download button for each stream and a downloads panel within Stremio (requires page refresh after changing).</p>
+              </div>
+              <div className="setting-control">
+                <div className="toggle" id="downloadsManagerEnabledToggle"></div>
+              </div>
+            </div>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>TMDB API Key</h3>
+                <p>Required for NSFW filter functionality. Get your free key from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>TMDB</a>. When set, enables NSFW content filtering in profiles.</p>
+              </div>
+              <div className="setting-control">
+                <div style={{ width: '300px' }}>
+                  <Input
+                    type="password"
+                    id="tmdbApiKeyInput"
+                    placeholder="Enter TMDB API key"
+                    autoComplete="new-password"
+                    name="tmdb_api_key_field"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(255,255,255,0.1)',
+                      color: 'var(--text, white)',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease'
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-
-        {/* Danger Zone */}
-        <div className="danger-zone">
-          <h3>Danger Zone</h3>
-          <div className="setting-item">
-            <div className="setting-info">
-              <h3>Delete Account</h3>
-              <p>Permanently delete your account and all data</p>
-            </div>
-            <div className="setting-control">
-              <Button variant="danger" id="deleteAccountBtn">
-                Delete Account
-              </Button>
+        {/* Danger Zone Tab */}
+        <div id="tab-danger" className="tab-content">
+          <div className="settings-card danger-zone" style={{ border: '1px solid #dc3545' }}>
+            <h3 style={{ color: '#dc3545', marginBottom: '15px' }}>Danger Zone</h3>
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Delete Account</h3>
+                <p>Permanently delete your account and all data</p>
+              </div>
+              <div className="setting-control">
+                <Button variant="danger" id="deleteAccountBtn">
+                  Delete Account
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -395,6 +433,78 @@ export function SettingsPage({}: SettingsPageProps) {
         </FormGroup>
       </ModalWithFooter>
 
+      {/* Custom Theme Editor Modal */}
+      <ModalWithFooter
+        id="customThemeModal"
+        title="Edit Custom Theme"
+        footer={
+          <>
+            <Button variant="secondary" id="cancelCustomThemeBtn">
+              Cancel
+            </Button>
+            <Button variant="primary" id="saveCustomThemeBtn">
+              Save Theme
+            </Button>
+          </>
+        }
+      >
+        <div className="color-picker-row">
+            <label>Accent Color</label>
+            <div className="color-input-wrapper">
+                <span className="color-value" id="accentColorValue">#E50914</span>
+                <input type="color" id="accentColorInput" value="#E50914" />
+            </div>
+        </div>
+
+        <div className="color-picker-row">
+            <label>Background Highlight</label>
+            <div className="color-input-wrapper">
+                <span className="color-value" id="highlightColorValue">#2a2a2a</span>
+                <input type="color" id="highlightColorInput" value="#2a2a2a" />
+            </div>
+        </div>
+
+        <div className="color-picker-row">
+            <label>Background Midtone</label>
+            <div className="color-input-wrapper">
+                <span className="color-value" id="midtoneColorValue">#151515</span>
+                <input type="color" id="midtoneColorInput" value="#151515" />
+            </div>
+        </div>
+
+        <div className="color-picker-row">
+            <label>Background Lowlight</label>
+            <div className="color-input-wrapper">
+                <span className="color-value" id="lowlightColorValue">#070707</span>
+                <input type="color" id="lowlightColorInput" value="#070707" />
+            </div>
+        </div>
+
+        <div className="color-picker-row">
+            <label>Background Base</label>
+            <div className="color-input-wrapper">
+                <span className="color-value" id="baseColorValue">#000000</span>
+                <input type="color" id="baseColorInput" value="#000000" />
+            </div>
+        </div>
+
+        <div className="range-slider-container">
+            <div className="range-slider-header">
+                <span className="range-slider-label">Animation Speed</span>
+                <span className="range-slider-value" id="speedValue">0.5</span>
+            </div>
+            <input type="range" id="speedInput" min="0.1" max="5.0" step="0.1" value="0.5" />
+        </div>
+
+        <div className="range-slider-container">
+            <div className="range-slider-header">
+                <span className="range-slider-label">Zoom Level</span>
+                <span className="range-slider-value" id="zoomValue">0.3</span>
+            </div>
+            <input type="range" id="zoomInput" min="0.1" max="3.0" step="0.1" value="0.3" />
+        </div>
+      </ModalWithFooter>
+
       {/* Settings wiring script */}
       <script
         dangerouslySetInnerHTML={{
@@ -534,14 +644,21 @@ export function SettingsPage({}: SettingsPageProps) {
         return;
       }
 
+      let data = null;
+      try { data = await res.json(); } catch(_){}
+
       if (res.ok) {
+        if (data && data.type === 'link') {
+            closeModal('emailModal');
+            window.addToast('success', 'Verification link sent', 'Please check your email to complete the process.');
+            return;
+        }
         openOtpModalFor(newEmail);
         startResendCooldown(30);
         return;
       }
 
-      let code = '';
-      try { const j = await res.json(); code = j?.error?.code || ''; } catch(_){}
+      let code = data?.error?.code || '';
 
       if (res.status === 409 || code === 'EMAIL_IN_USE') {
         window.addToast('error', 'Email already in use');
@@ -726,6 +843,140 @@ export function SettingsPage({}: SettingsPageProps) {
   function wire() {
     // Prefill current email
     fetchProfileEmail();
+    
+    // Load linked accounts and providers
+    Promise.all([
+        fetch('/api/user/accounts').then(r => r.json()),
+        fetch('/api/auth/providers').then(r => r.json())
+    ]).then(([accountsRes, providers]) => {
+        const list = document.getElementById('linkedAccountsList');
+        if (!list) return;
+        list.innerHTML = '';
+        
+        const accounts = accountsRes.data || accountsRes || [];
+        const linkedProviders = new Set(accounts.map(a => a.providerId));
+        
+        // Render linked accounts
+        if (accounts.length > 0) {
+            accounts.forEach(acc => {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.justifyContent = 'space-between';
+                row.style.alignItems = 'center';
+                row.style.padding = '10px';
+                row.style.background = 'rgba(255,255,255,0.05)';
+                row.style.borderRadius = '4px';
+                
+                const info = document.createElement('div');
+                info.innerHTML = '<strong>' + acc.providerId + '</strong> <span style="color: #666; font-size: 12px; margin-left: 8px;">Added ' + new Date(acc.createdAt).toLocaleDateString() + '</span>';
+                
+                const actions = document.createElement('div');
+                const unlinkBtn = document.createElement('button');
+                unlinkBtn.className = 'btn btn-danger btn-sm'; // Assuming classes or style
+                unlinkBtn.style.padding = '4px 8px';
+                unlinkBtn.style.background = 'transparent';
+                unlinkBtn.style.border = '1px solid #dc3545';
+                unlinkBtn.style.color = '#dc3545';
+                unlinkBtn.style.borderRadius = '4px';
+                unlinkBtn.style.cursor = 'pointer';
+                unlinkBtn.style.fontSize = '12px';
+                unlinkBtn.textContent = 'Unlink';
+                unlinkBtn.onclick = async () => {
+                    if (!confirm('Are you sure you want to unlink ' + acc.providerId + '?')) return;
+                    try {
+                        const res = await fetch('/api/auth/unlink', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ providerId: acc.providerId })
+                        });
+                        if (res.ok) {
+                            window.addToast('success', 'Account unlinked');
+                            setTimeout(() => window.location.reload(), 1000);
+                        } else {
+                            const data = await res.json();
+                            window.addToast('error', data.message || 'Failed to unlink account');
+                        }
+                    } catch (e) {
+                        window.addToast('error', 'Network error');
+                    }
+                };
+                actions.appendChild(unlinkBtn);
+
+                row.appendChild(info);
+                row.appendChild(actions);
+                list.appendChild(row);
+            });
+        } else {
+            const empty = document.createElement('div');
+            empty.style.color = '#999';
+            empty.style.fontStyle = 'italic';
+            empty.style.marginBottom = '10px';
+            empty.textContent = 'No linked accounts';
+            list.appendChild(empty);
+        }
+
+        // Render available providers to connect
+        const available = [];
+        if (providers.google && !linkedProviders.has('google')) available.push({ id: 'google', name: 'Google' });
+        if (providers.github && !linkedProviders.has('github')) available.push({ id: 'github', name: 'GitHub' });
+        if (providers.discord && !linkedProviders.has('discord')) available.push({ id: 'discord', name: 'Discord' });
+        if (providers.oidc && !linkedProviders.has('oidc')) available.push({ id: 'oidc', name: providers.oidcName || 'OpenID' });
+
+        if (available.length > 0) {
+            const connectHeader = document.createElement('div');
+            connectHeader.style.marginTop = '15px';
+            connectHeader.style.marginBottom = '10px';
+            connectHeader.style.fontWeight = 'bold';
+            connectHeader.style.color = '#b3b3b3';
+            connectHeader.style.fontSize = '14px';
+            connectHeader.textContent = 'Connect another account:';
+            list.appendChild(connectHeader);
+
+            const btnContainer = document.createElement('div');
+            btnContainer.style.display = 'flex';
+            btnContainer.style.gap = '10px';
+            btnContainer.style.flexWrap = 'wrap';
+
+            available.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-secondary'; // Assuming these classes exist or style manually
+                btn.style.padding = '8px 12px';
+                btn.style.background = '#333';
+                btn.style.color = 'white';
+                btn.style.border = 'none';
+                btn.style.borderRadius = '4px';
+                btn.style.cursor = 'pointer';
+                btn.textContent = 'Connect ' + p.name;
+                btn.onclick = async () => {
+                    try {
+                        const res = await fetch('/api/auth/link-social', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                provider: p.id,
+                                callbackURL: '/settings'
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.url) {
+                            window.location.href = data.url;
+                        } else if (data.redirect) {
+                             window.location.href = data.redirect;
+                        } else {
+                            window.addToast('error', 'Failed to initiate linking');
+                        }
+                    } catch (e) {
+                        window.addToast('error', 'Network error');
+                    }
+                };
+                btnContainer.appendChild(btn);
+            });
+            list.appendChild(btnContainer);
+        }
+    }).catch(e => {
+        const list = document.getElementById('linkedAccountsList');
+        if (list) list.innerHTML = '<div style="color: #d33;">Failed to load accounts</div>';
+    });
 
     // Email modal
     const btnEmailOpen = document.getElementById('openEmailModalBtn');
@@ -799,44 +1050,47 @@ export function SettingsPage({}: SettingsPageProps) {
 
         .container {
           max-width: 800px;
-          margin: 120px auto 60px;
+          margin: 100px auto 60px;
           padding: 0 20px;
         }
 
-        .page-title {
-          font-size: 48px;
-          margin-bottom: 40px;
-          font-weight: bold;
-        }
-
         .back-btn {
+          position: fixed;
+          top: 40px;
+          left: 40px;
+          z-index: 100;
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 10px 16px;
-          background: var(--btn-secondary-bg, #333);
+          gap: 10px;
+          padding: 12px 24px;
+          background: rgba(20, 20, 20, 0.8);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           color: var(--text, white);
-          border: none;
-          border-radius: 4px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 100px;
           cursor: pointer;
-          font-size: 14px;
-          transition: all 0.3s;
+          font-size: 15px;
+          font-weight: 500;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           text-decoration: none;
-          margin-bottom: 20px;
-          width: fit-content;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
         }
 
         .back-btn:hover {
-          background: rgba(255,255,255,0.04);
-          color: var(--accent, #e50914);
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.2);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+          color: white;
         }
 
         .back-btn svg {
-          transition: transform 0.3s;
+          transition: transform 0.3s ease;
         }
 
         .back-btn:hover svg {
-          transform: translateX(-2px);
+          transform: translateX(-4px);
         }
 
         .settings-section {
@@ -1015,12 +1269,15 @@ export function SettingsPage({}: SettingsPageProps) {
         }
 
         @media (max-width: 768px) {
-          .container {
-            margin-top: 60px;
+          .back-btn {
+            top: 20px;
+            left: 20px;
+            padding: 10px 16px;
+            font-size: 14px;
           }
 
-          .page-title {
-            font-size: 32px;
+          .container {
+            margin-top: 80px;
           }
 
           .setting-item {
@@ -1052,6 +1309,7 @@ export function SettingsPage({}: SettingsPageProps) {
       {/* Vanta.js and Three.js */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+      <script src="/static/js/background-manager.js"></script>
       <script src="/static/js/settings.js"></script>
     </SimpleLayout>
   )

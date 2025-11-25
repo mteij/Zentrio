@@ -180,7 +180,12 @@
             </div>
             <div class="form-group">
               <label for="loginPassword">Password</label>
-              <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter your password" />
+              <div class="password-input-container" style="position: relative; width: 100%;">
+                <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter your password" style="padding-right: 40px;" />
+                <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; color: #b3b3b3; z-index: 2;">
+                  <span class="iconify" data-icon="mdi:eye" data-inline="false" style="font-size: 20px;"></span>
+                </button>
+              </div>
             </div>
             <div class="form-group remember-row">
               <label class="remember-checkbox" for="rememberMe">
@@ -215,6 +220,24 @@
           rememberEl.checked = getRememberPref();
           rememberEl.addEventListener('change', () => setRememberPref(rememberEl.checked));
         }
+
+        // Password toggle handler
+        const toggleBtns = document.querySelectorAll('.password-toggle-btn');
+        toggleBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.currentTarget;
+                const input = button.previousElementSibling;
+                const icon = button.querySelector('.iconify');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    if (icon) icon.setAttribute('data-icon', 'mdi:eye-off');
+                } else {
+                    input.type = 'password';
+                    if (icon) icon.setAttribute('data-icon', 'mdi:eye');
+                }
+            });
+        });
 
         // Back to email step
         backBtn?.addEventListener('click', () => {
@@ -571,7 +594,12 @@
             </div>
             <div class="form-group">
               <label for="regPassword">Password</label>
-              <input id="regPassword" type="password" placeholder="Enter your password" minlength="8" autocomplete="new-password" />
+              <div class="password-input-container" style="position: relative; width: 100%;">
+                <input id="regPassword" type="password" placeholder="Enter your password" minlength="8" autocomplete="new-password" style="padding-right: 40px;" />
+                <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; color: #b3b3b3; z-index: 2;">
+                  <span class="iconify" data-icon="mdi:eye" data-inline="false" style="font-size: 20px;"></span>
+                </button>
+              </div>
             </div>
             <div class="form-group remember-row">
               <label class="remember-checkbox" for="rememberMe">
@@ -603,6 +631,24 @@
             rememberEl.checked = getRememberPref();
             rememberEl.addEventListener('change', () => setRememberPref(rememberEl.checked));
         }
+
+        // Password toggle handler
+        const toggleBtns = document.querySelectorAll('.password-toggle-btn');
+        toggleBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.currentTarget;
+                const input = button.previousElementSibling;
+                const icon = button.querySelector('.iconify');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    if (icon) icon.setAttribute('data-icon', 'mdi:eye-off');
+                } else {
+                    input.type = 'password';
+                    if (icon) icon.setAttribute('data-icon', 'mdi:eye');
+                }
+            });
+        });
 
         usernameInput.focus();
 

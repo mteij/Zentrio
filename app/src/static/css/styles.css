@@ -22,9 +22,16 @@
 
 body {
     font-family: 'Helvetica Neue', Arial, sans-serif;
-    background: var(--bg, #141414);
+    background: var(--bg, #141414); /* Ensure dark background immediately */
     color: var(--text);
     min-height: 100vh;
+    /* Prevent white flash during rendering/transitions */
+    background-color: #141414;
+}
+
+/* Ensure html also has dark background to cover overscroll/loading areas */
+html {
+    background-color: #141414;
 }
 
 /* Header Styles */
@@ -440,13 +447,17 @@ input[type="range"]:active::-moz-range-thumb {
 }
 
 .modal-content {
-    background-color: #222;
+    background: rgba(20, 20, 20, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     margin: 5% auto;
     padding: 40px;
-    border-radius: 8px;
+    border-radius: 16px;
     width: 90%;
     max-width: 500px;
     position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 .close {
@@ -1364,4 +1375,223 @@ input[type="range"]:active::-moz-range-thumb {
     .email-form .cta-button {
         width: 100%;
     }
+}
+
+/* Settings Tabs */
+.settings-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0;
+    overflow-x: auto;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;  /* IE 10+ */
+}
+
+.settings-tabs::-webkit-scrollbar {
+    display: none; /* Chrome/Safari/Webkit */
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted, #b3b3b3);
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.tab-btn:hover {
+    color: var(--text, white);
+}
+
+.tab-btn.active {
+    color: var(--accent, #e50914);
+}
+
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--accent, #e50914);
+    box-shadow: 0 -2px 10px rgba(229, 9, 20, 0.5);
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Modern Card Style for Settings */
+.settings-card {
+    background: rgba(20, 20, 20, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 30px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.settings-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.settings-section {
+    background: transparent;
+    padding: 0;
+    margin-bottom: 0;
+    border-radius: 0;
+}
+
+.setting-item {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 25px 0;
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+/* Custom Theme Editor */
+.custom-theme-editor {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.color-picker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.color-picker-row label {
+    color: var(--muted, #b3b3b3);
+    font-size: 14px;
+}
+
+.color-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.color-input-wrapper input[type="color"] {
+    -webkit-appearance: none;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+    background: none;
+}
+
+.color-input-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-input-wrapper input[type="color"]::-webkit-color-swatch {
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+}
+
+.color-value {
+    font-family: monospace;
+    color: var(--text, white);
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.range-slider-container {
+    margin-bottom: 20px;
+}
+
+.range-slider-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.range-slider-label {
+    color: var(--muted, #b3b3b3);
+    font-size: 14px;
+}
+
+.range-slider-value {
+    color: var(--accent, #e50914);
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* Smooth Modal Transitions */
+.modal {
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+/* .modal-content styles are consolidated above to avoid duplication */
+
+.modal.active .modal-content {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+}
+
+/* Edit Theme Button */
+.edit-theme-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text, white);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+}
+
+.edit-theme-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--text, white);
+}
+
+.theme-tile-wrapper {
+    position: relative;
+}
+
+.theme-tile-actions {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    display: none;
+}
+
+.theme-tile-wrapper:hover .theme-tile-actions {
+    display: block;
 }

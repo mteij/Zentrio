@@ -25,6 +25,24 @@
     }
 
     if (form) {
+        // Initialize password toggles
+        const toggleBtns = document.querySelectorAll('.password-toggle-btn');
+        toggleBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.currentTarget;
+                const input = button.previousElementSibling;
+                const icon = button.querySelector('.iconify');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    if (icon) icon.setAttribute('data-icon', 'mdi:eye-off');
+                } else {
+                    input.type = 'password';
+                    if (icon) icon.setAttribute('data-icon', 'mdi:eye');
+                }
+            });
+        });
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             

@@ -118,7 +118,25 @@ function renderProfiles() {
 // Load avatar from server
 async function loadAvatar(seed, containerId) {
     try {
-        const response = await fetch(`/api/avatar/${encodeURIComponent(seed)}`);
+        // Get current theme colors to pass to avatar generator
+        let colors = '';
+        try {
+            const themeData = localStorage.getItem('zentrioThemeData');
+            if (themeData) {
+                const theme = JSON.parse(themeData);
+                // Create a palette from theme colors
+                const palette = [
+                    theme.accent || '#e50914',
+                    theme.vanta?.highlight || '#222222',
+                    theme.vanta?.midtone || '#111111',
+                    theme.vanta?.base || '#000000',
+                    theme.text || '#ffffff'
+                ];
+                colors = `?colors=${palette.map(c => encodeURIComponent(c)).join(',')}`;
+            }
+        } catch (e) {}
+
+        const response = await fetch(`/api/avatar/${encodeURIComponent(seed)}${colors}`);
         if (response.ok) {
             const svg = await response.text();
             document.getElementById(containerId).innerHTML = svg;
@@ -143,6 +161,7 @@ function createProfile() {
 
     generateNewAvatar();
     profileModal.style.display = 'block';
+    initPasswordToggles();
 }
 
 // Edit existing profile
@@ -175,6 +194,31 @@ function editProfile(profileId) {
     if (deleteProfileBtn) deleteProfileBtn.style.display = 'inline-flex';
 
     profileModal.style.display = 'block';
+    initPasswordToggles();
+}
+
+// Initialize password toggles
+function initPasswordToggles() {
+    const toggleBtns = profileModal.querySelectorAll('.password-toggle-btn');
+    toggleBtns.forEach(btn => {
+        // Remove old listeners to prevent duplicates
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.addEventListener('click', (e) => {
+            const button = e.currentTarget;
+            const input = button.previousElementSibling;
+            const icon = button.querySelector('.iconify');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                if (icon) icon.setAttribute('data-icon', 'mdi:eye-off');
+            } else {
+                input.type = 'password';
+                if (icon) icon.setAttribute('data-icon', 'mdi:eye');
+            }
+        });
+    });
 }
 
 // Delete profile (enhanced with better error handling)
@@ -219,7 +263,24 @@ async function updateAvatarPreview(seed = null) {
     const avatarSeed = seed || currentAvatarSeed || profileName || 'default';
     
     try {
-        const response = await fetch(`/api/avatar/${encodeURIComponent(avatarSeed)}`);
+        // Get current theme colors
+        let colors = '';
+        try {
+            const themeData = localStorage.getItem('zentrioThemeData');
+            if (themeData) {
+                const theme = JSON.parse(themeData);
+                const palette = [
+                    theme.accent || '#e50914',
+                    theme.vanta?.highlight || '#222222',
+                    theme.vanta?.midtone || '#111111',
+                    theme.vanta?.base || '#000000',
+                    theme.text || '#ffffff'
+                ];
+                colors = `?colors=${palette.map(c => encodeURIComponent(c)).join(',')}`;
+            }
+        } catch (e) {}
+
+        const response = await fetch(`/api/avatar/${encodeURIComponent(avatarSeed)}${colors}`);
         if (response.ok) {
             const svg = await response.text();
             avatarPreview.innerHTML = svg;
@@ -233,7 +294,24 @@ async function updateAvatarPreview(seed = null) {
 // Generate new random avatar
 async function generateNewAvatar() {
     try {
-        const response = await fetch('/api/avatar/random');
+        // Get current theme colors
+        let colors = '';
+        try {
+            const themeData = localStorage.getItem('zentrioThemeData');
+            if (themeData) {
+                const theme = JSON.parse(themeData);
+                const palette = [
+                    theme.accent || '#e50914',
+                    theme.vanta?.highlight || '#222222',
+                    theme.vanta?.midtone || '#111111',
+                    theme.vanta?.base || '#000000',
+                    theme.text || '#ffffff'
+                ];
+                colors = `?colors=${palette.map(c => encodeURIComponent(c)).join(',')}`;
+            }
+        } catch (e) {}
+
+        const response = await fetch(`/api/avatar/random${colors}`);
         if (response.ok) {
             const data = await response.json();
             currentAvatarSeed = data.seed;
@@ -326,7 +404,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (shuffleBtn) {
         shuffleBtn.addEventListener('click', async () => {
             try {
-                const response = await fetch('/api/avatar/random');
+                // Get current theme colors
+                let colors = '';
+                try {
+                    const themeData = localStorage.getItem('zentrioThemeData');
+                    if (themeData) {
+                        const theme = JSON.parse(themeData);
+                        const palette = [
+                            theme.accent || '#e50914',
+                            theme.vanta?.highlight || '#222222',
+                            theme.vanta?.midtone || '#111111',
+                            theme.vanta?.base || '#000000',
+                            theme.text || '#ffffff'
+                        ];
+                        colors = `?colors=${palette.map(c => encodeURIComponent(c)).join(',')}`;
+                    }
+                } catch (e) {}
+
+                const response = await fetch(`/api/avatar/random${colors}`);
                 if (response.ok) {
                     const data = await response.json();
                     currentAvatarSeed = data.seed;
@@ -456,6 +551,12 @@ function updateEditModeUI() {
             button.style.display = editMode ? 'none' : 'inline-flex';
         });
 
+        // Explicitly hide downloads button in edit mode
+        const downloadsBtn = document.getElementById('downloadsBtn');
+        if (downloadsBtn) {
+            downloadsBtn.style.display = editMode ? 'none' : 'inline-flex';
+        }
+
         // Show/hide the create profile button when toggling edit mode
         if (createProfileBtn) {
             // Only show Add Profile button while in edit mode
@@ -485,12 +586,6 @@ function updateEditModeUI() {
 // Initialize Vanta background (load themes from server and respect local preferences)
 (function initVantaExternal() {
     async function startVanta() {
-        const el = document.getElementById('vanta-bg');
-        if (!(window.VANTA && window.VANTA.FOG && el)) {
-            setTimeout(startVanta, 300);
-            return;
-        }
-
         try {
             // Load server-provided themes (if available)
             let themes = [];
@@ -503,8 +598,20 @@ function updateEditModeUI() {
             window.__loadedThemes = themes;
     
             // Determine selected theme id (prefer localStorage)
-            const storedThemeId = (function () { try { return localStorage.getItem('zentrioTheme') || (themes[0] && themes[0].id) || null; } catch (e) { return null; } })();
-            const selectedTheme = (themes && themes.length > 0) ? (themes.find(t => t.id === storedThemeId) || themes[0]) : null;
+            let storedThemeId = (function () { try { return localStorage.getItem('zentrioTheme') || (themes[0] && themes[0].id) || null; } catch (e) { return null; } })();
+            
+            // Check for custom theme
+            let selectedTheme = null;
+            if (storedThemeId === 'custom') {
+                try {
+                    const customData = localStorage.getItem('zentrioCustomTheme');
+                    if (customData) selectedTheme = JSON.parse(customData);
+                } catch(e) {}
+            }
+            
+            if (!selectedTheme && themes && themes.length > 0) {
+                selectedTheme = themes.find(t => t.id === storedThemeId) || themes[0];
+            }
     
             // Apply selected theme CSS variables so buttons, text and other components pick up colors
             if (selectedTheme) {
@@ -525,47 +632,11 @@ function updateEditModeUI() {
                     }
                 } catch (e) { /* silent */ }
             }
-    
-            const vantaColors = (selectedTheme && selectedTheme.vanta) ? selectedTheme.vanta : { highlight: '#222222', midtone: '#111111', lowlight: '#000000', base: '#000000' };
 
-            // Respect user's Vanta (animated background) preference
-            const vantaPref = (function () { try { return localStorage.getItem('zentrioVanta'); } catch (e) { return null; } })();
-            const vantaEnabled = (vantaPref === null) ? true : (vantaPref === 'true');
-
-            if (!vantaEnabled) {
-                if (window.__vantaProfilesInstance) {
-                    try { window.__vantaProfilesInstance.destroy(); } catch (e) {}
-                    window.__vantaProfilesInstance = null;
-                }
-                const bg = `linear-gradient(180deg, ${vantaColors.midtone} 0%, ${vantaColors.base} 100%)`;
-                el.style.background = bg;
-                const canv = el.querySelector('canvas');
-                if (canv) canv.remove();
-                return;
+            // Use shared background manager
+            if (window.ZentrioBackground) {
+                window.ZentrioBackground.apply();
             }
-
-            // destroy previous instance if exists to apply new colors
-            if (window.__vantaProfilesInstance) {
-                try { window.__vantaProfilesInstance.destroy(); } catch (e) {}
-                window.__vantaProfilesInstance = null;
-            }
-
-            function hexToInt(hex) { return parseInt((hex || '#000000').replace('#', ''), 16); }
-
-            window.__vantaProfilesInstance = window.VANTA.FOG({
-                el: "#vanta-bg",
-                mouseControls: false,
-                touchControls: false,
-                minHeight: 200.00,
-                minWidth: 200.00,
-                highlightColor: hexToInt(vantaColors.highlight),
-                midtoneColor: hexToInt(vantaColors.midtone),
-                lowlightColor: hexToInt(vantaColors.lowlight),
-                baseColor: hexToInt(vantaColors.base),
-                blurFactor: 0.90,
-                speed: 0.50,
-                zoom: 0.30
-            });
         } catch (e) {
             console.error('Vanta init failed', e);
         }

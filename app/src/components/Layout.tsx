@@ -8,6 +8,7 @@ interface LayoutProps {
   showHeader?: boolean
   showFooter?: boolean
   additionalCSS?: string[]
+  disableThemeSync?: boolean
 }
 
 interface PageHeaderProps {
@@ -27,7 +28,8 @@ export function Layout({
   className = '',
   showHeader = true,
   showFooter = true,
-  additionalCSS = []
+  additionalCSS = [],
+  disableThemeSync = false
 }: LayoutProps) {
   return (
     <html lang="en">
@@ -35,7 +37,9 @@ export function Layout({
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title} - Zentrio</title>
-        <script dangerouslySetInnerHTML={{__html: `(function(){try{var d=localStorage.getItem('zentrioThemeData');if(!d)return;var t=JSON.parse(d),doc=document.documentElement;var set=function(k,v){if(v)doc.style.setProperty(k,v)};set('--accent',t.accent);set('--btn-primary-bg',t.btnPrimary||t.accent);set('--btn-primary-bg-hover',t.btnPrimaryHover||t.btnPrimary||t.accent);set('--btn-secondary-bg',t.btnSecondary||t.accent);}catch(e){}})();`}} />
+        {!disableThemeSync && (
+          <script dangerouslySetInnerHTML={{__html: `(function(){try{var d=localStorage.getItem('zentrioThemeData');if(!d)return;var t=JSON.parse(d),doc=document.documentElement;var set=function(k,v){if(v)doc.style.setProperty(k,v)};set('--accent',t.accent);set('--btn-primary-bg',t.btnPrimary||t.accent);set('--btn-primary-bg-hover',t.btnPrimaryHover||t.btnPrimary||t.accent);set('--btn-secondary-bg',t.btnSecondary||t.accent);}catch(e){}})();`}} />
+        )}
         <link rel="stylesheet" href="/static/css/styles.css" />
         <link rel="stylesheet" href="/static/css/toast.css" />
         {additionalCSS.map(css => <link rel="stylesheet" href={css} />)}
@@ -46,6 +50,7 @@ export function Layout({
         <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
         <script src="https://unpkg.com/lucide@latest"></script>
+        <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
         <script src="/static/js/mobile-session-handler.js"></script>
         <script src="/static/js/downloads-core.js"></script>
         <script src="/static/js/spa-navigation.js"></script>
@@ -82,14 +87,16 @@ export function PageFooter({ children, className = '' }: PageFooterProps) {
   )
 }
 
-export function SimpleLayout({ title, children, className = '', additionalCSS = [] }: Omit<LayoutProps, 'showHeader' | 'showFooter'>) {
+export function SimpleLayout({ title, children, className = '', additionalCSS = [], disableThemeSync = false }: Omit<LayoutProps, 'showHeader' | 'showFooter'>) {
   return (
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title} - Zentrio</title>
-        <script dangerouslySetInnerHTML={{__html: `(function(){try{var d=localStorage.getItem('zentrioThemeData');if(!d)return;var t=JSON.parse(d),doc=document.documentElement;var set=function(k,v){if(v)doc.style.setProperty(k,v)};set('--accent',t.accent);set('--btn-primary-bg',t.btnPrimary||t.accent);set('--btn-primary-bg-hover',t.btnPrimaryHover||t.btnPrimary||t.accent);set('--btn-secondary-bg',t.btnSecondary||t.accent);}catch(e){}})();`}} />
+        {!disableThemeSync && (
+          <script dangerouslySetInnerHTML={{__html: `(function(){try{var d=localStorage.getItem('zentrioThemeData');if(!d)return;var t=JSON.parse(d),doc=document.documentElement;var set=function(k,v){if(v)doc.style.setProperty(k,v)};set('--accent',t.accent);set('--btn-primary-bg',t.btnPrimary||t.accent);set('--btn-primary-bg-hover',t.btnPrimaryHover||t.btnPrimary||t.accent);set('--btn-secondary-bg',t.btnSecondary||t.accent);}catch(e){}})();`}} />
+        )}
         <link rel="stylesheet" href="/static/css/styles.css" />
         <link rel="stylesheet" href="/static/css/toast.css" />
         {additionalCSS.map(css => <link rel="stylesheet" href={css} />)}
@@ -100,6 +107,7 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <link rel="icon" href="/static/logo/favicon/favicon.ico" />
         <meta name="theme-color" content="#141414" />
         <script src="https://unpkg.com/lucide@latest"></script>
+        <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
         <script src="/static/js/mobile-session-handler.js"></script>
         <script src="/static/js/downloads-core.js"></script>
         <script src="/static/js/spa-navigation.js"></script>

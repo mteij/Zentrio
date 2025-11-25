@@ -4,7 +4,7 @@ interface LandingPageProps {}
 
 export function LandingPage({}: LandingPageProps) {
   return (
-    <SimpleLayout title="Stream Your Way">
+    <SimpleLayout title="Stream Your Way" disableThemeSync={true}>
       <div id="vanta-bg"></div>
       
       <main className="main-content">
@@ -63,9 +63,6 @@ export function LandingPage({}: LandingPageProps) {
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
       
-      {/* Iconify Script */}
-      <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
-
       <script
         dangerouslySetInnerHTML={{
           __html: `

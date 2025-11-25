@@ -131,6 +131,17 @@
       if (userObj) {
         try { localStorage.setItem('user', JSON.stringify(userObj)); } catch(_) {}
       }
+
+      // Restore Zentrio background settings
+      if (session && session.zentrio) {
+        try {
+          if (session.zentrio.enableVanta) localStorage.setItem('zentrio_enable_vanta_bg', session.zentrio.enableVanta);
+          if (session.zentrio.backgroundStyle) localStorage.setItem('zentrioBackgroundStyle', session.zentrio.backgroundStyle);
+          if (session.zentrio.theme) localStorage.setItem('zentrioTheme', session.zentrio.theme);
+          if (session.zentrio.themeData) localStorage.setItem('zentrioThemeData', session.zentrio.themeData);
+          if (session.zentrio.customTheme) localStorage.setItem('zentrioCustomTheme', session.zentrio.customTheme);
+        } catch(_) {}
+      }
     } catch (e) {
       console.warn('Zentrio session minimal bootstrap failed', e);
     }

@@ -76,8 +76,11 @@
       '}' +
       '.modal-container {' +
         'position: relative;' +
-        'background: #1f2937;' +
-        'border-radius: 8px;' +
+        'background: rgba(20, 20, 20, 0.85);' +
+        'backdrop-filter: blur(16px);' +
+        '-webkit-backdrop-filter: blur(16px);' +
+        'border: 1px solid rgba(255, 255, 255, 0.1);' +
+        'border-radius: 16px;' +
         'box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);' +
         'width: 100%;' +
         'max-width: 56rem;' +
@@ -88,8 +91,9 @@
       '}' +
       '.modal-header {' +
         'padding: 24px;' +
-        'border-bottom: 1px solid #374151;' +
+        'border-bottom: 1px solid rgba(255, 255, 255, 0.1);' +
         'position: relative;' +
+        'background: rgba(255, 255, 255, 0.03);' +
       '}' +
       '.modal-header h2 {' +
         'font-size: 24px;' +
@@ -124,10 +128,11 @@
       '}' +
       '.modal-footer {' +
         'padding: 24px;' +
-        'border-top: 1px solid #374151;' +
+        'border-top: 1px solid rgba(255, 255, 255, 0.1);' +
         'display: flex;' +
         'justify-content: space-between;' +
         'align-items: center;' +
+        'background: rgba(255, 255, 255, 0.03);' +
       '}' +
       '.addon-count {' +
         'color: #9ca3af;' +
@@ -193,15 +198,16 @@
         'display: flex;' +
         'align-items: center;' +
         'padding: 16px;' +
-        'background: #1f2937;' +
-        'border: 1px solid #374151;' +
+        'background: rgba(255, 255, 255, 0.03);' +
+        'border: 1px solid rgba(255, 255, 255, 0.05);' +
         'border-radius: 8px;' +
         'margin-bottom: 8px;' +
         'cursor: move;' +
         'transition: all 0.2s;' +
       '}' +
       '.addon-item:hover {' +
-        'border-color: #6b7280;' +
+        'border-color: rgba(255, 255, 255, 0.2);' +
+        'background: rgba(255, 255, 255, 0.06);' +
       '}' +
       '.addon-item.dragging {' +
         'opacity: 0.5;' +
@@ -209,7 +215,7 @@
       '}' +
       '.addon-item.drag-over {' +
         'border-color: #dc2626;' +
-        'background: #374151;' +
+        'background: rgba(220, 38, 38, 0.1);' +
       '}' +
       '.drag-handle {' +
         'margin-right: 12px;' +
@@ -219,7 +225,7 @@
       '.addon-logo {' +
         'width: 48px;' +
         'height: 48px;' +
-        'background: #374151;' +
+        'background: rgba(255, 255, 255, 0.1);' +
         'border-radius: 8px;' +
         'margin-right: 16px;' +
         'flex-shrink: 0;' +

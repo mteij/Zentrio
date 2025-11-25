@@ -27,7 +27,8 @@ async function loadTmdbApiKey() {
     try {
         const response = await fetch('/api/user/tmdb-api-key');
         if (response.ok) {
-            const data = await response.json();
+            const payload = await response.json();
+            const data = payload.data || payload;
             tmdbApiKey = data.tmdb_api_key || '';
             const tmdbInput = document.getElementById('tmdbApiKeyInput');
             if (tmdbInput) {
@@ -120,12 +121,6 @@ function updateUI() {
         try { pref = localStorage.getItem('zentrioRememberMe') === 'true'; } catch (e) {}
         rememberToggle.classList.toggle('active', !!pref);
     }
-
-// Update TMDB API key input
-const tmdbInput = document.getElementById('tmdbApiKeyInput');
-if (tmdbInput) {
-    tmdbInput.value = tmdbApiKey || '';
-}
 }
 
 // Toggle setting
@@ -275,6 +270,31 @@ async function updateEmail() {
 // Password modal functions
 function togglePasswordForm() {
     openModal('passwordModal');
+    
+    // Initialize password toggles in the modal
+    const modal = document.getElementById('passwordModal');
+    if (modal) {
+        const toggleBtns = modal.querySelectorAll('.password-toggle-btn');
+        toggleBtns.forEach(btn => {
+            // Remove old listeners to prevent duplicates if opened multiple times
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            newBtn.addEventListener('click', (e) => {
+                const button = e.currentTarget;
+                const input = button.previousElementSibling;
+                const icon = button.querySelector('.iconify');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    if (icon) icon.setAttribute('data-icon', 'mdi:eye-off');
+                } else {
+                    input.type = 'password';
+                    if (icon) icon.setAttribute('data-icon', 'mdi:eye');
+                }
+            });
+        });
+    }
 }
 
 function closePasswordModal() {
@@ -396,65 +416,12 @@ function applyThemeObject(theme) {
         document.documentElement.style.setProperty('--vanta-base', theme.vanta.base);
     }
 
-    // Respect user's Vanta (animated background) preference
-    const vantaPref = (function () { try { return localStorage.getItem('zentrioVanta'); } catch (e) { return null; } })();
-    const vantaEnabled = (vantaPref === null) ? true : (vantaPref === 'true');
-
-    // If disabled, destroy any existing instance and set a subtle static background
-    if (!vantaEnabled) {
-        if (window.__vantaSettingsInstance) {
-            try { window.__vantaSettingsInstance.destroy(); } catch (e) {}
-            window.__vantaSettingsInstance = null;
-        }
-        const vEl = document.getElementById('vanta-bg');
-        if (vEl) {
-            const bg = (theme && theme.vanta)
-                ? `linear-gradient(180deg, ${theme.vanta.midtone} 0%, ${theme.vanta.base} 100%)`
-                : 'linear-gradient(180deg, rgba(0,0,0,0.8), rgba(0,0,0,0.95))';
-            vEl.style.background = bg;
-            // remove any canvas injected by Vanta
-            const canv = vEl.querySelector('canvas');
-            if (canv) canv.remove();
-        }
-        return;
-    }
-
-    // Re-init Vanta to pick up new colors
-    function initVanta() {
-        try {
-            if (!window.VANTA || !window.VANTA.FOG) return false;
-            if (window.__vantaSettingsInstance) {
-                try { window.__vantaSettingsInstance.destroy(); } catch (e) {}
-                window.__vantaSettingsInstance = null;
-            }
-    
-            const v = (theme.vanta || {});
-            const el = document.getElementById('vanta-bg');
-            if (el) el.style.background = 'transparent';
-    
-            window.__vantaSettingsInstance = window.VANTA.FOG({
-                el: "#vanta-bg",
-                mouseControls: false,
-                touchControls: false,
-                minHeight: 200.00,
-                minWidth: 200.00,
-                highlightColor: hexToInt(v.highlight || '#222222'),
-                midtoneColor: hexToInt(v.midtone || '#111111'),
-                lowlightColor: hexToInt(v.lowlight || '#000000'),
-                baseColor: hexToInt(v.base || '#000000'),
-                blurFactor: 0.90,
-                speed: 0.50,
-                zoom: 0.30
-            });
-            return true;
-        } catch (e) {
-            console.error('Vanta init failed', e);
-            return false;
-        }
-    }
-    
-    if (!initVanta()) {
-        setTimeout(initVanta, 300);
+    // Use shared background manager if available
+    if (window.ZentrioBackground) {
+        window.ZentrioBackground.apply();
+    } else {
+        // Fallback if manager not loaded yet (should be loaded via script tag in page)
+        // But for now we can just rely on the manager being present or loading soon
     }
 }
 
@@ -474,7 +441,36 @@ async function applyThemeById(themeId, themes) {
      gallery.innerHTML = '';
      if (selector) selector.innerHTML = '<option value="">Select theme...</option>';
   
-     themes.forEach(theme => {
+     // Add "Custom" theme option if not present
+     let allThemes = [...themes];
+     const customThemeData = localStorage.getItem('zentrioCustomTheme');
+     if (customThemeData) {
+         try {
+             const customTheme = JSON.parse(customThemeData);
+             // Check if custom theme is already in the list (by ID)
+             if (!allThemes.find(t => t.id === 'custom')) {
+                 allThemes.push(customTheme);
+             }
+         } catch (e) {
+             console.error('Failed to parse custom theme', e);
+         }
+     } else {
+         // Add a placeholder custom theme if none exists
+         if (!allThemes.find(t => t.id === 'custom')) {
+             allThemes.push({
+                 id: 'custom',
+                 name: 'Custom',
+                 accent: '#e50914',
+                 btnPrimary: '#e50914',
+                 btnPrimaryHover: '#f40612',
+                 text: '#ffffff',
+                 muted: '#b3b3b3',
+                 vanta: { highlight: '#222222', midtone: '#111111', lowlight: '#000000', base: '#000000', speed: 0.5, zoom: 0.3 }
+             });
+         }
+     }
+
+     allThemes.forEach(theme => {
          // add to selector (if present)
          if (selector) {
              const opt = document.createElement('option');
@@ -483,6 +479,11 @@ async function applyThemeById(themeId, themes) {
              selector.appendChild(opt);
          }
   
+         // Wrapper for tile and edit button
+         const wrapper = document.createElement('div');
+         wrapper.className = 'theme-tile-wrapper';
+         wrapper.style.position = 'relative';
+
          // preview tile
          const tile = document.createElement('button');
          tile.type = 'button';
@@ -540,6 +541,13 @@ async function applyThemeById(themeId, themes) {
              gallery.querySelectorAll('.theme-tile').forEach(t => t.style.outline = 'none');
              tile.style.outline = `2px solid ${theme.accent || '#e50914'}`;
              if (selector) selector.value = theme.id;
+             
+             // Show/hide edit button based on theme
+             if (theme.id === 'custom') {
+                 openCustomThemeEditor(theme);
+             } else {
+                 // document.getElementById('customThemeEditor').style.display = 'none';
+             }
          });
   
          // preview on hover (apply temporarily)
@@ -549,7 +557,7 @@ async function applyThemeById(themeId, themes) {
          tile.addEventListener('mouseleave', () => {
              const current = (function() { try { return localStorage.getItem('zentrioTheme') || ''; } catch (e) { return ''; } })();
              if (current) {
-                 const curTheme = themes.find(t => t.id === current);
+                 const curTheme = allThemes.find(t => t.id === current);
                  if (curTheme) applyThemeObject(curTheme);
              }
          });
@@ -557,9 +565,39 @@ async function applyThemeById(themeId, themes) {
          // mark active
          if (theme.id === activeId) {
              tile.style.outline = `2px solid ${theme.accent || '#e50914'}`;
+             if (theme.id === 'custom') {
+                 // If custom is active on load, show editor? Maybe not automatically to keep it clean.
+                 // But we should ensure the editor is populated with current values if opened.
+             }
          }
   
-         gallery.appendChild(tile);
+         wrapper.appendChild(tile);
+
+         // Add edit button for custom theme
+         if (theme.id === 'custom') {
+             const editBtn = document.createElement('div');
+             editBtn.className = 'theme-tile-actions';
+             editBtn.innerHTML = `
+                 <button class="edit-theme-btn" title="Edit Custom Theme">
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                     </svg>
+                 </button>
+             `;
+             editBtn.querySelector('button').addEventListener('click', (e) => {
+                 e.stopPropagation(); // Prevent tile click
+                 openCustomThemeEditor(theme);
+                 // Also select it
+                 try { localStorage.setItem('zentrioTheme', theme.id); } catch (e) {}
+                 applyThemeObject(theme);
+                 gallery.querySelectorAll('.theme-tile').forEach(t => t.style.outline = 'none');
+                 tile.style.outline = `2px solid ${theme.accent || '#e50914'}`;
+             });
+             wrapper.appendChild(editBtn);
+         }
+
+         gallery.appendChild(wrapper);
      });
   
      // selector change applies theme (only if selector exists)
@@ -567,9 +605,80 @@ async function applyThemeById(themeId, themes) {
          selector.addEventListener('change', () => {
              const id = selector.value;
              if (!id) return;
-             applyThemeById(id, themes);
+             applyThemeById(id, allThemes);
          });
      }
+ }
+
+ function openCustomThemeEditor(theme) {
+     openModal('customThemeModal');
+     
+     // Populate inputs
+     document.getElementById('accentColorInput').value = theme.accent || '#e50914';
+     document.getElementById('accentColorValue').textContent = theme.accent || '#e50914';
+     
+     const v = theme.vanta || {};
+     document.getElementById('highlightColorInput').value = v.highlight || '#222222';
+     document.getElementById('highlightColorValue').textContent = v.highlight || '#222222';
+     
+     document.getElementById('midtoneColorInput').value = v.midtone || '#111111';
+     document.getElementById('midtoneColorValue').textContent = v.midtone || '#111111';
+     
+     document.getElementById('lowlightColorInput').value = v.lowlight || '#000000';
+     document.getElementById('lowlightColorValue').textContent = v.lowlight || '#000000';
+     
+     document.getElementById('baseColorInput').value = v.base || '#000000';
+     document.getElementById('baseColorValue').textContent = v.base || '#000000';
+     
+     document.getElementById('speedInput').value = v.speed || 0.5;
+     document.getElementById('speedValue').textContent = v.speed || 0.5;
+     
+     document.getElementById('zoomInput').value = v.zoom || 0.3;
+     document.getElementById('zoomValue').textContent = v.zoom || 0.3;
+ }
+
+ function saveCustomTheme() {
+     const accent = document.getElementById('accentColorInput').value;
+     const highlight = document.getElementById('highlightColorInput').value;
+     const midtone = document.getElementById('midtoneColorInput').value;
+     const lowlight = document.getElementById('lowlightColorInput').value;
+     const base = document.getElementById('baseColorInput').value;
+     const speed = parseFloat(document.getElementById('speedInput').value);
+     const zoom = parseFloat(document.getElementById('zoomInput').value);
+     
+     const customTheme = {
+         id: 'custom',
+         name: 'Custom',
+         accent: accent,
+         btnPrimary: accent,
+         btnPrimaryHover: adjustColor(accent, -20), // Simple darken function needed or just use accent
+         text: '#ffffff',
+         muted: '#b3b3b3',
+         vanta: {
+             highlight,
+             midtone,
+             lowlight,
+             base,
+             speed,
+             zoom
+         }
+     };
+     
+     localStorage.setItem('zentrioCustomTheme', JSON.stringify(customTheme));
+     localStorage.setItem('zentrioTheme', 'custom');
+     
+     applyThemeObject(customTheme);
+     showMessage('Custom theme saved', 'success');
+     closeModal('customThemeModal');
+     
+     // Re-render gallery to update preview
+     fetchThemes().then(themes => {
+         renderThemeGallery(themes, 'custom');
+     });
+ }
+
+ function adjustColor(color, amount) {
+    return '#' + color.replace(/^#/, '').replace(/../g, color => ('0'+Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2));
  }
 
 // Upload handler: POST JSON to /api/themes/:id
@@ -665,41 +774,31 @@ document.addEventListener('DOMContentLoaded', () => {
             if (theme) applyThemeObject(theme);
         }
 
-        // wire Vanta toggle and persist preference
-        const vantaToggle = document.getElementById('vantaToggle');
-        if (vantaToggle) {
+        // Wire background style selector
+        const bgSelect = document.getElementById('backgroundStyleSelect');
+        if (bgSelect) {
             // Set initial state
-            const stored = (function () { try { return localStorage.getItem('zentrioVanta'); } catch (e) { return null; } })();
-            const initialState = (stored === null) ? true : (stored === 'true');
-            settings.vantaEnabled = initialState;
-            vantaToggle.classList.toggle('active', initialState);
+            const stored = (function () { try { return localStorage.getItem('zentrioBackgroundStyle') || 'stremio'; } catch (e) { return 'stremio'; } })();
+            bgSelect.value = stored;
 
-            vantaToggle.addEventListener('click', () => {
-                settings.vantaEnabled = !settings.vantaEnabled;
-                vantaToggle.classList.toggle('active', settings.vantaEnabled);
-                try { localStorage.setItem('zentrioVanta', settings.vantaEnabled ? 'true' : 'false'); } catch (e) {}
+            bgSelect.addEventListener('change', () => {
+                const newStyle = bgSelect.value;
+                try { localStorage.setItem('zentrioBackgroundStyle', newStyle); } catch (e) {}
 
-                // reapply currently selected theme to enforce Vanta on/off
+                // Reapply theme to update background
                 const current = (function () { try { return localStorage.getItem('zentrioTheme') || ''; } catch (e) { return ''; } })();
-                const themesRef = window.__loadedThemes || loaded;
-                const theme = themesRef ? themesRef.find(t => t.id === current) : null;
-                if (settings.vantaEnabled) {
-                    if (theme) applyThemeObject(theme);
-                } else {
-                    if (window.__vantaSettingsInstance) {
-                        try { window.__vantaSettingsInstance.destroy(); } catch (e) {}
-                        window.__vantaSettingsInstance = null;
-                    }
-                    const vEl = document.getElementById('vanta-bg');
-                    if (vEl) {
-                        const bg = (theme && theme.vanta)
-                            ? `linear-gradient(180deg, ${theme.vanta.midtone} 0%, ${theme.vanta.base} 100%)`
-                            : 'linear-gradient(180deg, rgba(0,0,0,0.8), rgba(0,0,0,0.95))';
-                        vEl.style.background = bg;
-                        const canv = vEl.querySelector('canvas');
-                        if (canv) canv.remove();
-                    }
+                
+                // Find theme object (handle custom theme)
+                let theme = null;
+                if (current === 'custom') {
+                    try { theme = JSON.parse(localStorage.getItem('zentrioCustomTheme')); } catch(e) {}
                 }
+                if (!theme) {
+                    const themesRef = window.__loadedThemes || loaded;
+                    theme = themesRef ? themesRef.find(t => t.id === current) : null;
+                }
+                
+                if (theme) applyThemeObject(theme);
             });
         }
  
@@ -713,6 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const usernameModal = document.getElementById('usernameModal');
     const emailModal = document.getElementById('emailModal');
     const passwordModal = document.getElementById('passwordModal');
+    const customThemeModal = document.getElementById('customThemeModal');
     
     if (usernameModal) {
         usernameModal.addEventListener('click', (e) => handleModalClick(e, 'usernameModal'));
@@ -722,6 +822,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (passwordModal) {
         passwordModal.addEventListener('click', (e) => handleModalClick(e, 'passwordModal'));
+    }
+    if (customThemeModal) {
+        customThemeModal.addEventListener('click', (e) => handleModalClick(e, 'customThemeModal'));
     }
     
     // Add escape key listener
@@ -785,6 +888,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             autoSaveTmdbApiKey();
         });
+
+        // Initialize password toggle for TMDB input
+        const container = tmdbInput.closest('.password-input-container');
+        if (container) {
+            const btn = container.querySelector('.password-toggle-btn');
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    const button = e.currentTarget;
+                    const input = button.previousElementSibling;
+                    const icon = button.querySelector('.iconify');
+                    
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        if (icon) icon.setAttribute('data-icon', 'mdi:eye-off');
+                    } else {
+                        input.type = 'password';
+                        if (icon) icon.setAttribute('data-icon', 'mdi:eye');
+                    }
+                });
+            }
+        }
     }
 
     // Enhance range inputs to reflect filled track with theme accent
@@ -949,6 +1073,76 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) {
                 showMessage('Network error', 'error');
             }
+        });
+    }
+    // Tab switching logic
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active class from all buttons and contents
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+
+            // Add active class to clicked button
+            btn.classList.add('active');
+
+            // Show corresponding content
+            const tabId = btn.getAttribute('data-tab');
+            const content = document.getElementById(`tab-${tabId}`);
+            if (content) {
+                content.classList.add('active');
+            }
+        });
+    });
+
+    // Custom Theme Editor Listeners
+    const colorInputs = [
+        { input: 'accentColorInput', value: 'accentColorValue' },
+        { input: 'highlightColorInput', value: 'highlightColorValue' },
+        { input: 'midtoneColorInput', value: 'midtoneColorValue' },
+        { input: 'lowlightColorInput', value: 'lowlightColorValue' },
+        { input: 'baseColorInput', value: 'baseColorValue' }
+    ];
+
+    colorInputs.forEach(item => {
+        const input = document.getElementById(item.input);
+        const valueDisplay = document.getElementById(item.value);
+        if (input && valueDisplay) {
+            input.addEventListener('input', (e) => {
+                valueDisplay.textContent = e.target.value;
+                // Live preview?
+                // We could create a temporary theme object and apply it
+                // But maybe too heavy for Vanta. Let's just update values.
+            });
+        }
+    });
+
+    const rangeInputs = [
+        { input: 'speedInput', value: 'speedValue' },
+        { input: 'zoomInput', value: 'zoomValue' }
+    ];
+
+    rangeInputs.forEach(item => {
+        const input = document.getElementById(item.input);
+        const valueDisplay = document.getElementById(item.value);
+        if (input && valueDisplay) {
+            input.addEventListener('input', (e) => {
+                valueDisplay.textContent = e.target.value;
+            });
+        }
+    });
+
+    const saveCustomThemeBtn = document.getElementById('saveCustomThemeBtn');
+    if (saveCustomThemeBtn) {
+        saveCustomThemeBtn.addEventListener('click', saveCustomTheme);
+    }
+
+    const cancelCustomThemeBtn = document.getElementById('cancelCustomThemeBtn');
+    if (cancelCustomThemeBtn) {
+        cancelCustomThemeBtn.addEventListener('click', () => {
+            closeModal('customThemeModal');
         });
     }
 });

@@ -47,6 +47,12 @@ const db = new Database(dbPath)
  } catch (e) {
    // ignore if column already exists
  }
+ // Add tmdbApiKey to user table
+ try {
+   db.exec('ALTER TABLE user ADD COLUMN tmdbApiKey TEXT')
+ } catch (e) {
+   // ignore if column already exists
+ }
 
 // Create tables
 db.exec(`
@@ -66,7 +72,8 @@ db.exec(`
     hideAddonsButton BOOLEAN DEFAULT FALSE,
     hideCinemetaContent BOOLEAN DEFAULT FALSE,
     downloadsManagerEnabled BOOLEAN DEFAULT TRUE,
-    twoFactorEnabled BOOLEAN DEFAULT FALSE
+    twoFactorEnabled BOOLEAN DEFAULT FALSE,
+    tmdbApiKey TEXT
   );
 
   CREATE TABLE IF NOT EXISTS session (
@@ -219,6 +226,7 @@ export interface User {
   hideCinemetaContent: boolean
   downloadsManagerEnabled: boolean
   twoFactorEnabled: boolean
+  tmdbApiKey?: string
 }
 
 export interface Profile {
@@ -334,6 +342,11 @@ export const userDb = {
     return stmt.get(email) as User | undefined
   },
 
+  findAccountsByUserId: (userId: string): any[] => {
+    const stmt = db.prepare('SELECT * FROM account WHERE userId = ?')
+    return stmt.all(userId) as any[]
+  },
+
   findById: (id: string): User | undefined => {
     const stmt = db.prepare('SELECT * FROM user WHERE id = ?')
     return stmt.get(id) as User | undefined
@@ -382,6 +395,10 @@ export const userDb = {
     if (updates.downloadsManagerEnabled !== undefined) {
         fields.push('downloadsManagerEnabled = ?')
         values.push(updates.downloadsManagerEnabled)
+    }
+    if (updates.tmdbApiKey !== undefined) {
+        fields.push('tmdbApiKey = ?')
+        values.push(updates.tmdbApiKey)
     }
     
     if (fields.length === 0) return userDb.findById(id)

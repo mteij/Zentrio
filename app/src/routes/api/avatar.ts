@@ -6,7 +6,11 @@ const app = new Hono()
 // Generate random avatar
 app.get('/random', async (c) => {
   try {
-    const { svg, seed } = await generateRandomAvatar()
+    // Get colors from query param if provided (comma separated hex codes)
+    const colorsParam = c.req.query('colors')
+    const colors = colorsParam ? colorsParam.split(',') : undefined
+    
+    const { svg, seed } = await generateRandomAvatar(colors)
     
     return c.json({
       svg,
@@ -22,7 +26,11 @@ app.get('/random', async (c) => {
 app.get('/:seed', async (c) => {
   try {
     const seed = c.req.param('seed')
-    const svg = await generateAvatar(seed)
+    // Get colors from query param if provided (comma separated hex codes)
+    const colorsParam = c.req.query('colors')
+    const colors = colorsParam ? colorsParam.split(',') : undefined
+
+    const svg = await generateAvatar(seed, colors)
     
     return new Response(svg, {
       headers: {

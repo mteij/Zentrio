@@ -34,10 +34,16 @@
 }
 
 .section-title {
-    font-size: clamp(24px, 4vw, 28px);
-    margin-bottom: 30px;
-    font-weight: bold;
+    font-size: clamp(32px, 5vw, 48px);
+    margin-bottom: 40px;
+    font-weight: 800;
     text-align: center;
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+    text-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 
 .profiles-grid {
@@ -52,21 +58,30 @@
 .profile-card {
     text-align: center;
     cursor: pointer;
-    transition: transform 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     width: 100%;
     max-width: 200px;
+    padding: 20px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 .profile-card:hover {
-    transform: scale(1.05);
+    transform: translateY(-5px);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
 .profile-avatar {
     width: 120px;
     height: 120px;
     aspect-ratio: 1 / 1;
-    border-radius: 8px;
+    border-radius: 50%;
     margin: 0 auto 15px;
     display: flex;
     align-items: center;
@@ -77,12 +92,15 @@
     overflow: hidden;
     background: var(--btn-secondary-bg);
     border: 3px solid transparent;
-    transition: border-color 0.3s ease;
+    transition: all 0.3s ease;
     line-height: 0; /* prevent baseline gaps */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .profile-card:hover .profile-avatar {
     border-color: var(--accent);
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
 .profile-avatar svg {
@@ -325,45 +343,107 @@
 /* Footer styles */
 .footer {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.8) 50%, rgba(0,0,0,0.9) 100%);
-    padding: 20px;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    background: transparent;
+    padding: 0;
     z-index: 50;
+    max-width: 90vw; /* Prevent overflow on small screens */
 }
 
 .footer-buttons {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 15px;
-    max-width: 600px;
-    margin: 0 auto;
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    gap: 12px;
+    padding: 12px 24px;
+    background: rgba(20, 20, 20, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 100px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    flex-wrap: nowrap; /* Force single row */
+    white-space: nowrap; /* Prevent text wrapping */
+}
+
+.footer-buttons .btn {
+    background: transparent !important;
+    border: none !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+    padding: 8px !important;
+    border-radius: 50% !important;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.footer-buttons .btn:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    transform: translateY(-2px);
+}
+
+.footer-buttons .btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Special styling for primary/danger buttons in the dock */
+.footer-buttons #createProfileBtn {
+    background: var(--accent) !important;
+    color: white !important;
+    width: auto !important;
+    padding: 8px 20px !important;
+    border-radius: 100px !important;
+}
+
+.footer-buttons #createProfileBtn:hover {
+    background: var(--btn-primary-bg-hover) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); /* Use neutral shadow to avoid red glow */
+}
+
+.footer-buttons #logoutBtn:hover {
+    background: rgba(220, 53, 69, 0.2) !important;
+    color: #dc3545 !important;
 }
 
 /* Mobile footer adjustments */
 @media (max-width: 768px) {
     .footer {
-        padding: 15px;
+        bottom: 20px;
+        padding: 0;
     }
     
     .footer-buttons {
-        gap: 10px;
-        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 16px;
+        flex-wrap: nowrap; /* Ensure single row on mobile too */
     }
 }
 
 @media (max-width: 480px) {
     .footer-buttons {
-        gap: 8px;
+        gap: 6px;
+        padding: 8px 12px;
     }
     
     .footer-buttons .btn {
-        width: auto;
-        text-align: center;
+        width: 36px;
+        height: 36px;
+        padding: 6px !important;
+    }
+
+    /* Adjust special buttons for mobile */
+    .footer-buttons #createProfileBtn {
+        padding: 6px 14px !important;
+        font-size: 13px;
     }
 }
 /* Profiles page: scoped layout, background, responsive grid, and accessibility */
@@ -372,9 +452,12 @@
   position: relative;
   background: transparent; /* let the Vanta canvas show through */
   min-height: 100svh;
-  display: grid;           /* enables centering */
-  place-items: center;     /* centers content vertically and horizontally */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   padding-block: 2rem;     /* ensures comfort on small screens */
+  padding-bottom: 120px;   /* Add extra padding at bottom to prevent overlap with footer dock */
 }
 
 /* translucent overlay above the Vanta background (keeps depth but doesn't hide Vanta) */
@@ -384,9 +467,7 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  /* Removed colored radial highlights to eliminate blue/purple overlay */
-  background: linear-gradient(180deg, rgba(18,18,22,0.25) 0%, rgba(10,10,12,0.25) 100%);
-  background-blend-mode: normal;
+  background: radial-gradient(circle at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%);
 }
 
 /* ensure page content is above the overlay */
@@ -405,15 +486,69 @@
 .profiles-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1rem;
-  align-items: start;
+  gap: 1rem; /* Reduced gap */
   justify-items: center;
+  align-items: start;
+  max-height: 65vh; /* Increased max-height slightly */
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  width: 100%;
+}
+
+/* Dynamic grid adjustments based on screen size and orientation */
+@media (orientation: landscape) and (max-height: 600px) {
+  .profiles-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    max-height: 50vh;
+  }
+  .profile-card {
+    max-width: 140px;
+    padding: 10px; /* Reduced padding */
+  }
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+    font-size: 24px; /* Smaller font */
+    margin-bottom: 8px;
+  }
+  .profile-name {
+    font-size: 12px;
+  }
+}
+
+/* Portrait mobile adjustments */
+@media (orientation: portrait) and (max-width: 480px) {
+  .profiles-grid {
+    grid-template-columns: repeat(2, 1fr); /* Force 2 columns */
+    gap: 10px;
+    max-height: 70vh;
+  }
+  .profile-card {
+    max-width: 100%; /* Allow full width in grid cell */
+    padding: 10px;
+  }
+  .profile-avatar {
+    width: 90px;
+    height: 90px;
+    margin-bottom: 8px;
+  }
+  .section-title {
+    margin-bottom: 20px;
+    font-size: 24px;
+  }
 }
 
 @media (min-width: 768px) {
   .profiles-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .profiles-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1.25rem;
   }
 }
 

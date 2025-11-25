@@ -5,22 +5,20 @@ interface DownloadsPageProps {}
 export function DownloadsPage({}: DownloadsPageProps) {
   return (
     <SimpleLayout title="Downloads">
-      <div className="container" style={{ maxWidth: 1200, margin: '60px auto 80px', padding: '0 20px' }}>
+      <div className="container" style={{ maxWidth: 1200, margin: '100px auto 80px', padding: '0 20px' }}>
         <h1 style={{ fontSize: 42, marginBottom: 28, fontWeight: 700 }}>Downloads</h1>
 
-        <div style={{ marginBottom: 24, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Button
-            id="downloadsBackBtn"
-            type="button"
-            variant="secondary"
-            size="small"
-            ariaLabel="Back to profiles"
-            title="Back to Profiles"
-          >
-            <i data-lucide="arrow-left" style={{ width: 20, height: 20 }}></i>
-            <span style={{ marginLeft: 6 }}>Back</span>
-          </Button>
-        </div>
+        <button
+          id="downloadsBackBtn"
+          className="back-btn"
+          aria-label="Back to profiles"
+          title="Back to Profiles"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+          </svg>
+          Back to Profiles
+        </button>
 
         <div id="downloadsSummary" style={{
           display: 'flex',
@@ -58,6 +56,57 @@ export function DownloadsPage({}: DownloadsPageProps) {
       </div>
 
       <style>{`
+        .back-btn {
+          position: fixed;
+          top: 40px;
+          left: 40px;
+          z-index: 100;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 24px;
+          background: rgba(20, 20, 20, 0.8);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          color: var(--text, white);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 100px;
+          cursor: pointer;
+          font-size: 15px;
+          font-weight: 500;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          text-decoration: none;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .back-btn:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.2);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+          color: white;
+        }
+
+        .back-btn svg {
+          transition: transform 0.3s ease;
+        }
+
+        .back-btn:hover svg {
+          transform: translateX(-4px);
+        }
+
+        @media (max-width: 768px) {
+          .back-btn {
+            top: 20px;
+            left: 20px;
+            padding: 10px 16px;
+            font-size: 14px;
+          }
+          .container {
+            margin-top: 80px !important;
+          }
+        }
+
         .downloads-container {
           min-height: 240px;
           position: relative;

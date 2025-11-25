@@ -18,7 +18,7 @@ const app = new Hono<{
 app.get('/ping', (c) => ok(c, { pong: true }))
 
 // Enforce session on all routes for this router
-app.use('/*', sessionMiddleware)
+app.use('*', sessionMiddleware)
 // CSRF-like guard mounted after session middleware
 app.use('*', csrfLikeGuard)
 
@@ -28,23 +28,16 @@ app.use('*', csrfLikeGuard)
 app.get('/tmdb-api-key', async (c) => {
   try {
     const user = c.get('user')
-    
-    // Find the user's default profile
-    const defaultProfile = profileDb.getDefault(user.id)
-    if (!defaultProfile) {
-      return ok(c, { tmdb_api_key: null })
-    }
-    
-    // Get the profile's settings
-    const settings = profileProxySettingsDb.findByProfileId(defaultProfile.id)
+    // Fetch fresh user data to get the key
+    const freshUser = userDb.findById(user.id)
     
     let tmdbApiKey = null
-    if (settings?.tmdb_api_key) {
+    if (freshUser?.tmdbApiKey) {
       try {
-        tmdbApiKey = decrypt(settings.tmdb_api_key)
+        tmdbApiKey = decrypt(freshUser.tmdbApiKey)
       } catch (error) {
         console.error('Failed to decrypt TMDB API key:', error)
-        tmdbApiKey = null
+        tmdbApiKey = 'DECRYPTION_FAILED'
       }
     }
     
@@ -72,12 +65,19 @@ app.put('/tmdb-api-key', async (c) => {
 
     const { tmdb_api_key } = validation.data
     
-    // Find the user's default profile
-    const defaultProfile = profileDb.getDefault(user.id)
-    if (!defaultProfile) {
-      return err(c, 404, 'NOT_FOUND', 'No default profile found')
+    // Check if key is unchanged
+    const freshUser = userDb.findById(user.id)
+    let currentKey = null
+    if (freshUser?.tmdbApiKey) {
+      try {
+        currentKey = decrypt(freshUser.tmdbApiKey)
+      } catch (e) {}
     }
-    
+
+    if (currentKey === tmdb_api_key) {
+      return ok(c, { tmdb_api_key }, 'TMDB API key unchanged')
+    }
+
     // Encrypt the API key if provided
     let encryptedApiKey = null
     if (tmdb_api_key && tmdb_api_key.trim()) {
@@ -89,17 +89,13 @@ app.put('/tmdb-api-key', async (c) => {
       }
     }
     
-    // Update the profile's TMDB API key
-    const updated = profileProxySettingsDb.update(defaultProfile.id, {
-      tmdb_api_key: encryptedApiKey || null
+    // Update the user's TMDB API key
+    const updated = await userDb.update(user.id, {
+      tmdbApiKey: encryptedApiKey || undefined
     })
     
     if (!updated) {
-      // Create settings if they don't exist
-      await profileProxySettingsDb.create({
-        profile_id: defaultProfile.id,
-        tmdb_api_key: encryptedApiKey || null
-      })
+      return err(c, 500, 'SERVER_ERROR', 'Failed to update user settings')
     }
     
     return ok(c, { tmdb_api_key: tmdb_api_key || null }, 'TMDB API key updated successfully')
@@ -304,6 +300,21 @@ app.get('/profile', async (c) => {
   }
 })
 
+// [GET /accounts] Get linked accounts
+app.get('/accounts', async (c) => {
+  try {
+    const user = c.get('user')
+    const accounts = userDb.findAccountsByUserId(user.id)
+    return ok(c, accounts.map(a => ({
+      id: a.id,
+      providerId: a.providerId,
+      createdAt: a.createdAt
+    })))
+  } catch (e) {
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
+
 // ========== Email change flow ==========
 
 // [PUT /email] Deprecated direct update
@@ -351,34 +362,20 @@ app.post('/email/initiate', async (c) => {
     }
 
     // Use Better Auth to change email
-    // Better Auth has a changeEmail flow, but it usually requires current password or verification
-    // For now, let's stick to our custom flow but use Better Auth's internal tools if possible
-    // or just keep our custom OTP logic but store it in the new verification table?
-    // Actually, Better Auth handles email verification.
-    // Let's use auth.api.changeEmail if available or just keep our custom logic for now but adapted.
-    
-    // Since we removed otpDb logic, we need to reimplement or use Better Auth.
-    // Better Auth doesn't expose a simple "send OTP to new email" for change email without full flow.
-    // Let's use auth.api.sendVerificationEmail if we were just verifying, but this is a change.
-    
-    // For simplicity in this migration, let's assume we use Better Auth's client side changeEmail
-    // which sends a verification link/code.
-    // But here we are in a custom API endpoint.
-    
-    // Let's return an error saying to use the new client-side flow?
-    // Or reimplement OTP using the new 'verification' table or 'two_factor' table?
-    
-    // Let's use the 'verification' table from Better Auth schema manually for now to keep this endpoint working
-    // or just fail and tell frontend to use new flow.
-    
-    // Given the instructions "Make sure the user verifies its email adress when creating an account",
-    // and "The user should be able to setup 2fa as an extra security in the settings",
-    // we should probably leverage Better Auth's built-in email change flow.
-    
-    return err(c, 500, 'SERVER_ERROR', 'Please use the new settings page to change email.')
+    const res = await auth.api.changeEmail({
+        body: {
+            newEmail,
+            callbackURL: '/settings'
+        },
+        headers: c.req.raw.headers
+    })
+
+    if (!res.status) {
+        return err(c, 400, 'INVALID_INPUT', 'Failed to initiate email change')
+    }
 
     console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'success', ip, userAgent, targetEmailHash: hashEmail(newEmail) }))
-    return ok(c, undefined, 'Verification code sent if eligible')
+    return ok(c, { type: 'link' }, 'Verification link sent to new email')
   } catch (_e) {
     console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'SERVER_ERROR' }))
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
@@ -486,4 +483,5 @@ app.put('/username', async (c) => {
 
 
 // TMDB API Key endpoints added - v2
+
 export default app
