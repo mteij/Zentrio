@@ -2,8 +2,8 @@
 layout: home
 hero:
   name: Zentrio
-  text: Profile management for Stremio Web
-  tagline: Minimal self-hosted profile manager for Stremio Web.
+  text: Your Personal Streaming Hub
+  tagline: A modern, self-hosted streaming platform for all your content.
   image:
     src: /icon-512.png
     alt: Zentrio
@@ -20,12 +20,18 @@ hero:
 
 features:
   - icon: 👥
-    title: Multiple profiles
-    details: Separate profiles with individual Stremio credentials, watch history, and addon configuration.
+    title: Profile Management
+    details: Create separate profiles with unique preferences, watch history, and addon configurations.
+  - icon: 🎨
+    title: Modern Experience
+    details: A clean, glassmorphic interface designed for immersion and ease of use on any device.
+  - icon: 🧩
+    title: Addon System
+    details: Extend functionality with Stremio-compatible addons to access a wide range of content.
   - icon: 🔒
-    title: Privacy & control
-    details: Run Zentrio yourself with Docker and keep all data on your own infrastructure.
+    title: Privacy & Control
+    details: Run Zentrio yourself with Docker and keep all your data on your own infrastructure.
   - icon: 📱
-    title: Cross‑platform & themed
-    details: Works on web and mobile, with themes to match your setup.
+    title: Cross-Platform
+    details: Seamless experience across web, iOS, Android, and PWA.
 ---

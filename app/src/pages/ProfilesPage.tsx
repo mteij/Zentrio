@@ -6,7 +6,6 @@ interface Profile {
   name: string
   avatar: string
   isDefault?: boolean
-  stremio_email?: string
   nsfw_filter_enabled?: boolean
   nsfw_age_rating?: number
 }
@@ -43,19 +42,6 @@ export function ProfilesPage({ profiles = [], user }: ProfilesPageProps) {
       {/* Footer with buttons */}
       <footer className="footer">
         <div className="footer-buttons" id="footerButtons">
-          {(!user || user.downloadsManagerEnabled !== false) && (
-            <Button
-              id="downloadsBtn"
-              variant="secondary"
-              size="small"
-              ariaLabel="Downloads"
-              title="Downloads"
-              href="/downloads"
-            >
-              <i data-lucide="download" style={{ width: 20, height: 20 }}></i>
-            </Button>
-          )}
-          
           <Button
             id="settingsBtn"
             variant="secondary"
@@ -111,7 +97,7 @@ export function ProfilesPage({ profiles = [], user }: ProfilesPageProps) {
       {/* Vanta.js and Three.js for background visuals */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
-      <script src="/static/js/background-manager.js"></script>
+      <script src="/static/js/theme.js"></script>
       <script src="/static/js/profiles.js"></script>
     </SimpleLayout>
   )

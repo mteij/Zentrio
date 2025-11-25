@@ -112,10 +112,6 @@ export const auth = betterAuth({
                 type: "boolean",
                 defaultValue: false,
             },
-            downloadsManagerEnabled: {
-                type: "boolean",
-                defaultValue: true,
-            },
         }
     },
     account: {

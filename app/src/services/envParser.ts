@@ -74,9 +74,7 @@ export function getConfig() {
   // Logging toggles
   // PROXY_LOGS controls the request logger middleware (Hono logger) that prints "-->" and "<--" lines.
   // Backwards compatibility: falls back to REQUEST_LOGS if PROXY_LOGS is not set.
-  // STREMIO_LOGS controls verbose logs inside the /stremio route; defaults to false.
   const PROXY_LOGS = parseBoolean(process.env.PROXY_LOGS ?? process.env.REQUEST_LOGS, true)
-  const STREMIO_LOGS = parseBoolean(process.env.STREMIO_LOGS, false)
   const LOG_LEVEL = process.env.LOG_LEVEL || 'info'
 
   // SSO Providers
@@ -102,7 +100,6 @@ export function getConfig() {
     RATE_LIMIT_WINDOW_MS,
     RATE_LIMIT_LIMIT,
     PROXY_LOGS,
-    STREMIO_LOGS,
     LOG_LEVEL,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,

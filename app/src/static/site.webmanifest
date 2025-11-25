@@ -32,12 +32,6 @@
       "icons": [{ "src": "/static/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Downloads",
-      "short_name": "Downloads",
-      "url": "/downloads",
-      "icons": [{ "src": "/static/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
-    },
-    {
       "name": "Settings",
       "short_name": "Settings",
       "url": "/settings",

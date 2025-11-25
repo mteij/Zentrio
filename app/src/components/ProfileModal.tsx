@@ -29,26 +29,6 @@ export function ProfileModal() {
               />
             </FormGroup>
             
-            <FormGroup htmlFor="stremioEmail">
-              <label htmlFor="stremioEmail">
-                Stremio Email <span style={{ color: '#e50914' }}>*</span>
-              </label>
-              <Input
-                type="email"
-                id="stremioEmail"
-                name="stremioEmail"
-                required
-              />
-            </FormGroup>
-            
-            <FormGroup label="Stremio Password" htmlFor="stremioPassword">
-              <Input
-                type="password"
-                id="stremioPassword"
-                name="stremioPassword"
-                ariaDescribedBy="stremioPasswordHelp"
-              />
-            </FormGroup>
 
 
             <FormGroup label="Age Rating" htmlFor="ageRatingInput" id="ageRatingGroup">

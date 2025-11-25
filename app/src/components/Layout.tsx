@@ -52,8 +52,7 @@ export function Layout({
         <script src="https://unpkg.com/lucide@latest"></script>
         <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
         <script src="/static/js/mobile-session-handler.js"></script>
-        <script src="/static/js/downloads-core.js"></script>
-        <script src="/static/js/spa-navigation.js"></script>
+        <script src="/static/js/theme.js"></script>
       </head>
       <body className={className}>
         {showHeader && <PageHeader />}
@@ -109,8 +108,7 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <script src="https://unpkg.com/lucide@latest"></script>
         <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
         <script src="/static/js/mobile-session-handler.js"></script>
-        <script src="/static/js/downloads-core.js"></script>
-        <script src="/static/js/spa-navigation.js"></script>
+        <script src="/static/js/theme.js"></script>
       </head>
       <body className={className}>
         {children}

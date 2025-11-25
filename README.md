@@ -3,7 +3,7 @@
 <div align="center">
   <img src="app/src/static/logo/icon-512.png" alt="Zentrio Icon" width="256" height="256" />
 
-  <strong>Profile management for Stremio Web</strong>
+  <strong>Your Personal Streaming Hub</strong>
 
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
@@ -36,21 +36,23 @@ For deployment, self-hosting, and development setup instructions, refer to the d
 
 ## 📖 What is Zentrio?
 
-Zentrio enhances your Stremio experience with:
+Zentrio is a modern, self-hosted streaming hub that brings your content together. Originally conceived as a profile manager for Stremio, it has evolved into a standalone platform with a focus on user experience and customization.
 
-- **👥 Profile Management** - Create separate profiles with unique Stremio credentials
-- **🎨 Quality of Life Features** - Addon management, UI customization, and more
-- **📱 Cross-Platform Support** - Web, iOS, Android, and PWA
-- **🔒 Privacy-Focused** - Your data stays local and secure
+- **👥 Profile Management** - Create separate profiles with unique preferences and watch history.
+- **🎨 Modern UI** - A clean, glassmorphic interface designed for immersion.
+- **🧩 Addon System** - Extend functionality with Stremio-compatible addons.
+- **📱 Cross-Platform Support** - Web, iOS, Android, and PWA.
+- **🔒 Privacy-Focused** - Your data stays local and secure.
 
 <div align="center">
   <img src="app/src/static/media/profiles.png" alt="Zentrio Profiles" width="800" />
 </div>
 
-## About Zentrio
+## Origin Story
 
-Zentrio started as a weekend project to solve [this community issue](https://github.com/Stremio/stremio-features/issues/622) regarding Stremio profiles, but it's grown into something bigger. Not only does Zentrio create a seperate space but its also bundled with a lot of QoL features that hope to make the already awesome Stremio experience even better!
+Zentrio started as a weekend project to solve [this community issue](https://github.com/Stremio/stremio-features/issues/622) regarding Stremio profiles. The initial goal was simple: provide a way to manage multiple users on Stremio Web.
 
+However, as development progressed, the vision expanded. We realized that a truly great experience required more than just profile switching—it needed a dedicated interface, better discovery, and a more cohesive design. Today, Zentrio stands as its own platform, compatible with the Stremio ecosystem but offering a distinct, refined experience.
 
 ## 📄 License
 

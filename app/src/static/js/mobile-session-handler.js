@@ -208,7 +208,6 @@
             // Clear local storage
             try {
                 localStorage.removeItem('selectedProfile');
-                localStorage.removeItem('stremioSessionToken');
             } catch (e) {
                 console.warn('Failed to clear localStorage:', e);
             }

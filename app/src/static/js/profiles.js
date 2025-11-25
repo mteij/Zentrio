@@ -151,17 +151,13 @@ function createProfile() {
     editingProfileId = null;
     modalTitle.textContent = 'Create New Profile';
     profileForm.reset();
-    const passwordInput = document.getElementById('stremioPassword');
-    passwordInput.placeholder = 'Enter Stremio password';
-    passwordInput.required = true;
-
+    
     ageRatingInput.value = '18';
 
     if (deleteProfileBtn) deleteProfileBtn.style.display = 'none';
 
     generateNewAvatar();
     profileModal.style.display = 'block';
-    initPasswordToggles();
 }
 
 // Edit existing profile
@@ -178,12 +174,6 @@ function editProfile(profileId) {
     modalTitle.textContent = 'Edit Profile';
 
     document.getElementById('profileName').value = profile.name;
-    document.getElementById('stremioEmail').value = profile.stremio_email || '';
-
-    const passwordInput = document.getElementById('stremioPassword');
-    passwordInput.value = '';
-    passwordInput.placeholder = 'Leave blank to keep current password';
-    passwordInput.required = false;
 
     const initialAge = (profile.nsfw_filter_enabled === false ? 18 : (profile.nsfw_age_rating || 18));
     ageRatingInput.value = String(initialAge);
@@ -194,7 +184,6 @@ function editProfile(profileId) {
     if (deleteProfileBtn) deleteProfileBtn.style.display = 'inline-flex';
 
     profileModal.style.display = 'block';
-    initPasswordToggles();
 }
 
 // Initialize password toggles
@@ -253,8 +242,8 @@ function selectProfile(profile) {
     // Store the selected profile to be used on the session page if needed
     localStorage.setItem('selectedProfile', JSON.stringify(profile));
 
-    // Redirect to the session page, which will handle loading Stremio
-    window.location.href = `/session/${profile.id}`;
+    // Redirect to the native streaming page
+    window.location.href = `/streaming/${profile.id}`;
 }
 
 // Update avatar preview
@@ -363,8 +352,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const formData = {
                     name: document.getElementById('profileName').value,
                     avatar: currentAvatarSeed || document.getElementById('profileName').value,
-                    stremioEmail: document.getElementById('stremioEmail').value,
-                    stremioPassword: document.getElementById('stremioPassword').value,
                     nsfwFilterEnabled: selectedAge < 18,
                     ageRating: selectedAge
                 };
@@ -467,30 +454,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Logout request failed:', e);
             } finally {
                 try { localStorage.removeItem('selectedProfile'); } catch {}
-                try { localStorage.removeItem('stremioSessionToken'); } catch {}
                 window.location.href = '/';
             }
         });
     }
     
-    // Handle downloads button (navigate to /downloads + feature flag hide)
-    const downloadsBtn = document.getElementById('downloadsBtn');
-    (async function initDownloadsButton() {
-        if (!downloadsBtn) return;
-        try {
-            const r = await fetch('/api/user/settings');
-            if (r.ok) {
-                const settings = await r.json();
-                if (settings && settings.downloadsManagerEnabled === false) {
-                    downloadsBtn.style.display = 'none';
-                    return;
-                }
-            }
-        } catch(e) { /* silent */ }
-        downloadsBtn.addEventListener('click', () => {
-            window.location.href = '/downloads';
-        });
-    })();
     
     // Handle settings button (navigate to settings). Added for non-hydrated pages.
     const settingsBtn = document.getElementById('settingsBtn');
@@ -551,11 +519,6 @@ function updateEditModeUI() {
             button.style.display = editMode ? 'none' : 'inline-flex';
         });
 
-        // Explicitly hide downloads button in edit mode
-        const downloadsBtn = document.getElementById('downloadsBtn');
-        if (downloadsBtn) {
-            downloadsBtn.style.display = editMode ? 'none' : 'inline-flex';
-        }
 
         // Show/hide the create profile button when toggling edit mode
         if (createProfileBtn) {
@@ -633,9 +596,9 @@ function updateEditModeUI() {
                 } catch (e) { /* silent */ }
             }
 
-            // Use shared background manager
-            if (window.ZentrioBackground) {
-                window.ZentrioBackground.apply();
+            // Use shared theme manager
+            if (window.ZentrioTheme) {
+                window.ZentrioTheme.apply();
             }
         } catch (e) {
             console.error('Vanta init failed', e);

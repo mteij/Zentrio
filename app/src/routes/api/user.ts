@@ -236,7 +236,6 @@ app.get('/settings', async (c) => {
       hideCalendarButton: user.hideCalendarButton ?? true,
       hideAddonsButton: user.hideAddonsButton ?? false,
       hideCinemetaContent: user.hideCinemetaContent ?? false,
-      downloadsManagerEnabled: user.downloadsManagerEnabled ?? true,
     })
   } catch (_e) {
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
@@ -254,14 +253,13 @@ app.put('/settings', async (c) => {
       hideCalendarButton: z.boolean().optional(),
       hideAddonsButton: z.boolean().optional(),
       hideCinemetaContent: z.boolean().optional(),
-      downloadsManagerEnabled: z.boolean().optional(),
     }), body)
 
     if (!validation.success) {
       return err(c, 400, 'INVALID_INPUT', 'Invalid input', validation.error)
     }
 
-    const { addonManagerEnabled, hideCalendarButton, hideAddonsButton, hideCinemetaContent, downloadsManagerEnabled } = validation.data
+    const { addonManagerEnabled, hideCalendarButton, hideAddonsButton, hideCinemetaContent } = validation.data
 
     // Use Better Auth internal API to update user if possible, or direct DB update
     // Since we defined additionalFields, we should be able to update them via userDb.update which we modified
@@ -270,7 +268,6 @@ app.put('/settings', async (c) => {
       hideCalendarButton,
       hideAddonsButton,
       hideCinemetaContent,
-      downloadsManagerEnabled,
     })
     
     if (!updated) {

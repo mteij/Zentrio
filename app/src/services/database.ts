@@ -25,11 +25,6 @@ const db = new Database(dbPath)
  db.exec('PRAGMA foreign_keys = ON')
 
  // Lightweight migrations (idempotent)
- try {
-   db.exec('ALTER TABLE user ADD COLUMN downloadsManagerEnabled BOOLEAN DEFAULT TRUE')
- } catch (e) {
-   // ignore if column already exists
- }
  // New setting: hideCinemetaContent (idempotent)
  try {
    db.exec('ALTER TABLE user ADD COLUMN hideCinemetaContent BOOLEAN DEFAULT FALSE')
@@ -53,6 +48,12 @@ const db = new Database(dbPath)
  } catch (e) {
    // ignore if column already exists
  }
+ // Add priority to profile_addons table
+ try {
+   db.exec('ALTER TABLE profile_addons ADD COLUMN priority INTEGER DEFAULT 0')
+ } catch (e) {
+   // ignore if column already exists
+ }
 
 // Create tables
 db.exec(`
@@ -71,7 +72,6 @@ db.exec(`
     hideCalendarButton BOOLEAN DEFAULT FALSE,
     hideAddonsButton BOOLEAN DEFAULT FALSE,
     hideCinemetaContent BOOLEAN DEFAULT FALSE,
-    downloadsManagerEnabled BOOLEAN DEFAULT TRUE,
     twoFactorEnabled BOOLEAN DEFAULT FALSE,
     tmdbApiKey TEXT
   );
@@ -125,8 +125,6 @@ db.exec(`
       avatar TEXT NOT NULL,
       avatar_type TEXT DEFAULT 'initials',
       is_default BOOLEAN DEFAULT FALSE,
-      stremio_email TEXT,
-      stremio_password TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
@@ -139,7 +137,6 @@ db.exec(`
     user_id INTEGER NOT NULL,
     profile_id INTEGER,
     session_token TEXT UNIQUE NOT NULL,
-    stremio_auth_key TEXT,
     security_fingerprint TEXT,
     ip_address TEXT,
     user_agent TEXT,
@@ -179,7 +176,6 @@ db.exec(`
     nsfw_age_rating INTEGER DEFAULT 0,
     hide_calendar_button BOOLEAN DEFAULT FALSE,
     hide_addons_button BOOLEAN DEFAULT FALSE,
-    downloads_enabled BOOLEAN DEFAULT FALSE,
     mobile_click_to_hover BOOLEAN DEFAULT FALSE,
     tmdb_api_key TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -191,7 +187,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS proxy_rate_limits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     identifier TEXT NOT NULL, -- IP + User Agent hash
-    endpoint_type TEXT NOT NULL, -- 'generic', 'stremio', 'api'
+    endpoint_type TEXT NOT NULL, -- 'generic', 'addon', 'api'
     request_count INTEGER DEFAULT 1,
     window_start DATETIME DEFAULT CURRENT_TIMESTAMP,
     blocked_until DATETIME,
@@ -207,6 +203,57 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_proxy_logs_timestamp ON proxy_logs(timestamp);
   CREATE INDEX IF NOT EXISTS idx_profile_proxy_settings_profile_id ON profile_proxy_settings(profile_id);
   CREATE INDEX IF NOT EXISTS idx_proxy_rate_limits_identifier ON proxy_rate_limits(identifier, endpoint_type);
+
+  CREATE TABLE IF NOT EXISTS watch_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    meta_id TEXT NOT NULL,
+    meta_type TEXT NOT NULL,
+    title TEXT,
+    poster TEXT,
+    duration INTEGER,
+    position INTEGER,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+    UNIQUE(profile_id, meta_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_watch_history_profile ON watch_history(profile_id);
+
+  CREATE TABLE IF NOT EXISTS library (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    meta_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT,
+    poster TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+    UNIQUE(profile_id, meta_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_library_profile ON library(profile_id);
+
+  CREATE TABLE IF NOT EXISTS addons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    manifest_url TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    version TEXT,
+    description TEXT,
+    logo TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS profile_addons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    addon_id INTEGER NOT NULL,
+    enabled BOOLEAN DEFAULT TRUE,
+    priority INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+    FOREIGN KEY (addon_id) REFERENCES addons (id) ON DELETE CASCADE,
+    UNIQUE(profile_id, addon_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_profile_addons_profile ON profile_addons(profile_id);
 `)
 
 export interface User {
@@ -224,7 +271,6 @@ export interface User {
   hideCalendarButton: boolean
   hideAddonsButton: boolean
   hideCinemetaContent: boolean
-  downloadsManagerEnabled: boolean
   twoFactorEnabled: boolean
   tmdbApiKey?: string
 }
@@ -236,8 +282,6 @@ export interface Profile {
   avatar: string
   avatar_type: 'initials' | 'avatar'
   is_default: boolean
-  stremio_email?: string
-  stremio_password?: string
   created_at: string
   updated_at: string
 }
@@ -257,7 +301,6 @@ export interface ProxySession {
   user_id: string
   profile_id?: number
   session_token: string
-  stremio_auth_key?: string
   security_fingerprint?: string
   ip_address?: string
   user_agent?: string
@@ -292,7 +335,6 @@ export interface ProfileProxySettings {
   nsfw_age_rating: number
   hide_calendar_button: boolean
   hide_addons_button: boolean
-  downloads_enabled: boolean
   mobile_click_to_hover: boolean
   tmdb_api_key?: string
   created_at: string
@@ -308,6 +350,47 @@ export interface ProxyRateLimit {
   blocked_until?: string
   created_at: string
   updated_at: string
+}
+
+export interface WatchHistoryItem {
+  id: number
+  profile_id: number
+  meta_id: string
+  meta_type: string
+  title?: string
+  poster?: string
+  duration?: number
+  position?: number
+  updated_at: string
+}
+
+export interface LibraryItem {
+  id: number
+  profile_id: number
+  meta_id: string
+  type: string
+  title?: string
+  poster?: string
+  created_at: string
+}
+
+export interface Addon {
+  id: number
+  manifest_url: string
+  name: string
+  version?: string
+  description?: string
+  logo?: string
+  created_at: string
+}
+
+export interface ProfileAddon {
+  id: number
+  profile_id: number
+  addon_id: number
+  enabled: boolean
+  created_at: string
+  addon?: Addon
 }
 
 // Hash password utility
@@ -392,10 +475,6 @@ export const userDb = {
         fields.push('hideCinemetaContent = ?')
         values.push(updates.hideCinemetaContent)
     }
-    if (updates.downloadsManagerEnabled !== undefined) {
-        fields.push('downloadsManagerEnabled = ?')
-        values.push(updates.downloadsManagerEnabled)
-    }
     if (updates.tmdbApiKey !== undefined) {
         fields.push('tmdbApiKey = ?')
         values.push(updates.tmdbApiKey)
@@ -421,24 +500,18 @@ export const profileDb = {
       avatar: string
       avatar_type?: 'initials' | 'avatar'
       is_default?: boolean
-      stremio_email?: string
-      stremio_password?: string
     }): Promise<Profile> => {
       const stmt = db.prepare(`
-        INSERT INTO profiles (user_id, name, avatar, avatar_type, is_default, stremio_email, stremio_password)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO profiles (user_id, name, avatar, avatar_type, is_default)
+        VALUES (?, ?, ?, ?, ?)
       `)
       
-      const encryptedPassword = profileData.stremio_password ? encrypt(profileData.stremio_password) : null;
-
       const result = stmt.run(
         profileData.user_id,
         profileData.name,
         profileData.avatar,
         profileData.avatar_type || 'initials',
-        profileData.is_default || false,
-        profileData.stremio_email || null,
-        encryptedPassword
+        profileData.is_default || false
       )
       
       return profileDb.findById(result.lastInsertRowid as number)!
@@ -475,8 +548,6 @@ export const profileDb = {
       avatar?: string
       avatar_type?: 'initials' | 'avatar'
       is_default?: boolean
-      stremio_email?: string
-      stremio_password?: string
     }): Promise<Profile | undefined> => {
       const fields: string[] = []
       const values: any[] = []
@@ -497,15 +568,6 @@ export const profileDb = {
         fields.push('is_default = ?')
         values.push(updates.is_default)
       }
-      if (updates.stremio_email !== undefined) {
-        fields.push('stremio_email = ?')
-        values.push(updates.stremio_email)
-      }
-      if (updates.stremio_password !== undefined) {
-        fields.push('stremio_password = ?')
-        values.push(encrypt(updates.stremio_password))
-      }
-    
     if (fields.length === 0) return profileDb.findById(id)
     
     fields.push('updated_at = CURRENT_TIMESTAMP')
@@ -552,22 +614,20 @@ export const proxySessionDb = {
     user_id: string
     profile_id?: number
     session_token: string
-    stremio_auth_key?: string
     security_fingerprint?: string
     ip_address?: string
     user_agent?: string
     expires_at: string
   }): ProxySession => {
     const stmt = db.prepare(`
-      INSERT INTO proxy_sessions (user_id, profile_id, session_token, stremio_auth_key, security_fingerprint, ip_address, user_agent, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO proxy_sessions (user_id, profile_id, session_token, security_fingerprint, ip_address, user_agent, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `)
     
     const result = stmt.run(
       sessionData.user_id,
       sessionData.profile_id || null,
       sessionData.session_token,
-      sessionData.stremio_auth_key || null,
       sessionData.security_fingerprint || null,
       sessionData.ip_address || null,
       sessionData.user_agent || null,
@@ -674,13 +734,12 @@ export const profileProxySettingsDb = {
     nsfw_age_rating?: number
     hide_calendar_button?: boolean
     hide_addons_button?: boolean
-    downloads_enabled?: boolean
     mobile_click_to_hover?: boolean
     tmdb_api_key?: string | null
   }): ProfileProxySettings => {
     const stmt = db.prepare(`
-      INSERT INTO profile_proxy_settings (profile_id, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, downloads_enabled, mobile_click_to_hover, tmdb_api_key)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO profile_proxy_settings (profile_id, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, mobile_click_to_hover, tmdb_api_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `)
     
     const result = stmt.run(
@@ -689,7 +748,6 @@ export const profileProxySettingsDb = {
       settingsData.nsfw_age_rating || 0,
       settingsData.hide_calendar_button || false,
       settingsData.hide_addons_button || false,
-      settingsData.downloads_enabled || false,
       settingsData.mobile_click_to_hover || false,
       settingsData.tmdb_api_key || null
     )
@@ -786,6 +844,226 @@ export const proxyRateLimitDb = {
 setInterval(() => {
   proxySessionDb.deleteExpired()
 }, 60 * 60 * 1000) // Every hour
+
+// Watch History operations
+export const watchHistoryDb = {
+  upsert: (data: {
+    profile_id: number
+    meta_id: string
+    meta_type: string
+    title?: string
+    poster?: string
+    duration?: number
+    position?: number
+  }): void => {
+    const stmt = db.prepare(`
+      INSERT INTO watch_history (profile_id, meta_id, meta_type, title, poster, duration, position, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(profile_id, meta_id) DO UPDATE SET
+        position = excluded.position,
+        duration = COALESCE(excluded.duration, watch_history.duration),
+        updated_at = CURRENT_TIMESTAMP
+    `)
+    stmt.run(
+      data.profile_id,
+      data.meta_id,
+      data.meta_type,
+      data.title || null,
+      data.poster || null,
+      data.duration || null,
+      data.position || null
+    )
+  },
+
+  getByProfileId: (profileId: number): WatchHistoryItem[] => {
+    const stmt = db.prepare('SELECT * FROM watch_history WHERE profile_id = ? ORDER BY updated_at DESC LIMIT 20')
+    return stmt.all(profileId) as WatchHistoryItem[]
+  }
+}
+
+// Library operations
+export const libraryDb = {
+  add: (data: {
+    profile_id: number
+    meta_id: string
+    type: string
+    title?: string
+    poster?: string
+  }): void => {
+    const stmt = db.prepare(`
+      INSERT INTO library (profile_id, meta_id, type, title, poster)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(profile_id, meta_id) DO NOTHING
+    `)
+    stmt.run(
+      data.profile_id,
+      data.meta_id,
+      data.type,
+      data.title || null,
+      data.poster || null
+    )
+  },
+
+  remove: (profileId: number, metaId: string): void => {
+    const stmt = db.prepare('DELETE FROM library WHERE profile_id = ? AND meta_id = ?')
+    stmt.run(profileId, metaId)
+  },
+
+  getByProfileId: (profileId: number): LibraryItem[] => {
+    const stmt = db.prepare('SELECT * FROM library WHERE profile_id = ? ORDER BY created_at DESC')
+    return stmt.all(profileId) as LibraryItem[]
+  },
+
+  isAdded: (profileId: number, metaId: string): boolean => {
+    const stmt = db.prepare('SELECT 1 FROM library WHERE profile_id = ? AND meta_id = ?')
+    return !!stmt.get(profileId, metaId)
+  }
+}
+
+// Addon operations
+export const addonDb = {
+  create: (data: {
+    manifest_url: string
+    name: string
+    version?: string
+    description?: string
+    logo?: string
+  }): Addon => {
+    const stmt = db.prepare(`
+      INSERT INTO addons (manifest_url, name, version, description, logo)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(manifest_url) DO UPDATE SET
+        name = excluded.name,
+        version = excluded.version,
+        description = excluded.description,
+        logo = excluded.logo
+    `)
+    const result = stmt.run(
+      data.manifest_url,
+      data.name,
+      data.version || null,
+      data.description || null,
+      data.logo || null
+    )
+    // If updated, we need to fetch by URL to get ID, as lastInsertRowid might not be accurate on update?
+    // Actually lastInsertRowid works for INSERT OR REPLACE but ON CONFLICT UPDATE might not return it if no insert happened.
+    // Safer to fetch by URL.
+    return addonDb.findByUrl(data.manifest_url)!
+  },
+
+  findByUrl: (url: string): Addon | undefined => {
+    const stmt = db.prepare('SELECT * FROM addons WHERE manifest_url = ?')
+    return stmt.get(url) as Addon | undefined
+  },
+
+  findById: (id: number): Addon | undefined => {
+    const stmt = db.prepare('SELECT * FROM addons WHERE id = ?')
+    return stmt.get(id) as Addon | undefined
+  },
+
+  list: (): Addon[] => {
+    const stmt = db.prepare('SELECT * FROM addons ORDER BY name ASC')
+    return stmt.all() as Addon[]
+  },
+
+  delete: (id: number): void => {
+    const stmt = db.prepare('DELETE FROM addons WHERE id = ?')
+    stmt.run(id)
+  },
+
+  // Profile Addon operations
+  enableForProfile: (profileId: number, addonId: number): void => {
+    const stmt = db.prepare(`
+      INSERT INTO profile_addons (profile_id, addon_id, enabled, priority)
+      VALUES (?, ?, TRUE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE profile_id = ?))
+      ON CONFLICT(profile_id, addon_id) DO UPDATE SET enabled = TRUE
+    `)
+    stmt.run(profileId, addonId, profileId)
+  },
+
+  disableForProfile: (profileId: number, addonId: number): void => {
+    const stmt = db.prepare(`
+      INSERT INTO profile_addons (profile_id, addon_id, enabled, priority)
+      VALUES (?, ?, FALSE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE profile_id = ?))
+      ON CONFLICT(profile_id, addon_id) DO UPDATE SET enabled = FALSE
+    `)
+    stmt.run(profileId, addonId, profileId)
+  },
+
+  getForProfile: (profileId: number): ProfileAddon[] => {
+    const stmt = db.prepare(`
+      SELECT pa.*, a.manifest_url, a.name, a.version, a.description, a.logo
+      FROM profile_addons pa
+      JOIN addons a ON pa.addon_id = a.id
+      WHERE pa.profile_id = ?
+      ORDER BY pa.priority ASC, pa.id ASC
+    `)
+    const rows = stmt.all(profileId) as any[]
+    return rows.map(row => ({
+      id: row.id,
+      profile_id: row.profile_id,
+      addon_id: row.addon_id,
+      enabled: !!row.enabled,
+      created_at: row.created_at,
+      addon: {
+        id: row.addon_id,
+        manifest_url: row.manifest_url,
+        name: row.name,
+        version: row.version,
+        description: row.description,
+        logo: row.logo,
+        created_at: row.created_at // addon creation time not strictly needed here but part of type
+      }
+    }))
+  },
+
+  getAllWithStatusForProfile: (profileId: number): (Addon & { enabled: boolean, priority: number })[] => {
+    const stmt = db.prepare(`
+      SELECT a.*,
+             COALESCE(pa.enabled, 1) as enabled,
+             COALESCE(pa.priority, 9999) as priority
+      FROM addons a
+      LEFT JOIN profile_addons pa ON a.id = pa.addon_id AND pa.profile_id = ?
+      ORDER BY priority ASC, a.id ASC
+    `)
+    const rows = stmt.all(profileId) as any[]
+    return rows.map(row => ({
+        ...row,
+        enabled: !!row.enabled
+    }))
+  },
+
+  updateProfileAddonOrder: (profileId: number, addonIds: number[]): void => {
+    const transaction = db.transaction((ids: number[]) => {
+      let priority = 0;
+      for (const addonId of ids) {
+        const stmt = db.prepare(`
+          INSERT INTO profile_addons (profile_id, addon_id, enabled, priority)
+          VALUES (?, ?, TRUE, ?)
+          ON CONFLICT(profile_id, addon_id) DO UPDATE SET priority = ?
+        `)
+        stmt.run(profileId, addonId, priority, priority)
+        priority++;
+      }
+    })
+    transaction(addonIds)
+  },
+
+  // Get enabled addons for a profile (including default logic if we want defaults enabled)
+  // For now, explicit enable is required, OR we can say if not in profile_addons, is it enabled?
+  // Let's assume explicit enable/disable. But we need a way to enable new addons for everyone?
+  // Or just let users manage it.
+  getEnabledForProfile: (profileId: number): Addon[] => {
+    const stmt = db.prepare(`
+      SELECT a.*
+      FROM addons a
+      LEFT JOIN profile_addons pa ON a.id = pa.addon_id AND pa.profile_id = ?
+      WHERE COALESCE(pa.enabled, 1) = 1
+      ORDER BY COALESCE(pa.priority, 9999) ASC, a.id ASC
+    `)
+    return stmt.all(profileId) as Addon[]
+  }
+}
 
 // Export database instance for advanced queries if needed
 export { db }

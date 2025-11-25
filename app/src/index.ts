@@ -7,8 +7,6 @@ import { logger } from './services/logger'
 
 // Import route modules
 import viewRoutes from './routes/views'
-import sessionRoutes from './routes/session'
-import stremioRoutes from './routes/stremio'
 
 // Import API route modules
 import apiRoutes from './routes/api/index'
@@ -160,12 +158,6 @@ app.get('/static/*', async (c) => {
       'Cross-Origin-Opener-Policy': 'same-origin',
     }
 
-    // Relax CSP for download worker to allow connecting to arbitrary stream URLs
-    if (reqPath.includes('download-worker.js')) {
-      headers['Content-Security-Policy'] = "connect-src * data: blob:;"
-      headers['Cache-Control'] = 'no-cache'
-    }
-
     return new Response(new Uint8Array(buf), { headers })
   } catch {
     return new Response('Not Found', { status: 404 })
@@ -195,7 +187,5 @@ app.get('/favicon.ico', async (c) => {
 // Mount route modules
 app.route('/', viewRoutes)              // JSX-rendered pages (converted from HTML)
 app.route('/api', apiRoutes)            // API routes, including auth, profiles, user, avatar, health, stream
-app.route('/session', sessionRoutes)
-app.route('/stremio', stremioRoutes)
 
 export default app

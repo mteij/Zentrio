@@ -31,13 +31,13 @@ export const securityHeaders = async (c: Context, next: Next) => {
   c.header('X-Content-Type-Options', 'nosniff')
   c.header('X-XSS-Protection', '1; mode=block')
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
+  c.header('Cross-Origin-Opener-Policy', 'same-origin')
+  c.header('Cross-Origin-Embedder-Policy', 'credentialless')
 
-  // Avoid overriding proxy responses (Stremio API/local bundle)
-  const path = c.req.path || ''
-  const isStremioPath = path.startsWith('/stremio')
+  // Avoid overriding proxy responses
   const alreadyProxied = c.res?.headers?.get('X-Zentrio-Proxy')
  
-  if (isStremioPath || alreadyProxied) {
+  if (alreadyProxied) {
     // Do not set global X-Frame-Options/CSP on proxied content.
     // These are managed by the proxy header manipulators.
     return
@@ -49,7 +49,7 @@ export const securityHeaders = async (c: Context, next: Next) => {
   // Reference: [securityHeaders()](app/src/middleware/security.ts:27)
   c.header(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.iconify.design https://api.iconify.design https://unpkg.com; connect-src * data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; worker-src 'self' blob:; manifest-src 'self';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.iconify.design https://api.iconify.design https://unpkg.com https://cdn.dashjs.org; connect-src * data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' https:;"
   )
 }
 

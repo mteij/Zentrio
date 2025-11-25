@@ -5,9 +5,7 @@ const CACHE_NAME = `zentrio-pwa-${VERSION}`;
 console.error('[SW] Script loaded/evaluated');
 
 const ASSETS = [
-  '/static/downloads-offline.html',
   '/static/offline.html',
-  '/static/js/downloads.js',
   '/static/js/toast.js',
   '/static/css/styles.css',
   '/static/css/toast.css',
@@ -124,14 +122,6 @@ if (url.origin !== self.location.origin) {
         const res = await fetch(req);
         return res;
       } catch {
-        if (url.pathname === '/downloads') {
-          const cache = await caches.open(CACHE_NAME);
-          const offline = await cache.match('/static/downloads-offline.html');
-          if (offline) notifyClients('info', 'Offline', 'Downloads available offline.');
-          return offline || new Response('<!doctype html><meta charset="utf-8"><title>Offline</title><h1>Offline</h1>', {
-            headers: { 'Content-Type': 'text/html; charset=utf-8' }
-          });
-        }
         const cache = await caches.open(CACHE_NAME);
         const fallback = await cache.match('/static/offline.html');
         if (fallback) notifyClients('info', 'Offline', 'You are offline.');

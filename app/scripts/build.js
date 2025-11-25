@@ -37,67 +37,6 @@ try {
  console.log('🔧 Building server...');
  execSync('bun build src/index.ts --outdir ./dist --target bun --minify', { stdio: 'inherit' });
  
- // Optionally build embedded Stremio Web frontend
- try {
-   const appRoot = path.join(__dirname, '..');
-   
-   // Setup fresh stremio-web and apply patches
-   console.log('🔄 Setting up fresh Stremio Web...');
-   try {
-     execSync('node scripts/setup-stremio-web.js', { cwd: appRoot, stdio: 'inherit' });
-   } catch (setupErr) {
-     console.error('⚠️ Failed to setup Stremio Web. Continuing without it.', setupErr);
-     // Don't throw - continue without stremio-web
-   }
-   
-   const stremioWebDir = path.join(__dirname, '..', 'vendor', 'stremio-web');
-   
-   if (fs.existsSync(stremioWebDir)) {
-     // Check if we can skip build
-     const buildVersionFile = path.join(stremioWebDir, '.zentrio-build-version');
-     const setupVersionFile = path.join(stremioWebDir, '.zentrio-setup-version');
-     const outDir = path.join(__dirname, '..', 'stremio-web-build');
-     
-     let skipBuild = false;
-     
-     // Always build to ensure patches are applied
-
-     if (!skipBuild) {
-       console.log('📦 Building embedded Stremio Web...');
-       
-       execSync('npm run build', { cwd: stremioWebDir, stdio: 'inherit' });
-
-       // Stremio Web outputs to "build" (see webpack.config.js -> output.path)
-       const srcDir = path.join(stremioWebDir, 'build');
-
-       if (fs.existsSync(outDir)) {
-         fs.rmSync(outDir, { recursive: true, force: true });
-       }
-       fs.mkdirSync(outDir, { recursive: true });
-
-       // Copy built Stremio Web assets into stremio-web-build for the server to serve
-       try {
-         fs.cpSync(srcDir, outDir, { recursive: true });
-         console.log('✅ Stremio Web build copied to stremio-web-build');
-         
-         // Mark build as complete for this version
-         if (fs.existsSync(setupVersionFile)) {
-           const version = fs.readFileSync(setupVersionFile, 'utf8').trim();
-           fs.writeFileSync(buildVersionFile, version);
-         }
-       } catch (copyErr) {
-         console.error('⚠️ Failed to copy Stremio Web build into stremio-web-build', copyErr);
-         throw copyErr;
-       }
-     } else {
-       console.log('✅ Using existing Stremio Web build');
-     }
-   } else {
-     console.log('ℹ️ Skipping Stremio Web build: vendor/stremio-web not found after setup');
-   }
- } catch (err) {
-   console.error('⚠️ Failed to build embedded Stremio Web. Continuing without it.', err);
- }
  
  // Create a simple index.html for Capacitor
 const indexHtml = `<!DOCTYPE html>

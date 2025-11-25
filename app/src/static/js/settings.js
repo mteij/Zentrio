@@ -416,12 +416,9 @@ function applyThemeObject(theme) {
         document.documentElement.style.setProperty('--vanta-base', theme.vanta.base);
     }
 
-    // Use shared background manager if available
-    if (window.ZentrioBackground) {
-        window.ZentrioBackground.apply();
-    } else {
-        // Fallback if manager not loaded yet (should be loaded via script tag in page)
-        // But for now we can just rely on the manager being present or loading soon
+    // Use shared theme manager if available
+    if (window.ZentrioTheme) {
+        window.ZentrioTheme.apply();
     }
 }
 
@@ -778,7 +775,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bgSelect = document.getElementById('backgroundStyleSelect');
         if (bgSelect) {
             // Set initial state
-            const stored = (function () { try { return localStorage.getItem('zentrioBackgroundStyle') || 'stremio'; } catch (e) { return 'stremio'; } })();
+            const stored = (function () { try { return localStorage.getItem('zentrioBackgroundStyle') || 'vanta'; } catch (e) { return 'vanta'; } })();
             bgSelect.value = stored;
 
             bgSelect.addEventListener('change', () => {
@@ -1145,24 +1142,382 @@ document.addEventListener('DOMContentLoaded', () => {
             closeModal('customThemeModal');
         });
     }
-});
 
-// Wire up the sync toggle
-(function() {
-    const SYNC_KEY = 'zentrio_enable_vanta_bg';
-    const toggle = document.getElementById('vantaSyncToggle');
-    
-    if (toggle) {
-        // Init state
-        const stored = localStorage.getItem(SYNC_KEY);
-        const active = stored === 'true'; // Default false
-        
-        if (active) toggle.classList.add('active');
-        
-        toggle.addEventListener('click', () => {
-            const newState = !toggle.classList.contains('active');
-            toggle.classList.toggle('active', newState);
-            localStorage.setItem(SYNC_KEY, String(newState));
+    // Addons Logic
+    const installAddonBtn = document.getElementById('installAddonBtn');
+    if (installAddonBtn) {
+        installAddonBtn.addEventListener('click', async () => {
+            const input = document.getElementById('addonManifestUrl');
+            const url = input.value.trim();
+            if (!url) return;
+
+            try {
+                installAddonBtn.disabled = true;
+                installAddonBtn.textContent = 'Installing...';
+                
+                const res = await fetch('/api/addons', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ manifestUrl: url })
+                });
+                
+                if (res.ok) {
+                    input.value = '';
+                    if (currentProfileId) loadAddonsForProfile(currentProfileId);
+                    showMessage('Addon installed successfully', 'success');
+                } else {
+                    const err = await res.json();
+                    showMessage(err.error || 'Failed to install addon', 'error');
+                }
+            } catch (e) {
+                showMessage('Network error', 'error');
+            } finally {
+                installAddonBtn.disabled = false;
+                installAddonBtn.textContent = 'Install';
+            }
         });
     }
-})();
+
+    // Initialize Addon Profile Selector
+    const addonProfileSelect = document.getElementById('addonProfileSelect');
+    if (addonProfileSelect) {
+        addonProfileSelect.addEventListener('change', (e) => {
+            const profileId = e.target.value;
+            if (profileId) {
+                loadAddonsForProfile(profileId);
+            }
+        });
+        loadAddonProfiles();
+    }
+});
+
+let currentAddons = [];
+let currentProfileId = null;
+
+async function loadAddonProfiles() {
+    const select = document.getElementById('addonProfileSelect');
+    if (!select) return;
+
+    try {
+        const res = await fetch('/api/profiles');
+        if (res.ok) {
+            const profiles = await res.json();
+            select.innerHTML = '';
+            
+            if (profiles.length === 0) {
+                select.innerHTML = '<option value="">No profiles found</option>';
+                return;
+            }
+
+            profiles.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                select.appendChild(opt);
+            });
+
+            // Select first profile by default
+            if (profiles.length > 0) {
+                select.value = profiles[0].id;
+                loadAddonsForProfile(profiles[0].id);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load profiles', e);
+        select.innerHTML = '<option value="">Error loading profiles</option>';
+    }
+}
+
+async function loadAddonsForProfile(profileId) {
+    currentProfileId = profileId;
+    const list = document.getElementById('addonsList');
+    if (!list) return;
+
+    list.innerHTML = '<div style="color: #666">Loading addons...</div>';
+
+    try {
+        const res = await fetch(`/api/addons/profile/${profileId}/manage`);
+        if (res.ok) {
+            currentAddons = await res.json();
+            renderAddonsList();
+        } else {
+            list.innerHTML = '<div style="color: #d33">Failed to load addons</div>';
+        }
+    } catch (e) {
+        console.error('Failed to load addons', e);
+        list.innerHTML = '<div style="color: #d33">Network error</div>';
+    }
+}
+
+function renderAddonsList() {
+    const list = document.getElementById('addonsList');
+    if (!list) return;
+    
+    list.innerHTML = '';
+
+    if (currentAddons.length === 0) {
+        list.innerHTML = '<div style="color: #666">No addons installed. Install one above.</div>';
+        return;
+    }
+
+    currentAddons.forEach((addon, index) => {
+        const item = document.createElement('div');
+        item.className = 'addon-item';
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.padding = '15px';
+        item.style.background = 'rgba(255,255,255,0.05)';
+        item.style.borderRadius = '8px';
+        item.style.backdropFilter = 'blur(10px)';
+        item.style.border = '1px solid rgba(255,255,255,0.05)';
+        item.style.transition = 'transform 0.2s, background 0.2s';
+        
+        // Left side: Reorder controls + Info
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.style.gap = '15px';
+        left.style.flex = '1';
+
+        // Reorder controls
+        const reorder = document.createElement('div');
+        reorder.style.display = 'flex';
+        reorder.style.flexDirection = 'column';
+        reorder.style.gap = '2px';
+        
+        const upBtn = document.createElement('button');
+        upBtn.innerHTML = '&#9650;'; // Up arrow
+        upBtn.style.background = 'none';
+        upBtn.style.border = 'none';
+        upBtn.style.color = index === 0 ? '#444' : '#888';
+        upBtn.style.cursor = index === 0 ? 'default' : 'pointer';
+        upBtn.style.fontSize = '10px';
+        upBtn.style.padding = '2px';
+        if (index > 0) upBtn.onclick = () => moveAddon(index, -1);
+        
+        const downBtn = document.createElement('button');
+        downBtn.innerHTML = '&#9660;'; // Down arrow
+        downBtn.style.background = 'none';
+        downBtn.style.border = 'none';
+        downBtn.style.color = index === currentAddons.length - 1 ? '#444' : '#888';
+        downBtn.style.cursor = index === currentAddons.length - 1 ? 'default' : 'pointer';
+        downBtn.style.fontSize = '10px';
+        downBtn.style.padding = '2px';
+        if (index < currentAddons.length - 1) downBtn.onclick = () => moveAddon(index, 1);
+
+        reorder.appendChild(upBtn);
+        reorder.appendChild(downBtn);
+        left.appendChild(reorder);
+
+        // Logo
+        if (addon.logo) {
+            const img = document.createElement('img');
+            img.src = addon.logo;
+            img.style.width = '40px';
+            img.style.height = '40px';
+            img.style.borderRadius = '4px';
+            img.style.objectFit = 'cover';
+            left.appendChild(img);
+        } else {
+            const placeholder = document.createElement('div');
+            placeholder.style.width = '40px';
+            placeholder.style.height = '40px';
+            placeholder.style.borderRadius = '4px';
+            placeholder.style.background = '#333';
+            placeholder.style.display = 'flex';
+            placeholder.style.alignItems = 'center';
+            placeholder.style.justifyContent = 'center';
+            placeholder.innerHTML = '<span style="font-size: 20px; color: #555">🧩</span>';
+            left.appendChild(placeholder);
+        }
+
+        // Text Info
+        const text = document.createElement('div');
+        text.innerHTML = `
+            <div style="font-weight: bold; color: #fff; font-size: 15px;">${addon.name} <span style="font-size: 0.8em; color: #888; margin-left: 5px;">v${addon.version || '?'}</span></div>
+            <div style="font-size: 13px; color: #aaa; margin-top: 2px;">${addon.description || 'No description'}</div>
+        `;
+        left.appendChild(text);
+        item.appendChild(left);
+
+        // Right side: Configure + Toggle + Uninstall
+        const right = document.createElement('div');
+        right.style.display = 'flex';
+        right.style.alignItems = 'center';
+        right.style.gap = '15px';
+
+        // Configure Button (if supported)
+        if (addon.behaviorHints && addon.behaviorHints.configurable) {
+            const configBtn = document.createElement('button');
+            configBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2 0l-.44.44a2 2 0 0 0 0 2l.08.18a2 2 0 0 1 0 2l-.25.43a2 2 0 0 1-1.73 1l-.18.08a2 2 0 0 0 0 2v.44a2 2 0 0 0 2 2h.18a2 2 0 0 1 1.73 1l.25.43a2 2 0 0 1 0 2l-.08.18a2 2 0 0 0 0 2l.44.44a2 2 0 0 0 2 0l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73v.18a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.18.08a2 2 0 0 0 2 0l.44-.44a2 2 0 0 0 0-2l-.08-.18a2 2 0 0 1 0-2l.25-.43a2 2 0 0 1 1.73-1l.18-.08a2 2 0 0 0 0-2v-.44a2 2 0 0 0-2-2h-.18a2 2 0 0 1-1.73-1l-.25-.43a2 2 0 0 1 0-2l.08-.18a2 2 0 0 0 0-2l-.44-.44a2 2 0 0 0-2 0l-.18.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+            configBtn.className = 'btn btn-secondary btn-sm';
+            configBtn.title = 'Configure Addon';
+            configBtn.style.padding = '8px';
+            configBtn.style.background = 'transparent';
+            configBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+            configBtn.style.color = '#fff';
+            configBtn.style.borderRadius = '4px';
+            configBtn.style.cursor = 'pointer';
+            configBtn.style.display = 'flex';
+            configBtn.style.alignItems = 'center';
+            configBtn.style.justifyContent = 'center';
+            
+            configBtn.onclick = (e) => {
+                e.stopPropagation();
+                configureAddon(addon);
+            };
+            
+            right.appendChild(configBtn);
+        }
+
+        // Toggle Switch
+        const toggleWrapper = document.createElement('div');
+        toggleWrapper.className = `toggle ${addon.enabled ? 'active' : ''}`;
+        toggleWrapper.style.transform = 'scale(0.8)'; // Make it slightly smaller
+        toggleWrapper.onclick = () => toggleAddon(addon.id, !addon.enabled);
+        right.appendChild(toggleWrapper);
+
+        // Uninstall Button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+        deleteBtn.className = 'btn btn-danger btn-sm';
+        deleteBtn.title = 'Uninstall globally';
+        deleteBtn.style.padding = '8px';
+        deleteBtn.style.background = 'transparent';
+        deleteBtn.style.border = '1px solid rgba(220, 53, 69, 0.3)';
+        deleteBtn.style.color = '#dc3545';
+        deleteBtn.style.borderRadius = '4px';
+        deleteBtn.style.cursor = 'pointer';
+        deleteBtn.style.display = 'flex';
+        deleteBtn.style.alignItems = 'center';
+        deleteBtn.style.justifyContent = 'center';
+        
+        deleteBtn.onclick = async (e) => {
+            e.stopPropagation();
+            if (!confirm(`Uninstall ${addon.name} globally? This will remove it for all users.`)) return;
+            try {
+                await fetch(`/api/addons/${addon.id}`, { method: 'DELETE' });
+                if (currentProfileId) loadAddonsForProfile(currentProfileId);
+                showMessage('Addon uninstalled', 'success');
+            } catch (e) {
+                showMessage('Failed to uninstall', 'error');
+            }
+        };
+        
+        right.appendChild(deleteBtn);
+        item.appendChild(right);
+        list.appendChild(item);
+    });
+}
+
+async function moveAddon(index, direction) {
+    if (!currentProfileId) return;
+    
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= currentAddons.length) return;
+
+    // Swap in local array
+    const temp = currentAddons[index];
+    currentAddons[index] = currentAddons[newIndex];
+    currentAddons[newIndex] = temp;
+
+    // Re-render immediately for responsiveness
+    renderAddonsList();
+
+    // Send new order to server
+    const addonIds = currentAddons.map(a => a.id);
+    try {
+        await fetch(`/api/addons/profile/${currentProfileId}/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addonIds })
+        });
+    } catch (e) {
+        console.error('Failed to save order', e);
+        showMessage('Failed to save order', 'error');
+    }
+}
+
+function configureAddon(addon) {
+    // Construct configuration URL
+    // Usually it's the manifest URL without /manifest.json
+    let configUrl = addon.manifest_url.replace('/manifest.json', '');
+    if (configUrl.endsWith('/')) configUrl = configUrl.slice(0, -1);
+    
+    // Open in new window/tab
+    const win = window.open(configUrl, '_blank');
+    
+    if (win) {
+        // Poll for closure or URL change?
+        // Stremio addons usually redirect back to stremio:// protocol with the new manifest URL
+        // Since we are web, we might need manual intervention or a custom protocol handler if possible.
+        // For now, we'll just let the user configure it and manually copy the new link if needed,
+        // OR we can provide a prompt to paste the new manifest URL.
+        
+        const newUrl = prompt(`Configuring ${addon.name}.\n\n1. Configure the addon in the new window.\n2. Click "Install" when done.\n3. If it gives you a new link, paste it here to update:\n\n(Leave empty to cancel update)`, addon.manifest_url);
+        
+        if (newUrl && newUrl !== addon.manifest_url) {
+            // Update addon with new manifest URL
+            updateAddonManifest(addon.id, newUrl);
+        }
+    } else {
+        showMessage('Popup blocked. Please allow popups to configure addons.', 'error');
+    }
+}
+
+async function updateAddonManifest(addonId, newUrl) {
+    try {
+        // We treat this as installing a new addon (or updating existing if logic supports it)
+        // Ideally we should have an update endpoint. For now, let's try the install endpoint
+        // which might create a duplicate if not handled, or we delete old and add new.
+        
+        // Delete old
+        await fetch(`/api/addons/${addonId}`, { method: 'DELETE' });
+        
+        // Install new
+        const res = await fetch('/api/addons', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ manifestUrl: newUrl })
+        });
+        
+        if (res.ok) {
+            if (currentProfileId) loadAddonsForProfile(currentProfileId);
+            showMessage('Addon updated successfully', 'success');
+        } else {
+            const err = await res.json();
+            showMessage(err.error || 'Failed to update addon', 'error');
+        }
+    } catch (e) {
+        showMessage('Network error during update', 'error');
+    }
+}
+
+async function toggleAddon(addonId, enabled) {
+    if (!currentProfileId) return;
+
+    // Update local state
+    const addon = currentAddons.find(a => a.id === addonId);
+    if (addon) {
+        addon.enabled = enabled;
+        renderAddonsList();
+    }
+
+    try {
+        await fetch(`/api/addons/profile/${currentProfileId}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addonId, enabled })
+        });
+    } catch (e) {
+        console.error('Failed to toggle addon', e);
+        showMessage('Failed to update addon status', 'error');
+        // Revert on error
+        if (addon) {
+            addon.enabled = !enabled;
+            renderAddonsList();
+        }
+    }
+}
+

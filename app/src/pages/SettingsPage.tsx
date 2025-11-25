@@ -22,7 +22,7 @@ export function SettingsPage({}: SettingsPageProps) {
           `,
         }}
       />
-      <div id="vanta-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, width: '100vw', height: '100vh' }}></div>
+      <div id="zentrio-vanta-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, width: '100vw', height: '100vh' }}></div>
       <div className="container" style={{ position: 'relative', zIndex: 1 }}>
         <button
           id="backButton"
@@ -38,7 +38,7 @@ export function SettingsPage({}: SettingsPageProps) {
         <div className="settings-tabs">
           <button className="tab-btn active" data-tab="account">Account</button>
           <button className="tab-btn" data-tab="appearance">Appearance</button>
-          <button className="tab-btn" data-tab="plugins">Plugins</button>
+          <button className="tab-btn" data-tab="addons">Addons</button>
           <button className="tab-btn" data-tab="danger">Danger Zone</button>
         </div>
 
@@ -165,103 +165,52 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="setting-control">
                 <select id="backgroundStyleSelect" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
                   <option value="vanta">Animated (Vanta)</option>
-                  <option value="stremio">Stremio Official</option>
                   <option value="none">Fade (Gradient)</option>
                   <option value="solid">Solid Color</option>
                 </select>
               </div>
             </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Sync background to Stremio</h3>
-                <p>Apply the same animated background to the Stremio interface (requires refresh)</p>
-              </div>
-              <div className="setting-control">
-                <div className="toggle" id="vantaSyncToggle"></div>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Plugins Tab */}
-        <div id="tab-plugins" className="tab-content">
+        {/* Addons Tab */}
+        <div id="tab-addons" className="tab-content">
           <div className="settings-card">
-            <h2 className="section-title">Plugins</h2>
-            <div className="setting-item">
+            <h2 className="section-title">Addons</h2>
+            
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
               <div className="setting-info">
-                <h3>Enable Addon Manager</h3>
-                <p>Adds an "Edit Order" button to the Stremio addons page to allow reordering and removing addons.</p>
+                <h3>Install Addon</h3>
+                <p>Enter the Manifest URL of a Stremio addon to install it globally.</p>
               </div>
-              <div className="setting-control">
-                <div className="toggle" id="addonManagerEnabledToggle"></div>
-              </div>
-            </div>
-  
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Hide Calendar Button</h3>
-                <p>Removes the Calendar button from the Stremio UI for all profiles</p>
-              </div>
-              <div className="setting-control">
-                <div className="toggle" id="hideCalendarButtonToggle"></div>
-              </div>
-            </div>
-  
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Hide Addons Button</h3>
-                <p>Removes the Addons button from the Stremio UI for all profiles</p>
-              </div>
-              <div className="setting-control">
-                <div className="toggle" id="hideAddonsButtonToggle"></div>
+              <div className="setting-control" style={{ width: '100%', marginTop: '15px', display: 'flex', gap: '10px' }}>
+                <Input
+                  type="text"
+                  id="addonManifestUrl"
+                  placeholder="https://example.com/manifest.json"
+                  style={{ flex: '1' }}
+                />
+                <Button variant="primary" id="installAddonBtn">Install</Button>
               </div>
             </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Hide Cinemeta Content</h3>
-                <p>Removes rows from the Stremio home/discover screens that originate from Cinemeta.</p>
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <div>
+                    <h3>Manage Addons</h3>
+                    <p>Configure addons per profile. Drag to reorder.</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <label htmlFor="addonProfileSelect" style={{ color: '#b3b3b3', fontSize: '14px' }}>Profile:</label>
+                    <select id="addonProfileSelect" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
+                        <option value="">Loading profiles...</option>
+                    </select>
+                </div>
               </div>
-              <div className="setting-control">
-                <div className="toggle" id="hideCinemetaContentToggle"></div>
-              </div>
-            </div>
-
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Enable Downloads Manager</h3>
-                <p>Shows a download button for each stream and a downloads panel within Stremio (requires page refresh after changing).</p>
-              </div>
-              <div className="setting-control">
-                <div className="toggle" id="downloadsManagerEnabledToggle"></div>
-              </div>
-            </div>
-
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>TMDB API Key</h3>
-                <p>Required for NSFW filter functionality. Get your free key from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>TMDB</a>. When set, enables NSFW content filtering in profiles.</p>
-              </div>
-              <div className="setting-control">
-                <div style={{ width: '300px' }}>
-                  <Input
-                    type="password"
-                    id="tmdbApiKeyInput"
-                    placeholder="Enter TMDB API key"
-                    autoComplete="new-password"
-                    name="tmdb_api_key_field"
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '4px',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      background: 'rgba(255,255,255,0.1)',
-                      color: 'var(--text, white)',
-                      fontSize: '14px',
-                      transition: 'all 0.3s ease'
-                    }}
-                  />
+              <div className="setting-control" style={{ width: '100%' }}>
+                <div id="addonsList" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ color: '#666' }}>Select a profile to manage addons.</div>
                 </div>
               </div>
             </div>
@@ -1043,7 +992,7 @@ export function SettingsPage({}: SettingsPageProps) {
 
         body {
           font-family: 'Helvetica Neue', Arial, sans-serif;
-          background: var(--bg, #141414);
+          /* Remove background here to let Vanta show through, fallback is in styles.css */
           color: var(--text, white);
           min-height: 100vh;
         }
@@ -1093,11 +1042,15 @@ export function SettingsPage({}: SettingsPageProps) {
           transform: translateX(-4px);
         }
 
-        .settings-section {
-          background: var(--section-bg, #222);
-          border-radius: 8px;
+        .settings-card {
+          background: rgba(20, 20, 20, 0.5);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 16px;
           padding: 30px;
-          margin-bottom: 30px;
+          margin-bottom: 20px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         }
 
         .section-title {
@@ -1309,7 +1262,7 @@ export function SettingsPage({}: SettingsPageProps) {
       {/* Vanta.js and Three.js */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
-      <script src="/static/js/background-manager.js"></script>
+      <script src="/static/js/theme.js"></script>
       <script src="/static/js/settings.js"></script>
     </SimpleLayout>
   )

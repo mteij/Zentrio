@@ -10,7 +10,6 @@ export const renderer = jsxRenderer(({ children }) => {
         <link rel="stylesheet" href="/static/css/styles.css" />
         <link rel="stylesheet" href="/static/css/toast.css" />
         <script src="/static/js/toast.js"></script>
-        <script src="/static/js/downloads-core.js"></script>
       </head>
       <body>{children}</body>
     </html>
