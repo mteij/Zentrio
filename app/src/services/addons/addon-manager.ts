@@ -2,7 +2,7 @@ import { AddonClient } from './client'
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
 import { addonDb } from '../database'
 
-const DEFAULT_TMDB_ADDON = 'https://tmdb.mteij.nl/%7B%22language%22%3A%22en-US%22%2C%22streaming%22%3A%5B%5D%2C%22catalogs%22%3A%5B%7B%22id%22%3A%22tmdb.top%22%2C%22type%22%3A%22movie%22%2C%22showInHome%22%3Atrue%7D%2C%7B%22id%22%3A%22tmdb.top%22%2C%22type%22%3A%22series%22%2C%22showInHome%22%3Atrue%7D%2C%7B%22id%22%3A%22tmdb.year%22%2C%22type%22%3A%22movie%22%2C%22showInHome%22%3Atrue%7D%2C%7B%22id%22%3A%22tmdb.year%22%2C%22type%22%3A%22series%22%2C%22showInHome%22%3Atrue%7D%2C%7B%22id%22%3A%22tmdb.language%22%2C%22type%22%3A%22movie%22%2C%22showInHome%22%3Atrue%7D%2C%7B%22id%22%3A%22tmdb.language%22%2C%22type%22%3A%22series%22%2C%22showInHome%22%3Atrue%7D%2C%7B%22id%22%3A%22tmdb.trending%22%2C%22type%22%3A%22movie%22%2C%22showInHome%22%3Atrue%7D%2C%7B%22id%22%3A%22tmdb.trending%22%2C%22type%22%3A%22series%22%2C%22showInHome%22%3Atrue%7D%5D%7D/manifest.json'
+const DEFAULT_TMDB_ADDON = 'https://v3-cinemeta.strem.io/manifest.json'
 
 export class AddonManager {
   private clientCache = new Map<string, AddonClient>()
@@ -16,7 +16,8 @@ export class AddonManager {
           manifest_url: DEFAULT_TMDB_ADDON,
           name: 'TMDB',
           description: 'The Movie Database Addon',
-          version: '1.0.0'
+          version: '1.0.0',
+          logo_url: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded90420192a96da33a9f244fc962a07410a121121f3b7b2ed52.svg'
         })
       }
     } catch (e) {

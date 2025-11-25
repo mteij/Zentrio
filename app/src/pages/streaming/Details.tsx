@@ -79,7 +79,11 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
                 {streams.map((group, idx) => (
                   <div key={idx} className="addon-group">
                     <div className="addon-title">
-                      <span className="iconify" data-icon="lucide:box" data-width="16" data-height="16"></span>
+                      {group.addon.logo_url ? (
+                        <img src={group.addon.logo_url} alt={group.addon.name} style={{ width: '16px', height: '16px', marginRight: '8px', verticalAlign: 'middle' }} />
+                      ) : (
+                        <span className="iconify" data-icon="lucide:box" data-width="16" data-height="16"></span>
+                      )}
                       {group.addon.name}
                     </div>
                     <div className="stream-list">
@@ -187,7 +191,11 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
             streamsList.innerHTML = streamGroups.map((group, idx) => \`
               <div key="\${idx}" class="addon-group">
                 <div class="addon-title">
-                  <span class="iconify" data-icon="lucide:box" data-width="16" data-height="16"></span>
+                  \${group.addon.logo_url ? \`
+                    <img src="\${group.addon.logo_url}" alt="\${group.addon.name}" style="width: 16px; height: 16px; margin-right: 8px; vertical-align: middle;" />
+                  \` : \`
+                    <span class="iconify" data-icon="lucide:box" data-width="16" data-height="16"></span>
+                  \`}
                   \${group.addon.name}
                 </div>
                 <div class="stream-list">

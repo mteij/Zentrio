@@ -9,6 +9,7 @@ export interface Manifest {
   idPrefixes?: string[]
   background?: string
   logo?: string
+  logo_url?: string
   contactEmail?: string
   behaviorHints?: {
     configurable?: boolean

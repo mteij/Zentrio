@@ -9,83 +9,33 @@ interface StreamingLibraryProps {
 
 export const StreamingLibrary = ({ items, profileId }: StreamingLibraryProps) => {
   return (
-    <Layout title="My List">
+    <Layout title="My List" additionalCSS={['/static/css/streaming.css']}>
       <Navbar profileId={profileId} activePage="library" />
-      <div className="streaming-home">
-        <h1>My List</h1>
-        {items.length === 0 ? (
-          <div className="loading">Your list is empty.</div>
-        ) : (
-          <div className="items-grid">
-            {items.map(item => (
-              <a key={item.meta_id} href={`/streaming/${profileId}/${item.type}/${item.meta_id}`} className="item-card">
-                <div className="poster-wrapper">
-                  {item.poster ? (
-                    <img src={item.poster} alt={item.title} loading="lazy" />
-                  ) : (
-                    <div className="no-poster">{item.title}</div>
-                  )}
-                </div>
-                <div className="item-info">
-                  <span className="item-name">{item.title}</span>
-                </div>
-              </a>
-            ))}
-          </div>
-        )}
+      <div className="streaming-layout">
+        <div className="content-container" style={{ paddingTop: '40px' }}>
+          <h1 style={{ padding: '0 40px', marginBottom: '30px', fontSize: '2.5rem', fontWeight: '800' }}>My List</h1>
+          {items.length === 0 ? (
+            <div className="loading" style={{ padding: '40px', textAlign: 'center' }}>Your list is empty.</div>
+          ) : (
+            <div className="media-grid">
+              {items.map(item => (
+                <a key={item.meta_id} href={`/streaming/${profileId}/${item.type}/${item.meta_id}`} className="media-card">
+                  <div className="poster-container">
+                    {item.poster ? (
+                      <img src={item.poster} alt={item.title} className="poster-image" loading="lazy" />
+                    ) : (
+                      <div className="no-poster">{item.title}</div>
+                    )}
+                    <div className="card-overlay">
+                      <div className="card-title">{item.title}</div>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-      <style>{`
-        .streaming-home {
-          padding: 20px;
-          color: #fff;
-          padding-bottom: 80px;
-        }
-        .items-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-          gap: 16px;
-        }
-        .item-card {
-          display: block;
-          text-decoration: none;
-          color: inherit;
-          transition: transform 0.2s;
-        }
-        .item-card:hover {
-          transform: scale(1.05);
-        }
-        .poster-wrapper {
-          aspect-ratio: 2/3;
-          background: #333;
-          border-radius: 8px;
-          overflow: hidden;
-          margin-bottom: 8px;
-        }
-        .poster-wrapper img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .no-poster {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 10px;
-          text-align: center;
-          font-size: 0.9rem;
-          color: #aaa;
-        }
-        .item-name {
-          font-size: 0.9rem;
-          font-weight: 500;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
     </Layout>
   )
 }

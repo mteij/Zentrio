@@ -12,7 +12,7 @@ RUN bun install --production --frozen-lockfile
 
 # Copy scripts and patches needed for stremio-web build
 COPY scripts ./scripts
-COPY stremio-patches ./stremio-patches
+RUN if [ -d stremio-patches ]; then cp -r stremio-patches ./stremio-patches; fi
 # Copy source code including static assets
 COPY src ./src
 
@@ -33,7 +33,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/src/themes ./src/themes
 
 # Copy local data directory if it exists
-COPY data/ ./data/
+RUN if [ -d data ]; then cp -r data ./data; fi
 COPY --from=builder /app/stremio-web-build ./stremio-web-build
 
 ENV NODE_ENV=production

@@ -10,7 +10,7 @@ import { ResetPasswordPage } from '../pages/ResetPasswordPage'
 import { StreamingHome } from '../pages/streaming/Home'
 import { StreamingDetails } from '../pages/streaming/Details'
 import { StreamingPlayer } from '../pages/streaming/Player'
-import { StreamingCategory } from '../pages/streaming/Category'
+import { StreamingExplore } from '../pages/streaming/Explore'
 import { StreamingLibrary } from '../pages/streaming/Library'
 import { StreamingSearch } from '../pages/streaming/Search'
 import { addonManager } from '../services/addons/addon-manager'
@@ -85,39 +85,24 @@ app.get('/streaming/:profileId', async (c) => {
   }
 })
 
-app.get('/streaming/:profileId/series', async (c) => {
+app.get('/streaming/:profileId/explore', async (c) => {
   if (!await isAuthenticated(c)) return c.redirect('/')
-  const profileId = parseInt(c.req.param('profileId'))
   
-  try {
-    const results = await addonManager.getCatalogs(profileId)
-    const catalogs = results
-      .filter(r => r.catalog.type === 'series')
-      .map(r => ({
-        title: `${r.addon.name} - ${r.catalog.name || r.catalog.type}`,
-        items: r.items
-      }))
-    return c.html(StreamingCategory({ catalogs, profileId, type: 'series' }))
-  } catch (e) {
-    return c.html(StreamingCategory({ catalogs: [], profileId, type: 'series' }))
-  }
-})
+  const profileId = parseInt(c.req.param('profileId'))
+  if (isNaN(profileId)) return c.redirect('/profiles')
 
-app.get('/streaming/:profileId/movie', async (c) => {
-  if (!await isAuthenticated(c)) return c.redirect('/')
-  const profileId = parseInt(c.req.param('profileId'))
-  
   try {
+    const profile = profileDb.findById(profileId)
+    const history = watchHistoryDb.getByProfileId(profileId)
     const results = await addonManager.getCatalogs(profileId)
-    const catalogs = results
-      .filter(r => r.catalog.type === 'movie')
-      .map(r => ({
-        title: `${r.addon.name} - ${r.catalog.name || r.catalog.type}`,
-        items: r.items
-      }))
-    return c.html(StreamingCategory({ catalogs, profileId, type: 'movie' }))
+    const catalogs = results.map(r => ({
+      title: `${r.addon.name} - ${r.catalog.name || r.catalog.type}`,
+      items: r.items
+    }))
+    return c.html(StreamingExplore({ catalogs, history, profileId, profile }))
   } catch (e) {
-    return c.html(StreamingCategory({ catalogs: [], profileId, type: 'movie' }))
+    console.error('Streaming explore error:', e)
+    return c.html(StreamingExplore({ catalogs: [], history: [], profileId }))
   }
 })
 

@@ -25,12 +25,19 @@ app.post('/', async (c) => {
         return c.json({ error: `Failed to fetch manifest: ${e.message}` }, 400)
     }
     
+    let logoUrl = manifest.logo
+    if (logoUrl && !logoUrl.startsWith('http')) {
+      const baseUrl = new URL(manifestUrl)
+      logoUrl = new URL(logoUrl, baseUrl).href
+    }
+
     const addon = addonDb.create({
       manifest_url: manifestUrl,
       name: manifest.name,
       version: manifest.version,
       description: manifest.description,
-      logo: manifest.logo
+      logo: manifest.logo,
+      logo_url: logoUrl
     })
     
     return c.json(addon)

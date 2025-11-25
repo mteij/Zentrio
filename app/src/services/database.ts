@@ -239,6 +239,7 @@ db.exec(`
     version TEXT,
     description TEXT,
     logo TEXT,
+    logo_url TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -381,6 +382,7 @@ export interface Addon {
   version?: string
   description?: string
   logo?: string
+  logo_url?: string
   created_at: string
 }
 
@@ -928,22 +930,25 @@ export const addonDb = {
     version?: string
     description?: string
     logo?: string
+    logo_url?: string
   }): Addon => {
     const stmt = db.prepare(`
-      INSERT INTO addons (manifest_url, name, version, description, logo)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO addons (manifest_url, name, version, description, logo, logo_url)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(manifest_url) DO UPDATE SET
         name = excluded.name,
         version = excluded.version,
         description = excluded.description,
-        logo = excluded.logo
+        logo = excluded.logo,
+        logo_url = excluded.logo_url
     `)
     const result = stmt.run(
       data.manifest_url,
       data.name,
       data.version || null,
       data.description || null,
-      data.logo || null
+      data.logo || null,
+      data.logo_url || null
     )
     // If updated, we need to fetch by URL to get ID, as lastInsertRowid might not be accurate on update?
     // Actually lastInsertRowid works for INSERT OR REPLACE but ON CONFLICT UPDATE might not return it if no insert happened.
@@ -992,7 +997,7 @@ export const addonDb = {
 
   getForProfile: (profileId: number): ProfileAddon[] => {
     const stmt = db.prepare(`
-      SELECT pa.*, a.manifest_url, a.name, a.version, a.description, a.logo
+      SELECT pa.*, a.manifest_url, a.name, a.version, a.description, a.logo, a.logo_url
       FROM profile_addons pa
       JOIN addons a ON pa.addon_id = a.id
       WHERE pa.profile_id = ?
@@ -1012,9 +1017,10 @@ export const addonDb = {
         version: row.version,
         description: row.description,
         logo: row.logo,
-        created_at: row.created_at // addon creation time not strictly needed here but part of type
+        logo_url: row.logo_url,
+        created_at: row.created_at
       }
-    }))
+    }));
   },
 
   getAllWithStatusForProfile: (profileId: number): (Addon & { enabled: boolean, priority: number })[] => {
