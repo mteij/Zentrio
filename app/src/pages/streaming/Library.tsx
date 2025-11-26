@@ -53,6 +53,18 @@ export const StreamingLibrary = ({ lists, activeList, items, profileId, profile 
               {items.map(item => (
                 <a key={item.meta_id} href={`/streaming/${profileId}/${item.type}/${item.meta_id}`} className="media-card">
                   <div className="poster-container">
+                    {item.imdb_rating && (
+                      <div className="imdb-rating-badge">
+                        <span className="iconify" data-icon="lucide:star" data-width="10" data-height="10"></span>
+                        {item.imdb_rating}
+                      </div>
+                    )}
+                    {item.imdb_rating && (
+                      <div className="imdb-rating-badge">
+                        <span className="iconify" data-icon="lucide:star" data-width="10" data-height="10"></span>
+                        {item.imdb_rating}
+                      </div>
+                    )}
                     {item.poster ? (
                       <img src={item.poster} alt={item.title} className="poster-image" loading="lazy" />
                     ) : (

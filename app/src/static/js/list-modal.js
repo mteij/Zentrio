@@ -107,7 +107,8 @@ class ListModal {
         metaId: this.meta.id,
         type: this.meta.type,
         title: this.meta.name || this.meta.title,
-        poster: this.meta.poster
+        poster: this.meta.poster,
+        imdbRating: this.meta.imdbRating
       });
 
       await fetch(url, {

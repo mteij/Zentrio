@@ -205,6 +205,12 @@ document.addEventListener('DOMContentLoaded', () => {
             closeSearchBtn.addEventListener('click', () => {
                 searchOverlay.classList.remove('active');
                 searchBtn.classList.remove('active');
+                // After closing, move marker back to the actual active page link
+                const currentPath = window.location.pathname;
+                const currentLink = findLinkForPath(currentPath);
+                if (currentLink) {
+                    moveMarker(currentLink, false);
+                }
             });
         }
 
@@ -213,6 +219,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Escape' && searchOverlay.classList.contains('active')) {
                 searchOverlay.classList.remove('active');
                 searchBtn.classList.remove('active');
+                // After closing, move marker back to the actual active page link
+                const currentPath = window.location.pathname;
+                const currentLink = findLinkForPath(currentPath);
+                if (currentLink) {
+                    moveMarker(currentLink, false);
+                }
             }
         });
 

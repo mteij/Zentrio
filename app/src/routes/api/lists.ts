@@ -42,9 +42,9 @@ lists.get('/:id/items', async (c) => {
 // Add item to list
 lists.post('/:id/items', async (c) => {
   const listId = parseInt(c.req.param('id'))
-  const { metaId, type, title, poster } = await c.req.json()
+  const { metaId, type, title, poster, imdbRating } = await c.req.json()
   try {
-    listDb.addItem({ list_id: listId, meta_id: metaId, type, title, poster })
+    listDb.addItem({ list_id: listId, meta_id: metaId, type, title, poster, imdb_rating: imdbRating })
     return c.json({ success: true })
   } catch (e) {
     return c.json({ error: 'Failed to add item' }, 500)

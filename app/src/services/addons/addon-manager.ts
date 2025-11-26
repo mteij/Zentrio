@@ -160,11 +160,39 @@ export class AddonManager {
   async search(query: string, profileId: number): Promise<MetaPreview[]> {
     const clients = await this.getClientsForProfile(profileId)
     const results: MetaPreview[] = []
-    
+
+    // Prioritize TMDB addon for search
+    const tmdbClient = clients.find(c => c.manifest?.id?.includes('tmdb') || c.manifest?.name?.toLowerCase().includes('tmdb') || c.manifestUrl === DEFAULT_TMDB_ADDON)
+
+    if (tmdbClient && tmdbClient.manifest) {
+      for (const cat of tmdbClient.manifest.catalogs) {
+        const searchExtra = cat.extra?.find(e => e.name === 'search')
+        if (searchExtra) {
+          try {
+            console.log(`[AddonManager] Searching TMDB catalog "${cat.id}" for "${query}"`)
+            const items = await tmdbClient.getCatalog(cat.type, cat.id, { search: query })
+            results.push(...items)
+          } catch (e) {
+            console.warn(`TMDB search failed for catalog ${cat.id}`, e)
+          }
+        }
+      }
+      // If we got results from TMDB, return them directly
+      if (results.length > 0) {
+        // Simple deduplication based on ID
+        const uniqueResults = Array.from(new Map(results.map(item => [item.id, item])).values());
+        return uniqueResults;
+      }
+    }
+
+    // Fallback to searching all other addons if TMDB fails or isn't present
+    console.log('[AddonManager] TMDB search yielded no results or TMDB addon not found. Falling back to all addons.')
     for (const client of clients) {
+      // Skip the TMDB client if we already tried it
+      if (client === tmdbClient) continue;
+
       if (!client.manifest) continue
       for (const cat of client.manifest.catalogs) {
-        // Check if catalog supports search
         const searchExtra = cat.extra?.find(e => e.name === 'search')
         if (searchExtra) {
           try {
@@ -176,7 +204,10 @@ export class AddonManager {
         }
       }
     }
-    return results
+    
+    // Deduplicate final results from all sources
+    const uniqueResults = Array.from(new Map(results.map(item => [item.id, item])).values());
+    return uniqueResults;
   }
 
   async getCatalogItems(profileId: number, manifestUrl: string, type: string, id: string, skip?: number): Promise<{ title: string, items: MetaPreview[] } | null> {

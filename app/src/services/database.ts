@@ -45,6 +45,7 @@ const db = new Database(dbPath)
          type TEXT NOT NULL,
          title TEXT,
          poster TEXT,
+         imdb_rating REAL,
          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
          FOREIGN KEY (list_id) REFERENCES lists (id) ON DELETE CASCADE,
          UNIQUE(list_id, meta_id)
@@ -301,6 +302,7 @@ db.exec(`
     type TEXT NOT NULL,
     title TEXT,
     poster TEXT,
+    imdb_rating REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (list_id) REFERENCES lists (id) ON DELETE CASCADE,
     UNIQUE(list_id, meta_id)
@@ -465,6 +467,7 @@ export interface ListItem {
   type: string
   title?: string
   poster?: string
+  imdb_rating?: number
   created_at: string
 }
 
@@ -1008,13 +1011,16 @@ export const listDb = {
     db.prepare("DELETE FROM lists WHERE id = ?").run(id)
   },
 
-  addItem: (data: { list_id: number, meta_id: string, type: string, title?: string, poster?: string }): void => {
+  addItem: (data: { list_id: number, meta_id: string, type: string, title?: string, poster?: string, imdb_rating?: number }): void => {
     const stmt = db.prepare(`
-      INSERT INTO list_items (list_id, meta_id, type, title, poster)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(list_id, meta_id) DO NOTHING
+      INSERT INTO list_items (list_id, meta_id, type, title, poster, imdb_rating)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(list_id, meta_id) DO UPDATE SET
+        title = COALESCE(excluded.title, list_items.title),
+        poster = COALESCE(excluded.poster, list_items.poster),
+        imdb_rating = COALESCE(excluded.imdb_rating, list_items.imdb_rating)
     `)
-    stmt.run(data.list_id, data.meta_id, data.type, data.title || null, data.poster || null)
+    stmt.run(data.list_id, data.meta_id, data.type, data.title || null, data.poster || null, data.imdb_rating ? parseFloat(data.imdb_rating as any) : null)
   },
 
   removeItem: (listId: number, metaId: string): void => {

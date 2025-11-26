@@ -1023,6 +1023,7 @@ body.hide-imdb-ratings .imdb-rating-badge {
     display: flex;
     align-items: center;
     justify-content: center;
+    padding-left: var(--nav-width-desktop);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
@@ -1107,6 +1108,7 @@ body.hide-imdb-ratings .imdb-rating-badge {
         top: 0;
         transform: none;
         border: none;
+        padding-left: 0;
     }
     
     #searchInput {
