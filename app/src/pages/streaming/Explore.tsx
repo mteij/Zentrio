@@ -110,9 +110,13 @@ export const StreamingExplore = ({ catalogs, items, filters, activeFilters, hist
       <Navbar profileId={profileId} activePage="explore" profile={profile} />
       <script dangerouslySetInnerHTML={{__html: script}} />
       
-      <div className="streaming-layout">
-        <div className="content-container" style={{ marginTop: '120px' }}>
+      <div className="streaming-layout no-hero">
+        <div className="content-container" style={{ marginTop: '0' }}>
           
+          <div style={{ padding: '0 60px', marginBottom: '30px' }}>
+            <h1 style={{ fontSize: '3rem', fontWeight: '800', margin: 0 }}>Explore</h1>
+          </div>
+
           {/* Filters Section */}
           <div className="filters-section" style={{ padding: '0 60px', marginBottom: '40px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <select 

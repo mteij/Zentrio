@@ -14,8 +14,8 @@ export const StreamingLibrary = ({ lists, activeList, items, profileId, profile 
   return (
     <Layout title={activeList.name} additionalCSS={['/static/css/streaming.css']} additionalJS={['/static/js/streaming-ui.js']} showHeader={false} showFooter={false}>
       <Navbar profileId={profileId} activePage="library" profile={profile} />
-      <div className="streaming-layout">
-        <div className="content-container" style={{ paddingTop: '120px', marginTop: 0 }}>
+      <div className="streaming-layout no-hero">
+        <div className="content-container" style={{ marginTop: 0 }}>
           <div style={{ padding: '0 60px', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '20px' }}>
             <h1 style={{ fontSize: '2.5rem', fontWeight: '800', color: '#fff', margin: 0 }}>{activeList.name}</h1>
             <div className="list-selector" style={{ position: 'relative' }}>

@@ -192,10 +192,12 @@ app.get('/streaming/:profileId/search', async (c) => {
   const profile = profileDb.findWithSettingsById(profileId)
   const query = c.req.query('q') || ''
   
+  // If there's a query, we'll load the page first then fetch results client-side
+  // This makes the navigation instant as requested
   let results: any[] = []
-  if (query) {
-    results = await addonManager.search(query, profileId)
-  }
+  
+  // If it's an HTMX request or we want server-side rendering (optional), we could do it here
+  // But for the "instant" requirement, we'll just return the shell with the query
   
   return c.html(StreamingSearch({ results, query, profileId, profile }))
 })

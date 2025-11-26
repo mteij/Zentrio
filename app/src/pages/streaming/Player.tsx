@@ -3,7 +3,7 @@ import { Stream } from '../../services/addons/types'
 
 interface StreamingPlayerProps {
   stream: Stream
-  meta: { id: string, type: string, name: string, poster?: string }
+  meta: { id: string, type: string, name: string, poster?: string, season?: number, episode?: number }
   profileId: number
 }
 
@@ -17,23 +17,28 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
           autoPlay
           playsInline
           poster={meta.poster}
+          crossOrigin="anonymous"
         >
           Your browser does not support the video tag.
         </video>
 
         <div className="player-overlay" id="playerOverlay">
           <div className="player-top-bar">
-            <a href="javascript:history.back()" className="zentrio-back-btn" style={{ position: 'static', transform: 'none', margin: 0 }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-              </svg>
-              Back
+            <a href={`/streaming/${profileId}/${meta.type}/${meta.id}`} className="back-btn">
+              <i data-lucide="arrow-left" style={{ width: 24, height: 24 }}></i>
             </a>
             <div className="stream-info">
-              <div className="stream-title">{meta.name}</div>
+              <div className="stream-title">
+                {meta.name}
+                {meta.season && meta.episode && <span className="episode-tag">S{meta.season}:E{meta.episode}</span>}
+              </div>
               <div className="stream-subtitle">{stream.title || stream.name || 'Playing'}</div>
             </div>
-            <div style={{ width: 40 }}></div> {/* Spacer for centering */}
+            <div className="top-right-controls">
+                <button className="control-btn" id="settingsBtn" title="Settings">
+                    <i data-lucide="settings" style={{ width: 24, height: 24 }}></i>
+                </button>
+            </div>
           </div>
 
           <div className="player-loading" id="playerLoading">
@@ -50,16 +55,18 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
             <div className="controls-row">
               <div className="left-controls">
                 <button className="control-btn play-pause-btn" id="playPauseBtn">
-                  <i data-lucide="pause" id="playIcon" style={{ width: 24, height: 24, fill: 'currentColor' }}></i>
+                  <span id="playIconContainer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i data-lucide="pause" style={{ width: 28, height: 28, fill: 'currentColor' }}></i>
+                  </span>
                 </button>
                 
                 <div className="volume-wrapper">
-                  <div className="volume-container">
-                    <input type="range" min="0" max="1" step="0.1" className="volume-slider" id="volumeSlider" />
-                  </div>
                   <button className="control-btn" id="muteBtn">
                     <i data-lucide="volume-2" id="volumeIcon" style={{ width: 24, height: 24 }}></i>
                   </button>
+                  <div className="volume-container">
+                    <input type="range" min="0" max="1" step="0.05" className="volume-slider" id="volumeSlider" />
+                  </div>
                 </div>
 
                 <div className="time-display">
@@ -68,12 +75,50 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
               </div>
 
               <div className="right-controls">
+                <button className="control-btn" id="nextSourceBtn" title="Find another source">
+                    <i data-lucide="layers" style={{ width: 24, height: 24 }}></i>
+                </button>
                 <button className="control-btn" id="fullscreenBtn">
                   <i data-lucide="maximize" style={{ width: 24, height: 24 }}></i>
                 </button>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Settings Modal */}
+        <div className="settings-modal" id="settingsModal">
+            <div className="settings-content">
+                <h3>Playback Settings</h3>
+                
+                <div className="setting-group">
+                    <label>Playback Speed</label>
+                    <select id="speedSelect">
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>Normal</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                    </select>
+                </div>
+
+                <div className="setting-group">
+                    <label>Audio Track</label>
+                    <select id="audioSelect">
+                        <option value="-1">Default</option>
+                    </select>
+                </div>
+
+                <div className="setting-group">
+                    <label>Subtitles</label>
+                    <select id="subtitleSelect">
+                        <option value="-1">Off</option>
+                    </select>
+                </div>
+
+                <button className="close-settings-btn" id="closeSettingsBtn">Close</button>
+            </div>
         </div>
       </div>
 
@@ -87,7 +132,7 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
           const wrapper = document.getElementById('playerWrapper');
           const overlay = document.getElementById('playerOverlay');
           const playPauseBtn = document.getElementById('playPauseBtn');
-          const playIcon = document.getElementById('playIcon');
+          const playIconContainer = document.getElementById('playIconContainer');
           const progressBar = document.getElementById('progressBar');
           const progressContainer = document.getElementById('progressContainer');
           const volumeSlider = document.getElementById('volumeSlider');
@@ -97,10 +142,19 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
           const currentTimeEl = document.getElementById('currentTime');
           const durationEl = document.getElementById('duration');
           const loadingSpinner = document.getElementById('playerLoading');
+          const settingsBtn = document.getElementById('settingsBtn');
+          const settingsModal = document.getElementById('settingsModal');
+          const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+          const speedSelect = document.getElementById('speedSelect');
+          const audioSelect = document.getElementById('audioSelect');
+          const subtitleSelect = document.getElementById('subtitleSelect');
+          const nextSourceBtn = document.getElementById('nextSourceBtn');
 
           const streamUrl = "${stream.url}";
           const profileId = ${profileId};
           const meta = ${JSON.stringify(meta)};
+          
+          let hlsInstance = null;
           
           // --- Platform Detection & Player Setup ---
           
@@ -121,19 +175,121 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
 
             if (isHls && Hls.isSupported()) {
               const hls = new Hls();
+              hlsInstance = hls;
               hls.loadSource(streamUrl);
               hls.attachMedia(video);
               hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 video.play().catch(e => console.log('Autoplay blocked', e));
+                updateAudioTracks();
+                updateSubtitles();
               });
+              hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, updateAudioTracks);
+              hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, updateSubtitles);
             } else if (isDash && typeof dashjs !== 'undefined') {
               const player = dashjs.MediaPlayer().create();
               player.initialize(video, streamUrl, true);
             } else {
               // Fallback for native support (Safari HLS, or direct MP4)
               video.src = streamUrl;
+              // Native HLS support (Safari)
+              if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                  video.addEventListener('loadedmetadata', () => {
+                      updateAudioTracks();
+                      updateSubtitles();
+                  });
+              }
             }
           }
+
+          // --- Track Management ---
+
+          function updateAudioTracks() {
+              audioSelect.innerHTML = '<option value="-1">Default</option>';
+              
+              if (hlsInstance) {
+                  hlsInstance.audioTracks.forEach((track, index) => {
+                      const option = document.createElement('option');
+                      option.value = index;
+                      option.text = track.name || \`Track \${index + 1} (\${track.lang || 'unknown'})\`;
+                      if (hlsInstance.audioTrack === index) option.selected = true;
+                      audioSelect.appendChild(option);
+                  });
+              } else if (video.audioTracks) {
+                   // Native audio tracks support
+                   for (let i = 0; i < video.audioTracks.length; i++) {
+                       const track = video.audioTracks[i];
+                       const option = document.createElement('option');
+                       option.value = i;
+                       option.text = track.label || track.language || \`Track \${i + 1}\`;
+                       if (track.enabled) option.selected = true;
+                       audioSelect.appendChild(option);
+                   }
+              }
+          }
+
+          function updateSubtitles() {
+              subtitleSelect.innerHTML = '<option value="-1">Off</option>';
+              
+              if (hlsInstance) {
+                  hlsInstance.subtitleTracks.forEach((track, index) => {
+                      const option = document.createElement('option');
+                      option.value = index;
+                      option.text = track.name || \`Subtitle \${index + 1} (\${track.lang || 'unknown'})\`;
+                      if (hlsInstance.subtitleTrack === index) option.selected = true;
+                      subtitleSelect.appendChild(option);
+                  });
+              } else if (video.textTracks) {
+                  // Native text tracks
+                  for (let i = 0; i < video.textTracks.length; i++) {
+                      const track = video.textTracks[i];
+                      // Only show subtitles/captions
+                      if (track.kind === 'subtitles' || track.kind === 'captions') {
+                          const option = document.createElement('option');
+                          option.value = i;
+                          option.text = track.label || track.language || \`Subtitle \${i + 1}\`;
+                          if (track.mode === 'showing') option.selected = true;
+                          subtitleSelect.appendChild(option);
+                      }
+                  }
+              }
+          }
+
+          audioSelect.addEventListener('change', (e) => {
+              const index = parseInt(e.target.value);
+              if (hlsInstance) {
+                  hlsInstance.audioTrack = index;
+              } else if (video.audioTracks) {
+                  for (let i = 0; i < video.audioTracks.length; i++) {
+                      video.audioTracks[i].enabled = (i === index);
+                  }
+              }
+          });
+
+          subtitleSelect.addEventListener('change', (e) => {
+              const index = parseInt(e.target.value);
+              if (hlsInstance) {
+                  hlsInstance.subtitleTrack = index;
+              } else if (video.textTracks) {
+                  for (let i = 0; i < video.textTracks.length; i++) {
+                      const track = video.textTracks[i];
+                      if (track.kind === 'subtitles' || track.kind === 'captions') {
+                          // We can't easily map index back to track list index if we filtered, 
+                          // but for simplicity assuming direct mapping or just iterating all
+                          // Ideally we store track reference.
+                          // Simple approach: disable all, enable selected if match
+                          track.mode = 'hidden';
+                      }
+                  }
+                  if (index !== -1 && video.textTracks[index]) {
+                      video.textTracks[index].mode = 'showing';
+                  }
+              }
+          });
+
+          speedSelect.addEventListener('change', (e) => {
+              video.playbackRate = parseFloat(e.target.value);
+          });
+
 
           // --- UI Logic ---
 
@@ -144,23 +300,34 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
           }
 
           function updatePlayIcon() {
+            const iconName = video.paused ? 'play' : 'pause';
+            if (playIconContainer) {
+                playIconContainer.innerHTML = '<i data-lucide="' + iconName + '" style="width: 28px; height: 28px; fill: currentColor;"></i>';
+                if (window.lucide) window.lucide.createIcons();
+            }
+
             if (video.paused) {
-              playIcon.setAttribute('data-lucide', 'play');
               wrapper.classList.add('paused');
             } else {
-              playIcon.setAttribute('data-lucide', 'pause');
               wrapper.classList.remove('paused');
             }
-            if (window.lucide) window.lucide.createIcons();
           }
 
-          playPauseBtn.addEventListener('click', () => {
+          playPauseBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent wrapper click
             if (video.paused) video.play();
             else video.pause();
           });
 
           video.addEventListener('play', updatePlayIcon);
           video.addEventListener('pause', updatePlayIcon);
+          
+          // Click on video to toggle play/pause
+          video.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (video.paused) video.play();
+              else video.pause();
+          });
           
           video.addEventListener('waiting', () => {
             loadingSpinner.style.display = 'block';
@@ -221,20 +388,75 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
             }
           });
 
+          // Settings Modal
+          settingsBtn.addEventListener('click', () => {
+              settingsModal.classList.add('active');
+          });
+
+          closeSettingsBtn.addEventListener('click', () => {
+              settingsModal.classList.remove('active');
+          });
+
+          // Next Source Logic
+          nextSourceBtn.addEventListener('click', async () => {
+              const originalHtml = nextSourceBtn.innerHTML;
+              nextSourceBtn.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>';
+              nextSourceBtn.disabled = true;
+
+              try {
+                  const fetchId = meta.imdb_id || meta.id;
+                  let url = \`/api/streaming/streams/\${meta.type}/\${fetchId}?profileId=\${profileId}\`;
+                  if (meta.type === 'series' && meta.season && meta.episode) {
+                    url += \`&season=\${meta.season}&episode=\${meta.episode}\`;
+                  }
+                  
+                  const res = await fetch(url);
+                  const data = await res.json();
+                  
+                  if (data.streams && data.streams.length > 0) {
+                      // Flatten streams
+                      const allStreams = data.streams.flatMap(g => g.streams);
+                      // Find current stream index
+                      const currentIdx = allStreams.findIndex(s => s.url === streamUrl);
+                      // Get next stream
+                      const nextStream = allStreams[currentIdx + 1] || allStreams[0];
+                      
+                      if (nextStream && nextStream.url !== streamUrl) {
+                          window.location.replace(\`/streaming/\${profileId}/player?stream=\${encodeURIComponent(JSON.stringify(nextStream))}&meta=\${encodeURIComponent(JSON.stringify(meta))}\`);
+                      } else {
+                          alert('No other sources available');
+                      }
+                  } else {
+                      alert('No streams found');
+                  }
+              } catch (e) {
+                  console.error(e);
+                  alert('Error finding streams');
+              } finally {
+                  nextSourceBtn.innerHTML = originalHtml;
+                  nextSourceBtn.disabled = false;
+                  if (window.lucide) window.lucide.createIcons();
+              }
+          });
+
           // Auto-hide controls
           let hideTimeout;
           function showControls() {
             wrapper.classList.add('active');
             clearTimeout(hideTimeout);
             hideTimeout = setTimeout(() => {
-              if (!video.paused) {
+              if (!video.paused && !settingsModal.classList.contains('active')) {
                 wrapper.classList.remove('active');
               }
             }, 3000);
           }
 
           wrapper.addEventListener('mousemove', showControls);
-          wrapper.addEventListener('click', showControls);
+          wrapper.addEventListener('click', (e) => {
+              if (!settingsModal.contains(e.target) && e.target !== settingsBtn && !settingsBtn.contains(e.target)) {
+                  showControls();
+              }
+          });
 
           // Progress Saving
           let lastUpdate = 0;

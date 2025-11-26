@@ -1,8 +1,15 @@
 /* Glassmorphism Video Player Styles */
 
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent scrolling */
+    background: #000;
+}
+
 .player-wrapper {
     position: relative;
-    width: 100%;
+    width: 100vw;
     height: 100vh;
     background: #000;
     overflow: hidden;
@@ -59,6 +66,7 @@
     cursor: pointer;
     backdrop-filter: blur(10px);
     transition: all 0.2s ease;
+    text-decoration: none;
 }
 
 .back-btn:hover {
@@ -69,6 +77,8 @@
 .stream-info {
     text-align: center;
     text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+    flex: 1;
+    margin: 0 20px;
 }
 
 .stream-title {
@@ -76,11 +86,28 @@
     font-weight: 700;
     color: #fff;
     margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.episode-tag {
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
 }
 
 .stream-subtitle {
     font-size: 1rem;
     color: rgba(255, 255, 255, 0.7);
+}
+
+.top-right-controls {
+    display: flex;
+    gap: 16px;
 }
 
 /* Bottom Controls */
@@ -156,28 +183,32 @@
     justify-content: center;
     opacity: 0.8;
     transition: all 0.2s ease;
+    padding: 8px;
+    border-radius: 8px;
 }
 
 .control-btn:hover {
     opacity: 1;
     transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.1);
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 .play-pause-btn {
-    width: 56px;
-    height: 56px;
-    background: #fff;
-    color: #000;
+    width: 64px;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 50%;
     opacity: 1;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
 }
 
 .play-pause-btn:hover {
-    transform: scale(1.1);
-    background: #fff;
-    box-shadow: 0 0 30px rgba(255, 255, 255, 0.4);
+    transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .time-display {
@@ -192,24 +223,33 @@
 .volume-wrapper {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0;
+    padding: 0 10px;
+    border-radius: 20px;
+    transition: background 0.3s ease;
+}
+
+.volume-wrapper:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .volume-container {
     display: flex;
     align-items: center;
-    gap: 10px;
     width: 0;
     overflow: hidden;
-    transition: width 0.3s ease;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    opacity: 0;
 }
 
 .volume-wrapper:hover .volume-container {
     width: 100px;
+    opacity: 1;
+    margin-left: 10px;
 }
 
 .volume-slider {
-    width: 100%;
+    width: 100px;
     height: 4px;
     -webkit-appearance: none;
     background: rgba(255, 255, 255, 0.3);
@@ -249,6 +289,95 @@
     to { transform: rotate(360deg); }
 }
 
+/* Settings Modal */
+.settings-modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 100;
+}
+
+.settings-modal.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.settings-content {
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 30px;
+    width: 90%;
+    max-width: 400px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+
+.settings-content h3 {
+    margin: 0 0 20px;
+    color: #fff;
+    font-size: 1.5rem;
+    text-align: center;
+}
+
+.setting-group {
+    margin-bottom: 20px;
+}
+
+.setting-group label {
+    display: block;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.setting-group select {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    outline: none;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.setting-group select:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.setting-group select option {
+    background: #222;
+    color: #fff;
+}
+
+.close-settings-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent, #e50914);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.close-settings-btn:hover {
+    filter: brightness(1.1);
+}
+
 /* Mobile Adjustments */
 @media (max-width: 768px) {
     .player-top-bar {
@@ -265,6 +394,8 @@
     
     .stream-title {
         font-size: 1.1rem;
+        flex-direction: column;
+        gap: 4px;
     }
     
     .stream-subtitle {
@@ -279,5 +410,9 @@
     .control-btn i {
         width: 20px !important;
         height: 20px !important;
+    }
+    
+    .episode-tag {
+        font-size: 0.8rem;
     }
 }

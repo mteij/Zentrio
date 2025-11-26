@@ -11,6 +11,19 @@ streaming.get('/streams/:type/:id', async (c) => {
   return c.json({ streams })
 })
 
+streaming.get('/search', async (c) => {
+  const { q, profileId } = c.req.query()
+  if (!q || !profileId) return c.json({ results: [] })
+  
+  try {
+    const results = await addonManager.search(q, parseInt(profileId))
+    return c.json({ results })
+  } catch (e) {
+    console.error('Search API error:', e)
+    return c.json({ results: [] })
+  }
+})
+
 streaming.get('/catalog', async (c) => {
   const { profileId, manifestUrl, type, id, skip, genre } = c.req.query()
   const pId = parseInt(profileId)
@@ -44,4 +57,29 @@ streaming.put('/settings', async (c) => {
   return c.json({ success: true })
 })
 
+streaming.post('/progress', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { profileId, metaId, metaType, title, poster, duration, position } = body
+    
+    if (!profileId || !metaId || !metaType) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+
+    watchHistoryDb.upsert({
+      profile_id: parseInt(profileId),
+      meta_id: metaId,
+      meta_type: metaType,
+      title,
+      poster,
+      duration,
+      position
+    })
+
+    return c.json({ success: true })
+  } catch (e) {
+    console.error('Failed to save progress', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
 export default streaming

@@ -176,68 +176,159 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Search Overlay Logic
-    const searchBtn = document.getElementById('navSearchBtn');
-    const searchOverlay = document.getElementById('searchOverlay');
-    const closeSearchBtn = document.getElementById('closeSearchBtn');
+    // Search Page Logic
+    const searchForm = document.getElementById('searchForm');
     const searchInput = document.getElementById('searchInput');
 
-    if (searchBtn && searchOverlay && searchInput) {
-        const toggleSearch = (e) => {
-            if (e) e.preventDefault();
-            const isActive = searchOverlay.classList.contains('active');
-            
-            if (isActive) {
-                searchOverlay.classList.remove('active');
-                searchBtn.classList.remove('active');
-                // Restore active state of current page link if needed
-                // But for now, just removing active from search btn is enough
-            } else {
-                searchOverlay.classList.add('active');
-                searchBtn.classList.add('active');
-                setTimeout(() => searchInput.focus(), 100);
-            }
-        };
-
-        searchBtn.addEventListener('click', toggleSearch);
-        
-        if (closeSearchBtn) {
-            closeSearchBtn.addEventListener('click', () => {
-                searchOverlay.classList.remove('active');
-                searchBtn.classList.remove('active');
-                // After closing, move marker back to the actual active page link
-                const currentPath = window.location.pathname;
-                const currentLink = findLinkForPath(currentPath);
-                if (currentLink) {
-                    moveMarker(currentLink, false);
-                }
-            });
-        }
-
-        // Close on escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && searchOverlay.classList.contains('active')) {
-                searchOverlay.classList.remove('active');
-                searchBtn.classList.remove('active');
-                // After closing, move marker back to the actual active page link
-                const currentPath = window.location.pathname;
-                const currentLink = findLinkForPath(currentPath);
-                if (currentLink) {
-                    moveMarker(currentLink, false);
-                }
-            }
-        });
-
+    if (searchForm && searchInput) {
         // Handle search submission
         searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent default form submission
                 const query = searchInput.value.trim();
                 if (query) {
                     const profileId = window.location.pathname.split('/')[2];
-                    window.location.href = `/streaming/${profileId}/search?q=${encodeURIComponent(query)}`;
+                    
+                    // Use View Transitions API if available
+                    if (document.startViewTransition) {
+                        document.startViewTransition(() => {
+                            window.location.href = `/streaming/${profileId}/search?q=${encodeURIComponent(query)}`;
+                        });
+                    } else {
+                        window.location.href = `/streaming/${profileId}/search?q=${encodeURIComponent(query)}`;
+                    }
                 }
             }
         });
+    }
+
+    // Search Overlay Logic
+    const navSearchBtn = document.getElementById('navSearchBtn');
+    const searchOverlay = document.getElementById('searchOverlay');
+    const closeSearchBtn = document.getElementById('closeSearchBtn');
+    const overlaySearchInput = document.getElementById('overlaySearchInput');
+    const overlaySearchForm = document.getElementById('overlaySearchForm');
+
+    if (navSearchBtn && searchOverlay && closeSearchBtn && overlaySearchInput) {
+        // Open overlay
+        navSearchBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            searchOverlay.classList.add('active');
+            overlaySearchInput.focus();
+            document.body.style.overflow = 'hidden'; // Prevent scrolling
+        });
+
+        // Close overlay
+        const closeOverlay = () => {
+            searchOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+            overlaySearchInput.value = ''; // Clear input
+        };
+
+        closeSearchBtn.addEventListener('click', closeOverlay);
+
+        // Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && searchOverlay.classList.contains('active')) {
+                closeOverlay();
+            }
+        });
+
+        // Handle overlay search submission
+        overlaySearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const query = overlaySearchInput.value.trim();
+                if (query) {
+                    const profileId = window.location.pathname.split('/')[2];
+                    
+                    // Close overlay first
+                    closeOverlay();
+
+                    // Navigate to search page
+                    if (document.startViewTransition) {
+                        document.startViewTransition(() => {
+                            window.location.href = `/streaming/${profileId}/search?q=${encodeURIComponent(query)}`;
+                        });
+                    } else {
+                        window.location.href = `/streaming/${profileId}/search?q=${encodeURIComponent(query)}`;
+                    }
+                }
+            }
+        });
+    }
+
+    // Client-side Search Results Fetching
+    const searchResultsContainer = document.getElementById('searchResultsContainer');
+    if (searchResultsContainer) {
+        const query = searchResultsContainer.getAttribute('data-query');
+        const profileId = searchResultsContainer.getAttribute('data-profile-id');
+        const grid = document.getElementById('searchResultsGrid');
+
+        if (query && profileId && grid) {
+            // Fetch results
+            fetch(`/api/streaming/search?q=${encodeURIComponent(query)}&profileId=${profileId}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Search failed');
+                    return res.json();
+                })
+                .then(data => {
+                    grid.innerHTML = ''; // Clear loading spinner
+                    
+                    if (!data.results || data.results.length === 0) {
+                        grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #666;">No results found.</div>';
+                        return;
+                    }
+
+                    data.results.forEach(item => {
+                        const card = document.createElement('a');
+                        card.href = `/streaming/${profileId}/${item.type}/${item.id}`;
+                        card.className = 'media-card';
+                        
+                        // Check if in list (this would require fetching list status or including it in response)
+                        // For now, we'll skip the checkmark or fetch it separately if needed
+                        // But ideally the API should return it.
+                        
+                        let posterHtml = '';
+                        if (item.poster) {
+                            posterHtml = `<img src="${item.poster}" alt="${item.name}" class="poster-image" loading="lazy" />`;
+                        } else {
+                            posterHtml = `<div class="no-poster">${item.name}</div>`;
+                        }
+
+                        let ratingHtml = '';
+                        if (item.imdbRating) {
+                            ratingHtml = `
+                                <div class="imdb-rating-badge">
+                                    <span class="iconify" data-icon="lucide:star" data-width="10" data-height="10"></span>
+                                    ${item.imdbRating}
+                                </div>
+                            `;
+                        }
+
+                        card.innerHTML = `
+                            <div class="poster-container">
+                                ${ratingHtml}
+                                ${posterHtml}
+                                <div class="card-overlay">
+                                    <div class="card-title">${item.name}</div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Add animation delay based on index
+                        // We can't easily do nth-child in JS without loop index, but CSS handles it for first 10
+                        // If we want to be precise:
+                        // card.style.animationDelay = `${index * 0.05}s`;
+                        
+                        grid.appendChild(card);
+                    });
+                })
+                .catch(err => {
+                    console.error('Search error:', err);
+                    grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #e50914;">Error loading results.</div>';
+                });
+        }
     }
 
     // Navigation Marker Animation

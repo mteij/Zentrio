@@ -27,20 +27,10 @@ export const Navbar = ({ profileId, activePage, profile }: NavbarProps) => {
             <span className="iconify" data-icon="lucide:library" data-width="24" data-height="24"></span>
             <span>My List</span>
           </a>
-          <a href="#" className={`nav-link ${activePage === 'search' ? 'active' : ''}`} title="Search" id="navSearchBtn">
+          <a href={`/streaming/${profileId}/search`} className={`nav-link ${activePage === 'search' ? 'active' : ''}`} title="Search" id="navSearchBtn">
             <span className="iconify" data-icon="lucide:search" data-width="24" data-height="24"></span>
             <span>Search</span>
           </a>
-        </div>
-
-        <div className="search-overlay" id="searchOverlay">
-          <button className="close-search" id="closeSearchBtn">
-            <span className="iconify" data-icon="lucide:x" data-width="24" data-height="24"></span>
-          </button>
-          <div className="search-container">
-            <span className="iconify search-icon" data-icon="lucide:search"></span>
-            <input type="text" id="searchInput" placeholder="Search movies & series..." autoComplete="off" />
-          </div>
         </div>
 
         <div className="nav-right">
@@ -56,6 +46,25 @@ export const Navbar = ({ profileId, activePage, profile }: NavbarProps) => {
           </a>
         </div>
       </nav>
+
+      {/* Search Overlay */}
+      <div className="search-overlay" id="searchOverlay">
+        <div className="search-container">
+          <span className="iconify search-icon" data-icon="lucide:search"></span>
+          <form action={`/streaming/${profileId}/search`} method="get" id="overlaySearchForm" style={{ width: '100%' }}>
+            <input
+              type="text"
+              name="q"
+              id="overlaySearchInput"
+              placeholder="Search movies & series..."
+              autoComplete="off"
+            />
+          </form>
+          <button className="close-search" id="closeSearchBtn" aria-label="Close Search">
+            <span className="iconify" data-icon="lucide:x" data-width="32" data-height="32"></span>
+          </button>
+        </div>
+      </div>
     </>
   )
 }
