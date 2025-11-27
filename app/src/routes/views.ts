@@ -6,6 +6,7 @@ import { auth } from '../services/auth'
 import { LandingPage } from '../pages/LandingPage'
 import { ProfilesPage } from '../pages/ProfilesPage'
 import { SettingsPage } from '../pages/SettingsPage'
+import { ExploreAddonsPage } from '../pages/ExploreAddonsPage'
 import { ResetPasswordPage } from '../pages/ResetPasswordPage'
 import { StreamingHome } from '../pages/streaming/Home'
 import { StreamingDetails } from '../pages/streaming/Details'
@@ -55,6 +56,10 @@ app.get('/settings', async (c) => {
   return c.html(SettingsPage({}))
 })
 
+app.get('/settings/explore-addons', async (c) => {
+  if (!await isAuthenticated(c)) return c.redirect('/')
+  return c.html(ExploreAddonsPage())
+})
 
 app.get('/reset-password', async (c) => {
   return c.html(ResetPasswordPage({}))

@@ -12,7 +12,7 @@ app.get('/', (c) => {
 
 // Install an addon
 app.post('/', async (c) => {
-  const { manifestUrl } = await c.req.json()
+  const { manifestUrl, settingsProfileId } = await c.req.json()
   if (!manifestUrl) return c.json({ error: 'Manifest URL required' }, 400)
 
   try {
@@ -37,8 +37,14 @@ app.post('/', async (c) => {
       version: manifest.version,
       description: manifest.description,
       logo: manifest.logo,
-      logo_url: logoUrl
+      logo_url: logoUrl,
+      behavior_hints: manifest.behaviorHints
     })
+
+    // If settingsProfileId is provided, enable it for that profile
+    if (settingsProfileId) {
+        addonDb.enableForProfile(parseInt(settingsProfileId), addon.id);
+    }
     
     return c.json(addon)
   } catch (e) {
@@ -54,44 +60,72 @@ app.delete('/:id', (c) => {
   return c.json({ success: true })
 })
 
-// Get enabled addons for a profile
+// Get enabled addons for a profile (legacy support + resolution)
 app.get('/profile/:profileId', (c) => {
   const profileId = parseInt(c.req.param('profileId'))
-  const addons = addonDb.getEnabledForProfile(profileId)
+  // Resolve settings profile
+  const { profileDb } = require('../../services/database'); // Lazy import to avoid circular dep if any
+  const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+  if (!settingsProfileId) return c.json([]);
+  
+  const addons = addonDb.getEnabledForProfile(settingsProfileId)
   return c.json(addons)
 })
 
-// Get all addons with status for a profile (for management)
-app.get('/profile/:profileId/manage', (c) => {
-  const profileId = parseInt(c.req.param('profileId'))
-  const addons = addonDb.getAllWithStatusForProfile(profileId)
+// Get enabled addons for a settings profile
+app.get('/settings-profile/:settingsProfileId', (c) => {
+  const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
+  const addons = addonDb.getEnabledForProfile(settingsProfileId)
   return c.json(addons)
 })
 
-// Toggle addon for profile
-app.post('/profile/:profileId/toggle', async (c) => {
-  const profileId = parseInt(c.req.param('profileId'))
+// Get all addons with status for a settings profile (for management)
+app.get('/settings-profile/:settingsProfileId/manage', (c) => {
+  const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
+  const addons = addonDb.getAllWithStatusForProfile(settingsProfileId)
+  return c.json(addons)
+})
+
+// Toggle addon for settings profile
+app.post('/settings-profile/:settingsProfileId/toggle', async (c) => {
+  const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
   const { addonId, enabled } = await c.req.json()
   
   if (enabled) {
-    addonDb.enableForProfile(profileId, addonId)
+    addonDb.enableForProfile(settingsProfileId, addonId)
   } else {
-    addonDb.disableForProfile(profileId, addonId)
+    addonDb.disableForProfile(settingsProfileId, addonId)
   }
   
   return c.json({ success: true })
 })
 
-// Reorder addons for profile
-app.post('/profile/:profileId/reorder', async (c) => {
-  const profileId = parseInt(c.req.param('profileId'))
+// Reorder addons for settings profile
+app.post('/settings-profile/:settingsProfileId/reorder', async (c) => {
+  const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
   const { addonIds } = await c.req.json()
   
   if (!Array.isArray(addonIds)) {
     return c.json({ error: 'addonIds must be an array' }, 400)
   }
 
-  addonDb.updateProfileAddonOrder(profileId, addonIds)
+  addonDb.updateProfileAddonOrder(settingsProfileId, addonIds)
+  return c.json({ success: true })
+})
+
+// Remove addon from settings profile
+app.delete('/settings-profile/:settingsProfileId/:addonId', (c) => {
+  const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
+  const addonId = parseInt(c.req.param('addonId'))
+  
+  console.log(`[API] DELETE /settings-profile/${settingsProfileId}/${addonId}`);
+  
+  if (isNaN(settingsProfileId) || isNaN(addonId)) {
+    console.error('[API] Invalid parameters for remove addon');
+    return c.json({ error: 'Invalid parameters' }, 400);
+  }
+
+  addonDb.removeFromProfile(settingsProfileId, addonId)
   return c.json({ success: true })
 })
 

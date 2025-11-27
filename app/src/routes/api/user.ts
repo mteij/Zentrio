@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { sessionMiddleware } from '../../middleware/session'
-import { userDb, verifyPassword, profileProxySettingsDb, profileDb, type User } from '../../services/database'
+import { userDb, verifyPassword, profileProxySettingsDb, profileDb, streamDb, settingsProfileDb, type User } from '../../services/database'
 import { auth } from '../../services/auth'
 import { emailService } from '../../services/email'
 import { createHash } from 'crypto'
@@ -21,6 +21,120 @@ app.get('/ping', (c) => ok(c, { pong: true }))
 app.use('*', sessionMiddleware)
 // CSRF-like guard mounted after session middleware
 app.use('*', csrfLikeGuard)
+
+// ========== Settings Profiles ==========
+
+// [GET /settings-profiles] List settings profiles for current user
+app.get('/settings-profiles', async (c) => {
+  try {
+    const user = c.get('user')
+    const profiles = settingsProfileDb.listByUserId(user.id)
+    return ok(c, profiles)
+  } catch (e) {
+    console.error('Failed to list settings profiles:', e)
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
+
+// [POST /settings-profiles] Create a new settings profile
+app.post('/settings-profiles', async (c) => {
+  try {
+    const user = c.get('user')
+    const { name } = await c.req.json()
+    if (!name) return err(c, 400, 'INVALID_INPUT', 'Name is required')
+    
+    const profile = settingsProfileDb.create(user.id, name)
+    return ok(c, profile)
+  } catch (e) {
+    console.error('Failed to create settings profile:', e)
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
+
+// [PUT /settings-profiles/:id] Update a settings profile
+app.put('/settings-profiles/:id', async (c) => {
+  try {
+    const user = c.get('user')
+    const id = parseInt(c.req.param('id'))
+    const { name } = await c.req.json()
+    if (!name) return err(c, 400, 'INVALID_INPUT', 'Name is required')
+    
+    const profile = settingsProfileDb.findById(id)
+    if (!profile || profile.user_id !== user.id) return err(c, 404, 'NOT_FOUND', 'Profile not found')
+    
+    settingsProfileDb.update(id, name)
+    return ok(c, { success: true })
+  } catch (e) {
+    console.error('Failed to update settings profile:', e)
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
+
+// [DELETE /settings-profiles/:id] Delete a settings profile
+app.delete('/settings-profiles/:id', async (c) => {
+  try {
+    const user = c.get('user')
+    const id = parseInt(c.req.param('id'))
+    
+    const profile = settingsProfileDb.findById(id)
+    if (!profile || profile.user_id !== user.id) return err(c, 404, 'NOT_FOUND', 'Profile not found')
+    
+    if (profile.is_default) return err(c, 400, 'INVALID_OPERATION', 'Cannot delete default profile')
+    
+    if (settingsProfileDb.isUsed(id)) return err(c, 400, 'INVALID_OPERATION', 'Cannot delete profile in use')
+    
+    settingsProfileDb.delete(id)
+    return ok(c, { success: true })
+  } catch (e) {
+    console.error('Failed to delete settings profile:', e)
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
+
+// ========== Streaming Settings ==========
+
+// [GET /streaming-settings] Get current user's streaming settings
+app.get('/streaming-settings', async (c) => {
+  try {
+    const user = c.get('user')
+    // Get default profile for user
+    const profile = profileDb.getDefault(user.id)
+    if (!profile) {
+      return err(c, 404, 'PROFILE_NOT_FOUND', 'Default profile not found')
+    }
+    const settings = streamDb.getSettings(profile.id)
+    return ok(c, settings)
+  } catch (e) {
+    console.error('Failed to get streaming settings:', e)
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
+
+// [PUT /streaming-settings] Update current user's streaming settings
+app.put('/streaming-settings', async (c) => {
+  try {
+    const user = c.get('user')
+    const body = await c.req.json().catch(() => ({}))
+    
+    // Get default profile for user
+    const profile = profileDb.getDefault(user.id)
+    if (!profile) {
+      return err(c, 404, 'PROFILE_NOT_FOUND', 'Default profile not found')
+    }
+
+    // Validate body structure if needed, but StreamSettings is complex
+    // For now, trust the client or do basic validation
+    if (typeof body !== 'object') {
+      return err(c, 400, 'INVALID_INPUT', 'Invalid input')
+    }
+
+    streamDb.saveSettings(profile.id, body)
+    return ok(c, undefined, 'Streaming settings saved')
+  } catch (e) {
+    console.error('Failed to save streaming settings:', e)
+    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
 
 // ========== TMDB API Key Management ==========
 
@@ -149,9 +263,12 @@ async function csrfLikeGuard(c: any, next: any) {
     return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
   }
 
-  const ct = (c.req.header('content-type') || '').toLowerCase()
-  if (!ct.startsWith('application/json')) {
-    return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
+  // DELETE requests might not have a content-type if they have no body
+  if (method !== 'DELETE') {
+    const ct = (c.req.header('content-type') || '').toLowerCase()
+    if (!ct.startsWith('application/json')) {
+        return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
+    }
   }
 
   // Reconstruct expected origin honoring reverse proxy headers (TLS termination etc.)
@@ -241,6 +358,7 @@ app.get('/settings', async (c) => {
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
+
 
 // [PUT /settings] Update current user's app settings (keeps legacy shape for frontend)
 app.put('/settings', async (c) => {

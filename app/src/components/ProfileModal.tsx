@@ -42,6 +42,12 @@ export function ProfileModal() {
               </select>
             </FormGroup>
 
+            <FormGroup label="Settings Profile" htmlFor="settingsProfileInput">
+              <select id="settingsProfileInput" name="settingsProfile">
+                <option value="">Loading...</option>
+              </select>
+            </FormGroup>
+
             <div className="profile-action-row">
               <Button
                 type="submit"

@@ -4,6 +4,13 @@
 // Settings state
 const settings = {};
 let tmdbApiKey = '';
+let currentAppearanceProfileId = null;
+let appearanceSettings = {
+    theme_id: 'zentrio',
+    show_imdb_ratings: true,
+    background_style: 'vanta',
+    custom_theme_config: null
+};
 
 // Load user settings
 async function loadSettings() {
@@ -532,6 +539,9 @@ async function applyThemeById(themeId, themes) {
   
          // select/apply on click
          tile.addEventListener('click', () => {
+             appearanceSettings.theme_id = theme.id;
+             saveAppearanceSettings();
+             
              try { localStorage.setItem('zentrioTheme', theme.id); } catch (e) {}
              applyThemeObject(theme);
              // highlight active tile
@@ -542,8 +552,6 @@ async function applyThemeById(themeId, themes) {
              // Show/hide edit button based on theme
              if (theme.id === 'custom') {
                  openCustomThemeEditor(theme);
-             } else {
-                 // document.getElementById('customThemeEditor').style.display = 'none';
              }
          });
   
@@ -576,10 +584,7 @@ async function applyThemeById(themeId, themes) {
              editBtn.className = 'theme-tile-actions';
              editBtn.innerHTML = `
                  <button class="edit-theme-btn" title="Edit Custom Theme">
-                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                     </svg>
+                     <span class="iconify" data-icon="mdi:pencil" style="font-size: 14px;"></span>
                  </button>
              `;
              editBtn.querySelector('button').addEventListener('click', (e) => {
@@ -664,12 +669,17 @@ async function applyThemeById(themeId, themes) {
      localStorage.setItem('zentrioCustomTheme', JSON.stringify(customTheme));
      localStorage.setItem('zentrioTheme', 'custom');
      
+     appearanceSettings.theme_id = 'custom';
+     appearanceSettings.custom_theme_config = JSON.stringify(customTheme);
+     saveAppearanceSettings();
+
      applyThemeObject(customTheme);
      showMessage('Custom theme saved', 'success');
      closeModal('customThemeModal');
      
      // Re-render gallery to update preview
      fetchThemes().then(themes => {
+         window.__loadedThemes = themes;
          renderThemeGallery(themes, 'custom');
      });
  }
@@ -703,99 +713,298 @@ async function uploadTheme(file) {
     }
 }
 
+// Appearance Profile Functions
+async function loadAppearanceProfiles() {
+    const select = document.getElementById('appearance-profile-select');
+    if (!select) return;
+
+    try {
+        const res = await fetch('/api/user/settings-profiles');
+        if (res.ok) {
+            const data = await res.json();
+            const profiles = data.data || data || [];
+            select.innerHTML = '';
+            
+            if (profiles.length === 0) {
+                select.innerHTML = '<option value="">No settings profiles found</option>';
+                return;
+            }
+
+            profiles.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                select.appendChild(opt);
+            });
+
+            const lastSelectedId = localStorage.getItem('lastSelectedAppearanceProfile');
+            if (lastSelectedId && profiles.some(p => p.id.toString() === lastSelectedId)) {
+                select.value = lastSelectedId;
+            } else if (profiles.length > 0) {
+                select.value = profiles[0].id;
+            }
+            
+            if (select.value) {
+                loadAppearanceSettings(select.value);
+                updateAppearanceProfileActions();
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load settings profiles', e);
+        select.innerHTML = '<option value="">Error loading profiles</option>';
+    }
+}
+
+function updateAppearanceProfileActions() {
+    const select = document.getElementById('appearance-profile-select');
+    const deleteBtn = document.getElementById('delete-settings-profile-btn-appearance');
+    const renameBtn = document.getElementById('rename-settings-profile-btn-appearance');
+    
+    if (!select || !deleteBtn || !renameBtn) return;
+    
+    const selectedOption = select.options[select.selectedIndex];
+    const isDefault = selectedOption && selectedOption.textContent === 'Default';
+    
+    deleteBtn.style.display = isDefault ? 'none' : 'inline-block';
+    renameBtn.style.display = isDefault ? 'none' : 'inline-block';
+}
+
+async function loadAppearanceSettings(settingsProfileId) {
+    currentAppearanceProfileId = settingsProfileId;
+    try {
+        const res = await fetch(`/api/appearance/settings?settingsProfileId=${settingsProfileId}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.data) {
+                appearanceSettings = data.data;
+                renderAppearanceUI();
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load appearance settings', e);
+    }
+}
+
+async function saveAppearanceSettings() {
+    if (!currentAppearanceProfileId) return;
+    try {
+        const res = await fetch(`/api/appearance/settings?settingsProfileId=${currentAppearanceProfileId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'xmlhttprequest'
+            },
+            body: JSON.stringify(appearanceSettings)
+        });
+        if (res.ok) {
+            // showMessage('Appearance settings saved', 'success');
+        } else {
+            showMessage('Failed to save appearance settings', 'error');
+        }
+    } catch (e) {
+        console.error('Failed to save appearance settings', e);
+    }
+}
+
+function renderAppearanceUI() {
+    // Update Theme Gallery Selection
+    const gallery = document.getElementById('themeGallery');
+    if (gallery) {
+        gallery.querySelectorAll('.theme-tile').forEach(t => t.style.outline = 'none');
+        const activeTile = gallery.querySelector(`.theme-tile[data-theme-id="${appearanceSettings.theme_id}"]`);
+        if (activeTile) {
+            activeTile.style.outline = `2px solid var(--accent)`;
+        }
+    }
+
+    // Update Background Style
+    const bgSelect = document.getElementById('backgroundStyleSelect');
+    if (bgSelect) {
+        bgSelect.value = appearanceSettings.background_style || 'vanta';
+    }
+
+    // Update IMDb Ratings Toggle
+    const imdbToggle = document.getElementById('imdbRatingsToggle');
+    if (imdbToggle) {
+        imdbToggle.classList.toggle('active', !!appearanceSettings.show_imdb_ratings);
+    }
+
+    // Apply settings locally
+    try {
+        localStorage.setItem('zentrioTheme', appearanceSettings.theme_id);
+        localStorage.setItem('zentrioBackgroundStyle', appearanceSettings.background_style);
+        localStorage.setItem('zentrioHideImdbRatings', !appearanceSettings.show_imdb_ratings);
+        if (appearanceSettings.custom_theme_config) {
+            localStorage.setItem('zentrioCustomTheme', appearanceSettings.custom_theme_config);
+        }
+    } catch (e) {}
+
+    // Apply theme
+    const themes = window.__loadedThemes || [];
+    let theme = null;
+    if (appearanceSettings.theme_id === 'custom') {
+        try { theme = JSON.parse(appearanceSettings.custom_theme_config); } catch(e) {}
+    }
+    if (!theme) {
+        theme = themes.find(t => t.id === appearanceSettings.theme_id);
+    }
+    if (theme) applyThemeObject(theme);
+    
+    // Apply IMDb ratings
+    if (window.ZentrioTheme && window.ZentrioTheme.applyImdbRatings) {
+        window.ZentrioTheme.applyImdbRatings();
+    }
+}
+
 // Initialize page
 document.addEventListener('DOMContentLoaded', () => {
     // Fetch themes from server and render gallery
     (async function initThemes() {
         const themes = await fetchThemes();
-        let activeId = (function () { try { return localStorage.getItem('zentrioTheme') || ''; } catch (e) { return ''; } })();
-    
-        // If no themes found, fall back to a minimal built-in set to ensure UI works
-        let loaded = themes;
-        if (!loaded || loaded.length === 0) {
-            loaded = [
-                {
-                    id: 'theme1',
-                    name: 'Crimson (subtle)',
-                    accent: '#e14a3b',
-                    btnPrimary: '#e14a3b',
-                    btnPrimaryHover: '#cf3f31',
-                    text: '#eff1f3',
-                    muted: '#bfc6cc',
-                    vanta: { highlight: '#2a2a2a', midtone: '#161616', lowlight: '#080808', base: '#050505' }
-                },
-                {
-                    id: 'theme2',
-                    name: 'Ocean (muted)',
-                    accent: '#2a8fb6',
-                    btnPrimary: '#2a8fb6',
-                    btnPrimaryHover: '#227aa3',
-                    text: '#eaf6fb',
-                    muted: '#a9cbdc',
-                    vanta: { highlight: '#dff6ff', midtone: '#bfe7fb', lowlight: '#063043', base: '#02131a' }
-                },
-                {
-                    id: 'theme3',
-                    name: 'Forest (soft)',
-                    accent: '#1fa07a',
-                    btnPrimary: '#1fa07a',
-                    btnPrimaryHover: '#178b67',
-                    text: '#ecf9f3',
-                    muted: '#bfe6d9',
-                    vanta: { highlight: '#dff6e9', midtone: '#bfead2', lowlight: '#07321f', base: '#05150b' }
+        window.__loadedThemes = themes; // Store globally for access
+        
+        // Initialize Appearance Profile Selector
+        const appearanceProfileSelect = document.getElementById('appearance-profile-select');
+        if (appearanceProfileSelect) {
+            appearanceProfileSelect.addEventListener('change', (e) => {
+                const profileId = e.target.value;
+                if (profileId) {
+                    localStorage.setItem('lastSelectedAppearanceProfile', profileId);
+                    loadAppearanceSettings(profileId);
+                    updateAppearanceProfileActions();
                 }
-            ];
-        }
-    
-        // If no explicit stored theme, prefer the Zentrio theme when available
-        if (!activeId && loaded && loaded.length > 0) {
-            const zTheme = loaded.find(t => {
-                if (!t) return false;
-                const nid = (t.id || '').toString().toLowerCase();
-                const nname = (t.name || '').toString().toLowerCase();
-                return nid === 'zentrio' || nname === 'zentrio' || nname === 'zentrio theme';
             });
-            if (zTheme) {
-                activeId = zTheme.id;
-                try { localStorage.setItem('zentrioTheme', activeId); } catch (e) {}
-                // apply immediately so UI reflects it before user interaction
-                applyThemeObject(zTheme);
-            }
+            // Ensure we call this
+            loadAppearanceProfiles();
         }
-    
-        renderThemeGallery(loaded, activeId);
-    
-        // If active theme exists, apply it (unless already applied above)
-        if (activeId) {
-            const theme = loaded.find(t => t.id === activeId);
-            if (theme) applyThemeObject(theme);
+
+        // Appearance Profile Actions
+        const createAppearanceProfileBtn = document.getElementById('create-settings-profile-btn-appearance');
+        if (createAppearanceProfileBtn) {
+            createAppearanceProfileBtn.addEventListener('click', async () => {
+                const name = prompt("Enter name for new settings profile:");
+                if (!name) return;
+                
+                try {
+                    const res = await fetch('/api/user/settings-profiles', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'xmlhttprequest'
+                        },
+                        body: JSON.stringify({ name })
+                    });
+                    if (res.ok) {
+                        const profile = await res.json();
+                        await loadAppearanceProfiles();
+                        if (appearanceProfileSelect) {
+                            appearanceProfileSelect.value = profile.data.id;
+                            loadAppearanceSettings(profile.data.id);
+                            updateAppearanceProfileActions();
+                        }
+                    } else {
+                        alert("Failed to create profile");
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            });
+        }
+
+        const deleteAppearanceProfileBtn = document.getElementById('delete-settings-profile-btn-appearance');
+        if (deleteAppearanceProfileBtn) {
+            deleteAppearanceProfileBtn.addEventListener('click', async () => {
+                if (!currentAppearanceProfileId) return;
+                if (!confirm("Are you sure you want to delete this settings profile?")) return;
+                
+                try {
+                    const res = await fetch(`/api/user/settings-profiles/${currentAppearanceProfileId}`, {
+                        method: 'DELETE',
+                        headers: { 'X-Requested-With': 'xmlhttprequest' }
+                    });
+                    if (res.ok) {
+                        currentAppearanceProfileId = null;
+                        await loadAppearanceProfiles();
+                    } else {
+                        const err = await res.json();
+                        alert(err.error?.message || "Failed to delete profile");
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            });
+        }
+
+        const renameAppearanceProfileBtn = document.getElementById('rename-settings-profile-btn-appearance');
+        if (renameAppearanceProfileBtn) {
+            renameAppearanceProfileBtn.addEventListener('click', async () => {
+                if (!currentAppearanceProfileId) return;
+                const name = prompt("Enter new name:");
+                if (!name) return;
+                
+                try {
+                    const res = await fetch(`/api/user/settings-profiles/${currentAppearanceProfileId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'xmlhttprequest'
+                        },
+                        body: JSON.stringify({ name })
+                    });
+                    if (res.ok) {
+                        const oldId = currentAppearanceProfileId;
+                        await loadAppearanceProfiles();
+                        if (appearanceProfileSelect) {
+                            appearanceProfileSelect.value = oldId;
+                            updateAppearanceProfileActions();
+                        }
+                    } else {
+                        alert("Failed to rename profile");
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            });
         }
 
         // Wire background style selector
         const bgSelect = document.getElementById('backgroundStyleSelect');
         if (bgSelect) {
-            // Set initial state
-            const stored = (function () { try { return localStorage.getItem('zentrioBackgroundStyle') || 'vanta'; } catch (e) { return 'vanta'; } })();
-            bgSelect.value = stored;
-
             bgSelect.addEventListener('change', () => {
                 const newStyle = bgSelect.value;
-                try { localStorage.setItem('zentrioBackgroundStyle', newStyle); } catch (e) {}
-
-                // Reapply theme to update background
-                const current = (function () { try { return localStorage.getItem('zentrioTheme') || ''; } catch (e) { return ''; } })();
+                appearanceSettings.background_style = newStyle;
+                saveAppearanceSettings();
                 
-                // Find theme object (handle custom theme)
+                // Apply immediately
+                try { localStorage.setItem('zentrioBackgroundStyle', newStyle); } catch (e) {}
+                
+                // Reapply theme to update background
+                const current = appearanceSettings.theme_id;
                 let theme = null;
                 if (current === 'custom') {
-                    try { theme = JSON.parse(localStorage.getItem('zentrioCustomTheme')); } catch(e) {}
+                    try { theme = JSON.parse(appearanceSettings.custom_theme_config); } catch(e) {}
                 }
                 if (!theme) {
-                    const themesRef = window.__loadedThemes || loaded;
-                    theme = themesRef ? themesRef.find(t => t.id === current) : null;
+                    theme = themes.find(t => t.id === current);
                 }
-                
                 if (theme) applyThemeObject(theme);
+            });
+        }
+
+        // Wire IMDb Ratings Toggle
+        const imdbToggle = document.getElementById('imdbRatingsToggle');
+        if (imdbToggle) {
+            imdbToggle.addEventListener('click', () => {
+                const newState = !appearanceSettings.show_imdb_ratings;
+                appearanceSettings.show_imdb_ratings = newState;
+                imdbToggle.classList.toggle('active', newState);
+                saveAppearanceSettings();
+                
+                // Apply immediately
+                localStorage.setItem('zentrioHideImdbRatings', !newState);
+                if (window.ZentrioTheme && window.ZentrioTheme.applyImdbRatings) {
+                    window.ZentrioTheme.applyImdbRatings();
+                }
             });
         }
  
@@ -874,24 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // IMDb Ratings Toggle
-    const imdbToggle = document.getElementById('imdbRatingsToggle');
-    if (imdbToggle) {
-        const hide = localStorage.getItem('zentrioHideImdbRatings') === 'true';
-        imdbToggle.classList.toggle('active', !hide);
-
-        imdbToggle.addEventListener('click', () => {
-            const currentHide = localStorage.getItem('zentrioHideImdbRatings') === 'true';
-            const newHide = !currentHide;
-            localStorage.setItem('zentrioHideImdbRatings', newHide);
-            imdbToggle.classList.toggle('active', !newHide);
-            
-            // Apply immediately
-            if (window.ZentrioTheme && window.ZentrioTheme.applyImdbRatings) {
-                window.ZentrioTheme.applyImdbRatings();
-            }
-        });
-    }
+    // IMDb Ratings Toggle logic moved to initThemes to use appearanceSettings
 
     // Add TMDB API key auto-save listener
     const tmdbInput = document.getElementById('tmdbApiKeyInput');
@@ -1174,15 +1366,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 installAddonBtn.disabled = true;
                 installAddonBtn.textContent = 'Installing...';
                 
+                // If we have a current profile, install specifically for it
+                // Otherwise fallback to global install (which might not be what we want anymore)
+                // But wait, the backend /api/addons POST installs globally AND returns the addon.
+                // We should probably update the backend to optionally link it to a profile immediately.
+                // OR, we install globally, then enable for the current profile.
+                
+                // Let's use a new endpoint or modify the existing one to handle profile-specific installation context
+                // For now, let's install globally (create record) then enable for profile.
+                
                 const res = await fetch('/api/addons', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ manifestUrl: url })
+                    body: JSON.stringify({
+                        manifestUrl: url,
+                        settingsProfileId: currentProfileId // Pass current profile ID to enable it immediately
+                    })
                 });
                 
                 if (res.ok) {
+                    const addon = await res.json();
+                    
+                    if (currentProfileId) {
+                        loadAddonsForProfile(currentProfileId);
+                    }
+                    
                     input.value = '';
-                    if (currentProfileId) loadAddonsForProfile(currentProfileId);
                     showMessage('Addon installed successfully', 'success');
                 } else {
                     const err = await res.json();
@@ -1197,18 +1406,130 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const exploreAddonsBtn = document.getElementById('exploreAddonsBtn');
+    if (exploreAddonsBtn) {
+        exploreAddonsBtn.addEventListener('click', () => {
+            window.location.href = '/settings/explore-addons';
+        });
+    }
+
     // Initialize Addon Profile Selector
     const addonProfileSelect = document.getElementById('addonProfileSelect');
     if (addonProfileSelect) {
         addonProfileSelect.addEventListener('change', (e) => {
             const profileId = e.target.value;
             if (profileId) {
+                localStorage.setItem('lastSelectedAddonProfile', profileId);
                 loadAddonsForProfile(profileId);
+                updateAddonProfileActions();
             }
         });
         loadAddonProfiles();
     }
+
+    // Addon Profile Actions
+    const createAddonProfileBtn = document.getElementById('create-settings-profile-btn-addons');
+    if (createAddonProfileBtn) {
+        createAddonProfileBtn.addEventListener('click', async () => {
+            const name = prompt("Enter name for new settings profile:");
+            if (!name) return;
+            
+            try {
+                const res = await fetch('/api/user/settings-profiles', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'xmlhttprequest'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const profile = await res.json();
+                    await loadAddonProfiles();
+                    if (addonProfileSelect) {
+                        addonProfileSelect.value = profile.data.id;
+                        loadAddonsForProfile(profile.data.id);
+                        updateAddonProfileActions();
+                    }
+                } else {
+                    alert("Failed to create profile");
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    }
+
+    const deleteAddonProfileBtn = document.getElementById('delete-settings-profile-btn-addons');
+    if (deleteAddonProfileBtn) {
+        deleteAddonProfileBtn.addEventListener('click', async () => {
+            if (!currentProfileId) return;
+            if (!confirm("Are you sure you want to delete this settings profile?")) return;
+            
+            try {
+                const res = await fetch(`/api/user/settings-profiles/${currentProfileId}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Requested-With': 'xmlhttprequest' }
+                });
+                if (res.ok) {
+                    currentProfileId = null;
+                    await loadAddonProfiles();
+                } else {
+                    const err = await res.json();
+                    alert(err.error?.message || "Failed to delete profile");
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    }
+
+    const renameAddonProfileBtn = document.getElementById('rename-settings-profile-btn-addons');
+    if (renameAddonProfileBtn) {
+        renameAddonProfileBtn.addEventListener('click', async () => {
+            if (!currentProfileId) return;
+            const name = prompt("Enter new name:");
+            if (!name) return;
+            
+            try {
+                const res = await fetch(`/api/user/settings-profiles/${currentProfileId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'xmlhttprequest'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const oldId = currentProfileId;
+                    await loadAddonProfiles();
+                    if (addonProfileSelect) {
+                        addonProfileSelect.value = oldId;
+                        updateAddonProfileActions();
+                    }
+                } else {
+                    alert("Failed to rename profile");
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    }
 });
+
+function updateAddonProfileActions() {
+    const select = document.getElementById('addonProfileSelect');
+    const deleteBtn = document.getElementById('delete-settings-profile-btn-addons');
+    const renameBtn = document.getElementById('rename-settings-profile-btn-addons');
+    
+    if (!select || !deleteBtn || !renameBtn) return;
+    
+    const selectedOption = select.options[select.selectedIndex];
+    const isDefault = selectedOption && selectedOption.textContent === 'Default';
+    
+    deleteBtn.style.display = isDefault ? 'none' : 'inline-block';
+    renameBtn.style.display = isDefault ? 'none' : 'inline-block';
+}
 
 let currentAddons = [];
 let currentProfileId = null;
@@ -1218,13 +1539,14 @@ async function loadAddonProfiles() {
     if (!select) return;
 
     try {
-        const res = await fetch('/api/profiles');
+        const res = await fetch('/api/user/settings-profiles');
         if (res.ok) {
-            const profiles = await res.json();
+            const data = await res.json();
+            const profiles = data.data || data || [];
             select.innerHTML = '';
             
             if (profiles.length === 0) {
-                select.innerHTML = '<option value="">No profiles found</option>';
+                select.innerHTML = '<option value="">No settings profiles found</option>';
                 return;
             }
 
@@ -1235,27 +1557,33 @@ async function loadAddonProfiles() {
                 select.appendChild(opt);
             });
 
-            // Select first profile by default
-            if (profiles.length > 0) {
+            const lastSelectedId = localStorage.getItem('lastSelectedAddonProfile');
+            if (lastSelectedId && profiles.some(p => p.id.toString() === lastSelectedId)) {
+                select.value = lastSelectedId;
+            } else if (profiles.length > 0) {
                 select.value = profiles[0].id;
-                loadAddonsForProfile(profiles[0].id);
+            }
+
+            if (select.value) {
+                loadAddonsForProfile(select.value);
+                updateAddonProfileActions();
             }
         }
     } catch (e) {
-        console.error('Failed to load profiles', e);
+        console.error('Failed to load settings profiles', e);
         select.innerHTML = '<option value="">Error loading profiles</option>';
     }
 }
 
-async function loadAddonsForProfile(profileId) {
-    currentProfileId = profileId;
+async function loadAddonsForProfile(settingsProfileId) {
+    currentProfileId = settingsProfileId;
     const list = document.getElementById('addonsList');
     if (!list) return;
 
     list.innerHTML = '<div style="color: #666">Loading addons...</div>';
 
     try {
-        const res = await fetch(`/api/addons/profile/${profileId}/manage`);
+        const res = await fetch(`/api/addons/settings-profile/${settingsProfileId}/manage`);
         if (res.ok) {
             currentAddons = await res.json();
             renderAddonsList();
@@ -1268,9 +1596,16 @@ async function loadAddonsForProfile(profileId) {
     }
 }
 
+let sortableInstance = null;
+
 function renderAddonsList() {
     const list = document.getElementById('addonsList');
     if (!list) return;
+
+    if (sortableInstance) {
+        sortableInstance.destroy();
+        sortableInstance = null;
+    }
     
     list.innerHTML = '';
 
@@ -1282,6 +1617,7 @@ function renderAddonsList() {
     currentAddons.forEach((addon, index) => {
         const item = document.createElement('div');
         item.className = 'addon-item';
+        item.setAttribute('data-id', addon.id);
         item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
         item.style.alignItems = 'center';
@@ -1291,6 +1627,7 @@ function renderAddonsList() {
         item.style.backdropFilter = 'blur(10px)';
         item.style.border = '1px solid rgba(255,255,255,0.05)';
         item.style.transition = 'transform 0.2s, background 0.2s';
+        item.style.width = '100%'; // Ensure full width
         
         // Left side: Reorder controls + Info
         const left = document.createElement('div');
@@ -1298,6 +1635,16 @@ function renderAddonsList() {
         left.style.alignItems = 'center';
         left.style.gap = '15px';
         left.style.flex = '1';
+        left.style.minWidth = '0'; // Allow text truncation
+
+        // Drag Handle
+        const handle = document.createElement('div');
+        handle.className = 'drag-handle';
+        handle.innerHTML = '<span class="iconify" data-icon="mdi:drag-horizontal" style="font-size: 20px; color: #888;"></span>';
+        handle.style.cursor = 'grab';
+        handle.style.display = 'flex';
+        handle.style.alignItems = 'center';
+        left.appendChild(handle);
 
         // Reorder controls
         const reorder = document.createElement('div');
@@ -1306,22 +1653,22 @@ function renderAddonsList() {
         reorder.style.gap = '2px';
         
         const upBtn = document.createElement('button');
-        upBtn.innerHTML = '&#9650;'; // Up arrow
+        upBtn.innerHTML = '<span class="iconify" data-icon="mdi:chevron-up"></span>';
         upBtn.style.background = 'none';
         upBtn.style.border = 'none';
         upBtn.style.color = index === 0 ? '#444' : '#888';
         upBtn.style.cursor = index === 0 ? 'default' : 'pointer';
-        upBtn.style.fontSize = '10px';
+        upBtn.style.fontSize = '14px';
         upBtn.style.padding = '2px';
         if (index > 0) upBtn.onclick = () => moveAddon(index, -1);
         
         const downBtn = document.createElement('button');
-        downBtn.innerHTML = '&#9660;'; // Down arrow
+        downBtn.innerHTML = '<span class="iconify" data-icon="mdi:chevron-down"></span>';
         downBtn.style.background = 'none';
         downBtn.style.border = 'none';
         downBtn.style.color = index === currentAddons.length - 1 ? '#444' : '#888';
         downBtn.style.cursor = index === currentAddons.length - 1 ? 'default' : 'pointer';
-        downBtn.style.fontSize = '10px';
+        downBtn.style.fontSize = '14px';
         downBtn.style.padding = '2px';
         if (index < currentAddons.length - 1) downBtn.onclick = () => moveAddon(index, 1);
 
@@ -1347,15 +1694,16 @@ function renderAddonsList() {
             placeholder.style.display = 'flex';
             placeholder.style.alignItems = 'center';
             placeholder.style.justifyContent = 'center';
-            placeholder.innerHTML = '<span style="font-size: 20px; color: #555">🧩</span>';
+            placeholder.innerHTML = '<span class="iconify" data-icon="mdi:puzzle" style="font-size: 20px; color: #555"></span>';
             left.appendChild(placeholder);
         }
 
         // Text Info
         const text = document.createElement('div');
+        text.style.minWidth = '0'; // Allow truncation
         text.innerHTML = `
-            <div style="font-weight: bold; color: #fff; font-size: 15px;">${addon.name} <span style="font-size: 0.8em; color: #888; margin-left: 5px;">v${addon.version || '?'}</span></div>
-            <div style="font-size: 13px; color: #aaa; margin-top: 2px;">${addon.description || 'No description'}</div>
+            <div style="font-weight: bold; color: #fff; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${addon.name} <span style="font-size: 0.8em; color: #888; margin-left: 5px;">v${addon.version || '?'}</span></div>
+            <div style="font-size: 13px; color: #aaa; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${addon.description || 'No description'}</div>
         `;
         left.appendChild(text);
         item.appendChild(left);
@@ -1366,29 +1714,65 @@ function renderAddonsList() {
         right.style.alignItems = 'center';
         right.style.gap = '15px';
 
+        // Share Button
+        const shareBtn = document.createElement('button');
+        shareBtn.innerHTML = '<span class="iconify" data-icon="mdi:share-variant" style="font-size: 16px;"></span>';
+        shareBtn.className = 'btn btn-secondary btn-sm';
+        shareBtn.title = 'Share Addon';
+        shareBtn.style.padding = '8px';
+        shareBtn.style.background = 'transparent';
+        shareBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        shareBtn.style.color = '#fff';
+        shareBtn.style.borderRadius = '4px';
+        shareBtn.style.cursor = 'pointer';
+        shareBtn.style.display = 'flex';
+        shareBtn.style.alignItems = 'center';
+        shareBtn.style.justifyContent = 'center';
+        
+        shareBtn.onclick = (e) => {
+            e.stopPropagation();
+            shareAddon(addon);
+        };
+        right.appendChild(shareBtn);
+
         // Configure Button (if supported)
-        if (addon.behaviorHints && addon.behaviorHints.configurable) {
-            const configBtn = document.createElement('button');
-            configBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2 0l-.44.44a2 2 0 0 0 0 2l.08.18a2 2 0 0 1 0 2l-.25.43a2 2 0 0 1-1.73 1l-.18.08a2 2 0 0 0 0 2v.44a2 2 0 0 0 2 2h.18a2 2 0 0 1 1.73 1l.25.43a2 2 0 0 1 0 2l-.08.18a2 2 0 0 0 0 2l.44.44a2 2 0 0 0 2 0l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73v.18a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.18.08a2 2 0 0 0 2 0l.44-.44a2 2 0 0 0 0-2l-.08-.18a2 2 0 0 1 0-2l.25-.43a2 2 0 0 1 1.73-1l.18-.08a2 2 0 0 0 0-2v-.44a2 2 0 0 0-2-2h-.18a2 2 0 0 1-1.73-1l-.25-.43a2 2 0 0 1 0-2l.08-.18a2 2 0 0 0 0-2l-.44-.44a2 2 0 0 0-2 0l-.18.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-            configBtn.className = 'btn btn-secondary btn-sm';
-            configBtn.title = 'Configure Addon';
-            configBtn.style.padding = '8px';
-            configBtn.style.background = 'transparent';
-            configBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-            configBtn.style.color = '#fff';
-            configBtn.style.borderRadius = '4px';
-            configBtn.style.cursor = 'pointer';
-            configBtn.style.display = 'flex';
-            configBtn.style.alignItems = 'center';
-            configBtn.style.justifyContent = 'center';
-            
+        // Check behaviorHints.configurable OR configurationRequired
+        let behaviorHints = {};
+        if (typeof addon.behavior_hints === 'string') {
+            try {
+                behaviorHints = JSON.parse(addon.behavior_hints);
+            } catch (e) {
+                console.error('Failed to parse behavior_hints', e);
+            }
+        } else if (typeof addon.behavior_hints === 'object' && addon.behavior_hints !== null) {
+            behaviorHints = addon.behavior_hints;
+        }
+        const isConfigurable = (behaviorHints && behaviorHints.configurable) || (behaviorHints && behaviorHints.configurationRequired);
+        
+        const configBtn = document.createElement('button');
+        // Gear icon
+        configBtn.innerHTML = '<span class="iconify" data-icon="mdi:cog" style="font-size: 18px;"></span>';
+        configBtn.className = 'btn btn-secondary btn-sm';
+        configBtn.title = isConfigurable ? 'Configure Addon' : 'Not Configurable';
+        configBtn.style.padding = '8px';
+        configBtn.style.background = 'transparent';
+        configBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        configBtn.style.color = isConfigurable ? '#fff' : '#555';
+        configBtn.style.borderRadius = '4px';
+        configBtn.style.cursor = isConfigurable ? 'pointer' : 'default';
+        configBtn.style.display = 'flex';
+        configBtn.style.alignItems = 'center';
+        configBtn.style.justifyContent = 'center';
+        configBtn.style.opacity = isConfigurable ? '1' : '0.5';
+        
+        if (isConfigurable) {
             configBtn.onclick = (e) => {
                 e.stopPropagation();
                 configureAddon(addon);
             };
-            
-            right.appendChild(configBtn);
         }
+        
+        right.appendChild(configBtn);
 
         // Toggle Switch
         const toggleWrapper = document.createElement('div');
@@ -1399,9 +1783,9 @@ function renderAddonsList() {
 
         // Uninstall Button
         const deleteBtn = document.createElement('button');
-        deleteBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+        deleteBtn.innerHTML = '<span class="iconify" data-icon="mdi:delete" style="font-size: 16px;"></span>';
         deleteBtn.className = 'btn btn-danger btn-sm';
-        deleteBtn.title = 'Uninstall globally';
+        deleteBtn.title = 'Remove from this profile';
         deleteBtn.style.padding = '8px';
         deleteBtn.style.background = 'transparent';
         deleteBtn.style.border = '1px solid rgba(220, 53, 69, 0.3)';
@@ -1414,13 +1798,27 @@ function renderAddonsList() {
         
         deleteBtn.onclick = async (e) => {
             e.stopPropagation();
-            if (!confirm(`Uninstall ${addon.name} globally? This will remove it for all users.`)) return;
+            if (!confirm(`Remove ${addon.name} from this profile?`)) return;
+            
+            if (!currentProfileId || !addon.id) {
+                showMessage('Invalid profile or addon ID', 'error');
+                return;
+            }
+
             try {
-                await fetch(`/api/addons/${addon.id}`, { method: 'DELETE' });
+                // Use the toggle endpoint to disable it (which effectively removes it from the active list in UI)
+                // Or we can implement a specific remove endpoint if we want to delete the record from profile_addons
+                // For now, let's use a new endpoint to remove it from the profile specifically
+                const res = await fetch(`/api/addons/settings-profile/${currentProfileId}/${addon.id}`, { method: 'DELETE' });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to remove addon');
+                }
                 if (currentProfileId) loadAddonsForProfile(currentProfileId);
-                showMessage('Addon uninstalled', 'success');
+                showMessage('Addon removed from profile', 'success');
             } catch (e) {
-                showMessage('Failed to uninstall', 'error');
+                console.error(e);
+                showMessage(e.message || 'Failed to remove addon', 'error');
             }
         };
         
@@ -1428,26 +1826,30 @@ function renderAddonsList() {
         item.appendChild(right);
         list.appendChild(item);
     });
+
+    sortableInstance = new Sortable(list, {
+        animation: 150,
+        handle: '.drag-handle',
+        onEnd: function (evt) {
+            const addonIds = Array.from(list.children).map(item => item.getAttribute('data-id'));
+            saveAddonOrder(addonIds);
+        }
+    });
 }
 
-async function moveAddon(index, direction) {
+async function saveAddonOrder(addonIds) {
     if (!currentProfileId) return;
-    
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= currentAddons.length) return;
 
-    // Swap in local array
-    const temp = currentAddons[index];
-    currentAddons[index] = currentAddons[newIndex];
-    currentAddons[newIndex] = temp;
+    // Update local array for consistency
+    const newOrder = [];
+    addonIds.forEach(id => {
+        const addon = currentAddons.find(a => a.id === id);
+        if (addon) newOrder.push(addon);
+    });
+    currentAddons = newOrder;
 
-    // Re-render immediately for responsiveness
-    renderAddonsList();
-
-    // Send new order to server
-    const addonIds = currentAddons.map(a => a.id);
     try {
-        await fetch(`/api/addons/profile/${currentProfileId}/reorder`, {
+        await fetch(`/api/addons/settings-profile/${currentProfileId}/reorder`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ addonIds })
@@ -1455,14 +1857,30 @@ async function moveAddon(index, direction) {
     } catch (e) {
         console.error('Failed to save order', e);
         showMessage('Failed to save order', 'error');
+        // Optionally, reload to revert UI changes on failure
+        loadAddonsForProfile(currentProfileId);
     }
+}
+
+async function moveAddon(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= currentAddons.length) return;
+
+    const movedAddon = currentAddons.splice(index, 1)[0];
+    currentAddons.splice(newIndex, 0, movedAddon);
+
+    renderAddonsList();
+
+    const addonIds = currentAddons.map(a => a.id);
+    await saveAddonOrder(addonIds);
 }
 
 function configureAddon(addon) {
     // Construct configuration URL
-    // Usually it's the manifest URL without /manifest.json
+    // Usually it's the manifest URL without /manifest.json, with /configure appended
     let configUrl = addon.manifest_url.replace('/manifest.json', '');
     if (configUrl.endsWith('/')) configUrl = configUrl.slice(0, -1);
+    configUrl += '/configure';
     
     // Open in new window/tab
     const win = window.open(configUrl, '_blank');
@@ -1524,7 +1942,7 @@ async function toggleAddon(addonId, enabled) {
     }
 
     try {
-        await fetch(`/api/addons/profile/${currentProfileId}/toggle`, {
+        await fetch(`/api/addons/settings-profile/${currentProfileId}/toggle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ addonId, enabled })
@@ -1541,136 +1959,60 @@ async function toggleAddon(addonId, enabled) {
 }
 
 
-// Streaming settings
-let streamingSettings = {
-  qualities: ['4K', '1080p', '720p', '480p'],
-  preferredKeywords: [],
-  requiredKeywords: []
-};
-
-async function loadStreamingSettings() {
-  try {
-    const response = await fetch('/api/user/streaming-settings');
-    if (response.ok) {
-      const payload = await response.json();
-      const userSettings = (payload && (payload.data || payload)) || {};
-      if (userSettings && typeof userSettings === 'object') {
-        streamingSettings = { ...streamingSettings, ...userSettings };
-        updateStreamingUI();
-      }
+function shareAddon(addon) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('shareAddonModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'shareAddonModal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <span class="close">&times;</span>
+                <h2 style="margin-bottom: 20px; color: white;">Share Addon</h2>
+                <p style="color: #ccc; margin-bottom: 15px;">Copy the link below to share this addon:</p>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="shareAddonUrl" readonly style="flex: 1; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    <button id="copyShareUrlBtn" class="btn btn-primary" style="white-space: nowrap;">Copy</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Close button logic
+        const closeBtn = modal.querySelector('.close');
+        closeBtn.onclick = () => {
+            modal.classList.remove('active');
+        };
+        
+        // Click outside to close
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        };
+        
+        // Copy button logic
+        const copyBtn = document.getElementById('copyShareUrlBtn');
+        copyBtn.onclick = () => {
+            const input = document.getElementById('shareAddonUrl');
+            input.select();
+            document.execCommand('copy');
+            
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 2000);
+        };
     }
-  } catch (error) {
-    console.error('Failed to load streaming settings:', error);
-  }
+    
+    // Set URL and open modal
+    const input = document.getElementById('shareAddonUrl');
+    // Use manifest URL directly
+    input.value = addon.manifest_url;
+    
+    modal.classList.add('active');
 }
 
-function updateStreamingUI() {
-  renderQualityList();
-  renderKeywordList('preferredKeywords', streamingSettings.preferredKeywords);
-  renderKeywordList('requiredKeywords', streamingSettings.requiredKeywords);
-}
-
-function renderQualityList() {
-  const list = document.getElementById('qualityList');
-  if (!list) return;
-  list.innerHTML = '';
-  streamingSettings.qualities.forEach((quality, index) => {
-    const item = document.createElement('div');
-    item.className = 'reorder-item';
-    item.textContent = quality;
-    item.setAttribute('draggable', 'true');
-    item.setAttribute('data-index', index);
-    list.appendChild(item);
-  });
-}
-
-function renderKeywordList(id, keywords) {
-  const list = document.getElementById(id);
-  if (!list) return;
-  list.innerHTML = '';
-  keywords.forEach(keyword => {
-    const item = document.createElement('div');
-    item.className = 'keyword-item';
-    item.textContent = keyword;
-    const removeBtn = document.createElement('button');
-    removeBtn.innerHTML = '&times;';
-    removeBtn.onclick = () => {
-      streamingSettings[id] = streamingSettings[id].filter(k => k !== keyword);
-      saveStreamingSettings();
-      updateStreamingUI();
-    };
-    item.appendChild(removeBtn);
-    list.appendChild(item);
-  });
-}
-
-async function saveStreamingSettings() {
-  try {
-    const response = await fetch('/api/user/streaming-settings', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'xmlhttprequest'
-      },
-      body: JSON.stringify(streamingSettings)
-    });
-
-    if (response.ok) {
-      showMessage('Streaming settings saved', 'success');
-    } else {
-      throw new Error('Failed to save streaming settings');
-    }
-  } catch (error) {
-    showMessage(error.message, 'error');
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  loadStreamingSettings();
-
-  const addPreferredKeywordBtn = document.getElementById('addPreferredKeywordBtn');
-  if (addPreferredKeywordBtn) {
-    addPreferredKeywordBtn.addEventListener('click', () => {
-      const input = document.getElementById('preferredKeywordInput');
-      const keyword = input.value.trim();
-      if (keyword && !streamingSettings.preferredKeywords.includes(keyword)) {
-        streamingSettings.preferredKeywords.push(keyword);
-        input.value = '';
-        saveStreamingSettings();
-        updateStreamingUI();
-      }
-    });
-  }
-
-  const addRequiredKeywordBtn = document.getElementById('addRequiredKeywordBtn');
-  if (addRequiredKeywordBtn) {
-    addRequiredKeywordBtn.addEventListener('click', () => {
-      const input = document.getElementById('requiredKeywordInput');
-      const keyword = input.value.trim();
-      if (keyword && !streamingSettings.requiredKeywords.includes(keyword)) {
-        streamingSettings.requiredKeywords.push(keyword);
-        input.value = '';
-        saveStreamingSettings();
-        updateStreamingUI();
-      }
-    });
-  }
-
-  const qualityList = document.getElementById('qualityList');
-  if (qualityList) {
-    let dragStartIndex;
-    qualityList.addEventListener('dragstart', (e) => {
-      dragStartIndex = +e.target.getAttribute('data-index');
-    });
-    qualityList.addEventListener('dragover', (e) => {
-      e.preventDefault();
-    });
-    qualityList.addEventListener('drop', (e) => {
-      const dragEndIndex = +e.target.getAttribute('data-index');
-      const [removed] = streamingSettings.qualities.splice(dragStartIndex, 1);
-      streamingSettings.qualities.splice(dragEndIndex, 0, removed);
-      saveStreamingSettings();
-      updateStreamingUI();
-    });
-  }
-});
+// Streaming settings logic moved to React component (StreamingSettings.tsx)

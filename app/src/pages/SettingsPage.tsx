@@ -1,5 +1,6 @@
 import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter } from '../components/index'
 import { OTPModal } from '../components/auth/OTPModal'
+import { StreamingSettings } from '../components/settings/StreamingSettings'
 
 interface SettingsPageProps {}
 
@@ -144,10 +145,35 @@ export function SettingsPage({}: SettingsPageProps) {
           <div className="settings-card">
             <h2 className="section-title">Appearance</h2>
 
+            {/* Profile Selector */}
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <div>
+                    <h3>Profile</h3>
+                    <p>Select profile to configure.</p>
+                 </div>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <select id="appearance-profile-select" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
+                        <option value="">Loading profiles...</option>
+                    </select>
+                    <button id="create-settings-profile-btn-appearance" className="btn btn-secondary" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer' }} title="Create new profile">+</button>
+                    <button id="rename-settings-profile-btn-appearance" className="btn btn-secondary" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer', display: 'none' }} title="Rename profile">✎</button>
+                    <button id="delete-settings-profile-btn-appearance" className="btn btn-danger" style={{ padding: '8px', borderRadius: '4px', background: '#dc3545', color: 'white', border: 'none', cursor: 'pointer', display: 'none' }} title="Delete profile">🗑️</button>
+                 </div>
+              </div>
+            </div>
+
             <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 16 }}>
-              <div className="setting-info">
-                <h3>Theme</h3>
-                <p>Choose a subtle, modern theme for button colors, accents and the background. Use previews to pick a look; selection is stored locally on this device.</p>
+              <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h3>Theme</h3>
+                    <p>Choose a subtle, modern theme for button colors, accents and the background. Use previews to pick a look; selection is stored locally on this device.</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <select id="themeSelector" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', display: 'none' }}>
+                        <option value="">Select theme...</option>
+                    </select>
+                </div>
               </div>
 
               <div className="setting-control" style={{ width: '100%' }}>
@@ -190,6 +216,24 @@ export function SettingsPage({}: SettingsPageProps) {
           <div className="settings-card">
             <h2 className="section-title">Addons</h2>
             
+            {/* Profile Selector */}
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <div>
+                    <h3>Profile</h3>
+                    <p>Select profile to configure.</p>
+                 </div>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <select id="addonProfileSelect" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
+                        <option value="">Loading profiles...</option>
+                    </select>
+                    <button id="create-settings-profile-btn-addons" className="btn btn-secondary" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer' }} title="Create new profile">+</button>
+                    <button id="rename-settings-profile-btn-addons" className="btn btn-secondary" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer', display: 'none' }} title="Rename profile">✎</button>
+                    <button id="delete-settings-profile-btn-addons" className="btn btn-danger" style={{ padding: '8px', borderRadius: '4px', background: '#dc3545', color: 'white', border: 'none', cursor: 'pointer', display: 'none' }} title="Delete profile">🗑️</button>
+                 </div>
+              </div>
+            </div>
+
             <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
               <div className="setting-info">
                 <h3>Install Addon</h3>
@@ -203,6 +247,7 @@ export function SettingsPage({}: SettingsPageProps) {
                   style={{ flex: '1' }}
                 />
                 <Button variant="primary" id="installAddonBtn">Install</Button>
+                <Button variant="secondary" id="exploreAddonsBtn">Explore Addons</Button>
               </div>
             </div>
 
@@ -212,15 +257,9 @@ export function SettingsPage({}: SettingsPageProps) {
                     <h3>Manage Addons</h3>
                     <p>Configure addons per profile. Drag to reorder.</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <label htmlFor="addonProfileSelect" style={{ color: '#b3b3b3', fontSize: '14px' }}>Profile:</label>
-                    <select id="addonProfileSelect" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
-                        <option value="">Loading profiles...</option>
-                    </select>
-                </div>
               </div>
               <div className="setting-control" style={{ width: '100%' }}>
-                <div id="addonsList" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div id="addonsList" style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
                   <div style={{ color: '#666' }}>Select a profile to manage addons.</div>
                 </div>
               </div>
@@ -230,53 +269,8 @@ export function SettingsPage({}: SettingsPageProps) {
 
         {/* Streaming Tab */}
         <div id="tab-streaming" className="tab-content">
-          <div className="settings-card">
-            <h2 className="section-title">Streaming</h2>
-            
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div className="setting-info">
-                <h3>Preferred Quality</h3>
-                <p>Drag to reorder your preferred stream qualities.</p>
-              </div>
-              <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
-                <div id="qualityList" className="reorder-list">
-                  {/* Qualities will be rendered here */}
-                </div>
-              </div>
-            </div>
-
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div className="setting-info">
-                <h3>Preferred Keywords</h3>
-                <p>Add keywords to prioritize in stream titles (e.g., "HEVC", "x265").</p>
-              </div>
-              <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
-                <div id="preferredKeywords" className="keyword-list">
-                  {/* Keywords will be rendered here */}
-                </div>
-                <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
-                  <Input type="text" id="preferredKeywordInput" placeholder="Add a keyword" style={{ flex: '1' }} />
-                  <Button variant="secondary" id="addPreferredKeywordBtn">Add</Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div className="setting-info">
-                <h3>Required Keywords</h3>
-                <p>Add keywords that must be present in stream titles (e.g., "4K", "HDR").</p>
-              </div>
-              <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
-                <div id="requiredKeywords" className="keyword-list">
-                  {/* Keywords will be rendered here */}
-                </div>
-                <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
-                  <Input type="text" id="requiredKeywordInput" placeholder="Add a keyword" style={{ flex: '1' }} />
-                  <Button variant="secondary" id="addRequiredKeywordBtn">Add</Button>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* @ts-ignore */}
+          <StreamingSettings />
         </div>
 
         {/* Danger Zone Tab */}
@@ -517,6 +511,7 @@ export function SettingsPage({}: SettingsPageProps) {
       </ModalWithFooter>
 
       {/* Settings wiring script */}
+      <script src="/static/js/streaming-settings.js"></script>
       <script
         dangerouslySetInnerHTML={{
           __html: `
@@ -1279,6 +1274,7 @@ export function SettingsPage({}: SettingsPageProps) {
       {/* Vanta.js and Three.js */}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
       <script src="/static/js/theme.js"></script>
       <script src="/static/js/settings.js"></script>
     </SimpleLayout>

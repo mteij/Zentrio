@@ -1,7 +1,8 @@
 import { AddonClient } from './client'
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
-import { addonDb, streamDb } from '../database'
+import { addonDb, streamDb, profileDb } from '../database'
 import { getConfig } from '../envParser'
+import { StreamProcessor } from './stream-processor'
 
 const DEFAULT_TMDB_ADDON = 'https://v3-cinemeta.strem.io/manifest.json'
 
@@ -27,15 +28,22 @@ export class AddonManager {
   }
 
   private async getClientsForProfile(profileId: number): Promise<AddonClient[]> {
-    const addons = addonDb.getEnabledForProfile(profileId)
-    console.log(`[AddonManager] Found ${addons.length} enabled addons for profile ${profileId}:`, addons.map(a => a.name))
+    // Resolve settings profile ID
+    const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+    if (!settingsProfileId) {
+        console.warn(`[AddonManager] No settings profile found for profile ${profileId}`);
+        return [];
+    }
+
+    const addons = addonDb.getEnabledForProfile(settingsProfileId)
+    console.log(`[AddonManager] Found ${addons.length} enabled addons for profile ${profileId} (settings: ${settingsProfileId}):`, addons.map(a => a.name))
     
     // If no addons enabled, enable default for this profile automatically?
     // Or just return empty? Let's auto-enable default if list is empty to avoid empty state.
     if (addons.length === 0) {
       const defaultAddon = addonDb.findByUrl(DEFAULT_TMDB_ADDON)
       if (defaultAddon) {
-        addonDb.enableForProfile(profileId, defaultAddon.id)
+        addonDb.enableForProfile(settingsProfileId, defaultAddon.id)
         addons.push(defaultAddon)
       }
     }
@@ -305,7 +313,7 @@ export class AddonManager {
 
   async getStreams(type: string, id: string, profileId: number, season?: number, episode?: number): Promise<{ addon: Manifest, streams: Stream[] }[]> {
     const clients = await this.getClientsForProfile(profileId)
-    const results: { addon: Manifest, streams: Stream[] }[] = []
+    const rawResults: { addon: Manifest, streams: Stream[] }[] = []
 
     // For series, we generally need season and episode.
     // If they are missing, we might be requesting the whole series which some addons don't support and return 500.
@@ -338,7 +346,7 @@ export class AddonManager {
         const streams = await client.getStreams(type, videoId)
         console.log(`Received ${streams ? streams.length : 0} streams from ${client.manifest.name}`)
         if (streams && streams.length > 0) {
-          results.push({ addon: client.manifest, streams })
+          rawResults.push({ addon: client.manifest, streams })
         }
       } catch (e) {
         console.warn(`Failed to fetch streams from ${client.manifest.name}`, e)
@@ -347,36 +355,98 @@ export class AddonManager {
 
     await Promise.all(promises)
 
-    const settings = streamDb.getSettings(profileId);
-    if (!settings) return results;
+    const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+    const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;
+    
+    if (!settings) return rawResults;
 
-    results.forEach(result => {
-      result.streams.sort((a, b) => {
-        const aTitle = a.title || a.name || '';
-        const bTitle = b.title || b.name || '';
+    // Fetch meta for filtering context (e.g. type, year, etc.)
+    // We need basic meta info. We can try to fetch it or construct a minimal one.
+    // Ideally we should have passed meta to getStreams, but for now let's fetch it if possible or use minimal info.
+    let meta: MetaDetail | null = null
+    try {
+        meta = await this.getMeta(type, id, profileId)
+    } catch (e) {
+        console.warn('Failed to fetch meta for stream processing', e)
+    }
 
-        // Quality scoring
-        const aQualityIndex = settings.qualities.findIndex(q => aTitle.toLowerCase().includes(q.toLowerCase()));
-        const bQualityIndex = settings.qualities.findIndex(q => bTitle.toLowerCase().includes(q.toLowerCase()));
-        const aQualityScore = aQualityIndex === -1 ? settings.qualities.length : aQualityIndex;
-        const bQualityScore = bQualityIndex === -1 ? settings.qualities.length : bQualityIndex;
-        if (aQualityScore !== bQualityScore) return aQualityScore - bQualityScore;
+    if (!meta) {
+        // Fallback minimal meta
+        meta = {
+            id,
+            type,
+            name: 'Unknown',
+        }
+    }
 
-        // Preferred keywords scoring
-        const aPreferredScore = settings.preferredKeywords.filter(k => aTitle.toLowerCase().includes(k.toLowerCase())).length;
-        const bPreferredScore = settings.preferredKeywords.filter(k => bTitle.toLowerCase().includes(k.toLowerCase())).length;
-        if (aPreferredScore !== bPreferredScore) return bPreferredScore - aPreferredScore;
+    const processor = new StreamProcessor(settings)
+    
+    // Flatten results for processing
+    const flatStreams = rawResults.flatMap(r => r.streams.map(s => ({ stream: s, addon: r.addon })))
+    
+    const processedStreams = processor.process(flatStreams, meta)
 
-        // Required keywords filtering
-        const aRequiredScore = settings.requiredKeywords.filter(k => aTitle.toLowerCase().includes(k.toLowerCase())).length;
-        const bRequiredScore = settings.requiredKeywords.filter(k => bTitle.toLowerCase().includes(k.toLowerCase())).length;
-        if (aRequiredScore !== bRequiredScore) return bRequiredScore - aRequiredScore;
-
-        return 0;
-      });
-    });
-
-    return results;
+    // Re-group by addon for frontend compatibility (or return flat list if frontend supports it?)
+    // The frontend expects { addon: Manifest, streams: Stream[] }[]
+    // But since we deduplicated and sorted globally, grouping back by addon might lose the sort order if we just list addons.
+    // However, the frontend likely renders groups.
+    // If we want to respect the global sort order, we might need to change the return type or how frontend renders.
+    // For now, let's group them back but keep the order within groups?
+    // Actually, if we deduplicated "Single Result", we might have streams from different addons.
+    
+    // If we want to support the "Single Result" deduplication where we might pick one stream from Addon A and another from Addon B,
+    // and we want to present them in a unified list, the current return type structure is a bit limiting if it forces grouping by addon.
+    // But let's try to map it back.
+    
+    const groupedResults: { addon: Manifest, streams: Stream[] }[] = []
+    const addonMap = new Map<string, Manifest>()
+    
+    // Collect all addons involved
+    rawResults.forEach(r => addonMap.set(r.addon.id, r.addon)) // Use ID as key
+    
+    // We need to preserve the global sort order.
+    // If the frontend renders addon groups sequentially, we can't easily preserve global sort order across addons.
+    // BUT, if we return a single "Virtual" addon group or if we just return the streams and let frontend handle it?
+    // The current frontend iterates over groups.
+    
+    // Let's group by addon, but maybe we can sort the groups themselves?
+    // Or just return what we have.
+    
+    // Wait, if we use "Single Result" deduplication, we only have unique streams.
+    // If we group them back by addon, we are just organizing them.
+    
+    // Let's just group them back by addon for now to maintain compatibility.
+    const streamsByAddon = new Map<string, Stream[]>()
+    
+    processedStreams.forEach(stream => {
+        // We need to find which addon this stream belongs to.
+        // The processed stream is the original stream object.
+        // We don't have a direct link back to addon in the Stream object unless we added it.
+        // The StreamProcessor returns Stream[], but internally it had { stream, addon }.
+        // We should probably modify StreamProcessor to return the wrapper or we need to find it.
+        // Since we passed objects by reference, we can find it if we kept the reference?
+        // Actually, StreamProcessor returns parsedStreams.map(p => p.original).
+        
+        // Let's find the addon for this stream from our flat list input.
+        const originalEntry = flatStreams.find(fs => fs.stream === stream)
+        if (originalEntry) {
+            const addonId = originalEntry.addon.id
+            if (!streamsByAddon.has(addonId)) {
+                streamsByAddon.set(addonId, [])
+            }
+            streamsByAddon.get(addonId)!.push(stream)
+        }
+    })
+    
+    // Create result
+    for (const [addonId, streams] of streamsByAddon) {
+        const addon = addonMap.get(addonId)
+        if (addon) {
+            groupedResults.push({ addon, streams })
+        }
+    }
+    
+    return groupedResults
   }
 }
 

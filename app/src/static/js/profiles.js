@@ -2,6 +2,7 @@
 // This replaces the massive inline script from profiles.html
 
 let profiles = [];
+let settingsProfiles = [];
 let editingProfileId = null;
 let currentAvatarSeed = '';
 
@@ -26,12 +27,22 @@ let editMode = false;
 // Load profiles from server (enhanced with better error handling)
 async function loadProfiles() {
     try {
-        const response = await fetch('/api/profiles');
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Failed to load profiles: ${response.status} ${response.statusText}`);
+        const [profilesRes, settingsRes] = await Promise.all([
+            fetch('/api/profiles'),
+            fetch('/api/user/settings-profiles')
+        ]);
+
+        if (!profilesRes.ok) {
+            const errorData = await profilesRes.json().catch(() => ({}));
+            throw new Error(errorData.error || `Failed to load profiles: ${profilesRes.status} ${profilesRes.statusText}`);
         }
-        profiles = await response.json();
+        profiles = await profilesRes.json();
+        
+        if (settingsRes.ok) {
+            const data = await settingsRes.json();
+            settingsProfiles = data.data || data || [];
+        }
+
         renderProfiles();
 
         // Auto-open create profile modal if no profiles exist
@@ -44,6 +55,75 @@ async function loadProfiles() {
         console.error('Failed to load profiles:', error);
         showMessage('Failed to load profiles. Please refresh the page.', 'error');
     }
+}
+
+function populateSettingsProfiles(selectedId = null) {
+    const select = document.getElementById('settingsProfileInput');
+    if (!select) return;
+    
+    select.innerHTML = '';
+    settingsProfiles.forEach(sp => {
+        const opt = document.createElement('option');
+        opt.value = sp.id;
+        opt.textContent = sp.name;
+        if (selectedId && String(sp.id) === String(selectedId)) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    });
+
+    // Add "Create New Profile" option
+    const createOpt = document.createElement('option');
+    createOpt.value = 'create_new';
+    createOpt.textContent = '+ Create New Profile';
+    createOpt.style.fontWeight = 'bold';
+    createOpt.style.color = 'var(--accent)';
+    select.appendChild(createOpt);
+    
+    // If no selection and we have profiles, select the first one (usually Default)
+    if (!selectedId && settingsProfiles.length > 0) {
+        select.value = settingsProfiles[0].id;
+    }
+
+    // Add change listener for creation
+    select.onchange = async (e) => {
+        if (e.target.value === 'create_new') {
+            const name = prompt("Enter name for new settings profile:");
+            if (name) {
+                try {
+                    const res = await fetch('/api/user/settings-profiles', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'xmlhttprequest'
+                        },
+                        body: JSON.stringify({ name })
+                    });
+                    if (res.ok) {
+                        const profile = await res.json();
+                        // Refresh settings profiles list
+                        const settingsRes = await fetch('/api/user/settings-profiles');
+                        if (settingsRes.ok) {
+                            const data = await settingsRes.json();
+                            settingsProfiles = data.data || data || [];
+                            populateSettingsProfiles(profile.data.id);
+                        }
+                    } else {
+                        alert("Failed to create profile");
+                        // Revert selection
+                        select.value = settingsProfiles[0]?.id || '';
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error creating profile");
+                    select.value = settingsProfiles[0]?.id || '';
+                }
+            } else {
+                // Revert selection if cancelled
+                select.value = settingsProfiles[0]?.id || '';
+            }
+        }
+    };
 }
 
 // Load TMDB API key
@@ -153,6 +233,7 @@ function createProfile() {
     profileForm.reset();
     
     ageRatingInput.value = '18';
+    populateSettingsProfiles();
     
     if (deleteProfileBtn) deleteProfileBtn.style.display = 'none';
 
@@ -177,6 +258,8 @@ function editProfile(profileId) {
 
     const initialAge = (profile.nsfw_filter_enabled === false ? 18 : (profile.nsfw_age_rating || 18));
     ageRatingInput.value = String(initialAge);
+    
+    populateSettingsProfiles(profile.settings_profile_id);
 
     currentAvatarSeed = profile.avatar;
     updateAvatarPreview(profile.avatar);
@@ -349,12 +432,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const selectedAgeRaw = parseInt(ageRatingInput.value || '18', 10);
                 const selectedAge = isNaN(selectedAgeRaw) ? 18 : selectedAgeRaw;
+                const settingsProfileId = document.getElementById('settingsProfileInput').value;
                 const formData = {
                     name: document.getElementById('profileName').value,
                     avatar: currentAvatarSeed || document.getElementById('profileName').value,
                     nsfwFilterEnabled: selectedAge < 18,
                     ageRating: selectedAge,
-                    heroBannerEnabled: true
+                    heroBannerEnabled: true,
+                    settingsProfileId: settingsProfileId ? parseInt(settingsProfileId) : undefined
                 };
                 
                 const url = editingProfileId ? `/api/profiles/${editingProfileId}` : '/api/profiles';

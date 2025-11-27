@@ -23,7 +23,7 @@ import { sessionMiddleware } from '../../middleware/session'
  
  app.post('/', async (c) => {
    const user = c.get('user')
-   const { name, avatar, avatarType, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton } = await c.req.json()
+   const { name, avatar, avatarType, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton, settingsProfileId } = await c.req.json()
  
    if (!name) {
      return c.json({ error: 'Profile name is required' }, 400)
@@ -35,6 +35,7 @@ import { sessionMiddleware } from '../../middleware/session'
     avatar: avatar || name,
     avatar_type: avatarType || 'initials',
     is_default: false,
+    settings_profile_id: settingsProfileId
   })
 
   await profileProxySettingsDb.create({
@@ -53,7 +54,7 @@ import { sessionMiddleware } from '../../middleware/session'
  app.put('/:id', async (c) => {
    const user = c.get('user')
    const profileId = parseInt(c.req.param('id'))
-   const { name, avatar, avatarType, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton } = await c.req.json()
+   const { name, avatar, avatarType, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton, settingsProfileId } = await c.req.json()
 
    if (!name) {
      return c.json({ error: 'Profile name is required' }, 400)
@@ -68,10 +69,12 @@ import { sessionMiddleware } from '../../middleware/session'
       name?: string
       avatar?: string
       avatar_type?: 'initials' | 'avatar'
+      settings_profile_id?: number
     } = {
       name,
       avatar: avatar || name,
       avatar_type: avatarType,
+      settings_profile_id: settingsProfileId
     }
 
   const updatedProfile = await profileDb.update(profileId, updates)
