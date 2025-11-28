@@ -65,7 +65,10 @@ export function getConfig() {
   const PORT = Number(process.env.PORT ?? 3000)
   const DATABASE_URL = process.env.DATABASE_URL ?? './data/zentrio.db'
   const AUTH_SECRET = process.env.AUTH_SECRET ?? 'super-secret-key-change-in-production'
-  const APP_URL = process.env.APP_URL ?? `http://localhost:${PORT}`
+  // Check if running in Tauri
+  const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+  const defaultUrl = isTauri ? 'https://zentrio.eu' : `http://localhost:${PORT}`;
+  const APP_URL = process.env.APP_URL ?? defaultUrl
   const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY ?? 'super-secret-key-change-in-production'
   // Rate limit settings (configurable via environment variables)
   const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000)

@@ -1,6 +1,7 @@
 import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter } from '../components/index'
 import { OTPModal } from '../components/auth/OTPModal'
 import { StreamingSettings } from '../components/settings/StreamingSettings'
+import { CloudSyncSettings } from '../components/settings/CloudSyncSettings'
 
 interface SettingsPageProps {}
 
@@ -38,6 +39,7 @@ export function SettingsPage({}: SettingsPageProps) {
         {/* Tabs Navigation */}
         <div className="settings-tabs">
           <button className="tab-btn active" data-tab="account">Account</button>
+          <button className="tab-btn" data-tab="sync" id="sync-tab-btn" style={{ display: 'none' }}>Cloud Sync</button>
           <button className="tab-btn" data-tab="appearance">Appearance</button>
           <button className="tab-btn" data-tab="addons">Addons</button>
           <button className="tab-btn" data-tab="streaming">Streaming</button>
@@ -157,6 +159,14 @@ export function SettingsPage({}: SettingsPageProps) {
                     </div>
                 </div>
             </div>
+          </div>
+        </div>
+
+        {/* Cloud Sync Tab */}
+        <div id="tab-sync" className="tab-content">
+          <div className="settings-card">
+            {/* @ts-ignore */}
+            <CloudSyncSettings />
           </div>
         </div>
 
@@ -566,6 +576,13 @@ export function SettingsPage({}: SettingsPageProps) {
         dangerouslySetInnerHTML={{
           __html: `
 (function(){
+  // Show Cloud Sync tab only in Tauri
+  const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+  const syncTabBtn = document.getElementById('sync-tab-btn');
+  if (syncTabBtn) {
+    syncTabBtn.style.display = isTauri ? 'inline-block' : 'none';
+  }
+
   // Toast shim
   if (!window.addToast) {
     window.addToast = function(type, title, message, error){ console.log('[toast]', type, title, message||'', error||''); };

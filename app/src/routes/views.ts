@@ -8,6 +8,7 @@ import { ProfilesPage } from '../pages/ProfilesPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { ExploreAddonsPage } from '../pages/ExploreAddonsPage'
 import { ResetPasswordPage } from '../pages/ResetPasswordPage'
+import { TauriSetupPage } from '../pages/TauriSetupPage'
 import { StreamingHome } from '../pages/streaming/Home'
 import { StreamingDetails } from '../pages/streaming/Details'
 import { StreamingPlayer } from '../pages/streaming/Player'
@@ -41,8 +42,21 @@ async function serveHTML(filePath: string) {
  
 // JSX Component Routes (New)
 app.get('/', async (c) => {
+  // Check if running in Tauri and redirect to setup page
+  const userAgent = c.req.header('user-agent') || ''
+  const isTauri = userAgent.includes('Tauri') || c.req.query('tauri') === 'true'
+  
+  if (isTauri) {
+    return c.redirect('/setup')
+  }
+  
   if (await isAuthenticated(c)) return c.redirect('/profiles')
   return c.html(LandingPage({}))
+})
+
+// Tauri setup route
+app.get('/setup', async (c) => {
+  return c.html(TauriSetupPage({}))
 })
  
 app.get('/profiles', async (c) => {
@@ -53,6 +67,7 @@ app.get('/profiles', async (c) => {
  
 app.get('/settings', async (c) => {
   if (!await isAuthenticated(c)) return c.redirect('/')
+  // @ts-ignore
   return c.html(SettingsPage({}))
 })
 

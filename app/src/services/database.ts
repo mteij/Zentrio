@@ -340,7 +340,53 @@ const db = new Database(dbPath)
    console.error("Migration for settings profiles failed", e);
  }
 
-// Create tables
+ // Sync State Table & Migrations
+ try {
+   db.exec(`
+     CREATE TABLE IF NOT EXISTS sync_state (
+       id INTEGER PRIMARY KEY CHECK (id = 1),
+       remote_url TEXT,
+       remote_user_id TEXT,
+       auth_token TEXT,
+       last_sync_at DATETIME,
+       is_syncing BOOLEAN DEFAULT FALSE
+     );
+   `);
+
+   const syncTables = [
+     'profiles',
+     'settings_profiles',
+     'profile_addons',
+     'stream_settings',
+     'appearance_settings',
+     'watch_history',
+     'lists',
+     'list_items'
+   ];
+
+   const addColumn = (table: string, column: string, type: string) => {
+     try {
+       db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+     } catch (e) {
+       // ignore if exists
+     }
+   };
+
+   for (const table of syncTables) {
+     addColumn(table, 'remote_id', 'TEXT');
+     addColumn(table, 'dirty', 'BOOLEAN DEFAULT FALSE');
+     addColumn(table, 'deleted_at', 'DATETIME');
+     
+     // Ensure updated_at exists
+     if (['profile_addons', 'stream_settings', 'appearance_settings', 'lists', 'list_items'].includes(table)) {
+        addColumn(table, 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
+     }
+   }
+ } catch (e) {
+   console.error("Migration for sync features failed", e);
+ }
+
+ // Create tables
 db.exec(`
  CREATE TABLE IF NOT EXISTS user (
     id TEXT PRIMARY KEY,
@@ -694,7 +740,14 @@ export interface User {
   tmdbApiKey?: string
 }
 
-export interface Profile {
+export interface SyncableEntity {
+  remote_id?: string
+  dirty?: boolean
+  deleted_at?: string
+  updated_at?: string
+}
+
+export interface Profile extends SyncableEntity {
   id: number
   user_id: string
   name: string
@@ -703,16 +756,14 @@ export interface Profile {
   is_default: boolean
   settings_profile_id?: number
   created_at: string
-  updated_at: string
 }
 
-export interface SettingsProfile {
+export interface SettingsProfile extends SyncableEntity {
   id: number
   user_id: string
   name: string
   is_default: boolean
   created_at: string
-  updated_at: string
 }
 
 export interface UserSession {
@@ -783,7 +834,7 @@ export interface ProxyRateLimit {
   updated_at: string
 }
 
-export interface WatchHistoryItem {
+export interface WatchHistoryItem extends SyncableEntity {
   id: number
   profile_id: number
   meta_id: string
@@ -792,17 +843,16 @@ export interface WatchHistoryItem {
   poster?: string
   duration?: number
   position?: number
-  updated_at: string
 }
 
-export interface List {
+export interface List extends SyncableEntity {
   id: number
   profile_id: number
   name: string
   created_at: string
 }
 
-export interface ListItem {
+export interface ListItem extends SyncableEntity {
   id: number
   list_id: number
   meta_id: string
@@ -825,7 +875,7 @@ export interface Addon {
   created_at: string
 }
 
-export interface ProfileAddon {
+export interface ProfileAddon extends SyncableEntity {
   id: number
   profile_id: number
   settings_profile_id?: number
@@ -837,9 +887,9 @@ export interface ProfileAddon {
 
 import { StreamConfig } from './addons/stream-processor'
 
-export interface StreamSettings extends StreamConfig {}
+export interface StreamSettings extends StreamConfig, SyncableEntity {}
 
-export interface AppearanceSettings {
+export interface AppearanceSettings extends SyncableEntity {
   id?: number
   settings_profile_id?: number
   theme_id: string
@@ -1049,6 +1099,7 @@ export const profileDb = {
     if (fields.length === 0) return profileDb.findById(id)
     
     fields.push('updated_at = CURRENT_TIMESTAMP')
+    fields.push('dirty = TRUE')
     values.push(id)
     
     const stmt = db.prepare(`UPDATE profiles SET ${fields.join(', ')} WHERE id = ?`)
@@ -1058,7 +1109,8 @@ export const profileDb = {
   },
 
   delete: (id: number): boolean => {
-    const stmt = db.prepare('DELETE FROM profiles WHERE id = ?')
+    // Soft delete
+    const stmt = db.prepare('UPDATE profiles SET deleted_at = CURRENT_TIMESTAMP, dirty = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     const result = stmt.run(id)
     return result.changes > 0
   },
@@ -1337,12 +1389,13 @@ export const watchHistoryDb = {
     position?: number
   }): void => {
     const stmt = db.prepare(`
-      INSERT INTO watch_history (profile_id, meta_id, meta_type, title, poster, duration, position, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO watch_history (profile_id, meta_id, meta_type, title, poster, duration, position, updated_at, dirty)
+      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, TRUE)
       ON CONFLICT(profile_id, meta_id) DO UPDATE SET
         position = excluded.position,
         duration = COALESCE(excluded.duration, watch_history.duration),
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = CURRENT_TIMESTAMP,
+        dirty = TRUE
     `)
     stmt.run(
       data.profile_id,
@@ -1378,23 +1431,25 @@ export const listDb = {
   },
 
   delete: (id: number): void => {
-    db.prepare("DELETE FROM lists WHERE id = ?").run(id)
+    db.prepare("UPDATE lists SET deleted_at = CURRENT_TIMESTAMP, dirty = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id)
   },
 
   addItem: (data: { list_id: number, meta_id: string, type: string, title?: string, poster?: string, imdb_rating?: number }): void => {
     const stmt = db.prepare(`
-      INSERT INTO list_items (list_id, meta_id, type, title, poster, imdb_rating)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO list_items (list_id, meta_id, type, title, poster, imdb_rating, dirty)
+      VALUES (?, ?, ?, ?, ?, ?, TRUE)
       ON CONFLICT(list_id, meta_id) DO UPDATE SET
         title = COALESCE(excluded.title, list_items.title),
         poster = COALESCE(excluded.poster, list_items.poster),
-        imdb_rating = COALESCE(excluded.imdb_rating, list_items.imdb_rating)
+        imdb_rating = COALESCE(excluded.imdb_rating, list_items.imdb_rating),
+        dirty = TRUE,
+        updated_at = CURRENT_TIMESTAMP
     `)
     stmt.run(data.list_id, data.meta_id, data.type, data.title || null, data.poster || null, data.imdb_rating ? parseFloat(data.imdb_rating as any) : null)
   },
 
   removeItem: (listId: number, metaId: string): void => {
-    db.prepare("DELETE FROM list_items WHERE list_id = ? AND meta_id = ?").run(listId, metaId)
+    db.prepare("UPDATE list_items SET deleted_at = CURRENT_TIMESTAMP, dirty = TRUE, updated_at = CURRENT_TIMESTAMP WHERE list_id = ? AND meta_id = ?").run(listId, metaId)
   },
 
   getItems: (listId: number): ListItem[] => {
@@ -1501,18 +1556,18 @@ export const addonDb = {
   enableForProfile: (settingsProfileId: number, addonId: number): void => {
     // We use settings_profile_id now. profile_id is nullable.
     const stmt = db.prepare(`
-      INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority)
-      VALUES (NULL, ?, ?, TRUE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE settings_profile_id = ?))
-      ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = TRUE
+      INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority, dirty)
+      VALUES (NULL, ?, ?, TRUE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE settings_profile_id = ?), TRUE)
+      ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = TRUE, dirty = TRUE, updated_at = CURRENT_TIMESTAMP
     `)
     stmt.run(settingsProfileId, addonId, settingsProfileId)
   },
 
   disableForProfile: (settingsProfileId: number, addonId: number): void => {
     const stmt = db.prepare(`
-      INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority)
-      VALUES (NULL, ?, ?, FALSE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE settings_profile_id = ?))
-      ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = FALSE
+      INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority, dirty)
+      VALUES (NULL, ?, ?, FALSE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE settings_profile_id = ?), TRUE)
+      ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = FALSE, dirty = TRUE, updated_at = CURRENT_TIMESTAMP
     `)
     stmt.run(settingsProfileId, addonId, settingsProfileId)
   },
@@ -1569,9 +1624,9 @@ export const addonDb = {
       let priority = 0;
       for (const addonId of ids) {
         const stmt = db.prepare(`
-          INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority)
-          VALUES (NULL, ?, ?, TRUE, ?)
-          ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET priority = ?
+          INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority, dirty)
+          VALUES (NULL, ?, ?, TRUE, ?, TRUE)
+          ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET priority = ?, dirty = TRUE, updated_at = CURRENT_TIMESTAMP
         `)
         stmt.run(settingsProfileId, addonId, priority, priority)
         priority++;
@@ -1604,7 +1659,7 @@ export const addonDb = {
         return;
     }
 
-    const stmt = db.prepare('DELETE FROM profile_addons WHERE settings_profile_id = ? AND addon_id = ?')
+    const stmt = db.prepare('UPDATE profile_addons SET deleted_at = CURRENT_TIMESTAMP, dirty = TRUE, updated_at = CURRENT_TIMESTAMP WHERE settings_profile_id = ? AND addon_id = ?')
     stmt.run(settingsProfileId, addonId)
   }
 }
@@ -1635,10 +1690,10 @@ export const settingsProfileDb = {
         return db.prepare("SELECT * FROM settings_profiles WHERE user_id = ? ORDER BY is_default DESC, name ASC").all(userId) as SettingsProfile[];
     },
     update: (id: number, name: string): void => {
-        db.prepare("UPDATE settings_profiles SET name = ? WHERE id = ?").run(name, id);
+        db.prepare("UPDATE settings_profiles SET name = ?, dirty = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(name, id);
     },
     delete: (id: number): void => {
-        db.prepare("DELETE FROM settings_profiles WHERE id = ?").run(id);
+        db.prepare("UPDATE settings_profiles SET deleted_at = CURRENT_TIMESTAMP, dirty = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
     },
     isUsed: (id: number): boolean => {
         const count = db.prepare("SELECT COUNT(*) as count FROM profiles WHERE settings_profile_id = ?").get(id) as any;
@@ -1688,10 +1743,10 @@ export const streamDb = {
     const existing = db.prepare("SELECT id FROM stream_settings WHERE settings_profile_id = ?").get(settingsProfileId) as any;
     
     if (existing) {
-        const stmt = db.prepare("UPDATE stream_settings SET config = ? WHERE id = ?");
+        const stmt = db.prepare("UPDATE stream_settings SET config = ?, dirty = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
         stmt.run(JSON.stringify(settings), existing.id);
     } else {
-        const stmt = db.prepare("INSERT INTO stream_settings (profile_id, settings_profile_id, config) VALUES (NULL, ?, ?)");
+        const stmt = db.prepare("INSERT INTO stream_settings (profile_id, settings_profile_id, config, dirty) VALUES (NULL, ?, ?, TRUE)");
         stmt.run(settingsProfileId, JSON.stringify(settings));
     }
   }
@@ -1738,14 +1793,16 @@ export const appearanceDb = {
         if (settings.custom_theme_config !== undefined) { fields.push("custom_theme_config = ?"); values.push(settings.custom_theme_config); }
         
         if (fields.length > 0) {
+            fields.push('dirty = TRUE');
+            fields.push('updated_at = CURRENT_TIMESTAMP');
             values.push(existing.id);
             const stmt = db.prepare(`UPDATE appearance_settings SET ${fields.join(', ')} WHERE id = ?`);
             stmt.run(...values);
         }
     } else {
         const stmt = db.prepare(`
-            INSERT INTO appearance_settings (settings_profile_id, theme_id, show_imdb_ratings, show_age_ratings, background_style, custom_theme_config)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO appearance_settings (settings_profile_id, theme_id, show_imdb_ratings, show_age_ratings, background_style, custom_theme_config, dirty)
+            VALUES (?, ?, ?, ?, ?, ?, TRUE)
         `);
         stmt.run(
             settingsProfileId,

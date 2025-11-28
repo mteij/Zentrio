@@ -1,0 +1,16 @@
+{
+  "name": "zentrio",
+  "version": "2.0.0-alpha.4",
+  "description": "Zentrio Desktop Application",
+  "main": "src/main.rs",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "keywords": [
+    "tauri",
+    "desktop",
+    "zentrio"
+  ],
+  "author": "Zentrio Team",
+  "license": "MIT"
+}

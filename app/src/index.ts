@@ -11,6 +11,7 @@ import viewRoutes from './routes/views'
 // Import API route modules
 import apiRoutes from './routes/api/index'
 import { initImdbService } from './services/imdb'
+import { syncService } from './services/sync'
 
 // Initialize environment variables before starting the app
 initEnv()
@@ -85,6 +86,9 @@ logger.info('Preparing middleware and routes...')
 
 // Initialize IMDb service
 initImdbService()
+
+// Initialize Sync Service
+syncService.startBackgroundSync();
 
 // Basic Middleware
 app.use('*', corsMiddleware())
