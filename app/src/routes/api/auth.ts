@@ -47,6 +47,8 @@ app.post('/identify', async (c) => {
 app.all("*", (c) => {
     console.log(`[Auth] Handling request: ${c.req.method} ${c.req.url}`);
     console.log(`[Auth] Path: ${c.req.path}`);
+    console.log(`[Auth] Origin: ${c.req.header('Origin')}`);
+    console.log(`[Auth] Referer: ${c.req.header('Referer')}`);
     return auth.handler(c.req.raw);
 });
 

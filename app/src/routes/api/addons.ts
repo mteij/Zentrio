@@ -21,8 +21,9 @@ app.post('/', async (c) => {
     let manifest;
     try {
         manifest = await client.init()
-    } catch (e: any) {
-        return c.json({ error: `Failed to fetch manifest: ${e.message}` }, 400)
+    } catch (e) {
+        const message = e instanceof Error ? e.message : 'Unknown error';
+        return c.json({ error: `Failed to fetch manifest: ${message}` }, 400)
     }
     
     let logoUrl = manifest.logo

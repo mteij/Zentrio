@@ -33,7 +33,7 @@ export class AddonClient {
     }
   }
 
-  async getCatalog(type: string, id: string, extra: Record<string, string> = {}, config: any = {}): Promise<MetaPreview[]> {
+  async getCatalog(type: string, id: string, extra: Record<string, string> = {}, config: Record<string, any> = {}): Promise<MetaPreview[]> {
     if (!this.manifest) await this.init()
     
     // Construct extra path components (e.g. genre=Action&skip=20 -> genre=Action/skip=20)
@@ -50,7 +50,7 @@ export class AddonClient {
     return this.fetchResource<MetaPreview[]>(url, 'metas')
   }
 
-  async getMeta(type: string, id: string, config: any = {}): Promise<MetaDetail> {
+  async getMeta(type: string, id: string, config: Record<string, any> = {}): Promise<MetaDetail> {
     if (!this.manifest) await this.init()
     const url = `${this.baseUrl}/meta/${type}/${id}.json`
     return this.fetchResource<MetaDetail>(url, 'meta')
@@ -94,7 +94,7 @@ export class AddonClient {
       throw new Error(`Response missing key: ${String(extractKey)}`)
 
     } catch (e) {
-      console.error(`[AddonClient] Error fetching ${url}`, e)
+      // console.error(`[AddonClient] Error fetching ${url}`, e)
       throw e
     } finally {
       clearTimeout(timeout)

@@ -38,6 +38,76 @@ body {
     pointer-events: none; /* Allow clicks to pass through to video when hidden */
 }
 
+/* Brightness Overlay */
+.brightness-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Gesture Feedback */
+.gesture-feedback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    z-index: 20;
+    min-width: 100px;
+}
+
+/* Error Display */
+.error-display {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.error-content {
+    text-align: center;
+    color: #fff;
+}
+
+.retry-btn {
+    background: var(--accent, #e50914);
+    color: #fff;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.retry-btn:hover {
+    transform: scale(1.05);
+}
+
 .player-wrapper:hover .player-overlay,
 .player-wrapper.active .player-overlay,
 .player-wrapper.paused .player-overlay {
@@ -381,11 +451,12 @@ body {
 /* Mobile Adjustments */
 @media (max-width: 768px) {
     .player-top-bar {
-        padding: 20px;
+        padding: 16px;
     }
     
     .player-controls {
-        padding: 20px 20px 40px;
+        padding: 16px 16px 32px;
+        gap: 16px;
     }
     
     .volume-wrapper {
@@ -393,26 +464,75 @@ body {
     }
     
     .stream-title {
-        font-size: 1.1rem;
+        font-size: 1rem;
         flex-direction: column;
-        gap: 4px;
+        gap: 2px;
+        align-items: flex-start;
+    }
+    
+    .stream-info {
+        margin: 0 12px;
+        text-align: left;
     }
     
     .stream-subtitle {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
     }
     
     .play-pause-btn {
-        width: 48px;
-        height: 48px;
+        width: 56px;
+        height: 56px;
     }
     
+    .control-btn {
+        padding: 12px; /* Larger touch target */
+    }
+
     .control-btn i {
-        width: 20px !important;
-        height: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
     }
     
     .episode-tag {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
+        padding: 1px 6px;
+    }
+
+    .back-btn {
+        width: 40px;
+        height: 40px;
+    }
+
+    .progress-container {
+        height: 4px; /* Thinner on mobile initially */
+        margin-bottom: 8px;
+    }
+
+    .progress-container:hover,
+    .progress-container:active {
+        height: 12px; /* Easier to grab */
+    }
+
+    .progress-thumb {
+        width: 14px;
+        height: 14px;
+        transform: translateY(-50%) scale(1); /* Always show thumb on mobile */
+    }
+
+    .controls-row {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .left-controls {
+        gap: 16px;
+    }
+
+    .right-controls {
+        gap: 8px;
+    }
+
+    .time-display {
+        font-size: 0.9rem;
     }
 }

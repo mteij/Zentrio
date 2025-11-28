@@ -103,3 +103,19 @@ export interface AddonResponse<T> {
   addons?: Manifest[]
   err?: string
 }
+
+export interface AddonConfig {
+  rpdbkey?: string
+  enableAgeRating?: boolean
+  showAgeRatingInGenres?: boolean
+  castCount?: number
+  [key: string]: any
+}
+
+export interface StreamSettings {
+  parental?: {
+    enabled: boolean
+    ratingLimit?: string
+  }
+  [key: string]: any
+}

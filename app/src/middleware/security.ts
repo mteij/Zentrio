@@ -1,13 +1,24 @@
 import type { Context, Next } from 'hono'
+import { getConfig } from '../services/envParser'
 
 // Rate limiting storage
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
 
-export const corsMiddleware = (origins: string[] = ['http://localhost:3000', 'http://localhost:5173']) => {
+export const corsMiddleware = (origins?: string[]) => {
   return async (c: Context, next: Next) => {
+    const cfg = getConfig()
+    const defaultOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'capacitor://localhost',
+      'https://localhost',
+      cfg.APP_URL
+    ]
+    
+    const allowedOrigins = origins || defaultOrigins
     const origin = c.req.header('origin')
     
-    if (origin && origins.includes(origin)) {
+    if (origin && allowedOrigins.includes(origin)) {
       c.header('Access-Control-Allow-Origin', origin)
     }
     

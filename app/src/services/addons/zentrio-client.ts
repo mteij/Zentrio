@@ -94,7 +94,7 @@ export class ZentrioAddonClient extends AddonClient {
     return tmdbService.getClient(this.userId)
   }
 
-  async getCatalog(type: string, id: string, extra: Record<string, string> = {}, config: any = {}): Promise<MetaPreview[]> {
+  async getCatalog(type: string, id: string, extra: Record<string, string> = {}, config: Record<string, any> = {}): Promise<MetaPreview[]> {
     const client = await this.getClient()
     if (!client) return []
 
@@ -124,7 +124,7 @@ export class ZentrioAddonClient extends AddonClient {
     return res?.metas || []
   }
 
-  async getMeta(type: string, id: string, config: any = {}): Promise<MetaDetail> {
+  async getMeta(type: string, id: string, config: Record<string, any> = {}): Promise<MetaDetail> {
     const client = await this.getClient()
     if (!client) throw new Error('TMDB Client not available')
 

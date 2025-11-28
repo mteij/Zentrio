@@ -22,6 +22,21 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
           Your browser does not support the video tag.
         </video>
 
+        <div className="brightness-overlay" id="brightnessOverlay"></div>
+        
+        <div className="gesture-feedback" id="gestureFeedback">
+            <i id="gestureIcon" data-lucide="volume-2" style={{ width: 48, height: 48, marginBottom: 8 }}></i>
+            <span id="gestureValue" style={{ fontSize: '1.5rem', fontWeight: 'bold' }}></span>
+        </div>
+
+        <div className="error-display" id="errorDisplay" style={{ display: 'none' }}>
+            <div className="error-content">
+                <i data-lucide="alert-circle" style={{ width: 48, height: 48, marginBottom: 16, color: '#e50914' }}></i>
+                <p id="errorMessage" style={{ marginBottom: 20 }}>Playback Error</p>
+                <button id="retryBtn" className="retry-btn">Retry</button>
+            </div>
+        </div>
+
         <div className="player-overlay" id="playerOverlay">
           <div className="player-top-bar">
             <a href={`/streaming/${profileId}/${meta.type}/${meta.id}`} className="back-btn">
@@ -290,6 +305,158 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
               video.playbackRate = parseFloat(e.target.value);
           });
 
+
+          // --- Gestures & Error Handling ---
+          const brightnessOverlay = document.getElementById('brightnessOverlay');
+          const gestureFeedback = document.getElementById('gestureFeedback');
+          const gestureIcon = document.getElementById('gestureIcon');
+          const gestureValue = document.getElementById('gestureValue');
+          const errorDisplay = document.getElementById('errorDisplay');
+          const errorMessage = document.getElementById('errorMessage');
+          const retryBtn = document.getElementById('retryBtn');
+
+          let touchStartX = 0;
+          let touchStartY = 0;
+          let touchStartTime = 0;
+          let lastTapTime = 0;
+          let isDragging = false;
+          let dragType = null; // 'volume' or 'brightness'
+          let startVolume = 1;
+          let startBrightness = 1;
+          let currentBrightness = 1;
+
+          wrapper.addEventListener('touchstart', (e) => {
+              // Only handle single touch gestures
+              if (e.touches.length !== 1) return;
+              
+              // Don't interfere with controls
+              if (e.target.closest('.player-controls') || e.target.closest('.player-top-bar') || e.target.closest('.settings-modal')) {
+                  return;
+              }
+
+              touchStartX = e.touches[0].clientX;
+              touchStartY = e.touches[0].clientY;
+              touchStartTime = Date.now();
+              startVolume = video.volume;
+              startBrightness = currentBrightness;
+              isDragging = false;
+              dragType = null;
+          }, { passive: false });
+
+          wrapper.addEventListener('touchmove', (e) => {
+              if (e.touches.length !== 1 || !touchStartX) return;
+              
+              const deltaX = e.touches[0].clientX - touchStartX;
+              const deltaY = touchStartY - e.touches[0].clientY; // Up is positive
+              
+              if (!isDragging) {
+                  // Threshold for drag detection
+                  if (Math.abs(deltaY) > 20 && Math.abs(deltaY) > Math.abs(deltaX)) {
+                      isDragging = true;
+                      // Determine side
+                      if (touchStartX < window.innerWidth / 2) {
+                          dragType = 'brightness';
+                      } else {
+                          dragType = 'volume';
+                      }
+                  }
+              }
+
+              if (isDragging) {
+                  e.preventDefault();
+                  const percentChange = deltaY / (window.innerHeight * 0.5);
+                  
+                  if (dragType === 'volume') {
+                      let newVol = Math.max(0, Math.min(1, startVolume + percentChange));
+                      video.volume = newVol;
+                      if (volumeSlider) volumeSlider.value = newVol;
+                      showGestureFeedback('volume', Math.round(newVol * 100) + '%');
+                  } else if (dragType === 'brightness') {
+                      let newBright = Math.max(0.1, Math.min(1, startBrightness + percentChange));
+                      currentBrightness = newBright;
+                      if (brightnessOverlay) brightnessOverlay.style.opacity = (1 - currentBrightness);
+                      showGestureFeedback('sun', Math.round(newBright * 100) + '%');
+                  }
+              }
+          }, { passive: false });
+
+          wrapper.addEventListener('touchend', (e) => {
+              const now = Date.now();
+              if (!isDragging && touchStartX) {
+                  // Check for tap
+                  if (now - touchStartTime < 250) {
+                      // Check for double tap
+                      if (now - lastTapTime < 300) {
+                          // Double tap detected
+                          const width = window.innerWidth;
+                          // Avoid center area for double taps (leave it for play/pause or controls)
+                          if (touchStartX < width * 0.35) {
+                              // Left side double tap - seek back
+                              video.currentTime = Math.max(0, video.currentTime - 10);
+                              showGestureFeedback('rewind', '-10s');
+                          } else if (touchStartX > width * 0.65) {
+                              // Right side double tap - seek forward
+                              video.currentTime = Math.min(video.duration, video.currentTime + 10);
+                              showGestureFeedback('fast-forward', '+10s');
+                          }
+                          lastTapTime = 0; // Reset
+                      } else {
+                          lastTapTime = now;
+                      }
+                  }
+              }
+              isDragging = false;
+              touchStartX = 0;
+              if (gestureFeedback) gestureFeedback.style.opacity = '0';
+          });
+
+          function showGestureFeedback(icon, text) {
+              if (!gestureFeedback) return;
+              gestureFeedback.style.opacity = '1';
+              gestureValue.textContent = text;
+              
+              let iconName = 'activity';
+              if (icon === 'volume') {
+                  if (video.volume === 0) iconName = 'volume-x';
+                  else if (video.volume < 0.5) iconName = 'volume-1';
+                  else iconName = 'volume-2';
+              } else if (icon === 'sun') {
+                  iconName = 'sun';
+              } else if (icon === 'rewind') {
+                  iconName = 'rewind';
+              } else if (icon === 'fast-forward') {
+                  iconName = 'fast-forward';
+              }
+              
+              gestureIcon.setAttribute('data-lucide', iconName);
+              if (window.lucide) window.lucide.createIcons();
+          }
+
+          // Error Handling
+          video.addEventListener('error', (e) => {
+              console.error('Video Error:', video.error);
+              if (loadingSpinner) loadingSpinner.style.display = 'none';
+              if (errorDisplay) errorDisplay.style.display = 'flex';
+              if (errorMessage) errorMessage.textContent = 'Playback Error';
+          });
+
+          if (retryBtn) {
+              retryBtn.addEventListener('click', () => {
+                  if (errorDisplay) errorDisplay.style.display = 'none';
+                  if (loadingSpinner) loadingSpinner.style.display = 'block';
+                  
+                  // Try to reload
+                  const currentTime = video.currentTime;
+                  
+                  if (hlsInstance) {
+                      hlsInstance.recoverMediaError();
+                  } else {
+                      video.load();
+                      video.currentTime = currentTime;
+                      video.play().catch(console.error);
+                  }
+              });
+          }
 
           // --- UI Logic ---
 

@@ -3,6 +3,7 @@ import { Navbar } from '../../components/Navbar'
 import { MetaPreview } from '../../services/addons/types'
 import { listDb } from '../../services/database'
 import { RatingBadge } from '../../components/RatingBadge'
+import { LazyImage } from '../../components/LazyImage'
 
 interface StreamingCatalogProps {
   items: MetaPreview[]
@@ -112,7 +113,7 @@ export const StreamingCatalog = ({ items, title, profileId, profile, manifestUrl
                   <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
                     <div className="poster-container">
                       {item.poster ? (
-                        <img src={item.poster} alt={item.name} className="poster-image" loading="lazy" />
+                        <LazyImage src={item.poster} alt={item.name} className="poster-image" />
                       ) : (
                         <div className="no-poster">{item.name}</div>
                       )}

@@ -23,6 +23,12 @@ const db = new Database(dbPath);
 export const auth = betterAuth({
     baseURL: cfg.APP_URL,
     basePath: "/api/auth",
+    trustedOrigins: [
+        "capacitor://localhost",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        cfg.APP_URL
+    ],
     database: db,
     emailAndPassword: {
         enabled: true,

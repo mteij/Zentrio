@@ -883,28 +883,33 @@ body {
 @media (max-width: 1024px) {
     .streaming-layout {
         padding-left: 0;
-        padding-bottom: var(--nav-height-mobile);
+        padding-bottom: calc(var(--nav-height-mobile) + 20px); /* Add extra padding for safe area */
     }
 
     .streaming-navbar {
         top: auto;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 90%;
-        max-width: 400px;
+        bottom: 0;
+        left: 0;
+        transform: none;
+        width: 100%;
+        max-width: none;
         height: var(--nav-height-mobile);
         flex-direction: row;
-        justify-content: space-evenly;
+        justify-content: space-around;
         gap: 0;
-        padding: 0 10px;
-        border-radius: 100px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(20, 20, 20, 0.85);
-        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-        border-right: 1px solid rgba(255, 255, 255, 0.15); /* Reset border */
+        padding: 0;
+        border-radius: 0;
+        border: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(20, 20, 20, 0.95); /* More opaque for better readability */
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
         align-items: center;
-        display: flex; /* Back to flex for equal distribution */
+        display: flex;
+        z-index: 9999; /* Ensure it stays on top */
+        padding-bottom: env(safe-area-inset-bottom); /* Handle iPhone home indicator */
+        height: calc(var(--nav-height-mobile) + env(safe-area-inset-bottom));
     }
 
     .nav-left {
@@ -920,45 +925,75 @@ body {
     }
 
     .nav-link {
-        width: 50px;
-        height: 50px;
-        padding: 0;
+        width: auto;
+        height: 100%;
+        flex: 1;
+        padding: 8px 0;
         background: transparent !important;
         box-shadow: none !important;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 4px;
+        min-height: 44px; /* Minimum touch target size */
     }
 
     .nav-link .iconify {
         font-size: 24px;
         margin-bottom: 0;
+        transition: transform 0.2s ease;
     }
 
     .nav-link span {
-        display: none;
+        display: block;
+        font-size: 10px;
+        opacity: 0.7;
+        position: static;
+        transform: none;
+        margin-top: 0;
     }
 
     .nav-link.active {
         color: var(--accent);
     }
+
+    .nav-link.active .iconify {
+        transform: scale(1.1);
+    }
+
+    .nav-link.active span {
+        opacity: 1;
+        font-weight: 600;
+    }
     
     .nav-profile {
-        width: 50px;
-        height: 50px;
+        width: auto;
+        height: 100%;
+        flex: 1;
         margin: 0;
-        padding: 0;
+        padding: 8px 0;
         background: transparent;
         box-shadow: none;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 4px;
+        min-height: 44px;
     }
 
     .nav-profile .nav-avatar {
-        width: 36px;
-        height: 36px;
+        width: 24px;
+        height: 24px;
         border: 1px solid rgba(255, 255, 255, 0.5);
+        margin-bottom: 0;
+    }
+
+    .nav-profile span {
+        display: block;
+        font-size: 10px;
+        opacity: 0.7;
     }
     
     .details-content {
@@ -1032,6 +1067,32 @@ body {
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+}
+
+/* Page Transitions */
+.streaming-layout {
+    animation: pageFadeIn 0.4s ease-out;
+}
+
+@keyframes pageFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Touch Interactions */
+.media-card:active,
+.btn-hero:active,
+.action-btn:active,
+.stream-item:active,
+.nav-link:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+    transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+/* Ensure smooth scrolling on iOS */
+.row-scroll-container {
+    -webkit-overflow-scrolling: touch;
 }
 /* Adjust back button position when side navbar is present */
 @media (min-width: 1025px) {

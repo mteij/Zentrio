@@ -59,7 +59,7 @@ export class AddonManager {
     }
 
     const clients: AddonClient[] = []
-    const initPromises: Promise<any>[] = []
+    const initPromises: Promise<void>[] = []
 
     const profile = profileDb.findById(profileId)
     const userId = profile?.user_id
@@ -227,7 +227,7 @@ export class AddonManager {
     return []
   }
 
-  private async filterContent(items: MetaPreview[], settings?: any, userId?: string): Promise<MetaPreview[]> {
+  private async filterContent(items: MetaPreview[], settings?: Record<string, any>, userId?: string): Promise<MetaPreview[]> {
     if (!settings || !settings.parental || !settings.parental.enabled) return items;
 
     const ratingLimit = settings.parental.ratingLimit || 'R';
@@ -240,14 +240,14 @@ export class AddonManager {
     const tmdbClient = userId ? await tmdbService.getClient(userId) : null;
 
     const filteredItems = await Promise.all(items.map(async (item) => {
-        const itemAny = item as any;
+        const itemAny = item as Record<string, any>;
         
         // Try to find certification with country fallback (US -> GB -> NL)
         let cert = itemAny.ageRating || itemAny.certification || itemAny.rating || itemAny.contentRating || itemAny.info?.certification || itemAny.info?.rating;
 
         // If certification is an object (e.g. from TMDB sometimes), try to find by country
         if (typeof cert === 'object' && cert !== null) {
-            cert = cert['US'] || cert['GB'] || cert['NL'] || Object.values(cert)[0];
+            cert = (cert as Record<string, any>)['US'] || (cert as Record<string, any>)['GB'] || (cert as Record<string, any>)['NL'] || Object.values(cert)[0];
         }
         
         // Also check releaseInfo if it contains certification

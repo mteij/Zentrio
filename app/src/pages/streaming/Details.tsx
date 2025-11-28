@@ -1,5 +1,6 @@
 import { Layout, Button } from '../../components/index'
 import { Navbar } from '../../components/Navbar'
+import { LazyImage } from '../../components/LazyImage'
 import { MetaDetail, Stream, Manifest } from '../../services/addons/types'
 
 interface StreamingDetailsProps {
@@ -288,7 +289,7 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
         <div className="details-content">
           <div className="details-poster">
             {meta.poster ? (
-              <img src={meta.poster} alt={meta.name} />
+              <LazyImage src={meta.poster} alt={meta.name} />
             ) : (
               <div style={{ width: '100%', height: '100%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {meta.name}
