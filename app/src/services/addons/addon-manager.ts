@@ -59,7 +59,7 @@ export class AddonManager {
     }
 
     const clients: AddonClient[] = []
-    const initPromises: Promise<void>[] = []
+    const initPromises: Promise<any>[] = []
 
     const profile = profileDb.findById(profileId)
     const userId = profile?.user_id
@@ -75,10 +75,10 @@ export class AddonManager {
         }
         this.clientCache.set(normalizedUrl, client)
         // Only init if new or not ready
-        initPromises.push(client.init().catch(e => console.warn(`Failed to init ${addon.name}`, e)))
+        initPromises.push(client.init().then(() => {}).catch(e => console.warn(`Failed to init ${addon.name}`, e)))
       } else if (!client.manifest) {
          // Retry init if failed previously or incomplete
-         initPromises.push(client.init().catch(e => console.warn(`Failed to re-init ${addon.name}`, e)))
+         initPromises.push(client.init().then(() => {}).catch(e => console.warn(`Failed to re-init ${addon.name}`, e)))
       }
       clients.push(client)
     }

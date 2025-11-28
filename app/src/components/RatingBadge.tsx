@@ -1,11 +1,9 @@
-import React from 'react';
-
 interface RatingBadgeProps {
     rating: number;
     className?: string;
 }
 
-export const RatingBadge: React.FC<RatingBadgeProps> = ({ rating, className = '' }) => {
+export const RatingBadge = ({ rating, className = '' }: RatingBadgeProps) => {
     if (!rating || rating <= 0) return null;
 
     return (

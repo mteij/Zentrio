@@ -32,6 +32,19 @@ function getVersion() {
 }
 
 function getPrevTag(currentTag) {
+  // Try to find the last GitHub release first (to skip intermediate docker tags)
+  try {
+    // We want the latest release that is NOT the current tag (in case it was already created)
+    // Since this runs before release creation usually, the latest release is the previous one.
+    const lastRelease = sh('gh release list --limit 1 --exclude-drafts --exclude-pre-releases --json tagName -q ".[0].tagName"', '');
+    if (lastRelease && lastRelease !== currentTag) {
+      console.log(`[release-notes] Found previous release tag via GitHub CLI: ${lastRelease}`);
+      return lastRelease;
+    }
+  } catch (e) {
+    console.log('[release-notes] Could not determine previous release via GitHub CLI, falling back to git tags.');
+  }
+
   // Prefer semantic tags sorted descending, then pick the one after current in the list
   const tags = sh('git tag --list --sort=-version:refname', '').split('\n').map(s => s.trim()).filter(Boolean);
   const currentIndex = tags.findIndex(t => t === currentTag);
@@ -141,7 +154,8 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
   });
 
   sections.push('\n---\n');
-  sections.push('🙏 **Thank you for using Zentrio!** Your continued support and feedback help us improve every day. If you encounter any issues or have suggestions, please don\'t hesitate to reach out.\n');
+  sections.push('**Links:**\n- 🌐 [Public Instance](https://zentrio.eu)\n- 📚 [Documentation](https://docs.zentrio.eu)\n');
+  sections.push('\n🙏 **Thank you for using Zentrio!**\n');
 
   return sections.join('\n');
 }
@@ -189,7 +203,7 @@ async function main() {
 
   const prompt = [
     `You are an expert release notes writer for a developer tool web application (Zentrio).`,
-    `Write engaging, comprehensive, and user-friendly GitHub release notes in Markdown for version ${tag}.`,
+    `Write professional, concise, and technical GitHub release notes in Markdown for version ${tag}.`,
     prevTag ? `This release includes changes since ${prevTag}.` : `This is the first release of Zentrio!`,
     ``,
     `Inputs:`,
@@ -199,19 +213,17 @@ async function main() {
     commitLog || '(no commits detected)',
     ``,
     `Guidelines:`,
-    `- Start with an engaging summary paragraph that highlights the most important changes`,
+    `- Start with a professional summary paragraph that highlights the most important changes`,
     `- Group changes into logical sections with emoji headers: 🚀 Features, 🐛 Bug Fixes, 💄 Improvements, 📝 Documentation, 🔧 Configuration, ⚙️ Chore`,
     `- Process ALL commits provided - every commit deserves attention`,
     `- Use commit bodies for additional context and technical details`,
-    `- Write descriptive, user-friendly bullet points that explain the benefit of each change`,
+    `- Write clear, professional bullet points that explain the technical impact of each change`,
     `- Include commit hashes and dates at the end of each bullet point for reference`,
     `- Use formatting like **bold** for emphasis and \`code\` for technical terms`,
-    `- Add emojis and personality to make it more engaging`,
+    `- Keep the tone professional and direct. Avoid excessive emojis or overly casual language in the descriptions.`,
     `- If there are many similar commits, group them into a single meaningful point`,
-    `- End with a friendly closing statement`,
     `- Do not invent changes - base everything strictly on provided commits`,
     `- Do not include a top-level title; the GitHub release title already includes the version`,
-    `- Make it sound like it was written by a human who cares about the users`,
     `- Take your time to analyze each commit and understand its impact`,
   ].join('\n');
 
@@ -245,8 +257,9 @@ async function main() {
   // Remove redundant top-level title; GitHub release already has one
   notes = notes.replace(/^\s*#{1,6}\s.*\r?\n+/, '').trimStart();
 
+  const links = '\n\n---\n\n**Links:**\n- 🌐 [Public Instance](https://zentrio.eu)\n- 📚 [Documentation](https://docs.zentrio.eu)';
   const disclaimer = "\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.";
-  writeFileSync('RELEASE_NOTES.md', notes + disclaimer, 'utf8');
+  writeFileSync('RELEASE_NOTES.md', notes + links + disclaimer, 'utf8');
   // Emit a small marker file if AI was actually used
   if (usedAi) {
     writeFileSync('.release_notes_ai.txt', apiKeySource.toLowerCase() || 'gemini', 'utf8');
