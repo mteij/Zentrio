@@ -2,6 +2,7 @@ import { Layout } from '../../components/Layout'
 import { Navbar } from '../../components/Navbar'
 import { MetaPreview } from '../../services/addons/types'
 import { WatchHistoryItem, listDb } from '../../services/database'
+import { RatingBadge } from '../../components/RatingBadge'
 
 interface CatalogSection {
   title: string
@@ -20,6 +21,7 @@ interface StreamingExploreProps {
 }
 
 export const StreamingExplore = ({ catalogs, items, filters, activeFilters, history, profileId, profile }: StreamingExploreProps) => {
+  const showImdbRatings = profile?.settings?.show_imdb_ratings !== false;
   const featuredItem = items.length > 0 ? items[0] : (catalogs.length > 0 && catalogs[0].items.length > 0
     ? catalogs[0].items[0]
     : (history.length > 0 ? history[0] : null));
@@ -83,12 +85,6 @@ export const StreamingExplore = ({ catalogs, items, filters, activeFilters, hist
         const html = items.map(item => \`
           <a key="\${item.id}" href="/streaming/\${profileId}/\${item.type}/\${item.id}" class="media-card">
             <div class="poster-container">
-              \${item.imdbRating ? \`
-                <div class="imdb-rating-badge">
-                  <span class="iconify" data-icon="lucide:star" data-width="10" data-height="10"></span>
-                  \${item.imdbRating}
-                </div>
-              \` : ''}
               \${item.poster ? \`
                 <img src="\${item.poster}" alt="\${item.name}" class="poster-image" loading="lazy" />
               \` : \`
@@ -173,20 +169,17 @@ export const StreamingExplore = ({ catalogs, items, filters, activeFilters, hist
                </div>
                <div className="media-grid">
                  {items.map(item => {
-                   const inList = listDb.isInAnyList(profileId, item.id);
-                   return (
-                     <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
-                       <div className="poster-container">
-                         {item.imdbRating && (
-                           <div className="imdb-rating-badge">
-                             <span className="iconify" data-icon="lucide:star" data-width="10" data-height="10"></span>
-                             {item.imdbRating}
-                           </div>
-                         )}
-                         {item.poster ? (
+                 const inList = listDb.isInAnyList(profileId, item.id);
+                 return (
+                   <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
+                     <div className="poster-container">
+                       {item.poster ? (
                            <img src={item.poster} alt={item.name} className="poster-image" loading="lazy" />
                          ) : (
                            <div className="no-poster">{item.name}</div>
+                         )}
+                         {showImdbRatings && item.imdbRating && (
+                           <RatingBadge rating={parseFloat(item.imdbRating)} />
                          )}
                          {inList && (
                            <div className="in-list-indicator" style={{
@@ -234,20 +227,17 @@ export const StreamingExplore = ({ catalogs, items, filters, activeFilters, hist
                       </button>
                       <div className="row-scroll-container">
                         {section.items.map(item => {
-                          const inList = listDb.isInAnyList(profileId, item.id);
-                          return (
-                            <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
-                              <div className="poster-container">
-                                {item.imdbRating && (
-                                  <div className="imdb-rating-badge">
-                                    <span className="iconify" data-icon="lucide:star" data-width="10" data-height="10"></span>
-                                    {item.imdbRating}
-                                  </div>
-                                )}
-                                {item.poster ? (
+                         const inList = listDb.isInAnyList(profileId, item.id);
+                         return (
+                           <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
+                             <div className="poster-container">
+                               {item.poster ? (
                                   <img src={item.poster} alt={item.name} className="poster-image" loading="lazy" />
                                 ) : (
                                   <div className="no-poster">{item.name}</div>
+                                )}
+                                {showImdbRatings && item.imdbRating && (
+                                  <RatingBadge rating={parseFloat(item.imdbRating)} />
                                 )}
                                 {inList && (
                                   <div className="in-list-indicator" style={{

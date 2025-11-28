@@ -33,7 +33,7 @@ export class AddonClient {
     }
   }
 
-  async getCatalog(type: string, id: string, extra: Record<string, string> = {}): Promise<MetaPreview[]> {
+  async getCatalog(type: string, id: string, extra: Record<string, string> = {}, config: any = {}): Promise<MetaPreview[]> {
     if (!this.manifest) await this.init()
     
     // Construct extra path components (e.g. genre=Action&skip=20 -> genre=Action/skip=20)
@@ -50,7 +50,7 @@ export class AddonClient {
     return this.fetchResource<MetaPreview[]>(url, 'metas')
   }
 
-  async getMeta(type: string, id: string): Promise<MetaDetail> {
+  async getMeta(type: string, id: string, config: any = {}): Promise<MetaDetail> {
     if (!this.manifest) await this.init()
     const url = `${this.baseUrl}/meta/${type}/${id}.json`
     return this.fetchResource<MetaDetail>(url, 'meta')

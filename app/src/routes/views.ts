@@ -16,7 +16,7 @@ import { StreamingLibrary } from '../pages/streaming/Library'
 import { StreamingSearch } from '../pages/streaming/Search'
 import { StreamingCatalog } from '../pages/streaming/Catalog'
 import { addonManager } from '../services/addons/addon-manager'
-import { watchHistoryDb, listDb, profileDb } from '../services/database'
+import { watchHistoryDb, listDb, profileDb, addonDb } from '../services/database'
 import { MetaPreview } from '../services/addons/types'
  
 const app = new Hono()
@@ -83,6 +83,12 @@ app.get('/streaming/:profileId', async (c) => {
     const results = await addonManager.getCatalogs(profileId)
     const trending = await addonManager.getTrending(profileId)
     
+    // Determine if the fallback was used by checking if the results contain only the default addon
+    // and if the profile has no other addons enabled.
+    const enabledAddons = profileDb.getSettingsProfileId(profileId) ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(profileId)!) : [];
+    const onlyDefaultAddon = results.every(r => r.manifestUrl === 'https://v3-cinemeta.strem.io/manifest.json');
+    const showFallbackToast = enabledAddons.length === 0 && onlyDefaultAddon && results.length > 0;
+
     const catalogs = results.map(r => {
       const typeName = r.catalog.type === 'movie' ? 'Movies' : (r.catalog.type === 'series' ? 'Series' : 'Other')
       const manifestUrl = r.manifestUrl || (r.addon as any).manifest_url || (r.addon as any).id;
@@ -92,10 +98,10 @@ app.get('/streaming/:profileId', async (c) => {
         seeAllUrl: `/streaming/${profileId}/catalog/${encodeURIComponent(manifestUrl)}/${r.catalog.type}/${r.catalog.id}`
       }
     })
-    return c.html(StreamingHome({ catalogs, history, profileId, profile, trending }))
+    return c.html(StreamingHome({ catalogs, history, profileId, profile, trending, showFallbackToast }))
   } catch (e) {
     console.error('Streaming home error:', e)
-    return c.html(StreamingHome({ catalogs: [], history: [], profileId, trending: [] }))
+    return c.html(StreamingHome({ catalogs: [], history: [], profileId, trending: [], showFallbackToast: false }))
   }
 })
 

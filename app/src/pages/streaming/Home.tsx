@@ -2,6 +2,7 @@ import { Layout } from '../../components/Layout'
 import { Navbar } from '../../components/Navbar'
 import { MetaPreview } from '../../services/addons/types'
 import { WatchHistoryItem, listDb } from '../../services/database'
+import { RatingBadge } from '../../components/RatingBadge'
 
 interface CatalogSection {
   title: string
@@ -15,9 +16,11 @@ interface StreamingHomeProps {
   profileId: number
   profile?: any
   trending?: MetaPreview[]
+  showFallbackToast?: boolean
 }
 
-export const StreamingHome = ({ catalogs, history, profileId, profile, trending }: StreamingHomeProps) => {
+export const StreamingHome = ({ catalogs, history, profileId, profile, trending, showFallbackToast }: StreamingHomeProps) => {
+  const showImdbRatings = profile?.settings?.show_imdb_ratings !== false;
   // Always show hero banner
   const showHero = true;
 
@@ -103,6 +106,10 @@ export const StreamingHome = ({ catalogs, history, profileId, profile, trending 
                           ) : (
                             <div className="no-poster">{item.title}</div>
                           )}
+                          {/* Watch history items don't usually have imdbRating, but if they did: */}
+                          {/* {showImdbRatings && item.imdbRating && (
+                            <RatingBadge rating={parseFloat(item.imdbRating)} />
+                          )} */}
                           {inList && (
                             <div className="in-list-indicator" style={{
                               position: 'absolute',
@@ -161,16 +168,13 @@ export const StreamingHome = ({ catalogs, history, profileId, profile, trending 
                       return (
                         <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
                           <div className="poster-container">
-                            {item.imdbRating && (
-                              <div className="imdb-rating-badge">
-                                <span className="iconify" data-icon="lucide:star" data-width="10" data-height="10"></span>
-                                {item.imdbRating}
-                              </div>
-                            )}
                             {item.poster ? (
                               <img src={item.poster} alt={item.name} className="poster-image" loading="lazy" />
                             ) : (
                               <div className="no-poster">{item.name}</div>
+                            )}
+                            {showImdbRatings && item.imdbRating && (
+                              <RatingBadge rating={parseFloat(item.imdbRating)} />
                             )}
                             {inList && (
                               <div className="in-list-indicator" style={{
@@ -206,6 +210,17 @@ export const StreamingHome = ({ catalogs, history, profileId, profile, trending 
           )}
         </div>
       </div>
+      {showFallbackToast && (
+        <script>
+          {`
+            document.addEventListener('DOMContentLoaded', () => {
+              if (window.addToast) {
+                window.addToast('message', 'Default Addon Used', 'No addons were found for this profile, so we are using the default Cinemeta addon to provide content.');
+              }
+            });
+          `}
+        </script>
+      )}
     </Layout>
   )
 }

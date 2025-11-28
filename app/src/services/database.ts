@@ -132,6 +132,28 @@ const db = new Database(dbPath)
    // ignore if column already exists
  }
 
+ // Ensure Zentrio addon is enabled for all settings profiles
+ try {
+   const zentrioAddon = db.prepare("SELECT id FROM addons WHERE manifest_url = 'zentrio://tmdb-addon'").get() as any;
+   if (zentrioAddon) {
+       const settingsProfiles = db.prepare("SELECT id FROM settings_profiles").all() as any[];
+       const insertProfileAddon = db.prepare(`
+           INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority)
+           VALUES (NULL, ?, ?, TRUE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE settings_profile_id = ?))
+           ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = TRUE
+       `);
+       
+       const transaction = db.transaction(() => {
+           for (const sp of settingsProfiles) {
+               insertProfileAddon.run(sp.id, zentrioAddon.id, sp.id);
+           }
+       });
+       transaction();
+   }
+ } catch (e) {
+   console.error("Migration for Zentrio addon failed", e);
+ }
+
  // Appearance Settings Migration
  try {
    db.exec(`
@@ -140,14 +162,22 @@ const db = new Database(dbPath)
        settings_profile_id INTEGER REFERENCES settings_profiles(id) ON DELETE CASCADE,
        theme_id TEXT DEFAULT 'zentrio',
        show_imdb_ratings BOOLEAN DEFAULT TRUE,
+       show_age_ratings BOOLEAN DEFAULT TRUE,
        background_style TEXT DEFAULT 'vanta',
        custom_theme_config TEXT,
        UNIQUE(settings_profile_id)
      );
    `);
- } catch (e) {
+
+   // Add show_age_ratings column if missing
+   try {
+       db.exec('ALTER TABLE appearance_settings ADD COLUMN show_age_ratings BOOLEAN DEFAULT TRUE');
+   } catch (e) {
+       // ignore if column already exists
+   }
+  } catch (e) {
    console.error("Migration for appearance_settings failed", e);
- }
+  }
 
  // Settings Profiles Migration
  try {
@@ -195,8 +225,8 @@ const db = new Database(dbPath)
    const updateProfile = db.prepare("UPDATE profiles SET settings_profile_id = ? WHERE id = ?");
    
    // Stream settings migration
-   let getStreamSettings;
-   let updateStreamSettings;
+   let getStreamSettings: any;
+   let updateStreamSettings: any;
    try {
        getStreamSettings = db.prepare("SELECT * FROM stream_settings WHERE profile_id = ?");
        updateStreamSettings = db.prepare("UPDATE stream_settings SET settings_profile_id = ? WHERE id = ?");
@@ -814,6 +844,7 @@ export interface AppearanceSettings {
   settings_profile_id?: number
   theme_id: string
   show_imdb_ratings: boolean
+  show_age_ratings: boolean
   background_style: string
   custom_theme_config?: string
 }
@@ -863,6 +894,11 @@ export const userDb = {
   exists: (email: string): boolean => {
     const stmt = db.prepare('SELECT 1 FROM user WHERE email = ? LIMIT 1')
     return !!stmt.get(email)
+  },
+
+  list: (): User[] => {
+    const stmt = db.prepare('SELECT * FROM user')
+    return stmt.all() as User[]
   },
 
   update: async (id: string, updates: Partial<User>): Promise<User | undefined> => {
@@ -1453,6 +1489,10 @@ export const addonDb = {
   },
 
   delete: (id: number): void => {
+    const addon = addonDb.findById(id);
+    if (addon && addon.manifest_url === 'zentrio://tmdb-addon') {
+        return;
+    }
     const stmt = db.prepare('DELETE FROM addons WHERE id = ?')
     stmt.run(id)
   },
@@ -1506,7 +1546,7 @@ export const addonDb = {
     }));
   },
 
-  getAllWithStatusForProfile: (settingsProfileId: number): (Addon & { enabled: boolean, priority: number })[] => {
+  getAllWithStatusForProfile: (settingsProfileId: number): (Addon & { enabled: boolean, priority: number, is_protected: boolean })[] => {
     const stmt = db.prepare(`
       SELECT a.*,
              pa.enabled,
@@ -1519,7 +1559,8 @@ export const addonDb = {
     const rows = stmt.all(settingsProfileId) as any[]
     return rows.map(row => ({
         ...row,
-        enabled: !!row.enabled
+        enabled: !!row.enabled,
+        is_protected: row.manifest_url === 'zentrio://tmdb-addon'
     }))
   },
 
@@ -1556,6 +1597,13 @@ export const addonDb = {
         console.error(`[Database] Invalid parameters for removeFromProfile: settingsProfileId=${settingsProfileId}, addonId=${addonId}`);
         return;
     }
+
+    // Prevent removing native addon
+    const addon = addonDb.findById(addonId);
+    if (addon && addon.manifest_url === 'zentrio://tmdb-addon') {
+        return;
+    }
+
     const stmt = db.prepare('DELETE FROM profile_addons WHERE settings_profile_id = ? AND addon_id = ?')
     stmt.run(settingsProfileId, addonId)
   }
@@ -1566,7 +1614,19 @@ export const settingsProfileDb = {
     create: (userId: string, name: string, isDefault: boolean = false): SettingsProfile => {
         const stmt = db.prepare("INSERT INTO settings_profiles (user_id, name, is_default) VALUES (?, ?, ?)");
         const res = stmt.run(userId, name, isDefault ? 1 : 0);
-        return settingsProfileDb.findById(res.lastInsertRowid as number)!;
+        const id = res.lastInsertRowid as number;
+
+        // Auto-enable Zentrio addon
+        try {
+            const zentrioAddon = db.prepare("SELECT id FROM addons WHERE manifest_url = 'zentrio://tmdb-addon'").get() as any;
+            if (zentrioAddon) {
+                addonDb.enableForProfile(id, zentrioAddon.id);
+            }
+        } catch (e) {
+            console.error("Failed to auto-enable Zentrio addon for new profile", e);
+        }
+
+        return settingsProfileDb.findById(id)!;
     },
     findById: (id: number): SettingsProfile | undefined => {
         return db.prepare("SELECT * FROM settings_profiles WHERE id = ?").get(id) as SettingsProfile | undefined;
@@ -1644,20 +1704,22 @@ export const appearanceDb = {
     const row = stmt.get(settingsProfileId) as any;
     
     if (row) {
-      return {
-        id: row.id,
-        settings_profile_id: row.settings_profile_id,
-        theme_id: row.theme_id,
-        show_imdb_ratings: !!row.show_imdb_ratings,
-        background_style: row.background_style,
-        custom_theme_config: row.custom_theme_config
-      };
-    }
+  return {
+    id: row.id,
+    settings_profile_id: row.settings_profile_id,
+    theme_id: row.theme_id,
+    show_imdb_ratings: !!row.show_imdb_ratings,
+    show_age_ratings: row.show_age_ratings !== null ? !!row.show_age_ratings : true,
+    background_style: row.background_style,
+    custom_theme_config: row.custom_theme_config
+  };
+}
     
     // Default settings
     return {
       theme_id: 'zentrio',
       show_imdb_ratings: true,
+      show_age_ratings: true,
       background_style: 'vanta'
     };
   },
@@ -1671,6 +1733,7 @@ export const appearanceDb = {
         
         if (settings.theme_id !== undefined) { fields.push("theme_id = ?"); values.push(settings.theme_id); }
         if (settings.show_imdb_ratings !== undefined) { fields.push("show_imdb_ratings = ?"); values.push(settings.show_imdb_ratings ? 1 : 0); }
+        if (settings.show_age_ratings !== undefined) { fields.push("show_age_ratings = ?"); values.push(settings.show_age_ratings ? 1 : 0); }
         if (settings.background_style !== undefined) { fields.push("background_style = ?"); values.push(settings.background_style); }
         if (settings.custom_theme_config !== undefined) { fields.push("custom_theme_config = ?"); values.push(settings.custom_theme_config); }
         
@@ -1681,13 +1744,14 @@ export const appearanceDb = {
         }
     } else {
         const stmt = db.prepare(`
-            INSERT INTO appearance_settings (settings_profile_id, theme_id, show_imdb_ratings, background_style, custom_theme_config)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO appearance_settings (settings_profile_id, theme_id, show_imdb_ratings, show_age_ratings, background_style, custom_theme_config)
+            VALUES (?, ?, ?, ?, ?, ?)
         `);
         stmt.run(
             settingsProfileId,
             settings.theme_id || 'zentrio',
             settings.show_imdb_ratings !== undefined ? (settings.show_imdb_ratings ? 1 : 0) : 1,
+            settings.show_age_ratings !== undefined ? (settings.show_age_ratings ? 1 : 0) : 1,
             settings.background_style || 'vanta',
             settings.custom_theme_config || null
         );

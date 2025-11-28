@@ -439,7 +439,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     nsfwFilterEnabled: selectedAge < 18,
                     ageRating: selectedAge,
                     heroBannerEnabled: true,
-                    settingsProfileId: settingsProfileId ? parseInt(settingsProfileId) : undefined
+                    settingsProfileId: settingsProfileId ? parseInt(settingsProfileId) : undefined,
+                    hideAddonsButton: false // Ensure addons button is visible by default
                 };
                 
                 const url = editingProfileId ? `/api/profiles/${editingProfileId}` : '/api/profiles';

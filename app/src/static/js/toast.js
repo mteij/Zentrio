@@ -8,7 +8,27 @@ function createToast(id, type, title, message, error) {
 
   const titleEl = document.createElement('h4');
   titleEl.className = 'toast-title';
-  titleEl.textContent = title;
+  
+  // Add icon based on type
+  const iconSpan = document.createElement('span');
+  iconSpan.className = 'iconify';
+  iconSpan.setAttribute('data-width', '18');
+  iconSpan.setAttribute('data-height', '18');
+  
+  if (type.includes('message') || type === 'success') {
+    iconSpan.setAttribute('data-icon', 'lucide:check-circle');
+  } else if (type.includes('warning')) {
+    iconSpan.setAttribute('data-icon', 'lucide:alert-triangle');
+  } else if (type.includes('error')) {
+    iconSpan.setAttribute('data-icon', 'lucide:alert-circle');
+  }
+  
+  if (iconSpan.hasAttribute('data-icon')) {
+    titleEl.appendChild(iconSpan);
+  }
+  
+  const textNode = document.createTextNode(title);
+  titleEl.appendChild(textNode);
 
   const closeButton = document.createElement('button');
   closeButton.className = 'close-button';

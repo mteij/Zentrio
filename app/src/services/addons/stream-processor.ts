@@ -214,6 +214,8 @@ export class StreamProcessor {
 
   private filterStreams(streams: ParsedStream[], meta: MetaDetail): ParsedStream[] {
     const { filters } = this.config
+    
+    if (!filters) return streams;
 
     return streams.filter(s => {
       // Cache Filter
@@ -309,6 +311,8 @@ export class StreamProcessor {
       s.score = 0
       const { filters } = this.config
       
+      if (!filters) return;
+
       // Preferred Resolution
       if (filters.resolution?.preferred && s.parsed.resolution) {
           const idx = filters.resolution.preferred.indexOf(s.parsed.resolution)

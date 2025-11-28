@@ -11,23 +11,13 @@
                 this.apply();
             }
             window.addEventListener('storage', (e) => {
-                if (e.key === THEME_DATA_KEY || e.key === STYLE_KEY || e.key === 'zentrioHideImdbRatings') this.apply();
+                if (e.key === THEME_DATA_KEY || e.key === STYLE_KEY) this.apply();
             });
         },
 
         apply: function() {
             this.applyColors();
             this.applyBackground();
-            this.applyImdbRatings();
-        },
-
-        applyImdbRatings: function() {
-            const hide = localStorage.getItem('zentrioHideImdbRatings') === 'true';
-            if (hide) {
-                document.body.classList.add('hide-imdb-ratings');
-            } else {
-                document.body.classList.remove('hide-imdb-ratings');
-            }
         },
 
         applyColors: function() {

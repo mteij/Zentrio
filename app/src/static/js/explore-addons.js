@@ -55,6 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
       addonCard.style.flexDirection = 'column';
       addonCard.style.justifyContent = 'space-between';
 
+      const isProtected = installedAddon?.is_protected;
+
       addonCard.innerHTML = `
         <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
           <img src="${addon.manifest.logo || 'https://www.stremio.com/website/stremio-logo-small.png'}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover;" onerror="this.onerror=null;this.src='https://www.stremio.com/website/stremio-logo-small.png';" />
@@ -66,7 +68,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <p style="color: #b3b3b3; font-size: 14px; margin-bottom: 20px;">${addon.manifest.description}</p>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <button class="btn ${isInstalled ? 'btn-secondary' : 'btn-primary'} install-addon-btn" data-manifest-url="${addon.transportUrl}" data-addon-id="${installedAddon?.id}">${isInstalled ? 'Uninstall' : 'Install'}</button>
+          ${isProtected ?
+            '<button class="btn btn-secondary" disabled style="opacity: 0.5; cursor: not-allowed;">Installed (System)</button>' :
+            `<button class="btn ${isInstalled ? 'btn-secondary' : 'btn-primary'} install-addon-btn" data-manifest-url="${addon.transportUrl}" data-addon-id="${installedAddon?.id}">${isInstalled ? 'Uninstall' : 'Install'}</button>`
+          }
           <div class="dropdown">
             <button class="btn btn-secondary dropdown-toggle" type="button" style="padding: 5px; min-width: 30px;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>

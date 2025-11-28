@@ -1,112 +1,145 @@
 :root {
-    --message-bg-color: rgba(46, 125, 50, 0.2);
-    --message-border-color: #2e7d32;
-    --warning-bg-color: rgba(255, 165, 0, 0.2);
-    --warning-border-color: #ffa500;
-    --error-bg-color: rgba(211, 47, 47, 0.2);
-    --error-border-color: #d32f2f;
+    --message-color: #4caf50;
+    --warning-color: #ffa500;
+    --error-color: #f44336;
     --text-color: #ffffff;
-    --input-bg-color: #333;
+    --toast-bg: rgba(20, 20, 20, 0.85);
+    --toast-border: rgba(255, 255, 255, 0.1);
 }
 
 .toast-container {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
+  top: 20px;
+  right: 20px;
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 12px;
 }
 
 .toast-notification {
-  max-width: 350px;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  animation: slide-in 0.3s ease-out;
+  max-width: 400px;
+  min-width: 300px;
+  border-radius: 12px;
+  background: var(--toast-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--toast-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: slide-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   color: var(--text-color);
+  overflow: hidden;
+  position: relative;
 }
 
 .toast-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid transparent;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .toast-title {
-  font-weight: bold;
+  font-weight: 600;
   margin: 0;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .close-button {
   background: none;
   border: none;
-  font-size: 1.2rem;
+  font-size: 18px;
   cursor: pointer;
-  color: inherit;
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.2s;
+  padding: 0;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.close-button:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .toast-message {
-  padding: 0.5rem 1rem;
+  padding: 12px 16px;
   margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.5;
 }
 
 .toast-error-details {
-  padding: 0.5rem 1rem;
+  padding: 0 16px 16px;
 }
 
 .toast-error-summary {
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 500;
   outline: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin-bottom: 8px;
 }
 
 .summary-text {
-  text-decoration: underline;
+  text-decoration: none;
+}
+
+.toast-error-summary:hover {
+  color: white;
 }
 
 .toast-error-pre {
-  background-color: var(--input-bg-color);
-  color: var(--error-color);
-  padding: 0.5rem;
-  border-radius: 0.25rem;
+  background-color: rgba(0, 0, 0, 0.3);
+  color: #ff8a80;
+  padding: 12px;
+  border-radius: 8px;
   white-space: pre-wrap;
   word-wrap: break-word;
-  margin-top: 0.5rem;
+  margin-top: 8px;
   max-height: 150px;
   overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Message Type */
 .toast-notification.message {
-  background-color: var(--message-bg-color);
-  border-left: 5px solid var(--message-border-color);
+  border-left: 4px solid var(--message-color);
 }
 
-.toast-notification.message .toast-header {
-  border-bottom-color: var(--message-border-color);
+.toast-notification.message .toast-title {
+  color: var(--message-color);
 }
 
 /* Warning Type */
 .toast-notification.warning {
-  background-color: var(--warning-bg-color);
-  border-left: 5px solid var(--warning-border-color);
+  border-left: 4px solid var(--warning-color);
 }
 
-.toast-notification.warning .toast-header {
-  border-bottom-color: var(--warning-border-color);
+.toast-notification.warning .toast-title {
+  color: var(--warning-color);
 }
 
 /* Error Type */
 .toast-notification.error {
-  background-color: var(--error-bg-color);
-  border-left: 5px solid var(--error-border-color);
+  border-left: 4px solid var(--error-color);
 }
 
-.toast-notification.error .toast-header {
-  border-bottom-color: var(--error-border-color);
+.toast-notification.error .toast-title {
+  color: var(--error-color);
 }
 
 @keyframes slide-in {

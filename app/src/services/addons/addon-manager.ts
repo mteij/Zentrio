@@ -1,13 +1,22 @@
 import { AddonClient } from './client'
+import { ZentrioAddonClient } from './zentrio-client'
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
 import { addonDb, streamDb, profileDb } from '../database'
 import { getConfig } from '../envParser'
 import { StreamProcessor } from './stream-processor'
+import { tmdbService } from '../tmdb/index'
 
-const DEFAULT_TMDB_ADDON = 'https://v3-cinemeta.strem.io/manifest.json'
+const DEFAULT_TMDB_ADDON = 'zentrio://tmdb-addon'
 
 export class AddonManager {
   private clientCache = new Map<string, AddonClient>()
+
+  private normalizeUrl(url: string): string {
+    if (url.endsWith('manifest.json')) {
+      return url
+    }
+    return `${url.replace(/\/$/, '')}/manifest.json`
+  }
 
   constructor() {
     // Ensure default addon exists in DB
@@ -16,10 +25,11 @@ export class AddonManager {
       if (!existing) {
         addonDb.create({
           manifest_url: DEFAULT_TMDB_ADDON,
-          name: 'TMDB',
-          description: 'The Movie Database Addon',
+          name: 'Zentrio',
+          description: 'Native TMDB integration for Zentrio',
           version: '1.0.0',
-          logo_url: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded90420192a96da33a9f244fc962a07410a121121f3b7b2ed52.svg'
+          logo_url: 'https://zentrio.eu/static/logo/icon-192.png',
+          behavior_hints: JSON.stringify({ configurationRequired: true })
         })
       }
     } catch (e) {
@@ -51,11 +61,19 @@ export class AddonManager {
     const clients: AddonClient[] = []
     const initPromises: Promise<any>[] = []
 
+    const profile = profileDb.findById(profileId)
+    const userId = profile?.user_id
+
     for (const addon of addons) {
-      let client = this.clientCache.get(addon.manifest_url)
+      const normalizedUrl = this.normalizeUrl(addon.manifest_url)
+      let client = this.clientCache.get(normalizedUrl)
       if (!client) {
-        client = new AddonClient(addon.manifest_url)
-        this.clientCache.set(addon.manifest_url, client)
+        if (addon.manifest_url === DEFAULT_TMDB_ADDON) {
+            client = new ZentrioAddonClient(addon.manifest_url, userId)
+        } else {
+            client = new AddonClient(addon.manifest_url)
+        }
+        this.clientCache.set(normalizedUrl, client)
         // Only init if new or not ready
         initPromises.push(client.init().catch(e => console.warn(`Failed to init ${addon.name}`, e)))
       } else if (!client.manifest) {
@@ -79,17 +97,23 @@ export class AddonManager {
 
   async getCatalogs(profileId: number): Promise<{ addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[]> {
     const clients = await this.getClientsForProfile(profileId)
-    const results: { addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[] = []
+    let results: { addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[] = []
 
     for (const client of clients) {
       if (!client.manifest) continue
       for (const cat of client.manifest.catalogs) {
         try {
-          // Only fetch if it doesn't require extra args or has defaults?
-          // For now, just fetch basic catalogs
           if (cat.extra?.some(e => e.isRequired)) continue
           
-          const items = await client.getCatalog(cat.type, cat.id)
+          const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+          const { appearanceDb } = require('../database');
+          const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+          const config = {
+              enableAgeRating: appearance ? appearance.show_age_ratings : true,
+              showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+          };
+
+          const items = await client.getCatalog(cat.type, cat.id, {}, config)
           results.push({
             addon: client.manifest,
             manifestUrl: client.manifestUrl,
@@ -101,23 +125,74 @@ export class AddonManager {
         }
       }
     }
+
+    // If no catalogs are found after checking all enabled addons, fallback to the default TMDB addon.
+    if (results.length === 0) {
+      console.log(`[AddonManager] No catalogs found for profile ${profileId}. Falling back to default TMDB addon.`);
+      const normalizedDefaultUrl = this.normalizeUrl(DEFAULT_TMDB_ADDON);
+      let defaultClient = this.clientCache.get(normalizedDefaultUrl);
+      if (!defaultClient) {
+        const profile = profileDb.findById(profileId)
+        defaultClient = new ZentrioAddonClient(DEFAULT_TMDB_ADDON, profile?.user_id);
+        this.clientCache.set(normalizedDefaultUrl, defaultClient);
+      }
+      
+      try {
+        await defaultClient.init();
+        if (defaultClient.manifest) {
+          for (const cat of defaultClient.manifest.catalogs) {
+            if (cat.extra?.some(e => e.isRequired)) continue;
+            
+            const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+            const { appearanceDb } = require('../database');
+            const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+            const config = {
+                enableAgeRating: appearance ? appearance.show_age_ratings : true,
+                showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+            };
+
+            const items = await defaultClient.getCatalog(cat.type, cat.id, {}, config);
+            results.push({
+              addon: defaultClient.manifest,
+              manifestUrl: defaultClient.manifestUrl,
+              catalog: cat,
+              items
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch catalogs from default TMDB addon fallback.', e);
+      }
+    }
+
     return results
   }
 
   async getTrending(profileId: number): Promise<MetaPreview[]> {
     const clients = await this.getClientsForProfile(profileId)
+    const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+    const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;
+    const profile = profileDb.findById(profileId);
     
     // 2. Try to find TMDB addon (Cinemeta)
-    const tmdbClient = clients.find(c => c.manifest?.id?.includes('tmdb') || c.manifest?.name?.toLowerCase().includes('tmdb'))
+    const tmdbClient = clients.find(c => c.manifest?.id?.includes('tmdb') || c.manifest?.name?.toLowerCase().includes('tmdb') || c.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON))
     
     if (tmdbClient) {
       try {
         // Usually the first catalog is the most popular/trending one
         const cat = tmdbClient.manifest?.catalogs[0]
         if (cat) {
-          const items = await tmdbClient.getCatalog(cat.type, cat.id)
+          const { appearanceDb } = require('../database');
+          const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+          const config = {
+              enableAgeRating: appearance ? appearance.show_age_ratings : true,
+              showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+          };
+
+          const items = await tmdbClient.getCatalog(cat.type, cat.id, {}, config)
           if (items && items.length > 0) {
-            return items.slice(0, 10)
+            const filtered = await this.filterContent(items, settings, profile?.user_id);
+            return filtered.slice(0, 10)
           }
         }
       } catch (e) {
@@ -131,9 +206,17 @@ export class AddonManager {
       try {
         const cat = client.manifest.catalogs[0]
         if (cat) {
-          const items = await client.getCatalog(cat.type, cat.id)
+          const { appearanceDb } = require('../database');
+          const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+          const config = {
+              enableAgeRating: appearance ? appearance.show_age_ratings : true,
+              showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+          };
+
+          const items = await client.getCatalog(cat.type, cat.id, {}, config)
           if (items && items.length > 0) {
-            return items.slice(0, 10)
+            const filtered = await this.filterContent(items, settings, profile?.user_id);
+            return filtered.slice(0, 10)
           }
         }
       } catch (e) {
@@ -144,8 +227,108 @@ export class AddonManager {
     return []
   }
 
+  private async filterContent(items: MetaPreview[], settings?: any, userId?: string): Promise<MetaPreview[]> {
+    if (!settings || !settings.parental || !settings.parental.enabled) return items;
+
+    const ratingLimit = settings.parental.ratingLimit || 'R';
+    const ratings = ['G', 'PG', 'PG-13', 'R', 'NC-17'];
+    const limitIndex = ratings.indexOf(ratingLimit);
+    
+    if (limitIndex === -1) return items; // Invalid rating, don't filter
+
+    // Initialize TMDB client if user ID is provided
+    const tmdbClient = userId ? await tmdbService.getClient(userId) : null;
+
+    const filteredItems = await Promise.all(items.map(async (item) => {
+        const itemAny = item as any;
+        
+        // Try to find certification with country fallback (US -> GB -> NL)
+        let cert = itemAny.ageRating || itemAny.certification || itemAny.rating || itemAny.contentRating || itemAny.info?.certification || itemAny.info?.rating;
+
+        // If certification is an object (e.g. from TMDB sometimes), try to find by country
+        if (typeof cert === 'object' && cert !== null) {
+            cert = cert['US'] || cert['GB'] || cert['NL'] || Object.values(cert)[0];
+        }
+        
+        // Also check releaseInfo if it contains certification
+        if (!cert && itemAny.releaseInfo) {
+            const parts = itemAny.releaseInfo.split('|').map((s: string) => s.trim());
+            const potentialRating = parts.find((p: string) => ratings.includes(p) || p.startsWith('TV-'));
+            if (potentialRating) cert = potentialRating;
+        }
+
+        // If no cert found and we have TMDB client, try to fetch it
+        if (!cert && tmdbClient && item.id.startsWith('tmdb:')) {
+            const tmdbId = item.id.split(':')[1];
+            const type = item.type === 'movie' ? 'movie' : 'series';
+            // Use 'en-US' as default language for rating check
+            cert = await tmdbService.getAgeRating(tmdbClient, tmdbId, type, 'en-US');
+        }
+
+        if (!cert) return true; // Pass if no rating found (permissive)
+
+        // Normalize cert
+        const certStr = String(cert).toUpperCase();
+        
+        // Map common variations
+        let mappedCert = certStr;
+        if (certStr.startsWith('TV-')) mappedCert = certStr.replace('TV-', '');
+        if (mappedCert === 'MA') mappedCert = 'NC-17';
+        if (mappedCert === '14') mappedCert = 'PG-13';
+        if (mappedCert === 'Y' || mappedCert === 'Y7') mappedCert = 'G';
+        
+        // UK (BBFC)
+        if (mappedCert === 'U') mappedCert = 'G';
+        if (mappedCert === '12' || mappedCert === '12A') mappedCert = 'PG-13';
+        if (mappedCert === '15') mappedCert = 'R';
+        if (mappedCert === '18' || mappedCert === 'R18' || mappedCert === 'CAUTION') mappedCert = 'NC-17';
+        if (mappedCert === 'E') mappedCert = 'G';
+
+        // UK (Non-BBFC / Additional)
+        if (mappedCert === 'ALL' || mappedCert === '0+') mappedCert = 'G';
+        if (mappedCert === '6+') mappedCert = 'PG';
+        if (mappedCert === '7+') mappedCert = 'PG';
+        if (mappedCert === '9+') mappedCert = 'PG';
+        if (mappedCert === '12+') mappedCert = 'PG-13';
+        if (mappedCert === '13+' || mappedCert === 'TEEN') mappedCert = 'PG-13';
+        if (mappedCert === '14+') mappedCert = 'PG-13';
+        if (mappedCert === '16') mappedCert = 'R';
+        if (mappedCert === 'MATURE' || mappedCert === 'ADULT') mappedCert = 'NC-17';
+
+        // Netherlands
+        if (mappedCert === 'AL') mappedCert = 'G';
+        if (mappedCert === '6') mappedCert = 'PG';
+        if (mappedCert === '9') mappedCert = 'PG';
+        if (mappedCert === '12') mappedCert = 'PG-13';
+        if (mappedCert === '14') mappedCert = 'PG-13';
+        if (mappedCert === '16') mappedCert = 'R';
+        if (mappedCert === '18') mappedCert = 'NC-17';
+        
+        // USA (MPA)
+        if (mappedCert === 'APPROVED') mappedCert = 'G';
+        
+        const itemRatingIndex = ratings.indexOf(mappedCert);
+        
+        if (itemRatingIndex > limitIndex) return false;
+        
+        return true;
+    }));
+
+    return items.filter((_, index) => filteredItems[index]);
+  }
+
   async getMeta(type: string, id: string, profileId: number): Promise<MetaDetail | null> {
     const clients = await this.getClientsForProfile(profileId)
+    const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+    const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;
+    
+    // Also get appearance settings for age rating toggle
+    // We need to import appearanceDb or fetch it.
+    // Since we are in AddonManager, we can import appearanceDb.
+    // But let's check if we can pass it.
+    // For now, let's assume default or fetch if possible.
+    // We can't easily fetch appearance settings here without importing appearanceDb.
+    // Let's import it at the top.
     
     for (const client of clients) {
       if (!client.manifest) continue
@@ -153,10 +336,29 @@ export class AddonManager {
       if (!client.manifest.types.includes(type)) continue
       
       // Check ID prefixes if available
-      if (client.manifest.idPrefixes && !client.manifest.idPrefixes.some(p => id.startsWith(p))) continue
+      if (client.manifest.idPrefixes && !client.manifest.idPrefixes.some(p => id.startsWith(p))) {
+          // Fallback: If it's a 'tt' ID and this is the Zentrio addon, allow it even if not in prefixes (though we added it)
+          // Or if we want to be robust for other addons that might handle it but forgot to declare.
+          // But specifically for Zentrio addon, we want to ensure it handles 'tt' IDs.
+          if (id.startsWith('tt') && (client instanceof ZentrioAddonClient || client.manifest.id === 'org.zentrio.tmdb')) {
+              // Allow
+          } else {
+              continue
+          }
+      }
 
       try {
-        const meta = await client.getMeta(type, id)
+        // Pass settings to getMeta if supported
+        // We need to fetch appearance settings
+        const { appearanceDb } = require('../database'); // Lazy import to avoid circular dep
+        const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+        
+        const config = {
+            enableAgeRating: appearance ? appearance.show_age_ratings : true,
+            showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+        };
+
+        const meta = await client.getMeta(type, id, config)
         if (meta) return meta
       } catch (e) {
         // ignore
@@ -168,9 +370,10 @@ export class AddonManager {
   async search(query: string, profileId: number): Promise<MetaPreview[]> {
     const clients = await this.getClientsForProfile(profileId)
     const results: MetaPreview[] = []
+    const profile = profileDb.findById(profileId);
 
     // Prioritize TMDB addon for search
-    const tmdbClient = clients.find(c => c.manifest?.id?.includes('tmdb') || c.manifest?.name?.toLowerCase().includes('tmdb') || c.manifestUrl === DEFAULT_TMDB_ADDON)
+    const tmdbClient = clients.find(c => c.manifest?.id?.includes('tmdb') || c.manifest?.name?.toLowerCase().includes('tmdb') || c.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON))
 
     if (tmdbClient && tmdbClient.manifest) {
       for (const cat of tmdbClient.manifest.catalogs) {
@@ -178,7 +381,16 @@ export class AddonManager {
         if (searchExtra) {
           try {
             console.log(`[AddonManager] Searching TMDB catalog "${cat.id}" for "${query}"`)
-            const items = await tmdbClient.getCatalog(cat.type, cat.id, { search: query })
+            
+            const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+            const { appearanceDb } = require('../database');
+            const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+            const config = {
+                enableAgeRating: appearance ? appearance.show_age_ratings : true,
+                showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+            };
+
+            const items = await tmdbClient.getCatalog(cat.type, cat.id, { search: query }, config)
             results.push(...items)
           } catch (e) {
             console.warn(`TMDB search failed for catalog ${cat.id}`, e)
@@ -189,7 +401,9 @@ export class AddonManager {
       if (results.length > 0) {
         // Simple deduplication based on ID
         const uniqueResults = Array.from(new Map(results.map(item => [item.id, item])).values());
-        return uniqueResults;
+        const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+        const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;
+        return this.filterContent(uniqueResults, settings, profile?.user_id);
       }
     }
 
@@ -215,15 +429,21 @@ export class AddonManager {
     
     // Deduplicate final results from all sources
     const uniqueResults = Array.from(new Map(results.map(item => [item.id, item])).values());
-    return uniqueResults;
+    const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+    const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;
+    return this.filterContent(uniqueResults, settings, profile?.user_id);
   }
 
   async getCatalogItems(profileId: number, manifestUrl: string, type: string, id: string, skip?: number): Promise<{ title: string, items: MetaPreview[] } | null> {
     // Ensure clients are initialized for this profile
     await this.getClientsForProfile(profileId)
     
-    const client = this.clientCache.get(manifestUrl)
-    if (!client || !client.manifest) return null
+    const normalizedUrl = this.normalizeUrl(manifestUrl)
+    const client = this.clientCache.get(normalizedUrl)
+    if (!client || !client.manifest) {
+        console.warn(`[AddonManager] Client not found for ${manifestUrl} (normalized: ${normalizedUrl})`)
+        return null
+    }
 
     const catalog = client.manifest.catalogs.find(c => c.type === type && c.id === id)
     if (!catalog) return null
@@ -232,13 +452,45 @@ export class AddonManager {
       const extra: Record<string, string> = {}
       if (skip) extra.skip = skip.toString()
       
-      const items = await client.getCatalog(type, id, extra)
+      const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+      const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;
+      const profile = profileDb.findById(profileId);
+      
+      const { appearanceDb } = require('../database');
+      const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+      const config = {
+          enableAgeRating: appearance ? appearance.show_age_ratings : true,
+          showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+      };
+
+      let items = await client.getCatalog(type, id, extra, config)
+      let filteredItems = await this.filterContent(items, settings, profile?.user_id);
+      
+      // If we filtered out items and have less than expected (e.g. < 20), try fetching next page
+      // @ts-ignore
+      if (settings?.parental?.enabled && filteredItems.length < 20 && items.length > 0) {
+          const nextSkip = (skip || 0) + items.length;
+          const extraNext = { ...extra, skip: nextSkip.toString() };
+          try {
+              const nextItems = await client.getCatalog(type, id, extraNext, config);
+              if (nextItems.length > 0) {
+                  const nextFiltered = await this.filterContent(nextItems, settings, profile?.user_id);
+                  filteredItems = [...filteredItems, ...nextFiltered];
+              }
+          } catch (e) {
+              // Ignore error on next page fetch
+          }
+      }
+      
       return {
         title: `${client.manifest.name} - ${catalog.name || catalog.type}`,
-        items
+        items: filteredItems
       }
     } catch (e) {
       console.error(`Failed to fetch catalog ${id} from ${manifestUrl}`, e)
+      if (e instanceof Error) {
+        console.error(e.stack)
+      }
       return null
     }
   }
@@ -300,7 +552,15 @@ export class AddonManager {
           if (genre) extra.genre = genre
           if (skip) extra.skip = skip.toString()
           
-          const items = await client.getCatalog(catalog.type, catalog.id, extra)
+          const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+          const { appearanceDb } = require('../database');
+          const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+          const config = {
+              enableAgeRating: appearance ? appearance.show_age_ratings : true,
+              showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+          };
+
+          const items = await client.getCatalog(catalog.type, catalog.id, extra, config)
           results.push(...items)
         } catch (e) {
           console.warn(`Failed to fetch filtered items from ${client.manifest.name}`, e)
@@ -308,7 +568,10 @@ export class AddonManager {
       }
     }
     
-    return results
+    const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+    const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;
+    const profile = profileDb.findById(profileId);
+    return this.filterContent(results, settings, profile?.user_id);
   }
 
   async getStreams(type: string, id: string, profileId: number, season?: number, episode?: number): Promise<{ addon: Manifest, streams: Stream[] }[]> {

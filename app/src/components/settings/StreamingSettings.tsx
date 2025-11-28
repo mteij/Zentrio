@@ -3,7 +3,7 @@ import { Input } from '../index'
 export function StreamingSettings() {
   return (
     <div id="streaming-settings-container" className="settings-card">
-      <h2 className="section-title">Streaming</h2>
+      <h2 className="section-title">Streaming Preferences <span className="info-icon" title="Configure your streaming preferences">?</span></h2>
 
       <div id="streaming-loading">Loading settings...</div>
       
@@ -26,140 +26,107 @@ export function StreamingSettings() {
           </div>
         </div>
 
-        {/* Cache */}
+        {/* Parental Guide */}
         <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-          <div className="setting-info">
-            <h3>Cache</h3>
-            <p>Filter streams based on cache status.</p>
-          </div>
-          <div className="setting-control" style={{ width: '100%', marginTop: '15px', display: 'flex', gap: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label>Cached</label>
-              <div id="cache-cached" className="toggle"></div>
+            <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h3>Parental Guide</h3>
+                    <p>Restrict content visibility based on maturity ratings. Hidden content will not appear in catalogs or search results.</p>
+                </div>
+                <div className="setting-control">
+                    <div id="parental-enabled" className="toggle"></div>
+                </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label>Uncached</label>
-              <div id="cache-uncached" className="toggle"></div>
+            <div id="parental-options" style={{ display: 'none', flexDirection: 'column', gap: '10px', marginTop: '15px', width: '100%' }}>
+                <label>Hide content rated above:</label>
+                <select id="parental-rating-limit" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
+                    <option value="G">G (General Audiences)</option>
+                    <option value="PG">PG (Parental Guidance Suggested)</option>
+                    <option value="PG-13">PG-13 (Parents Strongly Cautioned)</option>
+                    <option value="R">R (Restricted)</option>
+                    <option value="NC-17">NC-17 (Adults Only)</option>
+                </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label>Mode</label>
-              <select id="cache-mode" style={{ padding: '5px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
-                <option value="OR">OR</option>
-                <option value="AND">AND</option>
-              </select>
-            </div>
-          </div>
         </div>
 
-        {/* Resolutions */}
-        <FilterSection title="Resolution" description="Filter by video resolution." category="resolution" types={['preferred', 'required', 'excluded']} />
-
-        {/* Encodes */}
-        <FilterSection title="Encode" description="Filter by video codec." category="encode" types={['preferred', 'required', 'excluded']} />
-
-        {/* Visual Tags */}
-        <FilterSection title="Visual Tags" description="Filter by visual features." category="visualTag" types={['preferred', 'required', 'excluded']} />
-
-        {/* Audio Tags */}
-        <FilterSection title="Audio Tags" description="Filter by audio features." category="audioTag" types={['preferred', 'required', 'excluded']} />
-
-        {/* Matching */}
+        {/* Collapsible Sorting & Filtering Section */}
         <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-          <div className="setting-info">
-            <h3>Matching</h3>
-            <p>Strictness of title and episode matching.</p>
-          </div>
-          <div className="setting-control" style={{ width: '100%', marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>Title Matching</span>
-              <div id="matching-title-enabled" className="toggle"></div>
+            <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h3>Sorting & Filtering</h3>
+                    <p>Configure advanced sorting and filtering options.</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div id="sorting-enabled" className="toggle active" title="Enable/Disable Sorting & Filtering"></div>
+                    <span className="arrow" style={{ cursor: 'pointer', transition: 'transform 0.3s', fontSize: '1.2rem' }} onclick="const content = document.getElementById('sorting-filters-content'); content.style.display = content.style.display === 'none' ? 'block' : 'none'; this.style.transform = content.style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';">▼</span>
+                </div>
             </div>
-            <div id="matching-title-mode-container" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '20px' }}>
-              <label>Mode</label>
-              <select id="matching-title-mode" style={{ padding: '5px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
-                <option value="Exact">Exact</option>
-                <option value="Partial">Partial</option>
-              </select>
+            
+            <div id="sorting-filters-content" style={{ display: 'none', marginTop: '20px', width: '100%', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
+                {/* Streaming Resolutions */}
+                <div className="setting-section">
+                    <div className="section-header">
+                        <h3>Select Streaming Resolutions: <span className="info-icon" title="Select preferred resolutions">?</span></h3>
+                    </div>
+                    <div className="grid-options" id="resolution-options">
+                        {/* Populated by JS */}
+                    </div>
+                </div>
+
+                {/* Quality Filter */}
+                <div className="setting-section">
+                    <div className="section-header">
+                        <h3>Select Quality Filter: <span className="info-icon" title="Select preferred qualities">?</span></h3>
+                    </div>
+                    <div className="grid-options" id="quality-options">
+                        {/* Populated by JS */}
+                    </div>
+                </div>
+
+                {/* File Size Filter */}
+                <div className="setting-section">
+                    <div className="section-header">
+                        <h3>Set File Size Filter: <span className="info-icon" title="Set maximum file size">?</span></h3>
+                    </div>
+                    <div className="slider-container">
+                        <input type="range" id="file-size-slider" min="0" max="100" step="1" className="slider" />
+                        <div className="slider-value">Max File Size: <span id="file-size-value">Unlimited</span></div>
+                    </div>
+                </div>
+
+                {/* Sorting Priority */}
+                <div className="setting-section">
+                    <div className="section-header">
+                        <h3>Select & Arrange Sorting Priority: <span className="info-icon" title="Drag and drop to reorder sorting priority">?</span></h3>
+                    </div>
+                    <div className="sortable-grid" id="sorting-priority-list">
+                        {/* Populated by JS */}
+                    </div>
+                </div>
+
+                {/* Language Selection & Priority */}
+                <div className="setting-section">
+                    <div className="section-header">
+                        <h3>Language Preferences: <span className="info-icon" title="Select and prioritize languages">?</span></h3>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <select id="language-select-input" style={{ flex: 1, padding: '10px', borderRadius: '6px', background: '#333', color: 'white', border: '1px solid #555' }}>
+                                <option value="">Select a language to add...</option>
+                                {/* Populated by JS */}
+                            </select>
+                            <button id="add-language-btn" className="btn btn-primary" style={{ padding: '0 20px' }}>Add</button>
+                        </div>
+                        
+                        <div className="sortable-list" id="language-priority-list">
+                            {/* Populated by JS */}
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>Season/Episode Matching</span>
-              <div id="matching-season-enabled" className="toggle"></div>
-            </div>
-          </div>
         </div>
 
-        {/* Limits */}
-        <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-          <div className="setting-info">
-            <h3>Limits</h3>
-            <p>Control the number of results.</p>
-          </div>
-          <div className="setting-control" style={{ width: '100%', marginTop: '15px', display: 'flex', gap: '20px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label>Max Results</label>
-              <Input type="number" id="limit-maxResults" style={{ width: '100px' }} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label>Per Addon</label>
-              <Input type="number" id="limit-perAddon" style={{ width: '100px' }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Deduplication */}
-        <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-          <div className="setting-info">
-            <h3>Deduplication</h3>
-            <p>Remove duplicate streams.</p>
-          </div>
-          <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Mode: </label>
-              <select id="dedup-mode" style={{ padding: '5px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
-                <option value="Single Result">Single Result</option>
-                <option value="Per Service">Per Service</option>
-                <option value="Per Addon">Per Addon</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <input type="checkbox" id="dedup-filename" /> Filename
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <input type="checkbox" id="dedup-infoHash" /> InfoHash
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <input type="checkbox" id="dedup-smartDetect" /> Smart Detect
-              </label>
-            </div>
-          </div>
-        </div>
       </div>
-    </div>
-  )
-}
-
-function FilterSection({ title, description, category, types = ['preferred', 'excluded'] }: { title: string, description: string, category: string, types?: string[] }) {
-  return (
-    <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-      <div className="setting-info">
-        <h3>{title}</h3>
-        <p>{description}</p>
-      </div>
-      <div className="setting-control" style={{ width: '100%', marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {types.includes('preferred') && <ChipList label="Preferred" id={`chips-${category}-preferred`} />}
-        {types.includes('required') && <ChipList label="Required" id={`chips-${category}-required`} />}
-        {types.includes('excluded') && <ChipList label="Excluded" id={`chips-${category}-excluded`} />}
-      </div>
-    </div>
-  )
-}
-
-function ChipList({ label, id }: { label: string, id: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-      <label style={{ width: '80px', fontSize: '14px', color: '#aaa' }}>{label}</label>
-      <div id={id} style={{ flex: '1', display: 'flex', flexWrap: 'wrap', gap: '5px' }}></div>
     </div>
   )
 }

@@ -8,6 +8,7 @@ let currentAppearanceProfileId = null;
 let appearanceSettings = {
     theme_id: 'zentrio',
     show_imdb_ratings: true,
+    show_age_ratings: true,
     background_style: 'vanta',
     custom_theme_config: null
 };
@@ -797,7 +798,7 @@ async function saveAppearanceSettings() {
             body: JSON.stringify(appearanceSettings)
         });
         if (res.ok) {
-            // showMessage('Appearance settings saved', 'success');
+            showMessage('Appearance settings saved successfully', 'success');
         } else {
             showMessage('Failed to save appearance settings', 'error');
         }
@@ -829,11 +830,18 @@ function renderAppearanceUI() {
         imdbToggle.classList.toggle('active', !!appearanceSettings.show_imdb_ratings);
     }
 
+    // Update Age Ratings Toggle (in Zentrio Config Modal)
+    const ageToggle = document.getElementById('enableAgeRatingToggle');
+    if (ageToggle) {
+        ageToggle.classList.toggle('active', !!appearanceSettings.show_age_ratings);
+    }
+
     // Apply settings locally
     try {
         localStorage.setItem('zentrioTheme', appearanceSettings.theme_id);
         localStorage.setItem('zentrioBackgroundStyle', appearanceSettings.background_style);
         localStorage.setItem('zentrioHideImdbRatings', !appearanceSettings.show_imdb_ratings);
+        localStorage.setItem('zentrioHideAgeRatings', !appearanceSettings.show_age_ratings);
         if (appearanceSettings.custom_theme_config) {
             localStorage.setItem('zentrioCustomTheme', appearanceSettings.custom_theme_config);
         }
@@ -850,10 +858,6 @@ function renderAppearanceUI() {
     }
     if (theme) applyThemeObject(theme);
     
-    // Apply IMDb ratings
-    if (window.ZentrioTheme && window.ZentrioTheme.applyImdbRatings) {
-        window.ZentrioTheme.applyImdbRatings();
-    }
 }
 
 // Initialize page
@@ -1002,9 +1006,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Apply immediately
                 localStorage.setItem('zentrioHideImdbRatings', !newState);
-                if (window.ZentrioTheme && window.ZentrioTheme.applyImdbRatings) {
-                    window.ZentrioTheme.applyImdbRatings();
-                }
             });
         }
  
@@ -1019,6 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const emailModal = document.getElementById('emailModal');
     const passwordModal = document.getElementById('passwordModal');
     const customThemeModal = document.getElementById('customThemeModal');
+    const zentrioConfigModal = document.getElementById('zentrioConfigModal');
     
     if (usernameModal) {
         usernameModal.addEventListener('click', (e) => handleModalClick(e, 'usernameModal'));
@@ -1031,6 +1033,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (customThemeModal) {
         customThemeModal.addEventListener('click', (e) => handleModalClick(e, 'customThemeModal'));
+    }
+    if (zentrioConfigModal) {
+        zentrioConfigModal.addEventListener('click', (e) => handleModalClick(e, 'zentrioConfigModal'));
+    }
+    
+    const zentrioConfigCancelBtn = document.getElementById('zentrioConfigCancelBtn');
+    if (zentrioConfigCancelBtn) {
+        zentrioConfigCancelBtn.addEventListener('click', () => closeModal('zentrioConfigModal'));
+    }
+    
+    const zentrioConfigSaveBtn = document.getElementById('zentrioConfigSaveBtn');
+    if (zentrioConfigSaveBtn) {
+        zentrioConfigSaveBtn.addEventListener('click', () => {
+            // Save config
+            const ageToggle = document.getElementById('enableAgeRatingToggle');
+            if (ageToggle) {
+                appearanceSettings.show_age_ratings = ageToggle.classList.contains('active');
+                saveAppearanceSettings();
+                
+                // Apply immediately
+                localStorage.setItem('zentrioHideAgeRatings', !appearanceSettings.show_age_ratings);
+            }
+            
+            closeModal('zentrioConfigModal');
+            showMessage('Zentrio addon configuration saved', 'success');
+        });
     }
     
     // Add escape key listener
@@ -1714,28 +1742,24 @@ function renderAddonsList() {
         right.style.alignItems = 'center';
         right.style.gap = '15px';
 
-        // Share Button
-        const shareBtn = document.createElement('button');
-        shareBtn.innerHTML = '<span class="iconify" data-icon="mdi:share-variant" style="font-size: 16px;"></span>';
-        shareBtn.className = 'btn btn-secondary btn-sm';
-        shareBtn.title = 'Share Addon';
-        shareBtn.style.padding = '8px';
-        shareBtn.style.background = 'transparent';
-        shareBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-        shareBtn.style.color = '#fff';
-        shareBtn.style.borderRadius = '4px';
-        shareBtn.style.cursor = 'pointer';
-        shareBtn.style.display = 'flex';
-        shareBtn.style.alignItems = 'center';
-        shareBtn.style.justifyContent = 'center';
-        
-        shareBtn.onclick = (e) => {
-            e.stopPropagation();
-            shareAddon(addon);
-        };
-        right.appendChild(shareBtn);
+        // Share Button (Hide for Zentrio)
+        if (addon.manifest_url !== 'zentrio://tmdb-addon') {
+            const shareBtn = document.createElement('button');
+            shareBtn.innerHTML = '<span class="iconify" data-icon="mdi:share-variant" style="font-size: 16px;"></span>';
+            shareBtn.className = 'btn btn-secondary btn-small';
+            shareBtn.title = 'Share Addon';
+            shareBtn.style.display = 'flex';
+            shareBtn.style.alignItems = 'center';
+            shareBtn.style.justifyContent = 'center';
+            
+            shareBtn.onclick = (e) => {
+                e.stopPropagation();
+                shareAddon(addon);
+            };
+            right.appendChild(shareBtn);
+        }
 
-        // Configure Button (if supported)
+        // Configure Button (if supported or Zentrio)
         // Check behaviorHints.configurable OR configurationRequired
         let behaviorHints = {};
         if (typeof addon.behavior_hints === 'string') {
@@ -1747,28 +1771,29 @@ function renderAddonsList() {
         } else if (typeof addon.behavior_hints === 'object' && addon.behavior_hints !== null) {
             behaviorHints = addon.behavior_hints;
         }
-        const isConfigurable = (behaviorHints && behaviorHints.configurable) || (behaviorHints && behaviorHints.configurationRequired);
+        
+        const isZentrio = addon.manifest_url === 'zentrio://tmdb-addon';
+        const isConfigurable = isZentrio || (behaviorHints && behaviorHints.configurable) || (behaviorHints && behaviorHints.configurationRequired);
         
         const configBtn = document.createElement('button');
         // Gear icon
         configBtn.innerHTML = '<span class="iconify" data-icon="mdi:cog" style="font-size: 18px;"></span>';
-        configBtn.className = 'btn btn-secondary btn-sm';
+        configBtn.className = 'btn btn-secondary btn-small';
         configBtn.title = isConfigurable ? 'Configure Addon' : 'Not Configurable';
-        configBtn.style.padding = '8px';
-        configBtn.style.background = 'transparent';
-        configBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-        configBtn.style.color = isConfigurable ? '#fff' : '#555';
-        configBtn.style.borderRadius = '4px';
-        configBtn.style.cursor = isConfigurable ? 'pointer' : 'default';
         configBtn.style.display = 'flex';
         configBtn.style.alignItems = 'center';
         configBtn.style.justifyContent = 'center';
         configBtn.style.opacity = isConfigurable ? '1' : '0.5';
+        if (!isConfigurable) configBtn.style.cursor = 'default';
         
         if (isConfigurable) {
             configBtn.onclick = (e) => {
                 e.stopPropagation();
-                configureAddon(addon);
+                if (isZentrio) {
+                    openZentrioConfigModal();
+                } else {
+                    configureAddon(addon);
+                }
             };
         }
         
@@ -1778,51 +1803,57 @@ function renderAddonsList() {
         const toggleWrapper = document.createElement('div');
         toggleWrapper.className = `toggle ${addon.enabled ? 'active' : ''}`;
         toggleWrapper.style.transform = 'scale(0.8)'; // Make it slightly smaller
-        toggleWrapper.onclick = () => toggleAddon(addon.id, !addon.enabled);
+        
+        // Disable toggle if Zentrio addon and no API key
+        if (addon.manifest_url === 'zentrio://tmdb-addon' && !tmdbApiKey) {
+            toggleWrapper.classList.add('disabled');
+            toggleWrapper.title = 'TMDB API Key required (Account settings)';
+            toggleWrapper.style.opacity = '0.5';
+            toggleWrapper.style.cursor = 'not-allowed';
+            toggleWrapper.onclick = () => {
+                showMessage('Please add your TMDB API Key in Account settings to enable this addon.', 'error');
+            };
+        } else {
+            toggleWrapper.onclick = () => toggleAddon(addon.id, !addon.enabled);
+        }
+        
         right.appendChild(toggleWrapper);
 
-        // Uninstall Button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.innerHTML = '<span class="iconify" data-icon="mdi:delete" style="font-size: 16px;"></span>';
-        deleteBtn.className = 'btn btn-danger btn-sm';
-        deleteBtn.title = 'Remove from this profile';
-        deleteBtn.style.padding = '8px';
-        deleteBtn.style.background = 'transparent';
-        deleteBtn.style.border = '1px solid rgba(220, 53, 69, 0.3)';
-        deleteBtn.style.color = '#dc3545';
-        deleteBtn.style.borderRadius = '4px';
-        deleteBtn.style.cursor = 'pointer';
-        deleteBtn.style.display = 'flex';
-        deleteBtn.style.alignItems = 'center';
-        deleteBtn.style.justifyContent = 'center';
-        
-        deleteBtn.onclick = async (e) => {
-            e.stopPropagation();
-            if (!confirm(`Remove ${addon.name} from this profile?`)) return;
+        // Uninstall Button (Hide for Zentrio)
+        if (addon.manifest_url !== 'zentrio://tmdb-addon') {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '<span class="iconify" data-icon="mdi:delete" style="font-size: 16px;"></span>';
+            deleteBtn.className = 'btn btn-danger btn-small';
+            deleteBtn.title = 'Remove from this profile';
+            deleteBtn.style.display = 'flex';
+            deleteBtn.style.alignItems = 'center';
+            deleteBtn.style.justifyContent = 'center';
             
-            if (!currentProfileId || !addon.id) {
-                showMessage('Invalid profile or addon ID', 'error');
-                return;
-            }
-
-            try {
-                // Use the toggle endpoint to disable it (which effectively removes it from the active list in UI)
-                // Or we can implement a specific remove endpoint if we want to delete the record from profile_addons
-                // For now, let's use a new endpoint to remove it from the profile specifically
-                const res = await fetch(`/api/addons/settings-profile/${currentProfileId}/${addon.id}`, { method: 'DELETE' });
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Failed to remove addon');
+            deleteBtn.onclick = async (e) => {
+                e.stopPropagation();
+                if (!confirm(`Remove ${addon.name} from this profile?`)) return;
+                
+                if (!currentProfileId || !addon.id) {
+                    showMessage('Invalid profile or addon ID', 'error');
+                    return;
                 }
-                if (currentProfileId) loadAddonsForProfile(currentProfileId);
-                showMessage('Addon removed from profile', 'success');
-            } catch (e) {
-                console.error(e);
-                showMessage(e.message || 'Failed to remove addon', 'error');
-            }
-        };
-        
-        right.appendChild(deleteBtn);
+
+                try {
+                    const res = await fetch(`/api/addons/settings-profile/${currentProfileId}/${addon.id}`, { method: 'DELETE' });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.error || 'Failed to remove addon');
+                    }
+                    if (currentProfileId) loadAddonsForProfile(currentProfileId);
+                    showMessage('Addon removed from profile', 'success');
+                } catch (e) {
+                    console.error(e);
+                    showMessage(e.message || 'Failed to remove addon', 'error');
+                }
+            };
+            
+            right.appendChild(deleteBtn);
+        }
         item.appendChild(right);
         list.appendChild(item);
     });
@@ -1901,6 +1932,27 @@ function configureAddon(addon) {
     } else {
         showMessage('Popup blocked. Please allow popups to configure addons.', 'error');
     }
+}
+
+function openZentrioConfigModal() {
+    // Load current config
+    const ageToggle = document.getElementById('enableAgeRatingToggle');
+    if (ageToggle) {
+        ageToggle.classList.toggle('active', !!appearanceSettings.show_age_ratings);
+        
+        // Add click listener if not already added (check if it has a specific class or attribute?)
+        // Or just replace the element to clear listeners?
+        // Or just add listener once in init.
+        // Let's check if we added it in init. We didn't.
+        // So let's add it here but ensure we don't duplicate.
+        if (!ageToggle.hasAttribute('data-listener-attached')) {
+            ageToggle.addEventListener('click', () => {
+                ageToggle.classList.toggle('active');
+            });
+            ageToggle.setAttribute('data-listener-attached', 'true');
+        }
+    }
+    openModal('zentrioConfigModal');
 }
 
 async function updateAddonManifest(addonId, newUrl) {

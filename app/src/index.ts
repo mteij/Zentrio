@@ -10,6 +10,7 @@ import viewRoutes from './routes/views'
 
 // Import API route modules
 import apiRoutes from './routes/api/index'
+import { initImdbService } from './services/imdb'
 
 // Initialize environment variables before starting the app
 initEnv()
@@ -81,6 +82,9 @@ if (!RATE_LIMIT_LIMIT || RATE_LIMIT_LIMIT <= 0 || !RATE_LIMIT_WINDOW_MS || RATE_
 }
 
 logger.info('Preparing middleware and routes...')
+
+// Initialize IMDb service
+initImdbService()
 
 // Basic Middleware
 app.use('*', corsMiddleware())

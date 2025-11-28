@@ -300,9 +300,11 @@ export const StreamingDetails = ({ meta, streams, profileId, inLibrary, profile 
             <h1 className="details-title">{meta.name}</h1>
             
             <div className="details-meta-row">
-              {meta.released && <span className="meta-badge">{meta.released.split('-')}</span>}
+              {meta.released && <span className="meta-badge">{String(meta.released).split('-')[0]}</span>}
               {meta.runtime && <span className="meta-badge">{meta.runtime}</span>}
               {meta.imdbRating && <span className="meta-badge" style={{ background: '#f5c518', color: '#000' }}>IMDb {meta.imdbRating}</span>}
+              {/* @ts-ignore */}
+              {(meta.certification || meta.rating || meta.contentRating) && <span className="meta-badge" style={{ border: '1px solid #fff' }}>{(meta.certification || meta.rating || meta.contentRating)}</span>}
             </div>
 
             <div className="details-actions">

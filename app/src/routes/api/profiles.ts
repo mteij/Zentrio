@@ -47,6 +47,15 @@ import { sessionMiddleware } from '../../middleware/session'
     hero_banner_enabled: true, // Default to true
   })
 
+  // Ensure Zentrio addon is enabled for the new profile's settings profile
+  if (profile.settings_profile_id) {
+    const { addonDb, db } = require('../../services/database')
+    const zentrioAddon = db.prepare("SELECT id FROM addons WHERE manifest_url = 'zentrio://tmdb-addon'").get()
+    if (zentrioAddon) {
+      addonDb.enableForProfile(profile.settings_profile_id, zentrioAddon.id)
+    }
+  }
+
   // Don't return password
   return c.json(profile)
 })

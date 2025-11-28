@@ -121,6 +121,26 @@ export function SettingsPage({}: SettingsPageProps) {
                     </Button>
                 </div>
             </div>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>TMDB API Key</h3>
+                <p>Enter your TMDB API key to enable advanced metadata features like age ratings and IMDb ratings.</p>
+              </div>
+              <div className="setting-control">
+                <div className="password-input-container" style={{ position: 'relative', width: '300px' }}>
+                    <Input
+                        type="password"
+                        id="tmdbApiKeyInput"
+                        placeholder="Enter TMDB API Key"
+                        style={{ width: '100%', paddingRight: '40px' }}
+                    />
+                    <button className="password-toggle-btn" type="button" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                        <span className="iconify" data-icon="mdi:eye" style={{ fontSize: '20px' }}></span>
+                    </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Linked Accounts */}
@@ -156,9 +176,9 @@ export function SettingsPage({}: SettingsPageProps) {
                     <select id="appearance-profile-select" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
                         <option value="">Loading profiles...</option>
                     </select>
-                    <button id="create-settings-profile-btn-appearance" className="btn btn-secondary" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer' }} title="Create new profile">+</button>
-                    <button id="rename-settings-profile-btn-appearance" className="btn btn-secondary" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer', display: 'none' }} title="Rename profile">✎</button>
-                    <button id="delete-settings-profile-btn-appearance" className="btn btn-danger" style={{ padding: '8px', borderRadius: '4px', background: '#dc3545', color: 'white', border: 'none', cursor: 'pointer', display: 'none' }} title="Delete profile">🗑️</button>
+                    <button id="create-settings-profile-btn-appearance" className="btn btn-secondary" style={{ padding: '8px 12px' }} title="Create new profile">+</button>
+                    <button id="rename-settings-profile-btn-appearance" className="btn btn-secondary" style={{ padding: '8px 12px', display: 'none' }} title="Rename profile">✎</button>
+                    <button id="delete-settings-profile-btn-appearance" className="btn btn-danger" style={{ padding: '8px 12px', display: 'none' }} title="Delete profile">🗑️</button>
                  </div>
               </div>
             </div>
@@ -183,15 +203,6 @@ export function SettingsPage({}: SettingsPageProps) {
               </div>
             </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Show IMDb Ratings</h3>
-                <p>Display IMDb ratings on movie and series posters.</p>
-              </div>
-              <div className="setting-control">
-                <div className="toggle active" id="imdbRatingsToggle"></div>
-              </div>
-            </div>
 
             <div className="setting-item">
               <div className="setting-info">
@@ -204,6 +215,16 @@ export function SettingsPage({}: SettingsPageProps) {
                   <option value="none">Fade (Gradient)</option>
                   <option value="solid">Solid Color</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <h3>Show IMDb Ratings</h3>
+                <p>Display IMDb ratings on media cards.</p>
+              </div>
+              <div className="setting-control">
+                <div id="imdbRatingsToggle" className="toggle"></div>
               </div>
             </div>
 
@@ -227,9 +248,9 @@ export function SettingsPage({}: SettingsPageProps) {
                     <select id="addonProfileSelect" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
                         <option value="">Loading profiles...</option>
                     </select>
-                    <button id="create-settings-profile-btn-addons" className="btn btn-secondary" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer' }} title="Create new profile">+</button>
-                    <button id="rename-settings-profile-btn-addons" className="btn btn-secondary" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', cursor: 'pointer', display: 'none' }} title="Rename profile">✎</button>
-                    <button id="delete-settings-profile-btn-addons" className="btn btn-danger" style={{ padding: '8px', borderRadius: '4px', background: '#dc3545', color: 'white', border: 'none', cursor: 'pointer', display: 'none' }} title="Delete profile">🗑️</button>
+                    <button id="create-settings-profile-btn-addons" className="btn btn-secondary" style={{ padding: '8px 12px' }} title="Create new profile">+</button>
+                    <button id="rename-settings-profile-btn-addons" className="btn btn-secondary" style={{ padding: '8px 12px', display: 'none' }} title="Rename profile">✎</button>
+                    <button id="delete-settings-profile-btn-addons" className="btn btn-danger" style={{ padding: '8px 12px', display: 'none' }} title="Delete profile">🗑️</button>
                  </div>
               </div>
             </div>
@@ -510,7 +531,36 @@ export function SettingsPage({}: SettingsPageProps) {
         </div>
       </ModalWithFooter>
 
+      {/* Zentrio Addon Config Modal */}
+      <ModalWithFooter
+        id="zentrioConfigModal"
+        title="Configure Zentrio Addon"
+        footer={
+          <>
+            <Button variant="secondary" id="zentrioConfigCancelBtn">
+              Cancel
+            </Button>
+            <Button variant="primary" id="zentrioConfigSaveBtn">
+              Save Configuration
+            </Button>
+          </>
+        }
+      >
+        <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', borderBottom: 'none', padding: '0' }}>
+            <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h3>Show Age Ratings</h3>
+                    <p>Display age ratings in metadata.</p>
+                </div>
+                <div className="setting-control">
+                    <div id="enableAgeRatingToggle" className="toggle active"></div>
+                </div>
+            </div>
+        </div>
+      </ModalWithFooter>
+
       {/* Settings wiring script */}
+      <link rel="stylesheet" href="/static/css/streaming-settings.css" />
       <script src="/static/js/streaming-settings.js"></script>
       <script
         dangerouslySetInnerHTML={{

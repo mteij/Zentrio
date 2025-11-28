@@ -34,43 +34,6 @@ html {
     background-color: #141414;
 }
 
-/* Header Styles */
-.header {
-    background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    padding: 20px 60px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.logo {
-    color: #e50914;
-    font-size: 32px;
-    font-weight: bold;
-    letter-spacing: -1px;
-}
-
-.nav {
-    display: flex;
-    gap: 30px;
-    align-items: center;
-}
-
-.nav a {
-    color: white;
-    text-decoration: none;
-    font-size: 16px;
-    transition: color 0.3s;
-}
-
-.nav a:hover {
-    color: #e50914;
-}
 
 /* Button Styles */
 .btn {
