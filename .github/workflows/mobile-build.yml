@@ -11,6 +11,8 @@ on:
         description: 'Version to build (e.g., 1.0.0)'
         required: true
         type: string
+  repository_dispatch:
+    types: [mobile-build]
 
 permissions:
   contents: read
@@ -51,6 +53,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "VERSION=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
           else
             VERSION=$(node -e "console.log(require('./app/package.json').version)")
             echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
@@ -275,6 +279,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "VERSION=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
           else
             VERSION=$(node -e "console.log(require('./app/package.json').version)")
             echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
@@ -369,15 +375,23 @@ jobs:
           # echo "### iOS" >> mobile-section.md
           # echo "- iOS builds are temporarily disabled" >> mobile-section.md
           
-          # Combine notes
-          # We append the mobile section to the current notes, but we don't add extra separators or text
-          # The current notes already have the links and disclaimer at the bottom
-          # We want to insert the mobile downloads BEFORE the links/disclaimer if possible, or just append
-          
-          # Simple append for now, but without extra text
-          cat current-notes.md mobile-section.md > updated-notes.md
+          # Check if we already have a mobile downloads section
+          if grep -q "## 📱 Mobile Downloads" current-notes.md; then
+            # Replace existing mobile section
+            sed -i '/## 📱 Mobile Downloads/,/^## /{
+              /^## 📱 Mobile Downloads/{
+                r /dev/stdin
+                d
+              }
+              /^## [^📱]/!d
+            }' current-notes.md < mobile-section.md
+          else
+            # Append new mobile section
+            cat current-notes.md mobile-section.md > updated-notes.md
+            mv updated-notes.md current-notes.md
+          fi
           
           # Update release
-          gh release edit "v${{ steps.version.outputs.VERSION }}" --notes-file updated-notes.md
+          gh release edit "v${{ steps.version.outputs.VERSION }}" --notes-file current-notes.md
           
           echo "Release notes updated with mobile download links"

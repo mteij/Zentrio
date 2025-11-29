@@ -486,12 +486,12 @@ app.post('/email/initiate', async (c) => {
 
     // Use Better Auth to change email
     const res = await auth.api.changeEmail({
-        body: {
-            newEmail,
-            callbackURL: '/settings'
-        },
-        headers: c.req.raw.headers
-    })
+            body: {
+                newEmail,
+                callbackURL: c.req.header('User-Agent')?.includes('Tauri') ? 'tauri://localhost' : '/settings'
+            },
+            headers: c.req.raw.headers
+        })
 
     if (!res.status) {
         return err(c, 400, 'INVALID_INPUT', 'Failed to initiate email change')

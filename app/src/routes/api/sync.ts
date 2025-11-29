@@ -19,18 +19,7 @@ app.post('/configure', async (c) => {
     const { serverUrl, mode } = await c.req.json();
     
     // Store the configuration in the database
-    if (mode === 'offline') {
-      // Clear any existing sync configuration
-      await syncService.disconnect();
-      // Store offline mode preference in sync_state
-      await syncService.setSyncState({
-        remote_url: '',
-        auth_token: '',
-        remote_user_id: '',
-        is_syncing: false,
-        last_sync_at: null
-      });
-    } else if (mode === 'cloud' && serverUrl) {
+    if (mode === 'cloud' && serverUrl) {
       // Store server URL for later use
       await syncService.setSyncState({
         remote_url: serverUrl,
@@ -39,6 +28,8 @@ app.post('/configure', async (c) => {
         is_syncing: false,
         last_sync_at: null
       });
+    } else {
+      throw new Error('Invalid configuration mode');
     }
     
     return c.json({ success: true });
@@ -52,7 +43,7 @@ app.get('/config', async (c) => {
   try {
     const syncState = await syncService.getSyncState();
     
-    let mode = 'offline';
+    let mode = 'unconfigured';
     let serverUrl = 'https://zentrio.eu';
     
     if (syncState && syncState.remote_url) {

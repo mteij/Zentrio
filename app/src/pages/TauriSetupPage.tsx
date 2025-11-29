@@ -59,20 +59,6 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
                 Use Self-Hosted
               </Button>
             </div>
-
-            {/* Option 3: Offline Mode */}
-            <div className="setup-option" id="offline-option">
-              <div className="option-header">
-                <div className="option-icon">📱</div>
-                <div className="option-info">
-                  <h3>Offline Mode</h3>
-                  <p>Use Zentrio locally without cloud sync</p>
-                </div>
-              </div>
-              <Button variant="secondary" id="selectOfflineBtn" className="option-button">
-                Use Offline Mode
-              </Button>
-            </div>
           </div>
 
           <div className="setup-progress" id="setup-progress" style={{ display: 'none' }}>
@@ -118,7 +104,6 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
               // DOM elements
               const publicOption = document.getElementById('public-option');
               const selfHostedOption = document.getElementById('selfhosted-option');
-              const offlineOption = document.getElementById('offline-option');
               const selfHostedForm = document.getElementById('selfhosted-form');
               const setupProgress = document.getElementById('setup-progress');
               const setupError = document.getElementById('setup-error');
@@ -126,7 +111,6 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
               // Buttons
               const selectPublicBtn = document.getElementById('selectPublicBtn');
               const selectSelfHostedBtn = document.getElementById('selectSelfHostedBtn');
-              const selectOfflineBtn = document.getElementById('selectOfflineBtn');
               const backToOptionsBtn = document.getElementById('backToOptionsBtn');
               const connectSelfHostedBtn = document.getElementById('connectSelfHostedBtn');
               const cancelSetupBtn = document.getElementById('cancelSetupBtn');
@@ -139,14 +123,28 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
               const errorMessage = document.getElementById('error-message');
 
               // Initialize
-              function init() {
+              async function init() {
+                // Check if already configured
+                try {
+                  const response = await fetch('/api/sync/config');
+                  if (response.ok) {
+                    const config = await response.json();
+                    if (config.isConnected || config.mode === 'cloud') {
+                      // Already configured, redirect to profiles
+                      window.location.href = '/profiles';
+                      return;
+                    }
+                  }
+                } catch (error) {
+                  console.log('No existing configuration found');
+                }
+                
                 // Hide all options initially
                 showOptions();
                 
                 // Event listeners
                 selectPublicBtn.addEventListener('click', () => selectMode('public'));
                 selectSelfHostedBtn.addEventListener('click', () => selectMode('selfhosted'));
-                selectOfflineBtn.addEventListener('click', () => selectMode('offline'));
                 backToOptionsBtn.addEventListener('click', showOptions);
                 connectSelfHostedBtn.addEventListener('click', connectSelfHosted);
                 cancelSetupBtn.addEventListener('click', cancelSetup);
@@ -161,7 +159,6 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
                 // Show options
                 publicOption.style.display = 'flex';
                 selfHostedOption.style.display = 'flex';
-                offlineOption.style.display = 'flex';
                 
                 // Hide forms and progress
                 selfHostedForm.style.display = 'none';
@@ -178,7 +175,6 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
                 // Hide all options
                 publicOption.style.display = 'none';
                 selfHostedOption.style.display = 'none';
-                offlineOption.style.display = 'none';
                 
                 if (mode === 'selfhosted') {
                   // Show self-hosted form
@@ -189,9 +185,6 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
                 } else if (mode === 'public') {
                   // Connect to public instance
                   connectToServer('https://zentrio.eu');
-                } else if (mode === 'offline') {
-                  // Setup offline mode
-                  setupOfflineMode();
                 }
               }
 
@@ -264,37 +257,10 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
                 }
               }
 
-              async function setupOfflineMode() {
-                showProgress();
-                updateProgress('Setting up offline mode...');
-                
-                try {
-                  // Configure offline mode
-                  await fetch('/api/sync/configure', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                      mode: 'offline'
-                    })
-                  });
-                  
-                  updateProgress('Finalizing setup...');
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-                  
-                  // Redirect to profiles page
-                  window.location.href = '/profiles';
-                  
-                } catch (error) {
-                  console.error('Offline setup error:', error);
-                  showError('Failed to setup offline mode');
-                }
-              }
-
               function showProgress() {
                 // Hide options and error
                 publicOption.style.display = 'none';
                 selfHostedOption.style.display = 'none';
-                offlineOption.style.display = 'none';
                 setupError.style.display = 'none';
                 
                 // Show progress
@@ -317,7 +283,6 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
                 // Hide options and progress
                 publicOption.style.display = 'none';
                 selfHostedOption.style.display = 'none';
-                offlineOption.style.display = 'none';
                 setupProgress.style.display = 'none';
                 
                 // Show error
@@ -360,15 +325,22 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
         }
 
         .setup-card {
-          background: rgba(20, 20, 20, 0.9);
+          background: rgba(20, 20, 20, 0.6);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 16px;
           padding: 40px;
           width: 100%;
           max-width: 500px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .setup-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+          border-color: rgba(255, 255, 255, 0.1);
         }
 
         .setup-header {
@@ -380,11 +352,14 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
           font-size: 32px;
           margin-bottom: 10px;
           color: var(--accent, #e50914);
+          font-weight: 700;
+          letter-spacing: -0.5px;
         }
 
         .setup-header p {
           color: var(--muted, #b3b3b3);
           font-size: 16px;
+          line-height: 1.5;
         }
 
         .setup-options {
@@ -394,16 +369,36 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
         }
 
         .setup-option {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 12px;
           padding: 20px;
-          transition: all 0.3s ease;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .setup-option::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
         }
 
         .setup-option:hover {
-          background: rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.05);
           transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .setup-option:hover::before {
+          opacity: 1;
         }
 
         .option-header {
@@ -411,6 +406,8 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
           align-items: center;
           gap: 15px;
           margin-bottom: 15px;
+          position: relative;
+          z-index: 1;
         }
 
         .option-icon {
@@ -420,30 +417,39 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.08);
           border-radius: 10px;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .option-info h3 {
           font-size: 18px;
           margin-bottom: 5px;
           color: white;
+          font-weight: 600;
         }
 
         .option-info p {
           color: var(--muted, #b3b3b3);
           font-size: 14px;
           margin: 0;
+          line-height: 1.4;
         }
 
         .option-button {
           width: 100%;
+          position: relative;
+          z-index: 1;
         }
 
         .selfhosted-form {
           margin-top: 20px;
           padding-top: 20px;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          position: relative;
+          z-index: 1;
         }
 
         .form-actions {
@@ -465,6 +471,7 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
           font-size: 24px;
           margin-bottom: 10px;
           color: white;
+          font-weight: 600;
         }
 
         .progress-header p {
@@ -487,6 +494,7 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
           border-radius: 2px;
           transition: width 0.3s ease;
           width: 0%;
+          box-shadow: 0 0 10px rgba(229, 9, 20, 0.5);
         }
 
         .setup-error {
@@ -528,6 +536,8 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
           font-size: 14px;
           font-weight: 600;
           transition: all 0.2s ease;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
         }
 
         .btn:disabled {
@@ -538,10 +548,13 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
         .btn-primary {
           background: var(--accent, #e50914);
           color: white;
+          box-shadow: 0 4px 15px rgba(229, 9, 20, 0.3);
         }
 
         .btn-primary:hover:not(:disabled) {
           background: var(--btn-primary-bg-hover, #f40612);
+          box-shadow: 0 6px 20px rgba(229, 9, 20, 0.4);
+          transform: translateY(-1px);
         }
 
         .btn-secondary {
@@ -552,6 +565,8 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
 
         .btn-secondary:hover:not(:disabled) {
           background: rgba(255, 255, 255, 0.15);
+          border-color: rgba(255, 255, 255, 0.3);
+          transform: translateY(-1px);
         }
 
         .form-group {
@@ -575,12 +590,15 @@ export function TauriSetupPage({}: TauriSetupPageProps) {
           color: white;
           font-size: 14px;
           transition: all 0.2s ease;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
         }
 
         .form-group input:focus {
           outline: none;
           border-color: var(--accent, #e50914);
           background: rgba(255, 255, 255, 0.08);
+          box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.2);
         }
 
         .form-group input::placeholder {

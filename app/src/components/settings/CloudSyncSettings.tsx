@@ -235,7 +235,7 @@ export function CloudSyncSettings() {
             }
 
             async function handleDisconnect() {
-              if (!confirm('Are you sure you want to disconnect? This will stop synchronization.')) {
+              if (!confirm('Are you sure you want to disconnect? This will stop synchronization and return to setup.')) {
                 return;
               }
 
@@ -248,6 +248,9 @@ export function CloudSyncSettings() {
                   // Clear form
                   document.getElementById('sync-email').value = '';
                   document.getElementById('sync-password').value = '';
+                  
+                  // Redirect to setup page
+                  window.location.href = '/setup';
                 }
               } catch (error) {
                 console.error('Failed to disconnect:', error);

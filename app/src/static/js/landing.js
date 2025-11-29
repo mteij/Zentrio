@@ -36,7 +36,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             provider,
-                            callbackURL: '/profiles'
+                            callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles'
                         })
                     });
                     const data = await res.json();
@@ -270,7 +270,7 @@
                         email,
                         password: pwd.value,
                         rememberMe: getRememberPref(),
-                        callbackURL: '/profiles'
+                        callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles'
                     })
                 });
                 
@@ -307,7 +307,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         email,
-                        callbackURL: '/profiles',
+                        callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles',
                         rememberMe: getRememberPref()
                     })
                 });
@@ -455,7 +455,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         email,
-                        callbackURL: '/profiles',
+                        callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles',
                         rememberMe: getRememberPref()
                     })
                 });
@@ -688,7 +688,7 @@
                         name: username,
                         username,
                         rememberMe: getRememberPref(),
-                        callbackURL: '/profiles'
+                        callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles'
                     })
                 });
                 
@@ -741,7 +741,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         email,
-                        callbackURL: '/profiles'
+                        callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles'
                     })
                 });
                 

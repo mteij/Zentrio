@@ -1,0 +1,287 @@
+name: Create Release
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      create_tag:
+        description: 'Create git tag for this version'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  NODE_VERSION: 20
+  BUN_VERSION: latest
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(node -e "console.log(require('./app/package.json').version)")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create git tag
+        if: ${{ github.event.inputs.create_tag != 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Creating git tag v$VERSION"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "v$VERSION" -m "Release v$VERSION"
+            git push origin "v$VERSION"
+          else
+            echo "Tag v$VERSION already exists"
+          fi
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          
+          # Generate release notes
+          node .github/scripts/generate-release-notes.mjs "$VERSION" > release-notes.md
+          
+          # Create or update release
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Updating existing release v$VERSION"
+            gh release edit "v$VERSION" --notes-file release-notes.md
+          else
+            echo "Creating new release v$VERSION"
+            gh release create "v$VERSION" --title "Zentrio v$VERSION" --notes-file release-notes.md
+          fi
+
+  trigger-builds:
+    runs-on: ubuntu-latest
+    needs: [create-release]
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Trigger Mobile Build
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: mobile-build
+          client-payload: |
+            {
+              "version": "${{ needs.create-release.outputs.version }}"
+            }
+
+      - name: Trigger Tauri Build
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: tauri-build
+          client-payload: |
+            {
+              "version": "${{ needs.create-release.outputs.version }}"
+            }
+
+  update-release-with-all-assets:
+    runs-on: ubuntu-latest
+    needs: [create-release, trigger-builds]
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Wait for builds to complete
+        run: |
+          echo "Waiting for mobile and Tauri builds to complete..."
+          sleep 60
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(node -e "console.log(require('./app/package.json').version)")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Wait for and check release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          echo "Checking release assets for v$VERSION..."
+          
+          # Wait up to 30 minutes for assets to be uploaded
+          for i in {1..60}; do
+            echo "Check attempt $i/60..."
+            
+            # Get release assets
+            ASSETS=$(gh release view "v$VERSION" --json assets -q '.assets[].name' 2>/dev/null || echo "")
+            
+            # Check if we have both mobile and desktop assets
+            HAS_MOBILE=$(echo "$ASSETS" | grep -E "\.(apk|aab)$" || echo "")
+            HAS_DESKTOP=$(echo "$ASSETS" | grep -E "\.(exe|dmg|deb|rpm|AppImage)$" || echo "")
+            
+            if [ -n "$HAS_MOBILE" ] && [ -n "$HAS_DESKTOP" ]; then
+              echo "✅ Both mobile and desktop assets found!"
+              echo "Mobile assets:"
+              echo "$HAS_MOBILE"
+              echo "Desktop assets:"
+              echo "$HAS_DESKTOP"
+              break
+            fi
+            
+            if [ $i -eq 60 ]; then
+              echo "⚠️ Timeout waiting for assets. Proceeding with available assets."
+            else
+              echo "Waiting for more assets... (30s)"
+              sleep 30
+            fi
+          done
+
+      - name: Generate comprehensive release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          
+          # Get current release notes
+          gh release view "v$VERSION" --json body -q '.body' > current-notes.md
+          
+          # Create comprehensive download section
+          cat > downloads-section.md << 'EOF'
+          
+          ## 📥 Downloads
+          
+          EOF
+          
+          # Get all assets and categorize them
+          ASSETS=$(gh release view "v$VERSION" --json assets -q '.assets[] | {name: .name, size: .size}' | jq -s '.')
+          
+          # Mobile section
+          echo "### 📱 Mobile" >> downloads-section.md
+          MOBILE_FOUND=false
+          
+          # Android APKs
+          if echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".apk")) | .name' | grep -q .; then
+            MOBILE_FOUND=true
+            echo "" >> downloads-section.md
+            echo "**Android:**" >> downloads-section.md
+            echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".apk")) | "- [\(.name)](https://github.com/${{ github.repository }}/releases/download/v$VERSION/\(.name)) (\(.size / 1024 / 1024 | floor)MB)"' >> downloads-section.md
+          fi
+          
+          # Android AABs
+          if echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".aab")) | .name' | grep -q .; then
+            MOBILE_FOUND=true
+            if [ "$MOBILE_FOUND" = false ]; then
+              echo "" >> downloads-section.md
+              echo "**Android:**" >> downloads-section.md
+            fi
+            echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".aab")) | "- [\(.name)](https://github.com/${{ github.repository }}/releases/download/v$VERSION/\(.name)) (\(.size / 1024 / 1024 | floor)MB)"' >> downloads-section.md
+          fi
+          
+          if [ "$MOBILE_FOUND" = false ]; then
+            echo "No mobile assets available" >> downloads-section.md
+          fi
+          
+          # Desktop section
+          echo "" >> downloads-section.md
+          echo "### 🖥️ Desktop" >> downloads-section.md
+          DESKTOP_FOUND=false
+          
+          # Windows
+          if echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".exe")) | .name' | grep -q .; then
+            DESKTOP_FOUND=true
+            echo "" >> downloads-section.md
+            echo "**Windows:**" >> downloads-section.md
+            echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".exe")) | "- [\(.name)](https://github.com/${{ github.repository }}/releases/download/v$VERSION/\(.name)) (\(.size / 1024 / 1024 | floor)MB)"' >> downloads-section.md
+          fi
+          
+          # macOS
+          if echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".dmg")) | .name' | grep -q .; then
+            DESKTOP_FOUND=true
+            if [ "$DESKTOP_FOUND" = false ]; then
+              echo "" >> downloads-section.md
+              echo "**macOS:**" >> downloads-section.md
+            fi
+            echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".dmg")) | "- [\(.name)](https://github.com/${{ github.repository }}/releases/download/v$VERSION/\(.name)) (\(.size / 1024 / 1024 | floor)MB)"' >> downloads-section.md
+          fi
+          
+          # Linux
+          if echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".deb") or endswith(".rpm") or endswith(".AppImage")) | .name' | grep -q .; then
+            DESKTOP_FOUND=true
+            if [ "$DESKTOP_FOUND" = false ]; then
+              echo "" >> downloads-section.md
+              echo "**Linux:**" >> downloads-section.md
+            fi
+            echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".deb") or endswith(".rpm") or endswith(".AppImage")) | "- [\(.name)](https://github.com/${{ github.repository }}/releases/download/v$VERSION/\(.name)) (\(.size / 1024 / 1024 | floor)MB)"' >> downloads-section.md
+          fi
+          
+          if [ "$DESKTOP_FOUND" = false ]; then
+            echo "No desktop assets available" >> downloads-section.md
+          fi
+          
+          # Replace or append the downloads section
+          if grep -q "## 📥 Downloads" current-notes.md; then
+            # Replace existing downloads section
+            sed -i '/## 📥 Downloads/,/^## /{
+              /^## 📥 Downloads/{
+                r /dev/stdin
+                d
+              }
+              /^## [^📥]/!d
+            }' current-notes.md < downloads-section.md
+          else
+            # Find a good place to insert (before existing links or at the end)
+            if grep -q "## 🔗 Links" current-notes.md; then
+              # Insert before Links section
+              sed -i '/## 🔗 Links/i\' current-notes.md
+              sed -i '/## 🔗 Links/i\' current-notes.md
+              sed -i '/## 🔗 Links/r /dev/stdin' current-notes.md < downloads-section.md
+            else
+              # Append to end
+              cat current-notes.md downloads-section.md > updated-notes.md
+              mv updated-notes.md current-notes.md
+            fi
+          fi
+          
+          # Update release with comprehensive notes
+          gh release edit "v$VERSION" --notes-file current-notes.md
+          
+          echo "Release notes updated with comprehensive download links"

@@ -258,7 +258,7 @@ async function updateEmail() {
             },
             body: JSON.stringify({
                 newEmail,
-                callbackURL: '/settings'
+                callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/settings'
             })
         });
 
