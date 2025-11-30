@@ -1,12 +1,12 @@
-name: Deploy VitePress Documentation
+name: Deploy Landing Page
 
 on:
   push:
     branches: [ main, master ]
-    paths: [ 'docs/**' ]
+    paths: [ 'landing/**' ]
   pull_request:
     branches: [ main, master ]
-    paths: [ 'docs/**' ]
+    paths: [ 'landing/**' ]
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -17,7 +17,7 @@ permissions:
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
-  group: "docs-pages"
+  group: "landing-pages"
   cancel-in-progress: false
 
 jobs:
@@ -27,44 +27,36 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch full history for proper build
-          
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: docs/package-lock.json
+          cache-dependency-path: landing/package-lock.json
           
       - name: Setup Pages
         uses: actions/configure-pages@v4
         
       - name: Install dependencies
         run: |
-          cd docs
+          cd landing
           npm ci --prefer-offline --no-audit
           
-      - name: Clean build directory
+      - name: Build with Vite
         run: |
-          cd docs
-          rm -rf .vitepress/dist
-          rm -rf node_modules/.cache
-          
-      - name: Build with VitePress
-        run: |
-          cd docs
+          cd landing
           npm run build
           
       - name: Verify build output
         run: |
-          cd docs
-          ls -la .vitepress/dist/
+          cd landing
+          ls -la dist/
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/.vitepress/dist
+          path: landing/dist
 
   # Deployment job
   deploy:

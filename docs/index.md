@@ -1,8 +1,8 @@
 ---
 layout: home
 hero:
-  name: Zentrio
-  text: Your Personal Streaming Hub
+  name: Zentrio Documentation
+  text: Profile management for Stremio Web
   tagline: A modern, self-hosted streaming platform for all your content.
   image:
     src: /icon-512.png
@@ -10,7 +10,7 @@ hero:
   actions:
     - theme: brand
       text: Try Zentrio
-      link: https://app.zentrio.eu
+      link: https://zentrio.eu
     - theme: alt
       text: Get started
       link: /getting-started
