@@ -1,0 +1,19 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the app",
+  "windows": ["*"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:webview:allow-internal-toggle-devtools",
+    "core:window:allow-close",
+    "shell:default",
+    "dialog:default",
+    "fs:default",
+    "http:default",
+    "notification:default",
+    "os:default",
+    "process:default",
+    "deep-link:default"
+  ]
+}

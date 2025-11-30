@@ -9,10 +9,9 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["bun", "@capacitor/core"]
+    "types": ["bun"]
   },
   "include": [
-    "src/**/*",
-    "capacitor.config.ts"
+    "src/**/*"
   ]
 }

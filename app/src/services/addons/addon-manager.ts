@@ -616,7 +616,8 @@ export class AddonManager {
       }
     })
 
-    await Promise.all(promises)
+    // Wait for all promises to settle, but don't block if some fail or timeout
+    await Promise.allSettled(promises)
 
     const settingsProfileId = profileDb.getSettingsProfileId(profileId);
     const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;

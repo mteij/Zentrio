@@ -67,7 +67,7 @@ export function getConfig() {
   const AUTH_SECRET = process.env.AUTH_SECRET ?? 'super-secret-key-change-in-production'
   // Check if running in Tauri
   const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
-  const defaultUrl = isTauri ? 'https://zentrio.eu' : `http://localhost:${PORT}`;
+  const defaultUrl = isTauri ? 'https://app.zentrio.eu' : `http://localhost:${PORT}`;
   const APP_URL = process.env.APP_URL ?? defaultUrl
   const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY ?? 'super-secret-key-change-in-production'
   // Rate limit settings (configurable via environment variables)

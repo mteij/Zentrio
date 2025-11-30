@@ -2,267 +2,268 @@
 // Uses fetch for authentication (vanilla JS compatible)
 
 (function () {
-    const emailForm = document.getElementById('emailForm');
-    const emailInput = document.getElementById('email');
-    const submitBtn = document.getElementById('submitBtn');
-    const loading = document.getElementById('loading');
+    // DOM Elements
+    const introView = document.getElementById('intro-view');
+    const loginView = document.getElementById('login-view');
     const inlineAuth = document.getElementById('inlineAuth');
+    const backBtnContainer = document.getElementById('back-btn-container');
+    const setupProgress = document.getElementById('setup-progress');
+    const setupError = document.getElementById('setup-error');
+    const progressMessage = document.getElementById('progress-message');
+    const progressFill = document.getElementById('progress-fill');
+    const errorMessage = document.getElementById('error-message');
+    const retryConnectionBtn = document.getElementById('retryConnectionBtn');
+    const typewriterText = document.getElementById('typewriter-text');
+
+    // State
     let authProviders = {};
+    const DEFAULT_SERVER_URL = 'https://app.zentrio.eu';
+    const SLOGAN = "Stream Your Way";
 
-    // Fetch enabled providers
-    fetch('/api/auth/providers')
-        .then(res => res.json())
-        .then(data => {
-            authProviders = data;
-            renderSSOButtons();
-        })
-        .catch(err => console.error('Failed to fetch auth providers', err));
+    // Initialize
+    async function init() {
+        // Start Typewriter Effect
+        await typeWriter(SLOGAN);
+        
+        // Wait a bit after typing finishes
+        await new Promise(r => setTimeout(r, 800));
+        
+        // Transition to Login
+        transitionToLogin();
 
-    function renderSSOButtons() {
-        const container = document.createElement('div');
-        container.className = 'sso-container';
-        container.style.cssText = 'display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap;';
+        // Background tasks
+        if (retryConnectionBtn) {
+            retryConnectionBtn.addEventListener('click', () => connectToServer(DEFAULT_SERVER_URL));
+        }
 
-        const createBtn = (provider, iconName, label) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'sso-button';
-            btn.style.cssText = 'background:#333;border:1px solid #555;padding:10px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:8px;color:white;';
-            btn.innerHTML = `<span class="iconify" data-icon="mdi:${iconName}" data-inline="false" style="font-size: 20px;"></span> <span>${label}</span>`;
-            btn.onclick = async () => {
-                try {
-                    const res = await fetch('/api/auth/sign-in/social', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            provider,
-                            callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles'
-                        })
-                    });
-                    const data = await res.json();
-                    if (data.url) {
-                        window.location.href = data.url;
-                    } else if (data.error) {
-                        toast('error', 'Login failed', data.message || data.error);
-                    }
-                } catch (err) {
-                    console.error('Social login error:', err);
-                    toast('error', 'Login failed', 'Could not connect to server');
+        // Fetch enabled providers early
+        try {
+            const res = await fetch('/api/auth/providers');
+            authProviders = await res.json();
+        } catch (err) {
+            console.error('Failed to fetch auth providers', err);
+        }
+    }
+
+    function typeWriter(text) {
+        return new Promise(resolve => {
+            if (!typewriterText) {
+                resolve();
+                return;
+            }
+            
+            let i = 0;
+            const speed = 100; // ms per char
+
+            function type() {
+                if (i < text.length) {
+                    typewriterText.textContent += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                } else {
+                    resolve();
                 }
-            };
-            return btn;
-        };
+            }
+            type();
+        });
+    }
 
-        if (authProviders.google) {
-            container.appendChild(createBtn('google', 'google', 'Google'));
-        }
-        if (authProviders.github) {
-            container.appendChild(createBtn('github', 'github', 'GitHub'));
-        }
-        if (authProviders.discord) {
-            container.appendChild(createBtn('discord', 'discord', 'Discord'));
-        }
-        if (authProviders.oidc) {
-            container.appendChild(createBtn('oidc', 'openid', authProviders.oidcName));
-        }
-
-        if (container.children.length > 0) {
-            const heroContent = document.querySelector('.hero-content');
-            const form = document.getElementById('emailForm');
-            if (heroContent && form) {
-                // Insert after the form
-                form.parentNode.insertBefore(container, form.nextSibling);
+    function transitionToLogin() {
+        if (introView) {
+            // Zoom/Morph effect
+            introView.classList.add('fade-out');
+            
+            // Animate logo specifically if needed, but CSS handles the container
+            const logo = introView.querySelector('.logo-wrapper');
+            if (logo) {
+                logo.style.transform = 'scale(5) translateY(-50px)';
+                logo.style.opacity = '0';
             }
         }
+
+        setTimeout(() => {
+            if (introView) introView.style.display = 'none';
+            showLoginView();
+        }, 600); // Match CSS transition time roughly
     }
 
-    // Toast helpers — unify usage across auth flow
-    function toast(type, title, message) {
+    async function connectToServer(serverUrl) {
         try {
-            // Map common synonyms to our toast types: message | warning | error
-            const t = type === 'success' ? 'message' : (type === 'info' ? 'message' : type);
-            const defaultTitle =
-                t === 'error' ? 'Error' :
-                t === 'warning' ? 'Warning' :
-                'Notice';
-            window.addToast(t, title || defaultTitle, message || '');
-        } catch (e) {
-            // Soft fallback for environments without toast.js loaded
-            console.warn('[Toast]', type, title, message);
+            // Test server connectivity
+            const testResponse = await fetch(`${serverUrl}/api/auth/providers`, {
+                method: 'GET',
+                signal: AbortSignal.timeout(10000)
+            });
+            
+            if (!testResponse.ok) {
+                throw new Error('Server is not responding correctly');
+            }
+            
+            // Save server configuration
+            await fetch('/api/sync/configure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverUrl,
+                    mode: 'cloud'
+                })
+            });
+            
+            // Success - show login
+            showLoginView();
+            
+        } catch (error) {
+            console.error('Connection error:', error);
+            toast('error', 'Connection Failed', 'Could not connect to Zentrio Cloud. Please check your internet.');
         }
     }
 
-    // Safely escape text for HTML contexts
-    function escapeHtml(str) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        };
-        return String(str).replace(/[&<>"']/g, function(m) { return map[m]; });
-    }
-
-    function setFieldError(inputEl, text) {
-        if (!inputEl) return;
-        inputEl.setAttribute('aria-invalid', 'true');
-        let err = inputEl.parentElement.querySelector(`#${inputEl.id}-error`);
-        if (!err) {
-            err = document.createElement('div');
-            err.id = `${inputEl.id}-error`;
-            err.className = 'field-error';
-            err.setAttribute('role', 'alert');
-            inputEl.parentElement.appendChild(err);
-        }
-        inputEl.setAttribute('aria-describedby', err.id);
-        err.textContent = text;
-        inputEl.focus();
-    }
-    
-    function clearFieldError(inputEl) {
-        if (!inputEl) return;
-        inputEl.removeAttribute('aria-invalid');
-        const err = inputEl.parentElement.querySelector(`#${inputEl.id}-error`);
-        if (err) err.remove();
-        inputEl.removeAttribute('aria-describedby');
-    }
-    
-    function hideEmailStep() {
-        emailForm.classList.add('step-hidden');
-        const heroContent = document.querySelector('.hero-content h1, .hero-content p');
-        if (heroContent) {
-            const h1 = document.querySelector('.hero-content h1');
-            const p = document.querySelector('.hero-content p');
-            if (h1) h1.style.display = 'none';
-            if (p) p.style.display = 'none';
+    function showLoginView() {
+        if (loginView) {
+            loginView.style.display = 'block';
+            // Force reflow
+            void loginView.offsetWidth;
+            loginView.classList.add('active');
+            
+            // Render the initial email form
+            renderLoginForm('');
         }
     }
-    
-    function showEmailStep() {
-        emailForm.classList.remove('step-hidden');
-        const heroTitle = document.querySelector('.hero-content h1');
-        const heroDesc = document.querySelector('.hero-content p');
-        if (heroTitle) heroTitle.style.display = 'block';
-        if (heroDesc) heroDesc.style.display = 'block';
-    }
-    
-    function showLoading() {
-        loading.style.display = 'block';
-        submitBtn.disabled = true;
-    }
-    
-    function hideLoading() {
-        loading.style.display = 'none';
-        submitBtn.disabled = false;
+
+    // --- Auth Rendering Logic (Adapted from previous version) ---
+
+    function renderBackButton(onClick) {
+        if (!backBtnContainer) return;
+        
+        backBtnContainer.innerHTML = `
+            <button id="globalBackBtn" class="zentrio-back-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                </svg>
+                Back
+            </button>
+        `;
+        
+        document.getElementById('globalBackBtn').addEventListener('click', onClick);
     }
 
-    // Remember-me preference (local only)
-    function getRememberPref() {
-        try { return localStorage.getItem('zentrioRememberMe') === 'true'; } catch (e) { return false; }
-    }
-    function setRememberPref(val) {
-        try { localStorage.setItem('zentrioRememberMe', val ? 'true' : 'false'); } catch (e) {}
+    function clearBackButton() {
+        if (backBtnContainer) backBtnContainer.innerHTML = '';
     }
 
     function renderLoginForm(email, nickname = null) {
-        const welcomeMessage = nickname ? `<div class="welcome-message" style="text-align:center;margin-bottom:20px;color:#e50914;font-size:1.2rem;font-weight:bold;">Welcome back, ${escapeHtml(nickname)}!</div>` : '';
+        clearBackButton();
         
         inlineAuth.innerHTML = `
-          <form id="loginForm" class="fade-in" novalidate>
-            <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
-              <button id="loginBackBtn" type="button" class="btn btn-secondary" style="background:#000;border:1px solid #333;padding:8px 12px;">← Back</button>
+          <form id="emailForm" class="fade-in" novalidate>
+            <div class="form-group">
+              <label for="emailInput">Email</label>
+              <input id="emailInput" type="email" value="${escapeHtml(email)}" placeholder="name@example.com" required />
             </div>
-            ${welcomeMessage}
+            <button type="submit" class="cta-button" style="width:100%">Continue</button>
+            
+            <div id="sso-container-placeholder"></div>
+          </form>
+        `;
+        
+        // Render SSO buttons below
+        renderSSOButtons(document.getElementById('sso-container-placeholder'));
+
+        const form = document.getElementById('emailForm');
+        const emailInput = document.getElementById('emailInput');
+        
+        emailInput.focus();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const emailVal = emailInput.value.trim();
+            if (!emailVal) {
+                toast('warning', 'Email required', 'Please enter your email address.');
+                return;
+            }
+            
+            // Identify user
+            const btn = form.querySelector('button');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Checking...';
+            
+            try {
+                const res = await fetch('/api/auth/identify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: emailVal })
+                });
+                const data = await res.json();
+                
+                if (data.exists) {
+                    renderPasswordForm(emailVal, data.nickname);
+                } else {
+                    renderRegisterForm(emailVal);
+                }
+            } catch (err) {
+                console.error(err);
+                toast('error', 'Error', 'Something went wrong. Please try again.');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        });
+    }
+
+    function renderPasswordForm(email, nickname) {
+        renderBackButton(() => renderLoginForm(email));
+        
+        inlineAuth.innerHTML = `
+          <form id="passwordForm" class="fade-in" novalidate>
+            ${nickname ? `<div style="text-align:center;margin-bottom:16px;color:#fff;">Welcome back, <strong>${escapeHtml(nickname)}</strong></div>` : ''}
+            
             <div class="form-group">
               <label for="loginEmail">Email</label>
-              <input id="loginEmail" type="email" value="${escapeHtml(email)}" disabled aria-readonly="true" />
+              <input id="loginEmail" type="email" value="${escapeHtml(email)}" disabled style="opacity:0.7" />
             </div>
+            
             <div class="form-group">
               <label for="loginPassword">Password</label>
               <div class="password-input-container" style="position: relative; width: 100%;">
-                <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter your password" style="padding-right: 40px;" />
-                <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; color: #b3b3b3; z-index: 2;">
-                  <span class="iconify" data-icon="mdi:eye" data-inline="false" style="font-size: 20px;"></span>
-                </button>
+                <input id="loginPassword" type="password" placeholder="Enter your password" required />
               </div>
             </div>
+            
             <div class="form-group remember-row">
               <label class="remember-checkbox" for="rememberMe">
                 <input id="rememberMe" type="checkbox" />
-                <span>Stay signed in on this device</span>
+                <span>Stay signed in</span>
               </label>
             </div>
-            <button type="submit" class="cta-button">Sign in</button>
-            <div class="divider" style="text-align:center;margin:16px 0;color:#b3b3b3;">or</div>
-            <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
-              <button id="magicLinkBtn" type="button" class="cta-button" style="background:#333;border:1px solid #555;">Send Magic Link</button>
-              <button id="otpBtn" type="button" class="cta-button" style="background:#333;border:1px solid #555;">Get OTP Code</button>
-            </div>
+            
+            <button type="submit" class="cta-button" style="width:100%">Sign in</button>
+            
             <div style="text-align:center;margin-top:16px;">
                 <a href="#" id="forgotPasswordLink" style="color:#b3b3b3;text-decoration:underline;font-size:0.9rem;">Forgot Password?</a>
             </div>
           </form>
         `;
         
-        inlineAuth.classList.remove('step-hidden');
-        inlineAuth.classList.add('fade-in');
-
-        const form = document.getElementById('loginForm');
-        const backBtn = document.getElementById('loginBackBtn');
+        const form = document.getElementById('passwordForm');
         const pwd = document.getElementById('loginPassword');
-        const magicLinkBtn = document.getElementById('magicLinkBtn');
-        const otpBtn = document.getElementById('otpBtn');
-        const forgotPasswordLink = document.getElementById('forgotPasswordLink');
         const rememberEl = document.getElementById('rememberMe');
         
         if (rememberEl) {
-          rememberEl.checked = getRememberPref();
-          rememberEl.addEventListener('change', () => setRememberPref(rememberEl.checked));
+            rememberEl.checked = getRememberPref();
+            rememberEl.addEventListener('change', () => setRememberPref(rememberEl.checked));
         }
-
-        // Password toggle handler
-        const toggleBtns = document.querySelectorAll('.password-toggle-btn');
-        toggleBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const button = e.currentTarget;
-                const input = button.previousElementSibling;
-                const icon = button.querySelector('.iconify');
-                
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    if (icon) icon.setAttribute('data-icon', 'mdi:eye-off');
-                } else {
-                    input.type = 'password';
-                    if (icon) icon.setAttribute('data-icon', 'mdi:eye');
-                }
-            });
-        });
-
-        // Back to email step
-        backBtn?.addEventListener('click', () => {
-          showEmailStep();
-          inlineAuth.classList.add('step-hidden');
-          inlineAuth.innerHTML = '';
-          emailInput.focus();
-        });
-
+        
         pwd.focus();
-
-        // Password submit
+        
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            clearFieldError(pwd);
-
-            if (!pwd.value) {
-                setFieldError(pwd, 'Please enter your password');
-                toast('warning', 'Missing password', 'Please enter your password');
-                return;
-            }
-
+            if (!pwd.value) return;
+            
+            const btn = form.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            
             try {
-                form.querySelector('button[type="submit"]').disabled = true;
-                
                 const res = await fetch('/api/auth/sign-in/email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -274,411 +275,72 @@
                     })
                 });
                 
-                const data = await res.json().catch(() => ({}));
-
                 if (res.ok) {
-                    toast('success', 'Signed in', 'Success! Redirecting...');
-                    setTimeout(() => { window.location.href = '/profiles'; }, 800);
+                    toast('success', 'Signed in', 'Redirecting...');
+                    setTimeout(() => { window.location.href = '/profiles'; }, 500);
                 } else {
-                    if (data.code === 'EMAIL_NOT_VERIFIED' || (data.message && data.message.toLowerCase().includes('verif'))) {
-                        renderUnverifiedEmail(email);
-                    } else {
-                        const msg = data.message || data.error || 'Invalid email or password';
-                        setFieldError(pwd, msg);
-                        toast('error', 'Sign in failed', msg);
-                    }
+                    const data = await res.json();
+                    toast('error', 'Sign in failed', data.message || 'Invalid credentials');
+                    btn.disabled = false;
+                    btn.textContent = 'Sign in';
                 }
             } catch (err) {
-                setFieldError(pwd, 'Network error, try again');
-                toast('error', 'Network error', 'Please try again.');
-            } finally {
-                form.querySelector('button[type="submit"]').disabled = false;
-            }
-        });
-
-        // Magic link handler
-        magicLinkBtn.addEventListener('click', async () => {
-            try {
-                magicLinkBtn.disabled = true;
-                magicLinkBtn.textContent = 'Sending...';
-                
-                const res = await fetch('/api/auth/sign-in/magic-link', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email,
-                        callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles',
-                        rememberMe: getRememberPref()
-                    })
-                });
-                
-                const data = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    renderMagicLinkSent(email);
-                    toast('success', 'Magic link sent', 'Check your inbox to sign in.');
-                } else {
-                    toast('error', 'Magic link failed', data.message || data.error || 'Failed to send magic link.');
-                }
-            } catch (err) {
-                toast('error', 'Network error', 'Please try again.');
-            } finally {
-                magicLinkBtn.disabled = false;
-                magicLinkBtn.textContent = 'Send Magic Link';
-            }
-        });
-
-        // OTP handler
-        otpBtn.addEventListener('click', async () => {
-            try {
-                otpBtn.disabled = true;
-                otpBtn.textContent = 'Sending...';
-                
-                const res = await fetch('/api/auth/email-otp/send-verification-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, type: 'sign-in' })
-                });
-                
-                const data = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    renderOtpForm(email);
-                    toast('success', 'OTP sent', 'We sent a 6-digit code to your email.');
-                } else {
-                    toast('error', 'OTP send failed', data.message || data.error || 'Failed to send OTP.');
-                }
-            } catch (err) {
-                toast('error', 'Network error', 'Please try again.');
-            } finally {
-                otpBtn.disabled = false;
-                otpBtn.textContent = 'Get OTP Code';
-            }
-        });
-
-        // Forgot Password handler
-        forgotPasswordLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            renderForgotPassword(email);
-        });
-    }
-
-    function renderForgotPassword(email) {
-        inlineAuth.innerHTML = `
-            <div class="fade-in">
-                <button id="forgotBackBtn" type="button" class="back-button">
-                    <svg class="back-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
-                    Back
-                </button>
-                <h3>Reset Password</h3>
-                <p>Enter your email to receive a password reset link.</p>
-                <form id="forgotPasswordForm" novalidate>
-                    <div class="form-group">
-                        <label for="forgotEmail">Email</label>
-                        <input id="forgotEmail" type="email" value="${escapeHtml(email)}" disabled aria-readonly="true" />
-                    </div>
-                    <button type="submit" class="cta-button">Send Reset Link</button>
-                </form>
-            </div>
-        `;
-
-        document.getElementById('forgotBackBtn').addEventListener('click', () => {
-            renderLoginForm(email);
-        });
-
-        const form = document.getElementById('forgotPasswordForm');
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = form.querySelector('button[type="submit"]');
-            
-            try {
-                btn.disabled = true;
-                btn.textContent = 'Sending...';
-
-                const res = await fetch('/api/auth/forget-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email,
-                        redirectTo: window.location.origin + '/reset-password'
-                    })
-                });
-                
-                const data = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    toast('success', 'Email sent', 'Check your inbox for the reset link.');
-                    // Optionally go back to login or show a success state
-                    renderLoginForm(email); 
-                } else {
-                    toast('error', 'Failed', data.message || data.error || 'Failed to send reset link.');
-                }
-            } catch (err) {
-                toast('error', 'Network error', 'Please try again.');
-            } finally {
+                toast('error', 'Error', 'Network error');
                 btn.disabled = false;
-                btn.textContent = 'Send Reset Link';
+                btn.textContent = 'Sign in';
             }
         });
-    }
-
-    function renderMagicLinkSent(email) {
-        inlineAuth.innerHTML = `
-            <div class="magic-link-container fade-in">
-                <button id="magicLinkBackBtn" type="button" class="back-button">
-                    <svg class="back-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
-                    Back
-                </button>
-                <h3>
-                    <svg class="email-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path></svg>
-                    Magic Link Sent
-                </h3>
-                <div class="magic-link-sent">
-                    <p>A magic link has been sent to <strong>${escapeHtml(email)}</strong>. Check your inbox and click the link to sign in.</p>
-                </div>
-                <p class="resend-text" id="resendMagicLink">Didn't receive it? Resend link</p>
-            </div>
-        `;
-        inlineAuth.classList.remove('step-hidden');
-
-        document.getElementById('magicLinkBackBtn').addEventListener('click', () => {
-            renderLoginForm(email);
-        });
-
-        const resendBtn = document.getElementById('resendMagicLink');
-        resendBtn.addEventListener('click', async () => {
-            resendBtn.textContent = 'Sending...';
-            resendBtn.classList.add('disabled');
-            try {
-                const res = await fetch('/api/auth/sign-in/magic-link', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email,
-                        callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles',
-                        rememberMe: getRememberPref()
-                    })
-                });
-                
-                const data = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    toast('success', 'Magic link sent', 'Check your inbox.');
-                } else {
-                    toast('error', 'Magic link failed', data.message || data.error || 'Failed to send magic link.');
-                }
-            } catch {
-                toast('error', 'Network error', 'Please try again.');
-            } finally {
-                setTimeout(() => {
-                    resendBtn.textContent = "Didn't receive it? Resend link";
-                    resendBtn.classList.remove('disabled');
-                }, 5000);
-            }
-        });
-    }
-
-    function renderOtpForm(email) {
-        inlineAuth.innerHTML = `
-            <div class="otp-container fade-in">
-                <button id="otpBackBtn" type="button" class="back-button">
-                    <svg class="back-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
-                    Back
-                </button>
-                <h3>Enter OTP Code</h3>
-                <p>An OTP code has been sent to <strong>${escapeHtml(email)}</strong>. Please enter it below.</p>
-                <form id="otpForm" novalidate>
-                    <div class="form-group">
-                        <label for="otpInput" class="sr-only">OTP Code</label>
-                        <input id="otpInput" type="text" class="otp-input" placeholder="_ _ _ _ _ _" required pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
-                    </div>
-                    <button type="submit" class="cta-button">Verify & Sign In</button>
-                </form>
-                <p class="resend-text" id="resendOtp">Resend OTP</p>
-            </div>
-        `;
-        inlineAuth.classList.remove('step-hidden');
-
-        document.getElementById('otpBackBtn').addEventListener('click', () => {
-            renderLoginForm(email);
-        });
-
-        const otpForm = document.getElementById('otpForm');
-        const otpInput = document.getElementById('otpInput');
-        const submitBtn = otpForm.querySelector('button[type="submit"]');
-
-        otpInput.focus();
-
-        otpForm.addEventListener('submit', async (e) => {
+        
+        document.getElementById('forgotPasswordLink').addEventListener('click', (e) => {
             e.preventDefault();
-            const otp = otpInput.value;
-
-            if (!otp || otp.length !== 6) {
-                otpInput.classList.add('error');
-                toast('warning', 'Invalid OTP', 'Please enter a valid 6-digit OTP.');
-                return;
-            }
-            otpInput.classList.remove('error');
-
-            try {
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Verifying...';
-                
-                const res = await fetch('/api/auth/sign-in/email-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, otp })
-                });
-                
-                const data = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    otpInput.classList.add('success');
-                    toast('success', 'Verified', 'Success! Redirecting...');
-                    setTimeout(() => { window.location.href = '/profiles'; }, 800);
-                } else {
-                    otpInput.classList.add('error');
-                    otpInput.value = '';
-                    toast('error', 'Verification failed', data.message || data.error || 'Invalid or expired OTP.');
-                }
-            } catch (err) {
-                toast('error', 'Network error', 'Please try again.');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Verify & Sign In';
-            }
-        });
-
-        const resendBtn = document.getElementById('resendOtp');
-        resendBtn.addEventListener('click', async () => {
-            resendBtn.textContent = 'Sending...';
-            resendBtn.classList.add('disabled');
-            try {
-                const res = await fetch('/api/auth/email-otp/send-verification-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, type: 'sign-in' })
-                });
-                
-                const data = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    toast('success', 'OTP sent', 'Check your inbox for the new code.');
-                } else {
-                    toast('error', 'OTP send failed', data.message || data.error || 'Failed to resend OTP.');
-                }
-            } catch {
-                toast('error', 'Network error', 'Please try again.');
-            } finally {
-                setTimeout(() => {
-                    resendBtn.textContent = "Resend OTP";
-                    resendBtn.classList.remove('disabled');
-                }, 5000);
-            }
+            // Implement forgot password flow or toast
+            toast('info', 'Forgot Password', 'Please contact support or use the magic link option if available.');
         });
     }
 
     function renderRegisterForm(email) {
+        renderBackButton(() => renderLoginForm(email));
+        
         inlineAuth.innerHTML = `
-          <form id="registerInlineForm" class="fade-in" novalidate>
-            <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
-              <button id="registerBackBtn" type="button" class="btn btn-secondary" style="background:#000;border:1px solid #333;padding:8px 12px;">← Back</button>
-            </div>
+          <form id="registerForm" class="fade-in" novalidate>
+            <div style="text-align:center;margin-bottom:16px;color:#fff;">Create an account</div>
+            
             <div class="form-group">
               <label for="regEmail">Email</label>
-              <input id="regEmail" type="email" value="${escapeHtml(email)}" disabled aria-readonly="true" />
+              <input id="regEmail" type="email" value="${escapeHtml(email)}" disabled style="opacity:0.7" />
             </div>
+            
             <div class="form-group">
               <label for="regUsername">Nickname</label>
-              <input id="regUsername" type="text" placeholder="Enter your nickname" autocomplete="nickname" />
+              <input id="regUsername" type="text" placeholder="Nickname" required />
             </div>
+            
             <div class="form-group">
               <label for="regPassword">Password</label>
-              <div class="password-input-container" style="position: relative; width: 100%;">
-                <input id="regPassword" type="password" placeholder="Enter your password" minlength="8" autocomplete="new-password" style="padding-right: 40px;" />
-                <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; color: #b3b3b3; z-index: 2;">
-                  <span class="iconify" data-icon="mdi:eye" data-inline="false" style="font-size: 20px;"></span>
-                </button>
-              </div>
+              <input id="regPassword" type="password" placeholder="Create password (min 8 chars)" minlength="8" required />
             </div>
-            <div class="form-group remember-row">
-              <label class="remember-checkbox" for="rememberMe">
-                <input id="rememberMe" type="checkbox" />
-                <span>Stay signed in on this device</span>
-              </label>
-            </div>
-            <button type="submit" class="cta-button">Create account</button>
+            
+            <button type="submit" class="cta-button" style="width:100%">Create Account</button>
           </form>
         `;
         
-        inlineAuth.classList.remove('step-hidden');
-        inlineAuth.classList.add('fade-in');
+        const form = document.getElementById('registerForm');
         
-        const form = document.getElementById('registerInlineForm');
-        const usernameInput = document.getElementById('regUsername');
-        const passwordInput = document.getElementById('regPassword');
-        const backBtn = document.getElementById('registerBackBtn');
-
-        backBtn?.addEventListener('click', () => {
-            showEmailStep();
-            inlineAuth.classList.add('step-hidden');
-            inlineAuth.innerHTML = '';
-            emailInput.focus();
-        });
-
-        const rememberEl = document.getElementById('rememberMe');
-        if (rememberEl) {
-            rememberEl.checked = getRememberPref();
-            rememberEl.addEventListener('change', () => setRememberPref(rememberEl.checked));
-        }
-
-        // Password toggle handler
-        const toggleBtns = document.querySelectorAll('.password-toggle-btn');
-        toggleBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const button = e.currentTarget;
-                const input = button.previousElementSibling;
-                const icon = button.querySelector('.iconify');
-                
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    if (icon) icon.setAttribute('data-icon', 'mdi:eye-off');
-                } else {
-                    input.type = 'password';
-                    if (icon) icon.setAttribute('data-icon', 'mdi:eye');
-                }
-            });
-        });
-
-        usernameInput.focus();
-
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            clearFieldError(usernameInput);
-            clearFieldError(passwordInput);
-
-            const username = usernameInput.value.trim();
-            const password = passwordInput.value;
-
-            if (!username) {
-                setFieldError(usernameInput, 'Please enter a nickname');
-                toast('warning', 'Missing nickname', 'Please enter a nickname');
-                return;
-            }
-            if (!password) {
-                setFieldError(passwordInput, 'Please enter a password');
-                toast('warning', 'Missing password', 'Please enter a password');
-                return;
-            }
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+            
             if (password.length < 8) {
-                setFieldError(passwordInput, 'Password must be at least 8 characters');
                 toast('warning', 'Weak password', 'Password must be at least 8 characters');
                 return;
             }
-
+            
+            const btn = form.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+            
             try {
-                form.querySelector('button[type="submit"]').disabled = true;
-                
                 const res = await fetch('/api/auth/sign-up/email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -687,152 +349,133 @@
                         password,
                         name: username,
                         username,
-                        rememberMe: getRememberPref(),
+                        rememberMe: true,
                         callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles'
                     })
                 });
                 
-                const data = await res.json().catch(() => ({}));
-
                 if (res.ok) {
-                    renderUnverifiedEmail(email);
-                    toast('success', 'Account created', 'Please verify your email.');
+                    toast('success', 'Account created', 'Please verify your email if required.');
+                    // Show verification message or redirect
+                    inlineAuth.innerHTML = `
+                        <div class="fade-in" style="text-align:center;">
+                            <h3>Account Created!</h3>
+                            <p>Please check your email for a verification link.</p>
+                            <button class="cta-button" onclick="window.location.reload()">Back to Login</button>
+                        </div>
+                    `;
                 } else {
-                    toast('error', 'Registration failed', data.message || data.error || 'Registration failed');
+                    const data = await res.json();
+                    toast('error', 'Registration failed', data.message || 'Could not create account');
+                    btn.disabled = false;
+                    btn.textContent = 'Create Account';
                 }
             } catch (err) {
-                toast('error', 'Network error', 'Please try again');
-            } finally {
-                form.querySelector('button[type="submit"]').disabled = false;
+                toast('error', 'Error', 'Network error');
+                btn.disabled = false;
+                btn.textContent = 'Create Account';
             }
         });
     }
 
-    function renderUnverifiedEmail(email) {
-        inlineAuth.innerHTML = `
-            <div class="magic-link-container fade-in">
-                <button id="unverifiedBackBtn" type="button" class="back-button">
-                    <svg class="back-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
-                    Back
-                </button>
-                <h3>
-                    <svg class="email-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path></svg>
-                    Verify your email
-                </h3>
-                <div class="magic-link-sent">
-                    <p>We've sent a verification link to <strong>${escapeHtml(email)}</strong>. Please check your inbox and click the link to activate your account.</p>
-                </div>
-                <p class="resend-text" id="resendVerification">Didn't receive it? Resend email</p>
-            </div>
-        `;
-        inlineAuth.classList.remove('step-hidden');
-
-        document.getElementById('unverifiedBackBtn').addEventListener('click', () => {
-            renderLoginForm(email);
-        });
-
-        const resendBtn = document.getElementById('resendVerification');
-        resendBtn.addEventListener('click', async () => {
-            resendBtn.textContent = 'Sending...';
-            resendBtn.classList.add('disabled');
-            try {
-                const res = await fetch('/api/auth/send-verification-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email,
-                        callbackURL: window.__TAURI__ ? 'tauri://localhost' : '/profiles'
-                    })
-                });
-                
-                const data = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    toast('success', 'Email sent', 'Check your inbox.');
-                } else {
-                    toast('error', 'Failed to send', data.message || data.error || 'Failed to send verification email.');
+    function renderSSOButtons(container) {
+        if (!container) return;
+        
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.1);padding-top:20px;';
+        
+        const createBtn = (provider, iconName, label) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'sso-button';
+            btn.style.cssText = 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);padding:10px 16px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;color:white;transition:all 0.2s;';
+            btn.innerHTML = `<span class="iconify" data-icon="mdi:${iconName}" data-inline="false" style="font-size: 20px;"></span> <span>${label}</span>`;
+            
+            btn.onmouseover = () => { btn.style.background = 'rgba(255,255,255,0.1)'; };
+            btn.onmouseout = () => { btn.style.background = 'rgba(255,255,255,0.05)'; };
+            
+            btn.onclick = async () => {
+                try {
+                    if (window.__TAURI__) {
+                        // Tauri specific handling for SSO
+                        const { open } = window.__TAURI__.shell;
+                        const res = await fetch('/api/auth/sign-in/social', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                provider,
+                                callbackURL: 'zentrio://auth/callback' // Deep link for Tauri
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.url) {
+                            // Open in system browser
+                            await open(data.url);
+                        } else if (data.error) {
+                            toast('error', 'Login failed', data.message || data.error);
+                        }
+                    } else {
+                        // Web handling
+                        const res = await fetch('/api/auth/sign-in/social', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                provider,
+                                callbackURL: window.location.origin + '/profiles'
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.url) {
+                            window.location.href = data.url;
+                        } else if (data.error) {
+                            toast('error', 'Login failed', data.message || data.error);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Social login error:', err);
+                    toast('error', 'Login failed', 'Could not connect to server');
                 }
-            } catch {
-                toast('error', 'Network error', 'Please try again.');
-            } finally {
-                setTimeout(() => {
-                    resendBtn.textContent = "Didn't receive it? Resend email";
-                    resendBtn.classList.remove('disabled');
-                }, 5000);
-            }
-        });
-    }
+            };
+            return btn;
+        };
 
-    async function identifyAndRender(email) {
-        // clearGlobalMessage(); // Removed as we use toasts
-        clearFieldError(emailInput);
-        showLoading();
-        try {
-            // We still use our custom endpoint for identification as Better Auth doesn't have a direct "check if user exists" public endpoint without trying to sign in/up
-            const res = await fetch('/api/auth/identify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-            const data = await res.json().catch(() => ({}));
+        if (authProviders.google) wrapper.appendChild(createBtn('google', 'google', 'Google'));
+        if (authProviders.github) wrapper.appendChild(createBtn('github', 'github', 'GitHub'));
+        if (authProviders.discord) wrapper.appendChild(createBtn('discord', 'discord', 'Discord'));
+        if (authProviders.oidc) wrapper.appendChild(createBtn('oidc', 'openid', authProviders.oidcName || 'OIDC'));
 
-            if (res.status === 429) {
-                toast('error', 'Too many requests', 'Please try again later.');
-                return;
-            }
-            if (res.status >= 400 && res.status < 500) {
-                setFieldError(emailInput, data.error || 'Invalid email');
-                toast('warning', 'Invalid email', data.error || 'Please enter a valid email address');
-                emailInput.focus();
-                return;
-            }
-            if (!res.ok) {
-                throw new Error(data.error || 'Something went wrong');
-            }
-
-            hideEmailStep();
-            if (data.exists) {
-                renderLoginForm(email, data.nickname || null);
-            } else {
-                renderRegisterForm(email);
-            }
-        } catch (err) {
-            toast('error', 'Error', err.message || 'Something went wrong');
-            emailInput.focus();
-        } finally {
-            hideLoading();
+        if (wrapper.children.length > 0) {
+            container.appendChild(wrapper);
         }
     }
 
-    // Handle email form submission
-    emailForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const email = emailInput.value.trim();
-        if (!email) {
-            toast('warning', 'Invalid email', 'Please enter a valid email address');
-            emailInput.focus();
-            return;
-        }
-        identifyAndRender(email);
-    });
-
-    // Query param handling
-    const params = new URLSearchParams(window.location.search);
-    const qpEmail = params.get('email') || '';
-    const intent = params.get('intent');
-    if (qpEmail) {
-        emailInput.value = qpEmail;
-    }
-    if (intent && qpEmail) {
-        hideEmailStep();
-        if (intent === 'signin') {
-            renderLoginForm(qpEmail);
-        } else if (intent === 'register') {
-            renderRegisterForm(qpEmail);
+    // Helpers
+    function toast(type, title, message) {
+        if (window.addToast) {
+            window.addToast(type === 'success' ? 'message' : type, title, message);
         } else {
-            identifyAndRender(qpEmail);
+            console.log(`[${type}] ${title}: ${message}`);
+            alert(`${title}: ${message}`);
         }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const map = { '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#039;' };
+        return String(str).replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    function getRememberPref() {
+        try { return localStorage.getItem('zentrioRememberMe') === 'true'; } catch (e) { return false; }
+    }
+    function setRememberPref(val) {
+        try { localStorage.setItem('zentrioRememberMe', val ? 'true' : 'false'); } catch (e) {}
+    }
+
+    // Start
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        emailInput.focus();
+        init();
     }
 })();

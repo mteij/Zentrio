@@ -1,265 +1,83 @@
-name: Build Tauri Desktop Apps
+name: Build Tauri App
 
 on:
-  workflow_run:
-    workflows: ["Build and Push Docker Image"]
-    types:
-      - completed
+  push:
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to build (e.g., 1.0.0)'
-        required: true
-        type: string
-  repository_dispatch:
-    types: [tauri-build]
-
-permissions:
-  contents: write
-  actions: write
-
-env:
-  NODE_VERSION: 20
-  BUN_VERSION: latest
-  RUST_VERSION: 1.75
 
 jobs:
   build-tauri:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, windows-latest, macos-latest]
-        
+        include:
+          - platform: 'macos-latest' # for iOS
+            args: '--target aarch64-apple-ios'
+            name: 'ios'
+          - platform: 'macos-latest' # for macOS
+            args: '--target aarch64-apple-darwin'
+            name: 'macos'
+          - platform: 'ubuntu-22.04' # for Linux
+            args: ''
+            name: 'linux'
+          - platform: 'windows-latest' # for Windows
+            args: ''
+            name: 'windows'
+          - platform: 'ubuntu-22.04' # for Android
+            args: '--target aarch64-linux-android'
+            name: 'android'
+
     runs-on: ${{ matrix.platform }}
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          node-version: 20
 
-      - name: Setup Rust
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.RUST_VERSION }}
+          # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      - name: Rust Cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './app/src-tauri -> target'
-
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            echo "VERSION=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
-          else
-            VERSION=$(node -e "console.log(require('./app/package.json').version)")
-            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Cancel if Tauri assets for this version already exist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          echo "Checking if Tauri assets already exist for v$VERSION"
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            # Check for any Tauri build assets as marker that build is done
-            if gh release view "v$VERSION" --json assets -q '.assets[].name' | grep -E "\.(exe|dmg|deb|rpm|AppImage)$"; then
-              echo "Tauri assets for v$VERSION already exist. Cancelling this workflow run."
-              if gh run cancel "$GITHUB_RUN_ID"; then
-                gh run watch "$GITHUB_RUN_ID"
-              else
-                echo "Cancel not available in this context (likely due to token permissions). Continuing without failing the job."
-              fi
-            else
-              echo "Release v$VERSION exists but no Tauri assets found yet. Continuing."
-            fi
-          else
-            echo "Release v$VERSION does not exist yet or cannot be fetched; continuing."
-          fi
-
-      - name: Cache node modules
-        uses: actions/cache@v4
-        with:
-          path: app/node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('app/bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Install dependencies (Ubuntu)
-        if: matrix.platform == 'ubuntu-latest'
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        # You can remove libayatana-appindicator3-dev if you don't use the system tray feature.
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Install dependencies
-        working-directory: ./app
-        run: bun install --frozen-lockfile
-
-      - name: Build web assets
-        working-directory: ./app
-        run: bun run build
-
-      - name: Build Tauri app
-        env:
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        working-directory: ./app
-        run: bunx tauri build
-
-      - name: List build artifacts
-        working-directory: ./app/src-tauri/target/release/bundle
-        run: |
-          echo "Build artifacts:"
-          find . -type f -name "*" | sort
-
-      - name: Upload Tauri artifacts
-        uses: actions/upload-artifact@v4
+      - name: Setup Java (Android only)
+        if: matrix.name == 'android'
+        uses: actions/setup-java@v4
         with:
-          name: tauri-builds-${{ matrix.platform }}
-          path: |
-            app/src-tauri/target/release/bundle/
-            app/src-tauri/target/release/Zentrio*
-          retention-days: 30
+          distribution: 'zulu'
+          java-version: '17'
 
-  upload-to-release:
-    runs-on: ubuntu-latest
-    needs: [build-tauri]
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
-    permissions:
-      contents: write
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Setup Android SDK (Android only)
+        if: matrix.name == 'android'
+        uses: android-actions/setup-android@v3
 
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            echo "VERSION=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
-          else
-            VERSION=$(node -e "console.log(require('./app/package.json').version)")
-            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          fi
+      - name: Install NDK (Android only)
+        if: matrix.name == 'android'
+        run: sdkmanager "ndk;26.1.10909125"
 
-      - name: Download all Tauri artifacts
-        uses: actions/download-artifact@v4
+      - name: Install frontend dependencies
+        run: cd app && npm install # Using npm install instead of bun for broader compatibility in CI
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         with:
-          pattern: tauri-builds-*
-          path: ./tauri-artifacts
-          merge-multiple: true
-
-      - name: Create release directory
-        run: |
-          mkdir -p release-assets
-          echo "Checking Tauri artifacts:"
-          ls -la tauri-artifacts/ || echo "No tauri-artifacts directory"
-          
-          # Copy all executables and installers into release-assets
-          find tauri-artifacts/ -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \) -exec cp {} release-assets/ \; 2>/dev/null || echo "No installer files found"
-          
-          # Also copy the raw executables
-          find tauri-artifacts/ -type f -name "Zentrio*" -not -path "*/bundle/*" -exec cp {} release-assets/ \; 2>/dev/null || echo "No raw executables found"
-
-      - name: List release assets
-        run: |
-          echo "Release assets directory:"
-          ls -la release-assets/ || echo "No release-assets directory"
-          echo "File details:"
-          file release-assets/* || echo "No files to analyze"
-
-      - name: Upload assets to GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Attempting to upload Tauri files to release v${{ steps.version.outputs.VERSION }}"
-          if [ -d "release-assets" ] && [ "$(ls -A release-assets)" ]; then
-            for file in release-assets/*; do
-              if [ -f "$file" ]; then
-                echo "Uploading $file to release v${{ steps.version.outputs.VERSION }}"
-                gh release upload "v${{ steps.version.outputs.VERSION }}" "$file" --clobber || echo "Failed to upload $file"
-              fi
-            done
-          else
-            echo "No files to upload - release-assets directory is empty or doesn't exist"
-          fi
-
-      - name: Update release notes with Tauri download links
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Get current release notes
-          gh release view "v${{ steps.version.outputs.VERSION }}" --json body -q '.body' > current-notes.md
-          
-          # Create Tauri download section
-          cat > tauri-section.md << EOF
-          
-          ## 🖥️ Desktop Downloads
-          
-          EOF
-          
-          # Add Windows links
-          if ls release-assets/*.exe 1> /dev/null 2>&1; then
-            EXE_FILE=$(ls release-assets/*.exe 2>/dev/null | head -1 | xargs -n1 basename)
-            echo "### Windows" >> tauri-section.md
-            echo "- **Installer**: [Download EXE](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$EXE_FILE)" >> tauri-section.md
-          fi
-          
-          # Add macOS links
-          if ls release-assets/*.dmg 1> /dev/null 2>&1; then
-            DMG_FILE=$(ls release-assets/*.dmg 2>/dev/null | head -1 | xargs -n1 basename)
-            echo "### macOS" >> tauri-section.md
-            echo "- **DMG**: [Download DMG](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$DMG_FILE)" >> tauri-section.md
-          fi
-          
-          # Add Linux links
-          if ls release-assets/*.deb 1> /dev/null 2>&1 || ls release-assets/*.rpm 1> /dev/null 2>&1 || ls release-assets/*.AppImage 1> /dev/null 2>&1; then
-            echo "### Linux" >> tauri-section.md
-            
-            if ls release-assets/*.deb 1> /dev/null 2>&1; then
-              DEB_FILE=$(ls release-assets/*.deb 2>/dev/null | head -1 | xargs -n1 basename)
-              echo "- **DEB**: [Download DEB](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$DEB_FILE)" >> tauri-section.md
-            fi
-            
-            if ls release-assets/*.rpm 1> /dev/null 2>&1; then
-              RPM_FILE=$(ls release-assets/*.rpm 2>/dev/null | head -1 | xargs -n1 basename)
-              echo "- **RPM**: [Download RPM](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$RPM_FILE)" >> tauri-section.md
-            fi
-            
-            if ls release-assets/*.AppImage 1> /dev/null 2>&1; then
-              APPIMAGE_FILE=$(ls release-assets/*.AppImage 2>/dev/null | head -1 | xargs -n1 basename)
-              echo "- **AppImage**: [Download AppImage](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/$APPIMAGE_FILE)" >> tauri-section.md
-            fi
-          fi
-          
-          # Check if we already have a desktop downloads section
-          if grep -q "## 🖥️ Desktop Downloads" current-notes.md; then
-            # Replace existing desktop section
-            sed -i '/## 🖥️ Desktop Downloads/,/^## /{
-              /^## 🖥️ Desktop Downloads/{
-                r /dev/stdin
-                d
-              }
-              /^## [^🖥️]/!d
-            }' current-notes.md < tauri-section.md
-          else
-            # Append new desktop section
-            cat current-notes.md tauri-section.md > updated-notes.md
-            mv updated-notes.md current-notes.md
-          fi
-          
-          # Update release
-          gh release edit "v${{ steps.version.outputs.VERSION }}" --notes-file current-notes.md
-          
-          echo "Release notes updated with Tauri download links"
+          projectPath: ./app
+          tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'See the assets to download this version and install.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

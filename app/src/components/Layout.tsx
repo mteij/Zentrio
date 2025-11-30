@@ -1,3 +1,4 @@
+import { TitleBar } from './TitleBar'
 
 
 
@@ -53,10 +54,10 @@ export function Layout({
         <meta name="theme-color" content="#141414" />
         <script src="https://unpkg.com/lucide@latest"></script>
         <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
-        <script src="/static/js/mobile-session-handler.js"></script>
         <script src="/static/js/theme.js"></script>
       </head>
       <body className={className}>
+        <TitleBar />
         {showHeader && <PageHeader />}
         <main>
           {children}
@@ -110,10 +111,10 @@ export function SimpleLayout({ title, children, className = '', additionalCSS = 
         <meta name="theme-color" content="#141414" />
         <script src="https://unpkg.com/lucide@latest"></script>
         <script src="https://code.iconify.design/1/1.0.7/iconify.min.js"></script>
-        <script src="/static/js/mobile-session-handler.js"></script>
         <script src="/static/js/theme.js"></script>
       </head>
       <body className={className}>
+        <TitleBar />
         {children}
         <script src="/static/js/toast.js"></script>
         {additionalJS.map(js => <script src={js}></script>)}

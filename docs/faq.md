@@ -10,7 +10,7 @@ Zentrio is a minimal profile manager for Stremio Web. It lets you create multipl
 
 ### Do I need to self‑host?
 
-No. You can use the hosted instance at `https://zentrio.eu`. Self‑hosting with Docker is available if you want full control over data and configuration.
+No. You can use the hosted instance at `https://app.zentrio.eu`. Self‑hosting with Docker is available if you want full control over data and configuration.
 
 See [Getting started](/getting-started) for both options.
 

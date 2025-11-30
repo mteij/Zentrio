@@ -88,9 +88,6 @@ export function ProfilesPage({ profiles = [], user }: ProfilesPageProps) {
 
       {/* Profile Modal */}
       <ProfileModal />
-
-      {/* Mobile session handler */}
-      <script src="/static/js/mobile-session-handler.js"></script>
       
       {/* Add the client-side JavaScript */}
       {/* Vanta.js and Three.js for background visuals */}

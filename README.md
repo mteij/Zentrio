@@ -8,11 +8,11 @@
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
   <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-FF6A00?style=for-the-badge&logo=hono&logoColor=white" alt="Hono"></a>
-  <a href="https://capacitorjs.com/"><img src="https://img.shields.io/badge/Capacitor-119EFF?style=for-the-badge&logo=capacitor&logoColor=white" alt="Capacitor"></a>
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black" alt="Tauri"></a>
   <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
 
-  <a href="https://zentrio.eu"><strong>🌐 Public Instance</strong></a> •
+  <a href="https://app.zentrio.eu"><strong>🌐 Public Instance</strong></a> •
   <a href="https://docs.zentrio.eu"><strong>📚 Documentation</strong></a> •
   <a href="https://github.com/MichielEijpe/Zentrio/issues"><strong>🐛 Report Issues</strong></a>
 </div>
@@ -29,7 +29,7 @@ Although the project is maintained with care, it remains experimental and may co
 
 Zentrio is easiest to explore via the public instance and hosted documentation:
 
-- 🌐 Public instance: [**zentrio.eu**](https://zentrio.eu)
+- 🌐 Public instance: [**app.zentrio.eu**](https://app.zentrio.eu)
 - 📚 Documentation: [**docs.zentrio.eu**](https://docs.zentrio.eu)
 
 For deployment, self-hosting, and development setup instructions, refer to the documentation.

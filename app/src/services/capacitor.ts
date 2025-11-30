@@ -1,55 +1,47 @@
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
+// This service is deprecated and will be removed in future versions.
+// It is kept for compatibility with existing code that might import it,
+// but all functionality is now stubbed or redirected to Tauri equivalents where appropriate.
 
 export class CapacitorService {
   static isNative(): boolean {
-    return Capacitor.isNativePlatform();
+    // Check for Tauri environment
+    return !!(window as any).__TAURI__;
   }
 
   static isAndroid(): boolean {
-    return Capacitor.getPlatform() === 'android';
+    return false; // Tauri detection would go here if needed
   }
 
   static isIOS(): boolean {
-    return Capacitor.getPlatform() === 'ios';
+    return false; // Tauri detection would go here if needed
   }
 
   static isWeb(): boolean {
-    return Capacitor.getPlatform() === 'web';
+    return !this.isNative();
   }
 
   static getPlatform(): string {
-    return Capacitor.getPlatform();
+    return this.isNative() ? 'tauri' : 'web';
   }
 
   /**
    * Get app info for native platforms
    */
   static async getAppInfo() {
-    if (!this.isNative()) {
-      return null;
-    }
-
-    try {
-      return await App.getInfo();
-    } catch (error) {
-      console.error('Error getting app info:', error);
-      return null;
-    }
+    return null;
   }
 
   /**
    * Exit app for native platforms
    */
   static async exitApp() {
-    if (!this.isNative()) {
-      return;
-    }
-
-    try {
-      await App.exitApp();
-    } catch (error) {
-      console.error('Error exiting app:', error);
+    if (this.isNative()) {
+      try {
+        const { exit } = await import('@tauri-apps/plugin-process');
+        await exit();
+      } catch (e) {
+        console.error('Failed to exit app:', e);
+      }
     }
   }
 
@@ -57,7 +49,7 @@ export class CapacitorService {
    * Check if running on a device
    */
   static isDevice(): boolean {
-    return Capacitor.isNativePlatform();
+    return this.isNative();
   }
 
   /**
@@ -73,8 +65,8 @@ export class CapacitorService {
       isWeb: this.isWeb(),
       platform,
       // Add platform-specific settings here
-      statusBarStyle: this.isIOS() ? 'default' : 'default',
-      navigationBarStyle: this.isAndroid() ? 'default' : 'default'
+      statusBarStyle: 'default',
+      navigationBarStyle: 'default'
     };
   }
 }

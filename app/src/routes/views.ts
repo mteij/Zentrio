@@ -8,7 +8,6 @@ import { ProfilesPage } from '../pages/ProfilesPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { ExploreAddonsPage } from '../pages/ExploreAddonsPage'
 import { ResetPasswordPage } from '../pages/ResetPasswordPage'
-import { TauriSetupPage } from '../pages/TauriSetupPage'
 import { StreamingHome } from '../pages/streaming/Home'
 import { StreamingDetails } from '../pages/streaming/Details'
 import { StreamingPlayer } from '../pages/streaming/Player'
@@ -42,22 +41,24 @@ async function serveHTML(filePath: string) {
  
 // JSX Component Routes (New)
 app.get('/', async (c) => {
-  // Check if running in Tauri and redirect to setup page
-  const userAgent = c.req.header('user-agent') || ''
-  const isTauri = userAgent.includes('Tauri') || c.req.query('tauri') === 'true'
-  
-  if (isTauri) {
-    return c.redirect('/setup')
-  }
-  
   if (await isAuthenticated(c)) return c.redirect('/profiles')
-  return c.html(LandingPage({}))
+
+  let version = '2.0.0'
+  try {
+    // @ts-ignore
+    const pkgPath = join(import.meta.dir, '..', '..', 'package.json')
+    // @ts-ignore
+    const pkg = await Bun.file(pkgPath).json()
+    version = pkg.version || version
+  } catch (e) {}
+
+  return c.html(LandingPage({ version }))
 })
 
-// Tauri setup route
-app.get('/setup', async (c) => {
-  return c.html(TauriSetupPage({}))
-})
+// Redirect legacy Tauri routes to root
+app.get('/tauri', (c) => c.redirect('/'))
+app.get('/setup', (c) => c.redirect('/'))
+app.get('/tauri-login', (c) => c.redirect('/'))
  
 app.get('/profiles', async (c) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })

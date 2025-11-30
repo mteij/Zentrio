@@ -49,7 +49,6 @@ const indexHtml = `<!DOCTYPE html>
     <link rel="icon" href="/static/logo/favicon/favicon.ico">
     <meta name="theme-color" content="#141414">
     <meta name="description" content="Zentrio - Profile Management for Stremio">
-    <script src="/static/js/mobile-session-handler.js"></script>
 </head>
 <body>
     <div id="app">

@@ -8,7 +8,7 @@ This page helps you get up and running quickly, whether you use the public insta
 
 ### Option A: Use the hosted instance
 
-- Open `https://zentrio.eu` in your browser.
+- Open `https://app.zentrio.eu` in your browser.
 - Create or open a profile.
 - Log in with your email (Magic Link, Password) or Social Login.
 

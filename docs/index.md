@@ -10,7 +10,7 @@ hero:
   actions:
     - theme: brand
       text: Try Zentrio
-      link: https://zentrio.eu
+      link: https://app.zentrio.eu
     - theme: alt
       text: Get started
       link: /getting-started

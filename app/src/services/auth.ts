@@ -25,11 +25,30 @@ export const auth = betterAuth({
     basePath: "/api/auth",
     trustedOrigins: [
         "capacitor://localhost",
+        "tauri://localhost",
+        "zentrio://",
         "http://localhost:3000",
         "http://localhost:5173",
         cfg.APP_URL
     ],
     database: db,
+    advanced: {
+        defaultCookieAttributes: {
+            sameSite: "lax",
+            secure: true,
+        },
+        crossSubDomainCookies: {
+            enabled: true
+        },
+        cookiePrefix: "better-auth",
+        useSecureCookies: true
+    },
+    session: {
+        cookieCache: {
+            enabled: true,
+            maxAge: 5 * 60
+        }
+    },
     emailAndPassword: {
         enabled: true,
         requireEmailVerification: true,
@@ -48,22 +67,26 @@ export const auth = betterAuth({
             enabled: !!cfg.GOOGLE_CLIENT_ID && !!cfg.GOOGLE_CLIENT_SECRET,
             clientId: cfg.GOOGLE_CLIENT_ID || "",
             clientSecret: cfg.GOOGLE_CLIENT_SECRET || "",
+            redirectURI: `${cfg.APP_URL}/api/auth/callback/google`,
         },
         github: {
             enabled: !!cfg.GITHUB_CLIENT_ID && !!cfg.GITHUB_CLIENT_SECRET,
             clientId: cfg.GITHUB_CLIENT_ID || "",
             clientSecret: cfg.GITHUB_CLIENT_SECRET || "",
+            redirectURI: `${cfg.APP_URL}/api/auth/callback/github`,
         },
         discord: {
             enabled: !!cfg.DISCORD_CLIENT_ID && !!cfg.DISCORD_CLIENT_SECRET,
             clientId: cfg.DISCORD_CLIENT_ID || "",
             clientSecret: cfg.DISCORD_CLIENT_SECRET || "",
+            redirectURI: `${cfg.APP_URL}/api/auth/callback/discord`,
         },
         oidc: {
             enabled: !!cfg.OIDC_CLIENT_ID && !!cfg.OIDC_CLIENT_SECRET && !!cfg.OIDC_ISSUER,
             clientId: cfg.OIDC_CLIENT_ID || "",
             clientSecret: cfg.OIDC_CLIENT_SECRET || "",
             issuer: cfg.OIDC_ISSUER || "",
+            redirectURI: `${cfg.APP_URL}/api/auth/callback/oidc`,
         },
     },
     plugins: [

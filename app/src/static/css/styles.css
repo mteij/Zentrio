@@ -27,11 +27,15 @@ body {
     min-height: 100vh;
     /* Prevent white flash during rendering/transitions */
     background-color: #141414;
+    overscroll-behavior: none;
+    overflow-x: hidden;
 }
 
 /* Ensure html also has dark background to cover overscroll/loading areas */
 html {
     background-color: #141414;
+    overscroll-behavior: none;
+    height: 100%;
 }
 
 
@@ -1217,18 +1221,58 @@ input[type="range"]:active::-moz-range-thumb {
     min-height: calc(100vh - 100px); /* Adjust based on footer height */
 }
 
+body.force-default-theme {
+    display: flex;
+    flex-direction: column;
+}
+
+body.force-default-theme .main-content {
+    flex: 1;
+    min-height: auto !important;
+}
+
 .hero-content {
     text-align: center;
     z-index: 1;
     position: relative;
     max-width: 800px;
     margin: 0 auto;
+    width: 100%;
 }
 
-.hero-content h1 {
+/* Intro Animation Styles */
+.intro-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.intro-view.fade-out {
+    opacity: 0;
+    transform: scale(1.1);
+    pointer-events: none;
+}
+
+.logo-wrapper {
+    margin-bottom: 20px;
+    transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.intro-logo {
+    width: 120px;
+    height: 120px;
+    border-radius: 24px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    transition: all 0.5s ease;
+}
+
+.intro-title {
     font-size: 4rem;
     font-weight: 800;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     background: linear-gradient(135deg, #ffffff 0%, #e50914 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -1236,17 +1280,55 @@ input[type="range"]:active::-moz-range-thumb {
     line-height: 1.1;
     letter-spacing: -0.02em;
     text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    opacity: 0;
+    animation: fadeInUp 0.8s ease forwards 0.2s;
 }
 
-.hero-content p {
+.slogan-container {
     font-size: 1.5rem;
-    margin-bottom: 40px;
-    color: rgba(255, 255, 255, 0.8);
-    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.9);
     font-weight: 300;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
+    height: 30px; /* Fixed height to prevent layout shift */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.cursor {
+    display: inline-block;
+    width: 2px;
+    background-color: #e50914;
+    animation: blink 1s infinite;
+    margin-left: 2px;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Login View Transition */
+.login-view {
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    transform: translateY(20px);
+}
+
+.login-view.active {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    display: block !important;
 }
 
 .email-form {
@@ -1680,4 +1762,32 @@ input[type="range"]:active::-moz-range-thumb {
 
 .dropdown-menu .dropdown-item:hover {
   background-color: #3c3c3c;
+}
+
+/* Landing Page Card */
+.setup-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 40px;
+    width: 100%;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.setup-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 640px) {
+    .setup-card {
+        padding: 30px 20px;
+    }
 }

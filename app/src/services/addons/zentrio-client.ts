@@ -18,7 +18,7 @@ export class ZentrioAddonClient extends AddonClient {
       version: '1.0.0',
       name: 'Zentrio',
       description: 'Native TMDB integration for Zentrio',
-      logo: 'https://zentrio.eu/static/logo/icon-192.png',
+      logo: 'https://app.zentrio.eu/static/logo/icon-192.png',
       resources: ['catalog', 'meta', 'stream'],
       types: ['movie', 'series'],
       catalogs: [

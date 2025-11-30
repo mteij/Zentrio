@@ -5,6 +5,7 @@ body {
     padding: 0;
     overflow: hidden; /* Prevent scrolling */
     background: #000;
+    overscroll-behavior: none;
 }
 
 .player-wrapper {

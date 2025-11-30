@@ -1,6 +1,6 @@
 {
   "name": "zentrio",
-  "version": "2.0.0-alpha.4",
+  "version": "2.0.0-alpha.5",
   "license": "MIT",
   "description": "Zentrio - Stream Your Way",
   "scripts": {
@@ -11,24 +11,13 @@
     "build:server": "bun build src/index.ts --outdir ./dist --target bun --minify",
     "preview": "bun run dist/index.js",
     "type-check": "tsc --noEmit",
-    "cap:build": "bun run build && bunx cap build",
-    "cap:sync": "bunx cap sync",
-    "cap:open:android": "bunx cap open android",
-    "cap:open:ios": "bunx cap open ios",
-    "cap:run:android": "bunx cap run android",
-    "cap:run:ios": "bunx cap run ios",
-    "cap:serve": "bun run build && bunx cap serve",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "sync-version": "bun run scripts/sync-version.ts",
+    "postversion": "bun run sync-version"
   },
   "dependencies": {
-    "@capacitor/android": "^7.4.4",
-    "@capacitor/app": "^7.1.0",
-    "@capacitor/cli": "^7.4.4",
-    "@capacitor/core": "^7.4.4",
-    "@capacitor/filesystem": "^7.1.4",
-    "@capacitor/ios": "^7.4.4",
     "@dicebear/collection": "^9.2.4",
     "@dicebear/core": "^9.2.4",
     "@hono/node-server": "^1.19.6",

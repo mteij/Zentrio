@@ -173,13 +173,11 @@ export const StreamingPlayer = ({ stream, meta, profileId }: StreamingPlayerProp
           
           // --- Platform Detection & Player Setup ---
           
-          // Simple check for Capacitor environment (window.Capacitor is injected)
-          const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
+          // Simple check for Tauri environment
+          const isNative = !!window.__TAURI__;
           
           if (isNative) {
-            // Native: Use Capacitor Video Player Plugin (or fallback to simple video tag if plugin not present)
-            // For this implementation, we'll assume the native video element handles HLS/Dash via OS support
-            // or we'd use a specific plugin call here.
+            // Native: Use native playback capabilities
             // Android/iOS webviews often support HLS natively.
             video.src = streamUrl;
             console.log('Native platform detected, using native playback capabilities');

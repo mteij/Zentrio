@@ -1772,7 +1772,7 @@ function renderAddonsList() {
             behaviorHints = addon.behavior_hints;
         }
         
-        const isZentrio = addon.manifest_url === 'zentrio://tmdb-addon';
+        const isZentrio = addon.manifest_url === 'zentrio://tmdb-addon' || addon.manifest_url === 'https://app.zentrio.eu/manifest.json';
         const isConfigurable = isZentrio || (behaviorHints && behaviorHints.configurable) || (behaviorHints && behaviorHints.configurationRequired);
         
         const configBtn = document.createElement('button');

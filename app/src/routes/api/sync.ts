@@ -116,22 +116,19 @@ app.post('/token', async (c) => {
     }
 
     // Generate a sync token (in production, use JWT or proper token system)
-    const syncToken = `sync-${session.user.id}-${Date.now()}`
-    
-    // Store the token mapping (in production, use Redis or database with expiry)
-    // For now, we'll use a simple approach
+    // For now, we'll use a simple approach with base64 encoding
     const tokenData = {
       userId: session.user.id,
       createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
     }
     
-    // In a real implementation, you'd store this securely
-    // For now, we'll encode it in the token (not secure for production!)
+    // In a real implementation, you'd store this securely or use a signed JWT
     const encodedToken = Buffer.from(JSON.stringify(tokenData)).toString('base64')
     
     return c.json({
       syncToken: encodedToken,
+      userId: session.user.id,
       expiresAt: tokenData.expiresAt
     })
   } catch (e: any) {

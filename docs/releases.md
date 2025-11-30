@@ -1,3 +1,8 @@
+---
+layout: page
+title: Releases
+---
+
 # Releases
 
 All Zentrio releases from GitHub, including direct Android APK downloads when available.
