@@ -1,0 +1,127 @@
+:root {
+  /* Brand Colors */
+  --vp-c-brand-1: #e50914;
+  --vp-c-brand-2: #f40612;
+  --vp-c-brand-3: #ff1f2b;
+  --vp-c-brand-soft: rgba(229, 9, 20, 0.16);
+
+  /* Backgrounds */
+  --vp-c-bg: #141414;
+  --vp-c-bg-alt: #0a0a0a;
+  --vp-c-bg-soft: rgba(255, 255, 255, 0.05);
+
+  /* Text */
+  --vp-c-text-1: #ffffff;
+  --vp-c-text-2: #b3b3b3;
+  --vp-c-text-3: #888888;
+
+  /* Borders */
+  --vp-c-border: rgba(255, 255, 255, 0.1);
+  --vp-c-divider: rgba(255, 255, 255, 0.1);
+  --vp-c-gutter: rgba(255, 255, 255, 0.1);
+
+  /* Glassmorphism */
+  --vp-nav-bg-color: rgba(20, 20, 20, 0.8);
+  --vp-sidebar-bg-color: rgba(20, 20, 20, 0.8);
+  --vp-backdrop-filter: blur(20px);
+}
+
+/* Global Background Effect */
+body {
+  background-color: var(--vp-c-bg);
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(229, 9, 20, 0.05), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(229, 9, 20, 0.03), transparent 25%);
+  background-attachment: fixed;
+}
+
+/* Navbar Glassmorphism */
+.VPNav {
+  background-color: var(--vp-nav-bg-color) !important;
+  backdrop-filter: var(--vp-backdrop-filter);
+  -webkit-backdrop-filter: var(--vp-backdrop-filter);
+  border-bottom: 1px solid var(--vp-c-border);
+}
+
+/* Sidebar Glassmorphism */
+.VPSidebar {
+  background-color: var(--vp-sidebar-bg-color) !important;
+  backdrop-filter: var(--vp-backdrop-filter);
+  -webkit-backdrop-filter: var(--vp-backdrop-filter);
+  border-right: 1px solid var(--vp-c-border);
+}
+
+/* Content Cards */
+.vp-doc h1, .vp-doc h2, .vp-doc h3, .vp-doc h4, .vp-doc h5, .vp-doc h6 {
+  color: var(--vp-c-text-1);
+}
+
+.vp-doc p, .vp-doc ul, .vp-doc ol {
+  color: var(--vp-c-text-2);
+}
+
+/* Code Blocks */
+.vp-doc [class*='language-'] {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid var(--vp-c-border);
+  border-radius: 8px;
+}
+
+/* Buttons */
+.VPButton.brand {
+  background-color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+  color: white;
+  box-shadow: 0 4px 15px rgba(229, 9, 20, 0.3);
+  transition: all 0.3s ease;
+}
+
+.VPButton.brand:hover {
+  background-color: var(--vp-c-brand-2);
+  border-color: var(--vp-c-brand-2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(229, 9, 20, 0.4);
+}
+
+.VPButton.alt {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  backdrop-filter: blur(10px);
+}
+
+.VPButton.alt:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Search Box */
+.VPNavBarSearch .DocSearch-Button {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.VPNavBarSearch .DocSearch-Button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
