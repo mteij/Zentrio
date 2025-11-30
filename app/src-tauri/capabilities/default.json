@@ -8,6 +8,16 @@
     "core:webview:allow-internal-toggle-devtools",
     "core:window:allow-close",
     "shell:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "zentrio-server",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
     "dialog:default",
     "fs:default",
     "http:default",

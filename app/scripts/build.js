@@ -36,6 +36,29 @@ try {
   // Build the server
  console.log('🔧 Building server...');
  execSync('bun build src/index.ts --outdir ./dist --target bun --minify', { stdio: 'inherit' });
+
+ // Compile server as sidecar
+ console.log('🔧 Compiling server sidecar...');
+ try {
+   // Get host triple
+   const rustInfo = execSync('rustc -vV').toString();
+   const hostTriple = rustInfo.split('\n').find(line => line.startsWith('host: ')).split(': ')[1].trim();
+   console.log(`Target triple: ${hostTriple}`);
+
+   const binDir = path.join(__dirname, '..', 'src-tauri', 'bin');
+   if (!fs.existsSync(binDir)) {
+     fs.mkdirSync(binDir, { recursive: true });
+   }
+
+   const extension = process.platform === 'win32' ? '.exe' : '';
+   const sidecarName = `zentrio-server-${hostTriple}${extension}`;
+   const sidecarPath = path.join(binDir, sidecarName);
+
+   execSync(`bun build --compile src/index.ts --outfile "${sidecarPath}"`, { stdio: 'inherit' });
+   console.log(`✅ Compiled sidecar: ${sidecarName}`);
+ } catch (err) {
+   console.warn('⚠️ Failed to compile sidecar (this is expected if rustc is not available or on non-desktop builds):', err.message);
+ }
  
  
  // Create a simple index.html
@@ -60,8 +83,21 @@ const indexHtml = `<!DOCTYPE html>
         </div>
     </div>
     <script>
-        // Redirect to the server
-        window.location.href = '/';
+        // Wait for Tauri to be ready and get the server port
+        if (window.__TAURI__) {
+            const invoke = window.__TAURI__.core.invoke;
+            invoke('get_server_port')
+                .then(port => {
+                    window.location.href = 'http://localhost:' + port;
+                })
+                .catch(err => {
+                    console.error('Failed to get server port:', err);
+                    document.querySelector('#app').innerHTML = '<div style="color:red;padding:20px">Failed to start server: ' + err + '</div>';
+                });
+        } else {
+            // Fallback for web/dev
+            window.location.href = '/';
+        }
     </script>
 </body>
 </html>`;
