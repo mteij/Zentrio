@@ -15,7 +15,7 @@ Run Zentrio on your own server in a few minutes using Docker. This is the recomm
 mkdir zentrio && cd zentrio
 
 # Download example env file
-curl -L https://raw.githubusercontent.com/MichielEijpe/Zentrio/main/.env.example -o .env
+curl -L https://raw.githubusercontent.com/mteij/Zentrio/main/.env.example -o .env
 
 # Start Zentrio from GHCR
 docker run -d --name zentrio ^

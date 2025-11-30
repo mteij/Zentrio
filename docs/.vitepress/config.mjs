@@ -47,7 +47,7 @@ export default defineConfig({
     ],
  
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/MichielEijpe/Zentrio' }
+      { icon: 'github', link: 'https://github.com/mteij/Zentrio' }
     ],
  
     footer: {

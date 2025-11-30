@@ -22,7 +22,7 @@ If you prefer full control and data locality, run Zentrio yourself:
 mkdir zentrio && cd zentrio
 
 # Download example env file
-curl -L https://raw.githubusercontent.com/MichielEijpe/Zentrio/main/.env.example -o .env
+curl -L https://raw.githubusercontent.com/mteij/Zentrio/main/.env.example -o .env
 
 # Start Zentrio from GHCR
 docker run -d --name zentrio \

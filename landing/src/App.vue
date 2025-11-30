@@ -11,7 +11,7 @@
         <div class="nav-links">
           <router-link to="/releases" class="nav-link">Releases</router-link>
           <a href="https://docs.zentrio.eu" class="nav-link">Documentation</a>
-          <a href="https://github.com/MichielEijpe/Zentrio" class="nav-link">GitHub</a>
+          <a href="https://github.com/mteij/Zentrio" class="nav-link">GitHub</a>
         </div>
       </div>
     </nav>

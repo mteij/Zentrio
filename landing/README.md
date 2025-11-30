@@ -46,4 +46,4 @@ The landing page is automatically deployed to GitHub Pages when changes are push
 ## Related
 
 - Documentation: [docs.zentrio.eu](https://docs.zentrio.eu)
-- Repository: [github.com/MichielEijpe/Zentrio](https://github.com/MichielEijpe/Zentrio)
+- Repository: [github.com/mteij/Zentrio](https://github.com/mteij/Zentrio)

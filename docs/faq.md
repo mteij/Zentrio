@@ -24,7 +24,7 @@ Use Docker with the published GHCR image:
 mkdir zentrio && cd zentrio
 
 # Download example env file
-curl -L https://raw.githubusercontent.com/MichielEijpe/Zentrio/main/.env.example -o .env
+curl -L https://raw.githubusercontent.com/mteij/Zentrio/main/.env.example -o .env
 
 # Start Zentrio from GHCR
 docker run -d --name zentrio \
@@ -110,4 +110,4 @@ Common issues:
 - Issues and bug reports: GitHub Issues on the main repository.
 - Feature requests and questions: GitHub Discussions.
 
-Repository: `https://github.com/MichielEijpe/Zentrio`
+Repository: `https://github.com/mteij/Zentrio`

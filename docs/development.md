@@ -13,7 +13,7 @@ Recommended: VS Code with TypeScript support and formatter extensions.
 ## 2. Getting the code running
 
 ```bash
-git clone https://github.com/MichielEijpe/Zentrio.git
+git clone https://github.com/mteij/Zentrio.git
 cd Zentrio/app
 
 # Install dependencies
@@ -95,4 +95,4 @@ See [Environment variables](/environment) for all options.
 - Keep changes small and focused.
 - Run lint and type‑check before opening a pull request.
 
-Repository: `https://github.com/MichielEijpe/Zentrio`
+Repository: `https://github.com/mteij/Zentrio`

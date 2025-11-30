@@ -6,76 +6,143 @@
         <p class="page-subtitle">Download the latest version of Zentrio for your device.</p>
       </header>
 
-      <div class="releases-list">
-        <!-- Latest Release -->
-        <div class="release-card latest">
+      <div v-if="loading" class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading releases...</p>
+      </div>
+
+      <div v-else-if="error" class="error-state">
+        <p>{{ error }}</p>
+        <button @click="fetchReleases" class="btn btn-secondary">Try Again</button>
+      </div>
+
+      <div v-else class="releases-list">
+        <div v-for="(release, index) in releases" :key="release.id" class="release-card" :class="{ latest: index === 0 }">
           <div class="release-header">
             <div class="version-info">
-              <span class="latest-badge">Latest</span>
-              <h2>v1.0.0</h2>
-              <span class="release-date">November 30, 2025</span>
+              <span v-if="index === 0" class="latest-badge">Latest</span>
+              <h2>{{ release.tag_name }}</h2>
+              <span class="release-date">{{ formatDate(release.published_at) }}</span>
             </div>
-            <a href="https://github.com/MichielEijpe/Zentrio/releases/tag/v1.0.0" target="_blank" class="github-link">
+            <a :href="release.html_url" target="_blank" class="github-link">
               View on GitHub ↗
             </a>
           </div>
 
-          <div class="release-notes">
-            <h3>Initial Release</h3>
-            <ul>
-              <li>🚀 First public release of Zentrio</li>
-              <li>👥 Multi-profile support with separate watch histories</li>
-              <li>🎨 Modern glassmorphic interface</li>
-              <li>🧩 Stremio addon support</li>
-              <li>🔄 Cross-device synchronization</li>
-            </ul>
-          </div>
+          <div class="release-notes" v-html="renderMarkdown(release.body)"></div>
 
           <div class="downloads-grid">
             <div class="platform-group">
               <h4>Mobile</h4>
               <div class="btn-group">
-                <a href="#" class="btn btn-secondary btn-sm">
+                <a v-if="getAsset(release, 'android')" :href="getAsset(release, 'android').browser_download_url" class="btn btn-secondary btn-sm">
                   <span class="icon">🤖</span> Android (APK)
                 </a>
-                <a href="#" class="btn btn-secondary btn-sm">
+                <span v-else class="btn btn-secondary btn-sm disabled">
+                  <span class="icon">🤖</span> Android (Not available)
+                </span>
+                
+                <a v-if="getAsset(release, 'ios')" :href="getAsset(release, 'ios').browser_download_url" class="btn btn-secondary btn-sm">
                   <span class="icon">🍎</span> iOS (IPA)
                 </a>
+                <span v-else class="btn btn-secondary btn-sm disabled">
+                  <span class="icon">🍎</span> iOS (Not available)
+                </span>
               </div>
             </div>
 
             <div class="platform-group">
               <h4>Desktop</h4>
               <div class="btn-group">
-                <a href="#" class="btn btn-secondary btn-sm">
+                <a v-if="getAsset(release, 'windows')" :href="getAsset(release, 'windows').browser_download_url" class="btn btn-secondary btn-sm">
                   <span class="icon">🪟</span> Windows (.exe)
                 </a>
-                <a href="#" class="btn btn-secondary btn-sm">
+                <span v-else class="btn btn-secondary btn-sm disabled">
+                  <span class="icon">🪟</span> Windows (Not available)
+                </span>
+
+                <a v-if="getAsset(release, 'mac')" :href="getAsset(release, 'mac').browser_download_url" class="btn btn-secondary btn-sm">
                   <span class="icon">🍎</span> macOS (.dmg)
                 </a>
-                <a href="#" class="btn btn-secondary btn-sm">
+                <span v-else class="btn btn-secondary btn-sm disabled">
+                  <span class="icon">🍎</span> macOS (Not available)
+                </span>
+
+                <a v-if="getAsset(release, 'linux')" :href="getAsset(release, 'linux').browser_download_url" class="btn btn-secondary btn-sm">
                   <span class="icon">🐧</span> Linux (.AppImage)
                 </a>
+                <span v-else class="btn btn-secondary btn-sm disabled">
+                  <span class="icon">🐧</span> Linux (Not available)
+                </span>
               </div>
             </div>
           </div>
         </div>
-
-        <!-- Older releases can be added here -->
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import { marked } from 'marked'
+
 export default {
-  name: 'Releases'
+  name: 'Releases',
+  data() {
+    return {
+      releases: [],
+      loading: true,
+      error: null
+    }
+  },
+  async created() {
+    await this.fetchReleases()
+  },
+  methods: {
+    async fetchReleases() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await fetch('https://api.github.com/repos/mteij/Zentrio/releases')
+        if (!response.ok) throw new Error('Failed to fetch releases')
+        this.releases = await response.json()
+      } catch (err) {
+        this.error = 'Unable to load releases. Please check your connection.'
+        console.error(err)
+      } finally {
+        this.loading = false
+      }
+    },
+    formatDate(dateString) {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    },
+    renderMarkdown(text) {
+      return marked(text || '')
+    },
+    getAsset(release, platform) {
+      if (!release.assets) return null
+      
+      const patterns = {
+        android: /\.apk$/i,
+        ios: /\.ipa$/i,
+        windows: /\.exe$/i,
+        mac: /\.dmg$/i,
+        linux: /\.AppImage$/i
+      }
+      
+      return release.assets.find(asset => patterns[platform].test(asset.name))
+    }
+  }
 }
 </script>
 
 <style scoped>
 .releases-view {
-  padding-top: 120px; /* Account for fixed navbar */
+  padding-top: 120px;
   padding-bottom: 80px;
   min-height: 100vh;
 }
@@ -98,6 +165,26 @@ export default {
 .page-subtitle {
   color: var(--text-muted);
   font-size: 1.2rem;
+}
+
+.loading-state, .error-state {
+  text-align: center;
+  padding: 60px;
+  color: var(--text-muted);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  border-top-color: var(--accent);
+  animation: spin 1s ease-in-out infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .release-card {
@@ -171,27 +258,37 @@ export default {
 
 .release-notes {
   margin-bottom: 40px;
-}
-
-.release-notes h3 {
-  font-size: 1.2rem;
-  margin-bottom: 16px;
-  color: var(--text);
-}
-
-.release-notes ul {
-  list-style: none;
-  padding: 0;
-}
-
-.release-notes li {
   color: var(--text-muted);
-  margin-bottom: 8px;
-  padding-left: 24px;
-  position: relative;
+  line-height: 1.6;
 }
 
-/* Downloads Grid */
+.release-notes :deep(h1),
+.release-notes :deep(h2),
+.release-notes :deep(h3) {
+  color: var(--text);
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.release-notes :deep(ul),
+.release-notes :deep(ol) {
+  padding-left: 24px;
+  margin-bottom: 16px;
+}
+
+.release-notes :deep(li) {
+  margin-bottom: 8px;
+}
+
+.release-notes :deep(a) {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.release-notes :deep(a:hover) {
+  text-decoration: underline;
+}
+
 .downloads-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -217,6 +314,12 @@ export default {
   font-size: 0.95rem;
   justify-content: flex-start;
   width: 100%;
+}
+
+.btn-sm.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .icon {
