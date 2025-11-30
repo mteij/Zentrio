@@ -4,83 +4,23 @@
     
     <nav class="navbar">
       <div class="container nav-content">
-        <div class="logo-area">
+        <router-link to="/" class="logo-area">
           <img src="/icon-512.png" alt="Zentrio" class="nav-logo" />
           <span class="nav-title">Zentrio</span>
-        </div>
+        </router-link>
         <div class="nav-links">
+          <router-link to="/releases" class="nav-link">Releases</router-link>
           <a href="https://docs.zentrio.eu" class="nav-link">Documentation</a>
           <a href="https://github.com/MichielEijpe/Zentrio" class="nav-link">GitHub</a>
         </div>
       </div>
     </nav>
 
-    <header class="hero">
-      <div class="container hero-container">
-        <div class="hero-content">
-          <div class="logo-wrapper">
-            <img src="/icon-512.png" alt="Zentrio" class="hero-logo" />
-          </div>
-          <h1 class="hero-title">Your Personal<br/><span class="text-gradient">Streaming Hub</span></h1>
-          <p class="hero-subtitle">
-            A modern, self-hosted streaming platform designed for immersion. 
-            Manage profiles, sync across devices, and extend with addons.
-          </p>
-          
-          <div class="hero-actions">
-            <a href="https://app.zentrio.eu" class="btn btn-primary btn-lg">
-              <span class="btn-icon">▶</span> Launch Zentrio
-            </a>
-            <a href="https://docs.zentrio.eu/getting-started" class="btn btn-secondary btn-lg">
-              Self Host
-            </a>
-          </div>
-          
-          <div class="hero-badges">
-            <span class="badge">v1.0.0</span>
-            <span class="badge">Open Source</span>
-            <span class="badge">Privacy Focused</span>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <main class="features">
-      <div class="container">
-        <div class="features-grid">
-          <div class="feature-card">
-            <div class="feature-icon">👥</div>
-            <h3>Profile Management</h3>
-            <p>Create separate profiles for everyone in your household with unique preferences and watch history.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🎨</div>
-            <h3>Modern Interface</h3>
-            <p>A clean, glassmorphic design that focuses on your content, providing a cinematic experience.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🧩</div>
-            <h3>Addon System</h3>
-            <p>Compatible with Stremio addons. Extend functionality to access a wide range of content sources.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🔄</div>
-            <h3>Cross-Platform Sync</h3>
-            <p>Seamlessly sync your progress and settings across all your devices, from desktop to mobile.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🔒</div>
-            <h3>Privacy First</h3>
-            <p>Your data stays with you. Self-host with Docker and keep full control over your viewing habits.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">📱</div>
-            <h3>PWA Support</h3>
-            <p>Install as a Progressive Web App on iOS and Android for a native-like app experience.</p>
-          </div>
-        </div>
-      </div>
-    </main>
+    <router-view v-slot="{ Component }">
+      <transition name="fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
 
     <footer class="footer">
       <div class="container">
@@ -175,6 +115,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  text-decoration: none;
+  color: var(--text);
 }
 
 .nav-logo {
@@ -201,11 +143,90 @@ body {
   transition: color 0.3s ease;
 }
 
-.nav-link:hover {
+.nav-link:hover, .nav-link.router-link-active {
   color: var(--text);
 }
 
-/* Hero Section */
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 1.1rem;
+}
+
+.btn-icon {
+  margin-right: 8px;
+  font-size: 0.9em;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 4px 15px rgba(229, 9, 20, 0.3);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(229, 9, 20, 0.4);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Footer */
+.footer {
+  padding: 60px 0;
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: auto;
+}
+
+.footer-content p {
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.copyright {
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+/* Page Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Shared Styles for Views */
 .hero {
   min-height: 90vh;
   display: flex;
@@ -280,57 +301,6 @@ body {
   color: var(--text-muted);
 }
 
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  border: 1px solid transparent;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.btn-lg {
-  padding: 16px 32px;
-  font-size: 1.1rem;
-}
-
-.btn-icon {
-  margin-right: 8px;
-  font-size: 0.9em;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: white;
-  box-shadow: 0 4px 15px rgba(229, 9, 20, 0.3);
-}
-
-.btn-primary:hover {
-  background: var(--accent-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(229, 9, 20, 0.4);
-}
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
-  border-color: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
-}
-
-/* Features Section */
 .features {
   padding: 80px 0;
 }
@@ -374,31 +344,11 @@ body {
   line-height: 1.6;
 }
 
-/* Footer */
-.footer {
-  padding: 60px 0;
-  text-align: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  margin-top: auto;
-}
-
-.footer-content p {
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
-
-.copyright {
-  font-size: 0.9rem;
-  opacity: 0.6;
-}
-
-/* Animations */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .hero-title {
     font-size: 2.5rem;

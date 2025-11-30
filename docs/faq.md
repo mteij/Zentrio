@@ -77,7 +77,7 @@ Yes. Open **Profiles**, select the profile, and use the delete action. This only
 
 ### Is there an Android app?
 
-Yes. Download the latest APK from the [Releases](/releases) page. Each release shows a direct **Download Android APK** button when an APK asset is available.
+Yes. Download the latest APK from the [Releases](https://zentrio.eu/releases) page. Each release shows a direct **Download Android APK** button when an APK asset is available.
 
 ### Can I use Zentrio as a PWA?
 

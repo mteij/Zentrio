@@ -51,4 +51,4 @@ Profiles keep their own Stremio settings, watch history, and addons.
 - Learn how to manage profiles and settings in [Usage](/usage).
 - Configure your server for production in [Self hosting with Docker](/self-hosting-docker).
 - See all configuration options in [Environment variables](/environment).
-- Download mobile apps and Android APKs from [Releases](/releases).
+- Download mobile apps and Android APKs from [Releases](https://zentrio.eu/releases).

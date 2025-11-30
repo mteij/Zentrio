@@ -41,8 +41,7 @@ export default defineConfig({
         items: [
           { text: 'Development Guide', link: '/development' },
           { text: 'Sync Architecture', link: '/sync-architecture' },
-          { text: 'Sync Implementation', link: '/sync-implementation-plan' },
-          { text: 'Releases', link: '/releases' }
+          { text: 'Sync Implementation', link: '/sync-implementation-plan' }
         ]
       }
     ],

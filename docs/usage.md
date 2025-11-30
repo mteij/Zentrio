@@ -61,7 +61,7 @@ You can use Zentrio on mobile via Android APK or as a PWA.
 
 ### Android app
 
-- Download the latest APK from the [Releases](/releases) page.
+- Download the latest APK from the [Releases](https://zentrio.eu/releases) page.
 - Install it on your device (you may need to enable installs from unknown sources).
 - Open the app and log in with your email.
 
