@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🔨 Building Zentrio for Capacitor...');
+console.log('🔨 Building Zentrio...');
 
 // Clean dist directory
 if (fs.existsSync('dist')) {
@@ -38,7 +38,7 @@ try {
  execSync('bun build src/index.ts --outdir ./dist --target bun --minify', { stdio: 'inherit' });
  
  
- // Create a simple index.html for Capacitor
+ // Create a simple index.html
 const indexHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>

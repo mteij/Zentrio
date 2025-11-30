@@ -24,7 +24,6 @@ export const auth = betterAuth({
     baseURL: cfg.APP_URL,
     basePath: "/api/auth",
     trustedOrigins: [
-        "capacitor://localhost",
         "tauri://localhost",
         "zentrio://",
         "http://localhost:3000",

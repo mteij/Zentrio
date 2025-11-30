@@ -11,6 +11,46 @@ const TAURI_CONF = join(TAURI_DIR, 'tauri.conf.json');
 const TAURI_PACKAGE_JSON = join(TAURI_DIR, 'package.json');
 const CARGO_TOML = join(TAURI_DIR, 'Cargo.toml');
 
+/**
+ * Convert traditional semantic version to MSI-compatible format
+ * Examples:
+ * - "2.0.0-alpha.5" -> "2.0.0-1005"
+ * - "2.0.0-beta.1" -> "2.0.0-2001"
+ * - "2.0.0-rc.2" -> "2.0.0-3002"
+ * - "2.0.0" -> "2.0.0"
+ */
+function convertToMsiVersion(version: string): string {
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?$/);
+  if (!match) {
+    throw new Error(`Invalid version format: ${version}`);
+  }
+  
+  const [, major, minor, patch, prereleaseType, prereleaseNumber] = match;
+  
+  if (!prereleaseType || !prereleaseNumber) {
+    // Stable version, no conversion needed
+    return `${major}.${minor}.${patch}`;
+  }
+  
+  let baseNumber: number;
+  switch (prereleaseType) {
+    case 'alpha':
+      baseNumber = 1000;
+      break;
+    case 'beta':
+      baseNumber = 2000;
+      break;
+    case 'rc':
+      baseNumber = 3000;
+      break;
+    default:
+      throw new Error(`Unknown prerelease type: ${prereleaseType}`);
+  }
+  
+  const msiPrerelease = baseNumber + parseInt(prereleaseNumber);
+  return `${major}.${minor}.${patch}-${msiPrerelease}`;
+}
+
 function updateJsonFile(path: string, version: string) {
   try {
     const content = readFileSync(path, 'utf-8');
@@ -64,25 +104,31 @@ function main() {
   try {
     // Read source version from app/package.json
     const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, 'utf-8'));
-    const version = packageJson.version;
+    const traditionalVersion = packageJson.version;
 
-    if (!version) {
+    if (!traditionalVersion) {
       console.error('Error: No version found in package.json');
       process.exit(1);
     }
 
-    console.log(`Syncing version ${version} across project...`);
+    console.log(`Syncing version ${traditionalVersion} across project...`);
+    
+    // Convert to MSI-compatible format for Tauri files
+    const msiVersion = convertToMsiVersion(traditionalVersion);
+    console.log(`Using MSI-compatible version: ${msiVersion} for Tauri files`);
 
-    // Update tauri.conf.json
-    updateJsonFile(TAURI_CONF, version);
+    // Update tauri.conf.json with MSI version
+    updateJsonFile(TAURI_CONF, msiVersion);
 
-    // Update src-tauri/package.json
-    updateJsonFile(TAURI_PACKAGE_JSON, version);
+    // Update src-tauri/package.json with MSI version
+    updateJsonFile(TAURI_PACKAGE_JSON, msiVersion);
 
-    // Update Cargo.toml
-    updateCargoToml(CARGO_TOML, version);
+    // Update Cargo.toml with MSI version
+    updateCargoToml(CARGO_TOML, msiVersion);
 
     console.log('Version sync complete!');
+    console.log(`Traditional version: ${traditionalVersion}`);
+    console.log(`MSI-compatible version: ${msiVersion}`);
   } catch (error) {
     console.error('Error syncing version:', error);
     process.exit(1);

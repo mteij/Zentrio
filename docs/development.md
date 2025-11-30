@@ -46,9 +46,7 @@ app/
     middleware/   # Security, logging, sessions
     static/       # JS, CSS, icons, manifest
     themes/       # Theme JSON files
-  android/        # Android project (Capacitor)
-  ios/            # iOS project (Capacitor)
-  capacitor.config.ts
+  src-tauri/      # Tauri project (Rust)
 ```
 
 ## 4. Useful scripts
@@ -63,14 +61,13 @@ bun run lint       # Lint code
 bun run type-check # TypeScript type checking
 ```
 
-Capacitor / mobile helpers (if configured):
+Tauri / mobile helpers:
 
 ```bash
-bun run cap:sync        # Sync web assets to native projects
-bun run cap:open:android
-bun run cap:open:ios
-bun run cap:run:android
-bun run cap:run:ios
+bun run tauri dev        # Start Tauri dev environment
+bun run tauri build      # Build Tauri app
+bun run tauri android dev # Run on Android
+bun run tauri ios dev     # Run on iOS
 ```
 
 ## 5. Environment for development

@@ -5990,7 +5990,7 @@ dependencies = [
 
 [[package]]
 name = "zentrio"
-version = "2.0.0-alpha.5"
+version = "2.0.0-1005"
 dependencies = [
  "serde",
  "serde_json",
