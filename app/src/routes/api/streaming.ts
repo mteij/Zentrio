@@ -102,6 +102,30 @@ streaming.get('/streams/:type/:id', async (c) => {
   return c.json({ streams })
 })
 
+streaming.get('/subtitles/:type/:id', async (c) => {
+  const { type, id } = c.req.param()
+  const { profileId, videoHash } = c.req.query()
+  
+  if (!profileId) {
+    return c.json({ subtitles: [] })
+  }
+  
+  try {
+    const results = await addonManager.getSubtitles(type, id, parseInt(profileId), videoHash)
+    // Flatten subtitles from all addons into a single list with addon info
+    const subtitles = results.flatMap(r => 
+      r.subtitles.map(s => ({
+        ...s,
+        addonName: r.addon.name
+      }))
+    )
+    return c.json({ subtitles })
+  } catch (e) {
+    console.error('Subtitles API error:', e)
+    return c.json({ subtitles: [] })
+  }
+})
+
 streaming.get('/search', async (c) => {
   const { q, profileId } = c.req.query()
   if (!q || !profileId) return c.json({ results: [] })

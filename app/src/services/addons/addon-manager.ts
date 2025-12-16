@@ -930,6 +930,43 @@ export class AddonManager {
     
     return groupedResults
   }
+
+  async getSubtitles(type: string, id: string, profileId: number, videoHash?: string): Promise<{ addon: Manifest, subtitles: Subtitle[] }[]> {
+    const clients = await this.getClientsForProfile(profileId)
+    const results: { addon: Manifest, subtitles: Subtitle[] }[] = []
+
+    const promises = clients.map(async (client) => {
+      if (!client.manifest) return
+
+      // Check if addon supports subtitles resource
+      const supportsSubtitles = client.manifest.resources.some(r => {
+        if (typeof r === 'string') return r === 'subtitles'
+        // @ts-ignore
+        return r.name === 'subtitles'
+      })
+
+      if (!supportsSubtitles) return
+
+      // Check ID prefixes if defined
+      if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
+        if (!client.manifest.idPrefixes.some(p => id.startsWith(p))) return
+      }
+
+      try {
+        console.log(`Requesting subtitles from ${client.manifest.name} for ${type}/${id}`)
+        const subtitles = await client.getSubtitles(type, id, videoHash)
+        console.log(`Received ${subtitles ? subtitles.length : 0} subtitles from ${client.manifest.name}`)
+        if (subtitles && subtitles.length > 0) {
+          results.push({ addon: client.manifest, subtitles })
+        }
+      } catch (e) {
+        console.warn(`Failed to fetch subtitles from ${client.manifest.name}`, e)
+      }
+    })
+
+    await Promise.allSettled(promises)
+    return results
+  }
 }
 
 export const addonManager = new AddonManager()

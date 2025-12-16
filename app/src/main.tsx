@@ -54,10 +54,14 @@ function AppRoutes() {
   }, [])
 
   if (!serverUrl) {
-    return <ServerSelector onServerSelected={(url) => {
-      setServerUrl(url);
-      window.location.reload(); // Reload to re-initialize auth client with new URL
-    }} />;
+    const isDev = import.meta.env.DEV;
+    return <ServerSelector 
+      showDevMode={isDev}
+      onServerSelected={(url) => {
+        setServerUrl(url);
+        window.location.reload(); // Reload to re-initialize auth client with new URL
+      }} 
+    />;
   }
   
   return (

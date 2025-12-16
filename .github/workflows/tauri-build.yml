@@ -15,21 +15,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # for iOS
-            args: '--target aarch64-apple-ios'
-            name: 'ios'
-          - platform: 'macos-latest' # for macOS
-            args: '--target aarch64-apple-darwin'
-            name: 'macos'
-          - platform: 'ubuntu-22.04' # for Linux
-            args: ''
-            name: 'linux'
-          - platform: 'windows-latest' # for Windows
-            args: ''
-            name: 'windows'
-          - platform: 'ubuntu-22.04' # for Android
-            args: '--target aarch64-linux-android'
-            name: 'android'
+          - platform: "macos-latest" # for iOS
+            args: "--target aarch64-apple-ios"
+            name: "ios"
+          - platform: "macos-latest" # for macOS
+            args: "--target aarch64-apple-darwin"
+            name: "macos"
+          - platform: "ubuntu-22.04" # for Linux
+            args: ""
+            name: "linux"
+          - platform: "windows-latest" # for Windows
+            args: ""
+            name: "windows"
+          - platform: "ubuntu-22.04" # for Android
+            args: "--target aarch64-linux-android"
+            name: "android"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -62,8 +62,8 @@ jobs:
         if: matrix.name == 'android'
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: "zulu"
+          java-version: "17"
 
       - name: Setup Android SDK (Android only)
         if: matrix.name == 'android'
@@ -72,6 +72,21 @@ jobs:
       - name: Install NDK (Android only)
         if: matrix.name == 'android'
         run: sdkmanager "ndk;26.1.10909125"
+
+      - name: Configure Android NDK environment
+        if: matrix.name == 'android'
+        run: |
+          ANDROID_NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
+          NDK_TOOLCHAIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+          echo "$NDK_TOOLCHAIN" >> $GITHUB_PATH
+
+          # Set the compilers directly to the specific API level binaries
+          echo "CC_aarch64_linux_android=$NDK_TOOLCHAIN/aarch64-linux-android24-clang" >> $GITHUB_ENV
+          echo "CXX_aarch64_linux_android=$NDK_TOOLCHAIN/aarch64-linux-android24-clang++" >> $GITHUB_ENV
+          echo "AR_aarch64_linux_android=$NDK_TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$NDK_TOOLCHAIN/aarch64-linux-android24-clang" >> $GITHUB_ENV
 
       - name: Install frontend dependencies
         run: cd app && npm install # Using npm install instead of bun for broader compatibility in CI
@@ -84,8 +99,8 @@ jobs:
         with:
           projectPath: ./app
           tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
-          releaseName: 'App v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
+          releaseName: "App v__VERSION__"
+          releaseBody: "See the assets to download this version and install."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

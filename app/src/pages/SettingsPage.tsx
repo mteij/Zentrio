@@ -6,6 +6,7 @@ import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter, Animate
 import { authClient, getClientUrl } from '../lib/auth-client'
 
 import { TwoFactorSetupModal } from '../components/auth/TwoFactorSetupModal'
+import { ServerConnectionIndicator } from '../components/auth/ServerConnectionIndicator'
 import { AppearanceSettings } from '../components/settings/AppearanceSettings'
 import { StreamingSettings } from '../components/settings/StreamingSettings'
 import { DangerZoneSettings } from '../components/settings/DangerZoneSettings'
@@ -502,6 +503,9 @@ export function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Server Connection - only shown in Tauri/mobile apps */}
+              <ServerConnectionIndicator variant="card" />
             </div>
           </div>
         )}

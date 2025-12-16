@@ -111,7 +111,7 @@ export function LandingPage({ version }: LandingPageProps) {
   };
 
   return (
-    <SimpleLayout title="Welcome to Zentrio" disableThemeSync={true} className="min-h-screen flex flex-col">
+    <SimpleLayout title="Welcome to Zentrio" disableThemeSync={true} className="h-[100vh] h-[var(--app-height,100vh)] flex flex-col overflow-hidden">
       <AnimatedBackground />
       
       <main className="flex-1 flex items-center justify-center relative z-10 p-4 w-full">

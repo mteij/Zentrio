@@ -57,7 +57,7 @@ export const StreamingDetails = () => {
     }
   }
 
-  const loadStreams = async (season?: number, episode?: number, overrideId?: string) => {
+  const loadStreams = async (season?: number, episode?: number, overrideId?: string, autoPlay: boolean = false) => {
     setStreamsLoading(true)
     try {
       const fetchId = overrideId || data?.meta.imdb_id || id
@@ -68,6 +68,15 @@ export const StreamingDetails = () => {
       const res = await fetch(url)
       const streamData = await res.json()
       setStreams(streamData.streams || [])
+      
+      // Auto-play best source if requested
+      if (autoPlay && streamData.streams?.length > 0) {
+        const firstGroup = streamData.streams[0]
+        if (firstGroup?.streams?.length > 0) {
+          handlePlay(firstGroup.streams[0])
+          return // Exit early since we're navigating away
+        }
+      }
     } catch (e) {
       console.error('Failed to load streams', e)
     } finally {
@@ -87,10 +96,10 @@ export const StreamingDetails = () => {
     navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`)
   }
 
-  const handleEpisodeSelect = (season: number, number: number, title: string) => {
+  const handleEpisodeSelect = (season: number, number: number, title: string, autoPlay: boolean = false) => {
     setSelectedEpisode({ season, number, title })
     setView('streams')
-    loadStreams(season, number)
+    loadStreams(season, number, undefined, autoPlay)
   }
 
   const toggleLibrary = async () => {
@@ -153,7 +162,7 @@ export const StreamingDetails = () => {
 
             <div className={styles.detailsActions}>
               {meta.type === 'movie' && (
-                  <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={() => loadStreams()}>
+                  <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={() => loadStreams(undefined, undefined, undefined, true)}>
                     <Play size={20} fill="currentColor" />
                     Play
                   </button>
@@ -196,7 +205,7 @@ export const StreamingDetails = () => {
                     <div
                         key={ep.id || `${ep.season}-${ep.number}`}
                         className="episode-item"
-                        onClick={() => handleEpisodeSelect(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`)}
+                        onClick={() => handleEpisodeSelect(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`, false)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -213,7 +222,14 @@ export const StreamingDetails = () => {
                             <span className="episode-number" style={{ fontWeight: 'bold', color: '#aaa', minWidth: '24px' }}>{ep.number}.</span>
                             <span className="episode-title" style={{ fontWeight: 500 }}>{ep.title || ep.name || `Episode ${ep.number}`}</span>
                         </div>
-                        <button className="action-btn btn-primary-glass" style={{ padding: '8px' }}>
+                        <button 
+                            className="action-btn btn-primary-glass" 
+                            style={{ padding: '8px' }}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleEpisodeSelect(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`, true)
+                            }}
+                        >
                             <Play size={16} />
                         </button>
                     </div>

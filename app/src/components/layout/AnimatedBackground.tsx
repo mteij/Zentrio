@@ -126,6 +126,8 @@ export function AnimatedBackground({ variant = 'zentrio', className = '' }: Anim
       <div
         className={`fixed inset-0 z-0 pointer-events-none ${className}`}
         style={{
+          top: 'var(--titlebar-height, 0px)',
+          height: 'var(--app-height, 100vh)',
           backgroundImage: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`,
           backgroundSize: '400% 400%',
           backgroundPosition: 'center',

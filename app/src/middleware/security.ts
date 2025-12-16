@@ -12,24 +12,39 @@ export const corsMiddleware = (origins?: string[]) => {
       'http://localhost:5173',
       'tauri://localhost',
       'https://localhost',
-      cfg.APP_URL
-    ]
+      cfg.APP_URL,
+      cfg.CLIENT_URL
+    ].filter(Boolean)
     
     const allowedOrigins = origins || defaultOrigins
     const origin = c.req.header('origin')
     
+    // Handle CORS headers
+    const corsHeaders: Record<string, string> = {
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept, Origin',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin'
+    }
+    
+    // Set origin header if origin is allowed
     if (origin && allowedOrigins.includes(origin)) {
-      c.header('Access-Control-Allow-Origin', origin)
+      corsHeaders['Access-Control-Allow-Origin'] = origin
     }
     
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    c.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE')
-    c.header('Access-Control-Allow-Credentials', 'true')
-    c.header('Vary', 'Origin')
-    
+    // Handle preflight OPTIONS requests
     if (c.req.method === 'OPTIONS') {
-      return new Response('', { status: 204 })
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+      })
     }
+    
+    // Set CORS headers for all other requests
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      c.header(key, value)
+    })
     
     await next()
   }

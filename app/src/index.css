@@ -13,6 +13,10 @@
   color: var(--text);
   /* Fallback background - AnimatedBackground will cover this */
   background-color: #000000;
+  /* Titlebar height variable - set by Tauri */
+  --titlebar-height: 0px;
+  /* Available height for content (accounts for titlebar) */
+  --app-height: 100vh;
 }
 
 html {
@@ -25,11 +29,47 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: var(--app-height);
   overscroll-behavior: none;
   overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
+  min-height: var(--app-height);
   width: 100%;
 }
+
+/* ==========================================================================
+   Titlebar Support (Tauri)
+   ========================================================================== */
+
+body.has-titlebar {
+  --titlebar-height: 32px;
+  --app-height: calc(100vh - var(--titlebar-height));
+  padding-top: var(--titlebar-height);
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+body.has-titlebar #root {
+  min-height: var(--app-height);
+  height: var(--app-height);
+  max-height: var(--app-height);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Utility class for full-height elements that respect titlebar */
+.full-height {
+  min-height: 100vh;
+  min-height: var(--app-height);
+}
+
+.exact-height {
+  height: 100vh;
+  height: var(--app-height);
+}
+

@@ -61,7 +61,8 @@
 }
 
 .indicatorIcon {
-    /* Optional animation or style */
+    /* Placeholder for optional animation */
+    display: inline-block;
 }
 
 @media (max-width: 768px) {
@@ -333,6 +334,7 @@
 .backBtn {
   position: fixed;
   top: 32px;
+  top: calc(32px + var(--titlebar-height, 0px));
   left: 32px;
   z-index: 100;
   display: flex;

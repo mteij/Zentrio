@@ -5,6 +5,7 @@
 .backBtn {
   position: fixed;
   top: 40px;
+  top: calc(40px + var(--titlebar-height, 0px));
   left: 40px;
   z-index: 100;
   display: flex;
@@ -59,10 +60,11 @@
 /* ======================= */
 .streamingNavbar {
   position: fixed;
-  top: 0;
+  top: var(--titlebar-height, 0px);
   left: 0;
   width: 80px;
   height: 100vh;
+  height: var(--app-height, 100vh);
   background: rgba(10, 10, 10, 0.95); /* Increased opacity for better legibility */
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -324,6 +326,7 @@
 /* Streaming Layout Base */
 .streamingLayout {
   min-height: 100vh;
+  min-height: var(--app-height, 100vh);
   padding-left: 80px; /* Fixed width matching navbar */
   padding-bottom: 40px;
   transition: padding-left 0.3s ease;
@@ -339,10 +342,11 @@
 /* Page Ambient Background */
 .pageAmbientBackground {
   position: fixed;
-  top: 0;
+  top: var(--titlebar-height, 0px);
   left: 0;
   width: 100%;
   height: 100vh;
+  height: var(--app-height, 100vh);
   z-index: 0;
   background-size: cover;
   background-position: center center; /* Better placement on large screens */
@@ -838,6 +842,7 @@
 .detailsContainer {
   position: relative;
   min-height: 100vh;
+  min-height: var(--app-height, 100vh);
   padding-top: 0;
   padding-left: 0;
 }

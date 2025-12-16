@@ -4,13 +4,13 @@ interface TauriEntryPageProps {}
 
 export function TauriEntryPage({}: TauriEntryPageProps) {
   return (
-    <SimpleLayout title="Welcome to Zentrio" disableThemeSync={true} className="min-h-screen flex flex-col">
+    <SimpleLayout title="Welcome to Zentrio" disableThemeSync={true} className="h-[100vh] h-[var(--app-height,100vh)] flex flex-col overflow-hidden">
       <div style={{
         position: 'fixed',
         inset: 0,
         zIndex: 0,
         width: '100vw',
-        height: '100vh',
+        height: 'var(--app-height, 100vh)',
         background: 'linear-gradient(135deg, #1a1a1a 0%, #000000 100%)'
       }}></div>
       

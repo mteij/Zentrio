@@ -22,11 +22,17 @@ export const getServerUrl = () => {
   if (typeof window === "undefined") return "http://localhost:3000";
 
   if (isTauri()) {
-    return (
-      localStorage.getItem("zentrio_server_url") || "https://app.zentrio.eu"
-    );
+    const stored = localStorage.getItem("zentrio_server_url");
+    // PROXY marker means use current origin (for dev mode with Vite proxy)
+    if (stored === "PROXY") {
+      console.log('[auth-client] Using PROXY mode, returning:', window.location.origin);
+      return window.location.origin;
+    }
+    console.log('[auth-client] Tauri mode, stored URL:', stored);
+    return stored || "https://app.zentrio.eu";
   }
 
+  console.log('[auth-client] Non-Tauri mode, using origin:', window.location.origin);
   return window.location.origin;
 };
 

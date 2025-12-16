@@ -7,6 +7,10 @@
     "core:event:default",
     "core:webview:allow-internal-toggle-devtools",
     "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-is-maximized",
     "shell:default",
     {
       "identifier": "shell:allow-execute",
@@ -20,7 +24,18 @@
     },
     "dialog:default",
     "fs:default",
-    "http:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "http://localhost" },
+        { "url": "http://localhost:*" },
+        { "url": "http://127.0.0.1" },
+        { "url": "http://127.0.0.1:*" },
+        { "url": "https://*" },
+        { "url": "http://*.zentrio.eu" },
+        { "url": "https://*.zentrio.eu" }
+      ]
+    },
     "notification:default",
     "os:default",
     "process:default",

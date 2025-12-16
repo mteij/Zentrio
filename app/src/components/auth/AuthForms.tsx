@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmailVerificationModal } from "./EmailVerificationModal";
+import { ServerConnectionIndicator } from "./ServerConnectionIndicator";
 
 // Brand icons as SVG components
 const GoogleIcon = () => (
@@ -433,6 +434,9 @@ export function AuthForms({ mode }: AuthFormsProps) {
               </button>
             </p>
           )}
+          
+          {/* Change Server option for Tauri/mobile apps */}
+          <ServerConnectionIndicator variant="inline" />
         </div>
       </div>
     </div>

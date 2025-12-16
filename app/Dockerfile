@@ -17,8 +17,14 @@ RUN if [ -d stremio-patches ]; then cp -r stremio-patches ./stremio-patches; fi
 COPY src ./src
 COPY public ./public
 
-# Build stremio-web and main application
-RUN bun run build
+# Build server (creates dist/index.js)
+RUN bun build src/index.ts --outdir ./dist --target bun --minify
+
+# Copy static assets to dist
+RUN mkdir -p dist/static && cp -r public/static/* dist/static/
+
+# Build SPA (creates dist/index.html and other frontend assets)
+RUN bun run vite build
 
 FROM oven/bun:latest AS runtime
 WORKDIR /app

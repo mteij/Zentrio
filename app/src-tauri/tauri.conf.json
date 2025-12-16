@@ -18,7 +18,7 @@
         "resizable": true,
         "fullscreen": false,
         "visible": true,
-        "url": "/tauri",
+        "url": "/",
         "decorations": false,
         "transparent": true
       }

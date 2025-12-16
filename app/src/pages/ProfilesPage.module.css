@@ -5,12 +5,15 @@
   position: relative;
   background: transparent;
   min-height: 100svh;
+  min-height: var(--app-height, 100svh);
+  height: var(--app-height, 100svh);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding-block: 2rem;
   padding-bottom: 120px;
+  overflow: hidden;
 }
 
 /* Translucent overlay above Vanta background */
