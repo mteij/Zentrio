@@ -1,6 +1,9 @@
 services:
   zentrio:
     image: ${IMAGE_NAME:-ghcr.io/michieleijpe/zentrio:latest}
+    build:
+      context: ./app
+      dockerfile: Dockerfile
     env_file:
       - .env
     environment:

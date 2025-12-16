@@ -8,7 +8,7 @@ FROM base AS builder
 WORKDIR /app
 COPY package.json bun.lock tsconfig.json ./
 # Enforce frozen lockfile: use the committed bun.lock exactly
-RUN bun install --production --no-save
+RUN bun install --no-save
 
 # Copy scripts and patches needed for stremio-web build
 COPY scripts ./scripts
