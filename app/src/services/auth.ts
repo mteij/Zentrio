@@ -28,7 +28,8 @@ export const auth = betterAuth({
         "zentrio://",
         "http://localhost:3000",
         "http://localhost:5173",
-        cfg.APP_URL
+        cfg.APP_URL,
+        cfg.CLIENT_URL
     ],
     database: db,
     advanced: {
@@ -57,8 +58,10 @@ export const auth = betterAuth({
     },
     emailVerification: {
         sendOnSignUp: true,
+        autoSignInAfterVerification: true,
         async sendVerificationEmail({ user, url, token }: any, request: any) {
-            await emailService.sendVerificationEmail(user.email, url);
+            // We use OTP now, but keep this as fallback or for specific flows if needed
+            // The actual OTP sending is handled by emailOTP plugin
         },
     },
     socialProviders: {
@@ -111,6 +114,9 @@ export const auth = betterAuth({
         changeEmail: {
             enabled: true,
         },
+        deleteUser: {
+            enabled: true,
+        },
         additionalFields: {
             username: {
                 type: "string",
@@ -153,12 +159,56 @@ export const auth = betterAuth({
         user: {
             create: {
                 before: async (user) => {
+                    if (user.email) {
+                        user.email = user.email.toLowerCase();
+                    }
                     if (!user.username && user.email) {
                         user.username = user.email.split('@')[0];
                     }
                     return {
                         data: user
                     }
+                },
+                after: async (user) => {
+                    // Auto-create default settings profile
+                    try {
+                        const { settingsProfileDb, profileDb, profileProxySettingsDb } = await import("./database.js");
+                        
+                        // 1. Create Default Settings Profile
+                        const settingsProfile = settingsProfileDb.create(user.id, "Default", true);
+                        
+                        // 2. Create Default User Profile
+                        // Use username or part of email as name
+                        const emailName = user.email ? user.email.split('@')[0] : "My Profile";
+                        const profileName = (user.username as string) || emailName;
+                        
+                        const profile = await profileDb.create({
+                            user_id: user.id,
+                            name: profileName,
+                            avatar: profileName, // Default avatar is name (initials)
+                            avatar_type: 'initials',
+                            avatar_style: 'bottts-neutral', // DiceBear default style
+                            is_default: true,
+                            settings_profile_id: settingsProfile.id
+                        });
+
+                        // 3. Create Profile Proxy Settings (18+ enabled by default as requested: nsfw_filter_enabled = false)
+                        profileProxySettingsDb.create({
+                            profile_id: profile.id,
+                            nsfw_filter_enabled: false, // 18+ allowed
+                            nsfw_age_rating: 0, // Unrestricted
+                            hide_calendar_button: false,
+                            hide_addons_button: false,
+                            mobile_click_to_hover: false,
+                            hero_banner_enabled: true
+                        });
+                        
+                        // Note: Zentrio addon is auto-enabled by settingsProfileDb.create
+                        
+                    } catch (e) {
+                        console.error("Failed to auto-create profile for new user", e);
+                    }
+                    console.log("Auto-create profile hook finished for user", user.id);
                 }
             }
         }

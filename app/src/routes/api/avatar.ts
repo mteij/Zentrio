@@ -1,20 +1,29 @@
 import { Hono } from 'hono'
-import { generateAvatar, generateRandomAvatar } from '../../services/avatar'
+import { generateAvatar, generateRandomAvatar, isValidAvatarStyle, DEFAULT_AVATAR_STYLE, AVATAR_STYLES, AVATAR_STYLE_NAMES, type AvatarStyle } from '../../services/avatar'
 
 const app = new Hono()
+
+// Get available avatar styles
+app.get('/styles', (c) => {
+  const styles = Object.keys(AVATAR_STYLES).map(key => ({
+    id: key,
+    name: AVATAR_STYLE_NAMES[key as AvatarStyle]
+  }))
+  return c.json({ styles, default: DEFAULT_AVATAR_STYLE })
+})
 
 // Generate random avatar
 app.get('/random', async (c) => {
   try {
-    // Get colors from query param if provided (comma separated hex codes)
-    const colorsParam = c.req.query('colors')
-    const colors = colorsParam ? colorsParam.split(',') : undefined
+    const styleParam = c.req.query('style') || DEFAULT_AVATAR_STYLE
+    const style = isValidAvatarStyle(styleParam) ? styleParam : DEFAULT_AVATAR_STYLE
     
-    const { svg, seed } = await generateRandomAvatar(colors)
+    const { svg, seed } = generateRandomAvatar(style)
     
     return c.json({
       svg,
       seed,
+      style,
       dataUrl: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
     })
   } catch (error) {
@@ -26,11 +35,10 @@ app.get('/random', async (c) => {
 app.get('/:seed', async (c) => {
   try {
     const seed = c.req.param('seed')
-    // Get colors from query param if provided (comma separated hex codes)
-    const colorsParam = c.req.query('colors')
-    const colors = colorsParam ? colorsParam.split(',') : undefined
+    const styleParam = c.req.query('style') || DEFAULT_AVATAR_STYLE
+    const style = isValidAvatarStyle(styleParam) ? styleParam : DEFAULT_AVATAR_STYLE
 
-    const svg = await generateAvatar(seed, colors)
+    const svg = generateAvatar(seed, style)
     
     return new Response(svg, {
       headers: {

@@ -7,14 +7,14 @@ const app = new Hono()
 app.get('/', async (c) => {
   try {
     const themes = await themeService.listThemes()
-    // Return lightweight list for the client (id, name, accent, muted preview colors)
+    // Return lightweight list for the client
     const payload = themes.map(t => ({
       id: t.id,
       name: t.name,
       accent: t.accent,
-      btnPrimary: t.btnPrimary,
+      btnPrimary: t.btnPrimary || t.accent,
       text: t.text || '#ffffff',
-      vanta: t.vanta
+      muted: t.muted || '#b3b3b3'
     }))
     return c.json(payload)
   } catch (e) {
@@ -33,9 +33,9 @@ app.post('/:id', async (c) => {
       return c.json({ error: 'Invalid theme body' }, 400)
     }
 
-    // Basic validation (ensure vanta keys exist)
-    if (!body.vanta || !body.vanta.highlight || !body.vanta.midtone || !body.vanta.lowlight || !body.vanta.base) {
-      return c.json({ error: 'Theme vanta colors are required' }, 400)
+    // Basic validation (ensure accent color exists)
+    if (!body.accent) {
+      return c.json({ error: 'Theme accent color is required' }, 400)
     }
 
     const theme = Object.assign({ id }, body)

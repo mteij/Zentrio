@@ -67,8 +67,13 @@ export function getConfig() {
   const AUTH_SECRET = process.env.AUTH_SECRET ?? 'super-secret-key-change-in-production'
   // Check if running in Tauri
   const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
-  const defaultUrl = isTauri ? 'https://app.zentrio.eu' : `http://localhost:${PORT}`;
-  const APP_URL = process.env.APP_URL ?? defaultUrl
+  const defaultServerUrl = isTauri ? 'https://app.zentrio.eu' : `http://localhost:${PORT}`;
+  const APP_URL = process.env.APP_URL ?? defaultServerUrl
+  
+  // Client URL (for redirects and CORS)
+  const defaultClientUrl = isTauri ? 'tauri://localhost' : 'http://localhost:5173';
+  const CLIENT_URL = process.env.CLIENT_URL ?? defaultClientUrl
+
   const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY ?? 'super-secret-key-change-in-production'
   // Rate limit settings (configurable via environment variables)
   const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000)
@@ -99,6 +104,7 @@ export function getConfig() {
     DATABASE_URL,
     AUTH_SECRET,
     APP_URL,
+    CLIENT_URL,
     ENCRYPTION_KEY,
     RATE_LIMIT_WINDOW_MS,
     RATE_LIMIT_LIMIT,
@@ -114,7 +120,8 @@ export function getConfig() {
     OIDC_CLIENT_SECRET,
     OIDC_ISSUER,
     OIDC_DISPLAY_NAME,
-    TMDB_API_KEY: process.env.TMDB_API_KEY
+    TMDB_API_KEY: process.env.TMDB_API_KEY,
+    RESEND_API_KEY: process.env.RESEND_API_KEY
   }
 }
 

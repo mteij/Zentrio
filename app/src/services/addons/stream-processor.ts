@@ -96,12 +96,14 @@ export interface ParsedStream {
 
 export class StreamProcessor {
   private config: StreamConfig
+  private platform?: string
 
-  constructor(config: StreamConfig) {
+  constructor(config: StreamConfig, platform?: string) {
     this.config = config
+    this.platform = platform
   }
 
-  public process(streams: { stream: Stream, addon: Manifest }[], meta: MetaDetail): Stream[] {
+  public process(streams: { stream: Stream, addon: Manifest }[], meta: MetaDetail): ParsedStream[] {
     // 1. Parse streams
     let parsedStreams = streams.map(s => this.parseStream(s.stream, s.addon))
 
@@ -117,7 +119,7 @@ export class StreamProcessor {
     // 5. Apply limits
     parsedStreams = this.applyLimits(parsedStreams)
 
-    return parsedStreams.map(p => p.original)
+    return parsedStreams
   }
 
   private parseStream(stream: Stream, addon: Manifest): ParsedStream {
@@ -152,9 +154,17 @@ export class StreamProcessor {
 
     // Audio Tags
     if (combined.includes('atmos')) parsed.audioTags?.push('atmos')
-    if (combined.includes('dts')) parsed.audioTags?.push('dts')
-    if (combined.includes('dd+') || combined.includes('eac3')) parsed.audioTags?.push('dd+')
+    if (combined.includes('dts') || combined.includes('dtshd') || combined.includes('dts-hd')) parsed.audioTags?.push('dts')
+    if (combined.includes('truehd')) parsed.audioTags?.push('truehd')
+    if (combined.includes('dd+') || combined.includes('eac3')) parsed.audioTags?.push('eac3')
+    if (combined.includes('ac3') || combined.includes('dd5.1') || combined.includes('dd 5.1')) parsed.audioTags?.push('ac3')
+    
     if (combined.includes('aac')) parsed.audioTags?.push('aac')
+    if (combined.includes('mp3')) parsed.audioTags?.push('mp3')
+    if (combined.includes('opus')) parsed.audioTags?.push('opus')
+    if (combined.includes('flac')) parsed.audioTags?.push('flac')
+    
+    if (combined.includes('multi') || combined.includes('dual') || combined.match(/[a-z]{3}-[a-z]{3}/i)) parsed.audioTags?.push('multi')
 
     // Audio Channels
     if (combined.includes('7.1')) parsed.audioChannels?.push('7.1')
@@ -235,6 +245,22 @@ export class StreamProcessor {
 
       // Audio Tag Filter
       if (!this.checkFilter(filters.audioTag, s.parsed.audioTags)) return false
+
+      // Mark unsupported audio for web
+      if (this.platform === 'web' && filters.audioTag?.preferred && filters.audioTag.preferred.length > 0) {
+          // Only mark if we detected audio tags but none of them are preferred
+          // If we detected NO audio tags, we give it the benefit of the doubt (avoid false positives)
+          if (s.parsed.audioTags && s.parsed.audioTags.length > 0) {
+              const hasPreferred = s.parsed.audioTags.some(tag => filters.audioTag.preferred!.includes(tag));
+              if (!hasPreferred) {
+                  // Mark as not web ready
+                  if (!s.original.behaviorHints) {
+                      s.original.behaviorHints = {};
+                  }
+                  s.original.behaviorHints.notWebReady = true;
+              }
+          }
+      }
 
       // Size Filter
       if (filters.size && s.parsed.size) {

@@ -1,6 +1,24 @@
-export { Button } from './Button'
-export { Input, FormGroup } from './Input'
-export { Modal, ModalHeader, ModalFooter, ModalWithFooter } from './Modal'
-export { Message } from './Message'
-export { Layout, PageHeader, PageFooter, SimpleLayout } from './Layout'
-export { ProfileModal } from './ProfileModal'
+// UI Components
+export { Button } from './ui/Button'
+export { Input, FormGroup } from './ui/Input'
+export { Modal, ModalWithFooter } from './ui/Modal'
+export { Message } from './ui/Message'
+export { Toggle } from './ui/Toggle'
+export { ConfirmDialog } from './ui/ConfirmDialog'
+export { InputDialog } from './ui/InputDialog'
+export { LoadingSpinner } from './ui/LoadingSpinner'
+export { LazyImage } from './ui/LazyImage'
+export { BackButton } from './ui/BackButton'
+export { RatingBadge } from './ui/RatingBadge'
+
+// Layout Components
+export { Layout, PageHeader, PageFooter, SimpleLayout } from './layout/Layout'
+export { Navbar } from './layout/Navbar'
+export { TitleBar } from './layout/TitleBar'
+export { AnimatedBackground } from './layout/AnimatedBackground'
+export { ErrorBoundary } from './layout/ErrorBoundary'
+
+// Feature Components
+export { ProfileModal } from './features/ProfileModal'
+export { StreamingRow } from './features/StreamingRow'
+export { SettingsProfileSelector } from './features/SettingsProfileSelector'

@@ -5,16 +5,16 @@ export interface Theme {
   id: string
   name: string
   accent: string
-  btnPrimary: string
+  btnPrimary?: string
   btnPrimaryHover?: string
   text?: string
   muted?: string
-  vanta: {
-    highlight: string
-    midtone: string
-    lowlight: string
-    base: string
+  background?: {
+    primary: string
+    secondary: string
+    tertiary: string
   }
+  animationSpeed?: number
 }
 
 const THEMES_DIR = join(process.cwd(), 'src', 'themes')

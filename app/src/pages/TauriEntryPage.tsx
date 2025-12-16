@@ -4,7 +4,7 @@ interface TauriEntryPageProps {}
 
 export function TauriEntryPage({}: TauriEntryPageProps) {
   return (
-    <SimpleLayout title="Welcome to Zentrio" disableThemeSync={true} className="force-default-theme">
+    <SimpleLayout title="Welcome to Zentrio" disableThemeSync={true} className="min-h-screen flex flex-col">
       <div style={{
         position: 'fixed',
         inset: 0,
@@ -14,30 +14,19 @@ export function TauriEntryPage({}: TauriEntryPageProps) {
         background: 'linear-gradient(135deg, #1a1a1a 0%, #000000 100%)'
       }}></div>
       
-      <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
-        <div className="container" style={{ textAlign: 'center' }}>
-          <div className="hero-content" data-tauri-drag-region>
-            <div className="logo-container" style={{ marginBottom: '2rem' }}>
+      <main className="flex-1 flex items-center justify-center relative z-10">
+        <div className="container text-center">
+          <div className="flex flex-col items-center" data-tauri-drag-region>
+            <div className="mb-8">
               <img src="/static/logo/icon-512.png" alt="Zentrio Logo" style={{ width: '120px', height: '120px', borderRadius: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
             </div>
-            <h1 style={{ fontSize: '3rem', marginBottom: '1rem', fontWeight: 'bold' }}>Zentrio</h1>
-            <p style={{ fontSize: '1.2rem', color: '#aaa', marginBottom: '3rem' }}>Your personal streaming hub</p>
+            <h1 className="text-5xl mb-4 font-bold">Zentrio</h1>
+            <p className="text-xl text-zinc-400 mb-12">Your personal streaming hub</p>
 
             <Button 
               variant="primary" 
               id="nextBtn" 
-              className="entry-button"
-              style={{ 
-                padding: '12px 48px', 
-                fontSize: '1.1rem',
-                borderRadius: '50px',
-                background: 'white',
-                color: 'black',
-                fontWeight: 'bold',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease'
-              }}
+              className="entry-button px-12 py-3 text-lg rounded-full bg-white text-black font-bold border-none cursor-pointer transition-transform duration-200 hover:scale-105"
             >
               Next
             </Button>

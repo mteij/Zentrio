@@ -182,3 +182,64 @@ export const getClient = async (userId: string): Promise<TMDBClient | null> => {
     return null
   }
 }
+
+/**
+ * Known blocked/test API keys that should not be allowed
+ */
+const BLOCKED_API_KEYS = new Set([
+  'test',
+  'demo',
+  'example',
+  'your_api_key',
+  'your-api-key',
+  'api_key',
+  'apikey',
+  '00000000000000000000000000000000',
+  'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+])
+
+/**
+ * Check if an API key is a known test/demo key that should be blocked
+ */
+export function isBlockedTmdbKey(apiKey: string): boolean {
+  const normalizedKey = apiKey.trim().toLowerCase()
+  
+  // Check against known blocked keys
+  if (BLOCKED_API_KEYS.has(normalizedKey)) {
+    return true
+  }
+  
+  // Block keys that are too short (TMDB keys are 32 chars)
+  if (normalizedKey.length < 32) {
+    return true
+  }
+  
+  // Block keys that are all the same character
+  if (/^(.)\1+$/.test(normalizedKey)) {
+    return true
+  }
+  
+  return false
+}
+
+/**
+ * Validate a TMDB API key by making a test request to the TMDB API
+ */
+export async function validateTmdbApiKey(apiKey: string): Promise<boolean> {
+  try {
+    // Use the authentication endpoint - lightweight and reliable
+    const url = `${TMDB_API_BASE}/authentication?api_key=${encodeURIComponent(apiKey)}`
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    })
+    
+    // TMDB returns 401 for invalid keys
+    return response.ok
+  } catch (error) {
+    console.error('Failed to validate TMDB API key:', error)
+    return false
+  }
+}

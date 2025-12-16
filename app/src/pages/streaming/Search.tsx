@@ -1,21 +1,74 @@
-import { Layout } from '../../components/Layout'
-import { Navbar } from '../../components/Navbar'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { Search, Loader2 } from 'lucide-react'
+import { Layout, Navbar, RatingBadge, LazyImage } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
-import { listDb } from '../../services/database'
+import styles from '../../styles/Streaming.module.css'
 
-interface StreamingSearchProps {
-  results: MetaPreview[]
-  query: string
-  profileId: number
-  profile?: any
-}
+export const StreamingSearch = () => {
+  const { profileId } = useParams<{ profileId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const [results, setResults] = useState<MetaPreview[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [profile, setProfile] = useState<any>(null)
+  
+  const query = searchParams.get('q') || ''
 
-export const StreamingSearch = ({ results, query, profileId, profile }: StreamingSearchProps) => {
+  // Fetch profile for navbar avatar
+  useEffect(() => {
+    if (profileId) {
+      fetch(`/api/streaming/dashboard?profileId=${profileId}`)
+        .then(res => res.json())
+        .then(data => setProfile(data.profile))
+        .catch(console.error)
+    }
+  }, [profileId])
+
+  useEffect(() => {
+    if (!profileId) {
+      navigate('/profiles')
+      return
+    }
+    if (query) {
+      performSearch(query)
+    } else {
+      setResults([])
+    }
+  }, [profileId, query])
+
+  const performSearch = async (q: string) => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/streaming/search?profileId=${profileId}&q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setResults(data.results || [])
+    } catch (err) {
+      console.error(err)
+      setError('Failed to search')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    const formData = new FormData(e.target as HTMLFormElement)
+    const q = formData.get('q') as string
+    if (q) {
+      setSearchParams({ q })
+    }
+  }
+
+  const showImdbRatings = true // Default
+
   return (
-    <Layout title="Search" additionalCSS={['/static/css/streaming.css']} additionalJS={['/static/js/streaming-ui.js']} showHeader={false} showFooter={false}>
-      <Navbar profileId={profileId} activePage="search" profile={profile} />
-      <div className="streaming-layout no-hero">
-        <div className="search-header" style={{
+    <Layout title="Search" showHeader={false} showFooter={false}>
+      <Navbar profileId={parseInt(profileId!)} activePage="search" profile={profile} />
+      <div className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}>
+        <div className={styles.searchHeader} style={{
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -25,9 +78,9 @@ export const StreamingSearch = ({ results, query, profileId, profile }: Streamin
           paddingBottom: '20px',
           borderBottom: '1px solid rgba(255,255,255,0.05)'
         }}>
-          <div className="search-input-wrapper">
-            <span className="iconify search-icon" data-icon="lucide:search" data-width="20" data-height="20"></span>
-            <form action={`/streaming/${profileId}/search`} method="get" id="searchForm">
+          <div className={styles.searchInputWrapper}>
+            <Search className={styles.searchIcon} size={20} />
+            <form onSubmit={handleSearch} id="searchForm">
               <input
                 type="text"
                 name="q"
@@ -35,7 +88,7 @@ export const StreamingSearch = ({ results, query, profileId, profile }: Streamin
                 placeholder="Search movies & series..."
                 defaultValue={query}
                 autoFocus
-                className="search-input-glass"
+                className={styles.searchInputGlass}
                 autoComplete="off"
               />
             </form>
@@ -43,14 +96,36 @@ export const StreamingSearch = ({ results, query, profileId, profile }: Streamin
         </div>
 
         {query && (
-          <div className="content-container" style={{ marginTop: 0 }} id="searchResultsContainer" data-query={query} data-profile-id={profileId}>
+          <div className={styles.contentContainer} style={{ marginTop: 0 }}>
             <h1 style={{ padding: '0 60px', marginBottom: '30px', fontSize: '2rem', fontWeight: '600', color: '#fff' }}>Results for "{query}"</h1>
-            <div id="searchResultsGrid" className="media-grid">
-                {/* Results will be populated here via JS */}
-                <div className="loading-spinner" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', padding: '40px' }}>
-                    <span className="iconify" data-icon="lucide:loader-2" data-width="40" data-height="40" style={{ animation: 'spin 1s linear infinite' }}></span>
+            
+            {loading ? (
+                <div className="flex justify-center p-10">
+                    <Loader2 className="animate-spin" size={40} />
                 </div>
-            </div>
+            ) : results.length === 0 ? (
+                <div style={{ padding: '0 60px', color: '#aaa' }}>No results found.</div>
+            ) : (
+                <div className={styles.mediaGrid}>
+                    {results.map(item => (
+                        <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
+                            <div className={styles.posterContainer}>
+                                {item.poster ? (
+                                    <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
+                                ) : (
+                                    <div className="flex items-center justify-center bg-gray-800 text-gray-400 w-full h-full p-2 text-center text-sm">{item.name}</div>
+                                )}
+                                {showImdbRatings && item.imdbRating && (
+                                    <RatingBadge rating={parseFloat(item.imdbRating)} />
+                                )}
+                                <div className={styles.cardOverlay}>
+                                    <div className={styles.cardTitle}>{item.name}</div>
+                                </div>
+                            </div>
+                        </a>
+                    ))}
+                </div>
+            )}
           </div>
         )}
       </div>

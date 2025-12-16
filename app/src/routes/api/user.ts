@@ -179,6 +179,25 @@ app.put('/tmdb-api-key', async (c) => {
 
     const { tmdb_api_key } = validation.data
     
+    // If a key is provided (not clearing), validate it
+    if (tmdb_api_key && tmdb_api_key.trim()) {
+      const trimmedKey = tmdb_api_key.trim()
+      
+      // Import validation functions
+      const { isBlockedTmdbKey, validateTmdbApiKey } = await import('../../services/tmdb/client')
+      
+      // Check for known test/demo keys
+      if (isBlockedTmdbKey(trimmedKey)) {
+        return err(c, 400, 'INVALID_API_KEY', 'This API key appears to be a test or demo key and is not allowed')
+      }
+      
+      // Validate key works with TMDB API
+      const isValid = await validateTmdbApiKey(trimmedKey)
+      if (!isValid) {
+        return err(c, 400, 'INVALID_API_KEY', 'Invalid TMDB API key. Please check that your key is correct.')
+      }
+    }
+    
     // Check if key is unchanged
     const freshUser = userDb.findById(user.id)
     let currentKey = null
@@ -288,6 +307,13 @@ async function csrfLikeGuard(c: any, next: any) {
     try {
       const cand = new URL(candidate)
       const exp = new URL(expectedOrigin)
+      
+      // Allow localhost/127.0.0.1 port mismatch for development (Vite proxy vs Hono server)
+      if ((cand.hostname === 'localhost' || cand.hostname === '127.0.0.1') && 
+          (exp.hostname === 'localhost' || exp.hostname === '127.0.0.1')) {
+          return true
+      }
+
       // Accept when host matches even if scheme differs (common behind HTTPS-terminating proxy)
       return cand.host.toLowerCase() === exp.host.toLowerCase()
     } catch {
@@ -409,7 +435,9 @@ app.put('/settings', async (c) => {
 app.get('/profile', async (c) => {
   try {
     const user = c.get('user')
-    // Use session user directly
+    const accounts = userDb.findAccountsByUserId(user.id)
+    const hasPassword = userDb.hasPassword(user.id)
+    
     return ok(c, {
       id: user.id,
       email: user.email,
@@ -417,6 +445,11 @@ app.get('/profile', async (c) => {
       firstName: user.firstName,
       lastName: user.lastName,
       twoFactorEnabled: user.twoFactorEnabled,
+      hasPassword,
+      linkedAccounts: accounts.map(a => ({
+        providerId: a.providerId,
+        createdAt: a.createdAt
+      }))
     })
   } catch (_e) {
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
@@ -537,6 +570,134 @@ app.put('/password', async (c) => {
         return err(c, 400, 'INVALID_INPUT', e.message || 'Failed to update password')
     }
 })
+
+// [POST /password/setup] Set password for SSO-only account (no existing password)
+app.post('/password/setup', async (c) => {
+  try {
+    const user = c.get('user')
+    
+    // Only allow if user doesn't have a password
+    if (userDb.hasPassword(user.id)) {
+      return err(c, 400, 'HAS_PASSWORD', 'Account already has a password. Use change password instead.')
+    }
+    
+    const body = await c.req.json().catch(() => ({}))
+    const validation = await validate(z.object({
+      password: z.string().min(8, 'Password must be at least 8 characters')
+    }), body)
+    
+    if (!validation.success) {
+      return err(c, 400, 'INVALID_INPUT', 'Invalid input', validation.error)
+    }
+    
+    const { password } = validation.data
+    
+    // Use better-auth API to set password for credential account
+    const res = await auth.api.setPassword({ 
+      body: { newPassword: password },
+      headers: c.req.raw.headers
+    })
+    
+    if (!res) {
+      return err(c, 500, 'SERVER_ERROR', 'Failed to set password')
+    }
+    
+    return ok(c, undefined, 'Password set successfully')
+  } catch (e: any) {
+    console.error('Failed to set password:', e)
+    return err(c, 500, 'SERVER_ERROR', e.message || 'Failed to set password')
+  }
+})
+
+// ========== Simplified 2FA Setup (no password/OTP required) ==========
+
+// Store pending 2FA secrets until user confirms with valid TOTP code
+const pending2FASecrets = new Map<string, { secret: string, backupCodes: string[], createdAt: number }>()
+
+// [POST /two-factor/generate] Generate TOTP secret for any authenticated user
+app.post('/two-factor/generate', async (c) => {
+  try {
+    const user = c.get('user')
+    
+    // Rate limit: 5 attempts per hour
+    if (!rateLimitUser(user.id, 'two_factor_generate', { max: 5, windowMs: 60 * 60 * 1000, minIntervalMs: 5000 })) {
+      return err(c, 429, 'RATE_LIMITED', 'Too many requests. Please try again later.')
+    }
+    
+    // Generate TOTP secret
+    const { generateSecret, generateBackupCodes, createTwoFactorTotpURI } = await import('./twoFactorUtils')
+    
+    const secret = generateSecret()
+    const backupCodes = generateBackupCodes(8)
+    const totpURI = createTwoFactorTotpURI(user.email, secret, 'Zentrio')
+    
+    // Store pending secret (valid for 10 minutes)
+    pending2FASecrets.set(user.id, { 
+      secret, 
+      backupCodes,
+      createdAt: Date.now()
+    })
+    
+    // Clean up old entries
+    for (const [key, value] of pending2FASecrets) {
+      if (Date.now() - value.createdAt > 10 * 60 * 1000) {
+        pending2FASecrets.delete(key)
+      }
+    }
+    
+    return ok(c, { totpURI, backupCodes })
+  } catch (e: any) {
+    console.error('Failed to generate 2FA secret:', e)
+    return err(c, 500, 'SERVER_ERROR', e.message || 'Failed to generate 2FA')
+  }
+})
+
+// [POST /two-factor/confirm] Verify TOTP code and activate 2FA
+app.post('/two-factor/confirm', async (c) => {
+  try {
+    const user = c.get('user')
+    const body = await c.req.json().catch(() => ({}))
+    const { code } = body
+    
+    if (!code || typeof code !== 'string' || code.length !== 6) {
+      return err(c, 400, 'INVALID_INPUT', 'Valid 6-digit code is required')
+    }
+    
+    // Get pending secret
+    const pending = pending2FASecrets.get(user.id)
+    if (!pending || Date.now() - pending.createdAt > 10 * 60 * 1000) {
+      pending2FASecrets.delete(user.id)
+      return err(c, 400, 'NO_PENDING', 'No pending 2FA setup found. Please start again.')
+    }
+    
+    // Verify the TOTP code
+    const { verifyTOTP } = await import('./twoFactorUtils')
+    if (!verifyTOTP(pending.secret, code)) {
+      return err(c, 400, 'INVALID_CODE', 'Invalid verification code')
+    }
+    
+    // Save to database
+    const { db } = await import('../../services/database')
+    const id = crypto.randomUUID()
+    db.prepare(`
+      INSERT INTO twoFactor (id, secret, backupCodes, userId)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(userId) DO UPDATE SET secret = excluded.secret, backupCodes = excluded.backupCodes
+    `).run(id, pending.secret, JSON.stringify(pending.backupCodes), user.id)
+    
+    // Update user's twoFactorEnabled flag
+    db.prepare('UPDATE user SET twoFactorEnabled = TRUE, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').run(user.id)
+    
+    // Clean up
+    pending2FASecrets.delete(user.id)
+    
+    return ok(c, undefined, 'Two-factor authentication enabled successfully')
+  } catch (e: any) {
+    console.error('Failed to confirm 2FA:', e)
+    return err(c, 500, 'SERVER_ERROR', e.message || 'Failed to enable 2FA')
+  }
+})
+
 // [PUT /username] Update username
 app.put('/username', async (c) => {
   try {
@@ -606,5 +767,29 @@ app.put('/username', async (c) => {
 
 
 // TMDB API Key endpoints added - v2
+
+// ========== Account Deletion ==========
+
+// [DELETE /account] Delete user account
+app.delete('/account', async (c) => {
+  try {
+    const user = c.get('user')
+    
+    // Use Better Auth's deleteUser API
+    const result = await auth.api.deleteUser({
+      body: {},
+      headers: c.req.raw.headers,
+    })
+    
+    if (!result) {
+      return err(c, 500, 'SERVER_ERROR', 'Failed to delete account')
+    }
+    
+    return ok(c, undefined, 'Account deleted successfully')
+  } catch (e: any) {
+    console.error('Failed to delete account:', e)
+    return err(c, 500, 'SERVER_ERROR', e.message || 'Failed to delete account')
+  }
+})
 
 export default app

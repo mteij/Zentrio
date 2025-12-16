@@ -125,6 +125,12 @@ const db = new Database(dbPath)
  } catch (e) {
    // ignore if column already exists
  }
+ // Add avatar_style to profiles table (DiceBear integration)
+ try {
+   db.exec("ALTER TABLE profiles ADD COLUMN avatar_style TEXT DEFAULT 'bottts-neutral'")
+ } catch (e) {
+   // ignore if column already exists
+ }
  // Add behavior_hints to addons table
  try {
    db.exec('ALTER TABLE addons ADD COLUMN behavior_hints TEXT')
@@ -165,13 +171,39 @@ const db = new Database(dbPath)
        show_age_ratings BOOLEAN DEFAULT TRUE,
        background_style TEXT DEFAULT 'vanta',
        custom_theme_config TEXT,
+       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+       dirty BOOLEAN DEFAULT FALSE,
        UNIQUE(settings_profile_id)
      );
    `);
 
+   // Add settings_profile_id column if missing (migration fix)
+   try {
+       db.exec('ALTER TABLE appearance_settings ADD COLUMN settings_profile_id INTEGER REFERENCES settings_profiles(id) ON DELETE CASCADE');
+       // If we just added it, we might want to populate it?
+       // But we don't know which profile it belongs to easily without more logic.
+       // For now, let's leave it null or default.
+   } catch (e) {
+       // ignore if column already exists
+   }
+
    // Add show_age_ratings column if missing
    try {
        db.exec('ALTER TABLE appearance_settings ADD COLUMN show_age_ratings BOOLEAN DEFAULT TRUE');
+   } catch (e) {
+       // ignore if column already exists
+   }
+
+   // Add updated_at column if missing
+   try {
+       db.exec('ALTER TABLE appearance_settings ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+   } catch (e) {
+       // ignore if column already exists
+   }
+
+   // Add dirty column if missing
+   try {
+       db.exec('ALTER TABLE appearance_settings ADD COLUMN dirty BOOLEAN DEFAULT FALSE');
    } catch (e) {
        // ignore if column already exists
    }
@@ -515,7 +547,28 @@ db.exec(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
   );
+`);
 
+  // Backfill profile_proxy_settings for existing profiles
+  try {
+      const profiles = db.prepare("SELECT id FROM profiles").all() as { id: number }[];
+      const insertSettings = db.prepare("INSERT INTO profile_proxy_settings (profile_id, nsfw_filter_enabled, nsfw_age_rating, hide_calendar_button, hide_addons_button, mobile_click_to_hover, hero_banner_enabled) VALUES (?, FALSE, 0, FALSE, FALSE, FALSE, TRUE)");
+      
+      const checkExists = db.prepare("SELECT 1 FROM profile_proxy_settings WHERE profile_id = ?");
+
+      const transaction = db.transaction(() => {
+          for (const p of profiles) {
+              if (!checkExists.get(p.id)) {
+                  insertSettings.run(p.id);
+              }
+          }
+      });
+      transaction();
+  } catch (e) {
+      console.error("Failed to backfill profile_proxy_settings", e);
+  }
+
+  db.exec(`
   -- Rate limiting for proxy endpoints
   CREATE TABLE IF NOT EXISTS proxy_rate_limits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -547,6 +600,7 @@ db.exec(`
     duration INTEGER,
     position INTEGER,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    dirty BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
     UNIQUE(profile_id, meta_id)
   );
@@ -557,6 +611,8 @@ db.exec(`
     profile_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    dirty BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
     UNIQUE(profile_id, name)
   );
@@ -570,6 +626,8 @@ db.exec(`
     poster TEXT,
     imdb_rating REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    dirty BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (list_id) REFERENCES lists (id) ON DELETE CASCADE,
     UNIQUE(list_id, meta_id)
   );
@@ -593,6 +651,8 @@ db.exec(`
     enabled BOOLEAN DEFAULT TRUE,
     priority INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    dirty BOOLEAN DEFAULT FALSE,
     settings_profile_id INTEGER REFERENCES settings_profiles(id) ON DELETE CASCADE,
     FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
     FOREIGN KEY (addon_id) REFERENCES addons (id) ON DELETE CASCADE,
@@ -609,6 +669,8 @@ db.exec(`
     required_keywords TEXT,
     config TEXT,
     settings_profile_id INTEGER REFERENCES settings_profiles(id) ON DELETE CASCADE,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    dirty BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
     UNIQUE(profile_id)
   );
@@ -626,6 +688,8 @@ try {
       const columns = tableInfo.map(c => c.name);
       const hasConfig = columns.includes('config');
       const hasSettingsProfileId = columns.includes('settings_profile_id');
+      const hasUpdatedAt = columns.includes('updated_at');
+      const hasDirty = columns.includes('dirty');
       
       db.exec("ALTER TABLE stream_settings RENAME TO stream_settings_old");
       
@@ -638,6 +702,8 @@ try {
           required_keywords TEXT,
           config TEXT,
           settings_profile_id INTEGER REFERENCES settings_profiles(id) ON DELETE CASCADE,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          dirty BOOLEAN DEFAULT FALSE,
           FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
           UNIQUE(profile_id)
         )
@@ -655,6 +721,16 @@ try {
       if (hasSettingsProfileId) {
         oldCols.push('settings_profile_id');
         newCols.push('settings_profile_id');
+      }
+
+      if (hasUpdatedAt) {
+        oldCols.push('updated_at');
+        newCols.push('updated_at');
+      }
+
+      if (hasDirty) {
+        oldCols.push('dirty');
+        newCols.push('dirty');
       }
       
       db.exec(`
@@ -691,6 +767,8 @@ try {
           enabled BOOLEAN DEFAULT TRUE,
           priority INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          dirty BOOLEAN DEFAULT FALSE,
           settings_profile_id INTEGER REFERENCES settings_profiles(id) ON DELETE CASCADE,
           FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
           FOREIGN KEY (addon_id) REFERENCES addons (id) ON DELETE CASCADE,
@@ -753,6 +831,7 @@ export interface Profile extends SyncableEntity {
   name: string
   avatar: string
   avatar_type: 'initials' | 'avatar'
+  avatar_style: string
   is_default: boolean
   settings_profile_id?: number
   created_at: string
@@ -936,6 +1015,13 @@ export const userDb = {
     return stmt.all(userId) as any[]
   },
 
+  hasPassword: (userId: string): boolean => {
+    const stmt = db.prepare(
+      "SELECT 1 FROM account WHERE userId = ? AND providerId = 'credential' AND password IS NOT NULL LIMIT 1"
+    )
+    return !!stmt.get(userId)
+  },
+
   findById: (id: string): User | undefined => {
     const stmt = db.prepare('SELECT * FROM user WHERE id = ?')
     return stmt.get(id) as User | undefined
@@ -1014,12 +1100,13 @@ export const profileDb = {
       name: string
       avatar: string
       avatar_type?: 'initials' | 'avatar'
+      avatar_style?: string
       is_default?: boolean
       settings_profile_id?: number
     }): Promise<Profile> => {
       const stmt = db.prepare(`
-        INSERT INTO profiles (user_id, name, avatar, avatar_type, is_default, settings_profile_id)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO profiles (user_id, name, avatar, avatar_type, avatar_style, is_default, settings_profile_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `)
       
       const result = stmt.run(
@@ -1027,6 +1114,7 @@ export const profileDb = {
         profileData.name,
         profileData.avatar,
         profileData.avatar_type || 'initials',
+        profileData.avatar_style || 'bottts-neutral',
         profileData.is_default || false,
         profileData.settings_profile_id || null
       )
@@ -1070,6 +1158,7 @@ export const profileDb = {
       name?: string
       avatar?: string
       avatar_type?: 'initials' | 'avatar'
+      avatar_style?: string
       is_default?: boolean
       settings_profile_id?: number
     }): Promise<Profile | undefined> => {
@@ -1087,6 +1176,10 @@ export const profileDb = {
       if (updates.avatar_type !== undefined) {
         fields.push('avatar_type = ?')
         values.push(updates.avatar_type)
+      }
+      if (updates.avatar_style !== undefined) {
+        fields.push('avatar_style = ?')
+        values.push(updates.avatar_style)
       }
       if (updates.is_default !== undefined) {
         fields.push('is_default = ?')
@@ -1136,6 +1229,7 @@ export const profileDb = {
   },
 
 }
+
 
 
 // Proxy session operations

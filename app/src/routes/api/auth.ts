@@ -19,6 +19,14 @@ app.get('/providers', (c) => {
     })
 })
 
+// [GET /error] Handle auth errors and redirect to settings with error param
+app.get('/error', (c) => {
+    const error = c.req.query('error') || 'unknown_error'
+    const cfg = getConfig()
+    // Redirect to settings page with error in query params
+    return c.redirect(`${cfg.CLIENT_URL}/settings?error=${encodeURIComponent(error)}`)
+})
+
 // [POST /identify] Check if user exists
 app.post('/identify', async (c) => {
     const body = await c.req.json().catch(() => ({}))
@@ -69,99 +77,41 @@ app.post('/mobile-callback', async (c) => {
             return c.json({ error: 'Missing code or state' }, 400)
         }
 
-        // We need to verify the state and exchange the code for a session.
-        // Since the initial request (sign-in) set a cookie with the state,
-        // and that cookie should be present in THIS request (if sent from the same client),
-        // we can try to manually invoke the provider's callback handler.
+        // Create a mock request to Better Auth's callback handler
+        const mockUrl = new URL('/api/auth/callback/social', 'http://localhost:3000')
+        mockUrl.searchParams.set('code', code)
+        mockUrl.searchParams.set('state', state)
         
-        // However, Better Auth's callback handler expects to be called via GET with query params.
-        // We can construct a fake request to pass to Better Auth.
+        // Create a mock request object
+        const mockRequest = new Request(mockUrl.toString(), {
+            method: 'GET',
+            headers: c.req.raw.headers
+        })
+
+        // Let Better Auth handle the callback
+        const response = await auth.handler(mockRequest)
         
-        // But wait, the issue is likely that the cookie set during sign-in (on tauri://localhost)
-        // is NOT available when the system browser opens the provider's login page.
-        // Wait, no.
-        // 1. App (tauri://localhost) calls POST /api/auth/sign-in/social
-        // 2. Server responds with URL to provider. Server sets 'better-auth.state' cookie on localhost:3000 (or whatever the API domain is).
-        //    BUT, since the request came from tauri://localhost, the cookie might be set for tauri://localhost OR rejected if SameSite is strict.
-        //    If the API is at http://localhost:3000, the cookie is set for localhost.
-        
-        // 3. App opens system browser with the provider URL.
-        // 4. User logs in.
-        // 5. Provider redirects to http://localhost:3000/api/auth/callback/google (or whatever is configured).
-        //    This request happens in the SYSTEM BROWSER. It has the cookies for localhost:3000.
-        //    So the state verification SHOULD work here.
-        
-        // 6. The server verifies state, creates session, sets session cookie, and redirects to... where?
-        //    It redirects to the callbackURL provided in step 1.
-        //    If callbackURL was 'zentrio://auth/callback', the server redirects to that custom scheme.
-        
-        // 7. The system browser sees zentrio://... and launches the app.
-        // 8. The app receives the deep link.
-        
-        // THE PROBLEM:
-        // The session cookie is set in the SYSTEM BROWSER (jar for localhost:3000).
-        // The app (tauri://localhost) does NOT have this cookie.
-        
-        // So when the app makes subsequent requests, it's not authenticated.
-        
-        // SOLUTION:
-        // The deep link should contain a one-time token or the session token itself?
-        // Better Auth doesn't send the session token in the URL by default for security.
-        
-        // However, the logs show "error=state_mismatch" happening at step 5/6 (GET /api/auth/callback/google).
-        // This means the cookie set in step 2 is NOT present or doesn't match in step 5.
-        
-        // Why?
-        // Step 1: POST /api/auth/sign-in/social from Tauri.
-        // If the API is on localhost:3000, and Tauri is on tauri://localhost (or http://tauri.localhost).
-        // The fetch request is cross-origin.
-        // The response sets a cookie.
-        // Does the Tauri webview accept this cookie? Yes, usually.
-        // BUT, the system browser (Chrome/Safari) is a DIFFERENT cookie jar.
-        
-        // So when the system browser makes the callback request (Step 5), it does NOT have the state cookie set by the Tauri webview in Step 2.
-        
-        // FIX:
-        // We need to initiate the login flow IN THE SYSTEM BROWSER, not in the Tauri webview.
-        // OR we need to use a flow that doesn't rely on cookies for state in the browser.
-        
-        // If we initiate in system browser:
-        // 1. App opens system browser to http://localhost:3000/api/auth/sign-in/social?provider=google&callbackURL=zentrio://...
-        //    (GET request instead of POST? Better Auth might support GET for sign-in if configured, or we make a wrapper).
-        // 2. System browser sets state cookie.
-        // 3. Redirects to Google.
-        // 4. Google redirects back to System Browser.
-        // 5. System browser has state cookie -> Verification passes.
-        // 6. Server creates session, sets session cookie (in system browser).
-        // 7. Server redirects to zentrio://auth/callback?session_token=... (we need to pass the token back).
-        
-        // Does Better Auth support passing the token back in the URL?
-        // Not by default.
-        
-        // Alternative:
-        // Use the "mobile" flow where the client generates the state and PKCE verifier?
-        // Better Auth might not support this out of the box yet.
-        
-        // Let's try the "initiate in system browser" approach.
-        // We need an endpoint that accepts GET and redirects to the provider.
-        
-        // But wait, the logs show:
-        // [Auth] Cookies: better-auth.state=... (present in the callback request!)
-        // So the system browser DOES have a state cookie.
-        // Why is it a mismatch?
-        // Maybe the cookie was set by a previous attempt in the system browser?
-        // Or maybe the Tauri app IS sharing cookies with the system browser? (Unlikely on desktop).
-        
-        // If the cookie in the log is from a previous attempt, it won't match the state in the URL from the NEW attempt (initiated by Tauri).
-        
-        // So, the fix is indeed to initiate the flow in the system browser so the state cookie is set THERE.
-        
-        // We'll create a GET endpoint that proxies to the sign-in.
+        if (response.ok) {
+            // Extract session data from the response
+            const sessionData = await response.json()
+            
+            // Return the session data to the client
+            return c.json({
+                success: true,
+                user: sessionData.user,
+                session: sessionData.session
+            })
+        } else {
+            const errorData = await response.json().catch(() => ({}))
+            return c.json({
+                error: errorData.error || 'Authentication failed',
+                message: errorData.message || 'Could not complete authentication'
+            }, response.status as any)
+        }
     } catch (e: any) {
-        return c.json({ error: e.message }, 500)
+        console.error('Mobile callback error:', e)
+        return c.json({ error: e.message || 'Internal server error' }, 500)
     }
-    
-    return c.json({ success: true })
 })
 
 // [GET /login-proxy] Initiate social login flow for native apps
@@ -206,6 +156,24 @@ app.get('/login-proxy', async (c) => {
                         margin-bottom: 16px;
                     }
                     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                    .error {
+                        color: #ef4444;
+                        text-align: center;
+                        max-width: 400px;
+                        padding: 20px;
+                    }
+                    .retry-btn {
+                        background-color: #e50914;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        margin-top: 10px;
+                    }
+                    .retry-btn:hover {
+                        background-color: #f40612;
+                    }
                 </style>
             </head>
             <body>
@@ -225,16 +193,81 @@ app.get('/login-proxy', async (c) => {
                         if (data.url) {
                             window.location.href = data.url;
                         } else {
-                            document.body.innerHTML = '<p style="color: #ef4444">Error: ' + (data.message || data.error || 'Unknown error') + '</p>';
+                            document.body.innerHTML = \`
+                                <div class="error">
+                                    <h3>Authentication Error</h3>
+                                    <p>\${data.message || data.error || 'Unknown error occurred'}</p>
+                                    <button class="retry-btn" onclick="window.history.back()">Go Back</button>
+                                </div>
+                            \`;
                         }
                     })
                     .catch(err => {
-                        document.body.innerHTML = '<p style="color: #ef4444">Error: ' + err.message + '</p>';
+                        document.body.innerHTML = \`
+                            <div class="error">
+                                <h3>Connection Error</h3>
+                                <p>Failed to connect to authentication service</p>
+                                <button class="retry-btn" onclick="window.location.reload()">Try Again</button>
+                            </div>
+                        \`;
                     });
                 </script>
             </body>
         </html>
     `)
+})
+
+// [POST /deep-link-callback] Handle deep link authentication for native apps
+app.post('/deep-link-callback', async (c) => {
+    const body = await c.req.json().catch(() => ({}))
+    const { provider, code, state, callbackURL } = body
+
+    if (!provider || !code || !state) {
+        return c.json({ error: 'Missing required parameters' }, 400)
+    }
+
+    try {
+        // Create a mock request to Better Auth's callback handler
+        const mockUrl = new URL(`/api/auth/callback/${provider}`, 'http://localhost:3000')
+        mockUrl.searchParams.set('code', code)
+        mockUrl.searchParams.set('state', state)
+        
+        // Create a mock request object with the callback URL
+        const mockRequest = new Request(mockUrl.toString(), {
+            method: 'GET',
+            headers: {
+                ...Object.fromEntries(c.req.raw.headers.entries()),
+                'Cookie': c.req.raw.headers.get('Cookie') || ''
+            }
+        })
+
+        // Let Better Auth handle the callback
+        const response = await auth.handler(mockRequest)
+        
+        if (response.ok) {
+            // Get the session cookies from the response
+            const setCookieHeader = response.headers.get('set-cookie')
+            
+            // Extract session data
+            const sessionData = await response.json()
+            
+            return c.json({
+                success: true,
+                user: sessionData.user,
+                session: sessionData.session,
+                cookies: setCookieHeader
+            })
+        } else {
+            const errorData = await response.json().catch(() => ({}))
+            return c.json({
+                error: errorData.error || 'Authentication failed',
+                message: errorData.message || 'Could not complete authentication'
+            }, response.status as any)
+        }
+    } catch (e: any) {
+        console.error('Deep link callback error:', e)
+        return c.json({ error: e.message || 'Internal server error' }, 500)
+    }
 })
 
 // Delegate everything else to Better Auth

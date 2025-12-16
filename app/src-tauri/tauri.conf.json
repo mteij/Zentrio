@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Zentrio",
-  "version": "2.0.0-1005",
+  "version": "2.0.0-1006",
   "identifier": "com.zentrio.mteij",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
   "app": {

@@ -7,11 +7,10 @@ export const renderer = jsxRenderer(({ children }) => {
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Zentrio</title>
-        <link rel="stylesheet" href="/static/css/styles.css" />
         <link rel="stylesheet" href="/static/css/toast.css" />
         <script src="/static/js/toast.js"></script>
       </head>
-      <body>{children}</body>
-    </html>
+      <body>{children as any}</body>
+    </html> as any
   )
 })

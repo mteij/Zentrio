@@ -1,4 +1,5 @@
 # Zentrio
+## <b>Please do not currently use! Under heavy development</b>
 
 <div align="center">
   <img src="app/src/static/logo/icon-512.png" alt="Zentrio Icon" width="256" height="256" />

@@ -1,1346 +1,653 @@
-import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter } from '../components/index'
-import { OTPModal } from '../components/auth/OTPModal'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { User, Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Check, Link, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
+import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter, AnimatedBackground } from '../components/index'
+import { authClient, getClientUrl } from '../lib/auth-client'
+
+import { TwoFactorSetupModal } from '../components/auth/TwoFactorSetupModal'
+import { AppearanceSettings } from '../components/settings/AppearanceSettings'
 import { StreamingSettings } from '../components/settings/StreamingSettings'
-import { CloudSyncSettings } from '../components/settings/CloudSyncSettings'
+import { DangerZoneSettings } from '../components/settings/DangerZoneSettings'
+import { AddonManager } from '../components/settings/AddonManager'
+import styles from '../styles/Settings.module.css'
 
-interface SettingsPageProps {}
+// Error message mappings for account linking errors
+const LINKING_ERROR_MESSAGES: Record<string, string> = {
+  'account_already_linked_to_different_user': 'This account is already linked to a different user.',
+  'account_already_linked': 'This account is already linked to your profile.',
+  'invalid_state': 'Authentication session expired. Please try again.',
+  'access_denied': 'Access was denied. Please try again.',
+}
 
-export function SettingsPage({}: SettingsPageProps) {
+
+
+export function SettingsPage() {
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState('account')
+  const [profile, setProfile] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  
+  // Modals state
+  const [showUsernameModal, setShowUsernameModal] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [showOTPModal, setShowOTPModal] = useState(false)
+  const [showTwoFactorSetupModal, setShowTwoFactorSetupModal] = useState(false)
+  
+  // Form state
+  const [newUsername, setNewUsername] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [tmdbApiKey, setTmdbApiKey] = useState('')
+
+  
+  // Account linking state
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null)
+  const [linkedAccounts, setLinkedAccounts] = useState<{providerId: string, createdAt?: string}[]>([])
+  const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({})
+  const [linkingProvider, setLinkingProvider] = useState<string | null>(null)
+
+  // Scroll indicators state
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  const tabsRef = useRef<HTMLDivElement>(null)
+
+  const checkScroll = () => {
+    if (tabsRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current
+      setCanScrollLeft(scrollLeft > 0)
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1)
+    }
+  }
+
+  useEffect(() => {
+    checkScroll()
+    window.addEventListener('resize', checkScroll)
+    return () => window.removeEventListener('resize', checkScroll)
+  }, [])
+
+  // Check for linking errors from URL params
+  useEffect(() => {
+    const errorCode = searchParams.get('error')
+    if (errorCode) {
+      const message = LINKING_ERROR_MESSAGES[errorCode] || `Account linking failed: ${errorCode.replace(/_/g, ' ')}`
+      toast.error('Link Failed', { description: message })
+      // Clear the error from URL
+      searchParams.delete('error')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    loadProfile()
+    loadTmdbApiKey()
+    loadAvailableProviders()
+   }, [])
+
+  const loadAvailableProviders = async () => {
+    try {
+      const res = await fetch('/api/auth/providers')
+      if (res.ok) {
+        const data = await res.json()
+        setAvailableProviders(data)
+      }
+    } catch (e) {
+      console.error('Failed to load providers:', e)
+    }
+  }
+
+  const loadProfile = async () => {
+    try {
+      const res = await fetch('/api/user/profile')
+      if (res.ok) {
+        const data = await res.json()
+        const profileData = data.data || data
+        setProfile(profileData)
+        setHasPassword(profileData.hasPassword ?? true)
+        setLinkedAccounts(profileData.linkedAccounts ?? [])
+      } else {
+        navigate('/')
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadTmdbApiKey = async () => {
+    try {
+      const res = await fetch('/api/user/tmdb-api-key')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.data?.tmdb_api_key) {
+            setTmdbApiKey(data.data.tmdb_api_key)
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load TMDB API key', e)
+    }
+  }
+
+  const handleUpdateTmdbApiKey = async () => {
+    try {
+        const res = await fetch('/api/user/tmdb-api-key', {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ tmdb_api_key: tmdbApiKey })
+        })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok) {
+            toast.success('Success', { description: 'TMDB API Key updated successfully' })
+        } else {
+            // Show specific error message from server
+            const message = data.message || 'Failed to update TMDB API Key'
+            toast.error('Update Failed', { description: message })
+        }
+    } catch (e) {
+        console.error(e)
+        toast.error('Network Error', { description: 'Failed to update TMDB API Key' })
+    }
+  }
+
+  const handleUpdateUsername = async () => {
+    try {
+        const res = await fetch('/api/user/username', {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ username: newUsername })
+        })
+        if (res.ok) {
+            loadProfile()
+            setShowUsernameModal(false)
+        } else {
+            toast.error('Update Failed', { description: 'Failed to update username' })
+        }
+    } catch (e) {
+        console.error(e)
+    }
+  }
+
+  const handleInitiateEmailChange = async () => {
+    try {
+        const res = await fetch('/api/user/email/initiate', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ newEmail })
+        })
+        if (res.ok) {
+            setShowEmailModal(false)
+            setShowOTPModal(true)
+        } else {
+            toast.error('Email Change Failed', { description: 'Failed to initiate email change' })
+        }
+    } catch (e) {
+        console.error(e)
+    }
+  }
+
+  const handleVerifyEmail = async () => {
+    try {
+        const res = await fetch('/api/user/email/verify', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ newEmail, code: otpCode })
+        })
+        if (res.ok) {
+            loadProfile()
+            setShowOTPModal(false)
+            toast.success('Success', { description: 'Email updated successfully' })
+        } else {
+            toast.error('Verification Failed', { description: 'Invalid code' })
+        }
+    } catch (e) {
+        console.error(e)
+    }
+  }
+
+  const handleUpdatePassword = async () => {
+    if (newPassword !== confirmPassword) {
+        toast.warning('Validation Error', { description: 'Passwords do not match' })
+        return
+    }
+    try {
+        const res = await fetch('/api/user/password', {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ oldPassword: currentPassword, newPassword })
+        })
+        if (res.ok) {
+            setShowPasswordModal(false)
+            setCurrentPassword('')
+            setNewPassword('')
+            setConfirmPassword('')
+            toast.success('Success', { description: 'Password updated successfully' })
+        } else {
+            toast.error('Update Failed', { description: 'Failed to update password' })
+        }
+    } catch (e) {
+        console.error(e)
+    }
+  }
+
+  // Handler for SSO-only accounts setting their first password
+  const handleSetupPassword = async () => {
+    if (newPassword !== confirmPassword) {
+        toast.warning('Validation Error', { description: 'Passwords do not match' })
+        return
+    }
+    if (newPassword.length < 8) {
+        toast.warning('Validation Error', { description: 'Password must be at least 8 characters' })
+        return
+    }
+    try {
+        const res = await fetch('/api/user/password/setup', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ password: newPassword })
+        })
+        if (res.ok) {
+            setShowPasswordModal(false)
+            setNewPassword('')
+            setConfirmPassword('')
+            setHasPassword(true)
+            toast.success('Success', { description: 'Password set successfully' })
+        } else {
+            const data = await res.json().catch(() => ({}))
+            toast.error('Setup Failed', { description: data.message || 'Failed to set password' })
+        }
+    } catch (e) {
+        console.error(e)
+        toast.error('Error', { description: 'Failed to set password' })
+    }
+  }
+
+  // Handler for linking SSO providers
+  const handleLinkProvider = async (provider: string) => {
+    setLinkingProvider(provider)
+    try {
+      await authClient.linkSocial({
+        provider: provider as any,
+        callbackURL: getClientUrl() + '/settings'
+      })
+    } catch (e: any) {
+      toast.error('Link Failed', { description: e.message || 'Failed to link account' })
+      setLinkingProvider(null)
+    }
+  }
+
+  // Get provider display name
+  const getProviderDisplayName = (providerId: string): string => {
+    if (providerId === 'oidc') {
+      return typeof availableProviders.oidcName === 'string' ? availableProviders.oidcName : 'OpenID'
+    }
+    const names: Record<string, string> = {
+      'credential': 'Email & Password',
+      'google': 'Google',
+      'github': 'GitHub',
+      'discord': 'Discord'
+    }
+    return names[providerId] || providerId
+  }
+
   return (
     <SimpleLayout title="Settings">
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            document.addEventListener('show-toast', (event) => {
-              const { text, type, error } = event.detail;
-              
-              let toastType = 'message';
-              if (type === 'success') toastType = 'message';
-              if (type === 'error') toastType = 'error';
-              if (type === 'info') toastType = 'warning';
-
-              window.showToast(toastType, text, undefined, error);
-            });
-          `,
-        }}
-      />
-      <div id="zentrio-vanta-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, width: '100vw', height: '100vh' }}></div>
-      <div className="container" style={{ position: 'relative', zIndex: 1 }}>
+      <AnimatedBackground />
+      <div className={styles.container} style={{ position: 'relative', zIndex: 1, paddingTop: '80px' }}>
         <button
-          id="backButton"
-          className="zentrio-back-btn"
+          className={styles.backBtn}
+          onClick={() => navigate('/profiles')}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-          </svg>
+          <ArrowLeft size={18} />
           Back to Profiles
         </button>
 
         {/* Tabs Navigation */}
-        <div className="settings-tabs">
-          <button className="tab-btn active" data-tab="account">Account</button>
-          <button className="tab-btn" data-tab="sync" id="sync-tab-btn" style={{ display: 'none' }}>Cloud Sync</button>
-          <button className="tab-btn" data-tab="appearance">Appearance</button>
-          <button className="tab-btn" data-tab="addons">Addons</button>
-          <button className="tab-btn" data-tab="streaming">Streaming</button>
-          <button className="tab-btn" data-tab="danger">Danger Zone</button>
+        <div className={styles.settingsTabsWrapper}>
+           {canScrollLeft && (
+             <div className={`${styles.scrollIndicator} ${styles.scrollIndicatorLeft}`}>
+               <ChevronLeft size={16} className={styles.indicatorIcon} />
+             </div>
+           )}
+           <div 
+             className={styles.settingsTabs} 
+             ref={tabsRef}
+             onScroll={checkScroll}
+           >
+              <button className={`${styles.tabBtn} ${activeTab === 'account' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('account')}>
+                <User size={16} />
+                Account
+              </button>
+              <button className={`${styles.tabBtn} ${activeTab === 'appearance' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('appearance')}>
+                <Palette size={16} />
+                Appearance
+              </button>
+              <button className={`${styles.tabBtn} ${activeTab === 'addons' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('addons')}>
+                <Puzzle size={16} />
+                Addons
+              </button>
+              <button className={`${styles.tabBtn} ${activeTab === 'streaming' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('streaming')}>
+                <Play size={16} />
+                Streaming
+              </button>
+              <button className={`${styles.tabBtn} ${activeTab === 'danger' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('danger')}>
+                <AlertTriangle size={16} />
+                Danger Zone
+              </button>
+           </div>
+           {canScrollRight && (
+             <div className={`${styles.scrollIndicator} ${styles.scrollIndicatorRight}`}>
+               <ChevronRight size={16} className={styles.indicatorIcon} />
+             </div>
+           )}
         </div>
 
         {/* Account Tab */}
-        <div id="tab-account" className="tab-content active">
-          <div className="settings-card">
-            <h2 className="section-title">Account</h2>
-            
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Username</h3>
-                <p>Change your account username</p>
+        {activeTab === 'account' && (
+          <div className={styles.tabContent}>
+            <div className={styles.settingsCard}>
+              <h2 className={styles.sectionTitle}>Account</h2>
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
+                <div className="flex-1 pr-4">
+                  <h3 className="text-lg font-medium text-white mb-1">Username</h3>
+                  <p className="text-sm text-zinc-400">Change your account username</p>
+                </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="text-zinc-300 font-medium">{profile?.username || 'Loading...'}</span>
+                  <Button variant="secondary" onClick={() => setShowUsernameModal(true)}>
+                    Change
+                  </Button>
+                </div>
               </div>
-              <div className="setting-control">
-                <span id="currentUsername">Loading...</span>
-                <Button variant="secondary" id="openUsernameModalBtn">
-                  Change
-                </Button>
-              </div>
-            </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Email Address</h3>
-                <p>Change your account email address</p>
+              <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
+                <div className="flex-1 pr-4">
+                  <h3 className="text-lg font-medium text-white mb-1">Email Address</h3>
+                  <p className="text-sm text-zinc-400">Change your account email address</p>
+                </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="text-zinc-300 font-medium">{profile?.email || 'Loading...'}</span>
+                  <Button variant="secondary" onClick={() => setShowEmailModal(true)}>
+                    Change
+                  </Button>
+                </div>
               </div>
-              <div className="setting-control">
-                <span id="currentEmail">Loading...</span>
-                <Button variant="secondary" id="openEmailModalBtn">
-                  Change
-                </Button>
-              </div>
-            </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Password</h3>
-                <p>Update your account password</p>
+              <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
+                <div className="flex-1 pr-4">
+                  <h3 className="text-lg font-medium text-white mb-1">
+                    {hasPassword ? 'Password' : 'Set Password'}
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    {hasPassword 
+                      ? 'Update your account password' 
+                      : 'Add a password to sign in with email'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  <Button variant="secondary" onClick={() => setShowPasswordModal(true)}>
+                    {hasPassword ? 'Change Password' : 'Set Password'}
+                  </Button>
+                </div>
               </div>
-              <div className="setting-control">
-                <Button variant="secondary" id="openPasswordModalBtn">
-                  Change Password
-                </Button>
-              </div>
-            </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Stay signed in on this device</h3>
-                <p>When enabled, you will remain signed in indefinitely. When disabled, you will be signed out after 3 hours of inactivity. This preference is stored only on this device.</p>
+              {/* Linked Accounts */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
+                <div className="flex-1 pr-4">
+                  <h3 className="text-lg font-medium text-white mb-1">Linked Accounts</h3>
+                  <p className="text-sm text-zinc-400">Sign-in methods connected to your account</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {/* Email & Password badge */}
+                  {hasPassword && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                      <Check className="w-3 h-3" />
+                      Email
+                    </span>
+                  )}
+                  
+                  {/* Linked SSO accounts */}
+                  {linkedAccounts.filter(a => a.providerId !== 'credential').map(acc => (
+                    <span 
+                      key={acc.providerId} 
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20"
+                    >
+                      <Check className="w-3 h-3" />
+                      {getProviderDisplayName(acc.providerId)}
+                    </span>
+                  ))}
+                  
+                  {/* Available providers to link */}
+                  {(['google', 'github', 'discord', 'oidc'] as const)
+                    .filter(provider => availableProviders[provider] && !linkedAccounts.find(a => a.providerId === provider))
+                    .map(provider => (
+                      <button 
+                        key={provider}
+                        onClick={() => handleLinkProvider(provider)}
+                        disabled={linkingProvider === provider}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-700/50 text-zinc-300 border border-white/10 hover:bg-zinc-600/50 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Link className="w-3 h-3" />
+                        {linkingProvider === provider ? 'Linking...' : getProviderDisplayName(provider)}
+                      </button>
+                    ))}
+                </div>
               </div>
-              <div className="setting-control">
-                <div className="toggle" id="rememberMeLocalToggle" aria-label="Stay signed in on this device"></div>
-              </div>
-            </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Two-Factor Authentication</h3>
-                <p>Add an extra layer of security to your account.</p>
-              </div>
-              <div className="setting-control">
-                  <div id="twoFactorControl">
-                      {/* Will be populated by JS */}
-                      <Button variant="primary" id="enable2faBtn">Enable 2FA</Button>
-                      <Button variant="danger" id="disable2faBtn" style={{ display: 'none' }}>Disable 2FA</Button>
+               <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
+                <div className="flex-1 pr-4">
+                  <h3 className="text-lg font-medium text-white mb-1">Two-Factor Authentication</h3>
+                  <p className="text-sm text-zinc-400">Add an extra layer of security to your account</p>
+                </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  <Button variant="secondary" onClick={() => setShowTwoFactorSetupModal(true)}>
+                    Enable / Configure
+                  </Button>
+                </div>
+               </div>
+
+              <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
+                <div className="flex-1 pr-8">
+                  <h3 className="text-lg font-medium text-white mb-1">TMDB API Key</h3>
+                  <p className="text-sm text-zinc-400 max-w-xl">
+                    Enter your TMDB API key to enable advanced metadata features like age ratings and IMDb ratings.{' '}
+                    <a 
+                      href="https://www.themoviedb.org/settings/api" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="underline hover:opacity-80 transition-opacity"
+                      style={{ color: 'var(--theme-color)' }}
+                    >
+                      Get your API key here
+                    </a>
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 shrink-0 w-full md:w-auto">
+                  <div className="flex gap-2 w-full md:w-72">
+                      <div className="flex-1">
+                        <Input
+                            type="password"
+                            value={tmdbApiKey}
+                            onChange={(e) => setTmdbApiKey(e.target.value)}
+                            placeholder="Enter TMDB API Key"
+                            className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
+                        />
+                      </div>
+                      <Button variant="secondary" onClick={handleUpdateTmdbApiKey}>Save</Button>
                   </div>
-              </div>
-            </div>
-            
-            <div id="backupCodesContainer" style={{ display: 'none', marginTop: '20px' }} className="setting-item">
-                <div style={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
-                    <h3>Backup Codes</h3>
-                    <p>Save these codes in a safe place. You can use them to access your account if you lose your authenticator device.</p>
-                    <pre id="backupCodesList" style={{ background: '#333', padding: '15px', borderRadius: '8px', width: '100%', overflowX: 'auto', fontFamily: 'monospace', marginTop: '10px' }}></pre>
-                    <Button variant="secondary" style={{ marginTop: '15px' }} onClick={() => { const el = document.getElementById('backupCodesContainer'); if (el) el.style.display = 'none'; }}>
-                      Done
-                    </Button>
-                </div>
-            </div>
-
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>TMDB API Key</h3>
-                <p>Enter your TMDB API key to enable advanced metadata features like age ratings and IMDb ratings.</p>
-              </div>
-              <div className="setting-control">
-                <div className="password-input-container" style={{ position: 'relative', width: '300px' }}>
-                    <Input
-                        type="password"
-                        id="tmdbApiKeyInput"
-                        placeholder="Enter TMDB API Key"
-                        style={{ width: '100%', paddingRight: '40px' }}
-                    />
-                    <button className="password-toggle-btn" type="button" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 0, display: 'flex' }}>
-                        <span className="iconify" data-icon="mdi:eye" style={{ fontSize: '20px' }}></span>
-                    </button>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Linked Accounts */}
-          <div className="settings-card">
-            <h2 className="section-title">Linked Accounts</h2>
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                <div className="setting-info">
-                    <h3>Connected Providers</h3>
-                    <p>Manage your linked social accounts.</p>
-                </div>
-                <div className="setting-control" style={{ width: '100%', marginTop: '15px' }}>
-                    <div id="linkedAccountsList" style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-                        <div style={{ color: '#666' }}>Loading...</div>
-                    </div>
-                </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Cloud Sync Tab */}
-        <div id="tab-sync" className="tab-content">
-          <div className="settings-card">
-            {/* @ts-ignore */}
-            <CloudSyncSettings />
-          </div>
-        </div>
-
-        {/* Appearance Tab */}
-        <div id="tab-appearance" className="tab-content">
-          <div className="settings-card">
-            <h2 className="section-title">Appearance</h2>
-
-            {/* Profile Selector */}
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <div>
-                    <h3>Profile</h3>
-                    <p>Select profile to configure.</p>
-                 </div>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <select id="appearance-profile-select" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
-                        <option value="">Loading profiles...</option>
-                    </select>
-                    <button id="create-settings-profile-btn-appearance" className="btn btn-secondary" style={{ padding: '8px 12px' }} title="Create new profile">+</button>
-                    <button id="rename-settings-profile-btn-appearance" className="btn btn-secondary" style={{ padding: '8px 12px', display: 'none' }} title="Rename profile">✎</button>
-                    <button id="delete-settings-profile-btn-appearance" className="btn btn-danger" style={{ padding: '8px 12px', display: 'none' }} title="Delete profile">🗑️</button>
-                 </div>
-              </div>
-            </div>
-
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 16 }}>
-              <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                    <h3>Theme</h3>
-                    <p>Choose a subtle, modern theme for button colors, accents and the background. Use previews to pick a look; selection is stored locally on this device.</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <select id="themeSelector" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555', display: 'none' }}>
-                        <option value="">Select theme...</option>
-                    </select>
-                </div>
-              </div>
-
-              <div className="setting-control" style={{ width: '100%' }}>
-                <div id="themeGallery" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {/* Previews will be rendered by client JS */}
-                </div>
-              </div>
-            </div>
-
-
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Background Style</h3>
-                <p>Choose between the animated Vanta background or the official Stremio background.</p>
-              </div>
-              <div className="setting-control">
-                <select id="backgroundStyleSelect" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
-                  <option value="vanta">Animated (Vanta)</option>
-                  <option value="none">Fade (Gradient)</option>
-                  <option value="solid">Solid Color</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Show IMDb Ratings</h3>
-                <p>Display IMDb ratings on media cards.</p>
-              </div>
-              <div className="setting-control">
-                <div id="imdbRatingsToggle" className="toggle"></div>
-              </div>
-            </div>
-
-
-          </div>
-        </div>
+        )}
 
         {/* Addons Tab */}
-        <div id="tab-addons" className="tab-content">
-          <div className="settings-card">
-            <h2 className="section-title">Addons</h2>
-            
-            {/* Profile Selector */}
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <div>
-                    <h3>Profile</h3>
-                    <p>Select profile to configure.</p>
-                 </div>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <select id="addonProfileSelect" style={{ padding: '8px', borderRadius: '4px', background: '#333', color: 'white', border: '1px solid #555' }}>
-                        <option value="">Loading profiles...</option>
-                    </select>
-                    <button id="create-settings-profile-btn-addons" className="btn btn-secondary" style={{ padding: '8px 12px' }} title="Create new profile">+</button>
-                    <button id="rename-settings-profile-btn-addons" className="btn btn-secondary" style={{ padding: '8px 12px', display: 'none' }} title="Rename profile">✎</button>
-                    <button id="delete-settings-profile-btn-addons" className="btn btn-danger" style={{ padding: '8px 12px', display: 'none' }} title="Delete profile">🗑️</button>
-                 </div>
-              </div>
-            </div>
+        {activeTab === 'addons' && <AddonManager />}
 
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div className="setting-info">
-                <h3>Install Addon</h3>
-                <p>Enter the Manifest URL of a Stremio addon to install it globally.</p>
-              </div>
-              <div className="setting-control" style={{ width: '100%', marginTop: '15px', display: 'flex', gap: '10px' }}>
-                <Input
-                  type="text"
-                  id="addonManifestUrl"
-                  placeholder="https://example.com/manifest.json"
-                  style={{ flex: '1' }}
-                />
-                <Button variant="primary" id="installAddonBtn">Install</Button>
-                <Button variant="secondary" id="exploreAddonsBtn">Explore Addons</Button>
-              </div>
-            </div>
+        {/* Other tabs placeholders */}
+        {activeTab === 'appearance' && <AppearanceSettings />}
+        {activeTab === 'streaming' && <StreamingSettings />}
+        {activeTab === 'danger' && <DangerZoneSettings />}
 
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <div>
-                    <h3>Manage Addons</h3>
-                    <p>Configure addons per profile. Drag to reorder.</p>
-                </div>
-              </div>
-              <div className="setting-control" style={{ width: '100%' }}>
-                <div id="addonsList" style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-                  <div style={{ color: '#666' }}>Select a profile to manage addons.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Streaming Tab */}
-        <div id="tab-streaming" className="tab-content">
-          {/* @ts-ignore */}
-          <StreamingSettings />
-        </div>
-
-        {/* Danger Zone Tab */}
-        <div id="tab-danger" className="tab-content">
-          <div className="settings-card danger-zone" style={{ border: '1px solid #dc3545' }}>
-            <h3 style={{ color: '#dc3545', marginBottom: '15px' }}>Danger Zone</h3>
-            <div className="setting-item">
-              <div className="setting-info">
-                <h3>Delete Account</h3>
-                <p>Permanently delete your account and all data</p>
-              </div>
-              <div className="setting-control">
-                <Button variant="danger" id="deleteAccountBtn">
-                  Delete Account
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Username Change Modal */}
-      <ModalWithFooter
-        id="usernameModal"
-        title="Change username"
-        footer={
-          <>
-            <Button variant="secondary" id="usernameCancelBtn">
-              Cancel
-            </Button>
-            <Button variant="primary" id="usernameUpdateBtn">
-              Update
-            </Button>
-          </>
-        }
-      >
-        <FormGroup label="New Username" htmlFor="newUsername">
-          <Input
-            type="text"
-            id="newUsername"
-            placeholder="Enter new username"
-            required
-          />
-        </FormGroup>
-      </ModalWithFooter>
-
-      {/* Email Change Modal */}
-      <ModalWithFooter
-        id="emailModal"
-        title="Change email"
-        footer={
-          <>
-            <Button variant="secondary" id="emailCancelBtn">
-              Cancel
-            </Button>
-            <Button variant="primary" id="emailContinueBtn">
-              Continue
-            </Button>
-          </>
-        }
-      >
-        <FormGroup label="Current Email Address" htmlFor="oldEmail">
-          <Input
-            type="email"
-            id="oldEmail"
-            placeholder="Current email"
-            disabled
-            value=""
-          />
-        </FormGroup>
-        <FormGroup label="New Email Address" htmlFor="newEmail">
-          <Input
-            type="email"
-            id="newEmail"
-            placeholder="Enter new email address"
-            required
-          />
-        </FormGroup>
-      </ModalWithFooter>
-
-      {/* OTP Modal */}
-      <Modal id="otpModal" title="Verify email">
-        <OTPModal
-          email=""
-          onBack={() => {}}
-          onVerify={() => {}}
-          onResend={() => {}}
-          resendSeconds={30}
-        />
-      </Modal>
-
-      {/* 2FA Setup Modal */}
-      <ModalWithFooter
-        id="twoFactorModal"
-        title="Setup Two-Factor Authentication"
-        footer={
-          <>
-            <Button variant="secondary" id="twoFactorCancelBtn">
-              Cancel
-            </Button>
-            <Button variant="primary" id="twoFactorVerifyBtn">
-              Verify & Enable
-            </Button>
-          </>
-        }
-      >
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <p style={{ marginBottom: '15px', color: '#b3b3b3' }}>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
-            <div id="qrCodeContainer" style={{ background: 'white', padding: '10px', display: 'inline-block', borderRadius: '8px' }}>
-                {/* QR Code will be injected here */}
-            </div>
-            <p id="qrCodeSecret" style={{ marginTop: '10px', fontSize: '12px', color: '#666', wordBreak: 'break-all' }}></p>
-        </div>
-        <FormGroup label="Verification Code" htmlFor="twoFactorCode">
-          <Input
-            type="text"
-            id="twoFactorCode"
-            placeholder="Enter 6-digit code"
-            maxLength="6"
-            style={{ textAlign: 'center', letterSpacing: '4px', fontSize: '18px' }}
-          />
-        </FormGroup>
-      </ModalWithFooter>
-
-      {/* Password Change Modal */}
-      <ModalWithFooter
-        id="passwordModal"
-        title="Change Password"
-        footer={
-          <>
-            <Button variant="secondary" id="passwordCancelBtn">
-              Cancel
-            </Button>
-            <Button variant="primary" id="passwordUpdateBtn">
-              Update Password
-            </Button>
-          </>
-        }
-      >
-        <FormGroup label="Current Password" htmlFor="currentPassword">
-          <Input
-            type="password"
-            id="currentPassword"
-            placeholder="Enter current password"
-            required
-          />
-        </FormGroup>
-        <FormGroup label="New Password" htmlFor="newPassword">
-          <Input
-            type="password"
-            id="newPassword"
-            placeholder="Enter new password (min 8 characters)"
-            required
-            minLength={8}
-          />
-        </FormGroup>
-        <FormGroup label="Confirm New Password" htmlFor="confirmPassword">
-          <Input
-            type="password"
-            id="confirmPassword"
-            placeholder="Confirm new password"
-            required
-            minLength={8}
-          />
-        </FormGroup>
-      </ModalWithFooter>
-
-      {/* Custom Theme Editor Modal */}
-      <ModalWithFooter
-        id="customThemeModal"
-        title="Edit Custom Theme"
-        footer={
-          <>
-            <Button variant="secondary" id="cancelCustomThemeBtn">
-              Cancel
-            </Button>
-            <Button variant="primary" id="saveCustomThemeBtn">
-              Save Theme
-            </Button>
-          </>
-        }
-      >
-        <div className="color-picker-row">
-            <label>Accent Color</label>
-            <div className="color-input-wrapper">
-                <span className="color-value" id="accentColorValue">#E50914</span>
-                <input type="color" id="accentColorInput" value="#E50914" />
-            </div>
-        </div>
-
-        <div className="color-picker-row">
-            <label>Background Highlight</label>
-            <div className="color-input-wrapper">
-                <span className="color-value" id="highlightColorValue">#2a2a2a</span>
-                <input type="color" id="highlightColorInput" value="#2a2a2a" />
-            </div>
-        </div>
-
-        <div className="color-picker-row">
-            <label>Background Midtone</label>
-            <div className="color-input-wrapper">
-                <span className="color-value" id="midtoneColorValue">#151515</span>
-                <input type="color" id="midtoneColorInput" value="#151515" />
-            </div>
-        </div>
-
-        <div className="color-picker-row">
-            <label>Background Lowlight</label>
-            <div className="color-input-wrapper">
-                <span className="color-value" id="lowlightColorValue">#070707</span>
-                <input type="color" id="lowlightColorInput" value="#070707" />
-            </div>
-        </div>
-
-        <div className="color-picker-row">
-            <label>Background Base</label>
-            <div className="color-input-wrapper">
-                <span className="color-value" id="baseColorValue">#000000</span>
-                <input type="color" id="baseColorInput" value="#000000" />
-            </div>
-        </div>
-
-        <div className="range-slider-container">
-            <div className="range-slider-header">
-                <span className="range-slider-label">Animation Speed</span>
-                <span className="range-slider-value" id="speedValue">0.5</span>
-            </div>
-            <input type="range" id="speedInput" min="0.1" max="5.0" step="0.1" value="0.5" />
-        </div>
-
-        <div className="range-slider-container">
-            <div className="range-slider-header">
-                <span className="range-slider-label">Zoom Level</span>
-                <span className="range-slider-value" id="zoomValue">0.3</span>
-            </div>
-            <input type="range" id="zoomInput" min="0.1" max="3.0" step="0.1" value="0.3" />
-        </div>
-      </ModalWithFooter>
-
-      {/* Zentrio Addon Config Modal */}
-      <ModalWithFooter
-        id="zentrioConfigModal"
-        title="Configure Zentrio Addon"
-        footer={
-          <>
-            <Button variant="secondary" id="zentrioConfigCancelBtn">
-              Cancel
-            </Button>
-            <Button variant="primary" id="zentrioConfigSaveBtn">
-              Save Configuration
-            </Button>
-          </>
-        }
-      >
-        <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', borderBottom: 'none', padding: '0' }}>
-            <div className="setting-info" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                    <h3>Show Age Ratings</h3>
-                    <p>Display age ratings in metadata.</p>
-                </div>
-                <div className="setting-control">
-                    <div id="enableAgeRatingToggle" className="toggle active"></div>
-                </div>
-            </div>
-        </div>
-      </ModalWithFooter>
-
-      {/* Settings wiring script */}
-      <link rel="stylesheet" href="/static/css/streaming-settings.css" />
-      <script src="/static/js/streaming-settings.js"></script>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-(function(){
-  // Show Cloud Sync tab only in Tauri
-  const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
-  const syncTabBtn = document.getElementById('sync-tab-btn');
-  if (syncTabBtn) {
-    syncTabBtn.style.display = isTauri ? 'inline-block' : 'none';
-  }
-
-  // Toast shim
-  if (!window.addToast) {
-    window.addToast = function(type, title, message, error){ console.log('[toast]', type, title, message||'', error||''); };
-  }
-  if (!window.showToast && window.addToast) {
-    window.showToast = window.addToast;
-  }
-
-  // Fallback modal helpers if not provided by settings.js
-  if (typeof window.openModal !== 'function') {
-    window.openModal = function(modalId) {
-      var modal = document.getElementById(modalId);
-      if (!modal) return;
-      modal.classList.add('active');
-      document.body.classList.add('modal-open');
-      // focus first input
-      var firstInput = modal.querySelector('input');
-      if (firstInput) setTimeout(function(){ firstInput.focus(); }, 50);
-    };
-  }
-  if (typeof window.closeModal !== 'function') {
-    window.closeModal = function(modalId) {
-      var modal = document.getElementById(modalId);
-      if (!modal) return;
-      modal.classList.remove('active');
-      document.body.classList.remove('modal-open');
-    };
-  }
-
-  const headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'xmlhttprequest' };
-  let cachedEmail = '';
-
-  async function fetchProfileEmail() {
-    try {
-      const res = await fetch('/api/user/profile');
-      if (!res.ok) return '';
-      const data = await res.json();
-      const email = (data && data.email) || (data && data.data && data.data.email) || '';
-      if (email) {
-        cachedEmail = email;
-        const span = document.getElementById('currentEmail');
-        if (span) span.textContent = email;
-        const oldInput = document.getElementById('oldEmail');
-        if (oldInput) oldInput.value = email;
-      }
-      return email;
-    } catch (_) {
-      return '';
-    }
-  }
-
-  function getCurrentEmailFromUI() {
-    const span = document.getElementById('currentEmail');
-    const v = span ? (span.textContent || '').trim() : '';
-    return v;
-  }
-
-  function setInlineOtpError(msg) {
-    // Use toast-only notifications for OTP errors (no inline messages)
-    if (msg && typeof window.addToast === 'function') {
-      window.addToast('error', 'Verification error', msg);
-    }
-  }
-
-  function disable(el, flag) {
-    if (!el) return;
-    el.setAttribute('disabled', flag ? 'true' : '');
-    if (!flag) el.removeAttribute('disabled');
-  }
-
-  // Email change + OTP flow
-  let otpNewEmail = '';
-  let resendSeconds = 0;
-  let resendTimer = null;
-
-  function startResendCooldown(sec) {
-    resendSeconds = sec;
-    updateResendText();
-    if (resendTimer) clearInterval(resendTimer);
-    resendTimer = setInterval(() => {
-      resendSeconds -= 1;
-      updateResendText();
-      if (resendSeconds <= 0) {
-        clearInterval(resendTimer);
-        resendTimer = null;
-      }
-    }, 1000);
-  }
-
-  function updateResendText() {
-    const el = document.getElementById('resendOtpText');
-    if (el) {
-      const s = resendSeconds > 0 ? resendSeconds : 0;
-      el.textContent = 'Resend OTP (' + s + 's)';
-      el.style.pointerEvents = s > 0 ? 'none' : 'auto';
-      el.style.opacity = s > 0 ? '0.6' : '1';
-    }
-  }
-
-  function openEmailModal() {
-    const old = cachedEmail || getCurrentEmailFromUI();
-    const oldInput = document.getElementById('oldEmail');
-    if (oldInput) oldInput.value = old || '';
-    openModal('emailModal');
-    setTimeout(() => {
-      const el = document.getElementById('newEmail');
-      if (el) el.focus();
-    }, 100);
-  }
-
-  async function initiateEmailChange() {
-    const btn = document.getElementById('emailContinueBtn');
-    disable(btn, true);
-    try {
-      const old = cachedEmail || getCurrentEmailFromUI();
-      const newInput = document.getElementById('newEmail');
-      const newEmail = newInput ? newInput.value.trim().toLowerCase() : '';
-      if (!newEmail || newEmail.indexOf('@') === -1 || (old && newEmail === old)) {
-        window.addToast('error', 'Invalid email', 'Enter a different valid email.');
-        return;
-      }
-
-      const res = await fetch('/api/user/email/initiate', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ newEmail })
-      });
-
-      if (res.status === 401) {
-        window.addToast('warning', 'Session expired', 'Redirecting to sign in...');
-        setTimeout(() => { window.location.href = '/'; }, 800);
-        return;
-      }
-
-      let data = null;
-      try { data = await res.json(); } catch(_){}
-
-      if (res.ok) {
-        if (data && data.type === 'link') {
-            closeModal('emailModal');
-            window.addToast('success', 'Verification link sent', 'Please check your email to complete the process.');
-            return;
-        }
-        openOtpModalFor(newEmail);
-        startResendCooldown(30);
-        return;
-      }
-
-      let code = data?.error?.code || '';
-
-      if (res.status === 409 || code === 'EMAIL_IN_USE') {
-        window.addToast('error', 'Email already in use');
-        return;
-      }
-      if (res.status === 429 || code === 'RATE_LIMITED') {
-        window.addToast('error', 'Too many requests, try later.');
-        return;
-      }
-      window.addToast('error', 'Could not start verification');
-    } catch (e) {
-      window.addToast('error', 'Network error', 'Please try again later.');
-    } finally {
-      disable(btn, false);
-    }
-  }
-
-  function openOtpModalFor(newEmail) {
-    otpNewEmail = newEmail;
-    const p = document.getElementById('otpEmailText');
-    if (p) p.textContent = "We've sent a 6-digit code to " + newEmail;
-    setInlineOtpError('');
-    openModal('otpModal');
-    setTimeout(() => {
-      const codeInput = document.getElementById('otpCodeInput');
-      if (codeInput) codeInput.focus();
-    }, 100);
-  }
-
-  async function verifyOtp() {
-    const btn = document.getElementById('verifyOtpCodeBtn');
-    const input = document.getElementById('otpCodeInput');
-    const code = input ? (input.value || '').replace(/\\D/g, '') : '';
-    if (!/^[0-9]{6}$/.test(code)) {
-      setInlineOtpError('Please enter a valid 6-digit code.');
-      if (input) input.focus();
-      return;
-    }
-    disable(btn, true);
-    try {
-      const res = await fetch('/api/user/email/verify', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ newEmail: otpNewEmail, code })
-      });
-
-      if (res.status === 401) {
-        window.addToast('warning', 'Session expired', 'Redirecting to sign in...');
-        setTimeout(() => { window.location.href = '/'; }, 800);
-        return;
-      }
-
-      let codeStr = '';
-      let data = null;
-      try { const j = await res.json(); codeStr = j?.error?.code || ''; data = j?.data || j; } catch(_){}
-
-      if (res.ok) {
-        const email = (data && (data.email || (data.data && data.data.email))) || otpNewEmail;
-        cachedEmail = email;
-        const span = document.getElementById('currentEmail');
-        if (span) span.textContent = email;
-        const oldInput = document.getElementById('oldEmail');
-        if (oldInput) oldInput.value = email;
-        closeModal('otpModal');
-        closeModal('emailModal');
-        window.addToast('success', 'Email updated. You may need to sign in again.');
-        return;
-      }
-
-      if (res.status === 400 && codeStr === 'INVALID_CODE') {
-        setInlineOtpError('Invalid verification code.');
-        if (input) { input.focus(); input.select && input.select(); }
-        return;
-      }
-
-      if (res.status === 409 || codeStr === 'EMAIL_IN_USE') {
-        window.addToast('error', 'Email already in use');
-        return;
-      }
-
-      if (res.status === 429 || codeStr === 'RATE_LIMITED') {
-        window.addToast('error', 'Too many requests, try later.');
-        return;
-      }
-
-      window.addToast('error', 'Verification failed');
-    } catch (e) {
-      window.addToast('error', 'Network error', 'Please try again later.');
-    } finally {
-      disable(btn, false);
-    }
-  }
-
-  async function resendOtp() {
-    if (resendSeconds > 0) return;
-    if (!otpNewEmail) return;
-    try {
-      const res = await fetch('/api/user/email/initiate', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ newEmail: otpNewEmail })
-      });
-      if (res.status === 401) {
-        window.addToast('warning', 'Session expired', 'Redirecting to sign in...');
-        setTimeout(() => { window.location.href = '/'; }, 800);
-        return;
-      }
-      if (res.ok) {
-        window.addToast('warning', 'Code resent');
-        startResendCooldown(30);
-        return;
-      }
-      let code = '';
-      try { const j = await res.json(); code = j?.error?.code || ''; } catch(_){}
-      if (res.status === 429 || code === 'RATE_LIMITED') {
-        window.addToast('error', 'Too many requests, try later.');
-        return;
-      }
-      window.addToast('error', 'Could not resend code');
-    } catch (e) {
-      window.addToast('error', 'Network error', 'Please try again later.');
-    }
-  }
-
-  // Password flow
-  async function submitPassword() {
-    const btn = document.getElementById('passwordUpdateBtn');
-    disable(btn, true);
-    try {
-      const oldPwEl = document.getElementById('currentPassword');
-      const newPwEl = document.getElementById('newPassword');
-      const confirmEl = document.getElementById('confirmPassword');
-      const oldPassword = oldPwEl ? oldPwEl.value : '';
-      const newPassword = newPwEl ? newPwEl.value : '';
-      const confirmPassword = confirmEl ? confirmEl.value : '';
-
-      if (!oldPassword) {
-        window.addToast('error', 'Enter your current password');
-        return;
-      }
-      if (!newPassword || newPassword.length < 8) {
-        window.addToast('error', 'Password too short', 'Minimum length is 8 characters.');
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        window.addToast('error', 'Passwords do not match');
-        return;
-      }
-
-      const res = await fetch('/api/user/password', {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ oldPassword, newPassword })
-      });
-
-      if (res.status === 401) {
-        window.addToast('warning', 'Unable to update password');
-        return;
-      }
-
-      if (res.ok) {
-        closeModal('passwordModal');
-        window.addToast('success', 'Password updated; please sign in again.');
-        setTimeout(() => { window.location.href = '/'; }, 1000);
-        return;
-      }
-
-      let code = '';
-      try { const j = await res.json(); code = j?.error?.code || ''; } catch(_){}
-      if (res.status === 429 || code === 'RATE_LIMITED') {
-        window.addToast('error', 'Too many requests, try later.');
-        return;
-      }
-      window.addToast('error', 'Unable to update password');
-    } catch (e) {
-      window.addToast('error', 'Network error', 'Please try again later.');
-    } finally {
-      disable(btn, false);
-    }
-  }
-
-  function wire() {
-    // Prefill current email
-    fetchProfileEmail();
-    
-    // Load linked accounts and providers
-    Promise.all([
-        fetch('/api/user/accounts').then(r => r.json()),
-        fetch('/api/auth/providers').then(r => r.json())
-    ]).then(([accountsRes, providers]) => {
-        const list = document.getElementById('linkedAccountsList');
-        if (!list) return;
-        list.innerHTML = '';
-        
-        const accounts = accountsRes.data || accountsRes || [];
-        const linkedProviders = new Set(accounts.map(a => a.providerId));
-        
-        // Render linked accounts
-        if (accounts.length > 0) {
-            accounts.forEach(acc => {
-                const row = document.createElement('div');
-                row.style.display = 'flex';
-                row.style.justifyContent = 'space-between';
-                row.style.alignItems = 'center';
-                row.style.padding = '10px';
-                row.style.background = 'rgba(255,255,255,0.05)';
-                row.style.borderRadius = '4px';
-                
-                const info = document.createElement('div');
-                info.innerHTML = '<strong>' + acc.providerId + '</strong> <span style="color: #666; font-size: 12px; margin-left: 8px;">Added ' + new Date(acc.createdAt).toLocaleDateString() + '</span>';
-                
-                const actions = document.createElement('div');
-                const unlinkBtn = document.createElement('button');
-                unlinkBtn.className = 'btn btn-danger btn-sm'; // Assuming classes or style
-                unlinkBtn.style.padding = '4px 8px';
-                unlinkBtn.style.background = 'transparent';
-                unlinkBtn.style.border = '1px solid #dc3545';
-                unlinkBtn.style.color = '#dc3545';
-                unlinkBtn.style.borderRadius = '4px';
-                unlinkBtn.style.cursor = 'pointer';
-                unlinkBtn.style.fontSize = '12px';
-                unlinkBtn.textContent = 'Unlink';
-                unlinkBtn.onclick = async () => {
-                    if (!confirm('Are you sure you want to unlink ' + acc.providerId + '?')) return;
-                    try {
-                        const res = await fetch('/api/auth/unlink', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ providerId: acc.providerId })
-                        });
-                        if (res.ok) {
-                            window.addToast('success', 'Account unlinked');
-                            setTimeout(() => window.location.reload(), 1000);
-                        } else {
-                            const data = await res.json();
-                            window.addToast('error', data.message || 'Failed to unlink account');
-                        }
-                    } catch (e) {
-                        window.addToast('error', 'Network error');
-                    }
-                };
-                actions.appendChild(unlinkBtn);
-
-                row.appendChild(info);
-                row.appendChild(actions);
-                list.appendChild(row);
-            });
-        } else {
-            const empty = document.createElement('div');
-            empty.style.color = '#999';
-            empty.style.fontStyle = 'italic';
-            empty.style.marginBottom = '10px';
-            empty.textContent = 'No linked accounts';
-            list.appendChild(empty);
-        }
-
-        // Render available providers to connect
-        const available = [];
-        if (providers.google && !linkedProviders.has('google')) available.push({ id: 'google', name: 'Google' });
-        if (providers.github && !linkedProviders.has('github')) available.push({ id: 'github', name: 'GitHub' });
-        if (providers.discord && !linkedProviders.has('discord')) available.push({ id: 'discord', name: 'Discord' });
-        if (providers.oidc && !linkedProviders.has('oidc')) available.push({ id: 'oidc', name: providers.oidcName || 'OpenID' });
-
-        if (available.length > 0) {
-            const connectHeader = document.createElement('div');
-            connectHeader.style.marginTop = '15px';
-            connectHeader.style.marginBottom = '10px';
-            connectHeader.style.fontWeight = 'bold';
-            connectHeader.style.color = '#b3b3b3';
-            connectHeader.style.fontSize = '14px';
-            connectHeader.textContent = 'Connect another account:';
-            list.appendChild(connectHeader);
-
-            const btnContainer = document.createElement('div');
-            btnContainer.style.display = 'flex';
-            btnContainer.style.gap = '10px';
-            btnContainer.style.flexWrap = 'wrap';
-
-            available.forEach(p => {
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-secondary'; // Assuming these classes exist or style manually
-                btn.style.padding = '8px 12px';
-                btn.style.background = '#333';
-                btn.style.color = 'white';
-                btn.style.border = 'none';
-                btn.style.borderRadius = '4px';
-                btn.style.cursor = 'pointer';
-                btn.textContent = 'Connect ' + p.name;
-                btn.onclick = async () => {
-                    try {
-                        const res = await fetch('/api/auth/link-social', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                provider: p.id,
-                                callbackURL: '/settings'
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.url) {
-                            window.location.href = data.url;
-                        } else if (data.redirect) {
-                             window.location.href = data.redirect;
-                        } else {
-                            window.addToast('error', 'Failed to initiate linking');
-                        }
-                    } catch (e) {
-                        window.addToast('error', 'Network error');
-                    }
-                };
-                btnContainer.appendChild(btn);
-            });
-            list.appendChild(btnContainer);
-        }
-    }).catch(e => {
-        const list = document.getElementById('linkedAccountsList');
-        if (list) list.innerHTML = '<div style="color: #d33;">Failed to load accounts</div>';
-    });
-
-    // Email modal
-    const btnEmailOpen = document.getElementById('openEmailModalBtn');
-    if (btnEmailOpen) btnEmailOpen.addEventListener('click', openEmailModal);
-
-    const btnEmailCancel = document.getElementById('emailCancelBtn');
-    if (btnEmailCancel) btnEmailCancel.addEventListener('click', () => closeModal('emailModal'));
-
-    const btnEmailContinue = document.getElementById('emailContinueBtn');
-    if (btnEmailContinue) btnEmailContinue.addEventListener('click', initiateEmailChange);
-
-    // Password modal
-    const btnPwdOpen = document.getElementById('openPasswordModalBtn');
-    if (btnPwdOpen) btnPwdOpen.addEventListener('click', () => openModal('passwordModal'));
-
-    const btnPwdCancel = document.getElementById('passwordCancelBtn');
-    if (btnPwdCancel) btnPwdCancel.addEventListener('click', () => closeModal('passwordModal'));
-
-    const btnPwdUpdate = document.getElementById('passwordUpdateBtn');
-    if (btnPwdUpdate) btnPwdUpdate.addEventListener('click', submitPassword);
-
-    // OTP modal
-    const otpBack = document.getElementById('otpBackBtn');
-    if (otpBack) otpBack.addEventListener('click', () => closeModal('otpModal'));
-
-    const otpVerify = document.getElementById('verifyOtpCodeBtn');
-    if (otpVerify) otpVerify.addEventListener('click', verifyOtp);
-
-    const otpResend = document.getElementById('resendOtpText');
-    if (otpResend) otpResend.addEventListener('click', resendOtp);
-    
-    // Delete account
-    const deleteBtn = document.getElementById('deleteAccountBtn');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', async () => {
-            if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-                try {
-                    const res = await fetch('/api/user/delete', { method: 'DELETE' });
-                    if (res.ok) {
-                        window.location.href = '/';
-                    } else {
-                        window.addToast('error', 'Failed to delete account');
-                    }
-                } catch (e) {
-                    window.addToast('error', 'Network error');
-                }
+      {/* Modals */}
+      {showUsernameModal && (
+        <ModalWithFooter
+            id="usernameModal"
+            title="Change Username"
+            isOpen={showUsernameModal}
+            onClose={() => setShowUsernameModal(false)}
+            footer={
+                <>
+                    <Button variant="secondary" onClick={() => setShowUsernameModal(false)}>Cancel</Button>
+                    <Button variant="primary" onClick={handleUpdateUsername}>Update</Button>
+                </>
             }
-        });
-    }
-  }
+        >
+            <FormGroup label="New Username">
+                <Input 
+                    type="text" 
+                    value={newUsername} 
+                    onChange={(e) => setNewUsername(e.target.value)} 
+                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
+                />
+            </FormGroup>
+        </ModalWithFooter>
+      )}
 
-  document.addEventListener('DOMContentLoaded', wire);
-})();
-          `
-        }}
-      />
-      {/* Settings page styles */}
-      <style>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
+      {showEmailModal && (
+        <ModalWithFooter
+            id="emailModal"
+            title="Change Email"
+            isOpen={showEmailModal}
+            onClose={() => setShowEmailModal(false)}
+            footer={
+                <>
+                    <Button variant="secondary" onClick={() => setShowEmailModal(false)}>Cancel</Button>
+                    <Button variant="primary" onClick={handleInitiateEmailChange}>Continue</Button>
+                </>
+            }
+        >
+            <FormGroup label="New Email">
+                <Input 
+                    type="email" 
+                    value={newEmail} 
+                    onChange={(e) => setNewEmail(e.target.value)} 
+                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
+                />
+            </FormGroup>
+        </ModalWithFooter>
+      )}
 
-        body {
-          font-family: 'Helvetica Neue', Arial, sans-serif;
-          /* Remove background here to let Vanta show through, fallback is in styles.css */
-          color: var(--text, white);
-          min-height: 100vh;
-        }
+      {showOTPModal && (
+        <Modal id="otpModal" title="Verify Email" isOpen={showOTPModal} onClose={() => setShowOTPModal(false)}>
+            <div className={styles.otpContainer}>
+                <p>Enter the code sent to {newEmail}</p>
+                <Input 
+                    type="text" 
+                    value={otpCode} 
+                    onChange={(e) => setOtpCode(e.target.value)} 
+                    placeholder="Code" 
+                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
+                />
+                <Button variant="primary" onClick={handleVerifyEmail} style={{ marginTop: '10px' }}>Verify</Button>
+            </div>
+        </Modal>
+      )}
 
-        .container {
-          max-width: 800px;
-          margin: 100px auto 60px;
-          padding: 0 20px;
-        }
+      {showPasswordModal && (
+        <ModalWithFooter
+            id="passwordModal"
+            title={hasPassword ? "Change Password" : "Set Password"}
+            isOpen={showPasswordModal}
+            onClose={() => { 
+              setShowPasswordModal(false)
+              setCurrentPassword('')
+              setNewPassword('')
+              setConfirmPassword('')
+            }}
+            footer={
+                <>
+                    <Button variant="secondary" onClick={() => { 
+                      setShowPasswordModal(false)
+                      setCurrentPassword('')
+                      setNewPassword('')
+                      setConfirmPassword('')
+                    }}>Cancel</Button>
+                    <Button variant="primary" onClick={hasPassword ? handleUpdatePassword : handleSetupPassword}>
+                      {hasPassword ? 'Update' : 'Set Password'}
+                    </Button>
+                </>
+            }
+        >
+            {hasPassword && (
+              <FormGroup label="Current Password">
+                  <Input 
+                      type="password" 
+                      value={currentPassword} 
+                      onChange={(e) => setCurrentPassword(e.target.value)} 
+                      className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
+                  />
+              </FormGroup>
+            )}
+            <FormGroup label="New Password">
+                <Input 
+                    type="password" 
+                    value={newPassword} 
+                    onChange={(e) => setNewPassword(e.target.value)} 
+                    placeholder={hasPassword ? undefined : "At least 8 characters"}
+                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
+                />
+            </FormGroup>
+            <FormGroup label="Confirm Password">
+                <Input 
+                    type="password" 
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)} 
+                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
+                />
+            </FormGroup>
+        </ModalWithFooter>
+      )}
 
+      {showTwoFactorSetupModal && (
+        <TwoFactorSetupModal 
+            onClose={() => setShowTwoFactorSetupModal(false)}
+            onSuccess={() => {
+                setShowTwoFactorSetupModal(false);
+                loadProfile();
+                toast.success('Success', { description: 'Two-Factor Authentication Enabled!' });
+            }}
+            hasPassword={hasPassword ?? true}
+        />
+      )}
 
-        .settings-card {
-          background: rgba(20, 20, 20, 0.5);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 16px;
-          padding: 30px;
-          margin-bottom: 20px;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .section-title {
-          font-size: 24px;
-          margin-bottom: 20px;
-          color: var(--accent, #e50914);
-        }
-
-        .setting-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 20px 0;
-          border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-
-        .setting-item:last-child {
-          border-bottom: none;
-        }
-
-        .setting-info h3 {
-          font-size: 18px;
-          margin-bottom: 5px;
-        }
-
-        .setting-info p {
-          color: var(--muted, #b3b3b3);
-          font-size: 14px;
-        }
-
-        .setting-control {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        /* Settings-page toggle: OFF is darker; thumb always white */
-        .setting-control .toggle {
-          position: relative;
-          width: 50px;
-          height: 24px;
-          background: var(--toggle-off-bg, #0d0f12);
-          border-radius: 12px;
-          cursor: pointer;
-          transition: background 0.2s ease, box-shadow 0.2s ease;
-          box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
-        }
-        
-        .setting-control .toggle.active {
-          background: var(--accent, #e50914);
-          box-shadow: none;
-        }
-        
-        .setting-control .toggle::after {
-          content: '';
-          position: absolute;
-          top: 2px;
-          left: 2px;
-          width: 20px;
-          height: 20px;
-          background: white;
-          border-radius: 50%;
-          transition: transform 0.2s ease;
-        }
-        
-        .setting-control .toggle.active::after {
-          transform: translateX(26px);
-        }
-
-        .danger-zone {
-          border: 1px solid #dc3545;
-          border-radius: 8px;
-          padding: 20px;
-          margin-top: 40px;
-        }
-
-        .danger-zone h3 {
-          color: #dc3545;
-          margin-bottom: 15px;
-        }
-
-        .modal {
-          display: none;
-          position: fixed;
-          z-index: 1000;
-          left: 0;
-          top: 0;
-          width: 100%;
-          height: 100%;
-          background-color: rgba(0, 0, 0, 0.7);
-          opacity: 0;
-          transition: opacity 0.3s ease;
-        }
-
-        .modal.active {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          opacity: 1;
-        }
-
-        .modal-content {
-          background: var(--section-bg, #222);
-          border-radius: 8px;
-          padding: 30px;
-          width: 90%;
-          max-width: 500px;
-          position: relative;
-          transform: scale(0.7);
-          transition: transform 0.3s ease;
-          max-height: 90vh;
-          overflow-y: auto;
-        }
-
-        .modal.active .modal-content {
-          transform: scale(1);
-        }
-
-        .modal-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 25px;
-          padding-bottom: 15px;
-          border-bottom: 1px solid #333;
-        }
-
-        .modal-title {
-          font-size: 24px;
-          color: var(--accent, #e50914);
-          margin: 0;
-        }
-
-        .modal-close {
-          background: none;
-          border: none;
-          color: #b3b3b3;
-          font-size: 28px;
-          cursor: pointer;
-          padding: 0;
-          width: 30px;
-          height: 30px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          transition: all 0.3s;
-        }
-
-        .modal-close:hover {
-          background: rgba(255,255,255,0.04);
-          color: var(--text, white);
-        }
-
-        .modal-body {
-          margin-bottom: 25px;
-        }
-
-        .modal-footer {
-          display: flex;
-          gap: 10px;
-          justify-content: flex-end;
-          padding-top: 15px;
-          border-top: 1px solid #333;
-        }
-
-        body.modal-open {
-          overflow: hidden;
-        }
-
-        @media (max-width: 768px) {
-          .container {
-            margin-top: 80px;
-          }
-
-          .setting-item {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 15px;
-          }
-
-          .modal-content {
-            width: 95%;
-            padding: 20px;
-            margin: 10px;
-          }
-
-          .modal-footer {
-            flex-direction: column;
-          }
-
-          .modal-footer .btn {
-            width: 100%;
-          }
-        }
-      `}</style>
-      
-      {/* Settings page JavaScript */}
-      {/* Vanta.js and Three.js */}
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-      <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
-      <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-      <script src="/static/js/theme.js"></script>
-      <script src="/static/js/settings.js"></script>
     </SimpleLayout>
   )
 }

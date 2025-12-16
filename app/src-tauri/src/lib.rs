@@ -24,7 +24,7 @@ pub fn run() {
             let port = 3000; // Default port, or find a free one
             app.manage(ServerPort(Mutex::new(port)));
 
-            #[cfg(desktop)]
+            #[cfg(all(desktop, not(debug_assertions)))]
             {
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {

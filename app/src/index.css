@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "./styles/design-system.css";
+
+/* ==========================================================================
+   Base Styles
+   ========================================================================== */
+
+:root {
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: var(--text);
+  /* Fallback background - AnimatedBackground will cover this */
+  background-color: #000000;
+}
+
+html {
+  background-color: transparent;
+  overscroll-behavior: none;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overscroll-behavior: none;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}

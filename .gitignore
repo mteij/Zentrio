@@ -142,3 +142,5 @@ jspm_packages/
 
 # Temporary files
 temp/
+
+old_app/

@@ -59,6 +59,9 @@ appearance.put('/settings', sessionMiddleware, async (c) => {
 
     if (querySettingsProfileId) {
         settingsProfileId = parseInt(querySettingsProfileId);
+        if (isNaN(settingsProfileId)) {
+            return err(c, 400, 'INVALID_ID', 'Invalid settings profile ID');
+        }
     } else {
         let pId: number;
         if (profileId) {

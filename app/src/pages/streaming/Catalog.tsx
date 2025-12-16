@@ -1,151 +1,172 @@
-import { Layout } from '../../components/Layout'
-import { Navbar } from '../../components/Navbar'
+import { useEffect, useRef, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { Layout, Navbar, RatingBadge, LazyImage, LoadingSpinner } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
-import { listDb } from '../../services/database'
-import { RatingBadge } from '../../components/RatingBadge'
-import { LazyImage } from '../../components/LazyImage'
+import styles from '../../styles/Streaming.module.css'
 
-interface StreamingCatalogProps {
+interface CatalogResponse {
   items: MetaPreview[]
-  title: string
-  profileId: number
-  profile?: any
-  manifestUrl?: string
-  type?: string
-  id?: string
+  hasMore: boolean
 }
 
-export const StreamingCatalog = ({ items, title, profileId, profile, manifestUrl, type, id }: StreamingCatalogProps) => {
-  const showImdbRatings = profile?.settings?.show_imdb_ratings !== false;
-  const script = `
-    document.addEventListener('DOMContentLoaded', function() {
-      let skip = ${items.length};
-      let loading = false;
-      let hasMore = true;
-      const profileId = ${profileId};
-      const manifestUrl = "${manifestUrl ? encodeURIComponent(manifestUrl) : ''}";
-      const type = "${type || ''}";
-      const id = "${id || ''}";
-      const grid = document.querySelector('.media-grid');
-      
-      if (!manifestUrl || !type || !id) return;
+const fetchCatalog = async ({ pageParam = 0, queryKey }: any) => {
+  const [_, profileId, manifestUrl, type, id] = queryKey
+  const res = await fetch(
+    `/api/streaming/catalog?profileId=${profileId}&manifestUrl=${encodeURIComponent(manifestUrl)}&type=${type}&id=${id}&skip=${pageParam}`
+  )
+  if (!res.ok) throw new Error('Failed to load catalog')
+  const data = await res.json()
+  return {
+    items: data.items || [],
+    title: data.title,
+    hasMore: data.items && data.items.length >= 20 // Assuming 20 is the limit
+  }
+}
 
-      window.addEventListener('scroll', async () => {
-        if (loading || !hasMore) return;
-        
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
-          loading = true;
-          
-          try {
-            const res = await fetch(\`/api/streaming/catalog?profileId=\${profileId}&manifestUrl=\${manifestUrl}&type=\${type}&id=\${id}&skip=\${skip}\`);
-            const data = await res.json();
-            
-            if (data.items && data.items.length > 0) {
-              // Filter duplicates
-              const existingIds = new Set(Array.from(grid.querySelectorAll('a')).map(a => a.getAttribute('href').split('/').pop()));
-              const newItems = data.items.filter(item => !existingIds.has(item.id));
-              
-              if (newItems.length === 0) {
-                 // If all items are duplicates, we might have reached the end or just a bad batch
-                 // Let's increment skip anyway
-              } else {
-                 renderItems(newItems);
-              }
-              
-              skip += data.items.length;
-              if (data.items.length < 20) hasMore = false; // Assuming default limit is around 20-100
-            } else {
-              hasMore = false;
-            }
-          } catch (e) {
-            console.error('Failed to load more items', e);
-          } finally {
-            loading = false;
-          }
+export const StreamingCatalog = () => {
+  const { profileId, manifestUrl, type, id } = useParams<{ profileId: string, manifestUrl: string, type: string, id: string }>()
+  const navigate = useNavigate()
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const [profile, setProfile] = useState<any>(null)
+
+  // Fetch profile for navbar avatar
+  useEffect(() => {
+    if (profileId) {
+      fetch(`/api/streaming/dashboard?profileId=${profileId}`)
+        .then(res => res.json())
+        .then(data => setProfile(data.profile))
+        .catch(console.error)
+    }
+  }, [profileId])
+
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    error
+  } = useInfiniteQuery({
+    queryKey: ['catalog', profileId, manifestUrl, type, id],
+    queryFn: fetchCatalog,
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage.hasMore) return undefined
+      return allPages.reduce((acc, page) => acc + page.items.length, 0)
+    },
+    initialPageParam: 0,
+    enabled: !!profileId && !!manifestUrl && !!type && !!id
+  })
+
+  useEffect(() => {
+    if (!profileId || !manifestUrl || !type || !id) {
+      navigate('/profiles')
+    }
+  }, [profileId, manifestUrl, type, id, navigate])
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
         }
-      });
+      },
+      { threshold: 0.5 }
+    )
 
-      function renderItems(items) {
-        const html = items.map(item => \`
-          <a key="\${item.id}" href="/streaming/\${profileId}/\${item.type}/\${item.id}" class="media-card">
-            <div class="poster-container">
-              \${item.poster ? \`
-                <img src="\${item.poster}" alt="\${item.name}" class="poster-image" loading="lazy" />
-              \` : \`
-                <div class="no-poster">\${item.name}</div>
-              \`}
-              <div class="card-overlay">
-                <div class="card-title">\${item.name}</div>
-              </div>
-            </div>
-          </a>
-        \`).join('');
-        grid.insertAdjacentHTML('beforeend', html);
-      }
-    });
-  `;
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  if (isLoading) {
+    return <LoadingSpinner />
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#141414] flex items-center justify-center text-white">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">Failed to load catalog</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-purple-600 rounded hover:bg-purple-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Dedup items
+  const allItems = data?.pages.reduce((acc: MetaPreview[], page) => {
+    const existingIds = new Set(acc.map(i => i.id))
+    const uniqueNew = page.items.filter((i: MetaPreview) => !existingIds.has(i.id))
+    return [...acc, ...uniqueNew]
+  }, []) || []
+
+  // Get title from first page if available, otherwise construct fallback
+  const firstPageTitle = data?.pages[0]?.title
+  const title = firstPageTitle || `${type === 'movie' ? 'Movies' : 'Series'} - ${id}`
+  const showImdbRatings = true
 
   return (
-    <Layout title={title} additionalCSS={['/static/css/streaming.css']} showHeader={false} showFooter={false}>
-      <Navbar profileId={profileId} profile={profile} />
-      <script dangerouslySetInnerHTML={{__html: script}} />
+    <Layout title={title} showHeader={false} showFooter={false}>
+      <Navbar profileId={parseInt(profileId!)} profile={profile} />
       
-      <a href="javascript:history.back()" className="zentrio-back-btn">
+      <button onClick={() => navigate(-1)} className={styles.backBtn}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
         </svg>
         Back
-      </a>
+      </button>
 
-      <div className="streaming-layout">
-        <div className="content-container" style={{ paddingTop: '120px', marginTop: 0 }}>
-          <div className="row-header" style={{ padding: '0 60px', marginBottom: '30px' }}>
+      <div 
+        className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}
+      >
+        <div className={styles.contentContainer}>
+          <div className={styles.rowHeader}>
             <h1 style={{ fontSize: '2.5rem', fontWeight: '800', color: '#fff', margin: 0 }}>{title}</h1>
           </div>
           
-          {items.length === 0 ? (
-            <div className="loading" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>No items found in this catalog.</div>
+          {allItems.length === 0 ? (
+            <div className="p-10 text-center text-gray-500">No items found in this catalog.</div>
           ) : (
-            <div className="media-grid">
-              {items.map(item => {
-                const inList = listDb.isInAnyList(profileId, item.id);
-                return (
-                  <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className="media-card">
-                    <div className="poster-container">
-                      {item.poster ? (
-                        <LazyImage src={item.poster} alt={item.name} className="poster-image" />
-                      ) : (
-                        <div className="no-poster">{item.name}</div>
-                      )}
-                      {showImdbRatings && item.imdbRating && (
-                        <RatingBadge rating={parseFloat(item.imdbRating)} />
-                      )}
-                      {inList && (
-                        <div className="in-list-indicator" style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          background: 'rgba(0,0,0,0.7)',
-                          borderRadius: '50%',
-                          width: '24px',
-                          height: '24px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid rgba(255,255,255,0.3)'
-                        }}>
-                          <span className="iconify" data-icon="lucide:check" data-width="14" data-height="14" style={{ color: 'var(--accent)' }}></span>
-                        </div>
-                      )}
-                      <div className="card-overlay">
-                        <div className="card-title">{item.name}</div>
-                      </div>
+            <div className={styles.mediaGrid}>
+              {allItems.map((item, index) => (
+                <a 
+                  key={`${item.id}-${index}`}
+                  href={`/streaming/${profileId}/${item.type}/${item.id}`} 
+                  className={styles.mediaCard}
+                >
+                  <div className={styles.posterContainer}>
+                    {item.poster ? (
+                      <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
+                    ) : (
+                      <div className="flex items-center justify-center bg-gray-800 text-gray-400 w-full h-full p-2 text-center text-sm">{item.name}</div>
+                    )}
+                    {showImdbRatings && item.imdbRating && (
+                      <RatingBadge rating={parseFloat(item.imdbRating)} />
+                    )}
+                    <div className={styles.cardOverlay}>
+                      <div className={styles.cardTitle}>{item.name}</div>
                     </div>
-                  </a>
-                );
-              })}
+                  </div>
+                </a>
+              ))}
             </div>
           )}
+          
+          {/* Infinite scroll trigger */}
+          <div ref={loadMoreRef} className="h-20 flex items-center justify-center w-full">
+            {isFetchingNextPage && (
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+            )}
+          </div>
         </div>
       </div>
     </Layout>

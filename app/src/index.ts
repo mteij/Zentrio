@@ -17,11 +17,7 @@ import { syncService } from './services/sync'
 initEnv()
 
 // Create app instance
-import { renderer } from './renderer'
 const app = new Hono()
-
-// Apply renderer only to view routes, not API or static
-app.get('*', renderer)
 
 // Load runtime config
 const cfg = getConfig()
@@ -98,40 +94,7 @@ if (PROXY_LOGS) {
 app.use('*', securityHeaders)
 app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
 
-// Service Worker explicit route (headers + version injection)
-app.get('/static/sw.js', async (c) => {
-  try {
-    // @ts-ignore
-    const swPath = join(import.meta.dir, 'static', 'sw.js')
-    // @ts-ignore
-    const swFile = Bun.file(swPath)
-    let swText = await swFile.text()
 
-    // Read app version from package.json and inject into SW (%%APP_VERSION%%)
-    let version = '0.0.0'
-    try {
-      // @ts-ignore
-      const pkgPath = join(import.meta.dir, '..', 'package.json')
-      // @ts-ignore
-      const pkg = await Bun.file(pkgPath).json()
-      version = (pkg && pkg.version) ? String(pkg.version) : version
-    } catch {}
-
-    swText = swText.replace(/%%APP_VERSION%%/g, version)
-
-    return new Response(swText, {
-      headers: {
-        'Content-Type': 'text/javascript; charset=utf-8',
-        'Cache-Control': 'no-cache',
-        'Service-Worker-Allowed': '/',
-        'Cross-Origin-Embedder-Policy': 'credentialless',
-        'Cross-Origin-Opener-Policy': 'same-origin',
-      }
-    })
-  } catch {
-    return new Response('Not Found', { status: 404 })
-  }
-})
 
 // Static file serving (explicit, to avoid path mismatches)
 app.get('/static/*', async (c) => {
@@ -191,9 +154,42 @@ app.get('/favicon.ico', async (c) => {
   }
 })
 
-// Mount proxy middleware for proxy routes
 // Mount route modules
-app.route('/', viewRoutes)              // JSX-rendered pages (converted from HTML)
 app.route('/api', apiRoutes)            // API routes, including auth, profiles, user, avatar, health, stream
+app.route('/', viewRoutes)              // View routes (redirects, etc.)
 
-export default app
+// SPA Fallback for all other routes
+app.get('*', async (c) => {
+  if (c.req.path.startsWith('/api')) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+
+  try {
+    // Check for production build first
+    // @ts-ignore
+    const indexPath = join(import.meta.dir, '..', 'dist', 'index.html')
+    // @ts-ignore
+    const indexFile = Bun.file(indexPath)
+    
+    if (await indexFile.exists()) {
+      return new Response(indexFile, {
+        headers: { 'Content-Type': 'text/html' }
+      })
+    }
+    
+    // In development, we rely on Vite's dev server, but if we are running the Hono server directly
+    // we might need to serve the index.html from src (though Vite usually handles this).
+    // If this is running via `bun run src/index.ts`, we are likely in a mode where we want to serve the API
+    // and let Vite handle the frontend.
+    
+    return c.text('SPA build not found. For development, use "npm run dev". For production, run "npm run build".', 404)
+  } catch (e) {
+    return c.text('Error serving SPA', 500)
+  }
+})
+
+export default {
+  port: process.env.PORT || 3000,
+  fetch: app.fetch,
+  idleTimeout: 60 // Increase timeout to 60s to allow for slow addon responses
+}

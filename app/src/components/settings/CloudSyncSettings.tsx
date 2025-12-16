@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Button } from '../Button';
-import { Input } from '../Input';
+import { toast } from 'sonner';
+import { Button, Input, ConfirmDialog } from '../index';
 import { createAuthClient } from "better-auth/client";
+import styles from '../../styles/Settings.module.css';
 
 interface SyncState {
   id: number;
@@ -20,6 +21,7 @@ export function CloudSyncSettings() {
   const [serverUrl, setServerUrl] = useState('https://app.zentrio.eu');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
 
   useEffect(() => {
     loadSyncState();
@@ -106,23 +108,23 @@ export function CloudSyncSettings() {
       await loadSyncState();
       setEmail('');
       setPassword('');
+      toast.success('Connected', { description: 'Cloud sync is now enabled' });
     } catch (err: any) {
       setError(err.message);
+      toast.error('Connection Failed', { description: err.message });
     } finally {
       setConnecting(false);
     }
   }
 
   async function handleDisconnect() {
-    if (!confirm('Are you sure you want to disconnect? This will stop synchronization.')) {
-      return;
-    }
-
     try {
       await fetch('/api/sync/disconnect', { method: 'POST' });
       setSyncState(null);
+      toast.success('Disconnected', { description: 'Cloud sync has been disabled' });
     } catch (err) {
       console.error('Failed to disconnect:', err);
+      toast.error('Disconnect Failed', { description: 'Failed to disconnect from cloud sync' });
     }
   }
 
@@ -136,8 +138,10 @@ export function CloudSyncSettings() {
     try {
       await fetch('/api/sync/sync', { method: 'POST' });
       await loadSyncState();
+      toast.success('Sync Complete', { description: 'Your data has been synchronized' });
     } catch (err) {
       console.error('Failed to sync:', err);
+      toast.error('Sync Failed', { description: 'Failed to synchronize data' });
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -147,54 +151,54 @@ export function CloudSyncSettings() {
   }
 
   if (loading) {
-    return <div className="settings-card">Loading sync status...</div>;
+    return <div className={styles.settingsCard}>Loading sync status...</div>;
   }
 
   const isConnected = syncState && syncState.auth_token;
 
   return (
-    <div className="settings-card">
-      <h2 className="section-title">Cloud Sync</h2>
+    <div className={styles.settingsCard}>
+      <h2 className={styles.sectionTitle}>Cloud Sync</h2>
 
       {isConnected ? (
-        <div className="sync-connected">
-          <div className="setting-item">
-            <div className="setting-info">
+        <div className={styles.syncConnected}>
+          <div className={styles.settingItem}>
+            <div className={styles.settingInfo}>
               <h3>Connection Status</h3>
               <p>Connected to {syncState.remote_url}</p>
             </div>
-            <div className="setting-control">
-              <div className={`status-indicator ${syncState.is_syncing ? 'syncing' : 'connected'}`}></div>
+            <div className={styles.settingControl}>
+              <div className={`${styles.statusIndicator} ${syncState.is_syncing ? styles.statusIndicatorSyncing : styles.statusIndicatorConnected}`}></div>
               <span>{syncState.is_syncing ? 'Syncing...' : 'Connected'}</span>
             </div>
           </div>
 
-          <div className="setting-item">
-            <div className="setting-info">
+          <div className={styles.settingItem}>
+            <div className={styles.settingInfo}>
               <h3>Last Sync</h3>
               <p>{syncState.last_sync_at ? new Date(syncState.last_sync_at).toLocaleString() : 'Never'}</p>
             </div>
-            <div className="setting-control">
+            <div className={styles.settingControl}>
               <Button id="sync-now-btn" variant="primary" onClick={handleSyncNow}>
                 Sync Now
               </Button>
-              <Button variant="danger" onClick={handleDisconnect}>
+              <Button variant="danger" onClick={() => setShowDisconnectDialog(true)}>
                 Disconnect
               </Button>
             </div>
           </div>
         </div>
       ) : (
-        <div className="sync-disconnected">
-          <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div className="setting-info">
+        <div className={styles.syncDisconnected}>
+          <div className={styles.settingItem} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+            <div className={styles.settingInfo}>
               <h3>Connect to Cloud Sync</h3>
               <p>Connect your account to sync your data across devices.</p>
             </div>
           </div>
 
-          <form onSubmit={handleConnect} className="sync-form">
-            <div className="form-group">
+          <form onSubmit={handleConnect} className={styles.syncForm}>
+            <div className={styles.formGroup}>
               <label htmlFor="sync-server-url">Server URL</label>
               <Input
                 type="text"
@@ -206,7 +210,7 @@ export function CloudSyncSettings() {
               />
             </div>
 
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label htmlFor="sync-email">Email</label>
               <Input
                 type="email"
@@ -218,7 +222,7 @@ export function CloudSyncSettings() {
               />
             </div>
 
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label htmlFor="sync-password">Password</label>
               <Input
                 type="password"
@@ -243,45 +247,18 @@ export function CloudSyncSettings() {
         </div>
       )}
 
-      <style>{`
-        .status-indicator {
-          display: inline-block;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          margin-right: 8px;
-        }
 
-        .status-indicator.connected {
-          background-color: #10b981;
-        }
 
-        .status-indicator.syncing {
-          background-color: #f59e0b;
-          animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-
-        .sync-form {
-          max-width: 400px;
-          margin-top: 20px;
-        }
-
-        .form-group {
-          margin-bottom: 15px;
-        }
-
-        .form-group label {
-          display: block;
-          margin-bottom: 5px;
-          color: #b3b3b3;
-          font-size: 14px;
-        }
-      `}</style>
+      <ConfirmDialog
+        isOpen={showDisconnectDialog}
+        onClose={() => setShowDisconnectDialog(false)}
+        onConfirm={handleDisconnect}
+        title="Disconnect Cloud Sync"
+        message="Are you sure you want to disconnect? This will stop synchronization."
+        confirmText="Disconnect"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }

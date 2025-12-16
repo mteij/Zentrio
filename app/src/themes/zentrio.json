@@ -6,10 +6,9 @@
   "btnPrimaryHover": "#CC0810",
   "text": "#F3F3F3",
   "muted": "#BFBFBF",
-  "vanta": {
-    "highlight": "#2a2a2a",
-    "midtone": "#151515",
-    "lowlight": "#070707",
-    "base": "#000000"
+  "background": {
+    "primary": "#b3b3b3",
+    "secondary": "#1a1a1a",
+    "tertiary": "#252525"
   }
 }

@@ -1,37 +1,50 @@
-import { renderToString } from 'react-dom/server'
-import React from 'react'
+import { createAvatar } from '@dicebear/core'
+import * as collection from '@dicebear/collection'
 
-let Avatar: any
+// Supported DiceBear avatar styles
+export const AVATAR_STYLES = {
+  'adventurer-neutral': collection.adventurerNeutral,
+  'avataaars-neutral': collection.avataaarsNeutral,
+  'bottts-neutral': collection.botttsNeutral,
+  'glass': collection.glass,
+  'fun-emoji': collection.funEmoji,
+  'lorelei-neutral': collection.loreleiNeutral,
+  'pixel-art-neutral': collection.pixelArtNeutral,
+  'thumbs': collection.thumbs,
+} as const
 
-async function ensureAvatar() {
-  if (!Avatar) {
-    // Dynamic import to handle ESM module in CommonJS environment
-    const module = await import('boring-avatars')
-    Avatar = module.default
-  }
+export type AvatarStyle = keyof typeof AVATAR_STYLES
+export const DEFAULT_AVATAR_STYLE: AvatarStyle = 'bottts-neutral'
+
+// Style display names for UI
+export const AVATAR_STYLE_NAMES: Record<AvatarStyle, string> = {
+  'adventurer-neutral': 'Adventurer',
+  'avataaars-neutral': 'Avataaars',
+  'bottts-neutral': 'Bottts',
+  'glass': 'Glass',
+  'fun-emoji': 'Fun Emoji',
+  'lorelei-neutral': 'Lorelei',
+  'pixel-art-neutral': 'Pixel Art',
+  'thumbs': 'Thumbs',
 }
 
-export async function generateAvatar(seed: string, colors?: string[]): Promise<string> {
-  await ensureAvatar()
+export function generateAvatar(seed: string, style: AvatarStyle = DEFAULT_AVATAR_STYLE): string {
+  const styleModule = AVATAR_STYLES[style] || AVATAR_STYLES[DEFAULT_AVATAR_STYLE]
   
-  // boring-avatars is a React component, so we render it to a string
-  // We use 'marble' variant as requested
-  // Colors can be passed in to match the theme, or default to Zentrio red/dark theme
-  const defaultColors = ['#e50914', '#141414', '#ffffff', '#333333', '#b3b3b3']
+  const avatar = createAvatar(styleModule as any, {
+    seed,
+    size: 120,
+  })
   
-  const svg = renderToString(
-    React.createElement(Avatar, {
-      size: 120,
-      name: seed,
-      variant: 'marble',
-      colors: colors || defaultColors,
-    })
-  )
-  return svg
+  return avatar.toString()
 }
 
-export async function generateRandomAvatar(colors?: string[]): Promise<{ svg: string; seed: string }> {
+export function generateRandomAvatar(style: AvatarStyle = DEFAULT_AVATAR_STYLE): { svg: string; seed: string } {
   const randomSeed = Math.random().toString(36).substring(2, 15) + Date.now().toString(36)
-  const svg = await generateAvatar(randomSeed, colors)
+  const svg = generateAvatar(randomSeed, style)
   return { svg, seed: randomSeed }
+}
+
+export function isValidAvatarStyle(style: string): style is AvatarStyle {
+  return style in AVATAR_STYLES
 }

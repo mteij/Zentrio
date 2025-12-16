@@ -1,0 +1,1030 @@
+/* Settings Components CSS Module */
+/* Enhanced Glassmorphism Design */
+
+/* ============================================
+   Settings Tabs Navigation
+   ============================================ */
+.settingsTabs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  /* margin-bottom: 32px; Moved to wrapper */
+  padding: 6px;
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-xl, 24px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.settingsTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settingsTabsWrapper {
+  position: relative;
+  margin-bottom: 32px;
+  /* border-radius matches settingsTabs to clip indicators nicely if needed, 
+     but settingsTabs has the border, so we place indicators inside */
+}
+
+.scrollIndicator {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+  color: white;
+  border-radius: inherit; /* Inherit from wrapper/parent if possible, or explicit */
+}
+
+.scrollIndicatorLeft {
+  left: 1px;
+  background: linear-gradient(90deg, rgba(20, 20, 20, 0.9) 0%, rgba(20, 20, 20, 0) 100%);
+  border-top-left-radius: var(--radius-xl, 24px);
+  border-bottom-left-radius: var(--radius-xl, 24px);
+}
+
+.scrollIndicatorRight {
+  right: 1px;
+  background: linear-gradient(-90deg, rgba(20, 20, 20, 0.9) 0%, rgba(20, 20, 20, 0) 100%);
+  border-top-right-radius: var(--radius-xl, 24px);
+  border-bottom-right-radius: var(--radius-xl, 24px);
+}
+
+.indicatorIcon {
+    /* Optional animation or style */
+}
+
+@media (max-width: 768px) {
+    .scrollIndicatorLeft {
+        border-top-left-radius: var(--radius-lg, 16px);
+        border-bottom-left-radius: var(--radius-lg, 16px);
+    }
+    .scrollIndicatorRight {
+        border-top-right-radius: var(--radius-lg, 16px);
+        border-bottom-right-radius: var(--radius-lg, 16px);
+    }
+}
+
+.tabBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #b3b3b3);
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg, 16px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabBtn:hover {
+  color: var(--text, white);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tabBtnActive {
+  color: var(--text, white);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.tabBtnActive::after {
+  content: '';
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: var(--accent, #e50914);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--accent, #e50914);
+}
+
+/* ============================================
+   Settings Card (Glass Panel)
+   ============================================ */
+.settingsCard {
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 16px);
+  padding: 32px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-card, 0 10px 30px rgba(0, 0, 0, 0.2));
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.settingsCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Section Title */
+.sectionTitle {
+  font-size: var(--text-2xl, 1.5rem);
+  font-weight: 600;
+  margin-bottom: 24px;
+  color: var(--text, #ffffff);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionTitle::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 24px;
+  background: linear-gradient(180deg, var(--accent, #e50914), transparent);
+  border-radius: 2px;
+}
+
+/* ============================================
+   Setting Item Row
+   ============================================ */
+.settingItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.2s ease;
+}
+
+.settingItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settingItem:first-child {
+  padding-top: 0;
+}
+
+.settingInfo {
+  flex: 1;
+  padding-right: 24px;
+}
+
+.settingInfo h3 {
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  color: var(--text, #ffffff);
+  margin-bottom: 4px;
+}
+
+.settingInfo p {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--text-muted, #b3b3b3);
+  line-height: 1.5;
+}
+
+.settingControl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.settingValue {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--text-muted, #b3b3b3);
+  font-weight: 500;
+}
+
+/* ============================================
+   Form Elements
+   ============================================ */
+.select {
+  background: rgba(30, 30, 30, 0.8);
+  color: var(--text, white);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm, 8px);
+  padding: 10px 14px;
+  font-size: var(--text-sm, 0.875rem);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.select:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(40, 40, 40, 0.9);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--accent, #e50914);
+  box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.2);
+}
+
+/* ============================================
+   Custom Theme Editor
+   ============================================ */
+.customThemeEditor {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-md, 12px);
+  padding: 24px;
+  margin-top: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.colorPickerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 8px 0;
+}
+
+.colorPickerRow label {
+  color: var(--text-muted, #b3b3b3);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+}
+
+.colorInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.colorInputWrapper input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+  transition: transform 0.2s ease;
+}
+
+.colorInputWrapper input[type="color"]:hover {
+  transform: scale(1.1);
+}
+
+.colorInputWrapper input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.colorInputWrapper input[type="color"]::-webkit-color-swatch {
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+}
+
+.colorValue {
+  font-family: var(--font-mono, monospace);
+  color: var(--text, white);
+  font-size: var(--text-xs, 0.75rem);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 10px;
+  border-radius: var(--radius-xs, 4px);
+}
+
+.rangeSliderContainer {
+  margin-bottom: 20px;
+}
+
+.rangeSliderHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.rangeSliderLabel {
+  color: var(--text-muted, #b3b3b3);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.rangeSliderValue {
+  color: var(--accent, #e50914);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+}
+
+/* ============================================
+   Back Button
+   ============================================ */
+.backBtn {
+  position: fixed;
+  top: 32px;
+  left: 32px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--glass-bg, rgba(20, 20, 20, 0.8));
+  backdrop-filter: blur(var(--glass-blur-lg, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg, 20px));
+  color: var(--text, white);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-full, 9999px);
+  cursor: pointer;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  box-shadow: var(--shadow-md, 0 8px 20px rgba(0, 0, 0, 0.3));
+}
+
+.backBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  color: white;
+}
+
+.backBtn svg,
+.backBtn .iconify,
+.backBtn i {
+  transition: transform 0.3s ease;
+}
+
+.backBtn:hover svg,
+.backBtn:hover .iconify,
+.backBtn:hover i {
+  transform: translateX(-4px);
+}
+
+/* ============================================
+   Addon Item Card
+   ============================================ */
+.addonItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+}
+
+.addonItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.addonItemDisabled {
+  opacity: 0.6;
+}
+
+.addonInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.addonLogo {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm, 8px);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.addonLogoPlaceholder {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.addonDetails {
+  min-width: 0;
+}
+
+.addonName {
+  font-weight: 600;
+  color: var(--text, #fff);
+  font-size: var(--text-base, 1rem);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.addonVersion {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--text-muted, #888);
+}
+
+.addonDescription {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--text-muted, #aaa);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.addonWarning {
+  font-size: var(--text-xs, 0.75rem);
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs, 4px);
+}
+
+.addonActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Theme Tile
+   ============================================ */
+.themeTile {
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md, 12px);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(180deg, rgba(30, 30, 30, 0.4), rgba(30, 30, 30, 0.2));
+  color: var(--text, #fff);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  width: 100%;
+}
+
+.themeTile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.themeTileSelected {
+  border-width: 2px;
+}
+
+.themePreview {
+  height: 48px;
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  width: 100%;
+}
+
+.themeFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.themeName {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  color: var(--text-muted, #ccc);
+}
+
+.themeAccent {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   Profile Selector
+   ============================================ */
+.profileSelector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ============================================
+   Mobile Responsive
+   ============================================ */
+@media (max-width: 768px) {
+  .settingsTabs {
+    border-radius: var(--radius-lg, 16px);
+    border-radius: var(--radius-lg, 16px);
+    padding: 4px;
+    gap: 4px;
+    justify-content: flex-start; /* Ensure start-aligned scrolling */
+    overflow-x: auto;
+  }
+
+  .tabBtn {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .backBtn {
+    top: 16px;
+    left: 16px;
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .settingsCard {
+    padding: 20px;
+    border-radius: var(--radius-md, 12px);
+  }
+
+  .settingItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .settingInfo {
+    padding-right: 0;
+  }
+
+  .settingControl {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .sortableGrid,
+  .gridOptions {
+    grid-template-columns: 1fr !important; /* Force single column on mobile */
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+}
+
+/* ============================================
+   Tab Content
+   ============================================ */
+.tabContent {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================
+   Form Group
+   ============================================ */
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-muted, #b3b3b3);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+}
+
+/* ============================================
+   Range Slider
+   ============================================ */
+.rangeSliderContainer {
+  margin-bottom: 20px;
+}
+
+.rangeSliderHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.rangeSliderLabel {
+  color: var(--text-muted, #b3b3b3);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.rangeSliderValue {
+  color: var(--accent, #e50914);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+}
+
+/* ============================================
+   Color Value Display
+   ============================================ */
+.colorValue {
+  font-family: var(--font-mono, monospace);
+  color: var(--text, white);
+  font-size: var(--text-xs, 0.75rem);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 10px;
+  border-radius: var(--radius-xs, 4px);
+}
+
+/* ============================================
+   Sync Settings
+   ============================================ */
+.syncConnected,
+.syncDisconnected {
+  margin-top: 16px;
+}
+
+.syncForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* ============================================
+   OTP Container
+   ============================================ */
+.otpContainer {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+/* ============================================
+   Container
+   ============================================ */
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ============================================
+   Info Icon (Streaming Settings)
+   ============================================ */
+.infoIcon {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--text-muted, #b3b3b3);
+  border: 1px solid var(--text-muted, #b3b3b3);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+
+/* ============================================
+   Setting Section (for grouped settings)
+   ============================================ */
+.settingSection {
+  margin-bottom: 30px;
+}
+
+.sectionHeader {
+  margin-bottom: 15px;
+}
+
+.sectionHeader h3 {
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ============================================
+   Grid Options (Resolution/Quality cards)
+   ============================================ */
+.gridOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.optionCard {
+  background: linear-gradient(145deg, #2a2a2a, #333);
+  border-radius: 6px;
+  padding: 10px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.optionCard.selected {
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 80%, white 20%);
+}
+
+.optionCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.2));
+}
+
+.optionLabel {
+  font-weight: 500;
+}
+
+.optionCheck {
+  opacity: 0;
+}
+
+.optionCard.selected .optionCheck {
+  opacity: 1;
+}
+
+/* ============================================
+   Slider (File Size Filter)
+   ============================================ */
+.sliderContainer {
+  width: 100%;
+  padding: 10px 0;
+}
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 5px;
+  background: #333;
+  outline: none;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.slider:hover {
+  opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--text, #fff);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--text, #fff);
+}
+
+.sliderValue {
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+/* ============================================
+   Sortable Grid (Sorting Priority)
+   ============================================ */
+.sortableGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.sortableItem {
+  background: #1e1e2e;
+  border: 1px solid #444;
+  border-radius: var(--radius-sm, 8px);
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  cursor: grab;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sortableItem:hover {
+  border-color: #666;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.sortableItem.sortableGhost {
+  opacity: 0.4;
+  background: #2a2a3a;
+  border: 2px dashed #666;
+}
+
+.sortableItem.sortableDrag {
+  opacity: 1;
+  background: #2a2a3a;
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.3));
+  transform: scale(1.02);
+  cursor: grabbing;
+}
+
+.sortHandle {
+  color: #888;
+  cursor: grab;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sortHandle:hover {
+  color: var(--text, #fff);
+}
+
+.sortContent {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sortLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sortLabel {
+  font-weight: 600;
+  background: var(--accent);
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 100px;
+  justify-content: space-between;
+}
+
+/* ============================================
+   Dropdown Toggle Button
+   ============================================ */
+.dropdownToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted, #b3b3b3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dropdownToggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text, #fff);
+}
+
+.dropdownToggle svg {
+  transition: transform 0.3s ease;
+}
+
+.dropdownToggleOpen svg {
+  transform: rotate(180deg);
+}
+
+.sortRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sortDirectionBtn {
+  background: #333;
+  border: 1px solid #555;
+  color: #ccc;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: var(--text-sm, 0.875rem);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.sortDirectionBtn:hover {
+  background: #444;
+  color: var(--text, #fff);
+  border-color: #666;
+}
+
+.sortDirectionBtn i {
+  font-size: 1.1em;
+}
+
+/* ============================================
+   Sortable List (Language Priority)
+   ============================================ */
+.sortableList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 600px;
+}
+
+.languageItem {
+  background: #2a2a2a;
+  padding: 12px 16px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: grab;
+  border: 1px solid #444;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.languageItem:hover {
+  background-color: #333;
+  border-color: #666;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.languageItem.sortableGhost {
+  opacity: 0.4;
+  background: #2a2a3a;
+  border: 2px dashed #666;
+}
+
+.languageItem.sortableDrag {
+  opacity: 1;
+  background: #3a3a4a;
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.3));
+  transform: scale(1.02);
+  cursor: grabbing;
+  z-index: 100;
+}
+
+.languageItem span {
+  font-weight: 500;
+}
+
+/* ============================================
+   Status Indicator (Cloud Sync)
+   ============================================ */
+.statusIndicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.statusIndicatorConnected {
+  background-color: #10b981;
+}
+
+.statusIndicatorSyncing {
+  background-color: #f59e0b;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

@@ -23,7 +23,7 @@ import { sessionMiddleware } from '../../middleware/session'
  
  app.post('/', async (c) => {
    const user = c.get('user')
-   const { name, avatar, avatarType, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton, settingsProfileId } = await c.req.json()
+   const { name, avatar, avatarType, avatarStyle, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton, settingsProfileId } = await c.req.json()
  
    if (!name) {
      return c.json({ error: 'Profile name is required' }, 400)
@@ -34,6 +34,7 @@ import { sessionMiddleware } from '../../middleware/session'
     name,
     avatar: avatar || name,
     avatar_type: avatarType || 'initials',
+    avatar_style: avatarStyle || 'bottts-neutral',
     is_default: false,
     settings_profile_id: settingsProfileId
   })
@@ -63,7 +64,7 @@ import { sessionMiddleware } from '../../middleware/session'
  app.put('/:id', async (c) => {
    const user = c.get('user')
    const profileId = parseInt(c.req.param('id'))
-   const { name, avatar, avatarType, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton, settingsProfileId } = await c.req.json()
+   const { name, avatar, avatarType, avatarStyle, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton, settingsProfileId } = await c.req.json()
 
    if (!name) {
      return c.json({ error: 'Profile name is required' }, 400)
@@ -78,11 +79,13 @@ import { sessionMiddleware } from '../../middleware/session'
       name?: string
       avatar?: string
       avatar_type?: 'initials' | 'avatar'
+      avatar_style?: string
       settings_profile_id?: number
     } = {
       name,
       avatar: avatar || name,
       avatar_type: avatarType,
+      avatar_style: avatarStyle,
       settings_profile_id: settingsProfileId
     }
 
@@ -110,8 +113,24 @@ import { sessionMiddleware } from '../../middleware/session'
    const profileId = parseInt(c.req.param('id'))
  
    const profile = profileDb.findById(profileId)
-   if (profile?.user_id !== user.id) {
+   
+   if (!profile) {
+     return c.json({ error: 'Profile not found' }, 404)
+   }
+   
+   if (profile.user_id !== user.id) {
      return c.json({ error: 'Forbidden' }, 403)
+   }
+
+   // Check if profile is default
+   if (profile.is_default) {
+     return c.json({ error: 'Cannot delete the default profile' }, 400)
+   }
+
+   // Check if profile is currently in use (has active sessions)
+   const activeSessions = db.prepare('SELECT COUNT(*) as count FROM proxy_sessions WHERE profile_id = ? AND is_active = TRUE').get(profileId) as { count: number }
+   if (activeSessions && activeSessions.count > 0) {
+     return c.json({ error: 'Cannot delete a profile that is currently in use' }, 400)
    }
  
    const deleted = profileDb.delete(profileId)

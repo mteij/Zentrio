@@ -1,75 +1,149 @@
 import * as nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
-interface EmailConfig {
-  host: string
-  port: number
-  secure: boolean
-  auth: {
-    user: string
-    pass: string
+// =============================================================================
+// Email Provider Interface
+// =============================================================================
+
+interface SendMailOptions {
+  from: string
+  to: string
+  subject: string
+  html: string
+}
+
+interface EmailProvider {
+  name: string
+  sendMail(options: SendMailOptions): Promise<void>
+}
+
+// =============================================================================
+// SMTP Provider (via Nodemailer)
+// =============================================================================
+
+class SmtpProvider implements EmailProvider {
+  name = 'SMTP'
+  private transporter: nodemailer.Transporter
+
+  constructor(config: {
+    host: string
+    port: number
+    secure: boolean
+    auth: { user: string; pass: string }
+  } | string) {
+    if (typeof config === 'string') {
+      // SMTP URL
+      this.transporter = nodemailer.createTransport(config)
+    } else {
+      this.transporter = nodemailer.createTransport(config)
+    }
+  }
+
+  async sendMail(options: SendMailOptions): Promise<void> {
+    await this.transporter.sendMail({
+      ...options,
+      envelope: { from: options.from, to: options.to }
+    })
   }
 }
 
-class EmailService {
-  private transporter?: nodemailer.Transporter
-  private config?: EmailConfig
+// =============================================================================
+// Resend Provider
+// =============================================================================
 
-  constructor(config?: EmailConfig) {
-    this.config = config
+class ResendProvider implements EmailProvider {
+  name = 'Resend'
+  private client: Resend
+
+  constructor(apiKey: string) {
+    this.client = new Resend(apiKey)
   }
 
-  private buildConfigFromEnv(): EmailConfig {
-    const host = process.env.EMAIL_HOST || 'smtp.gmail.com'
-    const port = parseInt(process.env.EMAIL_PORT || '587', 10)
-    // If EMAIL_SECURE is not set, infer from port (465 => secure)
-    const secure = process.env.EMAIL_SECURE !== undefined
-      ? process.env.EMAIL_SECURE === 'true'
-      : (port === 465)
+  async sendMail(options: SendMailOptions): Promise<void> {
+    const { error } = await this.client.emails.send({
+      from: options.from,
+      to: options.to,
+      subject: options.subject,
+      html: options.html
+    })
+    if (error) {
+      throw new Error(`Resend error: ${error.message}`)
+    }
+  }
+}
+
+// =============================================================================
+// Dev Fallback Provider (logs to console, doesn't send)
+// =============================================================================
+
+class DevFallbackProvider implements EmailProvider {
+  name = 'DevFallback'
+  private transporter: nodemailer.Transporter
+
+  constructor() {
+    this.transporter = nodemailer.createTransport({ jsonTransport: true })
+    console.warn('[email] No email provider configured; using DevFallback (emails will not be sent).')
+  }
+
+  async sendMail(options: SendMailOptions): Promise<void> {
+    const result = await this.transporter.sendMail(options)
+    console.log('[email] DevFallback would send:', JSON.parse(result.message).subject)
+  }
+}
+
+// =============================================================================
+// Email Service
+// =============================================================================
+
+class EmailService {
+  private provider?: EmailProvider
+
+  private getProvider(): EmailProvider {
+    if (this.provider) return this.provider
+
+    // Priority 1: SMTP URL
+    const smtpUrl = (process.env.SMTP_URL || process.env.EMAIL_URL || '').trim()
+    if (smtpUrl) {
+      console.log('[email] Using SMTP provider (URL)')
+      this.provider = new SmtpProvider(smtpUrl)
+      return this.provider
+    }
+
+    // Priority 2: SMTP individual settings
+    const host = process.env.EMAIL_HOST || ''
     const user = process.env.EMAIL_USER || ''
     const pass = process.env.EMAIL_PASS || ''
-    return {
-      host,
-      port,
-      secure,
-      auth: { user, pass },
+    if (host && user && pass) {
+      const port = parseInt(process.env.EMAIL_PORT || '587', 10)
+      const secure = process.env.EMAIL_SECURE !== undefined
+        ? process.env.EMAIL_SECURE === 'true'
+        : port === 465
+      console.log(`[email] Using SMTP provider (${host}:${port})`)
+      this.provider = new SmtpProvider({ host, port, secure, auth: { user, pass } })
+      return this.provider
     }
+
+    // Priority 3: Resend
+    const resendApiKey = (process.env.RESEND_API_KEY || '').trim()
+    if (resendApiKey) {
+      console.log('[email] Using Resend provider')
+      this.provider = new ResendProvider(resendApiKey)
+      return this.provider
+    }
+
+    // Fallback: Dev mode (no actual emails sent)
+    this.provider = new DevFallbackProvider()
+    return this.provider
   }
 
-  private ensureTransporter(): nodemailer.Transporter {
-    if (!this.transporter) {
-      const smtpUrl = (process.env.SMTP_URL || process.env.EMAIL_URL || '').trim()
-      if (smtpUrl) {
-        // Explicit SMTP URL configuration takes precedence
-        this.transporter = nodemailer.createTransport(smtpUrl)
-      } else {
-        const cfg = this.config || this.buildConfigFromEnv()
-        const hasAuth = !!(cfg?.auth?.user && cfg?.auth?.pass)
-        if (hasAuth) {
-          // Use configured host/port/auth when credentials are available
-          this.transporter = nodemailer.createTransport(cfg)
-        } else {
-          // Dev fallback: avoid network and hard failures when email is not configured.
-          // jsonTransport resolves sendMail() with the message serialized to JSON.
-          this.transporter = nodemailer.createTransport({ jsonTransport: true })
-          console.warn('[email] No SMTP configured; using jsonTransport (emails will not be sent).')
-        }
-      }
-    }
-    return this.transporter!
-  }
-
-  // Strict, conservative recipient validation to avoid quoted local-parts with embedded '@'
-  // - Reject CRLF/header injection, commas (lists), and quoted local-parts entirely
-  // - Accept simple addr-spec only: local@domain (RFC-lite)
+  // Strict, conservative recipient validation
   private validateRecipient(raw: string): string {
     const s = (raw || '').trim()
     if (!s || /[\r\n]/.test(s) || s.includes(',')) {
       throw new Error('Invalid recipient address')
     }
-    // Extract from angle brackets if present: Name <addr> or <addr>
     const angle = s.match(/<([^>]+)>/)
     const addr = (angle ? angle[1] : s).trim()
-    // Disallow quoted local-parts to prevent embedded '@' tricks
     if (addr.startsWith('"')) {
       throw new Error('Quoted local-parts are not allowed')
     }
@@ -80,22 +154,21 @@ class EmailService {
     const [local, domain] = addr.split('@')
     return `${local}@${domain.toLowerCase()}`
   }
- 
+
+  private getEmailConfig() {
+    const appUrl = process.env.APP_URL || 'http://localhost:3000'
+    const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
+    return { appUrl, from }
+  }
+
   async sendMagicLink(email: string, magicLink: string): Promise<boolean> {
     try {
-      const appUrl = process.env.APP_URL || 'http://localhost:3000'
-      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
-      let to: string
-      try {
-        to = this.validateRecipient(email)
-      } catch (e: any) {
-        console.error('Invalid recipient for magic link:', e?.message || e)
-        return false
-      }
-      const mailOptions = {
+      const { appUrl, from } = this.getEmailConfig()
+      const to = this.validateRecipient(email)
+      
+      await this.getProvider().sendMail({
         from,
         to,
-        envelope: { from, to },
         subject: 'Your secure sign-in link • Zentrio',
         html: `
   <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -116,34 +189,26 @@ class EmailService {
         <p style="margin:20px 0 10px;color:#8a8a8a;font-size:13px;">You received this email because someone tried to sign in with this address. If this wasn't you, you can safely ignore it.</p>
       </div>
       <div style="padding:16px 24px;border-top:1px solid #222;color:#666;text-align:center;font-size:12px;">
-        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//,'')}</a>
+        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//, '')}</a>
       </div>
     </div>
   </div>`
-      }
-      await this.ensureTransporter().sendMail(mailOptions)
+      })
       return true
     } catch (error: any) {
-      console.error('Failed to send magic link:', error?.response || error?.message || error)
+      console.error('Failed to send magic link:', error?.message || error)
       return false
     }
   }
 
   async sendOTP(email: string, otp: string): Promise<boolean> {
     try {
-      const appUrl = process.env.APP_URL || 'http://localhost:3000'
-      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
-      let to: string
-      try {
-        to = this.validateRecipient(email)
-      } catch (e: any) {
-        console.error('Invalid recipient for OTP:', e?.message || e)
-        return false
-      }
-      const mailOptions = {
+      const { appUrl, from } = this.getEmailConfig()
+      const to = this.validateRecipient(email)
+      
+      await this.getProvider().sendMail({
         from,
         to,
-        envelope: { from, to },
         subject: 'Your verification code • Zentrio',
         html: `
   <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -162,34 +227,26 @@ class EmailService {
         <p style="margin:16px 0;color:#8a8a8a;font-size:13px;">Didn't request this code? You can ignore this email.</p>
       </div>
       <div style="padding:16px 24px;border-top:1px solid #222;color:#666;text-align:center;font-size:12px;">
-        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//,'')}</a>
+        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//, '')}</a>
       </div>
     </div>
   </div>`
-      }
-      await this.ensureTransporter().sendMail(mailOptions)
+      })
       return true
     } catch (error: any) {
-      console.error('Failed to send OTP:', error?.response || error?.message || error)
+      console.error('Failed to send OTP:', error?.message || error)
       return false
     }
   }
 
   async sendWelcomeEmail(email: string, name: string): Promise<boolean> {
     try {
-      const appUrl = process.env.APP_URL || 'http://localhost:3000'
-      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
-      let to: string
-      try {
-        to = this.validateRecipient(email)
-      } catch (e: any) {
-        console.error('Invalid recipient for welcome email:', e?.message || e)
-        return false
-      }
-      const mailOptions = {
+      const { appUrl, from } = this.getEmailConfig()
+      const to = this.validateRecipient(email)
+      
+      await this.getProvider().sendMail({
         from,
         to,
-        envelope: { from, to },
         subject: 'Welcome to Zentrio 🎬',
         html: `
   <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -212,29 +269,22 @@ class EmailService {
       </div>
     </div>
   </div>`
-      }
-      await this.ensureTransporter().sendMail(mailOptions)
+      })
       return true
     } catch (error: any) {
-      console.error('Failed to send welcome email:', error?.response || error?.message || error)
+      console.error('Failed to send welcome email:', error?.message || error)
       return false
     }
   }
+
   async sendVerificationEmail(email: string, url: string): Promise<boolean> {
     try {
-      const appUrl = process.env.APP_URL || 'http://localhost:3000'
-      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
-      let to: string
-      try {
-        to = this.validateRecipient(email)
-      } catch (e: any) {
-        console.error('Invalid recipient for verification email:', e?.message || e)
-        return false
-      }
-      const mailOptions = {
+      const { appUrl, from } = this.getEmailConfig()
+      const to = this.validateRecipient(email)
+      
+      await this.getProvider().sendMail({
         from,
         to,
-        envelope: { from, to },
         subject: 'Verify your email • Zentrio',
         html: `
   <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -255,34 +305,26 @@ class EmailService {
         <p style="margin:20px 0 10px;color:#8a8a8a;font-size:13px;">If you didn't create an account, you can safely ignore this email.</p>
       </div>
       <div style="padding:16px 24px;border-top:1px solid #222;color:#666;text-align:center;font-size:12px;">
-        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//,'')}</a>
+        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//, '')}</a>
       </div>
     </div>
   </div>`
-      }
-      await this.ensureTransporter().sendMail(mailOptions)
+      })
       return true
     } catch (error: any) {
-      console.error('Failed to send verification email:', error?.response || error?.message || error)
+      console.error('Failed to send verification email:', error?.message || error)
       return false
     }
   }
 
   async sendResetPasswordEmail(email: string, url: string): Promise<boolean> {
     try {
-      const appUrl = process.env.APP_URL || 'http://localhost:3000'
-      const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
-      let to: string
-      try {
-        to = this.validateRecipient(email)
-      } catch (e: any) {
-        console.error('Invalid recipient for reset password email:', e?.message || e)
-        return false
-      }
-      const mailOptions = {
+      const { appUrl, from } = this.getEmailConfig()
+      const to = this.validateRecipient(email)
+      
+      await this.getProvider().sendMail({
         from,
         to,
-        envelope: { from, to },
         subject: 'Reset your password • Zentrio',
         html: `
   <div style="background:#0b0b0b;padding:24px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -303,19 +345,18 @@ class EmailService {
         <p style="margin:20px 0 10px;color:#8a8a8a;font-size:13px;">If you didn't ask to reset your password, you can safely ignore this email.</p>
       </div>
       <div style="padding:16px 24px;border-top:1px solid #222;color:#666;text-align:center;font-size:12px;">
-        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//,'')}</a>
+        © ${new Date().getFullYear()} Zentrio • <a href="${appUrl}" style="color:#888;text-decoration:none;">${appUrl.replace(/^https?:\/\//, '')}</a>
       </div>
     </div>
   </div>`
-      }
-      await this.ensureTransporter().sendMail(mailOptions)
+      })
       return true
     } catch (error: any) {
-      console.error('Failed to send reset password email:', error?.response || error?.message || error)
+      console.error('Failed to send reset password email:', error?.message || error)
       return false
     }
   }
 }
 
-// Create lazy email service singleton (reads env at first use)
+// Create lazy email service singleton
 export const emailService = new EmailService()

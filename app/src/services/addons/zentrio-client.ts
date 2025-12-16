@@ -13,38 +13,58 @@ export class ZentrioAddonClient extends AddonClient {
   }
 
   async init(): Promise<Manifest> {
+    const client = await this.getClient()
+    let movieGenres: any[] = []
+    let seriesGenres: any[] = []
+
+    if (client) {
+      try {
+        const [mGenres, sGenres] = await Promise.all([
+          tmdbService.getGenreList(client, 'en-US', 'movie'),
+          tmdbService.getGenreList(client, 'en-US', 'series')
+        ])
+        movieGenres = mGenres || []
+        seriesGenres = sGenres || []
+      } catch (e) {
+        console.warn('Failed to load genres for manifest', e)
+      }
+    }
+
+    const movieGenreOptions = movieGenres.map((g: any) => g.name)
+    const seriesGenreOptions = seriesGenres.map((g: any) => g.name)
+
     this.manifest = {
       id: 'org.zentrio.tmdb',
       version: '1.0.0',
       name: 'Zentrio',
       description: 'Native TMDB integration for Zentrio',
       logo: 'https://app.zentrio.eu/static/logo/icon-192.png',
-      resources: ['catalog', 'meta', 'stream'],
+      resources: ['catalog', 'meta'],
       types: ['movie', 'series'],
       catalogs: [
         {
           type: 'movie',
           id: 'tmdb.top',
           name: 'Popular Movies',
-          extra: [{ name: 'genre' }, { name: 'skip' }, { name: 'search' }]
+          extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }, { name: 'search' }]
         },
         {
           type: 'series',
           id: 'tmdb.top',
           name: 'Popular Series',
-          extra: [{ name: 'genre' }, { name: 'skip' }, { name: 'search' }]
+          extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }, { name: 'search' }]
         },
         {
             type: 'movie',
             id: 'tmdb.year',
             name: 'Movies by Year',
-            extra: [{ name: 'genre', isRequired: true }, { name: 'skip' }]
+            extra: [{ name: 'genre', isRequired: true, options: movieGenreOptions }, { name: 'skip' }]
         },
         {
             type: 'series',
             id: 'tmdb.year',
             name: 'Series by Year',
-            extra: [{ name: 'genre', isRequired: true }, { name: 'skip' }]
+            extra: [{ name: 'genre', isRequired: true, options: seriesGenreOptions }, { name: 'skip' }]
         },
         {
             type: 'movie',
@@ -62,13 +82,13 @@ export class ZentrioAddonClient extends AddonClient {
             type: 'movie',
             id: 'tmdb.trending',
             name: 'Trending Movies',
-            extra: [{ name: 'genre' }, { name: 'skip' }]
+            extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }]
         },
         {
             type: 'series',
             id: 'tmdb.trending',
             name: 'Trending Series',
-            extra: [{ name: 'genre' }, { name: 'skip' }]
+            extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }]
         }
       ],
       idPrefixes: ['tmdb:', 'tt']
@@ -121,6 +141,18 @@ export class ZentrioAddonClient extends AddonClient {
     }
 
     const res = await tmdbService.getCatalog(client, type, 'en-US', page, id, genre, mergedConfig)
+    
+    // Handle manual pagination offset properly to avoid duplicates
+    if (extra.skip && res?.metas) {
+        const skip = parseInt(extra.skip)
+        const offset = skip % 20
+        // If we are on the first page of the request (mathematically), we might need to skip some items
+        // Example: Skip 15. Page = 1. Offset = 15. Return items 15-20.
+        // Example: Skip 20. Page = 2. Offset = 0. Return items 0-20.
+        // Example: Skip 30. Page = 2. Offset = 10. Return items 10-20.
+        return res.metas.slice(offset)
+    }
+
     return res?.metas || []
   }
 

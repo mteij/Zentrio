@@ -1,0 +1,130 @@
+/* ==========================================================================
+   Design System - Single Source of Truth for Design Tokens
+   ========================================================================== */
+
+:root {
+  /* -------------------------------------------------------------------------
+     Brand Colors
+     ------------------------------------------------------------------------- */
+  --accent: #e50914;
+  --accent-hover: #f40612;
+  --accent-muted: rgba(229, 9, 20, 0.2);
+
+  /* -------------------------------------------------------------------------
+     Semantic Colors
+     ------------------------------------------------------------------------- */
+  --text: #ffffff;
+  --text-muted: #b3b3b3;
+  --text-subtle: rgba(255, 255, 255, 0.5);
+  
+  --bg: #141414;
+  --bg-elevated: #1e1e1e;
+  --bg-card: rgba(20, 20, 20, 0.6);
+  
+  --border: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.15);
+
+  /* Status Colors */
+  --success: #4caf50;
+  --warning: #ffa500;
+  --error: #f44336;
+  --danger: #dc3545;
+  --danger-hover: #c82333;
+
+  /* -------------------------------------------------------------------------
+     Glass Effects (Glassmorphism)
+     ------------------------------------------------------------------------- */
+  --glass-bg: rgba(20, 20, 20, 0.65);
+  --glass-bg-light: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 24px;
+  --glass-blur-sm: 10px;
+  --glass-blur-lg: 20px;
+
+  /* -------------------------------------------------------------------------
+     Shadows
+     ------------------------------------------------------------------------- */
+  --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --shadow-accent: 0 4px 15px rgba(229, 9, 20, 0.3);
+  --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.2);
+
+  /* -------------------------------------------------------------------------
+     Transitions
+     ------------------------------------------------------------------------- */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* -------------------------------------------------------------------------
+     Layout
+     ------------------------------------------------------------------------- */
+  --nav-width-desktop: 80px;
+  --nav-height-mobile: 70px;
+  --container-max: 1400px;
+  --content-max: 1200px;
+
+  /* -------------------------------------------------------------------------
+     Border Radius
+     ------------------------------------------------------------------------- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* -------------------------------------------------------------------------
+     Spacing (consistent with Tailwind defaults)
+     ------------------------------------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* -------------------------------------------------------------------------
+     Typography
+     ------------------------------------------------------------------------- */
+  --font-sans: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --font-mono: 'Courier New', monospace;
+  
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.5rem;
+  --text-5xl: 3rem;
+
+  /* -------------------------------------------------------------------------
+     Z-Index Scale
+     ------------------------------------------------------------------------- */
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 500;
+  --z-modal: 1000;
+  --z-overlay: 2000;
+  --z-toast: 9999;
+
+  /* -------------------------------------------------------------------------
+     Legacy Variable Aliases (for backward compatibility)
+     ------------------------------------------------------------------------- */
+  --btn-primary-bg: var(--accent);
+  --btn-primary-bg-hover: var(--accent-hover);
+  --btn-secondary-bg: #333;
+  --btn-danger-bg: var(--danger);
+  --btn-danger-bg-hover: var(--danger-hover);
+  --muted: var(--text-muted);
+}
