@@ -1,21 +1,23 @@
 # Zentrio
+
 ## <b>Please do not currently use! Under heavy development</b>
 
 <div align="center">
-  <img src="app/src/static/logo/icon-512.png" alt="Zentrio Icon" width="256" height="256" />
+  <img src="app/public/static/logo/icon-512.png" alt="Zentrio Icon" width="256" height="256" />
 
-  <strong>Stream Your Way</strong>
+<strong>Stream Your Way</strong>
 
-  <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
-  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-FF6A00?style=for-the-badge&logo=hono&logoColor=white" alt="Hono"></a>
-  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black" alt="Tauri"></a>
-  <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
-  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+<a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
+<a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
+<a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-FF6A00?style=for-the-badge&logo=hono&logoColor=white" alt="Hono"></a>
+<a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black" alt="Tauri"></a>
+<a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
+<a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
 
-  <a href="https://app.zentrio.eu"><strong>🌐 Public Instance</strong></a> •
-  <a href="https://docs.zentrio.eu"><strong>📚 Documentation</strong></a> •
-  <a href="https://github.com/MichielEijpe/Zentrio/issues"><strong>🐛 Report Issues</strong></a>
+<a href="https://app.zentrio.eu"><strong>🌐 Public Instance</strong></a> •
+<a href="https://docs.zentrio.eu"><strong>📚 Documentation</strong></a> •
+<a href="https://github.com/MichielEijpe/Zentrio/issues"><strong>🐛 Report Issues</strong></a>
+
 </div>
 
 <details>
@@ -24,6 +26,7 @@
 Zentrio was built with substantial assistance from AI tooling, guided by an engineering student exploring what these tools make possible.
 
 Although the project is maintained with care, it remains experimental and may contain imperfections. **Please use it at your own risk**, and consider using unique credentials instead of your primary Stremio account for additional safety.
+
 </details>
 
 ## 🚀 Getting Started
@@ -46,7 +49,7 @@ Zentrio is a modern, self-hosted streaming hub that brings your content together
 - **🔒 Privacy-Focused** - Your data stays local and secure.
 
 <!-- <div align="center">
-  <img src="app/src/static/media/profiles.png" alt="Zentrio Profiles" width="800" />
+  <img src="app/public/static/media/profiles.png" alt="Zentrio Profiles" width="800" />
 </div> -->
 
 ## Origin Story

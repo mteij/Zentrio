@@ -96,7 +96,7 @@ export function createTwoFactorTotpURI(
  * Generate TOTP code for a given secret and time
  */
 function generateTOTPCode(secret: string, time: number): string {
-  const counter = Math.floor(time / 30)
+  let counter = Math.floor(time / 30)
   const buffer = Buffer.alloc(8)
   
   for (let i = 7; i >= 0; i--) {

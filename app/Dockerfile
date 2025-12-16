@@ -15,6 +15,7 @@ COPY scripts ./scripts
 RUN if [ -d stremio-patches ]; then cp -r stremio-patches ./stremio-patches; fi
 # Copy source code including static assets
 COPY src ./src
+COPY public ./public
 
 # Build stremio-web and main application
 RUN bun run build
