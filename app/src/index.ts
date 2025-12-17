@@ -96,6 +96,42 @@ app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIM
 
 
 
+// Serve bundled assets (JS/CSS) from Vite build
+app.get('/assets/*', async (c) => {
+  const reqPath = c.req.path.replace(/^\/assets\//, '')
+  // @ts-ignore
+  const filePath = join(import.meta.dir, 'assets', reqPath)
+  try {
+    // @ts-ignore
+    const file = Bun.file(filePath)
+    const buf = await file.arrayBuffer()
+    const typeMap: Record<string, string> = {
+      '.html': 'text/html; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.js': 'text/javascript; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+    }
+    const ext = extname(filePath).toLowerCase()
+    const contentType = typeMap[ext] || 'application/octet-stream'
+
+    const headers: Record<string, string> = {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=31536000, immutable', // Long cache for hashed assets
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    }
+
+    return new Response(new Uint8Array(buf), { headers })
+  } catch {
+    return new Response('Not Found', { status: 404 })
+  }
+})
+
 // Static file serving (explicit, to avoid path mismatches)
 app.get('/static/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/static\//, '')
