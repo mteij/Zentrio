@@ -12,6 +12,29 @@ app.get('/styles', (c) => {
   return c.json({ styles, default: DEFAULT_AVATAR_STYLE })
 })
 
+// Root handler (redirect/alias to random or just generate)
+// Fixes 404 on /api/avatar/?style=...
+app.get('/', async (c) => {
+    try {
+        const styleParam = c.req.query('style') || DEFAULT_AVATAR_STYLE
+        const style = isValidAvatarStyle(styleParam) ? styleParam : DEFAULT_AVATAR_STYLE
+        
+        // If they want the SVG directly (acting as image src)
+        // We generate a random one
+        const seed = Math.random().toString(36).substring(7)
+        const svg = generateAvatar(seed, style)
+        
+        return new Response(svg, {
+          headers: {
+            'Content-Type': 'image/svg+xml',
+            'Cache-Control': 'no-store' // Random should not be cached tightly
+          }
+        })
+    } catch (error) {
+        return c.json({ error: 'Failed to generate avatar' }, 500)
+    }
+})
+
 // Generate random avatar
 app.get('/random', async (c) => {
   try {
