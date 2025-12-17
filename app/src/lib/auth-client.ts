@@ -29,6 +29,13 @@ export const getServerUrl = () => {
       return window.location.origin;
     }
     console.log('[auth-client] Tauri mode, stored URL:', stored);
+
+    // In development, default to localhost if no server is selected
+    if (!stored && import.meta.env.DEV) {
+      console.log('[auth-client] Host is DEV, defaulting to localhost:3000');
+      return "http://localhost:3000";
+    }
+
     return stored || "https://app.zentrio.eu";
   }
 
