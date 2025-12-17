@@ -194,18 +194,51 @@ app.get('/favicon.ico', async (c) => {
 app.route('/api', apiRoutes)            // API routes, including auth, profiles, user, avatar, health, stream
 app.route('/', viewRoutes)              // View routes (redirects, etc.)
 
+// Explicit Root Handler to prevent fallthrough issues
+app.get('/', async (c) => {
+  try {
+    // Try to serve index.html from dist (production) or src (dev fallthrough)
+    // using process.cwd() for reliability in Docker
+    const distPath = join(process.cwd(), 'dist', 'index.html')
+    // @ts-ignore
+    const distFile = Bun.file(distPath)
+    
+    if (await distFile.exists()) {
+       return new Response(distFile, {
+        headers: { 'Content-Type': 'text/html' }
+      })
+    }
+    
+    // Dev fallback: usually handled by Vite, but if we are here:
+    // @ts-ignore
+    const srcPath = join(import.meta.dir, '..', 'index.html') // In dev, meta.dir is src/
+    // @ts-ignore
+    const srcFile = Bun.file(srcPath)
+     if (await srcFile.exists()) {
+       return new Response(srcFile, {
+        headers: { 'Content-Type': 'text/html' }
+      })
+    }
+    
+    return c.text('Zentrio Server Running. SPA not found (build required?)', 200)
+  } catch (e) {
+    logger.error(`[Root] Error serving index: ${e}`)
+    return c.text('Error serving App', 500)
+  }
+})
+
 // SPA Fallback for all other routes
 app.get('*', async (c) => {
+  // Ignore API requests
   if (c.req.path.startsWith('/api')) {
     return c.json({ error: 'Not Found' }, 404)
   }
 
   try {
-    // Check for production build first
+    // Check for production build first using CWD
+    const distPath = join(process.cwd(), 'dist', 'index.html')
     // @ts-ignore
-    const indexPath = join(import.meta.dir, '..', 'dist', 'index.html')
-    // @ts-ignore
-    const indexFile = Bun.file(indexPath)
+    const indexFile = Bun.file(distPath)
     
     if (await indexFile.exists()) {
       return new Response(indexFile, {
@@ -213,13 +246,24 @@ app.get('*', async (c) => {
       })
     }
     
-    // In development, we rely on Vite's dev server, but if we are running the Hono server directly
-    // we might need to serve the index.html from src (though Vite usually handles this).
-    // If this is running via `bun run src/index.ts`, we are likely in a mode where we want to serve the API
-    // and let Vite handle the frontend.
+    // In development (src/index.ts is running), import.meta.dir is .../src
+    // So look for .../index.html? No, Vite keeps it in root.
+    
+    // @ts-ignore
+    const devPath = join(process.cwd(), 'index.html') // Root level index.html
+    // @ts-ignore
+    const devFile = Bun.file(devPath)
+    if (await devFile.exists()) {
+       return new Response(devFile, {
+        headers: { 'Content-Type': 'text/html' }
+      })
+    }
+
+    logger.warn(`[SPA Fallback] index.html not found at ${distPath} or ${devPath}`)
     
     return c.text('SPA build not found. For development, use "npm run dev". For production, run "npm run build".', 404)
   } catch (e) {
+    logger.error(`[SPA Fallback] Error: ${e}`)
     return c.text('Error serving SPA', 500)
   }
 })
