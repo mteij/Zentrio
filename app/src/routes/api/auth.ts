@@ -272,6 +272,29 @@ app.post('/deep-link-callback', async (c) => {
 
 // Delegate everything else to Better Auth
 app.all("*", (c) => {
+    const cfg = getConfig();
+    // Fix for Better Auth 403 Forbidden due to Origin/Protocol mismatch when running behind reverse proxy
+    if (cfg.APP_URL) {
+        try {
+            const reqUrl = new URL(c.req.raw.url);
+            const appUrl = new URL(cfg.APP_URL);
+            
+            // If the request protocol/host doesn't match the configured APP_URL
+            // (common in Docker/Reverse Proxy setups where internal traffic is HTTP but external is HTTPS),
+            // rewrite the request URL to match APP_URL so Better Auth's security checks pass.
+            if (reqUrl.protocol !== appUrl.protocol || reqUrl.host !== appUrl.host) {
+                const newUrl = new URL(c.req.raw.url);
+                newUrl.protocol = appUrl.protocol;
+                newUrl.host = appUrl.host;
+                newUrl.port = appUrl.port;
+                
+                const newReq = new Request(newUrl.toString(), c.req.raw);
+                return auth.handler(newReq);
+            }
+        } catch (e) {
+            // If URL parsing fails, fall back to original request
+        }
+    }
     return auth.handler(c.req.raw);
 });
 
