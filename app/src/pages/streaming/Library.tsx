@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Layout, Navbar, RatingBadge, LazyImage, LoadingSpinner } from '../../components'
+import { Layout, Navbar, RatingBadge, LazyImage, SkeletonCard } from '../../components'
 import { List, ListItem } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
 
@@ -81,7 +81,25 @@ export const StreamingLibrary = () => {
   }
 
   if (loading) {
-    return <LoadingSpinner />
+    return (
+      <Layout title="Library" showHeader={false} showFooter={false}>
+        <Navbar profileId={parseInt(profileId!)} activePage="library" />
+        <div className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}>
+          <div className={styles.contentContainer} style={{ marginTop: 0 }}>
+            <div style={{ padding: '0 60px', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{ width: '180px', height: '40px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
+                <div className={styles.skeletonShimmer} />
+              </div>
+            </div>
+            <div className={styles.mediaGrid}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
   if (error) {

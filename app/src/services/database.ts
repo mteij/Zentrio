@@ -1362,9 +1362,20 @@ export const streamDb = {
       },
       limits: { maxResults: 20 },
       deduplication: { mode: 'Per Addon', detection: { filename: true, infoHash: true, smartDetect: true } },
-      sorting: { global: ['quality', 'seeders'] }
+      sorting: { global: ['cached', 'resolution', 'quality', 'seeders', 'size'] },
+      sortingConfig: {
+        items: [
+          { id: 'cached', enabled: true, direction: 'desc' },
+          { id: 'resolution', enabled: true, direction: 'desc' },
+          { id: 'quality', enabled: true, direction: 'desc' },
+          { id: 'seeders', enabled: true, direction: 'desc' },
+          { id: 'size', enabled: true, direction: 'desc' },
+          { id: 'language', enabled: false, direction: 'desc' }
+        ]
+      }
     };
   },
+
 
   saveSettings: (settingsProfileId: number, settings: StreamSettings): void => {
     const existing = db.prepare("SELECT id FROM stream_settings WHERE settings_profile_id = ?").get(settingsProfileId) as any;

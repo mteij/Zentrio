@@ -53,10 +53,10 @@ jobs:
 
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
-        # You can remove libayatana-appindicator3-dev if you don't use the system tray feature.
+        # Added wget and curl for linuxdeploy
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libfuse2 file
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libfuse2 file wget curl
 
       - name: Setup Java (Android only)
         if: matrix.name == 'android'
@@ -91,16 +91,61 @@ jobs:
       - name: Install frontend dependencies
         run: cd app && npm install # Using npm install instead of bun for broader compatibility in CI
 
-      - name: Build Tauri App
+      - name: Get version
+        run: |
+          echo "VERSION=$(node -e "console.log(require('./app/package.json').version)")" >> $GITHUB_ENV
+
+      # Desktop Build (Linux, Windows, macOS Desktop)
+      - name: Build Tauri App (Desktop)
+        if: matrix.name != 'android' && matrix.name != 'ios'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         with:
           projectPath: ./app
-          tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
+          tagName: app-v__VERSION__
           releaseName: "App v__VERSION__"
           releaseBody: "See the assets to download this version and install."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # Android Build
+      - name: Build Android
+        if: matrix.name == 'android'
+        working-directory: ./app
+        env:
+          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+        run: |
+          bun tauri android init
+          bun tauri android build --apk
+
+      - name: Upload Android Artifacts to Release
+        if: matrix.name == 'android'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: app-v${{ env.VERSION }}
+          # We need to ensure the release exists or is created.
+          # tauri-action creates it. If Android runs faster, this might fail?
+          # Or softprops creates it if missing? It does.
+          draft: true
+          files: |
+            app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
+      # iOS Build
+      - name: Build iOS
+        if: matrix.name == 'ios'
+        working-directory: ./app
+        run: |
+          bun tauri ios init
+          bun tauri ios build --no-signing
+
+      - name: Upload iOS Artifacts to Release
+        if: matrix.name == 'ios'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: app-v${{ env.VERSION }}
+          draft: true
+          files: |
+            app/src-tauri/gen/apple/build/Release-iphoneos/*.app
+            app/src-tauri/gen/apple/build/Release-iphoneos/*.ipa

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Layout, Navbar, RatingBadge, LazyImage, StreamingRow, LoadingSpinner } from '../../components'
+import { Layout, Navbar, RatingBadge, LazyImage, StreamingRow, SkeletonRow, SkeletonCard } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import styles from '../../styles/Streaming.module.css'
@@ -135,7 +135,30 @@ export const StreamingExplore = () => {
   }
 
   if (loading) {
-    return <LoadingSpinner />
+    return (
+      <Layout title="Explore" showHeader={false} showFooter={false}>
+        <Navbar profileId={parseInt(profileId!)} activePage="explore" />
+        <div className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}>
+          <div className={styles.contentContainer} style={{ marginTop: '0' }}>
+            <div style={{ padding: '0 60px', marginBottom: '30px' }}>
+              <h1 style={{ fontSize: '3rem', fontWeight: '800', margin: 0 }}>Explore</h1>
+            </div>
+            {/* Skeleton filter tabs */}
+            <div style={{ padding: '0 60px', marginBottom: '40px', display: 'flex', gap: '16px' }}>
+              <div style={{ width: '120px', height: '44px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
+                <div className={styles.skeletonShimmer} />
+              </div>
+              <div style={{ width: '120px', height: '44px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
+                <div className={styles.skeletonShimmer} />
+              </div>
+            </div>
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
   if (error || !data) {

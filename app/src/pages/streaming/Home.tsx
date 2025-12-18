@@ -1,7 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { TrendingUp, Play, Info } from 'lucide-react'
-import { Layout, Navbar, StreamingRow, LoadingSpinner } from '../../components'
+import { Layout, Navbar, StreamingRow, SkeletonHero, SkeletonRow } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { WatchHistoryItem } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
@@ -45,13 +47,90 @@ export const StreamingHome = () => {
     }
   })
 
+  // State for cycling through featured items - must be before any returns
+  // Initialize from sessionStorage or use a placeholder (-1 means "needs initialization")
+  const [featuredIndex, setFeaturedIndex] = useState(() => {
+    const stored = sessionStorage.getItem('heroFeaturedIndex')
+    return stored !== null ? parseInt(stored, 10) : -1 // -1 means pick random on first data load
+  })
+
+  // Get featured items from data (or empty array if no data yet)
+  const featuredItems = useMemo(() => {
+    if (!data) return []
+    const { catalogs, history, trending } = data
+    if (trending && trending.length > 0) {
+      return trending
+    } else if (catalogs.length > 0 && catalogs[0].items.length > 0) {
+      return catalogs[0].items.slice(0, 10)
+    } else if (history.length > 0) {
+      return history.slice(0, 10)
+    }
+    return []
+  }, [data])
+
+  // Generate random index excluding current
+  const getRandomIndex = useCallback((currentIdx: number, length: number) => {
+    if (length <= 1) return 0
+    let newIdx = Math.floor(Math.random() * (length - 1))
+    if (newIdx >= currentIdx) newIdx++
+    return newIdx
+  }, [])
+
+  // Initialize with random index on first data load, or validate stored index
+  useEffect(() => {
+    if (featuredItems.length === 0) return
+    
+    if (featuredIndex === -1 || featuredIndex >= featuredItems.length) {
+      // Pick a random index on first load or if stored index is invalid
+      const randomIdx = Math.floor(Math.random() * featuredItems.length)
+      setFeaturedIndex(randomIdx)
+      sessionStorage.setItem('heroFeaturedIndex', randomIdx.toString())
+    }
+  }, [featuredItems.length, featuredIndex])
+
+  // Persist index changes to sessionStorage
+  useEffect(() => {
+    if (featuredIndex >= 0) {
+      sessionStorage.setItem('heroFeaturedIndex', featuredIndex.toString())
+    }
+  }, [featuredIndex])
+
+  // Cycle through items randomly every minute
+  useEffect(() => {
+    if (featuredItems.length <= 1) return
+
+    const interval = setInterval(() => {
+      setFeaturedIndex(prev => getRandomIndex(prev, featuredItems.length))
+    }, 60000) // 1 minute
+
+    return () => clearInterval(interval)
+  }, [featuredItems.length, getRandomIndex])
+
+  // Handle unauthorized redirect
+  useEffect(() => {
+    if (error?.message === 'Unauthorized') {
+      navigate('/')
+    }
+  }, [error, navigate])
+
   if (error?.message === 'Unauthorized') {
-    navigate('/')
     return null
   }
 
   if (isLoading) {
-    return <LoadingSpinner />
+    return (
+      <Layout title="Streaming" showHeader={false} showFooter={false}>
+        <Navbar profileId={parseInt(profileId!)} activePage="home" />
+        <div className={styles.streamingLayout}>
+          <SkeletonHero />
+          <div className={styles.contentContainer} style={{ marginTop: '-100px' }}>
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
   if (error || !data) {
@@ -75,18 +154,9 @@ export const StreamingHome = () => {
   const showImdbRatings = profile?.settings?.show_imdb_ratings !== false
   const showHero = true
 
-  // Find featured items (prioritize trending, then first items from first catalog or history)
-  let featuredItems: (MetaPreview | WatchHistoryItem)[] = []
-  
-  if (trending && trending.length > 0) {
-    featuredItems = trending
-  } else if (catalogs.length > 0 && catalogs[0].items.length > 0) {
-    featuredItems = catalogs[0].items.slice(0, 5)
-  } else if (history.length > 0) {
-    featuredItems = history.slice(0, 5)
-  }
-
-  const featuredItem = featuredItems.length > 0 ? featuredItems[0] : null
+  // Ensure index is valid (in case items change)
+  const currentIndex = featuredIndex >= featuredItems.length ? 0 : featuredIndex
+  const featuredItem = featuredItems.length > 0 ? featuredItems[currentIndex] : null
   const shouldShowHero = showHero && featuredItem && ((featuredItem as any).background || featuredItem.poster)
 
   return (
@@ -96,42 +166,89 @@ export const StreamingHome = () => {
       <div className={`${styles.streamingLayout} ${!showHero ? styles.streamingLayoutNoHero : ''}`}>
         {shouldShowHero && (
           <>
-            <div className={styles.pageAmbientBackground} id="ambientBackground" style={{
-              backgroundImage: `url(${(featuredItem as any).background || featuredItem?.poster})`
-            }}></div>
+            <AnimatePresence mode="sync">
+              <motion.div 
+                key={`ambient-${currentIndex}`}
+                className={styles.pageAmbientBackground} 
+                id="ambientBackground" 
+                style={{
+                  backgroundImage: `url(${(featuredItem as any).background || featuredItem?.poster})`
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.2, ease: "easeInOut" }}
+              />
+            </AnimatePresence>
             
             <div className={styles.heroSection} id="heroSection" data-items={JSON.stringify(featuredItems)}>
               <div className={styles.heroBackdrop} id="heroBackdrop">
-                {(featuredItem as any).background ? (
-                  <img src={(featuredItem as any).background} alt="Hero Background" id="heroImage" />
-                ) : featuredItem?.poster ? (
-                  <img src={featuredItem.poster} alt="Hero Background" id="heroImage" style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }} />
-                ) : (
-                  <div style={{ width: '100%', height: '100%', background: '#141414' }} id="heroImage"></div>
-                )}
+                <AnimatePresence mode="sync">
+                  {(featuredItem as any).background ? (
+                    <motion.img 
+                      key={`hero-bg-${currentIndex}`}
+                      src={(featuredItem as any).background} 
+                      alt="Hero Background" 
+                      id="heroImage"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1.2, ease: "easeInOut" }}
+                      style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : featuredItem?.poster ? (
+                    <motion.img 
+                      key={`hero-poster-${currentIndex}`}
+                      src={featuredItem.poster} 
+                      alt="Hero Background" 
+                      id="heroImage" 
+                      style={{ filter: 'blur(20px)', transform: 'scale(1.1)', position: 'absolute', width: '100%', height: '100%', objectFit: 'cover' }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1.2, ease: "easeInOut" }}
+                    />
+                  ) : (
+                    <motion.div 
+                      key={`hero-empty-${currentIndex}`}
+                      style={{ width: '100%', height: '100%', background: '#141414', position: 'absolute' }} 
+                      id="heroImage"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1.2, ease: "easeInOut" }}
+                    />
+                  )}
+                </AnimatePresence>
               </div>
               <div className={styles.heroOverlay}></div>
               <div className={styles.heroContent}>
-              <div className={styles.heroInfo} id="heroInfo">
-                {trending && trending.length > 0 && (
-                  <div className={styles.trendingChip} id="trendingChip">
-                    <TrendingUp size={16} />
-                    <span id="trendingText">#1 Trending Today</span>
-                  </div>
-                )}
-                <h1 className={styles.heroTitle} id="heroTitle">{(featuredItem as any).title || (featuredItem as any).name}</h1>
-                <p className={styles.heroDescription} id="heroDescription">{(featuredItem as any).description || 'Start watching now on Zentrio.'}</p>
-                <div className={styles.heroActions}>
-                  <a href={`/streaming/${profileId}/${(featuredItem as any).meta_type || (featuredItem as any).type}/${(featuredItem as any).meta_id || (featuredItem as any).id}`} className={`${styles.btnHero} ${styles.btnPlay}`} id="heroPlayBtn">
-                    <Play size={24} fill="currentColor" />
-                    Play Now
-                  </a>
-                  <a href={`/streaming/${profileId}/${(featuredItem as any).meta_type || (featuredItem as any).type}/${(featuredItem as any).meta_id || (featuredItem as any).id}`} className={`${styles.btnHero} ${styles.btnMore}`} id="heroMoreBtn">
-                    <Info size={24} />
-                    More Info
-                  </a>
-                </div>
-              </div>
+                <AnimatePresence mode="wait">
+                  <motion.div 
+                    key={`hero-info-${currentIndex}`}
+                    className={styles.heroInfo} 
+                    id="heroInfo"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                  >
+                    {trending && trending.length > 0 && (
+                      <div className={styles.trendingChip} id="trendingChip">
+                        <TrendingUp size={16} />
+                        <span id="trendingText">#{currentIndex + 1} Trending Today</span>
+                      </div>
+                    )}
+                    <h1 className={styles.heroTitle} id="heroTitle">{(featuredItem as any).title || (featuredItem as any).name}</h1>
+                    <p className={styles.heroDescription} id="heroDescription">{(featuredItem as any).description || 'Start watching now on Zentrio.'}</p>
+                    <div className={styles.heroActions}>
+                      <a href={`/streaming/${profileId}/${(featuredItem as any).meta_type || (featuredItem as any).type}/${(featuredItem as any).meta_id || (featuredItem as any).id}`} className={`${styles.btnHero} ${styles.btnPlay}`} id="heroPlayBtn">
+                        <Play size={24} fill="currentColor" />
+                        Play Now
+                      </a>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
           </>

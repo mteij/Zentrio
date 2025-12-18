@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { toast } from 'sonner'
 import Hls from 'hls.js'
 
 interface UsePlayerProps {
@@ -6,6 +7,9 @@ interface UsePlayerProps {
   videoRef: React.RefObject<HTMLVideoElement>
   autoPlay?: boolean
   onEnded?: () => void
+  behaviorHints?: {
+      notWebReady?: boolean
+  }
 }
 
 interface QualityLevel {
@@ -16,7 +20,7 @@ interface QualityLevel {
   label: string
 }
 
-export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayerProps) {
+export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHints }: UsePlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -46,6 +50,118 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     onEndedRef.current = onEnded
   }, [onEnded])
 
+    // Transcoder integration
+    const startTranscoding = useCallback(async () => {
+        try {
+            const video = videoRef.current;
+            if (!video) return;
+
+            toast.info("Attempting to transcode audio... (Beta 5MB Preview)")
+            const { transcoder } = await import('../services/transcoder/TranscoderService')
+            console.log('Starting transcoding for', url)
+            
+            // Setup MediaSource
+            const mediaSource = new MediaSource();
+            const originalSrc = video.src;
+            video.src = URL.createObjectURL(mediaSource);
+            
+            mediaSource.addEventListener('sourceopen', async () => {
+                try {
+                    // Simple codec detection based on URL
+                    const lowerUrl = url.toLowerCase();
+                    const isHevc = lowerUrl.includes('h265') || lowerUrl.includes('hevc');
+                    
+                    let videoCodec = 'avc1.42E01E'; // Default AVC (H.264)
+                    if (isHevc) {
+                        // Check for Main 10 / HDR features
+                        const isMain10 = lowerUrl.includes('hdr') || lowerUrl.includes('10bit') || lowerUrl.includes('dv') || lowerUrl.includes('dolby');
+                        // Main 10 Profile vs Main Profile
+                        videoCodec = isMain10 ? 'hev1.2.4.L153.B0' : 'hev1.1.6.L93.B0'; 
+                    }
+                    
+                    const mime = `video/mp4; codecs="${videoCodec}, mp4a.40.2"`;
+                    
+                    if (!MediaSource.isTypeSupported(mime)) {
+                         console.warn(`MSE: MIME type not supported: ${mime}. Trying fallback...`);
+                         // Try common Main 10 fallback or just generic generic hevc if available
+                         if (isHevc) videoCodec = 'hev1.1.6.L93.B0'; // Try Main profile as last ditch?
+                    }
+                    
+                    const finalMime = `video/mp4; codecs="${videoCodec}, mp4a.40.2"`;
+                    
+                    const supported = MediaSource.isTypeSupported(finalMime);
+                    console.log(`MSE: Final MIME: ${finalMime}, Supported: ${supported}`);
+                    
+                    if (!supported && isHevc) {
+                        // Fallback to a simpler codec string if specific one fails check
+                        // Note: If 'supported' is false, addSourceBuffer might throw, so we might want to change finalMime here
+                        // But for now let's just log it.
+                    }
+
+                    console.log("MSE: Adding SourceBuffer with mime:", finalMime);
+                    const sourceBuffer = mediaSource.addSourceBuffer(finalMime);
+                    
+                    await transcoder.transcode(url, (data, detectedCodec, hasAudio) => {
+                        console.log("Transcoded chunk received:", data.byteLength, "Codec:", detectedCodec, "Audio:", hasAudio)
+                        if (!sourceBuffer.updating && mediaSource.readyState === 'open') {
+                             try {
+                                // Dynamic Codec Switching (e.g. if file is actually H.264 but we thought HEVC)
+                                if (detectedCodec) {
+                                    const currentType = finalMime.split(';')[0]; // video/mp4
+                                    // Use specific codec params if possible, or just avc1/hev1 prefix checks
+                                    
+                                    // Handle Audio presence
+                                    const audioCodec = hasAudio !== false ? ', mp4a.40.2' : '';
+                                    
+                                    const newMime = `video/mp4; codecs="${detectedCodec}${audioCodec}"`;
+                                    
+                                    // Only change if significantly different (e.g. avc1 vs hev1)
+                                    // Simple check: if we are using avc1 but detected hevc, or vice versa
+                                    const isCurrentAvc = finalMime.includes('avc1');
+                                    const isNewAvc = detectedCodec.includes('avc1');
+                                    const isAudioDifferent = finalMime.includes('mp4a') && !hasAudio;
+                                    
+                                    if (isCurrentAvc !== isNewAvc || isAudioDifferent) {
+                                         console.warn(`MSE: Codec mismatch! Switching from ${finalMime} to ${newMime}`);
+                                         sourceBuffer.changeType(newMime);
+                                         // Update finalMime reference for next time (local var only, but effect persists for this buffer)
+                                         // Note: 'finalMime' is const in this scope, but changeType updates the SourceBuffer state.
+                                    }
+                                }
+
+                                // Wait for update to finish before closing stream
+                                sourceBuffer.addEventListener('updateend', () => {
+                                    if (mediaSource.readyState === 'open') {
+                                        mediaSource.endOfStream();
+                                    }
+                                }, { once: true });
+                                
+                                sourceBuffer.appendBuffer(data as any);
+                                // toast.success(`Playing transcoded segment (${Math.round(data.byteLength / 1024)}KB)`)
+                            } catch (e) {
+                                console.error("MSE Append Error", e)
+                                toast.error("MSE Append Error: " + String(e));
+                            }
+                        }
+                    })
+                    
+                    // Removed immediate endOfStream call to avoid race condition
+                    // if (mediaSource.readyState === 'open') {
+                    //    mediaSource.endOfStream();
+                    // }
+                } catch (e) {
+                    console.error("MSE Error", e);
+                    toast.error("MSE Setup Error: " + String(e));
+                    video.src = originalSrc; // Fallback
+                }
+            }, { once: true });
+           
+        } catch (e) {
+            console.error("Transcoding start failed", e)
+            toast.error("Transcoding failed: " + (e instanceof Error ? e.message : String(e)))
+        }
+    }, [url])
+
   // Detect if running in Tauri (native app) - use native video decoding
   const isTauri = useMemo(() => !!(window as any).__TAURI__, [])
 
@@ -60,11 +176,26 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     setError(null)
     setQualityLevels([])
     setCurrentQualityState(-1)
+    
+    // Check hints
+    if (behaviorHints?.notWebReady) {
+        console.warn("Stream marked as not web ready (likely unsupported audio). Readying transcoder...")
+        startTranscoding()
+    }
+
+    /* ... rest of hook unchanged ... */
 
     const isHls = url.includes('.m3u8')
 
     const handleError = (e: Event | string) => {
+      const video = videoRef.current
       console.error('Player error:', e)
+      if (video?.error) {
+        console.error('Video Error Details:', {
+            code: video.error.code,
+            message: video.error.message
+        })
+      }
       setError('Playback error occurred')
       setIsBuffering(false)
     }
@@ -162,6 +293,16 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
         capLevelToPlayerSize: true,
       })
       hlsRef.current = hls
+      
+      // Error handling for CODEC issues
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.details === Hls.ErrorDetails.BUFFER_ADD_CODEC_ERROR || data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR) {
+              // Potential codec issue, try transcoding?
+              console.warn("HLS Error hit, checking for transcoding need...", data)
+              startTranscoding()
+          }
+      })
+      
       hls.loadSource(url)
       hls.attachMedia(video)
       
@@ -213,6 +354,9 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
       }
     } else {
       // Regular video source
+      // Check if we suspect unsupported audio? 
+      // We can hook into 'error' event on video too
+      
       video.src = url
       if (autoPlay) {
         video.addEventListener('canplaythrough', () => {
@@ -242,7 +386,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
         hlsRef.current = null
       }
     }
-  }, [url, videoRef, autoPlay, isTauri]) // Removed onEnded from deps - using ref instead
+  }, [url, videoRef, autoPlay, isTauri, startTranscoding]) // Removed onEnded from deps - using ref instead
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current

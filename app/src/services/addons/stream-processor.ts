@@ -67,7 +67,16 @@ export interface StreamConfig {
     cached?: string[]
     uncached?: string[]
   }
+  // Extended sorting config with direction support
+  sortingConfig?: {
+    items: {
+      id: string
+      enabled: boolean
+      direction: 'asc' | 'desc'
+    }[]
+  }
 }
+
 
 export interface ParsedStream {
   original: Stream
@@ -153,23 +162,35 @@ export class StreamProcessor {
     if (combined.includes('10bit')) parsed.visualTags?.push('10bit')
 
     // Audio Tags
-    if (combined.includes('atmos')) parsed.audioTags?.push('atmos')
-    if (combined.includes('dts') || combined.includes('dtshd') || combined.includes('dts-hd')) parsed.audioTags?.push('dts')
-    if (combined.includes('truehd')) parsed.audioTags?.push('truehd')
-    if (combined.includes('dd+') || combined.includes('eac3')) parsed.audioTags?.push('eac3')
-    if (combined.includes('ac3') || combined.includes('dd5.1') || combined.includes('dd 5.1')) parsed.audioTags?.push('ac3')
+    const audioPatterns = {
+        atmos: /\b(atmos)\b/i,
+        dts: /\b(dts(-?hd)?)(?:$|[^\w]|\d|_)/i,
+        truehd: /\b(truehd)\b/i,
+        eac3: /\b(ddp|eac-?3|dd\+)(?:$|[^\w]|\d|_)/i,
+        ac3: /\b(ac-?3|dd[\s\.]?5\.?1)(?:$|[^\w]|\d|_)/i,
+        aac: /\b(aac)(?:$|[^\w]|\d|_)/i,
+        mp3: /\b(mp3)(?:$|[^\w]|\d|_)/i,
+        opus: /\b(opus)(?:$|[^\w]|\d|_)/i,
+        flac: /\b(flac)(?:$|[^\w]|\d|_)/i
+    }
+
+    if (audioPatterns.atmos.test(combined)) parsed.audioTags?.push('atmos')
+    if (audioPatterns.dts.test(combined)) parsed.audioTags?.push('dts')
+    if (audioPatterns.truehd.test(combined)) parsed.audioTags?.push('truehd')
+    if (audioPatterns.eac3.test(combined)) parsed.audioTags?.push('eac3')
+    if (audioPatterns.ac3.test(combined)) parsed.audioTags?.push('ac3')
     
-    if (combined.includes('aac')) parsed.audioTags?.push('aac')
-    if (combined.includes('mp3')) parsed.audioTags?.push('mp3')
-    if (combined.includes('opus')) parsed.audioTags?.push('opus')
-    if (combined.includes('flac')) parsed.audioTags?.push('flac')
+    if (audioPatterns.aac.test(combined)) parsed.audioTags?.push('aac')
+    if (audioPatterns.mp3.test(combined)) parsed.audioTags?.push('mp3')
+    if (audioPatterns.opus.test(combined)) parsed.audioTags?.push('opus')
+    if (audioPatterns.flac.test(combined)) parsed.audioTags?.push('flac')
     
     if (combined.includes('multi') || combined.includes('dual') || combined.match(/[a-z]{3}-[a-z]{3}/i)) parsed.audioTags?.push('multi')
 
     // Audio Channels
-    if (combined.includes('7.1')) parsed.audioChannels?.push('7.1')
-    if (combined.includes('5.1')) parsed.audioChannels?.push('5.1')
-    if (combined.includes('2.0')) parsed.audioChannels?.push('2.0')
+    if (combined.match(/\b7\.1(?!\.?\d)\b/) || combined.match(/(?:dd|ddp|truehd|dts|dtshd|flac)7\.1/i)) parsed.audioChannels?.push('7.1')
+    if (combined.match(/\b5\.1(?!\.?\d)\b/) || combined.match(/(?:dd|ddp|truehd|dts|dtshd|flac)5\.1/i)) parsed.audioChannels?.push('5.1')
+    if (combined.match(/\b2\.0(?!\.?\d)\b/) || combined.match(/(?:aac|mp3|flac|dd|ddp)2\.0/i)) parsed.audioChannels?.push('2.0')
 
     // Size (Regex for size like 1.5GB, 1000MB)
     const sizeMatch = combined.match(/(\d+(?:\.\d+)?)\s*(gb|mb|kb)/i)
@@ -247,18 +268,23 @@ export class StreamProcessor {
       if (!this.checkFilter(filters.audioTag, s.parsed.audioTags)) return false
 
       // Mark unsupported audio for web
-      if (this.platform === 'web' && filters.audioTag?.preferred && filters.audioTag.preferred.length > 0) {
-          // Only mark if we detected audio tags but none of them are preferred
-          // If we detected NO audio tags, we give it the benefit of the doubt (avoid false positives)
-          if (s.parsed.audioTags && s.parsed.audioTags.length > 0) {
-              const hasPreferred = s.parsed.audioTags.some(tag => filters.audioTag.preferred!.includes(tag));
-              if (!hasPreferred) {
-                  // Mark as not web ready
-                  if (!s.original.behaviorHints) {
-                      s.original.behaviorHints = {};
-                  }
-                  s.original.behaviorHints.notWebReady = true;
-              }
+      if (this.platform === 'web') {
+          // List of audio codecs not natively supported by browsers (generally)
+          // AC3 (Dolby Digital), EAC3 (DD+), DTS, TrueHD
+          const unsupportedCodecs = ['ac3', 'eac3', 'dts', 'truehd'];
+          
+          let isUnsupported = false;
+          
+          // Check if any detected tag is unsupported
+          if (s.parsed.audioTags && s.parsed.audioTags.some(tag => unsupportedCodecs.includes(tag))) {
+              isUnsupported = true;
+          }
+          
+          if (isUnsupported) {
+               if (!s.original.behaviorHints) {
+                   s.original.behaviorHints = {};
+               }
+               s.original.behaviorHints.notWebReady = true;
           }
       }
 
@@ -332,56 +358,119 @@ export class StreamProcessor {
   }
 
   private sortStreams(streams: ParsedStream[], meta: MetaDetail): ParsedStream[] {
-    // Calculate scores based on preferred options
-    streams.forEach(s => {
-      s.score = 0
-      const { filters } = this.config
-      
-      if (!filters) return;
+    // Get sorting configuration
+    const sortingItems = this.config.sortingConfig?.items?.filter(i => i.enabled) || []
+    
+    console.log(`[StreamProcessor] Sorting with ${sortingItems.length} criteria:`, sortingItems.map(i => `${i.id}(${i.direction})`).join(', '))
+    
+    // If no sorting config, fall back to score-based sorting
+    if (sortingItems.length === 0) {
 
-      // Preferred Resolution
-      if (filters.resolution?.preferred && s.parsed.resolution) {
-          const idx = filters.resolution.preferred.indexOf(s.parsed.resolution)
-          if (idx !== -1) {
-              s.score += (filters.resolution.preferred.length - idx) * 10
-          } else if (filters.resolution.required && filters.resolution.required.length > 0) {
-              // If we have required resolutions, but this stream matches none of the preferred ones
-              // (which implies it matched a required one that isn't preferred, if that's even possible given mutual exclusivity),
-              // we don't add extra score.
-              // However, if the user has BOTH required and preferred, and they are mutually exclusive (as enforced by UI),
-              // then a stream can't be both required and preferred.
-              // BUT, the filter logic passes streams that match ANY required.
-              // So if I require 1080p, only 1080p streams pass.
-              // If I also prefer 4k (which is impossible in UI now), it wouldn't matter.
-              // If I require 1080p AND 720p (meaning either is fine), and I prefer 1080p,
-              // then 1080p gets a score boost, 720p doesn't.
-              // This logic holds.
-          }
+      // Calculate scores based on preferred options (legacy behavior)
+      streams.forEach(s => {
+        s.score = 0
+        const { filters } = this.config
+        
+        if (!filters) return;
+
+        // Preferred Resolution
+        if (filters.resolution?.preferred && s.parsed.resolution) {
+            const idx = filters.resolution.preferred.indexOf(s.parsed.resolution)
+            if (idx !== -1) {
+                s.score += (filters.resolution.preferred.length - idx) * 10
+            }
+        }
+        
+        // Preferred Keywords
+        if (filters.keyword?.preferred && s.parsed.title) {
+            filters.keyword.preferred.forEach((k, i) => {
+                if (s.parsed.title!.toLowerCase().includes(k.toLowerCase())) {
+                    s.score += (filters.keyword!.preferred!.length - i) * 5
+                }
+            })
+        }
+        
+        // Seeders (more is better)
+        if (s.parsed.seeders) {
+            s.score += Math.min(s.parsed.seeders, 100) / 10
+        }
+        
+        // Size (larger is usually better quality, up to a point)
+        if (s.parsed.size) {
+            s.score += Math.min(s.parsed.size / (1024*1024*1024), 50)
+        }
+      })
+
+      return streams.sort((a, b) => b.score - a.score)
+    }
+
+    // Resolution priority map (higher = better)
+    const resolutionPriority: Record<string, number> = {
+      '4k': 100, '2160p': 100,
+      '1440p': 80,
+      '1080p': 60, 'fhd': 60,
+      '720p': 40, 'hd': 40,
+      '480p': 20, 'sd': 20,
+      'unknown': 0
+    }
+
+    // Sort using configured criteria in priority order
+    return streams.sort((a, b) => {
+      for (const sortItem of sortingItems) {
+        let comparison = 0
+        const multiplier = sortItem.direction === 'desc' ? 1 : -1
+
+        switch (sortItem.id) {
+          case 'cached':
+            // Cached streams should sort higher (or lower if asc)
+            const aCached = a.parsed.isCached ? 1 : 0
+            const bCached = b.parsed.isCached ? 1 : 0
+            comparison = (bCached - aCached) * multiplier
+            break
+
+          case 'resolution':
+            const aRes = resolutionPriority[a.parsed.resolution?.toLowerCase() || 'unknown'] || 0
+            const bRes = resolutionPriority[b.parsed.resolution?.toLowerCase() || 'unknown'] || 0
+            comparison = (bRes - aRes) * multiplier
+            break
+
+          case 'size':
+            const aSize = a.parsed.size || 0
+            const bSize = b.parsed.size || 0
+            comparison = (bSize - aSize) * multiplier
+            break
+
+          case 'seeders':
+            const aSeeders = a.parsed.seeders || 0
+            const bSeeders = b.parsed.seeders || 0
+            comparison = (bSeeders - aSeeders) * multiplier
+            break
+
+          case 'quality':
+            // Quality based on encode and visual tags
+            const aQuality = (a.parsed.visualTags?.length || 0) + (a.parsed.encode?.includes('hevc') ? 2 : 0) + (a.parsed.encode?.includes('av1') ? 3 : 0)
+            const bQuality = (b.parsed.visualTags?.length || 0) + (b.parsed.encode?.includes('hevc') ? 2 : 0) + (b.parsed.encode?.includes('av1') ? 3 : 0)
+            comparison = (bQuality - aQuality) * multiplier
+            break
+
+          case 'language':
+            // Language preference - check if any preferred languages match
+            const preferredLangs = this.config.filters?.language?.preferred || []
+            const aHasPreferred = a.parsed.languages?.some(l => preferredLangs.includes(l)) ? 1 : 0
+            const bHasPreferred = b.parsed.languages?.some(l => preferredLangs.includes(l)) ? 1 : 0
+            comparison = (bHasPreferred - aHasPreferred) * multiplier
+            break
+
+          default:
+            break
+        }
+
+        if (comparison !== 0) return comparison
       }
-      
-      // Preferred Keywords
-      if (filters.keyword?.preferred && s.parsed.title) {
-          filters.keyword.preferred.forEach((k, i) => {
-              if (s.parsed.title!.toLowerCase().includes(k.toLowerCase())) {
-                  s.score += (filters.keyword!.preferred!.length - i) * 5
-              }
-          })
-      }
-      
-      // Seeders (more is better)
-      if (s.parsed.seeders) {
-          s.score += Math.min(s.parsed.seeders, 100) / 10
-      }
-      
-      // Size (larger is usually better quality, up to a point)
-      if (s.parsed.size) {
-          s.score += Math.min(s.parsed.size / (1024*1024*1024), 50) // Cap at 50GB contribution
-      }
+      return 0
     })
-
-    // Sort by score descending
-    return streams.sort((a, b) => b.score - a.score)
   }
+
 
   private deduplicateStreams(streams: ParsedStream[]): ParsedStream[] {
     const { deduplication } = this.config

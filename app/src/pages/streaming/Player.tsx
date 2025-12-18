@@ -22,7 +22,7 @@ import {
   X,
   Monitor
 } from 'lucide-react'
-import { Layout, LoadingSpinner } from '../../components'
+import { Layout, SkeletonPlayer } from '../../components'
 import { Stream } from '../../services/addons/types'
 import { usePlayer } from '../../hooks/usePlayer'
 import { useSubtitles } from '../../hooks/useSubtitles'
@@ -113,7 +113,8 @@ export const StreamingPlayer = () => {
     url: stream?.url || '',
     videoRef: videoRef as React.RefObject<HTMLVideoElement>,
     autoPlay: true,
-    onEnded: handleVideoEnded
+    onEnded: handleVideoEnded,
+    behaviorHints: stream?.behaviorHints
   })
 
   // Subtitle hook
@@ -446,7 +447,7 @@ export const StreamingPlayer = () => {
     return <Volume2 size={20} />
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) return <SkeletonPlayer />
   if (error || playerError) {
     return (
       <div className="flex items-center justify-center h-screen bg-black text-red-500">
@@ -499,7 +500,10 @@ export const StreamingPlayer = () => {
                     <span className={styles.episodeBadge}>S{meta.season}:E{meta.episode}</span>
                   )}
                 </div>
-                <div className={styles.streamInfo}>{stream.title || stream.name || 'Playing'}</div>
+                <div className={styles.streamInfo}>
+                    {stream.title || stream.name || 'Playing'}
+                    {/* Placeholder for transcoding state if exposed from usePlayer */}
+                </div>
               </div>
             </div>
 

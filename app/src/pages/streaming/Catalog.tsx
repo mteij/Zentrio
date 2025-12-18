@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Layout, Navbar, RatingBadge, LazyImage, LoadingSpinner } from '../../components'
+import { Layout, Navbar, RatingBadge, LazyImage, SkeletonCard } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import styles from '../../styles/Streaming.module.css'
 
@@ -83,7 +83,31 @@ export const StreamingCatalog = () => {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   if (isLoading) {
-    return <LoadingSpinner />
+    return (
+      <Layout title="Loading..." showHeader={false} showFooter={false}>
+        <Navbar profileId={parseInt(profileId!)} />
+        <button onClick={() => navigate(-1)} className={styles.backBtn}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+          </svg>
+          Back
+        </button>
+        <div className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}>
+          <div className={styles.contentContainer}>
+            <div className={styles.rowHeader}>
+              <div style={{ width: '200px', height: '40px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
+                <div className={styles.skeletonShimmer} />
+              </div>
+            </div>
+            <div className={styles.mediaGrid}>
+              {Array.from({ length: 20 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
   if (error) {

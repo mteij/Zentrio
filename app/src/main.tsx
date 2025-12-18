@@ -65,7 +65,7 @@ function AppRoutes() {
   }
   
   return (
-    <Suspense fallback={<LoadingSpinner fullScreen size="lg" />}>
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#141414' }} />}>
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<LandingPage version="2.0.0" />} />
         <Route path="/signin" element={<SignInPage />} />

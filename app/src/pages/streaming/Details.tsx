@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Play, Plus, Check, ArrowLeft, Box, VolumeX } from 'lucide-react'
-import { Layout, LazyImage, RatingBadge, LoadingSpinner } from '../../components'
+import { Play, Plus, Check, ArrowLeft, Box, VolumeX, Filter, Zap, HardDrive, Wifi } from 'lucide-react'
+
+import { Layout, LazyImage, RatingBadge, SkeletonDetails, SkeletonStreamList } from '../../components'
 import { MetaDetail, Stream, Manifest } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
+import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
 
 interface StreamingDetailsData {
@@ -24,6 +26,8 @@ export const StreamingDetails = () => {
   const [episodes, setEpisodes] = useState<any[]>([])
   const [view, setView] = useState<'details' | 'episodes' | 'streams'>('details')
   const [selectedEpisode, setSelectedEpisode] = useState<{ season: number, number: number, title: string } | null>(null)
+  const [selectedAddon, setSelectedAddon] = useState<string | null>(null)
+
 
   useEffect(() => {
     if (!profileId || !type || !id) {
@@ -59,6 +63,7 @@ export const StreamingDetails = () => {
 
   const loadStreams = async (season?: number, episode?: number, overrideId?: string, autoPlay: boolean = false) => {
     setStreamsLoading(true)
+    setSelectedAddon(null) // Reset addon filter when loading new streams
     try {
       const fetchId = overrideId || data?.meta.imdb_id || id
       let url = `/api/streaming/streams/${type}/${fetchId}?profileId=${profileId}`
@@ -74,14 +79,73 @@ export const StreamingDetails = () => {
         const firstGroup = streamData.streams[0]
         if (firstGroup?.streams?.length > 0) {
           handlePlay(firstGroup.streams[0])
-          return // Exit early since we're navigating away
+          return { success: true } // Signal success for toast
         }
+        throw new Error('No streams available')
       }
+      return { success: true }
     } catch (e) {
       console.error('Failed to load streams', e)
+      throw e
     } finally {
       setStreamsLoading(false)
     }
+  }
+
+  // Filter streams by selected addon
+  const filteredStreams = useMemo(() => {
+    if (!selectedAddon) return streams
+    return streams.filter(group => group.addon.id === selectedAddon)
+  }, [streams, selectedAddon])
+
+  // Helper to parse stream information
+  const parseStreamInfo = (stream: Stream) => {
+    const title = stream.title || stream.name || ''
+    const desc = stream.description || ''
+    const combined = `${title} ${desc}`.toLowerCase()
+    
+    // Resolution
+    let resolution = ''
+    if (combined.includes('4k') || combined.includes('2160p')) resolution = '4K'
+    else if (combined.includes('1080p')) resolution = '1080p'
+    else if (combined.includes('720p')) resolution = '720p'
+    else if (combined.includes('480p')) resolution = '480p'
+    
+    // Size
+    const sizeMatch = combined.match(/(\d+(?:\.\d+)?)\s*(gb|mb)/i)
+    let size = ''
+    if (sizeMatch) {
+      const val = parseFloat(sizeMatch[1])
+      const unit = sizeMatch[2].toUpperCase()
+      size = `${val} ${unit}`
+    }
+    
+    // Cached status
+    const isCached = combined.includes('cached') || title.includes('+') || title.includes('⚡')
+    
+    // HDR/DV
+    const hasHDR = combined.includes('hdr')
+    const hasDV = combined.includes('dv') || combined.includes('dolby vision')
+    
+    return { resolution, size, isCached, hasHDR, hasDV }
+  }
+
+  // Count total streams
+  const totalStreamCount = useMemo(() => {
+    return streams.reduce((acc, group) => acc + group.streams.length, 0)
+  }, [streams])
+
+
+  const handleQuickPlay = (season: number, number: number, title: string) => {
+    setSelectedEpisode({ season, number, title })
+    toast.promise(
+      loadStreams(season, number, undefined, true),
+      {
+        loading: `Loading S${season}:E${number}...`,
+        success: 'Starting playback...',
+        error: 'No streams found'
+      }
+    )
   }
 
   const handlePlay = (stream: Stream) => {
@@ -111,7 +175,17 @@ export const StreamingDetails = () => {
   }
 
   if (loading) {
-    return <LoadingSpinner />
+    return (
+      <Layout title="Loading..." showHeader={false} showFooter={false}>
+        <button onClick={() => navigate(-1)} className={styles.backBtn}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+          </svg>
+          Back
+        </button>
+        <SkeletonDetails />
+      </Layout>
+    )
   }
 
   if (error || !data) {
@@ -200,38 +274,53 @@ export const StreamingDetails = () => {
                     })()}
                   </select>
                 </div>
-                <div className="episode-list">
+                <div className={styles.episodeList}>
                   {meta.videos.filter((v: any) => v.season === selectedSeason).map((ep: any) => (
                     <div
                         key={ep.id || `${ep.season}-${ep.number}`}
-                        className="episode-item"
+                        className={styles.episodeItem}
                         onClick={() => handleEpisodeSelect(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`, false)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '16px',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: '8px',
-                          marginBottom: '8px',
-                          cursor: 'pointer',
-                          transition: 'background 0.2s'
-                        }}
                     >
-                        <div className="episode-info" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <span className="episode-number" style={{ fontWeight: 'bold', color: '#aaa', minWidth: '24px' }}>{ep.number}.</span>
-                            <span className="episode-title" style={{ fontWeight: 500 }}>{ep.title || ep.name || `Episode ${ep.number}`}</span>
+                        <div className={styles.episodeThumbnail}>
+                          {ep.thumbnail ? (
+                            <LazyImage src={ep.thumbnail} alt={ep.title || ep.name || `Episode ${ep.number}`} />
+                          ) : (
+                            <div className={styles.episodeThumbnailPlaceholder}>
+                              <Play size={24} />
+                            </div>
+                          )}
+                          <span className={styles.episodeNumber}>{ep.number}</span>
                         </div>
-                        <button 
-                            className="action-btn btn-primary-glass" 
-                            style={{ padding: '8px' }}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleEpisodeSelect(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`, true)
-                            }}
-                        >
-                            <Play size={16} />
-                        </button>
+                        <div className={styles.episodeContent}>
+                          <div className={styles.episodeHeader}>
+                            <span className={styles.episodeTitle}>{ep.title || ep.name || `Episode ${ep.number}`}</span>
+                            <button 
+                                className={styles.episodePlayBtn}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleQuickPlay(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`)
+                                }}
+                                title="Quick play"
+                            >
+                                <Play size={22} fill="currentColor" />
+                            </button>
+                          </div>
+                          <div className={styles.episodeMeta}>
+                            {showImdbRatings && ep.rating && (
+                              <span className={styles.episodeRating}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="#f5c518"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                                {typeof ep.rating === 'number' ? ep.rating.toFixed(1) : ep.rating}
+                              </span>
+                            )}
+                            {showAgeRatings && (ep.certification || ep.contentRating) && (
+                              <span className={styles.episodeAge}>{ep.certification || ep.contentRating}</span>
+                            )}
+                            {ep.runtime && <span className={styles.episodeRuntime}>{ep.runtime}</span>}
+                          </div>
+                          {ep.overview && (
+                            <p className={styles.episodeDescription}>{ep.overview}</p>
+                          )}
+                        </div>
                     </div>
                   ))}
                 </div>
@@ -252,14 +341,30 @@ export const StreamingDetails = () => {
                         </div>
                     )}
 
-                    {streamsLoading ? (
-                        <div className="flex flex-col items-center p-5">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mb-2"></div>
-                            <p className="text-gray-400">Loading streams...</p>
+                    {/* Addon Filter */}
+                    {!streamsLoading && streams.length > 1 && (
+                        <div className={styles.addonFilter}>
+                            <Filter size={16} />
+                            <select
+                                value={selectedAddon || ''}
+                                onChange={(e) => setSelectedAddon(e.target.value || null)}
+                                className={styles.addonFilterSelect}
+                            >
+                                <option value="">All Sources ({totalStreamCount})</option>
+                                {streams.map((group) => (
+                                    <option key={group.addon.id} value={group.addon.id}>
+                                        {group.addon.name} ({group.streams.length})
+                                    </option>
+                                ))}
+                            </select>
                         </div>
-                    ) : streams.length > 0 ? (
+                    )}
+
+                    {streamsLoading ? (
+                        <SkeletonStreamList />
+                    ) : filteredStreams.length > 0 ? (
                         <div className="streams-list-wrapper">
-                            {streams.map((group, idx) => (
+                            {filteredStreams.map((group, idx) => (
                                 <div key={idx} className={styles.addonGroup}>
                                     <div className={styles.addonTitle}>
                                         {group.addon.logo_url ? (
@@ -268,39 +373,75 @@ export const StreamingDetails = () => {
                                             <Box size={16} />
                                         )}
                                         {group.addon.name}
+                                        <span className={styles.addonCount}>{group.streams.length}</span>
                                     </div>
                                     <div className={styles.streamList}>
-                                        {group.streams.map((stream, sIdx) => (
-                                            <div
-                                                key={sIdx}
-                                                className={styles.streamItem}
-                                                onClick={() => handlePlay(stream)}
-                                            >
-                                                <div className={styles.streamName}>
-                                                    {stream.title || stream.name || `Stream ${sIdx + 1}`}
-                                                    {stream.behaviorHints?.notWebReady && (
-                                                        <span
-                                                            style={{ color: '#ff4444', marginLeft: '8px', verticalAlign: 'middle', display: 'inline-flex' }}
-                                                            title="Audio format may not be supported in browser"
-                                                        >
-                                                            <VolumeX size={16} />
-                                                        </span>
+                                        {group.streams.map((stream, sIdx) => {
+                                            const info = parseStreamInfo(stream)
+                                            return (
+                                                <div
+                                                    key={sIdx}
+                                                    className={`${styles.streamItem} ${info.isCached ? styles.streamCached : ''}`}
+                                                    onClick={() => handlePlay(stream)}
+                                                >
+                                                    <div className={styles.streamHeader}>
+                                                        <div className={styles.streamName}>
+                                                            {stream.title || stream.name || `Stream ${sIdx + 1}`}
+                                                        </div>
+                                                        <div className={styles.streamBadges}>
+                                                            {info.isCached && (
+                                                                <span className={`${styles.streamBadge} ${styles.badgeCached}`} title="Cached">
+                                                                    <Zap size={12} />
+                                                                </span>
+                                                            )}
+                                                            {info.resolution && (
+                                                                <span className={`${styles.streamBadge} ${styles.badgeResolution}`}>
+                                                                    {info.resolution}
+                                                                </span>
+                                                            )}
+                                                            {info.size && (
+                                                                <span className={`${styles.streamBadge} ${styles.badgeSize}`}>
+                                                                    <HardDrive size={10} />
+                                                                    {info.size}
+                                                                </span>
+                                                            )}
+                                                            {info.hasHDR && (
+                                                                <span className={`${styles.streamBadge} ${styles.badgeHDR}`}>HDR</span>
+                                                            )}
+                                                            {info.hasDV && (
+                                                                <span className={`${styles.streamBadge} ${styles.badgeDV}`}>DV</span>
+                                                            )}
+                                                            {stream.behaviorHints?.notWebReady && (
+                                                                <span className={`${styles.streamBadge} ${styles.badgeWarning}`} title="Audio may not be supported in browser">
+                                                                    <VolumeX size={12} />
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {stream.description && (
+                                                        <div className={styles.streamDetails}>{stream.description}</div>
                                                     )}
                                                 </div>
-                                                <div className={styles.streamDetails}>{stream.description || ''}</div>
-                                            </div>
-                                        ))}
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="p-5 text-center text-gray-400">
-                            No streams found.
+                        <div className="flex flex-col items-center justify-center py-16 px-4 bg-white/5 rounded-xl border border-white/5 text-center">
+                            <div className="bg-white/10 p-4 rounded-full mb-4">
+                                <Wifi size={32} className="text-gray-400 opacity-50" />
+                            </div>
+                            <h3 className="text-lg font-medium text-white mb-2">No streams found</h3>
+                            <p className="text-sm text-gray-400 max-w-md">
+                                We couldn't find any streams for this content. Try adjusting your filters or checking your installed addons.
+                            </p>
                         </div>
                     )}
                 </div>
             )}
+
           </div>
         </div>
       </div>

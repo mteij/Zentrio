@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Monitor, Disc } from 'lucide-react'
 import { Button, Toggle, SettingsProfileSelector } from '../index'
 import styles from '../../styles/Settings.module.css'
+
 
 interface StreamingSettingsData {
   resolutions: { id: string; enabled: boolean }[]
@@ -131,8 +132,26 @@ export function StreamingSettings() {
               }
           }
 
-          // Sorting
-          if (loaded.sorting?.global) {
+          // Sorting - prefer sortingConfig if available (has direction info)
+          if (loaded.sortingConfig?.items) {
+              const newSorting: any[] = []
+              loaded.sortingConfig.items.forEach((item: any) => {
+                  const def = DEFAULT_SETTINGS.sorting.find(s => s.id === item.id)
+                  if (def) newSorting.push({ 
+                      ...def, 
+                      enabled: item.enabled, 
+                      direction: item.direction || def.direction 
+                  })
+              })
+              // Add any missing items from defaults
+              DEFAULT_SETTINGS.sorting.forEach(def => {
+                  if (!newSorting.find(s => s.id === def.id)) {
+                      newSorting.push({ ...def, enabled: false })
+                  }
+              })
+              merged.sorting = newSorting
+          } else if (loaded.sorting?.global) {
+              // Legacy format fallback
               const newSorting: any[] = []
               loaded.sorting.global.forEach((id: string) => {
                   const def = DEFAULT_SETTINGS.sorting.find(s => s.id === id)
@@ -146,6 +165,7 @@ export function StreamingSettings() {
               })
               merged.sorting = newSorting
           }
+
 
           // Legacy/Direct properties (fallback or custom fields)
           if (loaded.parental) merged.parental = loaded.parental
@@ -184,11 +204,20 @@ export function StreamingSettings() {
         sorting: {
             global: newSettings.sorting.filter(s => s.enabled).map(s => s.id)
         },
+        // Extended sorting config with direction support
+        sortingConfig: {
+            items: newSettings.sorting.map(s => ({
+                id: s.id,
+                enabled: s.enabled,
+                direction: s.direction
+            }))
+        },
         // Custom fields
         parental: newSettings.parental,
         sortingEnabled: newSettings.sortingEnabled,
         qualities: newSettings.qualities
     }
+
 
     try {
       const res = await fetch(`/api/streaming/settings?settingsProfileId=${currentProfileId}`, {
@@ -326,7 +355,7 @@ export function StreamingSettings() {
                             {settings.resolutions.map((res, index) => (
                                 <div
                                     key={res.id}
-                                    className={`${styles.optionCard} ${res.enabled ? styles.selected : ''}`}
+                                    className={`${styles.optionCard} ${styles.resolutionCard} ${res.enabled ? styles.selected : ''}`}
                                     onClick={() => toggleResolution(res.id)}
                                     draggable
                                     onDragStart={(e) => handleDragStart(e, 'resolution', index)}
@@ -334,7 +363,10 @@ export function StreamingSettings() {
                                     onDrop={(e) => handleDrop(e, 'resolution', index)}
                                     style={{ cursor: 'grab' }}
                                 >
-                                    <span className={styles.optionLabel} style={{ flex: 1 }}>{res.id}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <Monitor size={16} className={styles.optionIcon} />
+                                        <span className={styles.optionLabel} style={{ flex: 1 }}>{res.id}</span>
+                                    </div>
                                     <span className={styles.optionCheck}>✓</span>
                                 </div>
                             ))}
@@ -350,10 +382,13 @@ export function StreamingSettings() {
                             {DEFAULT_SETTINGS.qualities.map(qual => (
                                 <div 
                                     key={qual} 
-                                    className={`${styles.optionCard} ${settings.qualities.includes(qual) ? styles.selected : ''}`}
+                                    className={`${styles.optionCard} ${styles.qualityCard} ${settings.qualities.includes(qual) ? styles.selected : ''}`}
                                     onClick={() => toggleQuality(qual)}
                                 >
-                                    <span className={styles.optionLabel}>{qual}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <Disc size={16} className={styles.optionIcon} />
+                                        <span className={styles.optionLabel}>{qual}</span>
+                                    </div>
                                     <span className={styles.optionCheck}>✓</span>
                                 </div>
                             ))}
@@ -392,30 +427,37 @@ export function StreamingSettings() {
                             {settings.sorting.map((item, index) => (
                                 <div
                                     key={item.id}
-                                    className={styles.sortableItem}
+                                    className={`${styles.sortableItem} ${item.id === 'resolution' ? styles.resolutionItem : ''} ${item.id === 'quality' ? styles.qualityItem : ''}`}
                                     draggable
                                     onDragStart={(e) => handleDragStart(e, 'sorting', index)}
                                     onDragOver={(e) => handleDragOver(e, index)}
                                     onDrop={(e) => handleDrop(e, 'sorting', index)}
                                 >
-                                    <div className={styles.sortHandle} style={{ cursor: 'grab', padding: '10px' }}>
+                                    <div className={styles.sortHandle}>
                                         ☰
                                     </div>
                                     <div className={styles.sortContent}>
                                         <div className={styles.sortLeft}>
-                                            <div className={styles.sortLabel}>
-                                                {item.name}
+                                            <label className={styles.sortLabel}>
                                                 <input
                                                     type="checkbox"
                                                     checked={item.enabled}
                                                     onChange={() => toggleSortItem(item.id)}
-                                                    style={{ marginLeft: '10px' }}
                                                 />
-                                            </div>
+                                                {item.id === 'resolution' && <Monitor size={16} className="mr-2" style={{marginRight: '6px'}} />}
+                                                {item.id === 'quality' && <Disc size={16} className="mr-2" style={{marginRight: '6px'}} />}
+                                                {item.name}
+                                            </label>
                                         </div>
                                         <div className={styles.sortRight}>
                                             <button className={styles.sortDirectionBtn} onClick={() => toggleSortDirection(item.id)}>
-                                                <i>{item.direction === 'asc' ? '↑' : '↓'}</i> {item.directionLabels ? (item.direction === 'asc' ? item.directionLabels.asc : item.directionLabels.desc) : (item.direction === 'asc' ? 'Ascending' : 'Descending')}
+                                                <i>{item.direction === 'asc' ? '↑' : '↓'}</i>
+                                                <span>
+                                                    {item.directionLabels ? 
+                                                        (item.direction === 'asc' ? item.directionLabels.asc : item.directionLabels.desc) : 
+                                                        (item.direction === 'asc' ? 'Asc' : 'Desc')
+                                                    }
+                                                </span>
                                             </button>
                                         </div>
                                     </div>

@@ -24,6 +24,9 @@
   "dependencies": {
     "@dicebear/collection": "^9.2.4",
     "@dicebear/core": "^9.2.4",
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@hono/node-server": "^1.19.6",
     "@tanstack/react-query": "^5.90.11",
     "@tauri-apps/api": "^2.9.0",

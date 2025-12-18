@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Puzzle, Settings, Trash2 } from 'lucide-react'
+import { Puzzle, Settings, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Input, Toggle, SettingsProfileSelector } from '../index'
 import styles from '../../styles/Settings.module.css'
@@ -18,12 +18,95 @@ interface Addon {
   }
 }
 
+// Config/Install Modal Component
+const AddonConfigModal = ({ 
+    isOpen, 
+    onClose, 
+    profileId, 
+    onSuccess 
+}: { 
+    isOpen: boolean
+    onClose: () => void
+    profileId: string
+    onSuccess: () => void 
+}) => {
+    const [url, setUrl] = useState('')
+    const [installing, setInstalling] = useState(false)
+
+    if (!isOpen) return null
+
+    const handleInstall = async () => {
+        if (!url || !profileId) return
+        setInstalling(true)
+        try {
+            const res = await fetch('/api/addons', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    manifestUrl: url,
+                    settingsProfileId: profileId 
+                })
+            })
+            if (res.ok) {
+                toast.success('Success', { description: 'Addon installed successfully!' })
+                setUrl('')
+                onSuccess()
+                onClose()
+            } else {
+                const err = await res.json()
+                toast.error('Failed', { description: err.error || 'Failed to install addon' })
+            }
+        } catch (e) {
+            console.error(e)
+            toast.error('Error', { description: 'Network error installing addon' })
+        } finally {
+            setInstalling(false)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 w-full max-w-lg shadow-2xl">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-white">Addon Configuration</h3>
+                    <button onClick={onClose} className="text-zinc-400 hover:text-white">
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <p className="text-zinc-400 mb-4 text-sm">
+                    If you customized the addon in the new window, paste the installation link here to update or install it.
+                </p>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-medium text-zinc-500 mb-1 uppercase">Manifest URL</label>
+                        <Input 
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                            placeholder="https://.../manifest.json"
+                            className="w-full"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button variant="primary" onClick={handleInstall} disabled={installing || !url}>
+                        {installing ? 'Installing...' : 'Install / Update'}
+                    </Button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export function AddonManager() {
   const [loading, setLoading] = useState(false)
   const [currentProfileId, setCurrentProfileId] = useState<string>('')
   const [addons, setAddons] = useState<Addon[]>([])
   const [selectedAddon, setSelectedAddon] = useState<Addon | null>(null)
-  const [showConfigureInput, setShowConfigureInput] = useState(false)
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [manifestUrl, setManifestUrl] = useState('')
   const [installing, setInstalling] = useState(false)
   const [hasTmdbKey, setHasTmdbKey] = useState(false)
@@ -155,12 +238,8 @@ export function AddonManager() {
     if (configUrl.endsWith('/')) configUrl = configUrl.slice(0, -1)
     configUrl += '/configure'
     
-    const win = window.open(configUrl, '_blank')
-    if (win) {
-        setShowConfigureInput(true)
-    } else {
-        toast.warning('Popup Blocked', { description: 'Please allow popups to configure addons.' })
-    }
+    window.open(configUrl, '_blank')
+    setIsConfigModalOpen(true)
   }
 
   // handleCreateProfile, handleDeleteProfile, handleRenameProfile removed
@@ -276,7 +355,9 @@ export function AddonManager() {
                                         onClick={() => handleDeleteAddon(addon.id)}
                                         title="Uninstall"
                                     >
-                                        <Trash2 size={18} />
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>
+                                        </svg>
                                     </Button>
                                 )}
                             </div>
@@ -287,6 +368,13 @@ export function AddonManager() {
         </div>
 
       </div>
+
+      <AddonConfigModal 
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        profileId={currentProfileId}
+        onSuccess={() => loadAddons(currentProfileId)}
+      />
     </div>
   )
 }
