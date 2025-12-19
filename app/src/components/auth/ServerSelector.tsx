@@ -40,7 +40,7 @@ export function ServerSelector({ onServerSelected, showDevMode = false }: Server
           const isTauriEnv = isTauri();
           console.log('[Connection Check] Is Tauri:', isTauriEnv);
           
-          let fetchFn: typeof fetch;
+          let fetchFn: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
           try {
              fetchFn = isTauriEnv ? (await import('@tauri-apps/plugin-http')).fetch : fetch;
           } catch (importErr) {

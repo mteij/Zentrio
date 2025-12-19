@@ -78,20 +78,10 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
             
             mediaSource.addEventListener('sourceopen', async () => {
                 try {
-                    // Always use H.264 + AAC for maximum compatibility
-                    // Source codec can vary (proxy streams, etc.), so we re-encode to guarantee H.264
-                    const mimeType = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
-                    
-                    if (!MediaSource.isTypeSupported(mimeType)) {
-                        throw new Error("Browser doesn't support H.264 in MSE");
-                    }
-
-                    console.log("MSE: Creating SourceBuffer with:", mimeType);
-                    const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
-                    
                     // Track whether we've received the first chunk (init segment)
                     let isFirstChunk = true;
                     let chunksReceived = 0;
+                    let sourceBuffer: SourceBuffer | null = null;
                     
                     // Helper to find MP4 box boundaries
                     const findBox = (data: Uint8Array, boxType: string, start = 0): { offset: number, size: number } | null => {
@@ -109,10 +99,18 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
                         return null;
                     };
                     
+                    // Detect video codec from MP4 data by searching for codec boxes
+                    const detectCodec = (data: Uint8Array): 'hevc' | 'avc' => {
+                        // Search for hvc1/hev1 (HEVC) or avc1 (H.264) boxes in the data
+                        const dataStr = new TextDecoder('latin1').decode(data.slice(0, Math.min(data.length, 5000)));
+                        if (dataStr.includes('hvc1') || dataStr.includes('hev1')) {
+                            return 'hevc';
+                        }
+                        return 'avc'; // Default to H.264
+                    };
+                    
                     // Helper to strip init segment (ftyp + moov) from data
                     const stripInitSegment = (data: Uint8Array): Uint8Array => {
-                        const ftyp = findBox(data, 'ftyp');
-                        const moov = findBox(data, 'moov');
                         const moof = findBox(data, 'moof');
                         
                         if (!moof) {
@@ -125,7 +123,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
                         return data.slice(moof.offset);
                     };
                     
-                    // Handle transcoding - copy video if HEVC is supported, otherwise re-encode
+                    // Handle transcoding - video is copied unchanged, audio is transcoded to AAC
                     await transcoder.transcode(url, {
                         onData: async (data: Uint8Array) => {
                             chunksReceived++;
@@ -135,7 +133,19 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
                             let dataToAppend: Uint8Array;
                             
                             if (isFirstChunk) {
-                                // First chunk: append everything (ftyp + moov + moof + mdat)
+                                // First chunk: detect codec and create SourceBuffer
+                                const codec = detectCodec(data);
+                                const mimeType = codec === 'hevc' 
+                                    ? 'video/mp4; codecs="hvc1.1.6.L120.90, mp4a.40.2"'
+                                    : 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+                                
+                                console.log(`MSE: Detected ${codec} codec, creating SourceBuffer with: ${mimeType}`);
+                                
+                                if (!MediaSource.isTypeSupported(mimeType)) {
+                                    throw new Error(`Browser doesn't support ${codec} codec in MSE`);
+                                }
+                                
+                                sourceBuffer = mediaSource.addSourceBuffer(mimeType);
                                 dataToAppend = data;
                                 isFirstChunk = false;
                                 console.log("MSE: Appending first chunk with init segment");
@@ -143,6 +153,11 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
                                 // Subsequent chunks: strip ftyp and moov, keep only moof + mdat
                                 dataToAppend = stripInitSegment(data);
                                 console.log(`MSE: Appending chunk ${chunksReceived} (${(dataToAppend.byteLength / 1024 / 1024).toFixed(2)} MB stripped)`);
+                            }
+                            
+                            if (!sourceBuffer) {
+                                console.error("MSE: No SourceBuffer available");
+                                return;
                             }
                             
                             // Wait for any pending updates
@@ -157,17 +172,18 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
                             }
                             
                             // Append the data
+                            const sb = sourceBuffer; // Capture for closure
                             await new Promise<void>((resolve, reject) => {
                                 const onUpdateEnd = () => {
-                                    sourceBuffer.removeEventListener('updateend', onUpdateEnd);
-                                    sourceBuffer.removeEventListener('error', onError);
+                                    sb.removeEventListener('updateend', onUpdateEnd);
+                                    sb.removeEventListener('error', onError);
                                     console.log("MSE: Chunk appended successfully");
                                     resolve();
                                 };
                                 
                                 const onError = (e: Event) => {
-                                    sourceBuffer.removeEventListener('updateend', onUpdateEnd);
-                                    sourceBuffer.removeEventListener('error', onError);
+                                    sb.removeEventListener('updateend', onUpdateEnd);
+                                    sb.removeEventListener('error', onError);
                                     console.error("MSE: SourceBuffer error", e);
                                     // Don't reject for non-first chunks, try to continue
                                     if (chunksReceived === 1) {
@@ -178,16 +194,16 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
                                     }
                                 };
                                 
-                                sourceBuffer.addEventListener('updateend', onUpdateEnd);
-                                sourceBuffer.addEventListener('error', onError);
+                                sb.addEventListener('updateend', onUpdateEnd);
+                                sb.addEventListener('error', onError);
                                 
                                 try {
                                     const arrayBuffer = new ArrayBuffer(dataToAppend.byteLength);
                                     new Uint8Array(arrayBuffer).set(dataToAppend);
-                                    sourceBuffer.appendBuffer(arrayBuffer);
+                                    sb.appendBuffer(arrayBuffer);
                                 } catch (e) {
-                                    sourceBuffer.removeEventListener('updateend', onUpdateEnd);
-                                    sourceBuffer.removeEventListener('error', onError);
+                                    sb.removeEventListener('updateend', onUpdateEnd);
+                                    sb.removeEventListener('error', onError);
                                     if (chunksReceived === 1) {
                                         reject(e);
                                     } else {
@@ -214,13 +230,14 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
                             toast.dismiss('transcode-progress');
                             setError(`Transcoding failed: ${error.message}`);
                             toast.error(error.message);
+                        }
                     });
                     
-                    
                     // End the stream when transcoding is complete
-                    if (mediaSource.readyState === 'open') {
-                        // Wait for final buffer update
-                        while (sourceBuffer.updating) {
+                    if (mediaSource.readyState === 'open' && sourceBuffer !== null) {
+                        // Wait for final buffer update - use type assertion as TS narrowing doesn't work across async
+                        const finalBuffer = sourceBuffer as SourceBuffer;
+                        while (finalBuffer.updating) {
                             await new Promise(r => setTimeout(r, 10));
                         }
                         mediaSource.endOfStream();
