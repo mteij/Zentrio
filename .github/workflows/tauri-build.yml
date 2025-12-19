@@ -101,6 +101,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: true
         with:
           projectPath: ./app
           tagName: app-v__VERSION__
@@ -138,7 +139,7 @@ jobs:
         working-directory: ./app
         run: |
           bun tauri ios init
-          bun tauri ios build --no-signing
+          bun tauri ios build
 
       - name: Upload iOS Artifacts to Release
         if: matrix.name == 'ios'

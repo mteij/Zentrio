@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import Hls from 'hls.js'
+import { useCast } from '../contexts/CastContext'
 
 interface UsePlayerProps {
   url: string
@@ -44,21 +45,31 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
   const hlsRef = useRef<Hls | null>(null)
   const onEndedRef = useRef(onEnded)
   const initialVolumeApplied = useRef(false)
+  const { isConnected: isCastConnected, castSession } = useCast()
+  
+  // Effect to pause local video when cast connects
+  useEffect(() => {
+    const video = videoRef.current
+    if (isCastConnected && video && !video.paused) {
+        console.log("Cast connected, pausing local video")
+        video.pause() // Pause local if casting starts
+    }
+  }, [isCastConnected, videoRef])
   
   // Keep onEnded ref updated without causing re-renders
   useEffect(() => {
     onEndedRef.current = onEnded
   }, [onEnded])
 
-    // Transcoder integration
+    // Transcoder integration - simplified for proper fMP4 output
     const startTranscoding = useCallback(async () => {
         try {
             const video = videoRef.current;
             if (!video) return;
 
-            toast.info("Attempting to transcode audio... (Beta 5MB Preview)")
-            const { transcoder } = await import('../services/transcoder/TranscoderService')
-            console.log('Starting transcoding for', url)
+            toast.loading("Preparing to transcode...", { id: 'transcode-progress' });
+            const { transcoder } = await import('../services/transcoder/TranscoderService');
+            console.log('Starting transcoding for', url);
             
             // Setup MediaSource
             const mediaSource = new MediaSource();
@@ -67,100 +78,178 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
             
             mediaSource.addEventListener('sourceopen', async () => {
                 try {
-                    // Simple codec detection based on URL
-                    const lowerUrl = url.toLowerCase();
-                    const isHevc = lowerUrl.includes('h265') || lowerUrl.includes('hevc');
+                    // Always use H.264 + AAC for maximum compatibility
+                    // Source codec can vary (proxy streams, etc.), so we re-encode to guarantee H.264
+                    const mimeType = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
                     
-                    let videoCodec = 'avc1.42E01E'; // Default AVC (H.264)
-                    if (isHevc) {
-                        // Check for Main 10 / HDR features
-                        const isMain10 = lowerUrl.includes('hdr') || lowerUrl.includes('10bit') || lowerUrl.includes('dv') || lowerUrl.includes('dolby');
-                        // Main 10 Profile vs Main Profile
-                        videoCodec = isMain10 ? 'hev1.2.4.L153.B0' : 'hev1.1.6.L93.B0'; 
-                    }
-                    
-                    const mime = `video/mp4; codecs="${videoCodec}, mp4a.40.2"`;
-                    
-                    if (!MediaSource.isTypeSupported(mime)) {
-                         console.warn(`MSE: MIME type not supported: ${mime}. Trying fallback...`);
-                         // Try common Main 10 fallback or just generic generic hevc if available
-                         if (isHevc) videoCodec = 'hev1.1.6.L93.B0'; // Try Main profile as last ditch?
-                    }
-                    
-                    const finalMime = `video/mp4; codecs="${videoCodec}, mp4a.40.2"`;
-                    
-                    const supported = MediaSource.isTypeSupported(finalMime);
-                    console.log(`MSE: Final MIME: ${finalMime}, Supported: ${supported}`);
-                    
-                    if (!supported && isHevc) {
-                        // Fallback to a simpler codec string if specific one fails check
-                        // Note: If 'supported' is false, addSourceBuffer might throw, so we might want to change finalMime here
-                        // But for now let's just log it.
+                    if (!MediaSource.isTypeSupported(mimeType)) {
+                        throw new Error("Browser doesn't support H.264 in MSE");
                     }
 
-                    console.log("MSE: Adding SourceBuffer with mime:", finalMime);
-                    const sourceBuffer = mediaSource.addSourceBuffer(finalMime);
+                    console.log("MSE: Creating SourceBuffer with:", mimeType);
+                    const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
                     
-                    await transcoder.transcode(url, (data, detectedCodec, hasAudio) => {
-                        console.log("Transcoded chunk received:", data.byteLength, "Codec:", detectedCodec, "Audio:", hasAudio)
-                        if (!sourceBuffer.updating && mediaSource.readyState === 'open') {
-                             try {
-                                // Dynamic Codec Switching (e.g. if file is actually H.264 but we thought HEVC)
-                                if (detectedCodec) {
-                                    const currentType = finalMime.split(';')[0]; // video/mp4
-                                    // Use specific codec params if possible, or just avc1/hev1 prefix checks
-                                    
-                                    // Handle Audio presence
-                                    const audioCodec = hasAudio !== false ? ', mp4a.40.2' : '';
-                                    
-                                    const newMime = `video/mp4; codecs="${detectedCodec}${audioCodec}"`;
-                                    
-                                    // Only change if significantly different (e.g. avc1 vs hev1)
-                                    // Simple check: if we are using avc1 but detected hevc, or vice versa
-                                    const isCurrentAvc = finalMime.includes('avc1');
-                                    const isNewAvc = detectedCodec.includes('avc1');
-                                    const isAudioDifferent = finalMime.includes('mp4a') && !hasAudio;
-                                    
-                                    if (isCurrentAvc !== isNewAvc || isAudioDifferent) {
-                                         console.warn(`MSE: Codec mismatch! Switching from ${finalMime} to ${newMime}`);
-                                         sourceBuffer.changeType(newMime);
-                                         // Update finalMime reference for next time (local var only, but effect persists for this buffer)
-                                         // Note: 'finalMime' is const in this scope, but changeType updates the SourceBuffer state.
+                    // Track whether we've received the first chunk (init segment)
+                    let isFirstChunk = true;
+                    let chunksReceived = 0;
+                    
+                    // Helper to find MP4 box boundaries
+                    const findBox = (data: Uint8Array, boxType: string, start = 0): { offset: number, size: number } | null => {
+                        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+                        const typeCode = boxType.charCodeAt(0) << 24 | boxType.charCodeAt(1) << 16 | 
+                                        boxType.charCodeAt(2) << 8 | boxType.charCodeAt(3);
+                        let offset = start;
+                        while (offset < data.byteLength - 8) {
+                            const size = view.getUint32(offset, false);
+                            const type = view.getUint32(offset + 4, false);
+                            if (size === 0 || size > data.byteLength - offset) break;
+                            if (type === typeCode) return { offset, size };
+                            offset += size;
+                        }
+                        return null;
+                    };
+                    
+                    // Helper to strip init segment (ftyp + moov) from data
+                    const stripInitSegment = (data: Uint8Array): Uint8Array => {
+                        const ftyp = findBox(data, 'ftyp');
+                        const moov = findBox(data, 'moov');
+                        const moof = findBox(data, 'moof');
+                        
+                        if (!moof) {
+                            console.warn("MSE: No moof box found in chunk");
+                            return data;
+                        }
+                        
+                        // Return data starting from first moof
+                        console.log(`MSE: Stripping init segment, moof starts at offset ${moof.offset}`);
+                        return data.slice(moof.offset);
+                    };
+                    
+                    // Handle transcoding - copy video if HEVC is supported, otherwise re-encode
+                    await transcoder.transcode(url, {
+                        onData: async (data: Uint8Array) => {
+                            chunksReceived++;
+                            console.log(`MSE: Received chunk ${chunksReceived} (${(data.byteLength / 1024 / 1024).toFixed(2)} MB)`);
+                            
+                            // Process the data
+                            let dataToAppend: Uint8Array;
+                            
+                            if (isFirstChunk) {
+                                // First chunk: append everything (ftyp + moov + moof + mdat)
+                                dataToAppend = data;
+                                isFirstChunk = false;
+                                console.log("MSE: Appending first chunk with init segment");
+                            } else {
+                                // Subsequent chunks: strip ftyp and moov, keep only moof + mdat
+                                dataToAppend = stripInitSegment(data);
+                                console.log(`MSE: Appending chunk ${chunksReceived} (${(dataToAppend.byteLength / 1024 / 1024).toFixed(2)} MB stripped)`);
+                            }
+                            
+                            // Wait for any pending updates
+                            while (sourceBuffer.updating) {
+                                await new Promise(r => setTimeout(r, 10));
+                            }
+                            
+                            // Check MediaSource is still open
+                            if (mediaSource.readyState !== 'open') {
+                                console.warn("MSE: MediaSource no longer open, stopping");
+                                return;
+                            }
+                            
+                            // Append the data
+                            await new Promise<void>((resolve, reject) => {
+                                const onUpdateEnd = () => {
+                                    sourceBuffer.removeEventListener('updateend', onUpdateEnd);
+                                    sourceBuffer.removeEventListener('error', onError);
+                                    console.log("MSE: Chunk appended successfully");
+                                    resolve();
+                                };
+                                
+                                const onError = (e: Event) => {
+                                    sourceBuffer.removeEventListener('updateend', onUpdateEnd);
+                                    sourceBuffer.removeEventListener('error', onError);
+                                    console.error("MSE: SourceBuffer error", e);
+                                    // Don't reject for non-first chunks, try to continue
+                                    if (chunksReceived === 1) {
+                                        reject(new Error('SourceBuffer append failed'));
+                                    } else {
+                                        console.warn("MSE: Continuing despite error on chunk", chunksReceived);
+                                        resolve();
+                                    }
+                                };
+                                
+                                sourceBuffer.addEventListener('updateend', onUpdateEnd);
+                                sourceBuffer.addEventListener('error', onError);
+                                
+                                try {
+                                    const arrayBuffer = new ArrayBuffer(dataToAppend.byteLength);
+                                    new Uint8Array(arrayBuffer).set(dataToAppend);
+                                    sourceBuffer.appendBuffer(arrayBuffer);
+                                } catch (e) {
+                                    sourceBuffer.removeEventListener('updateend', onUpdateEnd);
+                                    sourceBuffer.removeEventListener('error', onError);
+                                    if (chunksReceived === 1) {
+                                        reject(e);
+                                    } else {
+                                        console.warn("MSE: Error appending chunk", chunksReceived, e);
+                                        resolve();
                                     }
                                 }
-
-                                // Wait for update to finish before closing stream
-                                sourceBuffer.addEventListener('updateend', () => {
-                                    if (mediaSource.readyState === 'open') {
-                                        mediaSource.endOfStream();
-                                    }
-                                }, { once: true });
-                                
-                                sourceBuffer.appendBuffer(data as any);
-                                // toast.success(`Playing transcoded segment (${Math.round(data.byteLength / 1024)}KB)`)
-                            } catch (e) {
-                                console.error("MSE Append Error", e)
-                                toast.error("MSE Append Error: " + String(e));
+                            });
+                            
+                            // Start playback once we have first chunk
+                            if (chunksReceived === 1 && video.paused && video.readyState >= 2) {
+                                video.play().catch(e => console.log('Autoplay blocked:', e));
                             }
+                        },
+                        onProgress: (progress: number, stage: 'downloading' | 'transcoding') => {
+                            // Show progress toast (throttled)
+                            const message = stage === 'downloading' 
+                                ? `Downloading: ${progress}%`
+                                : `Transcoding: ${progress}%`;
+                            toast.loading(message, { id: 'transcode-progress' });
+                        },
+                        onError: (error: Error) => {
+                            console.error("Transcoding error:", error);
+                            toast.dismiss('transcode-progress');
+                            setError(`Transcoding failed: ${error.message}`);
+                            toast.error(error.message);
                         }
-                    })
+                    }, { copyVideo: false }); // Always re-encode to H.264 for guaranteed compatibility
                     
-                    // Removed immediate endOfStream call to avoid race condition
-                    // if (mediaSource.readyState === 'open') {
-                    //    mediaSource.endOfStream();
-                    // }
+                    // End the stream when transcoding is complete
+                    if (mediaSource.readyState === 'open') {
+                        // Wait for final buffer update
+                        while (sourceBuffer.updating) {
+                            await new Promise(r => setTimeout(r, 10));
+                        }
+                        mediaSource.endOfStream();
+                        console.log("MSE: Stream ended successfully");
+                        toast.dismiss('transcode-progress');
+                        toast.success("Video ready!");
+                        setIsBuffering(false);
+                    }
+                    
                 } catch (e) {
-                    console.error("MSE Error", e);
-                    toast.error("MSE Setup Error: " + String(e));
-                    video.src = originalSrc; // Fallback
+                    console.error("MSE/Transcoding error:", e);
+                    toast.dismiss('transcode-progress');
+                    toast.error("Transcoding failed: " + (e instanceof Error ? e.message : String(e)));
+                    // Fallback to original source
+                    video.src = originalSrc;
+                    setError('Transcoding failed');
                 }
             }, { once: true });
+            
+            mediaSource.addEventListener('error', (e) => {
+                console.error('MediaSource error:', e);
+                setError('MediaSource error occurred');
+            });
            
         } catch (e) {
-            console.error("Transcoding start failed", e)
-            toast.error("Transcoding failed: " + (e instanceof Error ? e.message : String(e)))
+            console.error("Transcoding start failed", e);
+            toast.error("Transcoding failed: " + (e instanceof Error ? e.message : String(e)));
         }
-    }, [url])
+    }, [url, videoRef])
 
   // Detect if running in Tauri (native app) - use native video decoding
   const isTauri = useMemo(() => !!(window as any).__TAURI__, [])

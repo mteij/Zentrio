@@ -873,6 +873,7 @@ export class AddonManager {
         }
     }
 
+    console.log('[AddonManager] Settings sortingConfig:', JSON.stringify(settings?.sortingConfig))
     const processor = new StreamProcessor(settings, platform)
     
     // Flatten results for processing
@@ -908,6 +909,15 @@ export class AddonManager {
     
     // Wait, if we use "Single Result" deduplication, we only have unique streams.
     // If we group them back by addon, we are just organizing them.
+    
+    // Add sortIndex to each stream so frontend can reconstruct global sort order
+    processedStreams.forEach((parsedStream, index) => {
+        if (!parsedStream.original.behaviorHints) {
+            parsedStream.original.behaviorHints = {}
+        }
+        // Store the global sort index
+        (parsedStream.original.behaviorHints as any).sortIndex = index
+    })
     
     // Let's just group them back by addon for now to maintain compatibility.
     const streamsByAddon = new Map<string, Stream[]>()

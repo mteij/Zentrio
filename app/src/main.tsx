@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { preloadCommonRoutes } from './utils/route-preloader'
 // Initialize toast bridge for legacy window.addToast calls
 import './utils/toast'
+import { CastProvider } from './contexts/CastContext'
 
 // Lazy load all pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage as React.ComponentType<{version?: string}> })))
@@ -91,22 +92,24 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <AppRoutes />
-          <Toaster 
-            theme="dark"
-            position="top-right"
-            richColors
-            closeButton
-            toastOptions={{
-              style: {
-                background: 'rgba(20, 20, 20, 0.95)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(12px)',
-              },
-            }}
-          />
-        </BrowserRouter>
+        <CastProvider>
+          <BrowserRouter>
+            <AppRoutes />
+            <Toaster 
+              theme="dark"
+              position="top-right"
+              richColors
+              closeButton
+              toastOptions={{
+                style: {
+                  background: 'rgba(20, 20, 20, 0.95)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
+                },
+              }}
+            />
+          </BrowserRouter>
+        </CastProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   </React.StrictMode>,

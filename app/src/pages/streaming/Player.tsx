@@ -20,11 +20,13 @@ import {
   Copy,
   Check,
   X,
-  Monitor
+  Monitor,
+  Cast
 } from 'lucide-react'
 import { Layout, SkeletonPlayer } from '../../components'
 import { Stream } from '../../services/addons/types'
 import { usePlayer } from '../../hooks/usePlayer'
+import { useCast } from '../../contexts/CastContext'
 import { useSubtitles } from '../../hooks/useSubtitles'
 import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import { toast } from 'sonner'
@@ -130,6 +132,25 @@ export const StreamingPlayer = () => {
 
   // External player hook
   const { openInPlayer, getAvailablePlayers } = useExternalPlayer()
+
+  // Cast hook
+  const { castReceiverAvailable, isConnected: isCastConnected, castMedia, disconnect } = useCast()
+
+  function handleCast() {
+    if (isCastConnected) {
+        disconnect()
+    } else if (stream && meta && stream.url) {
+        // Construct visual metadata
+        const title = meta.season && meta.episode 
+            ? `${meta.name} S${meta.season}:E${meta.episode}`
+            : meta.name;
+        const image = meta.poster;
+        
+        // Pass stream URL directly
+        // Note: Client-side transcoding NOT supported
+        castMedia(stream.url, 'video/mp4', title, image)
+    }
+  }
 
   // Parse URL params
   useEffect(() => {
@@ -508,6 +529,17 @@ export const StreamingPlayer = () => {
             </div>
 
             <div className={styles.topBarRight}>
+              {/* Cast Button */}
+              {castReceiverAvailable && (
+                <button
+                    className={`${styles.controlButton} ${isCastConnected ? styles.active : ''}`}
+                    onClick={handleCast}
+                    title={isCastConnected ? "Disconnect Cast" : "Cast to Device"}
+                >
+                    <Cast size={20} />
+                </button>
+              )}
+
               {/* External Player Dropdown */}
               <div className={styles.externalPlayerDropdown}>
                 <button

@@ -92,7 +92,28 @@ export const StreamingDetails = () => {
     }
   }
 
-  // Filter streams by selected addon
+  // Flatten all streams when "All Sources" is selected
+  // Preserves the backend's sort order which respects user's custom sorting config
+  const flattenedStreams = useMemo(() => {
+    if (selectedAddon) return null // Not needed when specific addon is selected
+    
+    // Flatten all streams with addon info
+    const allStreams: { stream: Stream, addon: Manifest }[] = []
+    streams.forEach(group => {
+      group.streams.forEach(stream => {
+        allStreams.push({ stream, addon: group.addon })
+      })
+    })
+    
+    // Sort by the backend's sortIndex which respects user's custom sorting config
+    return allStreams.sort((a, b) => {
+      const indexA = (a.stream.behaviorHints as any)?.sortIndex ?? Infinity
+      const indexB = (b.stream.behaviorHints as any)?.sortIndex ?? Infinity
+      return indexA - indexB
+    })
+  }, [streams, selectedAddon])
+
+  // Filter streams by selected addon (for grouped view)
   const filteredStreams = useMemo(() => {
     if (!selectedAddon) return streams
     return streams.filter(group => group.addon.id === selectedAddon)
@@ -224,38 +245,43 @@ export const StreamingDetails = () => {
           </div>
 
           <div className={styles.detailsInfo}>
-            <h1 className={styles.detailsTitle}>{meta.name}</h1>
-            
-            <div className={styles.detailsMetaRow}>
-              {meta.released && <span className={styles.metaBadge}>{String(meta.released).split('-')[0]}</span>}
-              {meta.runtime && <span className={styles.metaBadge}>{meta.runtime}</span>}
-              {showImdbRatings && meta.imdbRating && <span className={styles.metaBadge} style={{ background: '#f5c518', color: '#000' }}>IMDb {meta.imdbRating}</span>}
-              {/* @ts-ignore */}
-              {showAgeRatings && (meta.certification || meta.rating || meta.contentRating) && <span className={styles.metaBadge} style={{ border: '1px solid #fff' }}>{(meta.certification || meta.rating || meta.contentRating)}</span>}
-            </div>
+            {/* Hide metadata only for series when viewing streams (since movies show streams as main page) */}
+            {!(meta.type === 'series' && view === 'streams') && (
+              <>
+                <h1 className={styles.detailsTitle}>{meta.name}</h1>
+                
+                <div className={styles.detailsMetaRow}>
+                  {meta.released && <span className={styles.metaBadge}>{String(meta.released).split('-')[0]}</span>}
+                  {meta.runtime && <span className={styles.metaBadge}>{meta.runtime}</span>}
+                  {showImdbRatings && meta.imdbRating && <span className={styles.metaBadge} style={{ background: '#f5c518', color: '#000' }}>IMDb {meta.imdbRating}</span>}
+                  {/* @ts-ignore */}
+                  {showAgeRatings && (meta.certification || meta.rating || meta.contentRating) && <span className={styles.metaBadge} style={{ border: '1px solid #fff' }}>{(meta.certification || meta.rating || meta.contentRating)}</span>}
+                </div>
 
-            <div className={styles.detailsActions}>
-              {meta.type === 'movie' && (
-                  <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={() => loadStreams(undefined, undefined, undefined, true)}>
-                    <Play size={20} fill="currentColor" />
-                    Play
+                <div className={styles.detailsActions}>
+                  {meta.type === 'movie' && (
+                      <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={() => loadStreams(undefined, undefined, undefined, true)}>
+                        <Play size={20} fill="currentColor" />
+                        Play
+                      </button>
+                  )}
+                  <button
+                    className={`${styles.actionBtn} ${styles.btnSecondaryGlass} ${inLibrary ? 'active' : ''}`}
+                    onClick={toggleLibrary}
+                  >
+                    {inLibrary ? <Check size={20} /> : <Plus size={20} />}
+                    {inLibrary ? 'In List' : 'Add to List'}
                   </button>
-              )}
-              <button
-                className={`${styles.actionBtn} ${styles.btnSecondaryGlass} ${inLibrary ? 'active' : ''}`}
-                onClick={toggleLibrary}
-              >
-                {inLibrary ? <Check size={20} /> : <Plus size={20} />}
-                {inLibrary ? 'In List' : 'Add to List'}
-              </button>
-            </div>
+                </div>
 
-            <p className={styles.detailsDescription}>{meta.description}</p>
-            
-            <div className="cast-info" style={{ marginBottom: '30px', color: '#ccc' }}>
-              {meta.director && <p style={{ marginBottom: '8px' }}><strong>Director:</strong> {meta.director.join(', ')}</p>}
-              {meta.cast && <p><strong>Cast:</strong> {meta.cast.join(', ')}</p>}
-            </div>
+                <p className={styles.detailsDescription}>{meta.description}</p>
+                
+                <div className="cast-info" style={{ marginBottom: '30px', color: '#ccc' }}>
+                  {meta.director && <p style={{ marginBottom: '8px' }}><strong>Director:</strong> {meta.director.join(', ')}</p>}
+                  {meta.cast && <p><strong>Cast:</strong> {meta.cast.join(', ')}</p>}
+                </div>
+              </>
+            )}
 
             {meta.type === 'series' && view === 'episodes' && meta.videos && (
               <div className="series-episodes-container">
@@ -309,7 +335,7 @@ export const StreamingDetails = () => {
                             {showImdbRatings && ep.rating && (
                               <span className={styles.episodeRating}>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="#f5c518"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                                {typeof ep.rating === 'number' ? ep.rating.toFixed(1) : ep.rating}
+                                {Number(ep.rating).toFixed(1)}
                               </span>
                             )}
                             {showAgeRatings && (ep.certification || ep.contentRating) && (
@@ -341,28 +367,109 @@ export const StreamingDetails = () => {
                         </div>
                     )}
 
-                    {/* Addon Filter */}
-                    {!streamsLoading && streams.length > 1 && (
-                        <div className={styles.addonFilter}>
-                            <Filter size={16} />
-                            <select
-                                value={selectedAddon || ''}
-                                onChange={(e) => setSelectedAddon(e.target.value || null)}
-                                className={styles.addonFilterSelect}
+                    {/* Stream Controls: Filter and Play Best */}
+                    {!streamsLoading && streams.length > 0 && (
+                        <div className={styles.addonFilter} style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            {/* Play Best Button */}
+                            <button 
+                                className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
+                                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                onClick={() => {
+                                    // Get the best stream (first from flattened sorted list)
+                                    if (flattenedStreams && flattenedStreams.length > 0) {
+                                        handlePlay(flattenedStreams[0].stream)
+                                    } else if (streams.length > 0 && streams[0].streams.length > 0) {
+                                        handlePlay(streams[0].streams[0])
+                                    }
+                                }}
                             >
-                                <option value="">All Sources ({totalStreamCount})</option>
-                                {streams.map((group) => (
-                                    <option key={group.addon.id} value={group.addon.id}>
-                                        {group.addon.name} ({group.streams.length})
-                                    </option>
-                                ))}
-                            </select>
+                                <Play size={16} fill="currentColor" />
+                                Play Best
+                            </button>
+                            
+                            {/* Addon Filter */}
+                            {streams.length > 1 && (
+                                <>
+                                    <Filter size={16} />
+                                    <select
+                                        value={selectedAddon || ''}
+                                        onChange={(e) => setSelectedAddon(e.target.value || null)}
+                                        className={styles.addonFilterSelect}
+                                    >
+                                        <option value="">All Sources ({totalStreamCount})</option>
+                                        {streams.map((group) => (
+                                            <option key={group.addon.id} value={group.addon.id}>
+                                                {group.addon.name} ({group.streams.length})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </>
+                            )}
                         </div>
                     )}
 
                     {streamsLoading ? (
                         <SkeletonStreamList />
+                    ) : !selectedAddon && flattenedStreams && flattenedStreams.length > 0 ? (
+                        /* Flat sorted list when "All Sources" is selected */
+                        <div className="streams-list-wrapper">
+                            <div className={styles.streamList}>
+                                {flattenedStreams.map(({ stream, addon }, idx) => {
+                                    const info = parseStreamInfo(stream)
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`${styles.streamItem} ${info.isCached ? styles.streamCached : ''}`}
+                                            onClick={() => handlePlay(stream)}
+                                        >
+                                            <div className={styles.streamHeader}>
+                                                <div className={styles.streamName}>
+                                                    {stream.title || stream.name || `Stream ${idx + 1}`}
+                                                </div>
+                                                <div className={styles.streamBadges}>
+                                                    {/* Addon badge */}
+                                                    <span className={styles.streamBadge} style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.7rem' }}>
+                                                        {addon.name}
+                                                    </span>
+                                                    {info.isCached && (
+                                                        <span className={`${styles.streamBadge} ${styles.badgeCached}`} title="Cached">
+                                                            <Zap size={12} />
+                                                        </span>
+                                                    )}
+                                                    {info.resolution && (
+                                                        <span className={`${styles.streamBadge} ${styles.badgeResolution}`}>
+                                                            {info.resolution}
+                                                        </span>
+                                                    )}
+                                                    {info.size && (
+                                                        <span className={`${styles.streamBadge} ${styles.badgeSize}`}>
+                                                            <HardDrive size={10} />
+                                                            {info.size}
+                                                        </span>
+                                                    )}
+                                                    {info.hasHDR && (
+                                                        <span className={`${styles.streamBadge} ${styles.badgeHDR}`}>HDR</span>
+                                                    )}
+                                                    {info.hasDV && (
+                                                        <span className={`${styles.streamBadge} ${styles.badgeDV}`}>DV</span>
+                                                    )}
+                                                    {stream.behaviorHints?.notWebReady && (
+                                                        <span className={`${styles.streamBadge} ${styles.badgeWarning}`} title="Audio may not be supported in browser">
+                                                            <VolumeX size={12} />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {stream.description && (
+                                                <div className={styles.streamDetails}>{stream.description}</div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
                     ) : filteredStreams.length > 0 ? (
+                        /* Grouped view when a specific addon is selected */
                         <div className="streams-list-wrapper">
                             {filteredStreams.map((group, idx) => (
                                 <div key={idx} className={styles.addonGroup}>

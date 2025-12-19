@@ -210,11 +210,38 @@ export class StreamProcessor {
 
     // Stream Type & Cache Status
     // This is heuristic. Addons usually indicate cached status in title or description.
-    // e.g. "[RD+]" or "Cached"
-    if (combined.includes('cached') || title.includes('+')) {
-      parsed.isCached = true
-    } else {
+    // Common patterns:
+    // - "[RD+]", "[AD+]", "[PM+]" = cached on debrid service
+    // - "⚡" (lightning bolt emoji) = cached/instant (Comet, Torrentio)
+    // - "+" symbol in title = cached
+    // - "cached" keyword
+    // - "⬇️" (download arrow) = NOT cached (needs download)
+    const cachedIndicators = [
+      'cached',
+      '⚡',           // Lightning bolt = instant/cached
+      '+',            // Plus sign in brackets like [RD+]
+      '✓',            // Checkmark sometimes used
+      'instant',
+    ]
+    const uncachedIndicators = [
+      '⬇️',           // Download arrow = needs download
+      '⬇',            // Alternative down arrow
+      'uncached',
+      'download',
+    ]
+    
+    // Check for explicit uncached indicators first
+    const isExplicitlyUncached = uncachedIndicators.some(indicator => 
+      combined.includes(indicator.toLowerCase()) || title.includes(indicator)
+    )
+    
+    if (isExplicitlyUncached) {
       parsed.isCached = false
+    } else {
+      // Check for cached indicators
+      parsed.isCached = cachedIndicators.some(indicator => 
+        combined.includes(indicator.toLowerCase()) || title.includes(indicator)
+      )
     }
 
     // Determine stream type based on addon or content
@@ -361,7 +388,8 @@ export class StreamProcessor {
     // Get sorting configuration
     const sortingItems = this.config.sortingConfig?.items?.filter(i => i.enabled) || []
     
-    console.log(`[StreamProcessor] Sorting with ${sortingItems.length} criteria:`, sortingItems.map(i => `${i.id}(${i.direction})`).join(', '))
+    console.log(`[StreamProcessor] Full sortingConfig.items:`, JSON.stringify(this.config.sortingConfig?.items))
+    console.log(`[StreamProcessor] Sorting with ${sortingItems.length} enabled criteria (in priority order):`, sortingItems.map((i, idx) => `${idx+1}. ${i.id}(${i.direction})`).join(', '))
     
     // If no sorting config, fall back to score-based sorting
     if (sortingItems.length === 0) {
