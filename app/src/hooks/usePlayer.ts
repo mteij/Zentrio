@@ -214,8 +214,8 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
                             toast.dismiss('transcode-progress');
                             setError(`Transcoding failed: ${error.message}`);
                             toast.error(error.message);
-                        }
-                    }, { copyVideo: false }); // Always re-encode to H.264 for guaranteed compatibility
+                    });
+                    
                     
                     // End the stream when transcoding is complete
                     if (mediaSource.readyState === 'open') {

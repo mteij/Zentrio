@@ -368,24 +368,27 @@ export const StreamingDetails = () => {
                     )}
 
                     {/* Stream Controls: Filter and Play Best */}
-                    {!streamsLoading && streams.length > 0 && (
+                    {/* Only show when there's something to display: series get Play Best, multiple addons get filter */}
+                    {!streamsLoading && streams.length > 0 && (meta.type === 'series' || streams.length > 1) && (
                         <div className={styles.addonFilter} style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                            {/* Play Best Button */}
-                            <button 
-                                className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
-                                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                onClick={() => {
-                                    // Get the best stream (first from flattened sorted list)
-                                    if (flattenedStreams && flattenedStreams.length > 0) {
-                                        handlePlay(flattenedStreams[0].stream)
-                                    } else if (streams.length > 0 && streams[0].streams.length > 0) {
-                                        handlePlay(streams[0].streams[0])
-                                    }
-                                }}
-                            >
-                                <Play size={16} fill="currentColor" />
-                                Play Best
-                            </button>
+                            {/* Play Best Button - only for series (movies have Play in main actions) */}
+                            {meta.type === 'series' && (
+                                <button 
+                                    className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
+                                    style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    onClick={() => {
+                                        // Get the best stream (first from flattened sorted list)
+                                        if (flattenedStreams && flattenedStreams.length > 0) {
+                                            handlePlay(flattenedStreams[0].stream)
+                                        } else if (streams.length > 0 && streams[0].streams.length > 0) {
+                                            handlePlay(streams[0].streams[0])
+                                        }
+                                    }}
+                                >
+                                    <Play size={16} fill="currentColor" />
+                                    Play Best
+                                </button>
+                            )}
                             
                             {/* Addon Filter */}
                             {streams.length > 1 && (

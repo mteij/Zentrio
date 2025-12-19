@@ -119,7 +119,7 @@ jobs:
           NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         run: |
           bun tauri android init
-          bun tauri android build --apk
+          bun tauri android build --apk true
 
       - name: Upload Android Artifacts to Release
         if: matrix.name == 'android'
@@ -139,7 +139,7 @@ jobs:
         working-directory: ./app
         run: |
           bun tauri ios init
-          bun tauri ios build
+          bun tauri ios build --export-method development
 
       - name: Upload iOS Artifacts to Release
         if: matrix.name == 'ios'

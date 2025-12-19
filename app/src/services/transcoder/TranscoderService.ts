@@ -6,11 +6,6 @@ export interface TranscodeCallbacks {
   onError?: (error: Error) => void;
 }
 
-export interface TranscodeOptions {
-  /** If true, copy video stream as-is (fast). If false, re-encode to H.264 */
-  copyVideo?: boolean;
-}
-
 // Header size to capture container metadata (MKV/MP4 headers, track info, etc.)
 const HEADER_SIZE = 2 * 1024 * 1024; // 2MB
 // Chunk size for streaming - 20MB chunks
@@ -21,7 +16,6 @@ export class TranscoderService {
   private isLoaded = false;
   private terminateReq = false;
   private headerData: Uint8Array | null = null;
-  private copyVideo = true;
 
   constructor() {
     this.ffmpeg = new FFmpeg();
@@ -69,19 +63,17 @@ export class TranscoderService {
   }
 
   /**
-   * Transcode video using chunked streaming with header prepending.
+   * Transcode audio using chunked streaming with header prepending.
+   * Video is always passed through unchanged (copy). Audio is transcoded to AAC.
    * Each chunk gets the file header prepended so FFmpeg can demux it properly.
-   * @param options.copyVideo If true, copy video as-is (fast). If false, re-encode to H.264.
    */
-  async transcode(inputUrl: string, callbacks: TranscodeCallbacks, options: TranscodeOptions = {}): Promise<void> {
-    const { copyVideo = true } = options;
-    console.log(`Transcoder: Starting chunked transcoding for ${inputUrl} (copyVideo: ${copyVideo})`);
+  async transcode(inputUrl: string, callbacks: TranscodeCallbacks): Promise<void> {
+    console.log(`Transcoder: Starting audio transcoding for ${inputUrl}`);
     
     if (!this.isLoaded) await this.load();
     this.terminateReq = false;
     this.headerData = null;
     this.progressCallback = callbacks.onProgress || null;
-    this.copyVideo = copyVideo;
 
     // Setup FFmpeg progress
     this.ffmpeg.on('progress', ({ progress }) => {
@@ -214,28 +206,14 @@ export class TranscoderService {
       const dataCopy = new Uint8Array(data);
       await this.ffmpeg.writeFile(inputName, dataCopy);
       
-      // Build FFmpeg arguments based on copyVideo setting
+      // Build FFmpeg arguments - copy video, transcode audio only
       const ffmpegArgs: string[] = [
         '-i', inputName,
         // Generate silent audio as fallback if input has no audio
         '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+        // Always copy video stream (fast, no quality loss)
+        '-c:v', 'copy',
       ];
-      
-      // Video handling
-      if (this.copyVideo) {
-        // Copy video stream without re-encoding (fast, preserves quality)
-        ffmpegArgs.push('-c:v', 'copy');
-      } else {
-        // Re-encode to H.264 for browsers without HEVC support
-        ffmpegArgs.push(
-          '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '28',
-          '-pix_fmt', 'yuv420p',
-          '-profile:v', 'baseline',
-          '-level', '3.1'
-        );
-      }
       
       // Stream mapping and audio settings
       ffmpegArgs.push(
