@@ -92,13 +92,32 @@ export class HybridEngine extends EventTarget {
       await this.reader.probe()
 
       // Import and initialize libav.js
-      // Using noworker mode to avoid SharedArrayBuffer Worker issues
-      // The Worker mode requires strict COOP: same-origin headers which conflicts with popups
-      const LibAV = await import('@libav.js/variant-webcodecs')
+      // Try custom Zentrio variant first (includes AC3/E-AC3 decoders)
+      // Falls back to webcodecs variant if custom build not available
+      let LibAV: any
+      let variantName = 'webcodecs'
+      
+      try {
+        // Check if custom variant is available (built via scripts/build-libav.ps1)
+        const customResponse = await fetch('/libav.js-zentrio/libav-6.8-zentrio.js', { method: 'HEAD' })
+        if (customResponse.ok) {
+          // Dynamic import of custom variant from public folder
+          LibAV = await import('/libav.js-zentrio/libav-6.8-zentrio.js')
+          variantName = 'zentrio (AC3/E-AC3 enabled)'
+          console.log('[HybridEngine] Using custom Zentrio variant with AC3/E-AC3 support')
+        } else {
+          throw new Error('Custom variant not found')
+        }
+      } catch {
+        // Fall back to standard webcodecs variant
+        LibAV = await import('@libav.js/variant-webcodecs')
+        console.log('[HybridEngine] Using standard webcodecs variant (AC3/E-AC3 not available)')
+      }
       
       // Try to initialize - use noworker mode for better compatibility
       try {
         this.libav = await LibAV.default.LibAV({ noworker: true })
+        console.log(`[HybridEngine] libav.js initialized (variant: ${variantName})`)
       } catch (libavError) {
         console.warn('[HybridEngine] Failed to initialize libav.js:', libavError)
         throw new Error('libav.js initialization failed')
