@@ -1,7 +1,8 @@
 # Dockerfile for building custom libav.js variant
 # Uses Emscripten SDK to compile FFmpeg to WebAssembly
 
-FROM emscripten/emsdk:3.1.51
+# Use Emscripten 3.1.64 (known compatible with FFmpeg 8.0)
+FROM emscripten/emsdk:3.1.64
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -20,8 +21,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /build
 
 # Clone libav.js at a specific version for reproducibility
-ARG LIBAV_VERSION=6.8.8
-RUN git clone --depth 1 --branch v${LIBAV_VERSION} https://github.com/Yahweasel/libav.js.git
+# Tag format: v{libav-version}.{ffmpeg-major}.{libav-release}.{patch}
+RUN git clone --depth 1 --branch v6.8.8.0 https://github.com/Yahweasel/libav.js.git
 
 WORKDIR /build/libav.js
 
@@ -50,6 +51,7 @@ RUN cd configs && node mkconfig.js zentrio '[ \
 ]'
 
 # Build the custom variant (this takes ~15-20 minutes)
+# Uses non-threaded build for simpler compatibility
 RUN make build-zentrio
 
 # Copy output files to a staging directory
@@ -59,3 +61,4 @@ RUN mkdir -p /output && \
 
 # Default command: copy files to mounted volume
 CMD ["sh", "-c", "cp /output/* /dest/ && echo 'Build files copied to /dest/'"]
+
