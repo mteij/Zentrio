@@ -144,3 +144,12 @@ jspm_packages/
 temp/
 
 old_app/
+
+# libav.js custom build artifacts
+# Keep only production files: *.js, *.wasm.js, *.wasm.wasm
+# Ignore debug builds, asm.js fallbacks, and threaded builds
+app/public/libav.js-zentrio/*.dbg.*
+app/public/libav.js-zentrio/*.asm.*
+app/public/libav.js-zentrio/*.thr.*
+app/public/libav.js-zentrio/*.mjs
+app/public/libav.js-zentrio/*.map

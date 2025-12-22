@@ -28,7 +28,10 @@ WORKDIR /build/libav.js
 
 # Create custom configuration for Zentrio variant
 # Extends webcodecs with AC3/E-AC3 decoders
+# IMPORTANT: avformat and avcodec are REQUIRED for I/O functions (mkblockreaderdev, etc.)
 RUN cd configs && node mkconfig.js zentrio '[ \
+  "avformat", \
+  "avcodec", \
   "format-ogg", \
   "format-webm", \
   "format-mp4", \

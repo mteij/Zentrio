@@ -99,24 +99,36 @@ export class HybridEngine extends EventTarget {
       
       try {
         // Check if custom variant is available (built via scripts/build-libav.ps1)
-        const customResponse = await fetch('/libav.js-zentrio/libav-6.8-zentrio.js', { method: 'HEAD' })
+        const customResponse = await fetch('/libav.js-zentrio/libav-6.8.8.0-zentrio.js', { method: 'HEAD' })
         if (customResponse.ok) {
-          // Dynamic import of custom variant from public folder
-          LibAV = await import('/libav.js-zentrio/libav-6.8-zentrio.js')
+          // Load via dynamic script tag (Vite doesn't allow ES imports from /public)
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script')
+            script.src = '/libav.js-zentrio/libav-6.8.8.0-zentrio.js'
+            script.onload = () => resolve()
+            script.onerror = () => reject(new Error('Failed to load custom libav.js'))
+            document.head.appendChild(script)
+          })
+          
+          // libav.js exposes itself as a global
+          LibAV = (window as any).LibAV
+          if (!LibAV) throw new Error('LibAV global not found')
+          
           variantName = 'zentrio (AC3/E-AC3 enabled)'
           console.log('[HybridEngine] Using custom Zentrio variant with AC3/E-AC3 support')
         } else {
           throw new Error('Custom variant not found')
         }
-      } catch {
+      } catch (e) {
         // Fall back to standard webcodecs variant
         LibAV = await import('@libav.js/variant-webcodecs')
+        LibAV = LibAV.default
         console.log('[HybridEngine] Using standard webcodecs variant (AC3/E-AC3 not available)')
       }
       
       // Try to initialize - use noworker mode for better compatibility
       try {
-        this.libav = await LibAV.default.LibAV({ noworker: true })
+        this.libav = await LibAV.LibAV({ noworker: true })
         console.log(`[HybridEngine] libav.js initialized (variant: ${variantName})`)
       } catch (libavError) {
         console.warn('[HybridEngine] Failed to initialize libav.js:', libavError)
