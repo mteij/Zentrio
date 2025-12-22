@@ -11,6 +11,7 @@ import { AppearanceSettings } from '../components/settings/AppearanceSettings'
 import { StreamingSettings } from '../components/settings/StreamingSettings'
 import { DangerZoneSettings } from '../components/settings/DangerZoneSettings'
 import { AddonManager } from '../components/settings/AddonManager'
+import { LoginBehaviorSettings } from '../components/settings/LoginBehaviorSettings'
 import styles from '../styles/Settings.module.css'
 
 // Error message mappings for account linking errors
@@ -460,14 +461,31 @@ export function SettingsPage() {
                 </div>
               </div>
 
+              {/* Login Behavior Setting */}
+              <LoginBehaviorSettings />
+
                <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
                 <div className="flex-1 pr-4">
                   <h3 className="text-lg font-medium text-white mb-1">Two-Factor Authentication</h3>
-                  <p className="text-sm text-zinc-400">Add an extra layer of security to your account</p>
+                  <p className="text-sm text-zinc-400">
+                    {hasPassword 
+                      ? 'Add an extra layer of security to your account' 
+                      : 'Set a password first to enable two-factor authentication'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
-                  <Button variant="secondary" onClick={() => setShowTwoFactorSetupModal(true)}>
-                    Enable / Configure
+                  {profile?.twoFactorEnabled && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                      <Check className="w-3 h-3" />
+                      Enabled
+                    </span>
+                  )}
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => setShowTwoFactorSetupModal(true)}
+                    disabled={!hasPassword}
+                  >
+                    {hasPassword ? (profile?.twoFactorEnabled ? 'Configure' : 'Enable') : 'Requires Password'}
                   </Button>
                 </div>
                </div>

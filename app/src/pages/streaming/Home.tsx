@@ -267,10 +267,16 @@ export const StreamingHome = () => {
                 logo: (h as any).logo,
                 description: (h as any).description,
                 releaseInfo: (h as any).releaseInfo,
-                imdbRating: (h as any).imdbRating
+                imdbRating: (h as any).imdbRating,
+                progressPercent: (h as any).progressPercent,
+                episodeDisplay: (h as any).episodeDisplay,
+                lastStream: (h as any).lastStream,
+                season: h.season,
+                episode: h.episode
               }))}
               profileId={profileId!}
               showImdbRatings={showImdbRatings}
+              isContinueWatching={true}
             />
           )}
 

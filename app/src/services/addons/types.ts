@@ -79,6 +79,7 @@ export interface Stream {
   title?: string
   name?: string
   description?: string
+  subtitles?: Array<{ url: string; lang: string }>
   behaviorHints?: {
     notWebReady?: boolean
     bingeGroup?: string

@@ -1,13 +1,31 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 
-// Type definitions for Chrome Cast API
-declare global {
-  interface Window {
-    chrome: any
-    cast: any
-    __onGCastApiAvailable: (isAvailable: boolean) => void
+// Type definitions for Chrome Cast API (using local types to avoid conflicts with Vidstack)
+interface ChromeCastApi {
+  isAvailable?: boolean
+  SessionRequest: new (appId: string) => any
+  ApiConfig: new (sessionRequest: any, sessionListener: any, receiverListener: any) => any
+  initialize: (config: any, onSuccess: () => void, onError: (e: any) => void) => void
+  requestSession: (onSuccess: (session: any) => void, onError: (e: any) => void) => void
+  ReceiverAvailability: { AVAILABLE: string; UNAVAILABLE: string }
+  media: {
+    DEFAULT_MEDIA_RECEIVER_APP_ID: string
+    MediaInfo: new (url: string, type: string) => any
+    GenericMediaMetadata: new () => any
+    MetadataType: { GENERIC: number }
+    LoadRequest: new (mediaInfo: any) => any
   }
+}
+
+// Helper to safely access Chrome Cast API
+const getChromeCast = (): ChromeCastApi | undefined => {
+  const win = window as any
+  return win?.chrome?.cast
+}
+
+const setGCastCallback = (callback: (isAvailable: boolean) => void) => {
+  (window as any).__onGCastApiAvailable = callback
 }
 
 interface CastContextType {
@@ -29,21 +47,24 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
   // Initialize Cast API
   useEffect(() => {
     // Callback for when the Cast API is loaded
-    window.__onGCastApiAvailable = (isAvailable) => {
+    setGCastCallback((isAvailable) => {
       if (isAvailable) {
         initializeCastApi()
       }
-    }
+    })
 
     // Check if API is already loaded
-    if (window.chrome && window.chrome.cast && window.chrome.cast.isAvailable) {
+    const cast = getChromeCast()
+    if (cast?.isAvailable) {
         initializeCastApi();
     }
   }, [])
 
   const initializeCastApi = () => {
     try {
-      const cast = window.chrome.cast
+      const cast = getChromeCast()
+      if (!cast) return
+      
       const sessionRequest = new cast.SessionRequest(cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID)
       
       const apiConfig = new cast.ApiConfig(
@@ -75,7 +96,8 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
   const receiverListener = (availability: string) => {
     // availability: "available" | "unavailable"
     console.log('Cast Receiver availability:', availability)
-    setCastReceiverAvailable(availability === window.chrome.cast.ReceiverAvailability.AVAILABLE)
+    const cast = getChromeCast()
+    setCastReceiverAvailable(availability === cast?.ReceiverAvailability?.AVAILABLE)
   }
 
   const onInitSuccess = () => {
@@ -87,11 +109,17 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
   }
 
   const castMedia = useCallback(async (url: string, type: string, title?: string, image?: string, subtitles?: any[]) => {
+    const cast = getChromeCast()
+    if (!cast) {
+      toast.error("Cast API not available")
+      return
+    }
+    
     if (!castSession) {
         // Try to request session if connected but no session object (edge case) or just request new one
         try {
             await new Promise((resolve, reject) => {
-                 window.chrome.cast.requestSession((session: any) => {
+                 cast.requestSession((session: any) => {
                      sessionListener(session)
                      resolve(session)
                  }, reject)
@@ -102,34 +130,6 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
             return;
         }
     }
-
-    // Get fresh session if the await above updated it, or use current
-    // Note: state update might be async, so we use the global reference or just assume window.chrome.cast.requestSession callback fired
-    // Ideally we wait for state, but for now let's use the one we have or the one newly created
-    // Actually, requestSession callback calls sessionListener which updates state.
-    
-    // We need to access the LATEST session. 
-    // Let's use a simpler approach: define a helper to get current session from framework if possible
-    // For basic SDK, we rely on the session passed to listener.
-    // Let's assume session is active now.
-    
-    // Using window.cast.framework.CastContext.getInstance().getCurrentSession() is better for Cast Framework (CAF),
-    // but we are using the low-level API setup in initializeCastApi (chrome.cast.initialize). 
-    // Let's stick to the low-level object we saved.
-    
-    // HOWEVER, `castSession` state might be stale in this closure if we JUST set it.
-    // But since we awaited requestSession (mock logic above), we might be ok? 
-    // Actually requestSession is callback based. 
-    // Let's proceed carefully.
-    
-    const cast = window.chrome.cast
-    
-    // Current active session
-    // If we just connected, castSession might be null in this closure still?
-    // Let's re-fetch or use a ref?
-    // For this simple implementation, let's rely on the user clicking the cast button FIRST to connect, 
-    // and then playing.
-    // Or if they click "Cast" on the player, it triggers connection.
     
     // If not connected, request session
     let currentSession = castSession;

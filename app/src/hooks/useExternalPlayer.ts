@@ -14,7 +14,7 @@ export function useExternalPlayer() {
   const getPlayerUrl = useCallback((player: ExternalPlayerType, url: string): string | null => {
     switch (player) {
       case 'vlc':
-        return `vlc://${url}`
+        return `vlc:${url}`
       case 'mpc':
         return `mpc-hc://${url}`
       case 'potplayer':

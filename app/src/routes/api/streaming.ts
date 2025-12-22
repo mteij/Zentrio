@@ -102,6 +102,179 @@ streaming.get('/streams/:type/:id', async (c) => {
   return c.json({ streams })
 })
 
+/**
+ * SSE endpoint for progressive stream loading.
+ * Streams addon results as they arrive instead of waiting for all addons.
+ * Uses StreamProcessor for proper filtering, sorting, and deduplication.
+ * 
+ * Events:
+ * - addon-start: { addon: { id, name, logo } } - Addon started loading
+ * - addon-result: { addon: { id, name, logo }, count, allStreams: [...] } - Addon returned streams
+ * - addon-error: { addon: { id, name, logo }, error: string } - Addon failed
+ * - complete: { allStreams: [...], totalCount } - All addons finished
+ */
+streaming.get('/streams-live/:type/:id', async (c) => {
+  const { type, id } = c.req.param()
+  const { profileId, season, episode } = c.req.query()
+  const userAgent = c.req.header('user-agent') || ''
+  const isApp = userAgent.includes('Tauri') || userAgent.includes('Capacitor') || userAgent.includes('ZentrioApp')
+  const platform = isApp ? 'app' : 'web'
+
+  // Set SSE headers
+  c.header('Content-Type', 'text/event-stream')
+  c.header('Cache-Control', 'no-cache')
+  c.header('Connection', 'keep-alive')
+  c.header('X-Accel-Buffering', 'no') // Disable nginx buffering
+
+  // Get stream processor settings for this profile
+  const settingsProfileId = profileDb.getSettingsProfileId(parseInt(profileId))
+  const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined
+
+  // Create a streaming response
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder()
+      let isClosed = false
+      
+      // Collect all raw results as they come in
+      const rawResults: { addon: { id: string, name: string, logo?: string }, streams: any[] }[] = []
+      
+      // Meta for processing
+      let meta: any = null
+      try {
+        meta = await addonManager.getMeta(type, id, parseInt(profileId))
+      } catch (e) {
+        // Fallback minimal meta
+        meta = { id, type, name: 'Unknown' }
+      }
+      
+      const sendEvent = (event: string, data: any) => {
+        if (isClosed) return
+        try {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+        } catch (e) {
+          // Stream might be closed
+          isClosed = true
+        }
+      }
+      
+      const closeController = () => {
+        if (isClosed) return
+        isClosed = true
+        try {
+          controller.close()
+        } catch (e) {
+          // Already closed
+        }
+      }
+      
+      // Process all collected streams using StreamProcessor
+      const processStreams = () => {
+        if (!settings) {
+          // No settings - just flatten and assign sortIndex
+          const allStreams: any[] = []
+          rawResults.forEach(r => {
+            r.streams.forEach(s => {
+              allStreams.push({ stream: s, addon: r.addon })
+            })
+          })
+          return allStreams.map((item, index) => {
+            if (!item.stream.behaviorHints) item.stream.behaviorHints = {}
+            item.stream.behaviorHints.sortIndex = index
+            return { stream: item.stream, addon: item.addon }
+          })
+        }
+
+        // Use StreamProcessor for proper filtering, sorting, deduplication
+        const { StreamProcessor } = require('../../services/addons/stream-processor')
+        const processor = new StreamProcessor(settings, platform)
+        
+        // Flatten all streams for processing
+        const flatStreams = rawResults.flatMap(r => 
+          r.streams.map(s => ({ 
+            stream: s, 
+            addon: { id: r.addon.id, name: r.addon.name, logo: r.addon.logo, version: '', description: '', resources: [], types: [], catalogs: [] }
+          }))
+        )
+        
+        // Process through StreamProcessor (filter, sort, dedupe, limit)
+        const processed = processor.process(flatStreams, meta)
+        
+        // Assign sortIndex and format for frontend
+        return processed.map((p: any, index: number) => {
+          if (!p.original.behaviorHints) p.original.behaviorHints = {}
+          p.original.behaviorHints.sortIndex = index
+          return {
+            stream: p.original,
+            addon: { id: p.addon.id, name: p.addon.name, logo: p.addon.logo || p.addon.logo_url }
+          }
+        })
+      }
+
+      try {
+        await addonManager.getStreamsProgressive(
+          type,
+          id,
+          parseInt(profileId),
+          season ? parseInt(season) : undefined,
+          episode ? parseInt(episode) : undefined,
+          platform,
+          {
+            onAddonStart: (addon) => {
+              sendEvent('addon-start', {
+                addon: { id: addon.id, name: addon.name, logo: addon.logo || addon.logo_url }
+              })
+            },
+            onAddonResult: (addon, streams) => {
+              // Add to collected results
+              rawResults.push({
+                addon: { id: addon.id, name: addon.name, logo: addon.logo || addon.logo_url },
+                streams
+              })
+              
+              // Process ALL collected streams using StreamProcessor
+              const sortedStreams = processStreams()
+              
+              sendEvent('addon-result', {
+                addon: { id: addon.id, name: addon.name, logo: addon.logo || addon.logo_url },
+                count: streams.length,
+                // Send the full sorted stream list
+                allStreams: sortedStreams
+              })
+            },
+            onAddonError: (addon, error) => {
+              sendEvent('addon-error', {
+                addon: { id: addon.id, name: addon.name, logo: addon.logo || addon.logo_url },
+                error
+              })
+            }
+          }
+        )
+
+        // All addons finished - send final processed list
+        const finalStreams = processStreams()
+        sendEvent('complete', { 
+          allStreams: finalStreams,
+          totalCount: finalStreams.length
+        })
+        closeController()
+      } catch (e) {
+        console.error('SSE stream error:', e)
+        sendEvent('error', { message: e instanceof Error ? e.message : 'Unknown error' })
+        closeController()
+      }
+    }
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    }
+  })
+})
+
 streaming.get('/subtitles/:type/:id', async (c) => {
   const { type, id } = c.req.param()
   const { profileId, videoHash } = c.req.query()
@@ -166,7 +339,7 @@ streaming.get('/catalog', async (c) => {
 streaming.post('/progress', async (c) => {
   try {
     const body = await c.req.json()
-    const { profileId, metaId, metaType, title, poster, duration, position } = body
+    const { profileId, metaId, metaType, season, episode, episodeId, title, poster, duration, position } = body
     
     if (!profileId || !metaId || !metaType) {
       return c.json({ error: 'Missing required fields' }, 400)
@@ -176,11 +349,25 @@ streaming.post('/progress', async (c) => {
       profile_id: parseInt(profileId),
       meta_id: metaId,
       meta_type: metaType,
+      season: season !== undefined ? parseInt(season) : undefined,
+      episode: episode !== undefined ? parseInt(episode) : undefined,
+      episode_id: episodeId,
       title,
       poster,
       duration,
-      position
+      position,
+      last_stream: body.lastStream
     })
+
+    // Auto-mark as watched if position >= 90% of duration
+    if (duration && position && position >= duration * 0.9) {
+      watchHistoryDb.autoMarkWatched(
+        parseInt(profileId),
+        metaId,
+        season !== undefined ? parseInt(season) : undefined,
+        episode !== undefined ? parseInt(episode) : undefined
+      )
+    }
 
     return c.json({ success: true })
   } catch (e) {
@@ -188,6 +375,108 @@ streaming.post('/progress', async (c) => {
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
+
+// Get watch progress for a specific item
+streaming.get('/progress/:type/:id', async (c) => {
+  try {
+    const { type, id } = c.req.param()
+    const { profileId, season, episode } = c.req.query()
+    
+    if (!profileId) {
+      return c.json({ error: 'profileId required' }, 400)
+    }
+
+    const progress = watchHistoryDb.getProgress(
+      parseInt(profileId),
+      id,
+      season ? parseInt(season) : undefined,
+      episode ? parseInt(episode) : undefined
+    )
+
+    return c.json({ progress: progress || null })
+  } catch (e) {
+    console.error('Failed to get progress', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get series watch progress (all episodes)
+streaming.get('/series-progress/:id', async (c) => {
+  try {
+    const { id } = c.req.param()
+    const { profileId } = c.req.query()
+    
+    if (!profileId) {
+      return c.json({ error: 'profileId required' }, 400)
+    }
+
+    const pId = parseInt(profileId)
+    const episodeProgress = watchHistoryDb.getSeriesProgress(pId, id)
+    const lastWatched = watchHistoryDb.getLastWatchedEpisode(pId, id)
+
+    return c.json({
+      episodeProgress,
+      lastWatched: lastWatched ? { season: lastWatched.season, episode: lastWatched.episode } : null
+    })
+  } catch (e) {
+    console.error('Failed to get series progress', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Mark item as watched/unwatched
+streaming.post('/mark-watched', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { profileId, metaId, metaType, season, episode, watched } = body
+    
+    if (!profileId || !metaId || !metaType || watched === undefined) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+
+    watchHistoryDb.markAsWatched(
+      parseInt(profileId),
+      metaId,
+      metaType,
+      watched,
+      season !== undefined ? parseInt(season) : undefined,
+      episode !== undefined ? parseInt(episode) : undefined
+    )
+
+    return c.json({ success: true })
+  } catch (e) {
+    console.error('Failed to mark as watched', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Mark entire season as watched/unwatched
+streaming.post('/mark-season-watched', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { profileId, metaId, metaType, season, watched, episodes } = body
+    
+    if (!profileId || !metaId || !metaType || season === undefined || watched === undefined || !episodes) {
+      return c.json({ error: 'Missing required fields (need episodes array)' }, 400)
+    }
+
+    watchHistoryDb.markSeasonWatched(
+      parseInt(profileId),
+      metaId,
+      metaType,
+      parseInt(season),
+      watched,
+      episodes.map((e: number) => parseInt(String(e)))
+    )
+
+    return c.json({ success: true })
+  } catch (e) {
+    console.error('Failed to mark season as watched', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+
 streaming.get('/details/:type/:id', sessionMiddleware, async (c) => {
   const { type, id } = c.req.param()
   const { profileId } = c.req.query()
@@ -199,7 +488,53 @@ streaming.get('/details/:type/:id', sessionMiddleware, async (c) => {
     
     const inLibrary = listDb.isInAnyList(pId, id)
     
-    return c.json({ meta, inLibrary })
+    // For movies, get watch progress
+    let watchProgress = null
+    let seriesProgress = null
+    let lastWatchedEpisode = null
+    
+    if (type === 'movie') {
+      const progress = watchHistoryDb.getProgress(pId, id)
+      if (progress) {
+        watchProgress = {
+          position: progress.position,
+          duration: progress.duration,
+          progressPercent: progress.duration && progress.duration > 0 && progress.position 
+            ? Math.min(100, Math.round((progress.position / progress.duration) * 100)) 
+            : 0,
+          isWatched: progress.is_watched
+        }
+      }
+    } else if (type === 'series') {
+      // Get all episode progress for series
+      const episodeProgress = watchHistoryDb.getSeriesProgress(pId, id)
+      const lastWatched = watchHistoryDb.getLastWatchedEpisode(pId, id)
+      
+      // Create a map of episode progress keyed by "season-episode"
+      seriesProgress = episodeProgress.reduce((acc, ep) => {
+        if (ep.season !== undefined && ep.episode !== undefined) {
+          const key = `${ep.season}-${ep.episode}`
+          acc[key] = {
+            position: ep.position,
+            duration: ep.duration,
+            progressPercent: ep.duration && ep.duration > 0 && ep.position 
+              ? Math.min(100, Math.round((ep.position / ep.duration) * 100)) 
+              : 0,
+            isWatched: ep.is_watched
+          }
+        }
+        return acc
+      }, {} as Record<string, any>)
+      
+      if (lastWatched) {
+        lastWatchedEpisode = {
+          season: lastWatched.season,
+          episode: lastWatched.episode
+        }
+      }
+    }
+    
+    return c.json({ meta, inLibrary, watchProgress, seriesProgress, lastWatchedEpisode })
   } catch (e) {
     console.error('Streaming details error:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to load content')
@@ -243,7 +578,61 @@ streaming.get('/dashboard', sessionMiddleware, async (c) => {
     const profile = profileDb.findWithSettingsById(pId)
     if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'Profile not found')
 
-    const history = watchHistoryDb.getByProfileId(pId)
+    const rawHistory = watchHistoryDb.getByProfileId(pId)
+    
+    // Thresholds for "Continue Watching" section:
+    // - MINIMUM: Must have watched at least 2 minutes OR 5% to appear (prevents misclick clutter)
+    // - MAXIMUM: Once 90%+ watched, consider it finished and hide (accounts for outro skipping)
+    const MIN_SECONDS_THRESHOLD = 120 // 2 minutes
+    const MIN_PERCENT_THRESHOLD = 5
+    const COMPLETED_PERCENT_THRESHOLD = 90
+    
+    // Filter by thresholds, then deduplicate series
+    const filteredHistory = rawHistory.filter(h => {
+      // Skip if marked as fully watched
+      if (h.is_watched) return false
+      
+      // Calculate progress percentage
+      const progressPercent = h.duration && h.duration > 0 && h.position 
+        ? (h.position / h.duration) * 100 
+        : 0
+      
+      // Skip if completed (90%+)
+      if (progressPercent >= COMPLETED_PERCENT_THRESHOLD) return false
+      
+      // Must meet minimum threshold (2 min OR 5%)
+      const meetsMinSeconds = h.position && h.position >= MIN_SECONDS_THRESHOLD
+      const meetsMinPercent = progressPercent >= MIN_PERCENT_THRESHOLD
+      
+      return meetsMinSeconds || meetsMinPercent
+    })
+    
+    // Deduplicate series to show only the latest episode per series
+    // Movies don't have duplicates since they're unique by meta_id
+    const deduplicatedHistory: typeof rawHistory = []
+    const seenSeries = new Set<string>()
+    
+    // filteredHistory is already sorted by updated_at DESC, so first occurrence is the latest
+    for (const h of filteredHistory) {
+      if (h.meta_type === 'series') {
+        if (!seenSeries.has(h.meta_id)) {
+          seenSeries.add(h.meta_id)
+          deduplicatedHistory.push(h)
+        }
+      } else {
+        // Movies and other types - include as-is
+        deduplicatedHistory.push(h)
+      }
+    }
+    
+    // Enhance history with progress percentage
+    const history = deduplicatedHistory.map(h => ({
+      ...h,
+      progressPercent: h.duration && h.duration > 0 && h.position ? Math.min(100, Math.round((h.position / h.duration) * 100)) : 0,
+      // For series, include season/episode display info
+      episodeDisplay: h.season && h.episode ? `S${h.season}:E${h.episode}` : null,
+      lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
+    }))
     const results = await addonManager.getCatalogs(pId)
     const trending = await addonManager.getTrending(pId)
     

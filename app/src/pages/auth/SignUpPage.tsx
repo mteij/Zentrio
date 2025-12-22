@@ -2,6 +2,8 @@ import { AuthForms } from "../../components/auth/AuthForms";
 import { AnimatedBackground, TitleBar } from "../../components";
 
 export function SignUpPage() {
+  // Note: Authenticated user redirect is now handled by PublicRoute wrapper
+  
   return (
     <>
       <TitleBar />

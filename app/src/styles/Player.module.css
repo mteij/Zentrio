@@ -606,6 +606,10 @@
   font-size: 0.9rem;
   cursor: pointer;
   transition: background 0.15s ease;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  border: none;
 }
 
 .settingsItem:hover {
@@ -714,105 +718,310 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* Touch Zone Overlays (for gesture detection) */
-.touchZone {
+.nextEpisodeButton.tertiary {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nextEpisodeButton.tertiary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* Short Video Warning Prompt */
+.shortVideoPrompt {
   position: absolute;
-  top: 20%;
-  bottom: 20%;
-  width: 30%;
-  z-index: 10;
+  bottom: 120px;
+  right: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  padding-bottom: 20px; /* Space for progress bar */
+  max-width: 320px;
+  background: rgba(30, 20, 20, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 180, 100, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateX(20px);
+  transition: all 0.3s ease;
+  z-index: 100;
+  overflow: hidden; /* For progress bar clipping */
 }
 
-.touchZone.left {
+.shortVideoPrompt.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.shortVideoClose {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.shortVideoClose:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.shortVideoIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 180, 100, 0.15);
+  border-radius: 8px;
+  color: #ffb464;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.shortVideoContent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  padding-right: 16px; /* Space for close button */
+}
+
+.shortVideoTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffb464;
+}
+
+.shortVideoDesc {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+.shortVideoActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.shortVideoButton {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.shortVideoButton.primary {
+  background: rgba(255, 180, 100, 0.15);
+  color: #ffb464;
+  border: 1px solid rgba(255, 180, 100, 0.3);
+}
+
+.shortVideoButton.primary:hover {
+  background: rgba(255, 180, 100, 0.25);
+}
+
+/* Progress Bar at bottom */
+.shortVideoProgress {
+  position: absolute;
+  bottom: 0;
   left: 0;
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 180, 100, 0.1);
 }
 
-.touchZone.right {
+.shortVideoProgressBar {
+  height: 100%;
+  background: #ffb464;
+  transition: width 0.1s linear;
+}
+
+/* ==========================================================================
+   Vidstack Player Overlay Styles
+   ========================================================================== */
+
+/* Back button overlay */
+.backOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
   right: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
-.touchZone.center {
-  left: 30%;
-  right: 30%;
-  width: 40%;
+.backOverlay.visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-/* Mobile Responsive */
-@media (max-width: 768px) {
-  .topBar {
-    padding: 16px;
-  }
-
-  .title {
-    font-size: 1rem;
-  }
-
-  .episodeBadge {
-    font-size: 0.65rem;
-    padding: 3px 8px;
-  }
-
-  .streamInfo {
-    display: none;
-  }
-
-  .backButton,
-  .controlButton {
-    width: 38px;
-    height: 38px;
-  }
-
-  .playPauseLarge {
-    width: 64px;
-    height: 64px;
-  }
-
-  .episodeNavButton {
-    padding: 12px 16px;
-  }
-
-  .bottomBar {
-    padding: 0 16px 16px;
-  }
-
-  .controlButtonSm {
-    width: 36px;
-    height: 36px;
-  }
-
-  .timeDisplay {
-    font-size: 0.75rem;
-  }
-
-  .subtitleText {
-    font-size: 1rem;
-    padding: 6px 12px;
-  }
-
-  .nextEpisodeOverlay {
-    bottom: 100px;
-    right: 16px;
-    left: 16px;
-  }
-
-  .seekIndicator.left {
-    left: 10%;
-  }
-
-  .seekIndicator.right {
-    right: 10%;
-  }
+/* Title overlay (next to back button) */
+.titleOverlay {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-/* Keyboard Focus Styles */
-.controlButton:focus-visible,
-.controlButtonSm:focus-visible,
-.playPauseLarge:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/* Episode navigation overlay */
+.episodeNavOverlay {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 24px;
+  pointer-events: none;
+  z-index: 40;
 }
 
-/* Hide cursor when controls hidden */
-.playerWrapper.hideCursor {
-  cursor: none;
+.episodeNavOverlay .episodeNavButton {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
 }
+
+.episodeNavOverlay .episodeNavButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
+}
+
+/* Vidstack theme overrides */
+:root {
+  --media-brand: var(--accent, #7c3aed);
+  --media-focus-ring-color: var(--accent, #7c3aed);
+}
+
+.vidstack-player {
+  width: 100% !important;
+  height: 100% !important;
+  --video-bg: #000;
+}
+
+/* Force Vidstack to fill container */
+.playerWrapper :global(.vds-video-layout),
+.playerWrapper :global([data-media-player]),
+.playerWrapper :global(media-player),
+.playerWrapper :global(.vds-player) {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  inset: 0 !important;
+}
+
+.playerWrapper :global(video) {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+/* External player button in overlay */
+.externalPlayerOverlay {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 55;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.externalPlayerOverlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.externalPlayerButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.externalPlayerButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.externalPlayerMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  min-width: 160px;
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.externalPlayerMenuItem {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  color: #fff;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s ease;
+}
+
+.externalPlayerMenuItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+

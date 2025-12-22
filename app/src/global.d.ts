@@ -7,4 +7,10 @@ declare global {
   }
 }
 
+// mp4box.js module declaration
+declare module 'mp4box' {
+  const MP4Box: any
+  export default MP4Box
+}
+
 export {};

@@ -1,0 +1,776 @@
+/* ==============================================
+   Addons Page - Premium Glassmorphism Design
+   ============================================== */
+
+/* ============================================
+   Page Layout
+   ============================================ */
+.addonsPage {
+  min-height: 100vh;
+  min-height: var(--app-height, 100vh);
+  position: relative;
+  z-index: 1;
+  padding-top: 100px;
+  padding-bottom: 60px;
+}
+
+.addonsContainer {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+/* ============================================
+   Header Section
+   ============================================ */
+.header {
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-xl, 24px);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    var(--accent, #e50914) 20%, 
+    var(--accent, #e50914) 80%, 
+    transparent 100%
+  );
+  opacity: 0.8;
+}
+
+.headerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.headerInfo {
+  flex: 1;
+  min-width: 280px;
+}
+
+.headerTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text, #ffffff);
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerTitle::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 28px;
+  background: linear-gradient(180deg, var(--accent, #e50914), transparent);
+  border-radius: 2px;
+}
+
+.headerDescription {
+  font-size: 1rem;
+  color: var(--text-muted, #b3b3b3);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ============================================
+   Search & Filter Bar
+   ============================================ */
+.searchFilterBar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.searchWrapper {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  max-width: 400px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted, #888);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.searchInput {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px 0 48px;
+  background: rgba(30, 30, 30, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg, 16px);
+  color: var(--text, white);
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted, #888);
+}
+
+.searchInput:focus {
+  background: rgba(40, 40, 40, 0.8);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.1);
+}
+
+.searchInput:focus + .searchIcon,
+.searchWrapper:focus-within .searchIcon {
+  color: var(--accent, #e50914);
+}
+
+.filterWrapper {
+  position: relative;
+  min-width: 180px;
+}
+
+.filterIcon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted, #888);
+  pointer-events: none;
+}
+
+.filterSelect {
+  width: 100%;
+  height: 48px;
+  padding: 0 40px 0 48px;
+  background: rgba(30, 30, 30, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg, 16px);
+  color: var(--text, white);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  appearance: none;
+  outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+
+.filterSelect:hover,
+.filterSelect:focus {
+  background-color: rgba(40, 40, 40, 0.8);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.filterSelect option {
+  background: #1a1a1a;
+  color: white;
+}
+
+/* ============================================
+   Section Headers
+   ============================================ */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text, #ffffff);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sectionIcon {
+  color: #fbbf24;
+}
+
+/* ============================================
+   Addon Cards Grid
+   ============================================ */
+.addonsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 24px;
+}
+
+/* ============================================
+   Addon Card - Premium Glass Design
+   ============================================ */
+.addonCard {
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 16px);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: cardFadeIn 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+.addonCard:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+/* Recommended card variant */
+.addonCardRecommended {
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.12) 0%,
+    rgba(168, 85, 247, 0.08) 50%,
+    rgba(20, 20, 20, 0.65) 100%
+  );
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+.addonCardRecommended:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    0 0 30px rgba(139, 92, 246, 0.1);
+}
+
+/* Installed indicator */
+.addonCardInstalled {
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.addonCardInstalled:hover {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+/* Card Header - Logo + Info */
+.cardHeader {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.cardLogo {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.addonCard:hover .cardLogo {
+  transform: scale(1.05);
+}
+
+.cardLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 8px;
+}
+
+.cardLogoPlaceholder {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cardInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.cardTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text, #ffffff);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.starIcon {
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.installedIcon {
+  color: #22c55e;
+  flex-shrink: 0;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.versionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted, #ccc);
+}
+
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted, #999);
+  text-transform: capitalize;
+}
+
+/* Card Description */
+.cardDescription {
+  font-size: 0.9rem;
+  color: var(--text-muted, #b3b3b3);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+  margin: 0;
+}
+
+/* Card Actions */
+.cardActions {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.btnInstall {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text, white);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btnInstall:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.btnInstallPrimary {
+  background: linear-gradient(135deg, rgba(229, 9, 20, 0.8), rgba(180, 7, 15, 0.9));
+  border-color: rgba(229, 9, 20, 0.5);
+}
+
+.btnInstallPrimary:hover {
+  background: linear-gradient(135deg, rgba(229, 9, 20, 0.9), rgba(180, 7, 15, 1));
+  border-color: rgba(229, 9, 20, 0.7);
+  box-shadow: 0 4px 20px rgba(229, 9, 20, 0.3);
+}
+
+.btnConfig {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: var(--text-muted, #ccc);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btnConfig:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text, white);
+}
+
+.btnUninstall {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 12px;
+  color: #f87171;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.btnUninstall:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: scale(1.05);
+}
+
+.btnUninstall:disabled,
+.btnInstall:disabled,
+.btnConfig:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ============================================
+   Empty State
+   ============================================ */
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted, #888);
+}
+
+.emptyState p {
+  margin: 0 0 20px 0;
+  font-size: 1rem;
+}
+
+/* ============================================
+   Loading State
+   ============================================ */
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+/* ============================================
+   Config Modal
+   ============================================ */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease;
+}
+
+.modalContent {
+  background: var(--glass-bg, rgba(20, 20, 20, 0.95));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-xl, 24px);
+  padding: 32px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+  animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modalTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text, white);
+  margin: 0;
+}
+
+.modalClose {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modalClose:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text, white);
+}
+
+.modalDescription {
+  font-size: 0.9rem;
+  color: var(--text-muted, #888);
+  line-height: 1.6;
+  margin: 0 0 24px 0;
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.formInput {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  background: rgba(30, 30, 30, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: var(--text, white);
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.formInput::placeholder {
+  color: var(--text-muted, #666);
+}
+
+.formInput:focus {
+  background: rgba(40, 40, 40, 0.8);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.1);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Staggered animation delays */
+.addonCard:nth-child(1) { animation-delay: 0.05s; }
+.addonCard:nth-child(2) { animation-delay: 0.1s; }
+.addonCard:nth-child(3) { animation-delay: 0.15s; }
+.addonCard:nth-child(4) { animation-delay: 0.2s; }
+.addonCard:nth-child(5) { animation-delay: 0.25s; }
+.addonCard:nth-child(6) { animation-delay: 0.3s; }
+.addonCard:nth-child(7) { animation-delay: 0.35s; }
+.addonCard:nth-child(8) { animation-delay: 0.4s; }
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+@media (max-width: 1024px) {
+  .addonsContainer {
+    padding: 0 24px;
+  }
+  
+  .addonsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .addonsPage {
+    padding-top: 80px;
+  }
+  
+  .addonsContainer {
+    padding: 0 16px;
+    gap: 24px;
+  }
+  
+  .header {
+    padding: 24px;
+    border-radius: var(--radius-lg, 16px);
+  }
+  
+  .headerTop {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .headerTitle {
+    font-size: 1.5rem;
+  }
+  
+  .searchFilterBar {
+    flex-direction: column;
+  }
+  
+  .searchWrapper,
+  .filterWrapper {
+    min-width: 100%;
+    max-width: 100%;
+  }
+  
+  .addonsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .addonCard {
+    padding: 20px;
+  }
+  
+  .cardActions {
+    flex-wrap: wrap;
+  }
+  
+  .btnInstall,
+  .btnConfig {
+    flex: 1 1 calc(50% - 5px);
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 20px;
+  }
+  
+  .headerActions {
+    width: 100%;
+  }
+  
+  .headerActions > * {
+    flex: 1;
+  }
+  
+  .cardHeader {
+    gap: 12px;
+  }
+  
+  .cardLogo {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .cardTitle {
+    font-size: 1rem;
+  }
+}

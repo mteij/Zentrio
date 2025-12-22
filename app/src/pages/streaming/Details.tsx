@@ -1,16 +1,33 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Play, Plus, Check, ArrowLeft, Box, VolumeX, Filter, Zap, HardDrive, Wifi } from 'lucide-react'
+import { Play, Plus, Check, ArrowLeft, Zap, HardDrive, Wifi, Eye, EyeOff } from 'lucide-react'
 
 import { Layout, LazyImage, RatingBadge, SkeletonDetails, SkeletonStreamList } from '../../components'
 import { MetaDetail, Stream, Manifest } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
+import { useStreamLoader, FlatStream, AddonLoadingState } from '../../hooks/useStreamLoader'
 import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
 
 interface StreamingDetailsData {
   meta: MetaDetail
   inLibrary: boolean
+  watchProgress?: {
+    position: number
+    duration: number
+    progressPercent: number
+    isWatched: boolean
+  }
+  seriesProgress?: Record<string, {
+    position: number
+    duration: number
+    progressPercent: number
+    isWatched: boolean
+  }>
+  lastWatchedEpisode?: {
+    season: number
+    episode: number
+  }
 }
 
 export const StreamingDetails = () => {
@@ -20,13 +37,24 @@ export const StreamingDetails = () => {
   const [data, setData] = useState<StreamingDetailsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [streams, setStreams] = useState<{ addon: Manifest, streams: Stream[] }[]>([])
-  const [streamsLoading, setStreamsLoading] = useState(false)
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null)
   const [episodes, setEpisodes] = useState<any[]>([])
   const [view, setView] = useState<'details' | 'episodes' | 'streams'>('details')
   const [selectedEpisode, setSelectedEpisode] = useState<{ season: number, number: number, title: string } | null>(null)
-  const [selectedAddon, setSelectedAddon] = useState<string | null>(null)
+  
+  // Progressive stream loading hook
+  const {
+    streams,
+    filteredStreams,
+    addonStatuses,
+    selectedAddon,
+    setSelectedAddon,
+    isLoading: streamsLoading,
+    isComplete: streamsComplete,
+    totalCount,
+    loadStreams: loadStreamsProgressive,
+    reset: resetStreams
+  } = useStreamLoader()
 
 
   useEffect(() => {
@@ -45,9 +73,19 @@ export const StreamingDetails = () => {
       setData(detailsData)
       
       if (detailsData.meta.type === 'series' && detailsData.meta.videos) {
-        const seasons = Array.from(new Set(detailsData.meta.videos.map((v: any) => v.season || 0))).sort((a: any, b: any) => a - b)
-        const initialSeason = seasons.length > 1 ? seasons.filter((s: any) => s !== 0)[0] : seasons[0]
-        setSelectedSeason(initialSeason as number)
+        const seasons = Array.from(new Set(detailsData.meta.videos.map((v: any) => v.season || 0))).sort((a: any, b: any) => a - b) as number[]
+        const filteredSeasons = seasons.length > 1 ? seasons.filter((s: number) => s !== 0) : seasons
+        
+        // Auto-select season based on last watched episode if available
+        let initialSeason = filteredSeasons[0]
+        if (detailsData.lastWatchedEpisode && detailsData.lastWatchedEpisode.season) {
+          const lastSeason = detailsData.lastWatchedEpisode.season
+          if (filteredSeasons.includes(lastSeason)) {
+            initialSeason = lastSeason
+          }
+        }
+        
+        setSelectedSeason(initialSeason)
         setView('episodes')
       } else {
         loadStreams(undefined, undefined, detailsData.meta.imdb_id || id)
@@ -61,63 +99,36 @@ export const StreamingDetails = () => {
     }
   }
 
-  const loadStreams = async (season?: number, episode?: number, overrideId?: string, autoPlay: boolean = false) => {
-    setStreamsLoading(true)
-    setSelectedAddon(null) // Reset addon filter when loading new streams
-    try {
-      const fetchId = overrideId || data?.meta.imdb_id || id
-      let url = `/api/streaming/streams/${type}/${fetchId}?profileId=${profileId}`
-      if (type === 'series' && season && episode) {
-        url += `&season=${season}&episode=${episode}`
-      }
-      const res = await fetch(url)
-      const streamData = await res.json()
-      setStreams(streamData.streams || [])
-      
-      // Auto-play best source if requested
-      if (autoPlay && streamData.streams?.length > 0) {
-        const firstGroup = streamData.streams[0]
-        if (firstGroup?.streams?.length > 0) {
-          handlePlay(firstGroup.streams[0])
-          return { success: true } // Signal success for toast
-        }
-        throw new Error('No streams available')
-      }
-      return { success: true }
-    } catch (e) {
-      console.error('Failed to load streams', e)
-      throw e
-    } finally {
-      setStreamsLoading(false)
-    }
+  // State for auto-play tracking
+  const autoPlayRef = useRef<boolean>(false)
+  
+  const loadStreams = (season?: number, episode?: number, overrideId?: string, autoPlay: boolean = false) => {
+    autoPlayRef.current = autoPlay
+    
+    const fetchId = overrideId || data?.meta.imdb_id || id
+    if (!fetchId || !profileId) return
+    
+    loadStreamsProgressive(
+      type || '',
+      fetchId,
+      profileId,
+      season,
+      episode
+    )
   }
+  
+  // Handle auto-play when streams arrive
+  useEffect(() => {
+    if (autoPlayRef.current && streams.length > 0) {
+      // streams is now a flat sorted list (FlatStream[])
+      handlePlay(streams[0].stream)
+      autoPlayRef.current = false
+    }
+  }, [streams])
 
-  // Flatten all streams when "All Sources" is selected
-  // Preserves the backend's sort order which respects user's custom sorting config
-  const flattenedStreams = useMemo(() => {
-    if (selectedAddon) return null // Not needed when specific addon is selected
-    
-    // Flatten all streams with addon info
-    const allStreams: { stream: Stream, addon: Manifest }[] = []
-    streams.forEach(group => {
-      group.streams.forEach(stream => {
-        allStreams.push({ stream, addon: group.addon })
-      })
-    })
-    
-    // Sort by the backend's sortIndex which respects user's custom sorting config
-    return allStreams.sort((a, b) => {
-      const indexA = (a.stream.behaviorHints as any)?.sortIndex ?? Infinity
-      const indexB = (b.stream.behaviorHints as any)?.sortIndex ?? Infinity
-      return indexA - indexB
-    })
-  }, [streams, selectedAddon])
+  // filteredStreams comes from hook - already sorted by backend sortIndex
+  // totalStreamCount is now based on totalCount from hook
 
-  // Filter streams by selected addon (for grouped view)
-  const filteredStreams = useMemo(() => {
-    if (!selectedAddon) return streams
-    return streams.filter(group => group.addon.id === selectedAddon)
-  }, [streams, selectedAddon])
 
   // Helper to parse stream information
   const parseStreamInfo = (stream: Stream) => {
@@ -151,22 +162,14 @@ export const StreamingDetails = () => {
     return { resolution, size, isCached, hasHDR, hasDV }
   }
 
-  // Count total streams
-  const totalStreamCount = useMemo(() => {
-    return streams.reduce((acc, group) => acc + group.streams.length, 0)
-  }, [streams])
+  // Count total streams - use totalCount from hook (which tracks unfiltered count)
+  const totalStreamCount = totalCount
 
 
   const handleQuickPlay = (season: number, number: number, title: string) => {
     setSelectedEpisode({ season, number, title })
-    toast.promise(
-      loadStreams(season, number, undefined, true),
-      {
-        loading: `Loading S${season}:E${number}...`,
-        success: 'Starting playback...',
-        error: 'No streams found'
-      }
-    )
+    toast.loading(`Loading S${season}:E${number}...`, { id: 'stream-load' })
+    loadStreams(season, number, undefined, true)
   }
 
   const handlePlay = (stream: Stream) => {
@@ -194,6 +197,102 @@ export const StreamingDetails = () => {
         setData({ ...data, inLibrary: !data.inLibrary })
     }
   }
+
+  // Mark movie or episode as watched/unwatched
+  const toggleWatched = async (season?: number, episode?: number) => {
+    if (!data || !profileId) return
+    
+    const isMovie = data.meta.type === 'movie'
+    const currentlyWatched = isMovie 
+      ? data.watchProgress?.isWatched 
+      : (season !== undefined && episode !== undefined 
+          ? data.seriesProgress?.[`${season}-${episode}`]?.isWatched 
+          : false)
+    
+    const newWatched = !currentlyWatched
+    
+    try {
+      await fetch('/api/streaming/mark-watched', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: parseInt(profileId),
+          metaId: id,
+          metaType: data.meta.type,
+          season,
+          episode,
+          watched: newWatched
+        })
+      })
+      
+      // Update local state
+      if (isMovie) {
+        setData({
+          ...data,
+          watchProgress: {
+            ...(data.watchProgress || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
+            isWatched: newWatched
+          }
+        })
+      } else if (season !== undefined && episode !== undefined) {
+        const key = `${season}-${episode}`
+        setData({
+          ...data,
+          seriesProgress: {
+            ...(data.seriesProgress || {}),
+            [key]: {
+              ...(data.seriesProgress?.[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
+              isWatched: newWatched
+            }
+          }
+        })
+      }
+    } catch (e) {
+      console.error('Failed to toggle watched status', e)
+      toast.error('Failed to update watched status')
+    }
+  }
+
+  // Mark entire season as watched
+  const toggleSeasonWatched = async (season: number, watched: boolean) => {
+    if (!data || !profileId || !data.meta.videos) return
+    
+    const episodes = data.meta.videos
+      .filter((v: any) => v.season === season)
+      .map((v: any) => v.number || v.episode)
+    
+    try {
+      await fetch('/api/streaming/mark-season-watched', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: parseInt(profileId),
+          metaId: id,
+          metaType: 'series',
+          season,
+          watched,
+          episodes
+        })
+      })
+      
+      // Update local state for all episodes in the season
+      const updatedProgress = { ...(data.seriesProgress || {}) }
+      episodes.forEach((ep: number) => {
+        const key = `${season}-${ep}`
+        updatedProgress[key] = {
+          ...(updatedProgress[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
+          isWatched: watched
+        }
+      })
+      
+      setData({ ...data, seriesProgress: updatedProgress })
+      toast.success(watched ? 'Season marked as watched' : 'Season marked as unwatched')
+    } catch (e) {
+      console.error('Failed to toggle season watched', e)
+      toast.error('Failed to update season watched status')
+    }
+  }
+
 
   if (loading) {
     return (
@@ -285,7 +384,7 @@ export const StreamingDetails = () => {
 
             {meta.type === 'series' && view === 'episodes' && meta.videos && (
               <div className="series-episodes-container">
-                <div className="season-selector">
+                <div className="season-selector" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <select 
                     value={selectedSeason || ''} 
                     onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
@@ -299,14 +398,48 @@ export const StreamingDetails = () => {
                       ));
                     })()}
                   </select>
+                  {/* Mark Season Watched Button */}
+                  {selectedSeason && (() => {
+                    const seasonEps = meta.videos.filter((v: any) => v.season === selectedSeason)
+                    const allWatched = seasonEps.every((ep: any) => 
+                      data.seriesProgress?.[`${ep.season}-${ep.number}`]?.isWatched
+                    )
+                    return (
+                      <button
+                        onClick={() => toggleSeasonWatched(selectedSeason, !allWatched)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '8px 12px',
+                          background: allWatched ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                          border: `1px solid ${allWatched ? 'rgba(34, 197, 94, 0.4)' : 'rgba(255, 255, 255, 0.2)'}`,
+                          borderRadius: '8px',
+                          color: allWatched ? '#22c55e' : '#fff',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                        title={allWatched ? 'Mark season as unwatched' : 'Mark season as watched'}
+                      >
+                        {allWatched ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {allWatched ? 'Unwatch Season' : 'Watch Season'}
+                      </button>
+                    )
+                  })()}
                 </div>
                 <div className={styles.episodeList}>
-                  {meta.videos.filter((v: any) => v.season === selectedSeason).map((ep: any) => (
-                    <div
+                  {meta.videos.filter((v: any) => v.season === selectedSeason).map((ep: any) => {
+                    const epProgress = data.seriesProgress?.[`${ep.season}-${ep.number}`]
+                    const isWatched = epProgress?.isWatched ?? false
+                    const progressPercent = epProgress?.progressPercent ?? 0
+                    
+                    return (
+                      <div
                         key={ep.id || `${ep.season}-${ep.number}`}
                         className={styles.episodeItem}
                         onClick={() => handleEpisodeSelect(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`, false)}
-                    >
+                        style={{ position: 'relative' }}
+                      >
                         <div className={styles.episodeThumbnail}>
                           {ep.thumbnail ? (
                             <LazyImage src={ep.thumbnail} alt={ep.title || ep.name || `Episode ${ep.number}`} />
@@ -316,10 +449,53 @@ export const StreamingDetails = () => {
                             </div>
                           )}
                           <span className={styles.episodeNumber}>{ep.number}</span>
+                          {/* Progress bar on thumbnail */}
+                          {progressPercent > 0 && !isWatched && (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: '3px',
+                              background: 'rgba(0, 0, 0, 0.6)'
+                            }}>
+                              <div style={{
+                                width: `${progressPercent}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #8b5cf6, #a855f7)'
+                              }} />
+                            </div>
+                          )}
                         </div>
                         <div className={styles.episodeContent}>
                           <div className={styles.episodeHeader}>
-                            <span className={styles.episodeTitle}>{ep.title || ep.name || `Episode ${ep.number}`}</span>
+                            {/* Watched indicator */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleWatched(ep.season, ep.number)
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '50%',
+                                background: isWatched ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                                border: `1px solid ${isWatched ? '#22c55e' : 'rgba(255, 255, 255, 0.3)'}`,
+                                color: isWatched ? '#22c55e' : '#888',
+                                cursor: 'pointer',
+                                marginRight: '8px',
+                                flexShrink: 0
+                              }}
+                              title={isWatched ? 'Mark as unwatched' : 'Mark as watched'}
+                            >
+                              {isWatched ? <Check size={14} /> : <Eye size={14} />}
+                            </button>
+                            <span className={styles.episodeTitle} style={{ opacity: isWatched ? 0.7 : 1 }}>
+                              {ep.title || ep.name || `Episode ${ep.number}`}
+                            </span>
                             <button 
                                 className={styles.episodePlayBtn}
                                 onClick={(e) => {
@@ -342,13 +518,17 @@ export const StreamingDetails = () => {
                               <span className={styles.episodeAge}>{ep.certification || ep.contentRating}</span>
                             )}
                             {ep.runtime && <span className={styles.episodeRuntime}>{ep.runtime}</span>}
+                            {progressPercent > 0 && !isWatched && (
+                              <span style={{ fontSize: '0.75rem', color: '#a855f7' }}>{progressPercent}% watched</span>
+                            )}
                           </div>
                           {ep.overview && (
                             <p className={styles.episodeDescription}>{ep.overview}</p>
                           )}
                         </div>
-                    </div>
-                  ))}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -367,57 +547,101 @@ export const StreamingDetails = () => {
                         </div>
                     )}
 
-                    {/* Stream Controls: Filter and Play Best */}
-                    {/* Only show when there's something to display: series get Play Best, multiple addons get filter */}
-                    {!streamsLoading && streams.length > 0 && (meta.type === 'series' || streams.length > 1) && (
-                        <div className={styles.addonFilter} style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                            {/* Play Best Button - only for series (movies have Play in main actions) */}
-                            {meta.type === 'series' && (
-                                <button 
-                                    className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
-                                    style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                    onClick={() => {
-                                        // Get the best stream (first from flattened sorted list)
-                                        if (flattenedStreams && flattenedStreams.length > 0) {
-                                            handlePlay(flattenedStreams[0].stream)
-                                        } else if (streams.length > 0 && streams[0].streams.length > 0) {
-                                            handlePlay(streams[0].streams[0])
-                                        }
-                                    }}
-                                >
-                                    <Play size={16} fill="currentColor" />
-                                    Play Best
-                                </button>
-                            )}
+                    {/* Unified Addon Status + Controls Bar */}
+                    {(addonStatuses.size > 0 || streams.length > 0) && (
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            marginBottom: '16px',
+                            padding: '12px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '8px'
+                        }}>
+                            {/* Top row: Play Best button + total count */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    {meta.type === 'series' && filteredStreams && filteredStreams.length > 0 && (
+                                        <button 
+                                            className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
+                                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            onClick={() => handlePlay(filteredStreams[0].stream)}
+                                        >
+                                            <Play size={16} fill="currentColor" />
+                                            Play Best
+                                        </button>
+                                    )}
+                                    <span style={{ fontSize: '0.9rem', color: '#9ca3af' }}>
+                                        {totalStreamCount > 0 ? `${totalStreamCount} sources` : streamsLoading ? 'Loading...' : 'No sources found'}
+                                    </span>
+                                </div>
+                            </div>
                             
-                            {/* Addon Filter */}
-                            {streams.length > 1 && (
-                                <>
-                                    <Filter size={16} />
-                                    <select
-                                        value={selectedAddon || ''}
-                                        onChange={(e) => setSelectedAddon(e.target.value || null)}
-                                        className={styles.addonFilterSelect}
+                            {/* Addon status chips - clickable to filter */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {Array.from(addonStatuses.values()).map((addon) => (
+                                    <div
+                                        key={addon.id}
+                                        onClick={() => {
+                                            // Toggle filter: if already selected, clear; otherwise set
+                                            setSelectedAddon(selectedAddon === addon.id ? null : addon.id)
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '4px 10px',
+                                            borderRadius: '16px',
+                                            cursor: addon.status === 'done' ? 'pointer' : 'default',
+                                            background: selectedAddon === addon.id
+                                                ? 'rgba(99, 102, 241, 0.3)' // Highlight selected
+                                                : addon.status === 'done' 
+                                                    ? 'rgba(34, 197, 94, 0.15)' 
+                                                    : addon.status === 'error' 
+                                                        ? 'rgba(239, 68, 68, 0.15)' 
+                                                        : 'rgba(255, 255, 255, 0.1)',
+                                            fontSize: '0.8rem',
+                                            color: selectedAddon === addon.id
+                                                ? '#a5b4fc' // Selected color
+                                                : addon.status === 'done' 
+                                                    ? '#22c55e' 
+                                                    : addon.status === 'error' 
+                                                        ? '#ef4444' 
+                                                        : '#9ca3af',
+                                            border: selectedAddon === addon.id ? '1px solid #6366f1' : '1px solid transparent',
+                                            transition: 'all 0.2s ease'
+                                        }}
                                     >
-                                        <option value="">All Sources ({totalStreamCount})</option>
-                                        {streams.map((group) => (
-                                            <option key={group.addon.id} value={group.addon.id}>
-                                                {group.addon.name} ({group.streams.length})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </>
-                            )}
+                                        {addon.status === 'loading' && (
+                                            <span style={{
+                                                width: '12px',
+                                                height: '12px',
+                                                border: '2px solid currentColor',
+                                                borderTopColor: 'transparent',
+                                                borderRadius: '50%',
+                                                animation: 'spin 1s linear infinite',
+                                                display: 'inline-block'
+                                            }} />
+                                        )}
+                                        {addon.status === 'done' && <Check size={12} />}
+                                        {addon.status === 'error' && <span>✕</span>}
+                                        <span>{addon.name}</span>
+                                        {addon.status === 'done' && addon.streamCount !== undefined && (
+                                            <span style={{ opacity: 0.7 }}>({addon.streamCount})</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
 
-                    {streamsLoading ? (
+                    {streamsLoading && streams.length === 0 ? (
                         <SkeletonStreamList />
-                    ) : !selectedAddon && flattenedStreams && flattenedStreams.length > 0 ? (
+                    ) : filteredStreams && filteredStreams.length > 0 ? (
                         /* Flat sorted list when "All Sources" is selected */
                         <div className="streams-list-wrapper">
                             <div className={styles.streamList}>
-                                {flattenedStreams.map(({ stream, addon }, idx) => {
+                                {filteredStreams.map(({ stream, addon }, idx) => {
                                     const info = parseStreamInfo(stream)
                                     return (
                                         <div
@@ -456,11 +680,6 @@ export const StreamingDetails = () => {
                                                     {info.hasDV && (
                                                         <span className={`${styles.streamBadge} ${styles.badgeDV}`}>DV</span>
                                                     )}
-                                                    {stream.behaviorHints?.notWebReady && (
-                                                        <span className={`${styles.streamBadge} ${styles.badgeWarning}`} title="Audio may not be supported in browser">
-                                                            <VolumeX size={12} />
-                                                        </span>
-                                                    )}
                                                 </div>
                                             </div>
                                             {stream.description && (
@@ -471,74 +690,7 @@ export const StreamingDetails = () => {
                                 })}
                             </div>
                         </div>
-                    ) : filteredStreams.length > 0 ? (
-                        /* Grouped view when a specific addon is selected */
-                        <div className="streams-list-wrapper">
-                            {filteredStreams.map((group, idx) => (
-                                <div key={idx} className={styles.addonGroup}>
-                                    <div className={styles.addonTitle}>
-                                        {group.addon.logo_url ? (
-                                            <img src={group.addon.logo_url} alt={group.addon.name} style={{ width: '16px', height: '16px', marginRight: '8px', verticalAlign: 'middle' }} />
-                                        ) : (
-                                            <Box size={16} />
-                                        )}
-                                        {group.addon.name}
-                                        <span className={styles.addonCount}>{group.streams.length}</span>
-                                    </div>
-                                    <div className={styles.streamList}>
-                                        {group.streams.map((stream, sIdx) => {
-                                            const info = parseStreamInfo(stream)
-                                            return (
-                                                <div
-                                                    key={sIdx}
-                                                    className={`${styles.streamItem} ${info.isCached ? styles.streamCached : ''}`}
-                                                    onClick={() => handlePlay(stream)}
-                                                >
-                                                    <div className={styles.streamHeader}>
-                                                        <div className={styles.streamName}>
-                                                            {stream.title || stream.name || `Stream ${sIdx + 1}`}
-                                                        </div>
-                                                        <div className={styles.streamBadges}>
-                                                            {info.isCached && (
-                                                                <span className={`${styles.streamBadge} ${styles.badgeCached}`} title="Cached">
-                                                                    <Zap size={12} />
-                                                                </span>
-                                                            )}
-                                                            {info.resolution && (
-                                                                <span className={`${styles.streamBadge} ${styles.badgeResolution}`}>
-                                                                    {info.resolution}
-                                                                </span>
-                                                            )}
-                                                            {info.size && (
-                                                                <span className={`${styles.streamBadge} ${styles.badgeSize}`}>
-                                                                    <HardDrive size={10} />
-                                                                    {info.size}
-                                                                </span>
-                                                            )}
-                                                            {info.hasHDR && (
-                                                                <span className={`${styles.streamBadge} ${styles.badgeHDR}`}>HDR</span>
-                                                            )}
-                                                            {info.hasDV && (
-                                                                <span className={`${styles.streamBadge} ${styles.badgeDV}`}>DV</span>
-                                                            )}
-                                                            {stream.behaviorHints?.notWebReady && (
-                                                                <span className={`${styles.streamBadge} ${styles.badgeWarning}`} title="Audio may not be supported in browser">
-                                                                    <VolumeX size={12} />
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    {stream.description && (
-                                                        <div className={styles.streamDetails}>{stream.description}</div>
-                                                    )}
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
+                    ) : !streamsLoading ? (
                         <div className="flex flex-col items-center justify-center py-16 px-4 bg-white/5 rounded-xl border border-white/5 text-center">
                             <div className="bg-white/10 p-4 rounded-full mb-4">
                                 <Wifi size={32} className="text-gray-400 opacity-50" />
@@ -548,7 +700,7 @@ export const StreamingDetails = () => {
                                 We couldn't find any streams for this content. Try adjusting your filters or checking your installed addons.
                             </p>
                         </div>
-                    )}
+                    ) : null}
                 </div>
             )}
 

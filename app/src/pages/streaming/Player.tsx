@@ -1,830 +1,542 @@
+/**
+ * StreamingPlayer - Video player page using Vidstack
+ * 
+ * This page handles:
+ * - URL/state parsing for stream and meta info
+ * - Progress saving
+ * - Subtitle loading from addons
+ * - Episode navigation
+ * - Back button overlay
+ * 
+ * Video playback is handled by VidstackPlayer component.
+ */
+
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
-import {
-  ArrowLeft,
-  ExternalLink,
-  Play,
-  Pause,
-  VolumeX,
-  Volume2,
-  Volume1,
-  Maximize,
-  Minimize,
-  SkipBack,
-  SkipForward,
-  Settings,
-  Subtitles,
-  PictureInPicture2,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  Check,
-  X,
-  Monitor,
-  Cast
-} from 'lucide-react'
+import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, X, AlertTriangle, SkipForward } from 'lucide-react'
 import { Layout, SkeletonPlayer } from '../../components'
+import { VidstackPlayer } from '../../components/player/VidstackPlayer'
 import { Stream } from '../../services/addons/types'
-import { usePlayer } from '../../hooks/usePlayer'
-import { useCast } from '../../contexts/CastContext'
-import { useSubtitles } from '../../hooks/useSubtitles'
-import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import { toast } from 'sonner'
+import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import styles from '../../styles/Player.module.css'
 
+// Threshold for "short video" warning (videos under 5 minutes)
+const SHORT_VIDEO_THRESHOLD = 300 // 5 minutes in seconds
+// Time before end to show next episode popup
+const NEXT_EPISODE_COUNTDOWN_START = 30 // seconds before end
+
 interface EpisodeInfo {
-  season: number
-  number: number
-  title: string
+    season: number
+    number: number
+    title: string
 }
 
 interface MetaInfo {
-  id: string
-  type: string
-  name: string
-  poster?: string
-  season?: number
-  episode?: number
-  videos?: { season: number; number: number; id: string; title?: string }[]
+    id: string
+    type: string
+    name: string
+    poster?: string
+    season?: number
+    episode?: number
+    videos?: { season: number; number: number; id: string; title?: string }[]
 }
 
-const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
-const SEEK_SECONDS = 10
-const CONTROLS_HIDE_DELAY = 3000
-
 export const StreamingPlayer = () => {
-  const { profileId } = useParams<{ profileId: string }>()
-  const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const playerWrapperRef = useRef<HTMLDivElement | null>(null)
-  const controlsTimeoutRef = useRef<number | null>(null)
+    const { profileId } = useParams<{ profileId: string }>()
+    const [searchParams] = useSearchParams()
+    const navigate = useNavigate()
+    const location = useLocation()
+    const playerWrapperRef = useRef<HTMLDivElement | null>(null)
 
-  // Parsed data from URL
-  const [stream, setStream] = useState<Stream | null>(null)
-  const [meta, setMeta] = useState<MetaInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+    // External player hook
+    const { openInPlayer, getAvailablePlayers } = useExternalPlayer()
+    const [externalMenuOpen, setExternalMenuOpen] = useState(false)
 
-  // UI State
-  const [showControls, setShowControls] = useState(true)
-  const [showExternalPlayerMenu, setShowExternalPlayerMenu] = useState(false)
-  const [showSettingsPanel, setShowSettingsPanel] = useState(false)
-  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false)
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false)
-  const [showQualityMenu, setShowQualityMenu] = useState(false)
-  const [seekIndicator, setSeekIndicator] = useState<'left' | 'right' | null>(null)
-  const [showNextEpisode, setShowNextEpisode] = useState(false)
-  const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(10)
-  const [previewTime, setPreviewTime] = useState<number | null>(null)
-  const [previewPosition, setPreviewPosition] = useState(0)
+    // Parsed data from URL
+    const [stream, setStream] = useState<Stream | null>(null)
+    const [meta, setMeta] = useState<MetaInfo | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState('')
 
-  // Double-tap detection
-  const lastTapRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 })
+    // Subtitles from addons
+    const [subtitleTracks, setSubtitleTracks] = useState<Array<{
+        src: string
+        label: string
+        language: string
+        default?: boolean
+    }>>([])
 
-  // Episode navigation
-  const [prevEpisode, setPrevEpisode] = useState<EpisodeInfo | null>(null)
-  const [nextEpisode, setNextEpisode] = useState<EpisodeInfo | null>(null)
+    // Episode navigation
+    const [prevEpisode, setPrevEpisode] = useState<EpisodeInfo | null>(null)
+    const [nextEpisode, setNextEpisode] = useState<EpisodeInfo | null>(null)
 
-  // Player hook
-  const {
-    isPlaying,
-    currentTime,
-    duration,
-    volume,
-    isMuted,
-    isBuffering,
-    error: playerError,
-    playbackSpeed,
-    bufferedProgress,
-    isPiPActive,
-    qualityLevels,
-    currentQuality,
-    isFullscreen,
-    isMetadataLoaded,
-    togglePlay,
-    seek,
-    seekRelative,
-    changeVolume,
-    toggleMute,
-    setPlaybackSpeed,
-    togglePiP,
-    setQuality,
-    toggleFullscreen
-  } = usePlayer({
-    url: stream?.url || '',
-    videoRef: videoRef as React.RefObject<HTMLVideoElement>,
-    autoPlay: true,
-    onEnded: handleVideoEnded,
-    behaviorHints: stream?.behaviorHints
-  })
+    // UI State
+    const [showOverlay, setShowOverlay] = useState(true)
+    const overlayTimeoutRef = useRef<number | null>(null)
 
-  // Subtitle hook
-  const {
-    tracks: subtitleTracks,
-    activeTrack,
-    currentSubtitle,
-    isEnabled: subtitlesEnabled,
-    loadSubtitles,
-    setActiveTrack,
-    toggleSubtitles
-  } = useSubtitles({ videoRef: videoRef as React.RefObject<HTMLVideoElement> })
+    // Duration for progress saving
+    const [duration, setDuration] = useState(0)
+    const lastSavedProgressRef = useRef<number>(0)
 
-  // External player hook
-  const { openInPlayer, getAvailablePlayers } = useExternalPlayer()
+    // Next episode popup state
+    const [showNextEpisodePopup, setShowNextEpisodePopup] = useState(false)
+    const [countdown, setCountdown] = useState(NEXT_EPISODE_COUNTDOWN_START)
+    const countdownIntervalRef = useRef<number | null>(null)
 
-  // Cast hook
-  const { castReceiverAvailable, isConnected: isCastConnected, castMedia, disconnect } = useCast()
+    // Short video warning state
+    const [showShortVideoWarning, setShowShortVideoWarning] = useState(false)
+    const [shortVideoProgress, setShortVideoProgress] = useState(0)
+    const shortVideoWarningDismissedRef = useRef(false)
 
-  function handleCast() {
-    if (isCastConnected) {
-        disconnect()
-    } else if (stream && meta && stream.url) {
-        // Construct visual metadata
-        const title = meta.season && meta.episode 
-            ? `${meta.name} S${meta.season}:E${meta.episode}`
-            : meta.name;
-        const image = meta.poster;
-        
-        // Pass stream URL directly
-        // Note: Client-side transcoding NOT supported
-        castMedia(stream.url, 'video/mp4', title, image)
-    }
-  }
+    // Parse URL params or location state
+    useEffect(() => {
+        const initPlayer = async () => {
+            try {
+                let parsedStream: Stream | null = null
+                let parsedMeta: MetaInfo | null = null
 
-  // Parse URL params
-  useEffect(() => {
-    const streamParam = searchParams.get('stream')
-    const metaParam = searchParams.get('meta')
+                // Check location state first (from navigation)
+                if (location.state?.stream && location.state?.meta) {
+                    parsedStream = location.state.stream
+                    parsedMeta = location.state.meta
+                } else {
+                    // Fall back to URL params
+                    const streamParam = searchParams.get('stream')
+                    const metaParam = searchParams.get('meta')
 
-    if (!streamParam || !metaParam) {
-      navigate(`/streaming/${profileId}`)
-      return
-    }
+                    if (!streamParam || !metaParam) {
+                        navigate(`/streaming/${profileId}`)
+                        return
+                    }
 
-    try {
-      const parsedStream = JSON.parse(streamParam)
-      const parsedMeta = JSON.parse(metaParam)
-      setStream(parsedStream)
-      setMeta(parsedMeta)
+                    parsedStream = JSON.parse(streamParam)
+                    parsedMeta = JSON.parse(metaParam)
+                }
 
-      // Load subtitles if available in stream
-      if (parsedStream.subtitles) {
-        parsedStream.subtitles.forEach((sub: { url: string; lang: string }) => {
-          loadSubtitles(sub.url, sub.lang, sub.lang)
-        })
-      }
+                if (!parsedStream || !parsedMeta) {
+                    throw new Error('Invalid stream or meta data')
+                }
 
-      // Fetch subtitles from addon services
-      const fetchAddonSubtitles = async () => {
-        try {
-          const contentId = parsedMeta.id
-          const contentType = parsedMeta.type
-          const res = await fetch(`/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}`)
-          if (res.ok) {
-            const data = await res.json()
-            if (data.subtitles && data.subtitles.length > 0) {
-              data.subtitles.forEach((sub: { id: string; url: string; lang: string; addonName?: string }) => {
-                const label = sub.addonName ? `${sub.lang} (${sub.addonName})` : sub.lang
-                loadSubtitles(sub.url, label, sub.lang)
-              })
+                setStream(parsedStream)
+                setMeta(parsedMeta)
+
+                // Load inline subtitles from stream
+                const tracks: typeof subtitleTracks = []
+                if (parsedStream.subtitles && Array.isArray(parsedStream.subtitles)) {
+                    parsedStream.subtitles.forEach((sub: { url: string; lang: string }, i: number) => {
+                        if (sub?.url) {
+                            tracks.push({
+                                src: sub.url,
+                                label: sub.lang || 'Unknown',
+                                language: sub.lang || 'und',
+                                default: i === 0
+                            })
+                        }
+                    })
+                }
+
+                // Fetch subtitles from addon services
+                try {
+                    const contentId = parsedMeta.id
+                    const contentType = parsedMeta.type
+                    const res = await fetch(`/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}`)
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data.subtitles && Array.isArray(data.subtitles)) {
+                            data.subtitles.forEach((sub: { url: string; lang: string; addonName?: string }) => {
+                                tracks.push({
+                                    src: sub.url,
+                                    label: sub.addonName ? `${sub.lang} (${sub.addonName})` : sub.lang,
+                                    language: sub.lang || 'und'
+                                })
+                            })
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch addon subtitles', e)
+                }
+
+                setSubtitleTracks(tracks)
+            } catch (e) {
+                console.error('Failed to initialize player', e)
+                setError('Invalid player parameters')
+            } finally {
+                setLoading(false)
             }
-          }
-        } catch (e) {
-          console.warn('Failed to fetch addon subtitles', e)
         }
-      }
-      fetchAddonSubtitles()
-    } catch (e) {
-      console.error('Failed to parse params', e)
-      setError('Invalid player parameters')
-    } finally {
-      setLoading(false)
-    }
-  }, [searchParams, profileId, loadSubtitles])
 
-  // Calculate episode navigation
-  useEffect(() => {
-    if (!meta || meta.type !== 'series' || !meta.videos || !meta.season || !meta.episode) return
+        initPlayer()
+    }, [searchParams.toString(), profileId, location.state])
 
-    const episodes = meta.videos
-      .filter(v => v.season === meta.season)
-      .sort((a, b) => a.number - b.number)
+    // Calculate episode navigation
+    useEffect(() => {
+        if (!meta || meta.type !== 'series' || !meta.videos || !meta.season || !meta.episode) return
 
-    const currentIndex = episodes.findIndex(e => e.number === meta.episode)
+        const currentSeason = meta.season
+        const currentEpisode = meta.episode
+        const videos = meta.videos.sort((a, b) => (a.season - b.season) || (a.number - b.number))
 
-    if (currentIndex > 0) {
-      const prev = episodes[currentIndex - 1]
-      setPrevEpisode({ season: prev.season, number: prev.number, title: prev.title || `Episode ${prev.number}` })
-    } else {
-      setPrevEpisode(null)
-    }
+        const currentIndex = videos.findIndex(
+            v => v.season === currentSeason && v.number === currentEpisode
+        )
 
-    if (currentIndex < episodes.length - 1) {
-      const next = episodes[currentIndex + 1]
-      setNextEpisode({ season: next.season, number: next.number, title: next.title || `Episode ${next.number}` })
-    } else {
-      setNextEpisode(null)
-    }
-  }, [meta])
-
-  // Show next episode overlay near end
-  useEffect(() => {
-    if (!nextEpisode || !duration) return
-
-    const timeRemaining = duration - currentTime
-    if (timeRemaining <= 30 && timeRemaining > 0 && !showNextEpisode) {
-      setShowNextEpisode(true)
-      setNextEpisodeCountdown(Math.floor(timeRemaining))
-    } else if (timeRemaining > 30) {
-      setShowNextEpisode(false)
-    }
-
-    if (showNextEpisode) {
-      setNextEpisodeCountdown(Math.max(0, Math.floor(timeRemaining)))
-    }
-  }, [currentTime, duration, nextEpisode, showNextEpisode])
-
-  // Auto-hide controls
-  useEffect(() => {
-    if (!isPlaying) {
-      setShowControls(true)
-      return
-    }
-
-    const hideControls = () => {
-      if (isPlaying && !showExternalPlayerMenu && !showSettingsPanel && !showSubtitleMenu && !showSpeedMenu && !showQualityMenu) {
-        setShowControls(false)
-      }
-    }
-
-    controlsTimeoutRef.current = window.setTimeout(hideControls, CONTROLS_HIDE_DELAY)
-
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current)
-      }
-    }
-  }, [isPlaying, showControls, showExternalPlayerMenu, showSettingsPanel, showSubtitleMenu, showSpeedMenu, showQualityMenu])
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-
-      switch (e.key.toLowerCase()) {
-        case ' ':
-        case 'k':
-          e.preventDefault()
-          togglePlay()
-          break
-        case 'arrowleft':
-        case 'j':
-          e.preventDefault()
-          seekRelative(-SEEK_SECONDS)
-          showSeekIndicator('left')
-          break
-        case 'arrowright':
-        case 'l':
-          e.preventDefault()
-          seekRelative(SEEK_SECONDS)
-          showSeekIndicator('right')
-          break
-        case 'arrowup':
-          e.preventDefault()
-          changeVolume(volume + 0.1)
-          break
-        case 'arrowdown':
-          e.preventDefault()
-          changeVolume(volume - 0.1)
-          break
-        case 'f':
-          e.preventDefault()
-          handleFullscreen()
-          break
-        case 'm':
-          e.preventDefault()
-          toggleMute()
-          break
-        case 'p':
-          e.preventDefault()
-          if (isMetadataLoaded) togglePiP()
-          break
-        case 's':
-          e.preventDefault()
-          setShowSubtitleMenu(prev => !prev)
-          break
-        case '[':
-          e.preventDefault()
-          cyclePlaybackSpeed(-1)
-          break
-        case ']':
-          e.preventDefault()
-          cyclePlaybackSpeed(1)
-          break
-        case 'escape':
-          if (isFullscreen) {
-            toggleFullscreen()
-          }
-          break
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-          e.preventDefault()
-          const percent = parseInt(e.key) / 10
-          seek(duration * percent)
-          break
-      }
-
-      // Show controls on any keypress
-      handleMouseMove()
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [togglePlay, seekRelative, changeVolume, volume, toggleMute, togglePiP, toggleSubtitles, seek, duration, isFullscreen, toggleFullscreen, isMetadataLoaded])
-
-  function handleVideoEnded() {
-    if (nextEpisode && showNextEpisode) {
-      goToEpisode(nextEpisode)
-    }
-  }
-
-  function showSeekIndicator(direction: 'left' | 'right') {
-    setSeekIndicator(direction)
-    setTimeout(() => setSeekIndicator(null), 500)
-  }
-
-  function cyclePlaybackSpeed(direction: number) {
-    const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackSpeed)
-    const newIndex = Math.max(0, Math.min(PLAYBACK_SPEEDS.length - 1, currentIndex + direction))
-    setPlaybackSpeed(PLAYBACK_SPEEDS[newIndex])
-  }
-
-  function handleMouseMove() {
-    setShowControls(true)
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current)
-    }
-  }
-
-  function handleVideoClick(e: React.MouseEvent) {
-    const now = Date.now()
-    const DOUBLE_TAP_DELAY = 300
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const relativeX = x / rect.width
-
-    if (now - lastTapRef.current.time < DOUBLE_TAP_DELAY) {
-      // Double tap detected
-      if (relativeX < 0.33) {
-        // Left side: seek back
-        seekRelative(-SEEK_SECONDS)
-        showSeekIndicator('left')
-      } else if (relativeX > 0.66) {
-        // Right side: seek forward
-        seekRelative(SEEK_SECONDS)
-        showSeekIndicator('right')
-      } else {
-        // Center: toggle fullscreen
-        handleFullscreen()
-      }
-    } else {
-      // Single tap - toggle play after a brief delay (to check for double tap)
-      setTimeout(() => {
-        if (Date.now() - lastTapRef.current.time >= DOUBLE_TAP_DELAY) {
-          togglePlay()
+        if (currentIndex > 0) {
+            const prev = videos[currentIndex - 1]
+            setPrevEpisode({ season: prev.season, number: prev.number, title: prev.title || '' })
         }
-      }, DOUBLE_TAP_DELAY)
+
+        if (currentIndex < videos.length - 1) {
+            const next = videos[currentIndex + 1]
+            setNextEpisode({ season: next.season, number: next.number, title: next.title || '' })
+        }
+    }, [meta])
+
+    // Progress saving and popup logic
+    const handleTimeUpdate = useCallback((currentTime: number, dur: number) => {
+        if (dur > 0) setDuration(dur)
+        
+        // Check for short video warning (under 5 minutes)
+        if (dur > 0 && dur < SHORT_VIDEO_THRESHOLD && !shortVideoWarningDismissedRef.current && nextEpisode) {
+            if (!showShortVideoWarning) {
+                setShowShortVideoWarning(true)
+            }
+            // Update progress bar (0-100%)
+            const progress = Math.min((currentTime / dur) * 100, 100)
+            setShortVideoProgress(progress)
+        }
+        
+        // Check for next episode popup (within 30 seconds of end)
+        const timeRemaining = dur - currentTime
+        if (dur > 0 && nextEpisode && timeRemaining <= NEXT_EPISODE_COUNTDOWN_START && timeRemaining > 0) {
+            if (!showNextEpisodePopup && !countdownIntervalRef.current) {
+                setShowNextEpisodePopup(true)
+                setCountdown(Math.ceil(timeRemaining))
+                
+                // Start countdown interval
+                countdownIntervalRef.current = window.setInterval(() => {
+                    setCountdown(prev => {
+                        if (prev <= 1) {
+                            if (countdownIntervalRef.current) {
+                                clearInterval(countdownIntervalRef.current)
+                                countdownIntervalRef.current = null
+                            }
+                            return 0
+                        }
+                        return prev - 1
+                    })
+                }, 1000)
+            }
+        }
+        
+        // Save progress every 10 seconds
+        if (
+            meta &&
+            profileId &&
+            dur > 0 &&
+            Math.abs(currentTime - lastSavedProgressRef.current) >= 10
+        ) {
+            lastSavedProgressRef.current = currentTime
+            const progress = currentTime / dur
+
+            // Don't save if near start or end
+            if (progress > 0.02 && progress < 0.95) {
+                fetch('/api/streaming/progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        profileId,
+                        metaId: meta.id,
+                        metaType: meta.type,
+                        season: meta.season,
+                        episode: meta.episode,
+                        position: currentTime,
+                        duration: dur,
+                        title: meta.name,
+                        poster: meta.poster
+                    })
+                }).catch(console.error)
+            }
+        }
+    }, [meta, profileId, nextEpisode, showShortVideoWarning, showNextEpisodePopup])
+
+    // Handle video ended
+    const handleVideoEnded = useCallback(() => {
+        // Clear countdown interval
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+            countdownIntervalRef.current = null
+        }
+        
+        if (nextEpisode) {
+            // Auto-play next episode
+            goToEpisode(nextEpisode)
+        }
+    }, [nextEpisode])
+
+    // Handle error
+    const handleError = useCallback((error: Error) => {
+        console.error('Playback error:', error)
+        toast.error('Playback error: ' + error.message)
+    }, [])
+
+    // Handle metadata loaded
+    const handleMetadataLoad = useCallback((dur: number) => {
+        setDuration(dur)
+        // Reset popup states on new video
+        setShowNextEpisodePopup(false)
+        setShowShortVideoWarning(false)
+        shortVideoWarningDismissedRef.current = false
+        setCountdown(NEXT_EPISODE_COUNTDOWN_START)
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+            countdownIntervalRef.current = null
+        }
+    }, [])
+
+    // Navigate to episode
+    const goToEpisode = useCallback((ep: EpisodeInfo) => {
+        if (!meta || !stream) return
+
+        // Find the video info
+        const video = meta.videos?.find(v => v.season === ep.season && v.number === ep.number)
+        if (!video) return
+
+        // Navigate to streams page for new episode
+        navigate(`/streaming/${profileId}/${meta.type}/${meta.id}/s${ep.season}e${ep.number}`)
+    }, [meta, stream, profileId, navigate])
+
+    // Overlay auto-hide
+    const resetOverlayTimeout = useCallback(() => {
+        setShowOverlay(true)
+        if (overlayTimeoutRef.current) {
+            clearTimeout(overlayTimeoutRef.current)
+        }
+        overlayTimeoutRef.current = window.setTimeout(() => {
+            setShowOverlay(false)
+        }, 3000)
+    }, [])
+
+    // Keyboard shortcuts for back
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' || e.key === 'Backspace') {
+                e.preventDefault()
+                navigate(-1)
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [navigate])
+
+    // Loading state
+    if (loading) {
+        return (
+            <Layout title="Loading..." showHeader={false} showFooter={false}>
+                <SkeletonPlayer />
+            </Layout>
+        )
     }
 
-    lastTapRef.current = { time: now, x }
-  }
-
-  function handleProgressClick(e: React.MouseEvent) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const pos = (e.clientX - rect.left) / rect.width
-    seek(pos * duration)
-  }
-
-  function handleProgressHover(e: React.MouseEvent) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const pos = (e.clientX - rect.left) / rect.width
-    setPreviewTime(pos * duration)
-    setPreviewPosition(e.clientX - rect.left)
-  }
-
-  function handleFullscreen() {
-    toggleFullscreen(playerWrapperRef.current || undefined)
-  }
-
-  async function handleExternalPlayer(player: string) {
-    if (!stream?.url) return
-
-    const result = await openInPlayer(player as any, {
-      url: stream.url,
-      title: meta?.name
-    })
-
-    if (result.success) {
-      toast.success(result.message)
-    } else {
-      toast.error(result.message)
+    // Error state
+    if (error) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-black text-red-500">
+                {error}
+            </div>
+        )
     }
 
-    setShowExternalPlayerMenu(false)
-  }
+    if (!stream || !meta) return null
 
-  function goToEpisode(episode: EpisodeInfo) {
-    if (!meta) return
+    const displayTitle = meta.season && meta.episode
+        ? `${meta.name} S${meta.season}:E${meta.episode}`
+        : meta.name
 
-    // Navigate to fetch streams for the new episode
-    navigate(`/streaming/${profileId}/details/${meta.type}/${meta.id}?autoPlayEpisode=${episode.season}-${episode.number}`)
-  }
-
-  function formatTime(seconds: number): string {
-    if (!seconds || isNaN(seconds)) return '0:00'
-    const h = Math.floor(seconds / 3600)
-    const m = Math.floor((seconds % 3600) / 60)
-    const s = Math.floor(seconds % 60)
-
-    if (h > 0) {
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-    }
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
-
-  function getVolumeIcon() {
-    if (isMuted || volume === 0) return <VolumeX size={20} />
-    if (volume < 0.5) return <Volume1 size={20} />
-    return <Volume2 size={20} />
-  }
-
-  if (loading) return <SkeletonPlayer />
-  if (error || playerError) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black text-red-500">
-        {error || playerError}
-      </div>
-    )
-  }
-  if (!stream || !meta) return null
-
-  return (
-    <Layout title={`Playing: ${meta.name}`} showHeader={false} showFooter={false}>
-      <div
-        ref={playerWrapperRef}
-        className={`${styles.playerWrapper} ${isFullscreen ? styles.fullscreen : ''} ${!showControls && isPlaying ? styles.hideCursor : ''}`}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => isPlaying && setShowControls(false)}
-      >
-        {/* Video Element */}
-        <video
-          ref={videoRef}
-          className={styles.video}
-          autoPlay
-          playsInline
-          poster={meta.poster}
-          crossOrigin="anonymous"
-          onClick={handleVideoClick}
-        >
-          Your browser does not support the video tag.
-        </video>
-
-        {/* Subtitles Display */}
-        {subtitlesEnabled && currentSubtitle && (
-          <div className={styles.subtitleContainer}>
-            <span className={styles.subtitleText}>{currentSubtitle}</span>
-          </div>
-        )}
-
-        {/* Controls Overlay */}
-        <div className={`${styles.controlsContainer} ${showControls ? styles.visible : ''} ${!isPlaying ? styles.paused : ''}`}>
-          {/* Top Bar */}
-          <div className={styles.topBar}>
-            <div className={styles.topBarLeft}>
-              <button className={styles.backButton} onClick={() => navigate(-1)}>
-                <ArrowLeft size={20} />
-              </button>
-              <div className={styles.titleInfo}>
-                <div className={styles.title}>
-                  {meta.name}
-                  {meta.season && meta.episode && (
-                    <span className={styles.episodeBadge}>S{meta.season}:E{meta.episode}</span>
-                  )}
-                </div>
-                <div className={styles.streamInfo}>
-                    {stream.title || stream.name || 'Playing'}
-                    {/* Placeholder for transcoding state if exposed from usePlayer */}
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.topBarRight}>
-              {/* Cast Button */}
-              {castReceiverAvailable && (
-                <button
-                    className={`${styles.controlButton} ${isCastConnected ? styles.active : ''}`}
-                    onClick={handleCast}
-                    title={isCastConnected ? "Disconnect Cast" : "Cast to Device"}
-                >
-                    <Cast size={20} />
-                </button>
-              )}
-
-              {/* External Player Dropdown */}
-              <div className={styles.externalPlayerDropdown}>
-                <button
-                  className={styles.controlButton}
-                  onClick={() => setShowExternalPlayerMenu(!showExternalPlayerMenu)}
-                  title="Open in External Player"
-                >
-                  <ExternalLink size={20} />
-                </button>
-                <div className={`${styles.dropdownMenu} ${showExternalPlayerMenu ? styles.open : ''}`}>
-                  {getAvailablePlayers().map(player => (
-                    <button
-                      key={player.id}
-                      className={styles.dropdownItem}
-                      onClick={() => handleExternalPlayer(player.id)}
-                    >
-                      {player.id === 'copy' ? <Copy size={16} /> : <Monitor size={16} />}
-                      {player.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Center Controls */}
-          <div className={styles.centerControls}>
-            {/* Previous Episode */}
-            {prevEpisode && (
-              <button
-                className={styles.episodeNavButton}
-                onClick={() => goToEpisode(prevEpisode)}
-              >
-                <SkipBack size={24} />
-                <span className={styles.episodeNavLabel}>Previous</span>
-              </button>
-            )}
-
-            {/* Play/Pause Large */}
-            <button className={styles.playPauseLarge} onClick={togglePlay}>
-              {isPlaying ? <Pause size={36} /> : <Play size={36} fill="white" />}
-            </button>
-
-            {/* Next Episode */}
-            {nextEpisode && (
-              <button
-                className={styles.episodeNavButton}
-                onClick={() => goToEpisode(nextEpisode)}
-              >
-                <SkipForward size={24} />
-                <span className={styles.episodeNavLabel}>Next</span>
-              </button>
-            )}
-
-            {/* Seek Indicators */}
-            <div className={`${styles.seekIndicator} ${styles.left} ${seekIndicator === 'left' ? styles.visible : ''}`}>
-              <ChevronLeft size={32} />
-              <ChevronLeft size={32} style={{ marginLeft: -20 }} />
-              <span className={styles.seekText}>-{SEEK_SECONDS}s</span>
-            </div>
-            <div className={`${styles.seekIndicator} ${styles.right} ${seekIndicator === 'right' ? styles.visible : ''}`}>
-              <ChevronRight size={32} />
-              <ChevronRight size={32} style={{ marginLeft: -20 }} />
-              <span className={styles.seekText}>+{SEEK_SECONDS}s</span>
-            </div>
-          </div>
-
-          {/* Buffering Spinner */}
-          {isBuffering && (
-            <div className={styles.bufferingSpinner}>
-              <div className={styles.spinner}></div>
-            </div>
-          )}
-
-          {/* Bottom Controls */}
-          <div className={styles.bottomBar}>
-            {/* Progress Bar */}
+        <Layout title={`Playing: ${meta.name}`} showHeader={false} showFooter={false}>
             <div
-              className={styles.progressContainer}
-              onClick={handleProgressClick}
-              onMouseMove={handleProgressHover}
-              onMouseLeave={() => setPreviewTime(null)}
+                ref={playerWrapperRef}
+                className={styles.playerWrapper}
+                onMouseMove={resetOverlayTimeout}
+                onTouchStart={resetOverlayTimeout}
             >
-              <div className={styles.progressBar}>
-                <div className={styles.progressBuffered} style={{ width: `${bufferedProgress}%` }} />
-                <div className={styles.progressFilled} style={{ width: `${(currentTime / duration) * 100}%` }} />
-                <div
-                  className={styles.progressThumb}
-                  style={{ left: `${(currentTime / duration) * 100}%` }}
+                {/* Vidstack Player */}
+                <VidstackPlayer
+                    src={stream.url!}
+                    poster={meta.poster}
+                    title={displayTitle}
+                    subtitles={subtitleTracks}
+                    streamUrl={stream.url}
+                    onTimeUpdate={handleTimeUpdate}
+                    onMetadataLoad={handleMetadataLoad}
+                    onEnded={handleVideoEnded}
+                    onError={handleError}
+                    autoPlay={true}
+                    showCast={true}
                 />
-              </div>
-              {previewTime !== null && (
-                <div className={styles.timePreview} style={{ left: previewPosition }}>
-                  {formatTime(previewTime)}
-                </div>
-              )}
-            </div>
 
-            {/* Controls Row */}
-            <div className={styles.controlsRow}>
-              <div className={styles.controlsLeft}>
-                {/* Play/Pause */}
-                <button className={styles.controlButtonSm} onClick={togglePlay}>
-                  {isPlaying ? <Pause size={20} /> : <Play size={20} fill="white" />}
-                </button>
-
-                {/* Skip Back/Forward */}
-                <button className={styles.controlButtonSm} onClick={() => { seekRelative(-SEEK_SECONDS); showSeekIndicator('left') }}>
-                  <SkipBack size={18} />
-                </button>
-                <button className={styles.controlButtonSm} onClick={() => { seekRelative(SEEK_SECONDS); showSeekIndicator('right') }}>
-                  <SkipForward size={18} />
-                </button>
-
-                {/* Volume */}
-                <div className={styles.volumeControl}>
-                  <button className={styles.controlButtonSm} onClick={toggleMute}>
-                    {getVolumeIcon()}
-                  </button>
-                  <div className={styles.volumeSliderWrapper}>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={isMuted ? 0 : volume}
-                      onChange={(e) => changeVolume(parseFloat(e.target.value))}
-                      className={styles.volumeSlider}
-                    />
-                  </div>
-                </div>
-
-                {/* Time Display */}
-                <span className={styles.timeDisplay}>
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
-              </div>
-
-              <div className={styles.controlsRight}>
-                {/* Playback Speed */}
-                <button
-                  className={styles.speedButton}
-                  onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                >
-                  {playbackSpeed}x
-                </button>
-                {showSpeedMenu && (
-                  <div className={`${styles.settingsPanel} ${styles.open}`} style={{ bottom: '60px' }}>
-                    {PLAYBACK_SPEEDS.map(speed => (
-                      <button
-                        key={speed}
-                        className={styles.settingsItem}
-                        onClick={() => { setPlaybackSpeed(speed); setShowSpeedMenu(false) }}
-                      >
-                        {speed}x
-                        {playbackSpeed === speed && <Check size={16} />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Subtitles */}
-                <button
-                  className={`${styles.controlButtonSm} ${subtitlesEnabled && activeTrack ? styles.active : ''}`}
-                  onClick={() => setShowSubtitleMenu(!showSubtitleMenu)}
-                  title="Subtitles (S)"
-                >
-                  <Subtitles size={20} />
-                </button>
-                {showSubtitleMenu && (
-                  <div className={`${styles.settingsPanel} ${styles.open}`} style={{ bottom: '60px', right: '140px' }}>
-                    <div style={{ padding: '8px 12px', fontSize: '12px', color: '#888', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '4px' }}>
-                      Subtitles
+                {/* Back button overlay */}
+                <div className={`${styles.backOverlay} ${showOverlay ? styles.visible : ''}`}>
+                    <button
+                        className={styles.backButton}
+                        onClick={() => navigate(-1)}
+                        aria-label="Go back"
+                    >
+                        <ArrowLeft size={24} />
+                    </button>
+                    
+                    <div className={styles.titleOverlay}>
+                        <span className={styles.title}>{meta.name}</span>
+                        {meta.season && meta.episode && (
+                            <span className={styles.episodeBadge}>S{meta.season}:E{meta.episode}</span>
+                        )}
                     </div>
-                    <button
-                      className={styles.settingsItem}
-                      onClick={() => { setActiveTrack(null); setShowSubtitleMenu(false) }}
-                    >
-                      Off
-                      {(!activeTrack || !subtitlesEnabled) && <Check size={16} />}
-                    </button>
-                    {subtitleTracks.length > 0 ? (
-                      subtitleTracks.map(track => (
+                </div>
+
+                {/* External player button overlay (top-right) */}
+                {stream.url && (
+                    <div className={`${styles.externalPlayerOverlay} ${showOverlay ? styles.visible : ''}`}>
                         <button
-                          key={track.id}
-                          className={styles.settingsItem}
-                          onClick={() => { 
-                            setActiveTrack(track.id)
-                            if (!subtitlesEnabled) toggleSubtitles()
-                            setShowSubtitleMenu(false) 
-                          }}
+                            className={styles.externalPlayerButton}
+                            onClick={() => setExternalMenuOpen(!externalMenuOpen)}
+                            aria-label="Open in external player"
                         >
-                          {track.label} ({track.language})
-                          {activeTrack === track.id && subtitlesEnabled && <Check size={16} />}
+                            <ExternalLink size={20} />
                         </button>
-                      ))
-                    ) : (
-                      <div style={{ padding: '12px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
-                        No subtitles available
-                      </div>
-                    )}
-                  </div>
+                        
+                        {externalMenuOpen && (
+                            <div className={styles.externalPlayerMenu}>
+                                {getAvailablePlayers().map(player => (
+                                    <button
+                                        key={player.id}
+                                        className={styles.externalPlayerMenuItem}
+                                        onClick={async () => {
+                                            setExternalMenuOpen(false)
+                                            const result = await openInPlayer(player.id as any, {
+                                                url: stream.url!,
+                                                title: meta.name
+                                            })
+                                            if (result.success) {
+                                                toast.success(result.message)
+                                            } else {
+                                                toast.error(result.message)
+                                            }
+                                        }}
+                                    >
+                                        {player.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 )}
 
-                {/* Quality (if multiple levels available) */}
-                {qualityLevels.length > 1 && (
-                  <button
-                    className={styles.controlButtonSm}
-                    onClick={() => setShowQualityMenu(!showQualityMenu)}
-                    title="Quality"
-                  >
-                    <Settings size={20} />
-                  </button>
-                )}
-                {showQualityMenu && qualityLevels.length > 1 && (
-                  <div className={`${styles.settingsPanel} ${styles.open}`} style={{ bottom: '60px', right: '100px' }}>
-                    <button
-                      className={styles.settingsItem}
-                      onClick={() => { setQuality(-1); setShowQualityMenu(false) }}
-                    >
-                      Auto
-                      {currentQuality === -1 && <Check size={16} />}
-                    </button>
-                    {qualityLevels.map(level => (
-                      <button
-                        key={level.index}
-                        className={styles.settingsItem}
-                        onClick={() => { setQuality(level.index); setShowQualityMenu(false) }}
-                      >
-                        {level.label}
-                        {currentQuality === level.index && <Check size={16} />}
-                      </button>
-                    ))}
-                  </div>
+                {/* Episode navigation overlay */}
+                {(prevEpisode || nextEpisode) && showOverlay && (
+                    <div className={styles.episodeNavOverlay}>
+                        {prevEpisode && (
+                            <button
+                                className={styles.episodeNavButton}
+                                onClick={() => goToEpisode(prevEpisode)}
+                            >
+                                <ChevronLeft size={20} />
+                                <span>Previous</span>
+                            </button>
+                        )}
+                        {nextEpisode && (
+                            <button
+                                className={styles.episodeNavButton}
+                                onClick={() => goToEpisode(nextEpisode)}
+                            >
+                                <span>Next</span>
+                                <ChevronRight size={20} />
+                            </button>
+                        )}
+                    </div>
                 )}
 
-                {/* Picture-in-Picture */}
-                <button
-                  className={`${styles.controlButtonSm} ${isPiPActive ? styles.active : ''}`}
-                  onClick={togglePiP}
-                  disabled={!isMetadataLoaded}
-                  title={isMetadataLoaded ? "Picture-in-Picture (P)" : "Loading..."}
-                  style={{ opacity: isMetadataLoaded ? 1 : 0.5 }}
-                >
-                  <PictureInPicture2 size={20} />
-                </button>
+                {/* Next Episode Popup (bottom right) - shown when near end of video */}
+                {showNextEpisodePopup && nextEpisode && (
+                    <div className={`${styles.nextEpisodeOverlay} ${styles.visible}`}>
+                        <div className={styles.nextEpisodeTitle}>Up Next</div>
+                        <div className={styles.nextEpisodeName}>
+                            S{nextEpisode.season}:E{nextEpisode.number}
+                            {nextEpisode.title && ` - ${nextEpisode.title}`}
+                        </div>
+                        <div className={styles.countdown}>
+                            Playing in {countdown}s
+                        </div>
+                        <div className={styles.nextEpisodeActions}>
+                            <button
+                                className={`${styles.nextEpisodeButton} ${styles.primary}`}
+                                onClick={() => {
+                                    if (countdownIntervalRef.current) {
+                                        clearInterval(countdownIntervalRef.current)
+                                        countdownIntervalRef.current = null
+                                    }
+                                    goToEpisode(nextEpisode)
+                                }}
+                            >
+                                <SkipForward size={16} style={{ marginRight: 6 }} />
+                                Play Now
+                            </button>
+                            <button
+                                className={`${styles.nextEpisodeButton} ${styles.secondary}`}
+                                onClick={() => {
+                                    if (countdownIntervalRef.current) {
+                                        clearInterval(countdownIntervalRef.current)
+                                        countdownIntervalRef.current = null
+                                    }
+                                    setShowNextEpisodePopup(false)
+                                }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
 
-                {/* Fullscreen */}
-                <button
-                  className={styles.controlButtonSm}
-                  onClick={handleFullscreen}
-                  title="Fullscreen (F)"
-                >
-                  {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-                </button>
-              </div>
+                {/* Short Video Warning (bottom right) - shown for videos under 5 mins */}
+                {showShortVideoWarning && nextEpisode && !showNextEpisodePopup && (
+                    <div className={`${styles.shortVideoPrompt} ${styles.visible}`}>
+                        <button
+                            className={styles.shortVideoClose}
+                            onClick={() => {
+                                setShowShortVideoWarning(false)
+                                shortVideoWarningDismissedRef.current = true
+                            }}
+                            aria-label="Dismiss"
+                        >
+                            <X size={16} />
+                        </button>
+                        <div className={styles.shortVideoIcon}>
+                            <AlertTriangle size={18} />
+                        </div>
+                        <div className={styles.shortVideoContent}>
+                            <div className={styles.shortVideoTitle}>Short Video</div>
+                            <div className={styles.shortVideoDesc}>
+                                This appears to be a short clip. Next episode will play automatically.
+                            </div>
+                            <div className={styles.shortVideoActions}>
+                                <button
+                                    className={`${styles.shortVideoButton} ${styles.primary}`}
+                                    onClick={() => goToEpisode(nextEpisode)}
+                                >
+                                    Skip to Next Episode
+                                </button>
+                            </div>
+                        </div>
+                        <div className={styles.shortVideoProgress}>
+                            <div 
+                                className={styles.shortVideoProgressBar} 
+                                style={{ width: `${shortVideoProgress}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
-          </div>
-        </div>
-
-        {/* Next Episode Overlay */}
-        {showNextEpisode && nextEpisode && (
-          <div className={`${styles.nextEpisodeOverlay} ${styles.visible}`}>
-            <span className={styles.nextEpisodeTitle}>Up Next</span>
-            <span className={styles.nextEpisodeName}>
-              S{nextEpisode.season}:E{nextEpisode.number} - {nextEpisode.title}
-            </span>
-            <div className={styles.nextEpisodeActions}>
-              <button
-                className={`${styles.nextEpisodeButton} ${styles.primary}`}
-                onClick={() => goToEpisode(nextEpisode)}
-              >
-                Play Now
-              </button>
-              <button
-                className={`${styles.nextEpisodeButton} ${styles.secondary}`}
-                onClick={() => setShowNextEpisode(false)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <span className={styles.countdown}>Auto-play in {nextEpisodeCountdown}s</span>
-          </div>
-        )}
-      </div>
-    </Layout>
-  )
+        </Layout>
+    )
 }

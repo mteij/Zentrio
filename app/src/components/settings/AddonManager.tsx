@@ -264,8 +264,8 @@ export function AddonManager() {
                 <h3>Install Addon</h3>
                 <p>Enter the manifest URL of a Stremio-compatible addon.</p>
             </div>
-            <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
-                <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
                     <Input
                         type="text"
                         placeholder="https://example.com/manifest.json"
@@ -273,14 +273,14 @@ export function AddonManager() {
                         onChange={(e) => setManifestUrl(e.target.value)}
                     />
                 </div>
-                <Button variant="primary" onClick={handleInstallAddon} disabled={installing}>
-                    {installing ? 'Installing...' : 'Install'}
-                </Button>
-            </div>
-            <div style={{ marginTop: '10px' }}>
-                <Button variant="secondary" onClick={() => window.location.href = '/settings/explore-addons'}>
-                    Explore Community Addons
-                </Button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <Button variant="primary" onClick={handleInstallAddon} disabled={installing}>
+                        {installing ? 'Installing...' : 'Install'}
+                    </Button>
+                    <Button variant="secondary" onClick={() => window.location.href = '/settings/explore-addons'}>
+                        Explore
+                    </Button>
+                </div>
             </div>
         </div>
 
@@ -331,7 +331,7 @@ export function AddonManager() {
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                {(addon.manifest_url === 'zentrio://tmdb-addon' || (addon.behavior_hints?.configurable || addon.behavior_hints?.configurationRequired)) && (
+                                {(addon.behavior_hints?.configurable || addon.behavior_hints?.configurationRequired) && (
                                     <Button 
                                         variant="secondary" 
                                         size="small" 

@@ -122,19 +122,24 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
         subtitles
       }
       
-      setTracks(prev => [...prev, track])
+      setTracks(prev => {
+        // Check if track already exists
+        if (prev.some(t => t.id === track.id)) return prev
+        return [...prev, track]
+      })
       
       // Auto-select first track if none active
-      if (!activeTrack) {
-        setActiveTrackState(track.id)
-      }
+      setActiveTrackState(prev => {
+        if (!prev) return track.id
+        return prev
+      })
       
       return track.id
     } catch (error) {
       console.error('Failed to load subtitles:', error)
       return null
     }
-  }, [activeTrack])
+  }, [])
 
   // Add subtitles manually (for embedded subtitle data)
   const addSubtitleTrack = useCallback((subtitles: Subtitle[], label: string, language: string = 'en') => {
@@ -145,14 +150,19 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
       subtitles
     }
     
-    setTracks(prev => [...prev, track])
-    
-    if (!activeTrack) {
-      setActiveTrackState(track.id)
-    }
-    
-    return track.id
-  }, [activeTrack])
+      setTracks(prev => {
+        // Check if track already exists
+        if (prev.some(t => t.id === track.id)) return prev
+        return [...prev, track]
+      })
+      
+      setActiveTrackState(prev => {
+        if (!prev) return track.id
+        return prev
+      })
+      
+      return track.id
+  }, [])
 
   // Set active track
   const setActiveTrack = useCallback((trackId: string | null) => {

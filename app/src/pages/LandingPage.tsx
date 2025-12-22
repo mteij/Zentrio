@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SimpleLayout, AnimatedBackground, Button, Input } from '../components'
-import { useAuthStore } from '../stores/authStore'
 import { Loader2, ArrowRight } from "lucide-react";
 import { authClient, getClientUrl } from '../lib/auth-client';
+import { getLoginBehaviorRedirectPath } from '../hooks/useLoginBehavior';
 
 // Brand icons as SVG components
 const GoogleIcon = () => (
@@ -34,7 +34,6 @@ interface LandingPageProps {
 
 export function LandingPage({ version }: LandingPageProps) {
   const navigate = useNavigate()
-  const { isLoading, isAuthenticated } = useAuthStore()
   
   const [view, setView] = useState<'intro' | 'login'>('intro')
   const [email, setEmail] = useState('')
@@ -43,24 +42,7 @@ export function LandingPage({ version }: LandingPageProps) {
   
   const SLOGAN = "Stream Your Way"
 
-  // Redirect authenticated users to profiles page after verifying session
-  useEffect(() => {
-    const verifyAndRedirect = async () => {
-      if (isAuthenticated && !isLoading) {
-        // Verify the session is actually valid with the server before redirecting
-        try {
-          const sessionValid = await useAuthStore.getState().refreshSession()
-          if (sessionValid) {
-            navigate('/profiles')
-          }
-          // If session is invalid, refreshSession() will have cleared the auth state
-        } catch (e) {
-          console.error('Session verification failed', e)
-        }
-      }
-    }
-    verifyAndRedirect()
-  }, [isAuthenticated, isLoading, navigate])
+  // Note: Authenticated user redirect is now handled by PublicRoute wrapper
 
   useEffect(() => {
     // Typewriter effect
@@ -101,9 +83,10 @@ export function LandingPage({ version }: LandingPageProps) {
 
   const handleSocialLogin = async (provider: "google" | "github" | "discord") => {
     try {
+      const redirectPath = getLoginBehaviorRedirectPath()
       await authClient.signIn.social({
         provider,
-        callbackURL: `${getClientUrl()}/profiles`,
+        callbackURL: `${getClientUrl()}${redirectPath}`,
       });
     } catch (e) {
       console.error("Social login failed", e);

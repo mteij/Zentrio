@@ -1,0 +1,16 @@
+/* VidstackPlayer Styles - Minimal container for video element */
+
+.videoContainer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+}
+
+.video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+}

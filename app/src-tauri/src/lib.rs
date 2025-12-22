@@ -1,3 +1,4 @@
+#[cfg(all(desktop, not(debug_assertions)))]
 use tauri_plugin_shell::ShellExt;
 use std::sync::Mutex;
 use tauri::Manager;

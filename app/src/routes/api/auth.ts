@@ -270,7 +270,7 @@ app.post('/deep-link-callback', async (c) => {
     }
 })
 
-// Delegate everything else to Better Auth
+// Delegate everything else to Better Auth (including native 2FA endpoints)
 app.all("*", (c) => {
     const cfg = getConfig();
     // Fix for Better Auth 403 Forbidden due to Origin/Protocol mismatch when running behind reverse proxy

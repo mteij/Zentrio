@@ -294,27 +294,6 @@ export class StreamProcessor {
       // Audio Tag Filter
       if (!this.checkFilter(filters.audioTag, s.parsed.audioTags)) return false
 
-      // Mark unsupported audio for web
-      if (this.platform === 'web') {
-          // List of audio codecs not natively supported by browsers (generally)
-          // AC3 (Dolby Digital), EAC3 (DD+), DTS, TrueHD
-          const unsupportedCodecs = ['ac3', 'eac3', 'dts', 'truehd'];
-          
-          let isUnsupported = false;
-          
-          // Check if any detected tag is unsupported
-          if (s.parsed.audioTags && s.parsed.audioTags.some(tag => unsupportedCodecs.includes(tag))) {
-              isUnsupported = true;
-          }
-          
-          if (isUnsupported) {
-               if (!s.original.behaviorHints) {
-                   s.original.behaviorHints = {};
-               }
-               s.original.behaviorHints.notWebReady = true;
-          }
-      }
-
       // Size Filter
       if (filters.size && s.parsed.size) {
         const sizeGB = s.parsed.size / (1024 * 1024 * 1024)
@@ -432,15 +411,35 @@ export class StreamProcessor {
       return streams.sort((a, b) => b.score - a.score)
     }
 
-    // Resolution priority map (higher = better)
-    const resolutionPriority: Record<string, number> = {
-      '4k': 100, '2160p': 100,
-      '1440p': 80,
-      '1080p': 60, 'fhd': 60,
-      '720p': 40, 'hd': 40,
-      '480p': 20, 'sd': 20,
-      'unknown': 0
+    // Build resolution priority from user settings (first item = highest priority)
+    // Use user's preferred order, or fallback to hardcoded defaults
+    const userResolutions = this.config.filters?.resolution?.preferred || []
+    const resolutionPriority: Record<string, number> = {}
+    
+    if (userResolutions.length > 0) {
+      // User-defined order: first item gets highest priority
+      userResolutions.forEach((res: string, index: number) => {
+        const priority = (userResolutions.length - index) * 10
+        resolutionPriority[res.toLowerCase()] = priority
+        // Map equivalent resolutions
+        if (res.toLowerCase() === '4k') resolutionPriority['2160p'] = priority
+        if (res.toLowerCase() === '2160p') resolutionPriority['4k'] = priority
+        if (res.toLowerCase() === '1080p') resolutionPriority['fhd'] = priority
+        if (res.toLowerCase() === '720p') resolutionPriority['hd'] = priority
+        if (res.toLowerCase() === '480p') resolutionPriority['sd'] = priority
+      })
+    } else {
+      // Fallback to default order
+      Object.assign(resolutionPriority, {
+        '4k': 100, '2160p': 100,
+        '1440p': 80,
+        '1080p': 60, 'fhd': 60,
+        '720p': 40, 'hd': 40,
+        '480p': 20, 'sd': 20,
+        'unknown': 0
+      })
     }
+    resolutionPriority['unknown'] = resolutionPriority['unknown'] || 0
 
     // Sort using configured criteria in priority order
     return streams.sort((a, b) => {
@@ -475,18 +474,75 @@ export class StreamProcessor {
             break
 
           case 'quality':
-            // Quality based on encode and visual tags
-            const aQuality = (a.parsed.visualTags?.length || 0) + (a.parsed.encode?.includes('hevc') ? 2 : 0) + (a.parsed.encode?.includes('av1') ? 3 : 0)
-            const bQuality = (b.parsed.visualTags?.length || 0) + (b.parsed.encode?.includes('hevc') ? 2 : 0) + (b.parsed.encode?.includes('av1') ? 3 : 0)
+            // Quality based on encode, visual tags, and user's quality preferences
+            // User's qualities list: ['BluRay/UHD', 'WEB/HD', 'DVD/TV/SAT', 'CAM/Screener', 'Unknown']
+            const userQualities = (this.config as any).qualities || []
+            
+            const getQualityScore = (stream: ParsedStream): number => {
+              const title = (stream.parsed.title || '').toLowerCase()
+              let score = 0
+              
+              // Score based on visual tags (HDR, DV, 10bit)
+              score += (stream.parsed.visualTags?.length || 0) * 5
+              
+              // Score based on encode (AV1 > HEVC > AVC)
+              if (stream.parsed.encode?.includes('av1')) score += 15
+              else if (stream.parsed.encode?.includes('hevc')) score += 10
+              else if (stream.parsed.encode?.includes('avc')) score += 5
+              
+              // Score based on user's quality order
+              if (userQualities.length > 0) {
+                for (let i = 0; i < userQualities.length; i++) {
+                  const qual = userQualities[i].toLowerCase()
+                  if (qual.includes('bluray') && (title.includes('bluray') || title.includes('blu-ray') || title.includes('remux'))) {
+                    score += (userQualities.length - i) * 20
+                    break
+                  } else if (qual.includes('web') && (title.includes('web') || title.includes('webrip') || title.includes('webdl'))) {
+                    score += (userQualities.length - i) * 20
+                    break
+                  } else if (qual.includes('dvd') && (title.includes('dvd') || title.includes('hdtv') || title.includes('tv'))) {
+                    score += (userQualities.length - i) * 20
+                    break
+                  } else if (qual.includes('cam') && (title.includes('cam') || title.includes('screener') || title.includes('scr'))) {
+                    score += (userQualities.length - i) * 20
+                    break
+                  }
+                }
+              }
+              
+              return score
+            }
+            
+            const aQuality = getQualityScore(a)
+            const bQuality = getQualityScore(b)
             comparison = (bQuality - aQuality) * multiplier
             break
 
           case 'language':
-            // Language preference - check if any preferred languages match
+            // Language preference - score by position in preferred list (earlier = higher priority)
             const preferredLangs = this.config.filters?.language?.preferred || []
-            const aHasPreferred = a.parsed.languages?.some(l => preferredLangs.includes(l)) ? 1 : 0
-            const bHasPreferred = b.parsed.languages?.some(l => preferredLangs.includes(l)) ? 1 : 0
-            comparison = (bHasPreferred - aHasPreferred) * multiplier
+            
+            const getLangScore = (stream: ParsedStream): number => {
+              if (!stream.parsed.languages || stream.parsed.languages.length === 0) return 0
+              if (preferredLangs.length === 0) return 0
+              
+              // Find the best matching language (earliest in preferred list)
+              let bestScore = 0
+              for (const lang of stream.parsed.languages) {
+                const idx = preferredLangs.findIndex((p: string) => 
+                  p.toLowerCase() === lang.toLowerCase()
+                )
+                if (idx !== -1) {
+                  const score = (preferredLangs.length - idx) * 10
+                  if (score > bestScore) bestScore = score
+                }
+              }
+              return bestScore
+            }
+            
+            const aLangScore = getLangScore(a)
+            const bLangScore = getLangScore(b)
+            comparison = (bLangScore - aLangScore) * multiplier
             break
 
           default:

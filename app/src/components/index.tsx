@@ -28,3 +28,6 @@ export { ErrorBoundary } from './layout/ErrorBoundary'
 export { ProfileModal } from './features/ProfileModal'
 export { StreamingRow } from './features/StreamingRow'
 export { SettingsProfileSelector } from './features/SettingsProfileSelector'
+
+// Player Components
+export { VidstackPlayer } from './player/VidstackPlayer'

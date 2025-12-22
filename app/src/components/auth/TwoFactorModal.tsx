@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '../index'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
+import { authClient } from '../../lib/auth-client'
 
 interface TwoFactorModalProps {
   onBack: () => void
@@ -18,7 +19,9 @@ export function TwoFactorModal({
   error
 }: TwoFactorModalProps) {
   const [code, setCode] = useState('')
-  const [rememberDevice, setRememberDevice] = useState(false)
+  const [trustDevice, setTrustDevice] = useState(false)
+  const [localLoading, setLocalLoading] = useState(false)
+  const [localError, setLocalError] = useState<string | undefined>()
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -30,25 +33,28 @@ export function TwoFactorModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (code.length === 6 && !isLoading) {
+    if (code.length === 6 && !isLoading && !localLoading) {
+      setLocalLoading(true)
+      setLocalError(undefined)
+      
       try {
-        const res = await fetch('/api/auth/two-factor/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code,
-            rememberDevice
-          })
+        const { data, error: verifyError } = await authClient.twoFactor.verifyTotp({
+          code,
+          trustDevice,
         })
         
-        if (res.ok) {
-          onSuccess()
-        } else {
-          // Error will be handled by parent component or we could parse it here
-          // const data = await res.json()
+        if (verifyError) {
+          setLocalError(verifyError.message || 'Invalid verification code')
+          return
         }
-      } catch (err) {
-        // Error will be handled by parent component
+        
+        if (data) {
+          onSuccess()
+        }
+      } catch (err: any) {
+        setLocalError(err.message || 'Verification failed')
+      } finally {
+        setLocalLoading(false)
       }
     }
   }
@@ -71,6 +77,9 @@ export function TwoFactorModal({
     setCode(digits)
   }
 
+  const displayError = localError || error
+  const loading = isLoading || localLoading
+
   return (
     <div className="animate-in fade-in zoom-in-95 duration-300">
       <div className="flex justify-start mb-2">
@@ -78,7 +87,7 @@ export function TwoFactorModal({
           variant="ghost"
           onClick={onBack}
           className="!p-2 -ml-2 text-zinc-400 hover:text-white"
-          disabled={isLoading}
+          disabled={loading}
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -88,9 +97,9 @@ export function TwoFactorModal({
         <p className="text-zinc-400 text-sm">
           Enter the 6-digit code from your authenticator app
         </p>
-        {error && (
+        {displayError && (
           <p className="text-red-500 mt-4 text-sm font-medium animate-pulse">
-            {error}
+            {displayError}
           </p>
         )}
       </div>
@@ -122,11 +131,34 @@ export function TwoFactorModal({
                     prevInput?.focus()
                   }
                 }}
-                disabled={isLoading}
+                disabled={loading}
                 className="w-11 h-14 bg-black/20 border border-white/10 rounded-lg text-xl font-bold text-center text-white font-mono focus:outline-none focus:border-[#e50914] focus:ring-1 focus:ring-[#e50914] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               />
             ))}
           </div>
+          
+          {/* Trust This Device Checkbox */}
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={trustDevice}
+                onChange={(e) => setTrustDevice(e.target.checked)}
+                disabled={loading}
+                className="sr-only peer"
+              />
+              <div className="w-5 h-5 border-2 border-white/20 rounded peer-checked:bg-[#e50914] peer-checked:border-[#e50914] transition-all group-hover:border-white/40 peer-disabled:opacity-50">
+                {trustDevice && (
+                  <svg className="w-full h-full text-white p-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">
+              Trust this device for 30 days
+            </span>
+          </label>
           
           {/* Hidden input for accessibility and form submission */}
           <input
@@ -139,7 +171,7 @@ export function TwoFactorModal({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            disabled={isLoading}
+            disabled={loading}
             className="sr-only"
             aria-label="Two-factor authentication code"
           />
@@ -149,24 +181,11 @@ export function TwoFactorModal({
           <Button
             variant="cta"
             type="submit"
-            disabled={code.length !== 6 || isLoading}
+            disabled={code.length !== 6 || loading}
             className="w-full !py-3"
           >
-            {isLoading ? 'Verifying...' : 'Verify Code'}
+            {loading ? 'Verifying...' : 'Verify Code'}
           </Button>
-        </div>
-        
-        <div className="my-4">
-          <label className="flex items-center gap-2 text-zinc-400 text-sm cursor-pointer hover:text-zinc-300 transition-colors">
-            <input
-              type="checkbox"
-              checked={rememberDevice}
-              onChange={(e) => setRememberDevice(e.target.checked)}
-              disabled={isLoading}
-              className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#e50914] focus:ring-[#e50914] focus:ring-offset-0"
-            />
-            Remember this device for 30 days
-          </label>
         </div>
       </form>
       
@@ -174,7 +193,7 @@ export function TwoFactorModal({
         <button
           type="button"
           onClick={onUseBackupCode}
-          disabled={isLoading}
+          disabled={loading}
           className="text-zinc-400 text-sm hover:text-white underline decoration-transparent hover:decoration-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Use a backup code instead

@@ -1,9 +1,8 @@
 import { AuthForms } from "../../components/auth/AuthForms";
 import { AnimatedBackground, TitleBar } from "../../components";
-import { useLocation } from "react-router-dom";
 
 export function SignInPage() {
-  const location = useLocation();
+  // Note: Authenticated user redirect is now handled by PublicRoute wrapper
   
   return (
     <>

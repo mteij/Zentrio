@@ -1,4 +1,4 @@
-import { AddonClient } from './client'
+import { AddonClient, RetryableError } from './client'
 import { ZentrioAddonClient } from './zentrio-client'
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
 import { addonDb, streamDb, profileDb, profileProxySettingsDb } from '../database'
@@ -800,7 +800,8 @@ export class AddonManager {
 
     const videoId = (type === 'series' && season !== undefined && episode !== undefined) ? `${id}:${season}:${episode}` : id
 
-    const promises = clients.map(async (client) => {
+    // Helper function to fetch streams with retry support
+    const fetchStreamsWithRetry = async (client: AddonClient, maxRetries: number = 3): Promise<void> => {
       if (!client.manifest) return
       
       // Check if addon supports streams for this type
@@ -817,17 +818,32 @@ export class AddonManager {
         if (!client.manifest.idPrefixes.some(p => id.startsWith(p))) return
       }
 
-      try {
-        console.log(`Requesting streams from ${client.manifest.name} for ${type}/${videoId}`)
-        const streams = await client.getStreams(type, videoId)
-        console.log(`Received ${streams ? streams.length : 0} streams from ${client.manifest.name}`)
-        if (streams && streams.length > 0) {
-          rawResults.push({ addon: client.manifest, streams })
+      let attempt = 0
+      while (attempt < maxRetries) {
+        try {
+          console.log(`[${client.manifest.name}] Requesting streams for ${type}/${videoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
+          const streams = await client.getStreams(type, videoId)
+          console.log(`[${client.manifest.name}] Received ${streams ? streams.length : 0} streams`)
+          if (streams && streams.length > 0) {
+            rawResults.push({ addon: client.manifest, streams })
+          }
+          return // Success, exit the retry loop
+        } catch (e) {
+          if (e instanceof RetryableError && attempt < maxRetries - 1) {
+            // Addon is busy, wait and retry
+            console.log(`[${client.manifest.name}] ${e.message} - retrying in ${e.retryAfterMs}ms...`)
+            await new Promise(resolve => setTimeout(resolve, e.retryAfterMs))
+            attempt++
+          } else {
+            // Non-retryable error or max retries exceeded
+            console.warn(`[${client.manifest.name}] Failed to fetch streams:`, e instanceof Error ? e.message : e)
+            return
+          }
         }
-      } catch (e) {
-        console.warn(`Failed to fetch streams from ${client.manifest.name}`, e)
       }
-    })
+    }
+
+    const promises = clients.map(client => fetchStreamsWithRetry(client))
 
     // Wait for all promises to settle, but don't block if some fail or timeout
     await Promise.allSettled(promises)
@@ -939,6 +955,86 @@ export class AddonManager {
     }
     
     return groupedResults
+  }
+
+  /**
+   * Progressive stream loading - calls back as each addon completes.
+   * Used for SSE streaming to update UI in real-time.
+   */
+  async getStreamsProgressive(
+    type: string, 
+    id: string, 
+    profileId: number, 
+    season?: number, 
+    episode?: number, 
+    platform?: string,
+    callbacks?: {
+      onAddonStart?: (addon: Manifest) => void
+      onAddonResult?: (addon: Manifest, streams: Stream[]) => void
+      onAddonError?: (addon: Manifest, error: string) => void
+    }
+  ): Promise<void> {
+    const clients = await this.getClientsForProfile(profileId)
+
+    // For series, we need season and episode
+    if (type === 'series' && (season === undefined || episode === undefined)) {
+      console.warn(`[AddonManager] Skipping stream fetch for series ${id} without season/episode`)
+      return
+    }
+
+    const videoId = (type === 'series' && season !== undefined && episode !== undefined) 
+      ? `${id}:${season}:${episode}` : id
+
+    // Fetch streams from each addon and callback as they complete
+    const fetchFromAddon = async (client: AddonClient): Promise<void> => {
+      if (!client.manifest) return
+
+      // Check if addon supports streams for this type
+      const supportsStreams = client.manifest.resources.some(r => {
+        if (typeof r === 'string') return r === 'stream'
+        // @ts-ignore
+        return r.name === 'stream' && (r.types?.includes(type) || client.manifest?.types.includes(type))
+      })
+      if (!supportsStreams) return
+
+      // Check ID prefixes if defined
+      if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
+        if (!client.manifest.idPrefixes.some(p => id.startsWith(p))) return
+      }
+
+      // Notify that this addon is starting
+      callbacks?.onAddonStart?.(client.manifest)
+
+      const maxRetries = 3
+      let attempt = 0
+
+      while (attempt < maxRetries) {
+        try {
+          console.log(`[${client.manifest.name}] Requesting streams for ${type}/${videoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
+          const streams = await client.getStreams(type, videoId)
+          console.log(`[${client.manifest.name}] Received ${streams ? streams.length : 0} streams`)
+          
+          // Callback with results (even if empty)
+          callbacks?.onAddonResult?.(client.manifest, streams || [])
+          return
+        } catch (e) {
+          if (e instanceof RetryableError && attempt < maxRetries - 1) {
+            console.log(`[${client.manifest.name}] ${e.message} - retrying in ${e.retryAfterMs}ms...`)
+            await new Promise(resolve => setTimeout(resolve, e.retryAfterMs))
+            attempt++
+          } else {
+            const errorMsg = e instanceof Error ? e.message : String(e)
+            console.warn(`[${client.manifest.name}] Failed to fetch streams:`, errorMsg)
+            callbacks?.onAddonError?.(client.manifest, errorMsg)
+            return
+          }
+        }
+      }
+    }
+
+    // Launch all addon fetches in parallel
+    const promises = clients.map(client => fetchFromAddon(client))
+    await Promise.allSettled(promises)
   }
 
   async getSubtitles(type: string, id: string, profileId: number, videoHash?: string): Promise<{ addon: Manifest, subtitles: Subtitle[] }[]> {

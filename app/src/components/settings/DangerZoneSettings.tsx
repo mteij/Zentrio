@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button, InputDialog, ConfirmDialog } from '../index'
 import styles from '../../styles/Settings.module.css'
+import { useAuthStore } from '../../stores/authStore'
 
 export function DangerZoneSettings() {
   const [showTypeDelete, setShowTypeDelete] = useState(false)
@@ -22,23 +23,25 @@ export function DangerZoneSettings() {
   }
 
   const handleDeleteAccount = async () => {
-            try {
-                const res = await fetch('/api/user/account', {
-                    method: 'DELETE',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                if (res.ok) {
-                    toast.success('Request Sent', { description: 'Account deletion initiated. You will receive a confirmation email.' })
-                    window.location.href = '/'
-                } else {
-                    toast.error('Deletion Failed', { description: 'Failed to initiate account deletion' })
-                }
-            } catch (e) {
-                console.error(e)
-                toast.error('Network Error', { description: 'Network error' })
-            }
+    try {
+      const res = await fetch('/api/user/account', {
+        method: 'DELETE',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      if (res.ok) {
+        toast.success('Account Deleted', { description: 'Your account has been permanently deleted.' })
+        // Clear local auth state before redirecting
+        useAuthStore.getState().logout()
+        window.location.href = '/'
+      } else {
+        toast.error('Deletion Failed', { description: 'Failed to delete account' })
+      }
+    } catch (e) {
+      console.error(e)
+      toast.error('Network Error', { description: 'Network error' })
+    }
   }
 
   return (

@@ -13,6 +13,9 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmailVerificationModal } from "./EmailVerificationModal";
 import { ServerConnectionIndicator } from "./ServerConnectionIndicator";
+import { useLoginBehavior, getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
+import { useSessionDuration } from "../../hooks/useSessionDuration";
+import { useAuthStore } from "../../stores/authStore";
 
 // Brand icons as SVG components
 const GoogleIcon = () => (
@@ -46,6 +49,8 @@ interface AuthFormsProps {
 export function AuthForms({ mode }: AuthFormsProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { getRedirectPath } = useLoginBehavior();
+  const { duration, setDuration } = useSessionDuration();
   const [method, setMethod] = useState<AuthMethod>("password");
   const [email, setEmail] = useState(searchParams.get("email") || "");
   const [password, setPassword] = useState("");
@@ -90,9 +95,10 @@ export function AuthForms({ mode }: AuthFormsProps) {
     try {
       setLoading(true);
       setError(null);
+      const redirectPath = getLoginBehaviorRedirectPath();
       await authClient.signIn.social({
         provider,
-        callbackURL: `${getClientUrl()}/profiles`,
+        callbackURL: `${getClientUrl()}${redirectPath}`,
       });
     } catch (e: any) {
       toast.error('Login Failed', { description: e.message || 'Failed to initiate social login' })
@@ -119,34 +125,45 @@ export function AuthForms({ mode }: AuthFormsProps) {
 
     try {
       if (mode === "signup") {
+        const redirectPath = getLoginBehaviorRedirectPath();
         const { data, error } = await authClient.signUp.email({
           email,
           password,
-          name,
-          callbackURL: `${getClientUrl()}/profiles`
-        });
+          name, // Using username as display name
+          username: name, // Set username field explicitly
+          callbackURL: `${getClientUrl()}${redirectPath}`
+        } as any);
         if (error) throw error;
         
-        // If email verification is enabled, we might show a message
-        // Account created, now show verification modal
-        // OTP should be sent automatically by the server hook, but to be sure we can trigger it or just wait
+        // Account created, now send verification OTP and show modal
         setResendSeconds(30);
+        // Send the initial verification OTP
+        await authClient.emailOtp.sendVerificationOtp({
+          email,
+          type: "email-verification"
+        });
         setShowVerificationModal(true);
       } else {
         // Sign In
         if (method === "password") {
+          const redirectPath = getRedirectPath();
           const { data, error } = await authClient.signIn.email({
             email,
             password,
-            callbackURL: `${getClientUrl()}/profiles`
+            callbackURL: `${getClientUrl()}${redirectPath}`
           });
           if (error) throw error;
-          navigate("/profiles");
+          // Update auth store with user data before navigating
+          if (data?.user) {
+            useAuthStore.getState().login(data.user);
+          }
+          navigate(redirectPath);
         } 
         else if (method === "magic-link") {
+          const redirectPath = getLoginBehaviorRedirectPath();
           const { data, error } = await authClient.signIn.magicLink({
             email,
-            callbackURL: `${getClientUrl()}/profiles`
+            callbackURL: `${getClientUrl()}${redirectPath}`
           });
           if (error) throw error;
           toast.success('Email Sent', { description: 'Magic link sent! Check your email.' })
@@ -162,12 +179,17 @@ export function AuthForms({ mode }: AuthFormsProps) {
              toast.success('OTP Sent', { description: 'OTP sent to your email.' })
           } else {
              if (otp) {
+                const redirectPath = getRedirectPath();
                 const { data, error } = await authClient.signIn.emailOtp({
                     email,
                     otp
                 });
                 if (error) throw error;
-                navigate("/profiles");
+                // Update auth store with user data before navigating
+                if (data?.user) {
+                  useAuthStore.getState().login(data.user);
+                }
+                navigate(redirectPath);
              } else {
                  toast.warning('Missing Code', { description: 'Please enter the verification code' })
              }
@@ -207,7 +229,7 @@ export function AuthForms({ mode }: AuthFormsProps) {
                 <EmailVerificationModal 
                     email={email}
                     onBack={() => setShowVerificationModal(false)}
-                    onSuccess={() => navigate("/profiles")}
+                    onSuccess={() => navigate(getRedirectPath())}
                     onResend={handleResendVerification}
                     resendSeconds={resendSeconds}
                 />
@@ -274,34 +296,34 @@ export function AuthForms({ mode }: AuthFormsProps) {
 
           {mode === "signup" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Name</label>
+              <label htmlFor="username" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Username</label>
               <input
                 type="text"
+                id="username"
+                name="username"
+                autoComplete="username"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="!w-full bg-white/5 border border-white/10 !rounded-md !px-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
-
-
-
-                placeholder="John Doe"
+                placeholder="johndoe"
               />
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Email</label>
+            <label htmlFor="email" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Email</label>
             <div className="relative">
               <Mail className="absolute left-3.5 top-3.5 w-5 h-5 text-zinc-500" />
               <input
                 type="email"
+                id="email"
+                name="email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value.toLowerCase())}
                 className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
-
-
-
                 placeholder="you@example.com"
               />
             </div>
@@ -309,18 +331,18 @@ export function AuthForms({ mode }: AuthFormsProps) {
 
           {(mode === "signup" || (mode === "signin" && method === "password")) && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Password</label>
+              <label htmlFor="password" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-3.5 w-5 h-5 text-zinc-500" />
                 <input
                   type="password"
+                  id="password"
+                  name="password"
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
-
-
-
                   placeholder="••••••••"
                 />
               </div>
@@ -333,21 +355,36 @@ export function AuthForms({ mode }: AuthFormsProps) {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-1.5"
             >
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Verification Code</label>
+              <label htmlFor="otp" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Verification Code</label>
               <input
                 type="text"
+                id="otp"
+                name="otp"
+                autoComplete="one-time-code"
+                inputMode="numeric"
                 required
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 className="!w-full bg-white/5 border border-white/10 !rounded-md !px-4 !py-3 text-white text-center tracking-[0.5em] font-mono text-lg placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all"
-
-
                 placeholder="000000"
                 maxLength={6}
               />
             </motion.div>
           )}
 
+          {/* Keep me signed in checkbox */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="keepSignedIn"
+              checked={duration === 'indefinite'}
+              onChange={(e) => setDuration(e.target.checked ? 'indefinite' : 'session')}
+              className="w-4 h-4 rounded border-white/20 bg-white/5 text-red-600 focus:ring-red-500 focus:ring-offset-0 cursor-pointer"
+            />
+            <label htmlFor="keepSignedIn" className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-300 transition-colors">
+              Keep me signed in
+            </label>
+          </div>
 
           <button
             type="submit"

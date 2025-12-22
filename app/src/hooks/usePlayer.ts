@@ -8,9 +8,7 @@ interface UsePlayerProps {
   videoRef: React.RefObject<HTMLVideoElement>
   autoPlay?: boolean
   onEnded?: () => void
-  behaviorHints?: {
-      notWebReady?: boolean
-  }
+  behaviorHints?: Record<string, any>
 }
 
 interface QualityLevel {
@@ -21,7 +19,7 @@ interface QualityLevel {
   label: string
 }
 
-export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHints }: UsePlayerProps) {
+export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -47,6 +45,10 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
   const initialVolumeApplied = useRef(false)
   const { isConnected: isCastConnected, castSession } = useCast()
   
+  // Audio analysis refs to prevent recreating source nodes
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  
   // Effect to pause local video when cast connects
   useEffect(() => {
     const video = videoRef.current
@@ -61,212 +63,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
     onEndedRef.current = onEnded
   }, [onEnded])
 
-    // Transcoder integration - simplified for proper fMP4 output
-    const startTranscoding = useCallback(async () => {
-        try {
-            const video = videoRef.current;
-            if (!video) return;
 
-            toast.loading("Preparing to transcode...", { id: 'transcode-progress' });
-            const { transcoder } = await import('../services/transcoder/TranscoderService');
-            console.log('Starting transcoding for', url);
-            
-            // Setup MediaSource
-            const mediaSource = new MediaSource();
-            const originalSrc = video.src;
-            video.src = URL.createObjectURL(mediaSource);
-            
-            mediaSource.addEventListener('sourceopen', async () => {
-                try {
-                    // Track whether we've received the first chunk (init segment)
-                    let isFirstChunk = true;
-                    let chunksReceived = 0;
-                    let sourceBuffer: SourceBuffer | null = null;
-                    
-                    // Helper to find MP4 box boundaries
-                    const findBox = (data: Uint8Array, boxType: string, start = 0): { offset: number, size: number } | null => {
-                        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-                        const typeCode = boxType.charCodeAt(0) << 24 | boxType.charCodeAt(1) << 16 | 
-                                        boxType.charCodeAt(2) << 8 | boxType.charCodeAt(3);
-                        let offset = start;
-                        while (offset < data.byteLength - 8) {
-                            const size = view.getUint32(offset, false);
-                            const type = view.getUint32(offset + 4, false);
-                            if (size === 0 || size > data.byteLength - offset) break;
-                            if (type === typeCode) return { offset, size };
-                            offset += size;
-                        }
-                        return null;
-                    };
-                    
-                    // Detect video codec from MP4 data by searching for codec boxes
-                    const detectCodec = (data: Uint8Array): 'hevc' | 'avc' => {
-                        // Search for hvc1/hev1 (HEVC) or avc1 (H.264) boxes in the data
-                        const dataStr = new TextDecoder('latin1').decode(data.slice(0, Math.min(data.length, 5000)));
-                        if (dataStr.includes('hvc1') || dataStr.includes('hev1')) {
-                            return 'hevc';
-                        }
-                        return 'avc'; // Default to H.264
-                    };
-                    
-                    // Helper to strip init segment (ftyp + moov) from data
-                    const stripInitSegment = (data: Uint8Array): Uint8Array => {
-                        const moof = findBox(data, 'moof');
-                        
-                        if (!moof) {
-                            console.warn("MSE: No moof box found in chunk");
-                            return data;
-                        }
-                        
-                        // Return data starting from first moof
-                        console.log(`MSE: Stripping init segment, moof starts at offset ${moof.offset}`);
-                        return data.slice(moof.offset);
-                    };
-                    
-                    // Handle transcoding - video is copied unchanged, audio is transcoded to AAC
-                    await transcoder.transcode(url, {
-                        onData: async (data: Uint8Array) => {
-                            chunksReceived++;
-                            console.log(`MSE: Received chunk ${chunksReceived} (${(data.byteLength / 1024 / 1024).toFixed(2)} MB)`);
-                            
-                            // Process the data
-                            let dataToAppend: Uint8Array;
-                            
-                            if (isFirstChunk) {
-                                // First chunk: detect codec and create SourceBuffer
-                                const codec = detectCodec(data);
-                                const mimeType = codec === 'hevc' 
-                                    ? 'video/mp4; codecs="hvc1.1.6.L120.90, mp4a.40.2"'
-                                    : 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
-                                
-                                console.log(`MSE: Detected ${codec} codec, creating SourceBuffer with: ${mimeType}`);
-                                
-                                if (!MediaSource.isTypeSupported(mimeType)) {
-                                    throw new Error(`Browser doesn't support ${codec} codec in MSE`);
-                                }
-                                
-                                sourceBuffer = mediaSource.addSourceBuffer(mimeType);
-                                dataToAppend = data;
-                                isFirstChunk = false;
-                                console.log("MSE: Appending first chunk with init segment");
-                            } else {
-                                // Subsequent chunks: strip ftyp and moov, keep only moof + mdat
-                                dataToAppend = stripInitSegment(data);
-                                console.log(`MSE: Appending chunk ${chunksReceived} (${(dataToAppend.byteLength / 1024 / 1024).toFixed(2)} MB stripped)`);
-                            }
-                            
-                            if (!sourceBuffer) {
-                                console.error("MSE: No SourceBuffer available");
-                                return;
-                            }
-                            
-                            // Wait for any pending updates
-                            while (sourceBuffer.updating) {
-                                await new Promise(r => setTimeout(r, 10));
-                            }
-                            
-                            // Check MediaSource is still open
-                            if (mediaSource.readyState !== 'open') {
-                                console.warn("MSE: MediaSource no longer open, stopping");
-                                return;
-                            }
-                            
-                            // Append the data
-                            const sb = sourceBuffer; // Capture for closure
-                            await new Promise<void>((resolve, reject) => {
-                                const onUpdateEnd = () => {
-                                    sb.removeEventListener('updateend', onUpdateEnd);
-                                    sb.removeEventListener('error', onError);
-                                    console.log("MSE: Chunk appended successfully");
-                                    resolve();
-                                };
-                                
-                                const onError = (e: Event) => {
-                                    sb.removeEventListener('updateend', onUpdateEnd);
-                                    sb.removeEventListener('error', onError);
-                                    console.error("MSE: SourceBuffer error", e);
-                                    // Don't reject for non-first chunks, try to continue
-                                    if (chunksReceived === 1) {
-                                        reject(new Error('SourceBuffer append failed'));
-                                    } else {
-                                        console.warn("MSE: Continuing despite error on chunk", chunksReceived);
-                                        resolve();
-                                    }
-                                };
-                                
-                                sb.addEventListener('updateend', onUpdateEnd);
-                                sb.addEventListener('error', onError);
-                                
-                                try {
-                                    const arrayBuffer = new ArrayBuffer(dataToAppend.byteLength);
-                                    new Uint8Array(arrayBuffer).set(dataToAppend);
-                                    sb.appendBuffer(arrayBuffer);
-                                } catch (e) {
-                                    sb.removeEventListener('updateend', onUpdateEnd);
-                                    sb.removeEventListener('error', onError);
-                                    if (chunksReceived === 1) {
-                                        reject(e);
-                                    } else {
-                                        console.warn("MSE: Error appending chunk", chunksReceived, e);
-                                        resolve();
-                                    }
-                                }
-                            });
-                            
-                            // Start playback once we have first chunk
-                            if (chunksReceived === 1 && video.paused && video.readyState >= 2) {
-                                video.play().catch(e => console.log('Autoplay blocked:', e));
-                            }
-                        },
-                        onProgress: (progress: number, stage: 'downloading' | 'transcoding') => {
-                            // Show progress toast (throttled)
-                            const message = stage === 'downloading' 
-                                ? `Downloading: ${progress}%`
-                                : `Transcoding: ${progress}%`;
-                            toast.loading(message, { id: 'transcode-progress' });
-                        },
-                        onError: (error: Error) => {
-                            console.error("Transcoding error:", error);
-                            toast.dismiss('transcode-progress');
-                            setError(`Transcoding failed: ${error.message}`);
-                            toast.error(error.message);
-                        }
-                    });
-                    
-                    // End the stream when transcoding is complete
-                    if (mediaSource.readyState === 'open' && sourceBuffer !== null) {
-                        // Wait for final buffer update - use type assertion as TS narrowing doesn't work across async
-                        const finalBuffer = sourceBuffer as SourceBuffer;
-                        while (finalBuffer.updating) {
-                            await new Promise(r => setTimeout(r, 10));
-                        }
-                        mediaSource.endOfStream();
-                        console.log("MSE: Stream ended successfully");
-                        toast.dismiss('transcode-progress');
-                        toast.success("Video ready!");
-                        setIsBuffering(false);
-                    }
-                    
-                } catch (e) {
-                    console.error("MSE/Transcoding error:", e);
-                    toast.dismiss('transcode-progress');
-                    toast.error("Transcoding failed: " + (e instanceof Error ? e.message : String(e)));
-                    // Fallback to original source
-                    video.src = originalSrc;
-                    setError('Transcoding failed');
-                }
-            }, { once: true });
-            
-            mediaSource.addEventListener('error', (e) => {
-                console.error('MediaSource error:', e);
-                setError('MediaSource error occurred');
-            });
-           
-        } catch (e) {
-            console.error("Transcoding start failed", e);
-            toast.error("Transcoding failed: " + (e instanceof Error ? e.message : String(e)));
-        }
-    }, [url, videoRef])
 
   // Detect if running in Tauri (native app) - use native video decoding
   const isTauri = useMemo(() => !!(window as any).__TAURI__, [])
@@ -282,20 +79,14 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
     setError(null)
     setQualityLevels([])
     setCurrentQualityState(-1)
+
+
     
-    // Check hints
-    if (behaviorHints?.notWebReady) {
-        console.warn("Stream marked as not web ready (likely unsupported audio). Readying transcoder...")
-        startTranscoding()
-    }
-
-    /* ... rest of hook unchanged ... */
-
-    const isHls = url.includes('.m3u8')
-
+    // Error handler
     const handleError = (e: Event | string) => {
       const video = videoRef.current
-      console.error('Player error:', e)
+      console.error('Player error event:', e)
+      
       if (video?.error) {
         console.error('Video Error Details:', {
             code: video.error.code,
@@ -335,7 +126,14 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
         setBufferedProgress((bufferedEnd / video.duration) * 100)
       }
     }
-    const handleDurationChange = () => setDuration(video.duration)
+    const handleDurationChange = () => {
+        // If the video reports Infinity, but we have a known finite duration (e.g. from transcoder)
+        // then don't overwrite our good duration with Infinity
+        if (!Number.isFinite(video.duration) && duration > 0) {
+            return
+        }
+        setDuration(video.duration)
+    }
     const handleVolumeChange = () => {
       setVolume(video.volume)
       setIsMuted(video.muted)
@@ -400,14 +198,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
       })
       hlsRef.current = hls
       
-      // Error handling for CODEC issues
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.details === Hls.ErrorDetails.BUFFER_ADD_CODEC_ERROR || data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR) {
-              // Potential codec issue, try transcoding?
-              console.warn("HLS Error hit, checking for transcoding need...", data)
-              startTranscoding()
-          }
-      })
+
       
       hls.loadSource(url)
       hls.attachMedia(video)
@@ -463,15 +254,18 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
       // Check if we suspect unsupported audio? 
       // We can hook into 'error' event on video too
       
+      console.log('usePlayer: Setting video src', url)
       video.src = url
       if (autoPlay) {
         video.addEventListener('canplaythrough', () => {
+          console.log('usePlayer: canplaythrough event')
           video.play().catch(e => console.log('Autoplay blocked:', e))
         }, { once: true })
       }
     }
 
     return () => {
+      console.log('usePlayer: Cleanup')
       video.removeEventListener('error', handleError)
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
       video.removeEventListener('waiting', handleWaiting)
@@ -492,7 +286,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
         hlsRef.current = null
       }
     }
-  }, [url, videoRef, autoPlay, isTauri, startTranscoding]) // Removed onEnded from deps - using ref instead
+  }, [url, videoRef, autoPlay, isTauri])
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current
@@ -508,14 +302,46 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded, behaviorHin
   const seek = useCallback((time: number) => {
     const video = videoRef.current
     if (!video || !isMetadataLoaded) return
-    video.currentTime = Math.max(0, Math.min(time, video.duration || duration))
+    
+    // Handle non-finite duration (common in MSE/transcoding)
+    const currentDuration = Number.isFinite(video.duration) ? video.duration : duration
+    
+    // If duration is still not finite (e.g. Infinity for live streams), just try to seek to valid time
+    if (!Number.isFinite(currentDuration)) {
+        if (Number.isFinite(time)) video.currentTime = Math.max(0, time)
+        return
+    }
+    
+    const targetTime = Math.max(0, Math.min(time, currentDuration))
+    
+    // Check if target time is buffered
+    let isBuffered = false;
+    for (let i = 0; i < video.buffered.length; i++) {
+        if (targetTime >= video.buffered.start(i) && targetTime <= video.buffered.end(i)) {
+            isBuffered = true;
+            break;
+        }
+    }
+    
+    // Note: With the new blob URL approach, seeking is handled by the video element directly
+    // No need to notify transcoder as the entire file is pre-transcoded
+    
+    video.currentTime = targetTime
   }, [videoRef, isMetadataLoaded, duration])
 
   const seekRelative = useCallback((delta: number) => {
     const video = videoRef.current
     if (!video || !isMetadataLoaded) return
+    
+    const currentDuration = Number.isFinite(video.duration) ? video.duration : duration
     const newTime = video.currentTime + delta
-    video.currentTime = Math.max(0, Math.min(newTime, video.duration || duration))
+    
+    if (!Number.isFinite(currentDuration)) {
+        video.currentTime = Math.max(0, newTime)
+        return
+    }
+    
+    video.currentTime = Math.max(0, Math.min(newTime, currentDuration))
   }, [videoRef, isMetadataLoaded, duration])
 
   const changeVolume = useCallback((newVolume: number) => {

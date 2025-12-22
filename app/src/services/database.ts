@@ -205,18 +205,25 @@ const db = new Database(dbPath)
     profile_id INTEGER NOT NULL,
     meta_id TEXT NOT NULL,
     meta_type TEXT NOT NULL,
+    season INTEGER NOT NULL DEFAULT -1,
+    episode INTEGER NOT NULL DEFAULT -1,
+    episode_id TEXT DEFAULT NULL,
     title TEXT,
     poster TEXT,
     duration INTEGER,
     position INTEGER,
+    is_watched BOOLEAN DEFAULT FALSE,
+    watched_at DATETIME DEFAULT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     remote_id TEXT,
     dirty BOOLEAN DEFAULT FALSE,
     deleted_at DATETIME,
     FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
-    UNIQUE(profile_id, meta_id)
+    UNIQUE(profile_id, meta_id, season, episode)
   );
   CREATE INDEX IF NOT EXISTS idx_watch_history_profile ON watch_history(profile_id);
+  CREATE INDEX IF NOT EXISTS idx_watch_history_meta ON watch_history(profile_id, meta_id);
+
 
   CREATE TABLE IF NOT EXISTS lists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -320,6 +327,91 @@ const db = new Database(dbPath)
     is_syncing BOOLEAN DEFAULT FALSE
   );
  `);
+
+ // Migrations: Add new columns to watch_history for existing databases
+ // SQLite will error if column already exists, so we wrap each in try/catch
+ const columnMigrations = [
+   "ALTER TABLE watch_history ADD COLUMN season INTEGER DEFAULT NULL",
+   "ALTER TABLE watch_history ADD COLUMN episode INTEGER DEFAULT NULL",
+   "ALTER TABLE watch_history ADD COLUMN episode_id TEXT DEFAULT NULL",
+   "ALTER TABLE watch_history ADD COLUMN is_watched BOOLEAN DEFAULT FALSE",
+   "ALTER TABLE watch_history ADD COLUMN watched_at DATETIME DEFAULT NULL",
+   "ALTER TABLE watch_history ADD COLUMN last_stream TEXT DEFAULT NULL"
+ ]
+ 
+ for (const sql of columnMigrations) {
+   try {
+     db.exec(sql)
+   } catch (e) {
+     // Column already exists, ignore
+   }
+ }
+
+ // Migration: Update UNIQUE constraint from (profile_id, meta_id) to composite constraint
+ // This allows per-episode tracking for series
+ // Note: SQLite doesn't allow expressions in UNIQUE constraints, so we use -1 as default for movies
+ try {
+   // Check if we need to migrate by looking at the table structure
+   const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='watch_history'").get() as { sql: string } | undefined
+   
+   // Check if old schema (has UNIQUE on just profile_id, meta_id without season/episode)
+   const needsMigration = tableInfo && tableInfo.sql && 
+     tableInfo.sql.includes('UNIQUE(profile_id, meta_id)') && 
+     !tableInfo.sql.includes('season')
+   
+   if (needsMigration) {
+     console.log('[Migration] Updating watch_history table for per-episode tracking...')
+     
+     // SQLite doesn't support modifying constraints, so we need to recreate the table
+     // Using -1 as default for season/episode to allow simple UNIQUE constraint
+     db.exec(`
+       -- Create new table with proper constraint
+       CREATE TABLE IF NOT EXISTS watch_history_new (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         profile_id INTEGER NOT NULL,
+         meta_id TEXT NOT NULL,
+         meta_type TEXT NOT NULL,
+         season INTEGER NOT NULL DEFAULT -1,
+         episode INTEGER NOT NULL DEFAULT -1,
+         episode_id TEXT DEFAULT NULL,
+         title TEXT,
+         poster TEXT,
+         duration INTEGER,
+         position INTEGER,
+         is_watched BOOLEAN DEFAULT FALSE,
+         watched_at DATETIME DEFAULT NULL,
+         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+         remote_id TEXT,
+         dirty BOOLEAN DEFAULT FALSE,
+         deleted_at DATETIME,
+         FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE,
+         UNIQUE(profile_id, meta_id, season, episode)
+       );
+       
+       -- Copy existing data, converting NULL to -1
+       INSERT OR IGNORE INTO watch_history_new 
+         (id, profile_id, meta_id, meta_type, season, episode, episode_id, title, poster, duration, position, is_watched, watched_at, updated_at, remote_id, dirty, deleted_at)
+       SELECT 
+         id, profile_id, meta_id, meta_type, 
+         COALESCE(season, -1), COALESCE(episode, -1), 
+         episode_id, title, poster, duration, position, 
+         COALESCE(is_watched, FALSE), watched_at, updated_at, remote_id, dirty, deleted_at
+       FROM watch_history;
+       
+       -- Drop old table and rename new one
+       DROP TABLE watch_history;
+       ALTER TABLE watch_history_new RENAME TO watch_history;
+       
+       -- Recreate indexes
+       CREATE INDEX IF NOT EXISTS idx_watch_history_profile ON watch_history(profile_id);
+       CREATE INDEX IF NOT EXISTS idx_watch_history_meta ON watch_history(profile_id, meta_id);
+     `)
+     
+     console.log('[Migration] watch_history table migrated successfully!')
+   }
+ } catch (e) {
+   console.error('[Migration] Failed to migrate watch_history table:', e)
+ }
 
  // Helper block to backfill/init data (idempotent checks)
  try {
@@ -451,10 +543,16 @@ export interface WatchHistoryItem extends SyncableEntity {
   profile_id: number
   meta_id: string
   meta_type: string
+  season?: number
+  episode?: number
+  episode_id?: string
   title?: string
   poster?: string
   duration?: number
   position?: number
+  is_watched?: boolean
+  watched_at?: string
+  last_stream?: any
 }
 
 export interface List extends SyncableEntity {
@@ -1010,34 +1108,152 @@ export const watchHistoryDb = {
     profile_id: number
     meta_id: string
     meta_type: string
+    season?: number
+    episode?: number
+    episode_id?: string
     title?: string
     poster?: string
     duration?: number
     position?: number
+    last_stream?: any
   }): void => {
-    const stmt = db.prepare(`
-      INSERT INTO watch_history (profile_id, meta_id, meta_type, title, poster, duration, position, updated_at, dirty)
-      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, TRUE)
-      ON CONFLICT(profile_id, meta_id) DO UPDATE SET
-        position = excluded.position,
-        duration = COALESCE(excluded.duration, watch_history.duration),
-        updated_at = CURRENT_TIMESTAMP,
-        dirty = TRUE
-    `)
-    stmt.run(
-      data.profile_id,
-      data.meta_id,
-      data.meta_type,
-      data.title || null,
-      data.poster || null,
-      data.duration || null,
-      data.position || null
-    )
+    // Use -1 for movies (no season/episode), actual values for series
+    const seasonVal = data.season ?? -1
+    const episodeVal = data.episode ?? -1
+    const lastStreamStr = data.last_stream ? JSON.stringify(data.last_stream) : null
+    
+    // Check if record exists
+    const checkStmt = db.prepare('SELECT id FROM watch_history WHERE profile_id = ? AND meta_id = ? AND season = ? AND episode = ?')
+    const existing = checkStmt.get(data.profile_id, data.meta_id, seasonVal, episodeVal) as { id: number } | undefined
+    
+    if (existing) {
+      // Update existing record
+      const fields = [
+        'position = ?',
+        'duration = COALESCE(?, duration)',
+        'title = COALESCE(?, title)',
+        'poster = COALESCE(?, poster)',
+        'episode_id = COALESCE(?, episode_id)',
+        'updated_at = CURRENT_TIMESTAMP',
+        'dirty = TRUE'
+      ]
+      
+      const values = [
+        data.position || null,
+        data.duration || null,
+        data.title || null,
+        data.poster || null,
+        data.episode_id || null
+      ]
+
+      if (lastStreamStr) {
+        fields.push('last_stream = ?')
+        values.push(lastStreamStr)
+      }
+      
+      values.push(existing.id)
+      
+      const updateStmt = db.prepare(`UPDATE watch_history SET ${fields.join(', ')} WHERE id = ?`)
+      updateStmt.run(...values)
+    } else {
+      // Insert new record
+      const insertStmt = db.prepare(`
+        INSERT INTO watch_history (profile_id, meta_id, meta_type, season, episode, episode_id, title, poster, duration, position, last_stream, updated_at, dirty)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, TRUE)
+      `)
+      insertStmt.run(
+        data.profile_id,
+        data.meta_id,
+        data.meta_type,
+        seasonVal,
+        episodeVal,
+        data.episode_id || null,
+        data.title || null,
+        data.poster || null,
+        data.duration || null,
+        data.position || null,
+        lastStreamStr
+      )
+    }
   },
 
   getByProfileId: (profileId: number): WatchHistoryItem[] => {
-    const stmt = db.prepare('SELECT * FROM watch_history WHERE profile_id = ? ORDER BY updated_at DESC LIMIT 20')
+    const stmt = db.prepare('SELECT * FROM watch_history WHERE profile_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 20')
     return stmt.all(profileId) as WatchHistoryItem[]
+  },
+
+  getProgress: (profileId: number, metaId: string, season?: number, episode?: number): WatchHistoryItem | undefined => {
+    const seasonVal = season ?? -1
+    const episodeVal = episode ?? -1
+    const stmt = db.prepare('SELECT * FROM watch_history WHERE profile_id = ? AND meta_id = ? AND season = ? AND episode = ? AND deleted_at IS NULL')
+    return stmt.get(profileId, metaId, seasonVal, episodeVal) as WatchHistoryItem | undefined
+  },
+
+  getSeriesProgress: (profileId: number, metaId: string): WatchHistoryItem[] => {
+    // Get all episode progress for a series (season > -1 means it's an episode)
+    const stmt = db.prepare('SELECT * FROM watch_history WHERE profile_id = ? AND meta_id = ? AND season > -1 AND deleted_at IS NULL ORDER BY season ASC, episode ASC')
+    return stmt.all(profileId, metaId) as WatchHistoryItem[]
+  },
+
+  getLastWatchedEpisode: (profileId: number, metaId: string): WatchHistoryItem | undefined => {
+    // Get last watched episode (season > -1 means it's an episode)
+    const stmt = db.prepare('SELECT * FROM watch_history WHERE profile_id = ? AND meta_id = ? AND season > -1 AND episode > -1 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 1')
+    return stmt.get(profileId, metaId) as WatchHistoryItem | undefined
+  },
+
+  markAsWatched: (profileId: number, metaId: string, metaType: string, watched: boolean, season?: number, episode?: number): void => {
+    // Use -1 for movies (no season/episode), actual values for series
+    const seasonVal = season ?? -1
+    const episodeVal = episode ?? -1
+    
+    try {
+      // Try upsert with the new UNIQUE constraint (profile_id, meta_id, season, episode)
+      const stmt = db.prepare(`
+        INSERT INTO watch_history (profile_id, meta_id, meta_type, season, episode, is_watched, watched_at, updated_at, dirty)
+        VALUES (?, ?, ?, ?, ?, ?, ${watched ? 'CURRENT_TIMESTAMP' : 'NULL'}, CURRENT_TIMESTAMP, TRUE)
+        ON CONFLICT(profile_id, meta_id, season, episode) DO UPDATE SET
+          is_watched = excluded.is_watched,
+          watched_at = ${watched ? 'CURRENT_TIMESTAMP' : 'NULL'},
+          updated_at = CURRENT_TIMESTAMP,
+          dirty = TRUE
+      `)
+      stmt.run(profileId, metaId, metaType, seasonVal, episodeVal, watched)
+    } catch (e: any) {
+      // If we hit the old UNIQUE constraint (profile_id, meta_id), update the existing record instead
+      if (e?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        const updateStmt = db.prepare(`
+          UPDATE watch_history 
+          SET is_watched = ?, watched_at = ${watched ? 'CURRENT_TIMESTAMP' : 'NULL'}, 
+              season = ?, episode = ?, updated_at = CURRENT_TIMESTAMP, dirty = TRUE
+          WHERE profile_id = ? AND meta_id = ?
+        `)
+        updateStmt.run(watched, seasonVal, episodeVal, profileId, metaId)
+      } else {
+        throw e
+      }
+    }
+  },
+
+  markSeasonWatched: (profileId: number, metaId: string, metaType: string, season: number, watched: boolean, episodes: number[]): void => {
+    const transaction = db.transaction(() => {
+      for (const ep of episodes) {
+        watchHistoryDb.markAsWatched(profileId, metaId, metaType, watched, season, ep)
+      }
+    })
+    transaction()
+  },
+
+  autoMarkWatched: (profileId: number, metaId: string, season?: number, episode?: number): void => {
+    // Mark as watched if position >= 90% of duration
+    const seasonVal = season ?? -1
+    const episodeVal = episode ?? -1
+    const stmt = db.prepare(`
+      UPDATE watch_history 
+      SET is_watched = TRUE, watched_at = CURRENT_TIMESTAMP, dirty = TRUE
+      WHERE profile_id = ? AND meta_id = ? AND season = ? AND episode = ?
+        AND duration > 0 AND position >= (duration * 0.9) AND is_watched = FALSE
+    `)
+    stmt.run(profileId, metaId, seasonVal, episodeVal)
   }
 }
 
@@ -1185,7 +1401,7 @@ export const addonDb = {
     const stmt = db.prepare(`
       INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority, dirty)
       VALUES (NULL, ?, ?, TRUE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE settings_profile_id = ?), TRUE)
-      ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = TRUE, dirty = TRUE, updated_at = CURRENT_TIMESTAMP
+      ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = TRUE, deleted_at = NULL, dirty = TRUE, updated_at = CURRENT_TIMESTAMP
     `)
     stmt.run(settingsProfileId, addonId, settingsProfileId)
   },
@@ -1194,7 +1410,7 @@ export const addonDb = {
     const stmt = db.prepare(`
       INSERT INTO profile_addons (profile_id, settings_profile_id, addon_id, enabled, priority, dirty)
       VALUES (NULL, ?, ?, FALSE, (SELECT COALESCE(MAX(priority), 0) + 1 FROM profile_addons WHERE settings_profile_id = ?), TRUE)
-      ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = FALSE, dirty = TRUE, updated_at = CURRENT_TIMESTAMP
+      ON CONFLICT(settings_profile_id, addon_id) DO UPDATE SET enabled = FALSE, deleted_at = NULL, dirty = TRUE, updated_at = CURRENT_TIMESTAMP
     `)
     stmt.run(settingsProfileId, addonId, settingsProfileId)
   },
@@ -1204,7 +1420,7 @@ export const addonDb = {
       SELECT pa.*, a.manifest_url, a.name, a.version, a.description, a.logo, a.logo_url
       FROM profile_addons pa
       JOIN addons a ON pa.addon_id = a.id
-      WHERE pa.settings_profile_id = ?
+      WHERE pa.settings_profile_id = ? AND pa.deleted_at IS NULL
       ORDER BY pa.priority ASC, pa.id ASC
     `)
     const rows = stmt.all(settingsProfileId) as any[]
@@ -1235,15 +1451,24 @@ export const addonDb = {
              pa.priority
       FROM addons a
       JOIN profile_addons pa ON a.id = pa.addon_id
-      WHERE pa.settings_profile_id = ?
+      WHERE pa.settings_profile_id = ? AND pa.deleted_at IS NULL
       ORDER BY pa.priority ASC, a.id ASC
     `)
     const rows = stmt.all(settingsProfileId) as any[]
-    return rows.map(row => ({
-        ...row,
-        enabled: !!row.enabled,
-        is_protected: row.manifest_url === 'zentrio://tmdb-addon'
-    }))
+    return rows.map(row => {
+        let behaviorHints = null
+        if (row.behavior_hints) {
+            try {
+                behaviorHints = JSON.parse(row.behavior_hints)
+            } catch (e) {}
+        }
+        return {
+            ...row,
+            behavior_hints: behaviorHints,
+            enabled: !!row.enabled,
+            is_protected: row.manifest_url === 'zentrio://tmdb-addon'
+        }
+    })
   },
 
   updateProfileAddonOrder: (settingsProfileId: number, addonIds: number[]): void => {
@@ -1267,7 +1492,7 @@ export const addonDb = {
       SELECT a.*
       FROM addons a
       JOIN profile_addons pa ON a.id = pa.addon_id
-      WHERE pa.settings_profile_id = ? AND pa.enabled = 1
+      WHERE pa.settings_profile_id = ? AND pa.enabled = 1 AND pa.deleted_at IS NULL
       ORDER BY pa.priority ASC, a.id ASC
     `)
     return stmt.all(settingsProfileId) as Addon[]

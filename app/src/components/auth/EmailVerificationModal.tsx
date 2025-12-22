@@ -3,6 +3,7 @@ import { Button } from '../index'
 import { authClient } from '../../lib/auth-client'
 import { toast } from '../../utils/toast'
 import { ArrowLeft, MailCheck, ShieldAlert } from 'lucide-react'
+import { useAuthStore } from '../../stores/authStore'
 
 interface EmailVerificationModalProps {
   email: string
@@ -71,6 +72,10 @@ export function EmailVerificationModal({
         setLocalError(error.message || 'Failed to verify email')
         toast.error('Verification Failed', error.message || 'Invalid code')
       } else {
+        // Update auth store with user data if available
+        if (data?.user) {
+          useAuthStore.getState().login(data.user)
+        }
         setIsVerified(true)
         toast.success('Email Verified', 'Your email has been successfully verified')
         setTimeout(() => {

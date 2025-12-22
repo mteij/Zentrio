@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings, LogOut, Edit, X, Plus } from 'lucide-react'
 import { SimpleLayout, Button, ConfirmDialog, ProfileModal, LoadingSpinner, AnimatedBackground } from '../components'
-import { authClient } from '../lib/auth-client'
+import { useAuthStore } from '../stores/authStore'
 import styles from './ProfilesPage.module.css'
 
 interface Profile {
@@ -107,7 +107,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
 
   const handleLogout = async () => {
     try {
-      await authClient.signOut()
+      await useAuthStore.getState().logout()
       navigate('/')
     } catch (e) {
       console.error('Logout failed', e)

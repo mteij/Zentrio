@@ -1,5 +1,37 @@
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle, AddonResponse } from './types'
 
+// Special error class for retryable addon errors
+export class RetryableError extends Error {
+  public retryAfterMs: number
+  constructor(message: string, retryAfterMs: number = 3000) {
+    super(message)
+    this.name = 'RetryableError'
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
+// Patterns that indicate the addon is busy and we should retry
+const RETRY_PATTERNS = [
+  /scraping in progress/i,
+  /please try again/i,
+  /rate limit/i,
+  /too many requests/i,
+  /busy/i,
+  /wait/i,
+]
+
+function checkForRetryableResponse(streams: Stream[]): boolean {
+  if (!streams || streams.length === 0) return false
+  
+  // Check if the only stream is a "please wait" type message
+  if (streams.length === 1) {
+    const stream = streams[0]
+    const text = `${stream.title || ''} ${stream.name || ''} ${stream.description || ''}`.toLowerCase()
+    return RETRY_PATTERNS.some(pattern => pattern.test(text))
+  }
+  return false
+}
+
 export class AddonClient {
   private baseUrl: string
   public manifestUrl: string
@@ -59,7 +91,15 @@ export class AddonClient {
   async getStreams(type: string, id: string): Promise<Stream[]> {
     if (!this.manifest) await this.init()
     const url = `${this.baseUrl}/stream/${type}/${id}.json`
-    return this.fetchResource<Stream[]>(url, 'streams')
+    const streams = await this.fetchResource<Stream[]>(url, 'streams')
+    
+    // Check if the addon returned a "please wait" type response
+    if (checkForRetryableResponse(streams)) {
+      const msg = streams[0]?.title || streams[0]?.name || 'Addon is busy'
+      throw new RetryableError(msg, 5000) // Suggest retrying in 5 seconds
+    }
+    
+    return streams
   }
 
   async getSubtitles(type: string, id: string, videoHash?: string): Promise<Subtitle[]> {

@@ -57,8 +57,10 @@ export const securityHeaders = async (c: Context, next: Next) => {
   c.header('X-Content-Type-Options', 'nosniff')
   c.header('X-XSS-Protection', '1; mode=block')
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
-  c.header('Cross-Origin-Opener-Policy', 'same-origin')
+  // same-origin-allow-popups enables SharedArrayBuffer while allowing extension popups
+  c.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
   c.header('Cross-Origin-Embedder-Policy', 'credentialless')
+  c.header('Cross-Origin-Resource-Policy', 'cross-origin')
 
   // Avoid overriding proxy responses
   const alreadyProxied = c.res?.headers?.get('X-Zentrio-Proxy')

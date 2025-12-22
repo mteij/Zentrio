@@ -11,12 +11,20 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
+    exclude: [
+      '@ffmpeg/ffmpeg', 
+      '@ffmpeg/util',
+      // libav.js needs to be excluded to properly load WASM files
+      '@libav.js/variant-webcodecs',
+      'libav.js'
+    ],
   },
   server: {
     port: 5173,
     strictPort: true,
     headers: {
+      // same-origin enables SharedArrayBuffer for hybrid audio playback
+      // credentialless allows cross-origin images while still enabling SharedArrayBuffer
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },

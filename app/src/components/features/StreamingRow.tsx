@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { MetaPreview } from '../../services/addons/types'
 import { LazyImage } from '../ui/LazyImage'
 import { RatingBadge } from '../ui/RatingBadge'
@@ -7,15 +8,17 @@ import styles from '../../styles/Streaming.module.css'
 
 interface StreamingRowProps {
   title: string
-  items: MetaPreview[]
+  items: (MetaPreview & { progressPercent?: number; episodeDisplay?: string; lastStream?: any; season?: number; episode?: number })[]
   profileId: string
   showImdbRatings?: boolean
   showAgeRatings?: boolean
   seeAllUrl?: string
+  isContinueWatching?: boolean
 }
 
-export function StreamingRow({ title, items, profileId, showImdbRatings = true, showAgeRatings = true, seeAllUrl }: StreamingRowProps) {
+export function StreamingRow({ title, items, profileId, showImdbRatings = true, showAgeRatings = true, seeAllUrl, isContinueWatching = false }: StreamingRowProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
   const [showLeftArrow, setShowLeftArrow] = useState(false)
   const [showRightArrow, setShowRightArrow] = useState(true)
   const [isDown, setIsDown] = useState(false)
@@ -150,11 +153,34 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
     }
   }
 
-  // Prevent click if dragged
-  const handleClick = (e: React.MouseEvent) => {
+  // Prevent click if dragged, handle continue watching instant play
+  const handleItemClick = (e: React.MouseEvent, item: any) => {
     if (isDraggingRef.current) {
       e.preventDefault()
       e.stopPropagation()
+      return
+    }
+
+    if (isContinueWatching && item.lastStream) {
+        e.preventDefault()
+        
+        // Construct minimal meta for player
+        const meta = {
+            id: item.id,
+            type: item.type,
+            name: item.name,
+            poster: item.poster,
+            season: item.season,
+            episode: item.episode
+            // videos intentionally omitted - next/prev won't work until full meta is fetched or passed
+        }
+
+        navigate(`/streaming/${profileId}/player`, { 
+            state: { 
+                stream: item.lastStream,
+                meta: meta
+            }
+        })
     }
   }
 
@@ -195,7 +221,7 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
               key={item.id} 
               href={`/streaming/${profileId}/${item.type}/${item.id}`} 
               className={styles.mediaCard}
-              onClick={handleClick}
+              onClick={(e) => handleItemClick(e, item)}
               onDragStart={handleDragStart}
               draggable={false}
             >
@@ -220,6 +246,44 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
                     </span>
                   )}
                 </div>
+                {/* Progress bar for continue watching */}
+                {isContinueWatching && item.progressPercent !== undefined && item.progressPercent > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    borderBottomLeftRadius: '8px',
+                    borderBottomRightRadius: '8px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${item.progressPercent}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #8b5cf6, #a855f7)',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                )}
+                {/* Episode badge for series */}
+                {isContinueWatching && item.episodeDisplay && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    color: '#fff',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    backdropFilter: 'blur(4px)'
+                  }}>
+                    {item.episodeDisplay}
+                  </div>
+                )}
                 <div className={styles.cardOverlay}>
                   <div className={styles.cardTitle}>{item.name}</div>
                 </div>

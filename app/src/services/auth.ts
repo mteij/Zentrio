@@ -21,6 +21,7 @@ try {
 const db = new Database(dbPath);
 
 export const auth = betterAuth({
+    secret: cfg.AUTH_SECRET,
     baseURL: cfg.APP_URL,
     basePath: "/api/auth",
     trustedOrigins: [
@@ -162,7 +163,10 @@ export const auth = betterAuth({
                     if (user.email) {
                         user.email = user.email.toLowerCase();
                     }
-                    if (!user.username && user.email) {
+                    if (!user.username && user.name) {
+                        // Use name as username if not explicitly provided
+                        user.username = user.name;
+                    } else if (!user.username && user.email) {
                         user.username = user.email.split('@')[0];
                     }
                     return {

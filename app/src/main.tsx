@@ -7,6 +7,7 @@ import { Toaster } from 'sonner'
 import { ErrorBoundary } from './components'
 import { LoadingSpinner } from './components'
 import { ServerSelector } from './components/auth/ServerSelector'
+import { ProtectedRoute, PublicRoute } from './components/auth/AuthGuards'
 import { isTauri } from './lib/auth-client'
 import { useState, useEffect } from 'react'
 import { preloadCommonRoutes } from './utils/route-preloader'
@@ -21,6 +22,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ defa
 const ExploreAddonsPage = lazy(() => import('./pages/ExploreAddonsPage').then(m => ({ default: m.ExploreAddonsPage })))
 const SignInPage = lazy(() => import('./pages/auth/SignInPage').then(m => ({ default: m.SignInPage })))
 const SignUpPage = lazy(() => import('./pages/auth/SignUpPage').then(m => ({ default: m.SignUpPage })))
+const TwoFactorPage = lazy(() => import('./pages/auth/TwoFactorPage').then(m => ({ default: m.TwoFactorPage })))
 
 // Streaming pages
 const StreamingHome = lazy(() => import('./pages/streaming/Home').then(m => ({ default: m.StreamingHome })))
@@ -51,8 +53,15 @@ function AppRoutes() {
 
   // Preload common routes after mount
   useEffect(() => {
+    console.log('AppRoutes: MOUNTED')
     preloadCommonRoutes()
+    return () => console.log('AppRoutes: UNMOUNTED')
   }, [])
+
+  // Log location changes
+  useEffect(() => {
+    console.log('AppRoutes: Location changed to', location.pathname)
+  }, [location.pathname])
 
   if (!serverUrl) {
     const isDev = import.meta.env.DEV;
@@ -67,21 +76,25 @@ function AppRoutes() {
   
   return (
     <Suspense fallback={<div style={{ minHeight: '100vh', background: '#141414' }} />}>
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<LandingPage version="2.0.0" />} />
-        <Route path="/signin" element={<SignInPage />} />
-        <Route path="/register" element={<SignUpPage />} />
-        <Route path="/profiles" element={<ProfilesPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/settings/explore-addons" element={<ExploreAddonsPage />} />
-        <Route path="/streaming/:profileId" element={<StreamingHome />} />
-        <Route path="/streaming/:profileId/explore" element={<StreamingExplore />} />
-        <Route path="/streaming/:profileId/library" element={<StreamingLibrary />} />
-        <Route path="/streaming/:profileId/library/:listId" element={<StreamingLibrary />} />
-        <Route path="/streaming/:profileId/search" element={<StreamingSearch />} />
-        <Route path="/streaming/:profileId/catalog/:manifestUrl/:type/:id" element={<StreamingCatalog />} />
-        <Route path="/streaming/:profileId/:type/:id" element={<StreamingDetails />} />
-        <Route path="/streaming/:profileId/player" element={<StreamingPlayer />} />
+      <Routes>
+        {/* Public routes - redirect authenticated users based on login behavior */}
+        <Route path="/" element={<PublicRoute><LandingPage version="2.0.0" /></PublicRoute>} />
+        <Route path="/signin" element={<PublicRoute><SignInPage /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><SignUpPage /></PublicRoute>} />
+        <Route path="/two-factor" element={<TwoFactorPage />} />
+        
+        {/* Protected routes - require authentication */}
+        <Route path="/profiles" element={<ProtectedRoute><ProfilesPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/settings/explore-addons" element={<ProtectedRoute><ExploreAddonsPage /></ProtectedRoute>} />
+        <Route path="/streaming/:profileId" element={<ProtectedRoute><StreamingHome /></ProtectedRoute>} />
+        <Route path="/streaming/:profileId/explore" element={<ProtectedRoute><StreamingExplore /></ProtectedRoute>} />
+        <Route path="/streaming/:profileId/library" element={<ProtectedRoute><StreamingLibrary /></ProtectedRoute>} />
+        <Route path="/streaming/:profileId/library/:listId" element={<ProtectedRoute><StreamingLibrary /></ProtectedRoute>} />
+        <Route path="/streaming/:profileId/search" element={<ProtectedRoute><StreamingSearch /></ProtectedRoute>} />
+        <Route path="/streaming/:profileId/catalog/:manifestUrl/:type/:id" element={<ProtectedRoute><StreamingCatalog /></ProtectedRoute>} />
+        <Route path="/streaming/:profileId/:type/:id" element={<ProtectedRoute><StreamingDetails /></ProtectedRoute>} />
+        <Route path="/streaming/:profileId/player" element={<ProtectedRoute><StreamingPlayer /></ProtectedRoute>} />
         {/* Add other routes here */}
       </Routes>
     </Suspense>
