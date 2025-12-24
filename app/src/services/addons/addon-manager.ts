@@ -37,6 +37,71 @@ export class AddonManager {
     }
   }
 
+  /**
+   * Check if a manifest supports a specific resource (meta, stream, etc.) for a given type.
+   * Resources can be strings or objects per Stremio protocol.
+   */
+  private supportsResource(manifest: Manifest, resourceName: string, contentType: string): boolean {
+    for (const resource of manifest.resources) {
+      if (typeof resource === 'string') {
+        // Simple string resource - check against manifest.types
+        if (resource === resourceName && manifest.types.includes(contentType)) {
+          return true
+        }
+      } else if (resource && typeof resource === 'object') {
+        // Object resource with its own types
+        const r = resource as { name: string; types?: string[]; idPrefixes?: string[] }
+        if (r.name === resourceName) {
+          // Check if this resource supports the content type
+          const resourceTypes = r.types || manifest.types
+          if (resourceTypes.includes(contentType)) {
+            return true
+          }
+        }
+      }
+    }
+    return false
+  }
+
+  /**
+   * Get the idPrefixes for a specific resource from a manifest.
+   * Returns the resource-level idPrefixes if defined, otherwise manifest-level, or empty array if none.
+   * Per Stremio protocol: if idPrefixes is not defined, addon handles ALL IDs.
+   */
+  private getResourceIdPrefixes(manifest: Manifest, resourceName: string): string[] | null {
+    // First check if there's a resource-level idPrefixes
+    for (const resource of manifest.resources) {
+      if (typeof resource === 'object' && resource !== null) {
+        const r = resource as { name: string; types?: string[]; idPrefixes?: string[] }
+        if (r.name === resourceName) {
+          // If resource is an object, check its idPrefixes
+          if (r.idPrefixes && r.idPrefixes.length > 0) {
+            return r.idPrefixes
+          }
+          // If resource is an object without idPrefixes, it handles ALL IDs
+          return null
+        }
+      }
+    }
+    // Resource is a string - fall back to manifest-level idPrefixes
+    return manifest.idPrefixes && manifest.idPrefixes.length > 0 ? manifest.idPrefixes : null
+  }
+
+  /**
+   * Check if an addon can handle a specific ID for a resource.
+   * Returns true if idPrefixes is not defined (handles all) or if ID matches a prefix.
+   */
+  private canHandleId(manifest: Manifest, resourceName: string, id: string): boolean {
+    const prefixes = this.getResourceIdPrefixes(manifest, resourceName)
+    // If no prefixes defined, addon handles ALL IDs
+    if (prefixes === null) {
+      return true
+    }
+    // Check if ID matches any prefix
+    const primaryId = id.includes(',') ? id.split(',')[0] : id
+    return prefixes.some(p => primaryId.startsWith(p))
+  }
+
   private async getClientsForProfile(profileId: number): Promise<AddonClient[]> {
     // Resolve settings profile ID
     const settingsProfileId = profileDb.getSettingsProfileId(profileId);
@@ -538,7 +603,7 @@ export class AddonManager {
         showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
     };
     
-    // Pass 1: Try addons with matching ID prefixes (or no prefix restriction)
+    // Pass 1: Try addons that support meta for this type and can handle this ID
     for (const client of sortedClients) {
       if (!client.manifest) continue
       
@@ -546,26 +611,26 @@ export class AddonManager {
       const isZentrio = client.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || client.manifest.id === 'org.zentrio.tmdb';
       if (isZentrio && !hasTmdbKey) continue;
 
-      if (!client.manifest.resources.includes('meta')) continue
-      if (!client.manifest.types.includes(type)) continue
+      // Use proper resource checking that handles object resources
+      if (!this.supportsResource(client.manifest, 'meta', type)) continue
       
-      // Check ID prefixes if the addon declares them
-      if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
-          const matchesPrefix = client.manifest.idPrefixes.some(p => primaryId.startsWith(p))
-          if (!matchesPrefix) {
-              // Special case: Zentrio can handle IMDB IDs even if not declared
-              if (primaryId.startsWith('tt') && isZentrio) {
-                  // Allow
-              } else {
-                  continue
-              }
+      // Check ID prefixes using the proper per-resource or manifest-level prefixes
+      if (!this.canHandleId(client.manifest, 'meta', id)) {
+          // Special case: Zentrio can handle IMDB IDs even if not declared
+          if (primaryId.startsWith('tt') && isZentrio) {
+              // Allow
+          } else {
+              continue
           }
       }
-      // If addon has no idPrefixes, it accepts any ID - always try it
 
       try {
+        console.log(`[AddonManager] Trying ${client.manifest.name} for meta ${type}/${primaryId}`)
         const meta = await client.getMeta(type, id, config)
-        if (meta) return meta
+        if (meta) {
+          console.log(`[AddonManager] Got meta from ${client.manifest.name} for ${type}/${primaryId}`)
+          return meta
+        }
       } catch (e) {
         console.debug(`[AddonManager] getMeta failed for ${client.manifest.name}:`, e instanceof Error ? e.message : e)
       }
@@ -854,21 +919,11 @@ export class AddonManager {
     const fetchStreamsWithRetry = async (client: AddonClient, maxRetries: number = 3): Promise<void> => {
       if (!client.manifest) return
       
-      // Check if addon supports streams for this type
-      const supportsStreams = client.manifest.resources.some(r => {
-        if (typeof r === 'string') return r === 'stream'
-        // @ts-ignore
-        return r.name === 'stream' && (r.types?.includes(type) || client.manifest?.types.includes(type))
-      })
-
-      if (!supportsStreams) return
+      // Use proper resource checking that handles object resources
+      if (!this.supportsResource(client.manifest, 'stream', type)) return
       
-      // Check ID prefixes if defined
-      // Handle compound IDs (comma-separated) - use first segment for prefix matching
-      const primaryId = id.includes(',') ? id.split(',')[0] : id
-      if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
-        if (!client.manifest.idPrefixes.some(p => primaryId.startsWith(p))) return
-      }
+      // Check ID prefixes using the proper per-resource or manifest-level prefixes
+      if (!this.canHandleId(client.manifest, 'stream', id)) return
 
       let attempt = 0
       while (attempt < maxRetries) {
@@ -1041,20 +1096,11 @@ export class AddonManager {
     const fetchFromAddon = async (client: AddonClient): Promise<void> => {
       if (!client.manifest) return
 
-      // Check if addon supports streams for this type
-      const supportsStreams = client.manifest.resources.some(r => {
-        if (typeof r === 'string') return r === 'stream'
-        // @ts-ignore
-        return r.name === 'stream' && (r.types?.includes(type) || client.manifest?.types.includes(type))
-      })
-      if (!supportsStreams) return
-
-      // Check ID prefixes if defined
-      // Handle compound IDs (comma-separated) - use first segment for prefix matching
-      const primaryId = id.includes(',') ? id.split(',')[0] : id
-      if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
-        if (!client.manifest.idPrefixes.some(p => primaryId.startsWith(p))) return
-      }
+      // Use proper resource checking that handles object resources
+      if (!this.supportsResource(client.manifest, 'stream', type)) return
+      
+      // Check ID prefixes using the proper per-resource or manifest-level prefixes
+      if (!this.canHandleId(client.manifest, 'stream', id)) return
 
       // Notify that this addon is starting
       callbacks?.onAddonStart?.(client.manifest)
@@ -1098,21 +1144,11 @@ export class AddonManager {
     const promises = clients.map(async (client) => {
       if (!client.manifest) return
 
-      // Check if addon supports subtitles resource
-      const supportsSubtitles = client.manifest.resources.some(r => {
-        if (typeof r === 'string') return r === 'subtitles'
-        // @ts-ignore
-        return r.name === 'subtitles'
-      })
-
-      if (!supportsSubtitles) return
-
-      // Check ID prefixes if defined
-      // Handle compound IDs (comma-separated) - use first segment for prefix matching
-      const primaryId = id.includes(',') ? id.split(',')[0] : id
-      if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
-        if (!client.manifest.idPrefixes.some(p => primaryId.startsWith(p))) return
-      }
+      // Use proper resource checking that handles object resources
+      if (!this.supportsResource(client.manifest, 'subtitles', type)) return
+      
+      // Check ID prefixes using the proper per-resource or manifest-level prefixes
+      if (!this.canHandleId(client.manifest, 'subtitles', id)) return
 
       try {
         console.log(`Requesting subtitles from ${client.manifest.name} for ${type}/${id}`)

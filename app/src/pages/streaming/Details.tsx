@@ -410,9 +410,10 @@ export const StreamingDetails = () => {
                   {/* Mark Season Watched Button */}
                   {selectedSeason && (() => {
                     const seasonEps = meta.videos.filter((v: any) => v.season === selectedSeason)
-                    const allWatched = seasonEps.every((ep: any) => 
-                      data.seriesProgress?.[`${ep.season}-${ep.number}`]?.isWatched
-                    )
+                    const allWatched = seasonEps.every((ep: any) => {
+                      const epNum = ep.episode ?? ep.number
+                      return data.seriesProgress?.[`${ep.season}-${epNum}`]?.isWatched
+                    })
                     return (
                       <button
                         onClick={() => toggleSeasonWatched(selectedSeason, !allWatched)}
@@ -438,26 +439,27 @@ export const StreamingDetails = () => {
                 </div>
                 <div className={styles.episodeList}>
                   {meta.videos.filter((v: any) => v.season === selectedSeason).map((ep: any) => {
-                    const epProgress = data.seriesProgress?.[`${ep.season}-${ep.number}`]
+                    const epNum = ep.episode ?? ep.number
+                    const epProgress = data.seriesProgress?.[`${ep.season}-${epNum}`]
                     const isWatched = epProgress?.isWatched ?? false
                     const progressPercent = epProgress?.progressPercent ?? 0
                     
                     return (
                       <div
-                        key={ep.id || `${ep.season}-${ep.number}`}
+                        key={ep.id || `${ep.season}-${epNum}`}
                         className={styles.episodeItem}
-                        onClick={() => handleEpisodeSelect(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`, false)}
+                        onClick={() => handleEpisodeSelect(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`, false)}
                         style={{ position: 'relative' }}
                       >
                         <div className={styles.episodeThumbnail}>
                           {ep.thumbnail ? (
-                            <LazyImage src={ep.thumbnail} alt={ep.title || ep.name || `Episode ${ep.number}`} />
+                            <LazyImage src={ep.thumbnail} alt={ep.title || ep.name || `Episode ${epNum}`} />
                           ) : (
                             <div className={styles.episodeThumbnailPlaceholder}>
                               <Play size={24} />
                             </div>
                           )}
-                          <span className={styles.episodeNumber}>{ep.number}</span>
+                          <span className={styles.episodeNumber}>{epNum}</span>
                           {/* Progress bar on thumbnail */}
                           {progressPercent > 0 && !isWatched && (
                             <div style={{
@@ -482,7 +484,7 @@ export const StreamingDetails = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                toggleWatched(ep.season, ep.number)
+                                toggleWatched(ep.season, epNum)
                               }}
                               style={{
                                 display: 'flex',
@@ -503,13 +505,13 @@ export const StreamingDetails = () => {
                               {isWatched ? <Check size={14} /> : <Eye size={14} />}
                             </button>
                             <span className={styles.episodeTitle} style={{ opacity: isWatched ? 0.7 : 1 }}>
-                              {ep.title || ep.name || `Episode ${ep.number}`}
+                              {ep.title || ep.name || `Episode ${epNum}`}
                             </span>
                             <button 
                                 className={styles.episodePlayBtn}
                                 onClick={(e) => {
                                     e.stopPropagation()
-                                    handleQuickPlay(ep.season, ep.number, ep.title || ep.name || `Episode ${ep.number}`)
+                                    handleQuickPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
                                 }}
                                 title="Quick play"
                             >
