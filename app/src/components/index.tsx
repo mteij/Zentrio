@@ -27,6 +27,7 @@ export { ErrorBoundary } from './layout/ErrorBoundary'
 // Feature Components
 export { ProfileModal } from './features/ProfileModal'
 export { StreamingRow } from './features/StreamingRow'
+export { LazyCatalogRow } from './features/LazyCatalogRow'
 export { SettingsProfileSelector } from './features/SettingsProfileSelector'
 
 // Player Components

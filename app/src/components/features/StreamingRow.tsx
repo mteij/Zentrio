@@ -190,6 +190,23 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
     return false
   }
 
+  // Generate URL with fallback metadata for addons that don't provide meta resource
+  const getItemUrl = (item: MetaPreview) => {
+    const baseUrl = `/streaming/${profileId}/${item.type}/${item.id}`
+    const fallback = {
+      id: item.id,
+      type: item.type,
+      name: item.name,
+      poster: item.poster,
+      background: item.background,
+      description: item.description,
+      releaseInfo: item.releaseInfo,
+      imdbRating: item.imdbRating,
+    }
+    const fallbackParam = encodeURIComponent(JSON.stringify(fallback))
+    return `${baseUrl}?metaFallback=${fallbackParam}`
+  }
+
   return (
     <div className={styles.contentRow}>
       <div className={styles.rowHeader}>
@@ -219,7 +236,7 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
           {items.map(item => (
             <a 
               key={item.id} 
-              href={`/streaming/${profileId}/${item.type}/${item.id}`} 
+              href={getItemUrl(item)} 
               className={styles.mediaCard}
               onClick={(e) => handleItemClick(e, item)}
               onDragStart={handleDragStart}

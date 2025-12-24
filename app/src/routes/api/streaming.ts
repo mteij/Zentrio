@@ -335,6 +335,31 @@ streaming.get('/catalog', async (c) => {
   }
 })
 
+/**
+ * Lazy loading endpoint - fetches items for a single catalog
+ * Used by LazyCatalogRow component to load each catalog independently
+ */
+streaming.get('/catalog-items', async (c) => {
+  const { profileId, manifestUrl, type, id } = c.req.query()
+  
+  if (!profileId || !manifestUrl || !type || !id) {
+    return c.json({ items: [], error: 'Missing required parameters' })
+  }
+
+  try {
+    const items = await addonManager.getSingleCatalog(
+      parseInt(profileId),
+      decodeURIComponent(manifestUrl),
+      type,
+      id
+    )
+    return c.json({ items })
+  } catch (e) {
+    console.error(`Failed to fetch catalog items for ${id}`, e)
+    return c.json({ items: [] })
+  }
+})
+
 
 streaming.post('/progress', async (c) => {
   try {
@@ -479,11 +504,36 @@ streaming.post('/mark-season-watched', async (c) => {
 
 streaming.get('/details/:type/:id', sessionMiddleware, async (c) => {
   const { type, id } = c.req.param()
-  const { profileId } = c.req.query()
+  const { profileId, metaFallback } = c.req.query()
   const pId = parseInt(profileId)
   
   try {
-    const meta = await addonManager.getMeta(type, id, pId)
+    let meta = await addonManager.getMeta(type, id, pId)
+    
+    // If getMeta returns null and we have fallback data from catalog, use it
+    if (!meta && metaFallback) {
+      try {
+        const fallbackData = JSON.parse(decodeURIComponent(metaFallback))
+        // Construct minimal MetaDetail from catalog item data
+        meta = {
+          id: fallbackData.id || id,
+          type: fallbackData.type || type,
+          name: fallbackData.name || 'Unknown',
+          poster: fallbackData.poster,
+          background: fallbackData.background,
+          description: fallbackData.description,
+          releaseInfo: fallbackData.releaseInfo,
+          imdbRating: fallbackData.imdbRating,
+          // Add any other fields from catalog item
+          ...(fallbackData.genres && { genres: fallbackData.genres }),
+          ...(fallbackData.released && { released: fallbackData.released }),
+        }
+        console.log(`[Streaming] Using fallback meta for ${type}/${id}:`, meta.name)
+      } catch (e) {
+        console.warn('Failed to parse metaFallback:', e)
+      }
+    }
+    
     if (!meta) return err(c, 404, 'NOT_FOUND', 'Content not found')
     
     const inLibrary = listDb.isInAnyList(pId, id)
@@ -633,27 +683,17 @@ streaming.get('/dashboard', sessionMiddleware, async (c) => {
       episodeDisplay: h.season && h.episode ? `S${h.season}:E${h.episode}` : null,
       lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
     }))
-    const results = await addonManager.getCatalogs(pId)
+    
+    // Use catalog metadata for lazy loading - don't fetch items here
+    const catalogMetadata = await addonManager.getCatalogMetadata(pId)
     const trending = await addonManager.getTrending(pId)
     
-    // Determine if the fallback was used by checking if the results contain only the default addon
-    // and if the profile has no other addons enabled.
+    // Determine if the fallback was used by checking enabled addons
     const enabledAddons = profileDb.getSettingsProfileId(pId) ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!) : [];
-    const onlyDefaultAddon = results.every(r => r.manifestUrl === 'https://v3-cinemeta.strem.io/manifest.json');
-    const showFallbackToast = enabledAddons.length === 0 && onlyDefaultAddon && results.length > 0;
-
-    const catalogs = results.map(r => {
-      const typeName = r.catalog.type === 'movie' ? 'Movies' : (r.catalog.type === 'series' ? 'Series' : 'Other')
-      const manifestUrl = r.manifestUrl || (r.addon as any).manifest_url || (r.addon as any).id;
-      return {
-        title: `${typeName} - ${r.catalog.name || r.catalog.type}`,
-        items: r.items,
-        seeAllUrl: `/streaming/${pId}/catalog/${encodeURIComponent(manifestUrl)}/${r.catalog.type}/${r.catalog.id}`
-      }
-    })
+    const showFallbackToast = enabledAddons.length === 0 && catalogMetadata.length === 0;
 
     return c.json({
-      catalogs,
+      catalogMetadata,
       history,
       trending,
       showFallbackToast,

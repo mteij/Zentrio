@@ -413,7 +413,7 @@ export class AddonManager {
         }
         
         // Also check releaseInfo if it contains certification
-        if (!cert && itemAny.releaseInfo) {
+        if (!cert && itemAny.releaseInfo && typeof itemAny.releaseInfo === 'string') {
             const parts = itemAny.releaseInfo.split('|').map((s: string) => s.trim());
             const potentialRating = parts.find((p: string) => ratings.includes(p) || p.startsWith('TV-'));
             if (potentialRating) cert = potentialRating;
@@ -507,16 +507,38 @@ export class AddonManager {
     const tmdbClient = profile?.user_id ? await tmdbService.getClient(profile.user_id) : null
     const hasTmdbKey = !!tmdbClient
 
-    // Sort clients to prioritize Zentrio/TMDB if key matches, otherwise filter or de-prioritize
+    // Determine if this is a "standard" ID (IMDB/TMDB) or a custom addon ID
+    // Standard IDs: tt* (IMDB), tmdb:* (TMDB)
+    // Custom IDs: anything else (e.g., tbm:*, mg_*, kitsu:*, etc.)
+    // Handle compound IDs (comma-separated) - use first segment for detection
+    const primaryId = id.includes(',') ? id.split(',')[0] : id
+    const isStandardId = primaryId.startsWith('tt') || primaryId.startsWith('tmdb:')
+
+    // Sort clients to prioritize Zentrio/TMDB for standard IDs
     const sortedClients = [...clients].sort((a, b) => {
         const isZentrioA = a.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || a.manifest?.id === 'org.zentrio.tmdb';
         const isZentrioB = b.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || b.manifest?.id === 'org.zentrio.tmdb';
-        if (isZentrioA && !isZentrioB) return -1;
-        if (!isZentrioA && isZentrioB) return 1;
+        
+        // For standard IDs, prioritize Zentrio/TMDB
+        if (isStandardId) {
+            if (isZentrioA && !isZentrioB) return -1;
+            if (!isZentrioA && isZentrioB) return 1;
+        } else {
+            // For custom IDs, de-prioritize Zentrio/TMDB (they won't have custom content)
+            if (isZentrioA && !isZentrioB) return 1;
+            if (!isZentrioA && isZentrioB) return -1;
+        }
         return 0;
     });
+
+    const { appearanceDb } = require('../database');
+    const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+    const config = {
+        enableAgeRating: appearance ? appearance.show_age_ratings : true,
+        showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+    };
     
-    // Pass 1: Try enabled addons
+    // Pass 1: Try addons with matching ID prefixes (or no prefix restriction)
     for (const client of sortedClients) {
       if (!client.manifest) continue
       
@@ -527,56 +549,84 @@ export class AddonManager {
       if (!client.manifest.resources.includes('meta')) continue
       if (!client.manifest.types.includes(type)) continue
       
-      // Check ID prefixes if available
-      if (client.manifest.idPrefixes && !client.manifest.idPrefixes.some(p => id.startsWith(p))) {
-          if (id.startsWith('tt') && (client instanceof ZentrioAddonClient || client.manifest.id === 'org.zentrio.tmdb')) {
-              // Allow
-          } else {
-              continue
+      // Check ID prefixes if the addon declares them
+      if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
+          const matchesPrefix = client.manifest.idPrefixes.some(p => primaryId.startsWith(p))
+          if (!matchesPrefix) {
+              // Special case: Zentrio can handle IMDB IDs even if not declared
+              if (primaryId.startsWith('tt') && isZentrio) {
+                  // Allow
+              } else {
+                  continue
+              }
           }
       }
+      // If addon has no idPrefixes, it accepts any ID - always try it
 
       try {
-        const { appearanceDb } = require('../database');
-        const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
-        
-        const config = {
-            enableAgeRating: appearance ? appearance.show_age_ratings : true,
-            showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
-        };
-
         const meta = await client.getMeta(type, id, config)
         if (meta) return meta
       } catch (e) {
-        // ignore
+        console.debug(`[AddonManager] getMeta failed for ${client.manifest.name}:`, e instanceof Error ? e.message : e)
       }
     }
 
-    // Pass 2: Fallback to Cinemeta if nothing found
-    console.log(`[AddonManager] Meta not found in enabled addons for ${type}/${id}. Falling back to Cinemeta.`);
-    
-    const cinemetaUrl = 'https://v3-cinemeta.strem.io/manifest.json';
-    // Check if we already tried Cinemeta in the loop above
-    const alreadyTried = sortedClients.some(c => this.normalizeUrl(c.manifestUrl) === this.normalizeUrl(cinemetaUrl) && c.manifest);
-    
-    if (!alreadyTried) {
-        let cinemetaClient = this.clientCache.get(cinemetaUrl);
-        if (!cinemetaClient) {
-            cinemetaClient = new AddonClient(cinemetaUrl);
-            this.clientCache.set(cinemetaUrl, cinemetaClient);
-        }
+    // Pass 2: For custom IDs, try ALL meta-capable addons (ignore prefix matching)
+    // This catches addons that may have idPrefixes set but still handle content from other sources
+    if (!isStandardId) {
+        console.log(`[AddonManager] Custom ID ${primaryId} - trying all meta-capable addons without prefix filtering`);
         
-        try {
-            if (!cinemetaClient.manifest) await cinemetaClient.init();
+        for (const client of sortedClients) {
+            if (!client.manifest) continue
             
-            // Only try if it supports the type
-            if (cinemetaClient.manifest?.resources.includes('meta') && cinemetaClient.manifest?.types.includes(type)) {
-                 const meta = await cinemetaClient.getMeta(type, id)
-                 if (meta) return meta
+            const isZentrio = client.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || client.manifest.id === 'org.zentrio.tmdb';
+            if (isZentrio) continue; // Skip Zentrio for custom IDs - it won't have them
+            
+            if (!client.manifest.resources.includes('meta')) continue
+            if (!client.manifest.types.includes(type)) continue
+            
+            // Skip if already tried in Pass 1 (matched prefix or had no prefix restriction)
+            const alreadyTried = !client.manifest.idPrefixes || 
+                client.manifest.idPrefixes.length === 0 || 
+                client.manifest.idPrefixes.some(p => primaryId.startsWith(p))
+            if (alreadyTried) continue
+
+            try {
+                const meta = await client.getMeta(type, id, config)
+                if (meta) return meta
+            } catch (e) {
+                console.debug(`[AddonManager] getMeta (pass 2) failed for ${client.manifest.name}:`, e instanceof Error ? e.message : e)
             }
-        } catch (e) {
-            console.warn(`Fallback to Cinemeta failed for ${type}/${id}`, e);
         }
+    }
+
+    // Pass 3: Fallback to Cinemeta for standard IDs only
+    if (isStandardId) {
+        console.log(`[AddonManager] Meta not found in enabled addons for ${type}/${id}. Falling back to Cinemeta.`);
+        
+        const cinemetaUrl = 'https://v3-cinemeta.strem.io/manifest.json';
+        const alreadyTried = sortedClients.some(c => this.normalizeUrl(c.manifestUrl) === this.normalizeUrl(cinemetaUrl) && c.manifest);
+        
+        if (!alreadyTried) {
+            let cinemetaClient = this.clientCache.get(cinemetaUrl);
+            if (!cinemetaClient) {
+                cinemetaClient = new AddonClient(cinemetaUrl);
+                this.clientCache.set(cinemetaUrl, cinemetaClient);
+            }
+            
+            try {
+                if (!cinemetaClient.manifest) await cinemetaClient.init();
+                
+                if (cinemetaClient.manifest?.resources.includes('meta') && cinemetaClient.manifest?.types.includes(type)) {
+                     const meta = await cinemetaClient.getMeta(type, id)
+                     if (meta) return meta
+                }
+            } catch (e) {
+                console.warn(`Fallback to Cinemeta failed for ${type}/${id}`, e);
+            }
+        }
+    } else {
+        console.log(`[AddonManager] Custom ID ${id} not found in any addon. This content may not have metadata available.`);
     }
 
     return null
@@ -814,8 +864,10 @@ export class AddonManager {
       if (!supportsStreams) return
       
       // Check ID prefixes if defined
+      // Handle compound IDs (comma-separated) - use first segment for prefix matching
+      const primaryId = id.includes(',') ? id.split(',')[0] : id
       if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
-        if (!client.manifest.idPrefixes.some(p => id.startsWith(p))) return
+        if (!client.manifest.idPrefixes.some(p => primaryId.startsWith(p))) return
       }
 
       let attempt = 0
@@ -998,8 +1050,10 @@ export class AddonManager {
       if (!supportsStreams) return
 
       // Check ID prefixes if defined
+      // Handle compound IDs (comma-separated) - use first segment for prefix matching
+      const primaryId = id.includes(',') ? id.split(',')[0] : id
       if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
-        if (!client.manifest.idPrefixes.some(p => id.startsWith(p))) return
+        if (!client.manifest.idPrefixes.some(p => primaryId.startsWith(p))) return
       }
 
       // Notify that this addon is starting
@@ -1054,8 +1108,10 @@ export class AddonManager {
       if (!supportsSubtitles) return
 
       // Check ID prefixes if defined
+      // Handle compound IDs (comma-separated) - use first segment for prefix matching
+      const primaryId = id.includes(',') ? id.split(',')[0] : id
       if (client.manifest.idPrefixes && client.manifest.idPrefixes.length > 0) {
-        if (!client.manifest.idPrefixes.some(p => id.startsWith(p))) return
+        if (!client.manifest.idPrefixes.some(p => primaryId.startsWith(p))) return
       }
 
       try {
@@ -1072,6 +1128,129 @@ export class AddonManager {
 
     await Promise.allSettled(promises)
     return results
+  }
+
+  /**
+   * Get catalog metadata without fetching items - used for lazy loading UI
+   * Returns catalog shells that can be used to render skeleton rows immediately
+   */
+  async getCatalogMetadata(profileId: number): Promise<{ 
+    addon: { id: string; name: string; logo?: string }; 
+    manifestUrl: string; 
+    catalog: { type: string; id: string; name?: string };
+    title: string;
+    seeAllUrl: string;
+  }[]> {
+    const clients = await this.getClientsForProfile(profileId)
+    const results: { 
+      addon: { id: string; name: string; logo?: string }; 
+      manifestUrl: string; 
+      catalog: { type: string; id: string; name?: string };
+      title: string;
+      seeAllUrl: string;
+    }[] = []
+
+    for (const client of clients) {
+      if (!client.manifest) continue
+      for (const cat of client.manifest.catalogs) {
+        // Skip catalogs that require extra params
+        if (cat.extra?.some(e => e.isRequired)) continue
+        
+        const typeName = cat.type === 'movie' ? 'Movies' : (cat.type === 'series' ? 'Series' : 'Other')
+        const manifestUrl = client.manifestUrl
+        
+        results.push({
+          addon: { 
+            id: client.manifest.id, 
+            name: client.manifest.name, 
+            logo: client.manifest.logo || (client.manifest as any).logo_url 
+          },
+          manifestUrl,
+          catalog: { type: cat.type, id: cat.id, name: cat.name },
+          title: `${typeName} - ${cat.name || cat.type}`,
+          seeAllUrl: `/streaming/${profileId}/catalog/${encodeURIComponent(manifestUrl)}/${cat.type}/${cat.id}`
+        })
+      }
+    }
+
+    // Sort to prioritize Zentrio (TMDB) addon
+    results.sort((a, b) => {
+      const isZentrioA = a.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || a.addon.id === 'org.zentrio.tmdb'
+      const isZentrioB = b.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || b.addon.id === 'org.zentrio.tmdb'
+      if (isZentrioA && !isZentrioB) return -1
+      if (!isZentrioA && isZentrioB) return 1
+      return 0
+    })
+
+    return results
+  }
+
+  /**
+   * Fetch items for a single catalog - used for lazy loading individual rows
+   */
+  async getSingleCatalog(
+    profileId: number, 
+    manifestUrl: string, 
+    catalogType: string, 
+    catalogId: string
+  ): Promise<MetaPreview[]> {
+    // Ensure clients are initialized for this profile
+    await this.getClientsForProfile(profileId)
+    
+    const normalizedUrl = this.normalizeUrl(manifestUrl)
+    const client = this.clientCache.get(normalizedUrl)
+    
+    if (!client || !client.manifest) {
+      console.warn(`[AddonManager] Client not found for ${manifestUrl}`)
+      return []
+    }
+
+    const catalog = client.manifest.catalogs.find(c => c.type === catalogType && c.id === catalogId)
+    if (!catalog) {
+      console.warn(`[AddonManager] Catalog ${catalogId} not found in ${client.manifest.name}`)
+      return []
+    }
+
+    try {
+      const settingsProfileId = profileDb.getSettingsProfileId(profileId)
+      const { appearanceDb } = require('../database')
+      const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined
+      const config = {
+        enableAgeRating: appearance ? appearance.show_age_ratings : true,
+        showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+      }
+
+      let items = await client.getCatalog(catalogType, catalogId, {}, config)
+      const parentalSettings = this.getParentalSettings(profileId)
+      const profile = profileDb.findById(profileId)
+      let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id)
+      
+      // Row filling logic if parental controls filter too many items
+      if (parentalSettings.enabled && filteredItems.length < 20 && items.length > 0) {
+        let currentSkip = items.length
+        let attempts = 0
+        const maxAttempts = 3
+        
+        while (filteredItems.length < 20 && attempts < maxAttempts) {
+          try {
+            const nextItems = await client.getCatalog(catalogType, catalogId, { skip: currentSkip.toString() }, config)
+            if (!nextItems || nextItems.length === 0) break
+            
+            const nextFiltered = await this.filterContent(nextItems, parentalSettings, profile?.user_id)
+            filteredItems = [...filteredItems, ...nextFiltered]
+            currentSkip += nextItems.length
+            attempts++
+          } catch (e) {
+            break
+          }
+        }
+      }
+
+      return filteredItems
+    } catch (e) {
+      console.error(`[AddonManager] Failed to fetch catalog ${catalogId} from ${manifestUrl}`, e)
+      return []
+    }
   }
 }
 

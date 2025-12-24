@@ -67,7 +67,16 @@ export const StreamingDetails = () => {
 
   const loadDetails = async () => {
     try {
-      const res = await fetch(`/api/streaming/details/${type}/${id}?profileId=${profileId}`)
+      // Get metaFallback from URL if present (for addons without meta resource)
+      const searchParams = new URLSearchParams(window.location.search)
+      const metaFallback = searchParams.get('metaFallback')
+      
+      let url = `/api/streaming/details/${type}/${id}?profileId=${profileId}`
+      if (metaFallback) {
+        url += `&metaFallback=${metaFallback}`
+      }
+      
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to load content')
       const detailsData = await res.json()
       setData(detailsData)

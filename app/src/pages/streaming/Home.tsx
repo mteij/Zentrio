@@ -3,19 +3,21 @@ import { useQuery } from '@tanstack/react-query'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { TrendingUp, Play, Info } from 'lucide-react'
-import { Layout, Navbar, StreamingRow, SkeletonHero, SkeletonRow } from '../../components'
+import { Layout, Navbar, StreamingRow, LazyCatalogRow, SkeletonHero, SkeletonRow } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { WatchHistoryItem } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
 
-interface CatalogSection {
+interface CatalogMetadata {
+  addon: { id: string; name: string; logo?: string }
+  manifestUrl: string
+  catalog: { type: string; id: string; name?: string }
   title: string
-  items: MetaPreview[]
-  seeAllUrl?: string
+  seeAllUrl: string
 }
 
 interface DashboardData {
-  catalogs: CatalogSection[]
+  catalogMetadata: CatalogMetadata[]
   history: WatchHistoryItem[]
   trending: MetaPreview[]
   showFallbackToast: boolean
@@ -55,13 +57,12 @@ export const StreamingHome = () => {
   })
 
   // Get featured items from data (or empty array if no data yet)
+  // Note: Catalog items are now lazy-loaded, so we use trending/history for hero
   const featuredItems = useMemo(() => {
     if (!data) return []
-    const { catalogs, history, trending } = data
+    const { history, trending } = data
     if (trending && trending.length > 0) {
       return trending
-    } else if (catalogs.length > 0 && catalogs[0].items.length > 0) {
-      return catalogs[0].items.slice(0, 10)
     } else if (history.length > 0) {
       return history.slice(0, 10)
     }
@@ -150,7 +151,7 @@ export const StreamingHome = () => {
     )
   }
 
-  const { catalogs, history, trending, showFallbackToast, profile } = data
+  const { catalogMetadata, history, trending, showFallbackToast, profile } = data
   const showImdbRatings = profile?.settings?.show_imdb_ratings !== false
   const showHero = true
 
@@ -280,17 +281,15 @@ export const StreamingHome = () => {
             />
           )}
 
-          {catalogs.length === 0 ? (
+          {catalogMetadata.length === 0 ? (
             <div className="p-10 text-center text-gray-500">No catalogs found.</div>
           ) : (
-            catalogs.map((section, idx) => (
-              <StreamingRow
-                key={idx}
-                title={section.title}
-                items={section.items}
+            catalogMetadata.map((metadata, idx) => (
+              <LazyCatalogRow
+                key={`${metadata.manifestUrl}-${metadata.catalog.type}-${metadata.catalog.id}`}
+                metadata={metadata}
                 profileId={profileId!}
                 showImdbRatings={showImdbRatings}
-                seeAllUrl={section.seeAllUrl}
               />
             ))
           )}
