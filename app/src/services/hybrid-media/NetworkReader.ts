@@ -34,8 +34,13 @@ export class NetworkReader {
   /**
    * Probe the file to get its size via HEAD request
    */
+  /**
+   * Probe the file to get its size via HEAD request
+   * AND verify Range request support
+   */
   async probe(): Promise<number> {
     try {
+      // Step 1: Get file size via HEAD
       const response = await fetch(this.url, {
         method: 'HEAD',
         signal: AbortSignal.timeout(this.timeout)
@@ -46,18 +51,35 @@ export class NetworkReader {
       }
 
       const contentLength = response.headers.get('Content-Length')
-      const acceptRanges = response.headers.get('Accept-Ranges')
-
       if (!contentLength) {
         throw new Error('Server did not provide Content-Length header')
       }
 
-      if (acceptRanges !== 'bytes') {
-        console.warn('[NetworkReader] Server may not support Range requests')
-      }
-
       this.fileSize = parseInt(contentLength, 10)
       console.log(`[NetworkReader] File size: ${(this.fileSize / 1024 / 1024).toFixed(2)} MB`)
+
+      // Step 2: Verify Range support with a real request (bytes=0-0)
+      // Some servers don't send Accept-Ranges header but do support it.
+      // Some consumers might send 200 OK for Range requests (bad).
+      try {
+        const rangeResponse = await fetch(this.url, {
+            headers: { 'Range': 'bytes=0-0' },
+            signal: AbortSignal.timeout(5000) // Short timeout for check
+        })
+
+        if (rangeResponse.status === 206) {
+             console.log('[NetworkReader] Server supports Range requests (verified)')
+        } else if (rangeResponse.status === 200) {
+             console.warn('[NetworkReader] Server returned 200 OK for Range request. SEEKING WILL FAIL.')
+             // We can't throw here because maybe linear playback would still work, 
+             // but for a 1.8GB file, seeking to end for metadata will definitely crash/fail.
+             // We'll let `fetchChunk` handle the error when it happens.
+        } else {
+             console.warn(`[NetworkReader] Range check failed with status ${rangeResponse.status}`)
+        }
+      } catch (e) {
+          console.warn('[NetworkReader] Range check verification failed:', e)
+      }
       
       return this.fileSize
     } catch (error) {
@@ -99,6 +121,9 @@ export class NetworkReader {
     const combined = this.combineChunks(chunks)
     const startOffset = offset - (startChunk * this.chunkSize)
     const result = new Uint8Array(combined, startOffset, actualLength)
+
+    // Log significant reads (skip small sequential ones to reduce noise if needed, but for now log all)
+    // console.log(`[NetworkReader] Read ${length} bytes at ${offset} -> ${result.byteLength} (Chunks: ${startChunk}-${endChunk})`)
 
     // Trigger prefetch for upcoming chunks (don't await)
     this.prefetch(endChunk + 1, this.prefetchCount).catch(() => {})
@@ -159,8 +184,19 @@ export class NetworkReader {
       signal: AbortSignal.timeout(this.timeout)
     })
 
-    if (!response.ok && response.status !== 206) {
+    if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    // Strict enforcement of Range requests
+    // If we asked for a range but got 200 OK, it means the server ignored the Range header
+    // and is sending the entire file. For large files, this is catastrophic.
+    if (response.status === 200) {
+      throw new Error(`Server returned 200 OK (full content) for Range request bytes=${start}-${end}. Aborting to prevent full file download.`)
+    }
+
+    if (response.status !== 206) {
+      throw new Error(`Unexpected HTTP status ${response.status} for Range request`)
     }
 
     return response.arrayBuffer()

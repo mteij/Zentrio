@@ -7,6 +7,16 @@
  * This file must be loaded as a separate module by AudioWorklet.
  */
 
+// AudioWorklet global API declarations (not available in main thread)
+declare function registerProcessor(name: string, processorCtor: any): void
+declare class AudioWorkletProcessor {
+  readonly port: MessagePort
+  process(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>): boolean
+}
+declare const currentFrame: number
+declare const currentTime: number
+declare const sampleRate: number
+
 // Constants matching AudioRingBuffer
 const HEADER_SIZE = 16
 const READ_POS_OFFSET = 0

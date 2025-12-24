@@ -7,6 +7,9 @@ on:
       - ".github/workflows/build-libav.yml"
       - "app/scripts/Dockerfile.libav"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest

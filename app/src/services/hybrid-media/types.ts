@@ -14,7 +14,9 @@ export interface CodecInfo {
   codecName: string
   codecString: string  // e.g., "avc1.640028" for MSE
   profile?: string
+  profileId?: number   // Numeric profile ID (e.g. 2 for HEVC Main 10)
   level?: number
+  bitDepth?: number    // e.g. 8 or 10
   extradata?: Uint8Array  // SPS/PPS for H.264, etc.
 }
 

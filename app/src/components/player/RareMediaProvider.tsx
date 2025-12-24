@@ -12,7 +12,8 @@ import {
   MediaProvider,
   Poster,
   Track,
-  type MediaPlayerInstance
+  type MediaPlayerInstance,
+  type MediaSrc
 } from '@vidstack/react'
 import {
   DefaultVideoLayout,
@@ -77,7 +78,7 @@ export function RareMediaProvider({
   const [engineState, setEngineState] = useState<EngineState>('idle')
   const [streams, setStreams] = useState<StreamInfo[]>([])
   const [duration, setDuration] = useState(0)
-  const [mediaSrc, setMediaSrc] = useState<{ src: string; type: string } | null>(null)
+  const [mediaSrc, setMediaSrc] = useState<MediaSrc | null>(null)
 
   // Initialize engine when source changes
   useEffect(() => {

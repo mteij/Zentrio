@@ -89,6 +89,10 @@ export function VidstackPlayer({
     const engineRef = useRef<HybridEngine | null>(null)
     const audioContextRef = useRef<AudioContext | null>(null)
     
+    // Prevent React Strict Mode from re-probing or re-initializing
+    const probeCompletedRef = useRef(false)
+    const hybridInitializedRef = useRef(false)
+    
     // Playback mode: native (Vidstack), hybrid (custom engine), or probing
     const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(() => {
         // If URL looks like it might need hybrid playback, start probing
@@ -105,6 +109,13 @@ export function VidstackPlayer({
     // Probe the file to check if we need hybrid playback
     useEffect(() => {
         if (playbackMode !== 'probing' || !src) return
+        
+        // Skip if we've already completed probing for this src
+        if (probeCompletedRef.current && engineRef.current) {
+            console.log('[VidstackPlayer] Skipping probe - already completed')
+            setPlaybackMode('hybrid')
+            return
+        }
         
         let cancelled = false
 
@@ -123,12 +134,14 @@ export function VidstackPlayer({
                 if (engine.requiresHybridPlayback) {
                     console.log('[VidstackPlayer] File requires hybrid playback (unsupported audio codec)')
                     engineRef.current = engine
+                    probeCompletedRef.current = true
                     setHybridDuration(engine.totalDuration)
                     setPlaybackMode('hybrid')
                     onMetadataLoad?.(engine.totalDuration)
                 } else {
                     console.log('[VidstackPlayer] File can use native playback')
                     engine.destroy()
+                    probeCompletedRef.current = true
                     setPlaybackMode('native')
                 }
             } catch (error) {
@@ -148,13 +161,31 @@ export function VidstackPlayer({
 
     // Initialize hybrid engine when in hybrid mode
     useEffect(() => {
-        if (playbackMode !== 'hybrid' || !engineRef.current || !hybridVideoRef.current) return
+        if (playbackMode !== 'hybrid' || !engineRef.current) return
+        
+        // Skip if already initialized (React Strict Mode protection)
+        if (hybridInitializedRef.current) {
+            console.log('[VidstackPlayer] Skipping hybrid init - already initialized')
+            return
+        }
 
         let cancelled = false
 
         const initHybrid = async () => {
+            hybridInitializedRef.current = true
             const engine = engineRef.current!
-            const video = hybridVideoRef.current!
+            
+            // Wait for the video element ref to be populated
+            let retries = 0
+            while (!hybridVideoRef.current && retries < 20) {
+                await new Promise(r => setTimeout(r, 50))
+                retries++
+            }
+
+            const video = hybridVideoRef.current
+            if (!video) {
+                throw new Error('Video element ref not available for hybrid playback')
+            }
 
             try {
                 // Attach video
@@ -191,25 +222,11 @@ export function VidstackPlayer({
 
                 if (cancelled) return
 
-                // Set up event handlers
-                engine.addEventListener('timeupdate', (e: any) => {
-                    if (!cancelled) {
-                        onTimeUpdate?.(e.detail.currentTime, e.detail.duration)
-                    }
-                })
+                if (cancelled) return
 
-                engine.addEventListener('ended', () => {
-                    if (!cancelled) {
-                        setHybridPlaying(false)
-                        onEnded?.()
-                    }
-                })
-
-                engine.addEventListener('statechange', (e: any) => {
-                    if (!cancelled) {
-                        setHybridPlaying(e.detail.state === 'playing')
-                    }
-                })
+                // Note: We don't need manual event listeners for timeupdate/ended anymore
+                // because Vidstack listens to the native video element events directly.
+                // HybridEngine now syncs its state with the video element events.
 
                 // Seek to start time
                 if (startTime > 0) {
@@ -220,10 +237,12 @@ export function VidstackPlayer({
 
                 // Auto-play
                 if (autoPlay) {
-                    if (audioContextRef.current.state === 'suspended') {
-                        await audioContextRef.current.resume()
+                    try {
+                        // We rely on the engine.start() to handle audio resuming
+                        await engine.start()
+                    } catch (e) {
+                        console.warn('[VidstackPlayer] Autoplay start failed:', e)
                     }
-                    await engine.start()
                 }
 
                 console.log('[VidstackPlayer] Hybrid playback initialized')
@@ -259,20 +278,42 @@ export function VidstackPlayer({
         }
     }, [playbackMode, autoPlay, startTime])
 
+    // Ref to store cleanup timeout (for cancellation on Strict Mode remount)
+    const cleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    
+    // Cancel any pending cleanup when component mounts
+    useEffect(() => {
+        if (cleanupTimeoutRef.current) {
+            clearTimeout(cleanupTimeoutRef.current)
+            cleanupTimeoutRef.current = null
+            console.log('[VidstackPlayer] Cancelled pending cleanup (Strict Mode remount)')
+        }
+    }, [])
+
     // Cleanup on unmount or src change
+    // Use a timeout to avoid destroying during React Strict Mode's quick unmount/remount
     useEffect(() => {
         return () => {
-            // Close AudioContext first (check state to avoid double-close)
-            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                audioContextRef.current.close().catch(() => {})
-            }
-            audioContextRef.current = null
-            
-            // Then destroy engine
-            if (engineRef.current) {
-                engineRef.current.destroy()
-                engineRef.current = null
-            }
+            // Delay cleanup slightly to allow Strict Mode remount to cancel it
+            cleanupTimeoutRef.current = setTimeout(() => {
+                console.log('[VidstackPlayer] Running delayed cleanup')
+                // Close AudioContext first (check state to avoid double-close)
+                if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                    audioContextRef.current.close().catch(() => {})
+                }
+                audioContextRef.current = null
+                
+                // Then destroy engine
+                if (engineRef.current) {
+                    engineRef.current.destroy()
+                    engineRef.current = null
+                }
+                
+                // Reset refs for new src
+                probeCompletedRef.current = false
+                hybridInitializedRef.current = false
+                cleanupTimeoutRef.current = null
+            }, 100) // Short delay - Strict Mode remounts happen synchronously
         }
     }, [src])
     
@@ -425,104 +466,51 @@ export function VidstackPlayer({
         )
     }
 
-    // Hybrid playback mode
+    // Hybrid playback mode with Vidstack UI
+    // We provide our own video element that HybridEngine will take control of.
+    // The video.src will be set by HybridEngine's MediaSource, not by Vidstack.
     if (playbackMode === 'hybrid') {
         return (
-            <div className="vidstack-player hybrid-mode" style={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                backgroundColor: '#000'
-            }}>
-                {/* Video element for MSE */}
-                <video
-                    ref={hybridVideoRef}
-                    muted
-                    playsInline
-                    style={{
-                        position: 'absolute',
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain'
+            <MediaPlayer
+                ref={playerRef}
+                title={title}
+                autoPlay={false}
+                playsInline
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={handleEnded}
+                onError={handlePlayerError}
+                className="vidstack-player hybrid-mode"
+                style={{ backgroundColor: '#000' }}
+            >
+                <MediaProvider>
+                    {/* Explicit video element for hybrid mode - HybridEngine will set src */}
+                    <video 
+                        ref={hybridVideoRef}
+                        playsInline
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                    {poster && <Poster className="vds-poster" src={poster} alt={title || ''} />}
+                    {subtitles.map((track, index) => (
+                        <Track
+                            key={track.src || `sub-${index}`}
+                            src={track.src}
+                            kind="subtitles"
+                            label={track.label}
+                            language={track.language}
+                            default={track.default}
+                        />
+                    ))}
+                </MediaProvider>
+
+                {/* Standard Vidstack Layout */}
+                <DefaultVideoLayout
+                    icons={defaultLayoutIcons}
+                    slots={{
+                        googleCastButton: showCast ? <CastButton /> : null
                     }}
                 />
 
-                {/* Poster while loading */}
-                {poster && !hybridReady && (
-                    <img 
-                        src={poster} 
-                        alt={title || ''} 
-                        style={{
-                            position: 'absolute',
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            zIndex: 1
-                        }}
-                    />
-                )}
-
-                {/* Loading indicator */}
-                {!hybridReady && (
-                    <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 2
-                    }}>
-                        <div style={{
-                            width: 48,
-                            height: 48,
-                            border: '3px solid rgba(255,255,255,0.3)',
-                            borderTopColor: 'white',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite'
-                        }} />
-                    </div>
-                )}
-
-                {/* Simple playback controls */}
-                {hybridReady && (
-                    <div 
-                        style={{
-                            position: 'absolute',
-                            inset: 0,
-                            zIndex: 3,
-                            cursor: 'pointer'
-                        }}
-                        onClick={() => {
-                            if (hybridPlaying) {
-                                handleHybridPause()
-                            } else {
-                                handleHybridPlay()
-                            }
-                        }}
-                    >
-                        {!hybridPlaying && (
-                            <div style={{
-                                position: 'absolute',
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                width: 80,
-                                height: 80,
-                                borderRadius: '50%',
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 32,
-                                color: 'white'
-                            }}>
-                                ▶
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Hybrid mode indicator */}
+                {/* Hybrid mode indicator overlay */}
                 <div style={{
                     position: 'absolute',
                     top: 16,
@@ -533,17 +521,12 @@ export function VidstackPlayer({
                     fontSize: 12,
                     color: 'black',
                     fontWeight: 'bold',
-                    zIndex: 5
+                    zIndex: 50,
+                    pointerEvents: 'none'
                 }}>
                     HYBRID AUDIO
                 </div>
-
-                <style>{`
-                    @keyframes spin {
-                        to { transform: rotate(360deg); }
-                    }
-                `}</style>
-            </div>
+            </MediaPlayer>
         )
     }
 

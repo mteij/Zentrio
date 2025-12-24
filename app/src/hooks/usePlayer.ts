@@ -80,6 +80,9 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     setQualityLevels([])
     setCurrentQualityState(-1)
 
+    // Detect if URL is an HLS stream
+    const isHls = url.toLowerCase().includes('.m3u8')
+
 
     
     // Error handler

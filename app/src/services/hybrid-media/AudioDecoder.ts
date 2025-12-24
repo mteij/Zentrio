@@ -93,7 +93,9 @@ export class AudioDecoder extends EventTarget {
 
       // Use ff_decode_multi which is a higher-level API
       // It handles send_packet and receive_frame internally
-      const [status, decodedFrames] = await libav.ff_decode_multi(
+      // Use ff_decode_multi which is a higher-level API
+      // It handles send_packet and receive_frame internally
+      const result = await libav.ff_decode_multi(
         this.codecCtx,
         this.packet,
         this.frame,
@@ -101,8 +103,40 @@ export class AudioDecoder extends EventTarget {
         false // not EOF
       )
 
+      // console.log(`[AudioDecoder] ff_decode_multi raw result:`, result)
+      
+      // Handle known libav.js return patterns
+      let status = 0
+      let decodedFrames: any[] = []
+
+      if (Array.isArray(result)) {
+        // Check if the first element looks like a status code (number) or a frame (object)
+        if (typeof result[0] === 'number') {
+           // Pattern: [ret, frames]
+           status = result[0]
+           decodedFrames = result[1] as any[]
+        } else {
+           // Pattern: [frame1, frame2, ...]
+           status = 0
+           decodedFrames = result
+        }
+      } else {
+         console.warn(`[AudioDecoder] Unexpected return type from ff_decode_multi:`, typeof result)
+      }
+
       if (status < 0) {
         console.warn(`[AudioDecoder] Decode error: ${status}`)
+        return frames
+      }
+
+      if (status < 0) {
+        console.warn(`[AudioDecoder] Decode error: ${status}`)
+        return frames
+      }
+
+      // Check if decodedFrames is valid and iterable
+      if (!decodedFrames || !Array.isArray(decodedFrames)) {
+        // No frames decoded yet (can happen with some codecs that need multiple packets)
         return frames
       }
 

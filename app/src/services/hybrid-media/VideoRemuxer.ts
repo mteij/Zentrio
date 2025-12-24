@@ -31,7 +31,10 @@ export class VideoRemuxer extends EventTarget {
   private codecInfo: CodecInfo | null = null
   private isAnnexB: boolean = false
   private sps: Uint8Array | null = null
+
   private pps: Uint8Array | null = null
+  private vps: Uint8Array | null = null
+  private hvcC: Uint8Array | null = null
   private isInitialized: boolean = false
   private pendingSegments: ArrayBuffer[] = []
   private isAppending: boolean = false
@@ -39,7 +42,11 @@ export class VideoRemuxer extends EventTarget {
   private mp4box: any | null = null
   private initSegmentGenerated: boolean = false
   private baseMediaDecodeTime: number = 0
+
   private sequenceNumber: number = 0
+  private width: number = 0
+  private height: number = 0
+  private nalLengthSize: number = 4
 
   constructor(config: VideoRemuxerConfig = {}) {
     super()
@@ -49,9 +56,11 @@ export class VideoRemuxer extends EventTarget {
   /**
    * Attach to a video element and set up MSE
    */
-  async attach(video: HTMLVideoElement, codecInfo: CodecInfo): Promise<void> {
+  async attach(video: HTMLVideoElement, codecInfo: CodecInfo, width?: number, height?: number): Promise<void> {
     this.videoElement = video
     this.codecInfo = codecInfo
+    if (width) this.width = width
+    if (height) this.height = height
 
     // Import mp4box.js dynamically
     try {
@@ -84,13 +93,131 @@ export class VideoRemuxer extends EventTarget {
             this.flushPendingSegments()
           })
 
-          this.sourceBuffer.addEventListener('error', (e) => {
-            console.error('[VideoRemuxer] SourceBuffer error:', e)
+          this.sourceBuffer.addEventListener('error', (e: Event) => {
+            const sb = e.target as SourceBuffer
+            console.error('[VideoRemuxer] SourceBuffer error event:', e)
+            console.error('[VideoRemuxer] SourceBuffer error object:', (sb as any)?.error)
+            console.error('[VideoRemuxer] MediaSource readyState:', this.mediaSource?.readyState)
             this.dispatchEvent(new CustomEvent('error', { detail: { error: e } }))
           })
 
           this.isInitialized = true
           console.log(`[VideoRemuxer] Initialized with codec: ${codecInfo.codecString}`)
+          
+          // Process extradata immediately if available
+          if (codecInfo.extradata && codecInfo.extradata.length > 0) {
+            console.log('[VideoRemuxer] Processing extradata for SPS/PPS')
+            try {
+              // Try to detect format of extradata
+              const isAnnexB = this.detectAnnexB(codecInfo.extradata)
+              
+              if (isAnnexB) {
+                const nalUnits = this.parseAnnexB(codecInfo.extradata)
+                for (const nal of nalUnits) {
+                  if (nal.type === NAL_TYPE_SPS) this.sps = nal.data
+                  if (nal.type === NAL_TYPE_PPS) this.pps = nal.data
+                }
+              } else {
+                // AVCC (H.264) or HVCC (H.265) parsing
+                console.log('[VideoRemuxer] Extradata is not Annex-B, attempting configuration record parsing')
+                
+                if (codecInfo.codecId === 173) { // HEVC
+                   // Parse hvcC
+                   try {
+                     this.hvcC = codecInfo.extradata // Store raw hvcC
+                     const parser = new DataView(codecInfo.extradata.buffer, codecInfo.extradata.byteOffset, codecInfo.extradata.byteLength)
+                     // Skip header (22 bytes for hvcC)
+                     if (codecInfo.extradata.length > 22) {
+                       // Parse NAL unit length size (minus one) from hvcC header (byte 21, last 2 bits)
+                       // format: [ver][profile_space...][...][lengthSizeMinusOne]
+                       // actually it's byte 21 (0-indexed) & 0x03
+                       this.nalLengthSize = (codecInfo.extradata[21] & 0x03) + 1
+                       console.log(`[VideoRemuxer] HEVC NAL length size: ${this.nalLengthSize}`)
+
+                       const numOfArrays = parser.getUint8(22)
+                       let offset = 23
+                       
+                       for (let i = 0; i < numOfArrays; i++) {
+                         if (offset >= codecInfo.extradata.length) break
+                         const type = parser.getUint8(offset) & 0x3f
+                         const numNalus = parser.getUint16(offset + 1)
+                         offset += 3
+                         
+                         for (let j = 0; j < numNalus; j++) {
+                           if (offset + 2 > codecInfo.extradata.length) break
+                           const len = parser.getUint16(offset)
+                           offset += 2
+                           if (offset + len > codecInfo.extradata.length) break
+                           
+                           const nalData = codecInfo.extradata.slice(offset, offset + len)
+                           
+                           if (type === 32) this.vps = nalData // VPS
+                           if (type === 33) this.sps = nalData // SPS
+                           if (type === 34) this.pps = nalData // PPS
+                           
+                           offset += len
+                         }
+                       }
+                     }
+                   } catch (e) {
+                     console.warn('[VideoRemuxer] Failed to parse hvcC extradata:', e)
+                   }
+                } else if (codecInfo.codecId === 27) { // H.264
+                   // Parse avcC
+                   try {
+                     const parser = new DataView(codecInfo.extradata.buffer, codecInfo.extradata.byteOffset, codecInfo.extradata.byteLength)
+                     // Skip version, profile, etc. (5 bytes)
+                     // byte 4 is lengthSizeMinusOne & 0x3
+                     // byte 5 is (sps_count & 0x1f)
+                     if (codecInfo.extradata.length > 6) {
+                        const spsCount = parser.getUint8(5) & 0x1f
+                        let offset = 6
+                        
+                        for (let i = 0; i < spsCount; i++) {
+                           const len = parser.getUint16(offset)
+                           offset += 2
+                           this.sps = codecInfo.extradata.slice(offset, offset + len)
+                           offset += len
+                        }
+                        
+                        const ppsCount = parser.getUint8(offset)
+                        offset++
+                        for (let i = 0; i < ppsCount; i++) {
+                           const len = parser.getUint16(offset)
+                           offset += 2
+                           this.pps = codecInfo.extradata.slice(offset, offset + len)
+                           offset += len
+                        }
+                     }
+                   } catch (e) {
+                     console.warn('[VideoRemuxer] Failed to parse avcC extradata:', e)
+                   }
+                }
+              }
+              
+              if (this.sps && this.pps) {
+                console.log('[VideoRemuxer] SPS/PPS extracted from extradata')
+              }
+              
+              // If we have VPS (HEVC), we're good
+              if (this.vps) {
+                 console.log('[VideoRemuxer] VPS extracted properly')
+              }
+            } catch (e) {
+              console.error('[VideoRemuxer] Failed to parse extradata:', e)
+            }
+          } else {
+             console.warn('[VideoRemuxer] No extradata available during attach.')
+          }
+
+          // If pixel format is missing/unspecified, warn but proceed. 
+          // MediaMetadata often doesn't need it for basic playback if container is right.
+          // If pixel format is missing/unspecified, warn but proceed. 
+          // MediaMetadata often doesn't need it for basic playback if container is right.
+          if (!this.width || !this.height) {
+              console.warn('[VideoRemuxer] Video dimensions missing, might cause playback issues.')
+          }
+          
           resolve()
         } catch (error) {
           reject(error)
@@ -106,14 +233,22 @@ export class VideoRemuxer extends EventTarget {
    * Process a video packet from the demuxer
    */
   async push(packet: VideoPacket): Promise<void> {
-    if (!this.isInitialized) {
-      throw new Error('Remuxer not initialized')
+    // Silently drop packets if not properly initialized or MediaSource is closed
+    if (!this.isInitialized || !this.mediaSource || this.mediaSource.readyState !== 'open') {
+      return
     }
 
-    // Detect Annex-B format on first packet
-    if (!this.initSegmentGenerated) {
-      this.isAnnexB = this.detectAnnexB(packet.data)
-      console.log(`[VideoRemuxer] Detected format: ${this.isAnnexB ? 'Annex-B' : 'AVCC'}`)
+    // Detect Annex-B format on first packet if not already known/decided
+    // If we already have SPS/PPS from extradata, we might still need to know packet format
+    // to strip start codes if necessary
+    if (!this.initSegmentGenerated || this.isAnnexB === undefined) {
+      const packetIsAnnexB = this.detectAnnexB(packet.data)
+      
+      // Only log if it changes or is first detection
+      if (this.isAnnexB !== packetIsAnnexB) {
+         this.isAnnexB = packetIsAnnexB
+         console.log(`[VideoRemuxer] Packet format detected: ${this.isAnnexB ? 'Annex-B' : 'AVCC'}`)
+      }
     }
 
     let naluData: Uint8Array
@@ -133,7 +268,14 @@ export class VideoRemuxer extends EventTarget {
       // Convert to AVCC format
       naluData = this.convertToAVCC(nalUnits)
     } else {
-      naluData = packet.data
+      // If it's already AVCC/HVCC, ensure it uses 4-byte length prefixes
+      // This is crucial because some containers/streams use 2-byte prefixes
+      // but our generated config (hvcC/avcC) says 4 bytes.
+      if (this.codecInfo?.codecId === 173 && this.nalLengthSize !== 4) {
+         naluData = this.ensureFourBytePrefix(packet.data, this.nalLengthSize)
+      } else {
+         naluData = packet.data
+      }
     }
 
     // Generate init segment on first keyframe
@@ -157,6 +299,17 @@ export class VideoRemuxer extends EventTarget {
 
     // Generate moof/mdat segment
     const segment = this.generateMediaSegment(naluData, packet)
+
+    // DEBUG LOGGING (Reduced frequency or disabled)
+    // if (this.sequenceNumber % 30 === 0) {
+    //   console.log(`[VideoRemuxer] Pushing segment #${this.sequenceNumber}`, {
+    //      pts: packet.pts,
+    //      dts: packet.dts,
+    //      baseMediaDecodeTime: this.baseMediaDecodeTime,
+    //      segmentSize: segment.byteLength
+    //   })
+    // }
+    
     this.appendSegment(segment)
   }
 
@@ -312,14 +465,28 @@ export class VideoRemuxer extends EventTarget {
     const timescale = 90000
     const duration = 0 // Unknown
 
-    // Build avcC (AVCC decoder configuration)
-    const avcC = this.buildAvcC()
+    // Build codec configuration
+    let codecConfig: ArrayBuffer
+    let sampleEntry: ArrayBuffer
+
+    if (this.codecInfo?.codecId === 173) { // HEVC
+      // Prefer the original hvcC from extradata as it's authoritative
+      // Only rebuild if missing
+      if (this.hvcC) {
+        codecConfig = this.box('hvcC', this.hvcC)
+      } else {
+        codecConfig = this.buildHvcC()
+      }
+      sampleEntry = this.buildHev1(width, height, codecConfig)
+    } else { // Default to H.264
+      codecConfig = this.buildAvcC()
+      sampleEntry = this.buildAvc1(width, height, codecConfig)
+    }
     
-    // Build stsd with avc1 sample entry
-    const avc1 = this.buildAvc1(width, height, avcC)
+    // Build stsd
     const stsd = this.box('stsd', this.concat([
       new Uint8Array([0, 0, 0, 0, 0, 0, 0, 1]), // version, flags, entry_count
-      new Uint8Array(avc1)
+      new Uint8Array(sampleEntry)
     ]))
     
     // Empty stts, stsc, stsz, stco
@@ -460,7 +627,27 @@ export class VideoRemuxer extends EventTarget {
       throw new Error('SPS/PPS required for avcC')
     }
 
-    const size = 8 + 3 + 2 + this.sps.length + 1 + 2 + this.pps.length
+    if (this.sps.length < 4) {
+      throw new Error(`Invalid SPS length: ${this.sps.length}`)
+    }
+
+    // Check for start code prefix in SPS/PPS and strip it if necessary
+    // Some demuxers might leave 00 00 00 01 in the data
+    let sps = this.sps
+    if (sps[0] === 0 && sps[1] === 0 && sps[2] === 0 && sps[3] === 1) {
+      sps = sps.subarray(4)
+    } else if (sps[0] === 0 && sps[1] === 0 && sps[2] === 1) {
+      sps = sps.subarray(3)
+    }
+
+    let pps = this.pps
+    if (pps[0] === 0 && pps[1] === 0 && pps[2] === 0 && pps[3] === 1) {
+      pps = pps.subarray(4)
+    } else if (pps[0] === 0 && pps[1] === 0 && pps[2] === 1) {
+      pps = pps.subarray(3)
+    }
+
+    const size = 8 + 7 + 2 + sps.length + 1 + 2 + pps.length
     const buffer = new ArrayBuffer(size)
     const view = new DataView(buffer)
     const arr = new Uint8Array(buffer)
@@ -470,16 +657,16 @@ export class VideoRemuxer extends EventTarget {
     view.setUint32(offset, 0x61766343); offset += 4 // 'avcC'
     
     view.setUint8(offset++, 1) // configurationVersion
-    view.setUint8(offset++, this.sps[1]) // AVCProfileIndication
-    view.setUint8(offset++, this.sps[2]) // profile_compatibility
-    view.setUint8(offset++, this.sps[3]) // AVCLevelIndication
+    view.setUint8(offset++, sps[1]) // AVCProfileIndication
+    view.setUint8(offset++, sps[2]) // profile_compatibility
+    view.setUint8(offset++, sps[3]) // AVCLevelIndication
     view.setUint8(offset++, 0xff) // lengthSizeMinusOne (3 = 4 bytes)
     view.setUint8(offset++, 0xe1) // numOfSequenceParameterSets
-    view.setUint16(offset, this.sps.length); offset += 2
-    arr.set(this.sps, offset); offset += this.sps.length
+    view.setUint16(offset, sps.length); offset += 2
+    arr.set(sps, offset); offset += sps.length
     view.setUint8(offset++, 1) // numOfPictureParameterSets
-    view.setUint16(offset, this.pps.length); offset += 2
-    arr.set(this.pps, offset)
+    view.setUint16(offset, pps.length); offset += 2
+    arr.set(pps, offset)
     
     return buffer
   }
@@ -516,6 +703,204 @@ export class VideoRemuxer extends EventTarget {
   }
 
   /**
+   * Build hvcC box (HEVC)
+   */
+  private buildHvcC(): ArrayBuffer {
+    if (!this.sps || !this.pps || !this.vps) {
+      throw new Error('VPS/SPS/PPS required for hvcC')
+    }
+
+    // Simplified hvcC builder
+    // Ref: ISO/IEC 14496-15
+
+    const vps = this.stripStartCode(this.vps)
+    const sps = this.stripStartCode(this.sps)
+    const pps = this.stripStartCode(this.pps)
+
+    // Calculate size
+    // Header (23 bytes) + Arrays
+    // Each array: 3 bytes header + (2 bytes len + data len) per NAL
+    const size = 23 + 
+                 3 + 2 + vps.length + 
+                 3 + 2 + sps.length + 
+                 3 + 2 + pps.length
+
+    const buffer = new ArrayBuffer(size + 8) // +8 for box header
+    const view = new DataView(buffer)
+    const arr = new Uint8Array(buffer)
+    
+    let offset = 0
+    view.setUint32(offset, size + 8); offset += 4
+    view.setUint32(offset, 0x68766343); offset += 4 // 'hvcC'
+    
+    // Configuration Version
+    view.setUint8(offset++, 1)
+    
+    // Profile/Tier/Level
+    // Use values from CodecInfo if available, otherwise defaults
+    const profileIdc = this.codecInfo?.profileId ?? 1 // Default Main
+    const levelIdc = this.codecInfo?.level ?? 120 // Default 4.0
+    const bitDepth = this.codecInfo?.bitDepth ?? 8
+    
+    view.setUint8(offset++, 1) // general_profile_space=0, tier=0, profile=profileIdc
+    // Overwrite the profile_idc (lower 5 bits of first byte)
+    // Actually the first byte is: [space:2][tier:1][profile:5]
+    // space=0, tier=0.
+    arr[offset - 1] = profileIdc & 0x1F
+
+    view.setUint32(offset, 0x60000000); offset += 4 // general_profile_compatibility_flags
+    view.setUint8(offset++, 0) // general_constraint_indicator_flags (48 bits)
+    view.setUint8(offset++, 0)
+    view.setUint8(offset++, 0)
+    view.setUint8(offset++, 0)
+    view.setUint8(offset++, 0)
+    view.setUint8(offset++, 0)
+    view.setUint8(offset++, levelIdc) // general_level_idc
+    
+    view.setUint16(offset, 0xF000); offset += 2 // min_spatial_segmentation_idc (0)
+    view.setUint8(offset++, 0xFC) // parallelismType (0)
+    view.setUint8(offset++, 0xFC) // chromaFormat (1=4:2:0 is typical)
+    
+    // bitDepthLumaMinus8
+    view.setUint8(offset++, 0xF8 | (bitDepth - 8)) 
+    // bitDepthChromaMinus8
+    view.setUint8(offset++, 0xF8 | (bitDepth - 8)) 
+    
+    view.setUint16(offset, 0); offset += 2 // avgFrameRate (0)
+    
+    view.setUint8(offset++, 0x0F) // constantFrameRate(0), numTemporalLayers(0), temporalIdNested(0), lengthSizeMinusOne(3)
+    view.setUint8(offset++, 3) // numOfArrays (VPS, SPS, PPS)
+    
+    // VPS Array
+    view.setUint8(offset++, 0x20) // array_completeness(0) + reserved(0) + NAL_unit_type(32=VPS)
+    view.setUint16(offset, 1); offset += 2 // numNalus
+    view.setUint16(offset, vps.length); offset += 2
+    arr.set(vps, offset); offset += vps.length
+    
+    // SPS Array
+    view.setUint8(offset++, 0x21) // type(33=SPS)
+    view.setUint16(offset, 1); offset += 2
+    view.setUint16(offset, sps.length); offset += 2
+    arr.set(sps, offset); offset += sps.length
+    
+    // PPS Array
+    view.setUint8(offset++, 0x22) // type(34=PPS)
+    view.setUint16(offset, 1); offset += 2
+    view.setUint16(offset, pps.length); offset += 2
+    arr.set(pps, offset); offset += pps.length
+    
+    return buffer
+  }
+
+  /**
+   * Build hev1 sample entry (HEVC)
+   */
+  private buildHev1(width: number, height: number, hvcC: ArrayBuffer): ArrayBuffer {
+    const size = 8 + 78 + hvcC.byteLength
+    const buffer = new ArrayBuffer(size)
+    const view = new DataView(buffer)
+    const arr = new Uint8Array(buffer)
+    
+    let offset = 0
+    view.setUint32(offset, size); offset += 4
+    view.setUint32(offset, 0x68766331); offset += 4 // 'hvc1'
+    
+    offset += 6 // reserved
+    view.setUint16(offset, 1); offset += 2 // data_reference_index
+    offset += 16 // pre_defined, reserved
+    view.setUint16(offset, width); offset += 2
+    view.setUint16(offset, height); offset += 2
+    view.setUint32(offset, 0x00480000); offset += 4 // horizresolution
+    view.setUint32(offset, 0x00480000); offset += 4 // vertresolution
+    offset += 4 // reserved
+    view.setUint16(offset, 1); offset += 2 // frame_count
+    offset += 32 // compressorname
+    view.setUint16(offset, 0x0018); offset += 2 // depth
+    view.setInt16(offset, -1); offset += 2 // pre_defined
+    
+    arr.set(new Uint8Array(hvcC), offset)
+    
+    return buffer
+  }
+
+  private stripStartCode(nal: Uint8Array): Uint8Array {
+    if (nal.length >= 4 && nal[0] === 0 && nal[1] === 0 && nal[2] === 0 && nal[3] === 1) {
+      return nal.subarray(4)
+    } else if (nal.length >= 3 && nal[0] === 0 && nal[1] === 0 && nal[2] === 1) {
+      return nal.subarray(3)
+    }
+    return nal
+  }
+
+  /**
+   * Ensure NAL units have 4-byte length prefixes
+   */
+  private ensureFourBytePrefix(data: Uint8Array, currentLengthSize: number): Uint8Array {
+    if (currentLengthSize === 4) return data
+
+    // Calculate new size
+    let newSize = 0
+    let offset = 0
+    const nalCount = 0
+    
+    // First pass to calculate size
+    while (offset < data.length) {
+      if (offset + currentLengthSize > data.length) break
+      
+      let len = 0
+      if (currentLengthSize === 2) {
+        len = (data[offset] << 8) | data[offset + 1]
+      } else if (currentLengthSize === 1) {
+        len = data[offset]
+      } else if (currentLengthSize === 3) { // Very rare
+        len = (data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2]
+      }
+      
+      offset += currentLengthSize
+      offset += len
+      newSize += 4 + len
+    }
+
+    const result = new Uint8Array(newSize)
+    const view = new DataView(result.buffer)
+    
+    offset = 0
+    let writeOffset = 0
+    
+    // Second pass to copy data
+    while (offset < data.length) {
+      if (offset + currentLengthSize > data.length) break
+      
+      let len = 0
+      if (currentLengthSize === 2) {
+        len = (data[offset] << 8) | data[offset + 1]
+      } else if (currentLengthSize === 1) {
+        len = data[offset]
+      } else if (currentLengthSize === 3) {
+        len = (data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2]
+      }
+      
+      offset += currentLengthSize
+      
+      // Write 4-byte length
+      view.setUint32(writeOffset, len)
+      writeOffset += 4
+      
+      // Copy data
+      if (offset + len <= data.length) {
+          result.set(data.subarray(offset, offset + len), writeOffset)
+          writeOffset += len
+          offset += len
+      } else {
+          break
+      }
+    }
+    
+    return result
+  }
+
+
+  /**
    * Generate moof + mdat segment
    */
   private generateMediaSegment(data: Uint8Array, packet: VideoPacket): ArrayBuffer {
@@ -535,15 +920,20 @@ export class VideoRemuxer extends EventTarget {
     tfdtView.setUint32(0, 20)
     tfdtView.setUint32(4, 0x74666474) // 'tfdt'
     tfdtView.setUint32(8, 0x01000000) // version 1
+    tfdtView.setUint32(8, 0x01000000) // version 1
     // Use BigInt for 64-bit baseMediaDecodeTime
-    const bmdt = BigInt(dts90k - this.baseMediaDecodeTime)
+    // FIX: The tfdt should be the decode time of the first sample in the fragment.
+    // We can just use the packet's DTS converted to timescale.
+    const bmdt = BigInt(dts90k) 
+    this.baseMediaDecodeTime = dts90k // Update our tracker (though using dts90k directly is safer for tfdt)
     tfdtView.setBigUint64(12, bmdt)
     
     // trun
     const sampleFlags = packet.isKeyframe ? 0x02000000 : 0x00010000
     const compositionOffset = pts90k - dts90k
     
-    const trun = new ArrayBuffer(8 + 4 + 4 + 4 + 4 + 4 + 4)
+    // 8 (header) + 4 (flags) + 4 (count) + 4 (offset) + 4 (first_flags) + 4 (duration) + 4 (size) + 4 (composition)
+    const trun = new ArrayBuffer(36)
     const trunView = new DataView(trun)
     let trunOffset = 0
     trunView.setUint32(trunOffset, trun.byteLength); trunOffset += 4
@@ -593,23 +983,25 @@ export class VideoRemuxer extends EventTarget {
     // Find trun in moof and patch data_offset
     // trun data_offset is at offset 12 from trun start
     // We need to find the trun box in the moof
-    let searchOffset = 0
-    while (searchOffset < moofArr.length - 8) {
-      const boxType = (moofArr[searchOffset + 4] << 24) | 
-                      (moofArr[searchOffset + 5] << 16) |
-                      (moofArr[searchOffset + 6] << 8) | 
-                      moofArr[searchOffset + 7]
-      if (boxType === 0x7472756E) { // 'trun'
-        // Patch data_offset at offset 16 from box start
-        const dv = new DataView(moofArr.buffer, searchOffset + 16, 4)
-        dv.setUint32(0, dataOffset)
-        break
-      }
-      const boxSize = (moofArr[searchOffset] << 24) | 
-                      (moofArr[searchOffset + 1] << 16) |
-                      (moofArr[searchOffset + 2] << 8) | 
-                      moofArr[searchOffset + 3]
-      searchOffset += boxSize || 8
+    // Find trun in moof and patch data_offset
+    // Scan for 'trun' signature (0x7472756E) to locate the box
+    // This is safer than traversing nested boxes manually
+    for (let i = 0; i < moofArr.length - 8; i++) {
+        if (moofArr[i] === 0x74 && 
+            moofArr[i+1] === 0x72 && 
+            moofArr[i+2] === 0x75 && 
+            moofArr[i+3] === 0x6E) { // 'trun'
+            
+            // Found trun, check if it looks like a box header
+            // The size bytes are at i-4
+            
+            // Patch data_offset. struct: size(4) type(4) flags(4) count(4) offset(4)
+            // 'trun' starts at i. Offset field is at i + 4 (type end) + 4 (flags) + 4 (count) = i + 12
+            
+            const dv = new DataView(moofArr.buffer, moofArr.byteOffset + i + 12, 4)
+            dv.setUint32(0, dataOffset)
+            break
+        }
     }
     
     // Combine moof + mdat
@@ -635,7 +1027,11 @@ export class VideoRemuxer extends EventTarget {
       // Try to extract from extradata
     }
     
-    // Fallback: common dimensions
+
+    // Fallback: use stored dimensions or common default
+    if (this.width && this.height) {
+      return { width: this.width, height: this.height }
+    }
     return { width: 1920, height: 1080 }
   }
 
@@ -686,7 +1082,13 @@ export class VideoRemuxer extends EventTarget {
    * Append segment to SourceBuffer
    */
   private appendSegment(data: ArrayBuffer): void {
-    if (!this.sourceBuffer) return
+    if (!this.sourceBuffer || !this.mediaSource) return
+
+    if (this.mediaSource.readyState !== 'open') {
+        // MediaSource closed or ended, stop appending
+        this.pendingSegments = []
+        return
+    }
 
     if (this.isAppending || this.sourceBuffer.updating) {
       this.pendingSegments.push(data)
@@ -696,9 +1098,16 @@ export class VideoRemuxer extends EventTarget {
     try {
       this.isAppending = true
       this.sourceBuffer.appendBuffer(data)
-    } catch (error) {
-      console.error('[VideoRemuxer] Error appending segment:', error)
+    } catch (error: any) {
       this.isAppending = false
+      if (error.name === 'InvalidStateError') {
+          console.warn('[VideoRemuxer] InvalidStateError during append - SourceBuffer removed or TS closed?', error)
+          // Don't throw, just drop the segment as the buffer is likely dead
+          this.pendingSegments = [] 
+      } else {
+          console.error('[VideoRemuxer] Error appending segment:', error)
+          throw error // Re-throw other errors
+      }
     }
   }
 
@@ -706,8 +1115,15 @@ export class VideoRemuxer extends EventTarget {
    * Flush pending segments
    */
   private flushPendingSegments(): void {
+    // Don't attempt to flush if MediaSource is not open
+    if (!this.mediaSource || this.mediaSource.readyState !== 'open') {
+      this.pendingSegments = []
+      return
+    }
+    
     if (this.pendingSegments.length > 0 && this.sourceBuffer && !this.sourceBuffer.updating) {
       const segment = this.pendingSegments.shift()!
+      console.log(`[VideoRemuxer] Appending buffered segment: ${segment.byteLength} bytes`)
       this.appendSegment(segment)
     }
   }
@@ -757,11 +1173,24 @@ export class VideoRemuxer extends EventTarget {
   /**
    * Destroy and cleanup
    */
-  destroy(): void {
+  async destroy(): Promise<void> {
+    // Mark as not initialized immediately to stop incoming segments
+    this.isInitialized = false
     this.pendingSegments = []
     
     if (this.sourceBuffer) {
       try {
+        // Wait for any pending updates before removing
+        if (this.sourceBuffer.updating) {
+          await new Promise<void>(resolve => {
+            const handler = () => {
+              this.sourceBuffer?.removeEventListener('updateend', handler)
+              resolve()
+            }
+            this.sourceBuffer!.addEventListener('updateend', handler)
+          })
+        }
+        
         if (this.mediaSource?.readyState === 'open') {
           this.mediaSource.removeSourceBuffer(this.sourceBuffer)
         }
@@ -787,8 +1216,6 @@ export class VideoRemuxer extends EventTarget {
       this.videoElement.src = ''
       this.videoElement = null
     }
-
-    this.isInitialized = false
   }
 
   get initialized(): boolean {

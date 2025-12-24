@@ -66,6 +66,7 @@ export class HybridEngine extends EventTarget {
   private audioStreamIndex: number = -1
   private streams: StreamInfo[] = []
   private keyframeIndex: KeyframeEntry[] = []
+  private startTime: number = -1
   
   private isProcessing: boolean = false
   private shouldStop: boolean = false
@@ -138,21 +139,68 @@ export class HybridEngine extends EventTarget {
       // Register custom I/O with libav
       await this.registerCustomIO()
 
-      // Open input
+      // Open demuxer (libav.js ff_init_demuxer_file only takes filename and optional format)
       const [fmtCtx] = await this.libav.ff_init_demuxer_file('input.media')
       this.fmtCtx = fmtCtx
+      
+      console.log('[HybridEngine] Demuxer opened, configuring probe options...')
 
-      // Find stream info
-      await this.libav.avformat_find_stream_info(fmtCtx, 0)
+      // CRITICAL: Set probe options AFTER opening demuxer but BEFORE find_stream_info
+      // Use av_opt_set which IS exported (unlike AVFormatContext_probesize_s which isn't)
+      // av_opt_set signature: (obj, name, val, search_flags)
+      // AV_OPT_SEARCH_CHILDREN = 1 is needed for format options
+      //
+      // NOTE: We use smaller values here because:
+      // 1. We don't have an HEVC decoder (only parser), so video frame decoding will fail anyway
+      // 2. Matroska containers have duration/stream info in headers, minimal probing needed
+      // 3. Large values cause excessive "decoding for stream 0 failed" warnings
+      const probeSize = '5000000'  // 5 MB - enough to read container headers
+      const analyzeDuration = '5000000'  // 5 seconds in microseconds
+      
+      try {
+        if (this.libav.av_opt_set) {
+          // Set probesize - controls max data read to detect format
+          const ret1 = await this.libav.av_opt_set(fmtCtx, 'probesize', probeSize, 1)
+          console.log(`[HybridEngine] Set probesize=${probeSize}, result=${ret1}`)
+          
+          // Set analyzeduration - controls max time spent analyzing streams  
+          const ret2 = await this.libav.av_opt_set(fmtCtx, 'analyzeduration', analyzeDuration, 1)
+          console.log(`[HybridEngine] Set analyzeduration=${analyzeDuration}, result=${ret2}`)
+        } else {
+          console.warn('[HybridEngine] av_opt_set not available, using default probe options')
+        }
+      } catch (e) {
+        console.warn('[HybridEngine] Failed to set probe options:', e)
+      }
+
+      // Now perform stream analysis with our settings applied
+      const ret = await this.libav.avformat_find_stream_info(fmtCtx, 0)
+      if (ret < 0) {
+         console.warn('[HybridEngine] avformat_find_stream_info failed:', ret)
+      } else {
+         console.log('[HybridEngine] Stream analysis completed')
+      }
 
       // Analyze streams
       this.streams = await this.analyzeStreams()
       
       // Get duration - handle AV_NOPTS_VALUE (very large negative number when unknown)
-      const duration = await this.libav.AVFormatContext_duration(fmtCtx)
+      let duration = await this.libav.AVFormatContext_duration(fmtCtx)
       // AV_NOPTS_VALUE is 0x8000000000000000, which shows as a large negative number
       // Duration should never be negative, so treat it as unknown/0
       this.duration = duration > 0 ? duration / 1000000 : 0 // Convert from microseconds
+
+      // Fallback: try to get duration from individual streams if container duration is unknown
+      if (this.duration <= 0) {
+        console.log('[HybridEngine] Container duration unknown, checking streams...')
+        for (const stream of this.streams) {
+          if (stream.duration && stream.duration > 0) {
+            this.duration = stream.duration
+            console.log(`[HybridEngine] Using stream duration: ${this.duration}s`)
+            break
+          }
+        }
+      }
 
       console.log('[HybridEngine] Streams detected:', this.streams)
       console.log('[HybridEngine] Duration:', this.duration, 'seconds')
@@ -212,12 +260,71 @@ export class HybridEngine extends EventTarget {
       const codecType = await this.libav.AVCodecParameters_codec_type(codecpar)
       const codecId = await this.libav.AVCodecParameters_codec_id(codecpar)
 
+      // Get stream-level duration (in stream time_base units)
+      const streamDuration = await this.libav.AVStream_duration(stream)
+      const timeBaseNum = await this.libav.AVStream_time_base_num(stream)
+      const timeBaseDen = await this.libav.AVStream_time_base_den(stream)
+      const timeBase = timeBaseDen > 0 ? timeBaseNum / timeBaseDen : 0
+      // Convert stream duration to seconds (handle AV_NOPTS_VALUE)
+      const streamDurationSeconds = (streamDuration > 0 && timeBase > 0) 
+        ? streamDuration * timeBase 
+        : 0
+
       if (codecType === 0) { // AVMEDIA_TYPE_VIDEO
         const width = await this.libav.AVCodecParameters_width(codecpar)
         const height = await this.libav.AVCodecParameters_height(codecpar)
         
-        // Get codec string for MSE
-        const codecString = this.getVideoCodecString(codecId, codecpar)
+        // Create explicit Safe Level variable for CodecInfo
+        let safeLevel = await this.libav.AVCodecParameters_level(codecpar)
+        let profile = await this.libav.AVCodecParameters_profile(codecpar)
+
+        // Extract extradata (SPS/PPS)
+        let extradata: Uint8Array | undefined
+        const extradataSize = await this.libav.AVCodecParameters_extradata_size(codecpar)
+        if (extradataSize > 0) {
+          const extradataPtr = await this.libav.AVCodecParameters_extradata(codecpar)
+          extradata = await this.libav.copyout_u8(extradataPtr, extradataSize)
+          console.log(`[HybridEngine] Extracted extradata for video stream ${i}: ${extradataSize} bytes`)
+        } else {
+          console.warn(`[HybridEngine] No extradata for video stream ${i} - format detection might flap`)
+        }
+        
+        // Manual profile detection from extradata if libav fails
+        if ((profile <= 0 || profile === -99) && codecId === 173 && extradata && extradata.length > 5) {
+             // Check for hvcC (configurationVersion = 1)
+             if (extradata[0] === 1) {
+                 // hvcC format: [ver][profile_space_tier_idc]...
+                 // profile_idc is lower 5 bits of byte 1
+                 const profileIdc = extradata[1] & 0x1F
+                 console.log(`[HybridEngine] Parsed HEVC profile from hvcC: ${profileIdc}`)
+                 if (profileIdc > 0) profile = profileIdc
+             } else {
+                 console.warn('[HybridEngine] Extradata exists but not hvcC, basic profile detection skipped')
+             }
+        }
+
+        // Get codec string for MSE - NOW passing the potentially corrected profile
+        const codecString = await this.getVideoCodecString(codecId, codecpar, profile)
+
+        // Check for bit depth from pixel format
+        const format = await this.libav.AVCodecParameters_format(codecpar)
+        let bitDepth = 8
+        // Map common 10-bit formats or use profile
+        if (codecId === 173 && profile === 2) { // HEVC Main 10
+             bitDepth = 10
+        }
+
+        console.log(`[HybridEngine] Stream ${i}: codec=${codecId} profile=${profile} level=${safeLevel} fmt=${format}`)
+        // Map common 10-bit formats (e.g. AV_PIX_FMT_YUV420P10LE = 64?? need to check libav mapping)
+        // For now, assume if profile is Main 10, it's 10-bit
+        if (codecId === 173 && profile === 2) { // HEVC Main 10
+             bitDepth = 10
+        }
+
+        // Fix invalid level
+        if (safeLevel <= 0 && codecId === 173) {
+             safeLevel = 120
+        }
         
         const streamInfo: StreamInfo = {
           index: i,
@@ -225,11 +332,15 @@ export class HybridEngine extends EventTarget {
           codec: {
             codecId,
             codecName: this.getCodecName(codecId),
-            codecString
+            codecString,
+            extradata,
+            profileId: profile,
+            level: safeLevel,
+            bitDepth
           },
           width,
           height,
-          duration: this.duration
+          duration: streamDurationSeconds
         }
 
         streams.push(streamInfo)
@@ -252,7 +363,7 @@ export class HybridEngine extends EventTarget {
           },
           sampleRate,
           channels,
-          duration: this.duration
+          duration: streamDurationSeconds
         }
 
         streams.push(streamInfo)
@@ -305,18 +416,65 @@ export class HybridEngine extends EventTarget {
   /**
    * Get MSE-compatible codec string
    */
-  private getVideoCodecString(codecId: number, _codecpar: number): string {
-    // Simplified codec strings - a proper implementation would extract
-    // profile and level from the extradata
+  private async getVideoCodecString(codecId: number, codecpar: number, profileOverride?: number): Promise<string> {
+    const profile = profileOverride ?? await this.libav.AVCodecParameters_profile(codecpar)
+    const level = await this.libav.AVCodecParameters_level(codecpar)
+
     switch (codecId) {
       case CODEC_ID_H264:
-        return 'avc1.640028' // High Profile, Level 4.0
+        // AVC1: avc1.[profile][compatibility][level]
+        // Simplified fallback for now, ideally strictly map profile/level pairs
+        return 'avc1.640028' 
+      
       case CODEC_ID_HEVC:
-        return 'hev1.1.6.L120.90' // Main Profile
+        // HEVC: hev1.[profile].[tier].[level].[constraints]
+        // Profile 1 (Main) -> hev1.1.6.L...
+        // Profile 2 (Main 10) -> hev1.2.4.L... (Main 10)
+        
+        // Profiles from libavcodec/avcodec.h
+        const FF_PROFILE_HEVC_MAIN = 1
+        const FF_PROFILE_HEVC_MAIN_10 = 2
+        
+        // Handle invalid/unknown level (-99)
+        let safeLevel = level
+        if (safeLevel <= 0) {
+          // Robust fallback based on resolution
+          const width = await this.libav.AVCodecParameters_width(codecpar)
+          const height = await this.libav.AVCodecParameters_height(codecpar)
+          const pixels = width * height
+          
+          console.log(`[HybridEngine] HEVC Level check: level=${level}, size=${width}x${height} (${pixels})`)
+
+          if (pixels >= 3840 * 2160) { // 4K classification
+             console.warn(`[HybridEngine] Invalid HEVC level ${level} for 4K, defaulting to 153 (5.1)`)
+             safeLevel = 153 // Level 5.1
+          } else if (width >= 1920 || height >= 1080) { // 1080p classification (covers 1920x800 etc)
+             console.warn(`[HybridEngine] Invalid HEVC level ${level} for 1080p (width>=1920), defaulting to 123 (4.1)`)
+             safeLevel = 123 // Level 4.1
+          } else {
+             // If resolution is unknown or small, default to 5.1 anyway to be safe.
+             // Level 5.1 covers up to 4K @ 30fps and 4.0 content will play fine on a 5.1 decoder.
+             // This avoids the risk of 4.0 being too low for weird resolutions.
+             console.warn(`[HybridEngine] Invalid HEVC level ${level}, defaulting to 153 (5.1) for safety. Dimensions: ${width}x${height}`)
+             safeLevel = 153 // Level 5.1
+          }
+        }
+
+        if (profile === FF_PROFILE_HEVC_MAIN_10) {
+          // Main 10, typically High Tier (4)
+          // Switch to hvc1 tag for better compatibility (e.g. Windows/Android)
+          return `hvc1.2.4.L${safeLevel}.B0`
+        }
+        // Default to Main Profile, Main Tier (6)
+        return `hvc1.1.6.L${safeLevel}.B0`
+
       case CODEC_ID_VP9:
         return 'vp09.00.10.08'
+      
       case CODEC_ID_AV1:
+        // AV1: av01.[profile].[level]M.[tier]
         return 'av01.0.04M.08'
+        
       default:
         return 'avc1.640028'
     }
@@ -339,12 +497,28 @@ export class HybridEngine extends EventTarget {
 
     // Create and attach video remuxer
     this.videoRemuxer = new VideoRemuxer(this.config.video)
-    await this.videoRemuxer.attach(video, videoStream.codec)
+    await this.videoRemuxer.attach(video, videoStream.codec, videoStream.width, videoStream.height)
 
     // Mute video element (audio comes from worklet)
     video.muted = true
+
+    // Sync engine state with video element events (allows UI controls to drive engine)
+    video.addEventListener('play', () => {
+      if (this.state !== 'playing') this.start()
+    })
+
+    video.addEventListener('pause', () => {
+       if (this.state === 'playing') this.pause()
+    })
+
+    video.addEventListener('seeking', () => {
+       // Only seek if the difference is significant to avoid micro-loops
+       if (Math.abs(video.currentTime - this.currentTime) > 0.5) {
+         this.seek(video.currentTime)
+       }
+    })
     
-    console.log('[HybridEngine] Video attached')
+    console.log('[HybridEngine] Video attached and listeners registered')
   }
 
   /**
@@ -438,12 +612,32 @@ export class HybridEngine extends EventTarget {
    * Start playback
    */
   async start(): Promise<void> {
+    // If already playing, just return (idempotent)
+    if (this.state === 'playing') {
+      return
+    }
+    
     if (this.state !== 'ready' && this.state !== 'paused') {
       throw new Error(`Cannot start from state: ${this.state}`)
     }
 
     this.setState('playing')
     this.shouldStop = false
+
+    // Start packet processing first to fill buffers
+    this.processPackets()
+
+    // Wait for sufficient audio buffer if we have an audio stream
+    if (this.audioStreamIndex !== -1 && this.audioRingBuffer) {
+      console.log('[HybridEngine] Buffering audio...')
+      let attempts = 0
+      // Buffer for up to 2000ms or until 0.5s of audio is buffered
+      while (attempts < 200 && this.audioRingBuffer.bufferedSeconds < 0.5 && !this.shouldStop) {
+        await new Promise(r => setTimeout(r, 10))
+        attempts++
+      }
+      console.log(`[HybridEngine] Buffered ${this.audioRingBuffer.bufferedSeconds.toFixed(3)}s (attempts: ${attempts})`)
+    }
 
     // Start audio worklet
     if (this.audioWorkletNode) {
@@ -452,16 +646,20 @@ export class HybridEngine extends EventTarget {
 
     // Resume audio context if suspended
     if (this.audioContext?.state === 'suspended') {
-      await this.audioContext.resume()
+      try {
+        await this.audioContext.resume()
+        console.log('[HybridEngine] AudioContext resumed successfully')
+      } catch (e) {
+        // This is expected if the user hasn't interacted with the page yet
+        console.warn('[HybridEngine] Audio available but autoplay blocked. Waiting for user interaction to resume audio.')
+        // Continue anyway - video should play, and next user interaction (play/pause) will retry resume
+      }
     }
 
     // Start video element
     if (this.videoElement) {
       this.videoElement.play().catch(e => console.warn('Autoplay blocked:', e))
     }
-
-    // Start packet processing loop
-    this.processPackets()
   }
 
   /**
@@ -606,8 +804,31 @@ export class HybridEngine extends EventTarget {
         const timeBaseDen = await this.libav.AVStream_time_base_den(stream)
         const timeBase = timeBaseNum / timeBaseDen
 
-        const ptsSeconds = pts * timeBase
-        const dtsSeconds = dts * timeBase
+        let ptsSeconds = pts * timeBase
+        let dtsSeconds = dts * timeBase
+
+        // Normalize timestamps if they start at a large offset
+        if (this.startTime === -1) {
+             // Try to get global start time from format context first
+             // AVFormatContext.start_time is in AV_TIME_BASE units (microseconds usually, or 1/1,000,000)
+             // But checking libav docs, it is AV_TIME_BASE (1,000,000)
+             const fmtStartTime = await this.libav.AVFormatContext_start_time(this.fmtCtx)
+             // AV_NOPTS_VALUE check
+             if (fmtStartTime > -9223372036854775000 && fmtStartTime !== 0) {
+                 this.startTime = fmtStartTime / 1000000
+                 console.log(`[HybridEngine] Found container start time: ${this.startTime}s`)
+             } else {
+                 // Use first packet as zero point
+                 this.startTime = ptsSeconds
+                 console.log(`[HybridEngine] Using first packet as start time: ${this.startTime}s`)
+             }
+        }
+
+        if (this.startTime > 0) {
+            ptsSeconds = Math.max(0, ptsSeconds - this.startTime)
+            dtsSeconds = Math.max(0, dtsSeconds - this.startTime)
+        }
+
         const isKeyframe = (flags & 1) !== 0
 
         // Route packet based on stream
@@ -630,7 +851,11 @@ export class HybridEngine extends EventTarget {
           }
 
           if (this.videoRemuxer) {
-            await this.videoRemuxer.push(videoPacket)
+            try {
+              await this.videoRemuxer.push(videoPacket)
+            } catch (remuxError) {
+              console.error('[HybridEngine] Video remux error:', remuxError)
+            }
           }
 
           this.currentTime = ptsSeconds
@@ -665,9 +890,22 @@ export class HybridEngine extends EventTarget {
         await this.libav.av_packet_unref(pkt)
 
         // Check buffer levels and potentially pause reading
-        if (this.audioRingBuffer && this.audioRingBuffer.fillLevel > 0.9) {
-          // Buffer nearly full, wait a bit
-          await new Promise(r => setTimeout(r, 50))
+        // When AudioContext is suspended (waiting for user interaction), audio isn't being consumed
+        // so we need to slow down decoding significantly to avoid buffer overflow
+        if (this.audioRingBuffer) {
+          const fillLevel = this.audioRingBuffer.fillLevel
+          const isAudioSuspended = this.audioContext?.state === 'suspended'
+          
+          if (fillLevel > 0.95) {
+            // Buffer critically full - wait longer
+            await new Promise(r => setTimeout(r, 200))
+          } else if (fillLevel > 0.9) {
+            // Buffer nearly full - wait a bit
+            await new Promise(r => setTimeout(r, 100))
+          } else if (fillLevel > 0.7 && isAudioSuspended) {
+            // Buffer filling up and audio not playing - slow down significantly
+            await new Promise(r => setTimeout(r, 150))
+          }
         }
       }
 
@@ -717,7 +955,7 @@ export class HybridEngine extends EventTarget {
 
     // Cleanup video
     if (this.videoRemuxer) {
-      this.videoRemuxer.destroy()
+      await this.videoRemuxer.destroy()
       this.videoRemuxer = null
     }
 
