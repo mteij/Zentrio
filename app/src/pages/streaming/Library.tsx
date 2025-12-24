@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Layout, Navbar, RatingBadge, LazyImage, SkeletonCard } from '../../components'
 import { List, ListItem } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
+import { apiFetch } from '../../lib/apiFetch'
 
 export const StreamingLibrary = () => {
   const { profileId, listId } = useParams<{ profileId: string, listId?: string }>()
@@ -17,7 +18,7 @@ export const StreamingLibrary = () => {
   // Fetch profile for navbar avatar
   useEffect(() => {
     if (profileId) {
-      fetch(`/api/streaming/dashboard?profileId=${profileId}`)
+      apiFetch(`/api/streaming/dashboard?profileId=${profileId}`)
         .then(res => res.json())
         .then(data => setProfile(data.profile))
         .catch(console.error)
@@ -36,7 +37,7 @@ export const StreamingLibrary = () => {
     setLoading(true)
     try {
       // Fetch lists
-      const listsRes = await fetch(`/api/lists?profileId=${profileId}`)
+      const listsRes = await apiFetch(`/api/lists?profileId=${profileId}`)
       const listsData = await listsRes.json()
       
       if (listsData.lists && listsData.lists.length > 0) {
@@ -51,12 +52,12 @@ export const StreamingLibrary = () => {
         setActiveList(currentList)
         
         // Fetch items for active list
-        const itemsRes = await fetch(`/api/lists/${currentList.id}/items`)
+        const itemsRes = await apiFetch(`/api/lists/${currentList.id}/items`)
         const itemsData = await itemsRes.json()
         setItems(itemsData.items || [])
       } else {
         // Create default list if none exist
-        const createRes = await fetch('/api/lists', {
+        const createRes = await apiFetch('/api/lists', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ profileId, name: 'My List' })

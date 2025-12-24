@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { Button, InputDialog, ConfirmDialog } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { useAuthStore } from '../../stores/authStore'
+import { apiFetch } from '../../lib/apiFetch'
 
 export function DangerZoneSettings() {
   const [showTypeDelete, setShowTypeDelete] = useState(false)
@@ -24,7 +25,7 @@ export function DangerZoneSettings() {
 
   const handleDeleteAccount = async () => {
     try {
-      const res = await fetch('/api/user/account', {
+      const res = await apiFetch('/api/user/account', {
         method: 'DELETE',
         headers: {
           'X-Requested-With': 'XMLHttpRequest'

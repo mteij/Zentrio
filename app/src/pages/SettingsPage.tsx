@@ -4,6 +4,7 @@ import { User, Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Check, Link, Eye
 import { toast } from 'sonner'
 import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter, AnimatedBackground } from '../components/index'
 import { authClient, getClientUrl } from '../lib/auth-client'
+import { apiFetch } from '../lib/apiFetch'
 
 import { TwoFactorSetupModal } from '../components/auth/TwoFactorSetupModal'
 import { ServerConnectionIndicator } from '../components/auth/ServerConnectionIndicator'
@@ -94,7 +95,7 @@ export function SettingsPage() {
 
   const loadAvailableProviders = async () => {
     try {
-      const res = await fetch('/api/auth/providers')
+      const res = await apiFetch('/api/auth/providers')
       if (res.ok) {
         const data = await res.json()
         setAvailableProviders(data)
@@ -106,7 +107,7 @@ export function SettingsPage() {
 
   const loadProfile = async () => {
     try {
-      const res = await fetch('/api/user/profile')
+      const res = await apiFetch('/api/user/profile')
       if (res.ok) {
         const data = await res.json()
         const profileData = data.data || data
@@ -125,7 +126,7 @@ export function SettingsPage() {
 
   const loadTmdbApiKey = async () => {
     try {
-      const res = await fetch('/api/user/tmdb-api-key')
+      const res = await apiFetch('/api/user/tmdb-api-key')
       if (res.ok) {
         const data = await res.json()
         if (data.data?.tmdb_api_key) {
@@ -139,7 +140,7 @@ export function SettingsPage() {
 
   const handleUpdateTmdbApiKey = async () => {
     try {
-        const res = await fetch('/api/user/tmdb-api-key', {
+        const res = await apiFetch('/api/user/tmdb-api-key', {
             method: 'PUT',
             headers: { 
                 'Content-Type': 'application/json',
@@ -163,7 +164,7 @@ export function SettingsPage() {
 
   const handleUpdateUsername = async () => {
     try {
-        const res = await fetch('/api/user/username', {
+        const res = await apiFetch('/api/user/username', {
             method: 'PUT',
             headers: { 
                 'Content-Type': 'application/json',
@@ -184,7 +185,7 @@ export function SettingsPage() {
 
   const handleInitiateEmailChange = async () => {
     try {
-        const res = await fetch('/api/user/email/initiate', {
+        const res = await apiFetch('/api/user/email/initiate', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -205,7 +206,7 @@ export function SettingsPage() {
 
   const handleVerifyEmail = async () => {
     try {
-        const res = await fetch('/api/user/email/verify', {
+        const res = await apiFetch('/api/user/email/verify', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -231,7 +232,7 @@ export function SettingsPage() {
         return
     }
     try {
-        const res = await fetch('/api/user/password', {
+        const res = await apiFetch('/api/user/password', {
             method: 'PUT',
             headers: { 
                 'Content-Type': 'application/json',
@@ -264,7 +265,7 @@ export function SettingsPage() {
         return
     }
     try {
-        const res = await fetch('/api/user/password/setup', {
+        const res = await apiFetch('/api/user/password/setup', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',

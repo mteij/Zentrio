@@ -1,2 +1,5 @@
 target
 bin/
+gen/
+data/
+node_modules/

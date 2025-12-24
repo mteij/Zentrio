@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Settings, LogOut, Edit, X, Plus } from 'lucide-react'
 import { SimpleLayout, Button, ConfirmDialog, ProfileModal, LoadingSpinner, AnimatedBackground } from '../components'
 import { useAuthStore } from '../stores/authStore'
+import { apiFetch } from '../lib/apiFetch'
 import styles from './ProfilesPage.module.css'
 
 interface Profile {
@@ -46,7 +47,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
 
   const loadProfiles = async () => {
     try {
-      const res = await fetch('/api/profiles')
+      const res = await apiFetch('/api/profiles')
       if (res.status === 401) {
         // Session expired or invalid, clear auth state and redirect to landing
         console.log('Session expired, redirecting to login...')
@@ -63,7 +64,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
            console.log("No profiles found, retrying once in 1s to handle potential consistency delay...");
            setTimeout(async () => {
               try {
-                  const res2 = await fetch('/api/profiles');
+                  const res2 = await apiFetch('/api/profiles');
                   if (res2.ok) {
                       const data2 = await res2.json();
                       console.log("Retry profiles loaded:", data2);

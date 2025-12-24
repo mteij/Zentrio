@@ -5,6 +5,7 @@ import { Search, Filter, ArrowLeft, Download, Star, Settings, Trash2, Check, X }
 import { SimpleLayout, Button, LoadingSpinner, AnimatedBackground } from '../components'
 import styles from '../styles/Addons.module.css'
 import settingsStyles from '../styles/Settings.module.css'
+import { apiFetch } from '../lib/apiFetch'
 
 interface Addon {
   manifest: {
@@ -221,7 +222,7 @@ export function ExploreAddonsPage() {
           const addonsPromise = fetch('https://api.strem.io/addonscollection.json').then(r => r.json());
           
           // 2. Fetch profiles to get the active one
-          const profilesRes = await fetch('/api/user/settings-profiles');
+          const profilesRes = await apiFetch('/api/user/settings-profiles');
           let profileId = '';
           if (profilesRes.ok) {
               const data = await profilesRes.json();
@@ -239,7 +240,7 @@ export function ExploreAddonsPage() {
           let installed: InstalledAddon[] = [];
           if (profileId) {
               try {
-                  const installedRes = await fetch(`/api/addons/settings-profile/${profileId}/manage`);
+                  const installedRes = await apiFetch(`/api/addons/settings-profile/${profileId}/manage`);
                   if (installedRes.ok) {
                       installed = await installedRes.json();
                   }
@@ -263,7 +264,7 @@ export function ExploreAddonsPage() {
   const reloadInstalled = async () => {
       if (!activeProfileId) return;
       try {
-          const res = await fetch(`/api/addons/settings-profile/${activeProfileId}/manage`);
+          const res = await apiFetch(`/api/addons/settings-profile/${activeProfileId}/manage`);
           if (res.ok) {
               setInstalledAddons(await res.json());
           }
@@ -279,7 +280,7 @@ export function ExploreAddonsPage() {
     }
     setProcessingAddonId(addon.transportUrl);
     try {
-        const res = await fetch('/api/addons', {
+        const res = await apiFetch('/api/addons', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -307,7 +308,7 @@ export function ExploreAddonsPage() {
       if (!activeProfileId) return;
       setProcessingAddonId(addonId);
       try {
-          const res = await fetch(`/api/addons/settings-profile/${activeProfileId}/${addonId}`, {
+          const res = await apiFetch(`/api/addons/settings-profile/${activeProfileId}/${addonId}`, {
               method: 'DELETE'
           });
           if (res.ok) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from 'sonner'
 import { authClient, getClientUrl } from "../../lib/auth-client";
+import { apiFetch } from "../../lib/apiFetch";
 import { 
   Mail, 
   Lock, 
@@ -78,7 +79,7 @@ export function AuthForms({ mode }: AuthFormsProps) {
   });
 
   useEffect(() => {
-    fetch('/api/auth/providers')
+    apiFetch('/api/auth/providers')
       .then(res => res.json())
       .then(data => setProviders(data))
       .catch(err => console.error("Failed to fetch auth providers", err));

@@ -20,6 +20,7 @@ import { Stream } from '../../services/addons/types'
 import { toast } from 'sonner'
 import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import styles from '../../styles/Player.module.css'
+import { apiFetch } from '../../lib/apiFetch'
 
 // Threshold for "short video" warning (videos under 5 minutes)
 const SHORT_VIDEO_THRESHOLD = 300 // 5 minutes in seconds
@@ -241,7 +242,7 @@ export const StreamingPlayer = () => {
 
             // Don't save if near start or end
             if (progress > 0.02 && progress < 0.95) {
-                fetch('/api/streaming/progress', {
+                apiFetch('/api/streaming/progress', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

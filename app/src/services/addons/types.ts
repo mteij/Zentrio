@@ -3,7 +3,7 @@ export interface Manifest {
   name: string
   version: string
   description: string
-  resources: string[]
+  resources: (string | { name: string; types?: string[]; idPrefixes?: string[] })[]
   types: string[]
   catalogs: Catalog[]
   idPrefixes?: string[]

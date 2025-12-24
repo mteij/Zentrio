@@ -611,18 +611,47 @@ export class AddonManager {
       const isZentrio = client.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || client.manifest.id === 'org.zentrio.tmdb';
       if (isZentrio && !hasTmdbKey) continue;
 
-      // Use proper resource checking that handles object resources
-      if (!this.supportsResource(client.manifest, 'meta', type)) continue
-      
       // Check ID prefixes using the proper per-resource or manifest-level prefixes
-      if (!this.canHandleId(client.manifest, 'meta', id)) {
-          // Special case: Zentrio can handle IMDB IDs even if not declared
-          if (primaryId.startsWith('tt') && isZentrio) {
-              // Allow
-          } else {
-              continue
+      const idPrefixes = this.getResourceIdPrefixes(client.manifest, 'meta');
+      // If we have specific prefixes, check if ID matches one of them
+      const hasPrefixMatch = idPrefixes && idPrefixes.some(p => primaryId.startsWith(p));
+      
+      let shouldQuery = false;
+
+      if (hasPrefixMatch) {
+          // STRONG MATCH: Addon explicitly claims this ID prefix.
+          // We assume the addon CAN handle it regardless of declared types if it supports 'meta' resource at all.
+          // Check if 'meta' resource is present (ignoring type restriction)
+          const hasMetaResource = client.manifest.resources.some(r => {
+              if (typeof r === 'string') return r === 'meta';
+              return r.name === 'meta';
+          });
+          
+          if (hasMetaResource) {
+              shouldQuery = true;
+          }
+      } else {
+          // WEAK MATCH: No specific prefix claim (or didn't match).
+          // Fall back to standard strict checking:
+          // 1. Must support resource AND type
+          // 2. Must pass canHandleId check (which passes if no prefixes defined)
+          
+          // Use proper resource checking that handles object resources AND types
+          if (this.supportsResource(client.manifest, 'meta', type)) {
+               // Check ID eligibility (will pass if no prefixes, or if matched - though if matched we caught it above usually, 
+               // but canHandleId also handles the "no prefixes = all" case)
+               if (this.canHandleId(client.manifest, 'meta', id)) {
+                   shouldQuery = true;
+               } else {
+                   // Special case: Zentrio can handle IMDB IDs even if not explicitly in some lists
+                   if (primaryId.startsWith('tt') && isZentrio) {
+                      shouldQuery = true;
+                   }
+               }
           }
       }
+
+      if (!shouldQuery) continue;
 
       try {
         console.log(`[AddonManager] Trying ${client.manifest.name} for meta ${type}/${primaryId}`)

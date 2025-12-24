@@ -20,6 +20,7 @@ export default defineConfig({
     ],
   },
   server: {
+    host: true, // Listen on all network interfaces for Tauri Android
     port: 5173,
     strictPort: true,
     headers: {

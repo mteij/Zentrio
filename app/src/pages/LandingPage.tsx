@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { SimpleLayout, AnimatedBackground, Button, Input } from '../components'
 import { Loader2, ArrowRight } from "lucide-react";
 import { authClient, getClientUrl } from '../lib/auth-client';
+import { apiFetch } from '../lib/apiFetch';
 import { getLoginBehaviorRedirectPath } from '../hooks/useLoginBehavior';
 
 // Brand icons as SVG components
@@ -75,7 +76,7 @@ export function LandingPage({ version }: LandingPageProps) {
   });
 
   useEffect(() => {
-    fetch('/api/auth/providers')
+    apiFetch('/api/auth/providers')
       .then(res => res.json())
       .then(data => setProviders(data))
       .catch(err => console.error("Failed to fetch auth providers", err));
@@ -140,7 +141,7 @@ export function LandingPage({ version }: LandingPageProps) {
                         if (email && !isChecking) {
                           setIsChecking(true);
                           try {
-                              const res = await fetch('/api/auth/identify', {
+                              const res = await apiFetch('/api/auth/identify', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ email })

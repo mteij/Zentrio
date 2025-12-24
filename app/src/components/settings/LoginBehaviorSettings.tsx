@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { LoginBehavior } from '../../hooks/useLoginBehavior'
 import { useSessionDuration, SessionDuration } from '../../hooks/useSessionDuration'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface Profile {
   id: number
@@ -34,7 +35,7 @@ export function LoginBehaviorSettings() {
 
   const loadProfiles = async () => {
     try {
-      const res = await fetch('/api/profiles')
+      const res = await apiFetch('/api/profiles')
       if (res.ok) {
         const data = await res.json()
         setProfiles(data)

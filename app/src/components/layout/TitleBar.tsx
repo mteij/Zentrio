@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { apiFetch } from '../../lib/apiFetch';
 
 // Helper to check if we're running in Tauri
 const isTauri = () => {
@@ -95,7 +96,7 @@ export function TitleBar() {
                 const urlObj = new URL(url);
                 const sessionToken = urlObj.searchParams.get('session_token');
                 
-                const res = await fetch('/api/auth/mobile-callback', {
+                const res = await apiFetch('/api/auth/mobile-callback', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ url, sessionToken })

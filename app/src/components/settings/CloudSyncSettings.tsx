@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Button, Input, ConfirmDialog } from '../index';
 import { createAuthClient } from "better-auth/client";
 import styles from '../../styles/Settings.module.css';
+import { apiFetch } from '../../lib/apiFetch';
 
 interface SyncState {
   id: number;
@@ -31,7 +32,7 @@ export function CloudSyncSettings() {
 
   async function loadSyncState() {
     try {
-      const response = await fetch('/api/sync/status');
+      const response = await apiFetch('/api/sync/status');
       if (response.ok) {
         const data = await response.json();
         setSyncState(data);
@@ -91,7 +92,7 @@ export function CloudSyncSettings() {
       }
 
       // Step 3: Configure local sync service
-      const connectResponse = await fetch('/api/sync/connect', {
+      const connectResponse = await apiFetch('/api/sync/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -119,7 +120,7 @@ export function CloudSyncSettings() {
 
   async function handleDisconnect() {
     try {
-      await fetch('/api/sync/disconnect', { method: 'POST' });
+      await apiFetch('/api/sync/disconnect', { method: 'POST' });
       setSyncState(null);
       toast.success('Disconnected', { description: 'Cloud sync has been disabled' });
     } catch (err) {
@@ -136,7 +137,7 @@ export function CloudSyncSettings() {
     }
 
     try {
-      await fetch('/api/sync/sync', { method: 'POST' });
+      await apiFetch('/api/sync/sync', { method: 'POST' });
       await loadSyncState();
       toast.success('Sync Complete', { description: 'Your data has been synchronized' });
     } catch (err) {

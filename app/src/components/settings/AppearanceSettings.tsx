@@ -3,6 +3,7 @@ import { Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, ModalWithFooter, Toggle, SettingsProfileSelector } from '../index'
 import styles from '../../styles/Settings.module.css'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface Theme {
   id: string
@@ -60,7 +61,7 @@ export function AppearanceSettings() {
 
   const loadThemes = async () => {
     try {
-      const res = await fetch('/api/themes')
+      const res = await apiFetch('/api/themes')
       if (res.ok) {
         const data = await res.json()
         setThemes(data)
@@ -74,7 +75,7 @@ export function AppearanceSettings() {
     if (!profileId) return
     try {
       setLoading(true)
-      const res = await fetch(`/api/appearance/settings?settingsProfileId=${profileId}`)
+      const res = await apiFetch(`/api/appearance/settings?settingsProfileId=${profileId}`)
       if (res.ok) {
         const data = await res.json()
         if (data.data) {
@@ -102,7 +103,7 @@ export function AppearanceSettings() {
     if (!currentProfileId) return
 
     try {
-      const res = await fetch(`/api/appearance/settings?settingsProfileId=${currentProfileId}`, {
+      const res = await apiFetch(`/api/appearance/settings?settingsProfileId=${currentProfileId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)

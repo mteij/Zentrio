@@ -31,19 +31,44 @@ class SmtpProvider implements EmailProvider {
     secure: boolean
     auth: { user: string; pass: string }
   } | string) {
+    const defaults = {
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,   // 10 seconds
+      socketTimeout: 10000      // 10 seconds
+    }
+
     if (typeof config === 'string') {
       // SMTP URL
-      this.transporter = nodemailer.createTransport(config)
+      this.transporter = nodemailer.createTransport(config, defaults)
     } else {
-      this.transporter = nodemailer.createTransport(config)
+      this.transporter = nodemailer.createTransport({
+        ...config,
+        ...defaults
+      })
     }
   }
 
   async sendMail(options: SendMailOptions): Promise<void> {
-    await this.transporter.sendMail({
-      ...options,
-      envelope: { from: options.from, to: options.to }
-    })
+    console.log(`[email] Sending mail to ${options.to} via SMTP...`)
+    const start = Date.now()
+    
+    try {
+      // Wrap sendMail in a promise race to enforce a strict timeout
+      // (in case nodemailer's internal timeouts fail to trigger)
+      await Promise.race([
+        this.transporter.sendMail({
+          ...options,
+          envelope: { from: options.from, to: options.to }
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('SMTP sendMail timed out after 15s')), 15000)
+        )
+      ])
+      console.log(`[email] sent to ${options.to} in ${Date.now() - start}ms`)
+    } catch (err: any) {
+      console.error(`[email] Failed to send to ${options.to} after ${Date.now() - start}ms:`, err?.message || err)
+      throw err
+    }
   }
 }
 

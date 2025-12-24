@@ -3,6 +3,7 @@ import { Puzzle, Settings, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Input, Toggle, SettingsProfileSelector } from '../index'
 import styles from '../../styles/Settings.module.css'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface Addon {
   id: string
@@ -39,7 +40,7 @@ const AddonConfigModal = ({
         if (!url || !profileId) return
         setInstalling(true)
         try {
-            const res = await fetch('/api/addons', {
+            const res = await apiFetch('/api/addons', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -119,7 +120,7 @@ export function AddonManager() {
 
   const checkTmdbKey = async () => {
     try {
-        const res = await fetch('/api/user/tmdb-api-key')
+        const res = await apiFetch('/api/user/tmdb-api-key')
         if (res.ok) {
             const data = await res.json()
             setHasTmdbKey(!!data.data?.tmdb_api_key)
@@ -134,7 +135,7 @@ export function AddonManager() {
   const loadAddons = async (profileId: string) => {
     try {
       setLoading(true)
-      const res = await fetch(`/api/addons/settings-profile/${profileId}/manage`)
+      const res = await apiFetch(`/api/addons/settings-profile/${profileId}/manage`)
       if (res.ok) {
         const data = await res.json()
         setAddons(data)
@@ -166,7 +167,7 @@ export function AddonManager() {
     if (!manifestUrl) return
     setInstalling(true)
     try {
-      const res = await fetch('/api/addons', {
+      const res = await apiFetch('/api/addons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -204,7 +205,7 @@ export function AddonManager() {
     setAddons(addons.map(a => a.id === addonId ? { ...a, enabled } : a))
 
     try {
-      await fetch(`/api/addons/settings-profile/${currentProfileId}/toggle`, {
+      await apiFetch(`/api/addons/settings-profile/${currentProfileId}/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addonId, enabled })
@@ -218,7 +219,7 @@ export function AddonManager() {
 
   const handleDeleteAddon = async (addonId: string) => {
     try {
-      const res = await fetch(`/api/addons/settings-profile/${currentProfileId}/${addonId}`, {
+      const res = await apiFetch(`/api/addons/settings-profile/${currentProfileId}/${addonId}`, {
         method: 'DELETE'
       })
       

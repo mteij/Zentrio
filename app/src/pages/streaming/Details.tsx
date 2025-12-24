@@ -8,6 +8,7 @@ import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import { useStreamLoader, FlatStream, AddonLoadingState } from '../../hooks/useStreamLoader'
 import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface StreamingDetailsData {
   meta: MetaDetail
@@ -76,7 +77,7 @@ export const StreamingDetails = () => {
         url += `&metaFallback=${metaFallback}`
       }
       
-      const res = await fetch(url)
+      const res = await apiFetch(url)
       if (!res.ok) throw new Error('Failed to load content')
       const detailsData = await res.json()
       setData(detailsData)
@@ -221,7 +222,7 @@ export const StreamingDetails = () => {
     const newWatched = !currentlyWatched
     
     try {
-      await fetch('/api/streaming/mark-watched', {
+      await apiFetch('/api/streaming/mark-watched', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -271,7 +272,7 @@ export const StreamingDetails = () => {
       .map((v: any) => v.number || v.episode)
     
     try {
-      await fetch('/api/streaming/mark-season-watched', {
+      await apiFetch('/api/streaming/mark-season-watched', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

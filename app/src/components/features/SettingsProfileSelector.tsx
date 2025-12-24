@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { Button, InputDialog, ConfirmDialog } from '../index'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface SettingsProfile {
   id: string
@@ -38,7 +39,7 @@ export function SettingsProfileSelector({
 
   const loadProfiles = async () => {
     try {
-      const res = await fetch('/api/user/settings-profiles')
+      const res = await apiFetch('/api/user/settings-profiles')
       if (res.ok) {
         const data = await res.json()
         const profilesList = data.data || data || []
@@ -53,7 +54,7 @@ export function SettingsProfileSelector({
   const handleCreateProfile = async (name: string) => {
     try {
       setError(null)
-      const res = await fetch('/api/user/settings-profiles', {
+      const res = await apiFetch('/api/user/settings-profiles', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
@@ -81,7 +82,7 @@ export function SettingsProfileSelector({
 
     try {
       setError(null)
-      const res = await fetch(`/api/user/settings-profiles/${currentProfileId}`, {
+      const res = await apiFetch(`/api/user/settings-profiles/${currentProfileId}`, {
         method: 'DELETE',
         headers: {
             'X-Requested-With': 'XMLHttpRequest' 
@@ -97,7 +98,7 @@ export function SettingsProfileSelector({
         // But we need the updated list first.
         // Actually loadProfiles updates state async.
         // Let's manually fetch here to decide what to select
-        const listRes = await fetch('/api/user/settings-profiles').then(r => r.json()).catch(() => [])
+        const listRes = await apiFetch('/api/user/settings-profiles').then(r => r.json()).catch(() => [])
         const newList = listRes.data || listRes || []
         if (newList.length > 0) {
             onProfileChange(String(newList[0].id))
@@ -119,7 +120,7 @@ export function SettingsProfileSelector({
 
     try {
       setError(null)
-      const res = await fetch(`/api/user/settings-profiles/${currentProfileId}`, {
+      const res = await apiFetch(`/api/user/settings-profiles/${currentProfileId}`, {
         method: 'PUT',
         headers: { 
             'Content-Type': 'application/json',

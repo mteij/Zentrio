@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '../index'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface PasswordResetModalProps {
   onBack: () => void
@@ -46,7 +47,7 @@ export function PasswordResetModal({
     }
     
     try {
-      const res = await fetch('/api/auth/forgot-password', {
+      const res = await apiFetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -71,7 +72,7 @@ export function PasswordResetModal({
     if (resendSeconds > 0 || isLoading) return
     
     try {
-      const res = await fetch('/api/auth/forgot-password', {
+      const res = await apiFetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

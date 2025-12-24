@@ -120,7 +120,7 @@ jobs:
           NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         run: |
           bun tauri android init
-          bun tauri android build --apk true
+          bun tauri android build --apk
 
       - name: Upload Android Artifacts to Release
         if: matrix.name == 'android'

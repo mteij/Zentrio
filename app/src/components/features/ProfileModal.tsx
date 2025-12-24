@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Pencil } from 'lucide-react'
 import { Button, FormGroup, Input, Modal, ConfirmDialog } from '../index'
+import { apiFetch } from '../../lib/apiFetch'
 
 // Avatar styles available in DiceBear
 const AVATAR_STYLES = [
@@ -74,7 +75,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
 
   const loadSettingsProfiles = async () => {
     try {
-      const res = await fetch('/api/user/settings-profiles')
+      const res = await apiFetch('/api/user/settings-profiles')
       if (res.ok) {
         const data = await res.json()
         const profiles = data.data || data || []
@@ -101,7 +102,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
   const generateNewAvatar = async (style?: string) => {
     try {
       const styleToUse = style || avatarStyle
-      const res = await fetch(`/api/avatar/random?style=${encodeURIComponent(styleToUse)}`)
+      const res = await apiFetch(`/api/avatar/random?style=${encodeURIComponent(styleToUse)}`)
       if (res.ok) {
         const data = await res.json()
         setAvatar(data.seed)
@@ -143,7 +144,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
         hideAddonsButton: false
       }
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -172,7 +173,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
 
     setLoading(true)
     try {
-      const res = await fetch(`/api/profiles/${profile.id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/profiles/${profile.id}`, { method: 'DELETE' })
       if (!res.ok) {
           const data = await res.json()
           throw new Error(data.error || 'Failed to delete profile')
