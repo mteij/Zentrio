@@ -32,9 +32,9 @@ class SmtpProvider implements EmailProvider {
     auth: { user: string; pass: string }
   } | string) {
     const defaults = {
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,   // 10 seconds
-      socketTimeout: 10000      // 10 seconds
+      connectionTimeout: 30000, // 30 seconds
+      greetingTimeout: 30000,   // 30 seconds
+      socketTimeout: 30000      // 30 seconds
     }
 
     if (typeof config === 'string') {
@@ -61,7 +61,7 @@ class SmtpProvider implements EmailProvider {
           envelope: { from: options.from, to: options.to }
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('SMTP sendMail timed out after 15s')), 15000)
+          setTimeout(() => reject(new Error('SMTP sendMail timed out after 35s')), 35000)
         )
       ])
       console.log(`[email] sent to ${options.to} in ${Date.now() - start}ms`)
