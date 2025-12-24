@@ -373,36 +373,61 @@ export class AddonManager {
     
     // Use User Profile settings for content filtering
     const parentalSettings = this.getParentalSettings(profileId);
-
     const profile = profileDb.findById(profileId);
     
-    // 2. Try to find TMDB addon (Cinemeta)
+    // 2. Try to find TMDB addon (Zentrio)
     const tmdbClient = clients.find(c => c.manifest?.id?.includes('tmdb') || c.manifest?.name?.toLowerCase().includes('tmdb') || c.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON))
     
     if (tmdbClient) {
       try {
-        // Usually the first catalog is the most popular/trending one
-        const cat = tmdbClient.manifest?.catalogs[0]
-        if (cat) {
-          const { appearanceDb } = require('../database');
-          const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
-          const config = {
-              enableAgeRating: appearance ? appearance.show_age_ratings : true,
-              showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
-          };
+        const { appearanceDb } = require('../database');
+        const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+        const config = {
+            enableAgeRating: appearance ? appearance.show_age_ratings : true,
+            showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+        };
 
-          const items = await tmdbClient.getCatalog(cat.type, cat.id, {}, config)
-          if (items && items.length > 0) {
-            const filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
-            return filtered.slice(0, 10)
-          }
+        // Try to get both trending movies and series
+        // We look for 'tmdb.trending' catalog ID, or 'tmdb.top' as fallback
+        const trendingMovieCat = tmdbClient.manifest?.catalogs.find(c => c.type === 'movie' && (c.id === 'tmdb.trending' || c.id === 'tmdb.top'));
+        const trendingSeriesCat = tmdbClient.manifest?.catalogs.find(c => c.type === 'series' && (c.id === 'tmdb.trending' || c.id === 'tmdb.top'));
+
+        const promises: Promise<MetaPreview[]>[] = [];
+        
+        if (trendingMovieCat) {
+             promises.push(tmdbClient.getCatalog(trendingMovieCat.type, trendingMovieCat.id, {}, config)
+                .then(items => this.filterContent(items, parentalSettings, profile?.user_id)));
+        } else {
+            promises.push(Promise.resolve([]));
+        }
+
+        if (trendingSeriesCat) {
+             promises.push(tmdbClient.getCatalog(trendingSeriesCat.type, trendingSeriesCat.id, {}, config)
+                .then(items => this.filterContent(items, parentalSettings, profile?.user_id)));
+        } else {
+            promises.push(Promise.resolve([]));
+        }
+
+        const [movies, series] = await Promise.all(promises);
+        
+        // Interleave valid results
+        const combined: MetaPreview[] = [];
+        const maxLen = Math.max(movies.length, series.length);
+        
+        for (let i = 0; i < maxLen; i++) {
+            if (i < movies.length) combined.push(movies[i]);
+            if (i < series.length) combined.push(series[i]);
+        }
+        
+        if (combined.length > 0) {
+            return combined.slice(0, 20); // Return top 20 items available for the UI
         }
       } catch (e) {
-        console.warn('Failed to fetch trending from TMDB addon', e)
+        console.warn('Failed to fetch mixed trending from TMDB addon', e)
       }
     }
 
-    // 3. Fallback to any client
+    // 3. Fallback to any client (old behavior)
     for (const client of clients) {
       if (!client.manifest) continue
       try {
@@ -427,6 +452,42 @@ export class AddonManager {
     }
     
     return []
+  }
+
+  async getTrendingByType(profileId: number, type: 'movie' | 'series'): Promise<MetaPreview[]> {
+    const clients = await this.getClientsForProfile(profileId)
+    const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+    
+    const parentalSettings = this.getParentalSettings(profileId);
+    const profile = profileDb.findById(profileId);
+    
+    // Try to find TMDB addon (Zentrio)
+    const tmdbClient = clients.find(c => c.manifest?.id?.includes('tmdb') || c.manifest?.name?.toLowerCase().includes('tmdb') || c.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON))
+    
+    if (tmdbClient) {
+      try {
+        const { appearanceDb } = require('../database');
+        const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+        const config = {
+            enableAgeRating: appearance ? appearance.show_age_ratings : true,
+            showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+        };
+
+        const cat = tmdbClient.manifest?.catalogs.find(c => c.type === type && (c.id === 'tmdb.trending' || c.id === 'tmdb.top'));
+        
+        if (cat) {
+             const items = await tmdbClient.getCatalog(cat.type, cat.id, {}, config);
+             if (items && items.length > 0) {
+                 const filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
+                 return filtered.slice(0, 10);
+             }
+        }
+      } catch (e) {
+        console.warn(`Failed to fetch trending ${type} from TMDB addon`, e)
+      }
+    }
+    
+    return [];
   }
 
   private getParentalSettings(profileId: number) {
@@ -694,7 +755,31 @@ export class AddonManager {
         }
     }
 
-    // Pass 3: Fallback to Cinemeta for standard IDs only
+    // Pass 3: Fallback logic for orphaned or specific IDs
+    // 3a. If ID is a TMDB ID (tmdb:...), try using Zentrio Addon explicitly, even if disabled
+    if (primaryId.startsWith('tmdb:')) {
+         console.log(`[AddonManager] TMDB ID ${primaryId} not resolved by enabled addons. Attempting fallback to Zentrio Client.`);
+         
+         const profile = profileDb.findById(profileId);
+         // Use a dedicated cache key to avoid conflicts with the main client if it exists but is disabled
+         const fallbackKey = `fallback:${DEFAULT_TMDB_ADDON}`;
+         let zentrioClient = this.clientCache.get(fallbackKey);
+         
+         if (!zentrioClient) {
+             zentrioClient = new ZentrioAddonClient(DEFAULT_TMDB_ADDON, profile?.user_id);
+             this.clientCache.set(fallbackKey, zentrioClient);
+         }
+         
+         try {
+             if (!zentrioClient.manifest) await zentrioClient.init();
+             const meta = await zentrioClient.getMeta(type, id, config);
+             if (meta) return meta;
+         } catch (e) {
+             console.warn(`Fallback to Zentrio Client failed for ${id}`, e);
+         }
+    }
+
+    // 3b. Fallback to Cinemeta for standard IDs only (IMDB)
     if (isStandardId) {
         console.log(`[AddonManager] Meta not found in enabled addons for ${type}/${id}. Falling back to Cinemeta.`);
         
@@ -726,7 +811,7 @@ export class AddonManager {
     return null
   }
 
-  async search(query: string, profileId: number): Promise<MetaPreview[]> {
+  async search(query: string, profileId: number, filters?: { type?: string, year?: string, sort?: string }): Promise<MetaPreview[]> {
     const clients = await this.getClientsForProfile(profileId)
     const results: MetaPreview[] = []
     const profile = profileDb.findById(profileId);
@@ -736,17 +821,21 @@ export class AddonManager {
 
     if (tmdbClient && tmdbClient.manifest) {
       for (const cat of tmdbClient.manifest.catalogs) {
+        // If type filter is set, skip catalogs that don't match
+        if (filters?.type && filters.type !== 'all' && cat.type !== filters.type) continue;
+
         const searchExtra = cat.extra?.find(e => e.name === 'search')
         if (searchExtra) {
           try {
-            console.log(`[AddonManager] Searching TMDB catalog "${cat.id}" for "${query}"`)
+            console.log(`[AddonManager] Searching TMDB catalog "${cat.id}" for "${query}" with filters`, filters)
             
             const settingsProfileId = profileDb.getSettingsProfileId(profileId);
             const { appearanceDb } = require('../database');
             const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
             const config = {
                 enableAgeRating: appearance ? appearance.show_age_ratings : true,
-                showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+                showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true,
+                ...(filters?.year ? { year: parseInt(filters.year) } : {})
             };
 
             const items = await tmdbClient.getCatalog(cat.type, cat.id, { search: query }, config)
@@ -773,6 +862,9 @@ export class AddonManager {
 
       if (!client.manifest) continue
       for (const cat of client.manifest.catalogs) {
+        // If type filter is set, skip catalogs that don't match
+        if (filters?.type && filters.type !== 'all' && cat.type !== filters.type) continue;
+
         const searchExtra = cat.extra?.find(e => e.name === 'search')
         if (searchExtra) {
           try {
@@ -786,7 +878,31 @@ export class AddonManager {
     }
     
     // Deduplicate final results from all sources
-    const uniqueResults = Array.from(new Map(results.map(item => [item.id, item])).values());
+    let uniqueResults = Array.from(new Map(results.map(item => [item.id, item])).values());
+
+    // Apply client-side sorting if requested
+    if (filters?.sort && filters.sort !== 'relevance') {
+        uniqueResults.sort((a, b) => {
+            if (filters.sort === 'newest') {
+                const dateA = a.released ? new Date(a.released).getTime() : 0
+                const dateB = b.released ? new Date(b.released).getTime() : 0
+                return dateB - dateA
+            } else if (filters.sort === 'oldest') {
+                const dateA = a.released ? new Date(a.released).getTime() : 0
+                const dateB = b.released ? new Date(b.released).getTime() : 0
+                // Push items without date to the end for oldest sort
+                if (dateA === 0 && dateB !== 0) return 1
+                if (dateB === 0 && dateA !== 0) return -1
+                return dateA - dateB
+            } else if (filters.sort === 'rating') {
+                const rateA = a.imdbRating ? parseFloat(a.imdbRating) : 0
+                const rateB = b.imdbRating ? parseFloat(b.imdbRating) : 0
+                return rateB - rateA
+            }
+            return 0
+        })
+    }
+
     const parentalSettings = this.getParentalSettings(profileId);
     return this.filterContent(uniqueResults, parentalSettings, profile?.user_id);
   }
@@ -844,6 +960,7 @@ export class AddonManager {
         items: filteredItems
       }
     } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e)
       console.error(`Failed to fetch catalog ${id} from ${manifestUrl}`, e)
       if (e instanceof Error) {
         console.error(e.stack)
@@ -888,6 +1005,24 @@ export class AddonManager {
   }
 
   async getFilteredItems(profileId: number, type: string, genre?: string, skip?: number): Promise<MetaPreview[]> {
+    // Handle multiple types (e.g. "movie,series")
+    if (type.includes(',')) {
+        const types = type.split(',').map(t => t.trim());
+        const promises = types.map(t => this.getFilteredItems(profileId, t, genre, skip));
+        const results = await Promise.all(promises);
+        
+        // Interleave results
+        const combined: MetaPreview[] = [];
+        const maxLen = Math.max(...results.map(r => r.length));
+        
+        for (let i = 0; i < maxLen; i++) {
+            for (const list of results) {
+                if (i < list.length) combined.push(list[i]);
+            }
+        }
+        return combined;
+    }
+
     const clients = await this.getClientsForProfile(profileId)
     const results: MetaPreview[] = []
 
@@ -898,6 +1033,9 @@ export class AddonManager {
       const catalog = client.manifest.catalogs.find(c => {
         if (c.type !== type) return false
         if (genre) {
+          // Check if genre is supported. 
+          // Note: some addons use 'genre' extra without options (means any genre allowed)
+          // others specify options.
           return c.extra?.some(e => e.name === 'genre' && (!e.options || e.options.includes(genre)))
         }
         return true
@@ -972,7 +1110,8 @@ export class AddonManager {
             attempt++
           } else {
             // Non-retryable error or max retries exceeded
-            console.warn(`[${client.manifest.name}] Failed to fetch streams:`, e instanceof Error ? e.message : e)
+            const errorMsg = e instanceof Error ? e.message : String(e)
+            console.warn(`[${client.manifest.name}] Failed to fetch streams:`, errorMsg)
             return
           }
         }
@@ -1313,6 +1452,7 @@ export class AddonManager {
 
       return filteredItems
     } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e)
       console.error(`[AddonManager] Failed to fetch catalog ${catalogId} from ${manifestUrl}`, e)
       return []
     }

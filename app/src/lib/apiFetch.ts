@@ -22,14 +22,6 @@ export async function apiFetch(
     url = `${serverUrl}${url}`;
   }
   
-  if (isTauri()) {
-    const { fetch } = await import('@tauri-apps/plugin-http');
-    return fetch(url, {
-        ...init,
-        // Tauri's fetch handles cookies automatically and bypasses CORS
-    });
-  }
-
   return fetch(url, {
     ...init,
     credentials: 'include', // Ensure cookies are sent for auth

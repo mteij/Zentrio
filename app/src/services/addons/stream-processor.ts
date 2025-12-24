@@ -132,9 +132,10 @@ export class StreamProcessor {
   }
 
   private parseStream(stream: Stream, addon: Manifest): ParsedStream {
-    const title = stream.title || stream.name || ''
+    const name = stream.name || ''
+    const title = stream.title || ''
     const description = stream.description || ''
-    const combined = `${title} ${description}`.toLowerCase()
+    const combined = `${name} ${title} ${description}`.toLowerCase()
 
     const parsed: ParsedStream['parsed'] = {
       encode: [],
@@ -222,17 +223,20 @@ export class StreamProcessor {
       '+',            // Plus sign in brackets like [RD+]
       '✓',            // Checkmark sometimes used
       'instant',
+      'your media',    // Torbox specific
+      '[tb+]',         // Torbox specific
     ]
     const uncachedIndicators = [
       '⬇️',           // Download arrow = needs download
       '⬇',            // Alternative down arrow
+      '⏳',           // Hourglass = download required
       'uncached',
       'download',
     ]
     
     // Check for explicit uncached indicators first
     const isExplicitlyUncached = uncachedIndicators.some(indicator => 
-      combined.includes(indicator.toLowerCase()) || title.includes(indicator)
+      combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
     )
     
     if (isExplicitlyUncached) {
@@ -240,7 +244,7 @@ export class StreamProcessor {
     } else {
       // Check for cached indicators
       parsed.isCached = cachedIndicators.some(indicator => 
-        combined.includes(indicator.toLowerCase()) || title.includes(indicator)
+        combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
       )
     }
 

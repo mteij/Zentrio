@@ -3,7 +3,6 @@ import authApiRoutes from './auth'
 import profileApiRoutes from './profiles'
 import userApiRoutes from './user'
 import avatarApiRoutes from './avatar'
-import themesApiRoutes from './themes'
 import streamingApiRoutes from './streaming'
 import addonsApiRoutes from './addons'
 import listsApiRoutes from './lists'
@@ -18,7 +17,6 @@ app.route('/auth', authApiRoutes)
 app.route('/profiles', profileApiRoutes)
 app.route('/user', userApiRoutes)
 app.route('/avatar', avatarApiRoutes)
-app.route('/themes', themesApiRoutes)
 app.route('/streaming', streamingApiRoutes)
 app.route('/addons', addonsApiRoutes)
 app.route('/lists', listsApiRoutes)

@@ -10,6 +10,17 @@
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
+
+  /* Zentrio Theme Variables */
+  --accent: #E50914;
+  --btn-primary-bg: #E50914;
+  --btn-primary-bg-hover: #CC0810;
+  --text: #ffffff;
+  --muted: #b3b3b3;
+  --bg: #141414;
+  --bg-elevated: #1e1e1e;
+  --bg-card: rgba(20, 20, 20, 0.6);
+
   color: var(--text);
   /* Fallback background - AnimatedBackground will cover this */
   background-color: #000000;
@@ -20,9 +31,10 @@
 }
 
 html {
-  background-color: transparent;
+  background-color: #000000; /* Set solid background to prevent transparency glitches */
   overscroll-behavior: none;
   height: 100%;
+  width: 100%;
 }
 
 body {
@@ -30,14 +42,17 @@ body {
   min-width: 320px;
   min-height: 100vh;
   min-height: var(--app-height);
+  width: 100%;
   overscroll-behavior: none;
   overflow-x: hidden;
+  background-color: #000000;
 }
 
 #root {
   min-height: 100vh;
   min-height: var(--app-height);
   width: 100%;
+  height: 100%;
 }
 
 /* ==========================================================================

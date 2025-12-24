@@ -4,6 +4,11 @@ import { useNavigate } from 'react-router-dom'
 import { MetaPreview } from '../../services/addons/types'
 import { LazyImage } from '../ui/LazyImage'
 import { RatingBadge } from '../ui/RatingBadge'
+import { ContextMenu, ContextMenuItem } from '../ui/ContextMenu'
+import { useContextMenu } from '../../hooks/useContextMenu'
+import { ListSelectionModal } from './ListSelectionModal'
+import { Plus, Play, Trash2, Eye } from 'lucide-react'
+import { apiFetch } from '../../lib/apiFetch'
 import styles from '../../styles/Streaming.module.css'
 
 interface StreamingRowProps {
@@ -14,9 +19,11 @@ interface StreamingRowProps {
   showAgeRatings?: boolean
   seeAllUrl?: string
   isContinueWatching?: boolean
+  isRanked?: boolean
 }
 
-export function StreamingRow({ title, items, profileId, showImdbRatings = true, showAgeRatings = true, seeAllUrl, isContinueWatching = false }: StreamingRowProps) {
+export function StreamingRow({ title, items, profileId, showImdbRatings = true, showAgeRatings = true, seeAllUrl, isContinueWatching = false, isRanked = false }: StreamingRowProps) {
+
   const containerRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [showLeftArrow, setShowLeftArrow] = useState(false)
@@ -233,15 +240,132 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
           onDragStart={handleDragStart}
           style={{ cursor: isDown ? 'grabbing' : 'grab', userSelect: 'none' }}
         >
-          {items.map(item => (
+          {items.map((item, index) => (
+            <StreamingItem 
+                key={item.id}
+                item={item} 
+                getItemUrl={getItemUrl} 
+                handleItemClick={handleItemClick}
+                handleDragStart={handleDragStart}
+                showImdbRatings={showImdbRatings}
+                showAgeRatings={showAgeRatings}
+                isContinueWatching={isContinueWatching}
+                profileId={profileId}
+                isRanked={isRanked}
+                rank={index + 1}
+            />
+          ))}
+        </div>
+
+        <button 
+          className={`${styles.scrollBtn} ${styles.scrollBtnRight} ${!showRightArrow ? styles.scrollBtnHidden : ''}`} 
+          onClick={() => scroll('right')}
+        >
+          <ChevronRight size={24} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function StreamingItem({ 
+    item, 
+    getItemUrl, 
+    handleItemClick, 
+    handleDragStart, 
+    showImdbRatings, 
+    showAgeRatings,
+    isContinueWatching,
+    profileId,
+    isRanked,
+    rank
+}: { 
+    item: MetaPreview & { progressPercent?: number; episodeDisplay?: string }, 
+    getItemUrl: (i: MetaPreview) => string, 
+    handleItemClick: (e: React.MouseEvent, i: any) => void,
+    handleDragStart: (e: React.DragEvent) => void,
+    showImdbRatings: boolean,
+    showAgeRatings: boolean,
+    isContinueWatching: boolean,
+    profileId: string,
+    isRanked?: boolean,
+    rank?: number
+}) {
+    const { isOpen, position, closeMenu, triggerProps } = useContextMenu()
+    const [showListModal, setShowListModal] = useState(false)
+    const navigate = useNavigate()
+
+    // Handle play with smart source selection
+    const handlePlay = async () => {
+        // For continue watching items, they already have lastStream
+        if (isContinueWatching && (item as any).lastStream) {
+            navigate(`/streaming/${profileId}/player`, { 
+                state: { 
+                    stream: (item as any).lastStream,
+                    meta: { id: item.id, type: item.type, name: item.name, poster: item.poster }
+                }
+            })
+            return
+        }
+        
+        // Otherwise go to details page (could enhance to fetch last stream from API)
+        window.location.href = getItemUrl(item)
+    }
+
+    const contextItems: ContextMenuItem[] = [
+        {
+            label: 'Play',
+            icon: <Play size={16} />,
+            action: handlePlay
+        },
+        {
+            label: 'View Details',
+            icon: <Eye size={16} />,
+            action: () => {
+                window.location.href = getItemUrl(item)
+            }
+        },
+        {
+            label: 'Add to List...',
+            icon: <Plus size={16} />,
+            action: () => setShowListModal(true)
+        }
+    ]
+
+    if (isContinueWatching) {
+        contextItems.push({
+            label: 'Remove from Continue Watching',
+            icon: <Trash2 size={16} />,
+            danger: true,
+            action: async () => {
+                try {
+                    await apiFetch(`/api/streaming/progress/${item.type}/${item.id}?profileId=${profileId}`, {
+                        method: 'DELETE'
+                    })
+                    window.dispatchEvent(new CustomEvent('history-updated'))
+                } catch (e) {
+                    console.error("Failed to remove progress", e)
+                }
+            }
+        })
+    }
+
+    return (
+        <>
             <a 
-              key={item.id} 
               href={getItemUrl(item)} 
-              className={styles.mediaCard}
+              className={`${styles.mediaCard} ${isRanked ? styles.rankedCard : ''}`}
               onClick={(e) => handleItemClick(e, item)}
               onDragStart={handleDragStart}
               draggable={false}
+              {...triggerProps}
             >
+              {isRanked && rank && (
+                <span className={`${styles.rankNumber} ${rank === 10 ? styles.rankNumber10 : ''}`}>
+                    {rank}
+                </span>
+              )}
+              
               <div className={styles.posterContainer}>
                 {item.poster ? (
                   <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
@@ -306,16 +430,21 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
                 </div>
               </div>
             </a>
-          ))}
-        </div>
 
-        <button 
-          className={`${styles.scrollBtn} ${styles.scrollBtnRight} ${!showRightArrow ? styles.scrollBtnHidden : ''}`} 
-          onClick={() => scroll('right')}
-        >
-          <ChevronRight size={24} />
-        </button>
-      </div>
-    </div>
-  )
+            <ContextMenu 
+                isOpen={isOpen}
+                onClose={closeMenu}
+                position={position}
+                items={contextItems}
+                title={item.name}
+            />
+            
+            <ListSelectionModal
+                isOpen={showListModal}
+                onClose={() => setShowListModal(false)}
+                profileId={parseInt(profileId)}
+                item={item}
+            />
+        </>
+    )
 }

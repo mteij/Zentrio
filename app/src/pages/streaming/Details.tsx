@@ -142,9 +142,10 @@ export const StreamingDetails = () => {
 
   // Helper to parse stream information
   const parseStreamInfo = (stream: Stream) => {
-    const title = stream.title || stream.name || ''
+    const name = stream.name || ''
+    const title = stream.title || ''
     const desc = stream.description || ''
-    const combined = `${title} ${desc}`.toLowerCase()
+    const combined = `${name} ${title} ${desc}`.toLowerCase()
     
     // Resolution
     let resolution = ''
@@ -163,7 +164,16 @@ export const StreamingDetails = () => {
     }
     
     // Cached status
-    const isCached = combined.includes('cached') || title.includes('+') || title.includes('⚡')
+    const cachedIndicators = ['cached', '⚡', '+', '✓', 'instant', 'your media', '[tb+]']
+    const uncachedIndicators = ['⬇️', '⬇', '⏳', 'uncached', 'download']
+    
+    const isExplicitlyUncached = uncachedIndicators.some(indicator => 
+      combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
+    )
+    
+    const isCached = !isExplicitlyUncached && cachedIndicators.some(indicator => 
+      combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
+    )
     
     // HDR/DV
     const hasHDR = combined.includes('hdr')

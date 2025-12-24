@@ -34,6 +34,11 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: false,
       },
+      '/api-cloud': {
+        target: 'https://app.zentrio.eu',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-cloud/, ''),
+      },
     },
   },
   build: {

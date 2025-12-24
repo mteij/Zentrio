@@ -58,6 +58,9 @@
 /* ======================= */
 /* Streaming Navbar Styles */
 /* ======================= */
+/* ======================= */
+/* Streaming Navbar Styles */
+/* ======================= */
 .streamingNavbar {
   position: fixed;
   top: var(--titlebar-height, 0px);
@@ -65,14 +68,9 @@
   width: 80px;
   height: 100vh;
   height: var(--app-height, 100vh);
-  background: linear-gradient(
-    to right,
-    rgba(0, 0, 0, 0.7) 0%,
-    rgba(0, 0, 0, 0.4) 70%,
-    transparent 100%
-  );
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(10, 10, 10, 0.4); 
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -82,68 +80,74 @@
   transition: all 0.3s ease;
 }
 
-/* Soft fade effect on right edge of navbar */
+/* Remove soft fade effect */
 .streamingNavbar::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: -40px;
-  width: 40px;
-  height: 100%;
-  background: linear-gradient(
-    to right,
-    rgba(0, 0, 0, 0.3) 0%,
-    transparent 100%
-  );
-  pointer-events: none;
+  display: none;
 }
 
 .navLeft {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex: 1;
+  width: 100%;
+  padding: 0 10px;
+  position: relative; /* Context for absolute indicator */
 }
 
 .navLink {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 12px 16px;
+  height: 64px; /* Fixed height for reliable math */
+  width: 100%;
   color: rgba(255, 255, 255, 0.5);
   text-decoration: none;
   font-size: 0.7rem;
   font-weight: 500;
   border-radius: 12px;
-  transition: all 0.2s ease;
-  width: 100%;
+  transition: color 0.2s ease;
+  z-index: 1; /* Above indicator */
   text-align: center;
 }
 
 .navLink:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.08);
 }
 
-/* Active state for nav links - works with CSS module class concatenation */
+/* Active state for nav links */
 .active {
   color: #fff !important;
-  background: rgba(229, 9, 20, 0.2) !important;
-  position: relative;
+  background: transparent !important;
 }
 
 .active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 24px;
-  background: #e50914;
-  border-radius: 0 2px 2px 0;
+  display: none;
+}
+
+/* 
+  Active indicator using CSS Transform for performance (Compositor thread)
+  Calculation: index * (height + gap)
+  height: 64px
+  gap: 12px 
+  total step: 76px
+*/
+.activeIndicator {
+    position: absolute;
+    top: 0;
+    left: 10px; /* Match padding of navLeft */
+    right: 10px;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    z-index: 0;
+    pointer-events: none;
+    transform: translateY(calc(var(--active-index, 0) * 76px));
+    transition: transform 0.3s cubic-bezier(0.2, 0.0, 0.2, 1);
 }
 
 .navRight {
@@ -197,68 +201,83 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
   z-index: 2000;
-  display: none;
-  align-items: flex-start;
+  display: flex !important; /* Ensure flex is used when rendered by React */
+  align-items: center;
   justify-content: center;
-  padding-top: 15vh;
-}
-
-.searchOverlay.active {
-  display: flex;
+  padding: 0;
 }
 
 .searchContainer {
-  width: 90%;
-  max-width: 700px;
+  position: relative;
+  width: 600px;
+  max-width: 90%;
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
-  gap: 20px;
+  padding: 0;
+  overflow: hidden;
+  transform-origin: center;
+}
+
+.searchContainer form {
+  flex: 1;
+  display: flex;
+  align-items: center;
 }
 
 .searchContainer input {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50px;
-  padding: 20px 30px 20px 60px;
-  font-size: 1.5rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  padding: 20px 20px 20px 64px;
   color: #fff;
-  outline: none;
-  transition: all 0.3s ease;
-}
-
-.searchContainer input:focus {
-  border-color: rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.15);
+  outline: none !important;
+  font-weight: 500;
+  line-height: normal;
 }
 
 .searchContainer input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .searchContainer .searchIcon {
   position: absolute;
-  left: 25px;
+  left: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
   color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
 }
 
 .closeSearch {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  padding: 10px;
-  transition: color 0.2s ease;
+  padding: 0 24px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .closeSearch:hover {
   color: #fff;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* Mobile Navbar */
@@ -273,7 +292,7 @@
     max-width: 90vw;
     height: auto;
     flex-direction: row;
-    padding: 8px 16px;
+    padding: 8px 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 100px;
     background: rgba(20, 20, 20, 0.9);
@@ -292,6 +311,7 @@
     flex-direction: row;
     flex: unset;
     justify-content: center;
+    padding: 0;
     padding-right: 10px;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     gap: 4px;
@@ -299,8 +319,9 @@
 
   .navLink {
     padding: 8px 12px;
-    font-size: 0; /* Hide text properly but keep spacing if needed, though hidden details below */
+    font-size: 0; /* Hide text properly */
     width: auto;
+    height: auto;
   }
 
   .navLink span:last-child {
@@ -329,6 +350,18 @@
   .navAvatar {
     width: 32px;
     height: 32px;
+  }
+
+  /* Mobile Active Indicator - Horizontal animation */
+  .activeIndicator {
+    top: 50%;
+    left: 0;
+    right: auto;
+    width: 44px; /* Match navLink width: padding 12px*2 + icon 20px = 44px */
+    height: 36px; /* Match navLink height: padding 8px*2 + icon 20px = 36px */
+    border-radius: 10px;
+    transform: translateY(-50%) translateX(calc(var(--active-index, 0) * 48px)); /* 44px width + 4px gap */
+    transition: transform 0.3s cubic-bezier(0.2, 0.0, 0.2, 1);
   }
 }
 
@@ -420,7 +453,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center top; /* Align better for banners */
+  object-position: center top; 
   transition: transform 10s ease;
 }
 
@@ -461,13 +494,16 @@
   font-size: 4rem;
   font-weight: 800;
   margin-bottom: 16px;
-  line-height: 1.1;
+  line-height: 1.25; /* Increased to prevent cutoff */
   letter-spacing: -0.02em;
   color: #fff;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
   background: none;
   -webkit-text-fill-color: initial;
+  padding-bottom: 5px; /* Extra safety for descenders */
 }
+
+/* ... existing styles ... */
 
 .heroDescription {
   font-size: 1.1rem;
@@ -545,7 +581,7 @@
 .contentContainer {
   position: relative;
   z-index: 10;
-  margin-top: -150px;
+  margin-top: -100px; 
   padding-bottom: 60px;
 }
 
@@ -569,7 +605,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  line-height: 1.4; /* Increased line-height */
+  padding-bottom: 4px; /* Safety for descenders */
 }
+
 
 .rowTitle::before {
   content: "";
@@ -776,6 +815,34 @@
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
+/* Ranked Items */
+.rankedCard {
+  margin-left: 30px; /* Make space for the number */
+}
+
+/* Rank Number styling matching standard "Top 10" aesthetic */
+.rankNumber {
+  position: absolute;
+  bottom: 0px;
+  left: -25px;
+  font-size: 7rem;
+  font-weight: 800;
+  color: #141414; /* Dark fill */
+  -webkit-text-stroke: 4px rgba(255, 255, 255, 0.5); /* White stroke */
+  line-height: 1;
+  z-index: 20; /* In front of poster? Or behind? "Overlay" -> Front. But usually "Top 10" style has number slightly behind or flush. Let's try front but lower part. */
+  font-family: 'Impact', sans-serif; /* Or closest sturdy font */
+  pointer-events: none;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  letter-spacing: -5px;
+}
+
+/* Special case for 10 */
+.rankNumber10 {
+  left: -45px;
+  letter-spacing: -8px;
+}
+
 /* Animations */
 @keyframes slideUp {
   from {
@@ -873,7 +940,7 @@
   min-height: 100vh;
   min-height: var(--app-height, 100vh);
   padding-top: 0;
-  padding-left: 0;
+  padding-left: 80px;
 }
 
 .detailsContent {
@@ -1596,5 +1663,208 @@
 
   .episodeTitle {
     white-space: normal;
+  }
+}
+
+@media (max-width: 768px) {
+  .detailsContainer {
+    padding-left: 0;
+    padding-bottom: calc(var(--nav-height-mobile) + 20px);
+  }
+}
+
+/* Library Page Styles */
+.librarySidebar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.librarySidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.librarySidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.librarySidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.libraryMain {
+  overflow-x: hidden;
+  padding: 20px 40px 40px;
+  min-height: calc(100vh - var(--titlebar-height, 0px) - 40px);
+}
+
+/* Library Layout - Desktop flex, Mobile single column */
+.libraryLayout {
+  display: flex;
+  padding-left: 80px;
+  padding-top: 20px;
+  padding-bottom: 0;
+  min-height: auto;
+}
+
+@media (max-width: 768px) {
+  .libraryLayout {
+    padding-left: 0 !important;
+    flex-direction: column;
+  }
+}
+
+.searchLayout {
+  padding-top: 0;
+}
+
+
+/* Mobile Library Layout */
+@media (max-width: 1024px) {
+  .librarySidebar {
+    width: 220px !important;
+    padding: 16px !important;
+  }
+
+  .libraryMain {
+    padding: 16px 24px 40px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .librarySidebar {
+    position: fixed !important;
+    left: 0;
+    top: var(--titlebar-height, 0px) !important;
+    width: 280px !important;
+    height: calc(100vh - var(--titlebar-height, 0px) - 80px) !important;
+    z-index: 100;
+    background: rgba(10, 10, 10, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .librarySidebar.open {
+    transform: translateX(0);
+  }
+
+  .libraryMain {
+    width: 100% !important;
+    padding: 16px !important;
+    margin-left: 0;
+  }
+}
+
+/* Mobile List Selector */
+.mobileListSelector {
+  display: none;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 100;
+}
+
+.mobileListSelectorBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.mobileListSelectorBtn:hover,
+.mobileListSelectorBtn:active {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mobileListSelectorBtn span {
+  flex: 1;
+  text-align: left;
+}
+
+.mobileListDropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: rgba(20, 20, 20, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 100;
+  max-height: 60vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 768px) {
+  .mobileListSelector {
+    display: block;
+  }
+
+  .mediaGrid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .mediaCard {
+    width: 100%;
+  }
+
+  .posterContainer {
+    border-radius: 8px;
+  }
+
+  .libraryMain {
+    padding: 12px !important;
+    padding-bottom: calc(var(--nav-height-mobile) + 40px) !important;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .mediaGrid {
+    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .contentRow {
+    padding: 0 12px;
+    margin-bottom: 30px;
+  }
+
+  .rowScrollContainer {
+    gap: 12px;
+    padding: 10px 12px 16px 12px;
+  }
+
+  .rowTitle {
+    font-size: 1.2rem;
+  }
+
+  .mobileListSelectorBtn {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .mobileListDropdown {
+    padding: 10px;
   }
 }

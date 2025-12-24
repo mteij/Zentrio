@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Layout, Navbar, RatingBadge, LazyImage, SkeletonCard } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
+import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
 
 interface CatalogResponse {
@@ -15,7 +16,14 @@ const fetchCatalog = async ({ pageParam = 0, queryKey }: any) => {
   const res = await fetch(
     `/api/streaming/catalog?profileId=${profileId}&manifestUrl=${encodeURIComponent(manifestUrl)}&type=${type}&id=${id}&skip=${pageParam}`
   )
-  if (!res.ok) throw new Error('Failed to load catalog')
+  if (!res.ok) {
+    let msg = 'Failed to load catalog'
+    try {
+      const data = await res.json()
+      if (data.error) msg = data.error
+    } catch {}
+    throw new Error(msg)
+  }
   const data = await res.json()
   return {
     items: data.items || [],
@@ -28,17 +36,6 @@ export const StreamingCatalog = () => {
   const { profileId, manifestUrl, type, id } = useParams<{ profileId: string, manifestUrl: string, type: string, id: string }>()
   const navigate = useNavigate()
   const loadMoreRef = useRef<HTMLDivElement>(null)
-  const [profile, setProfile] = useState<any>(null)
-
-  // Fetch profile for navbar avatar
-  useEffect(() => {
-    if (profileId) {
-      fetch(`/api/streaming/dashboard?profileId=${profileId}`)
-        .then(res => res.json())
-        .then(data => setProfile(data.profile))
-        .catch(console.error)
-    }
-  }, [profileId])
 
   const {
     data,
@@ -82,10 +79,15 @@ export const StreamingCatalog = () => {
     return () => observer.disconnect()
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
+  useEffect(() => {
+    if (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load catalog')
+    }
+  }, [error])
+
   if (isLoading) {
     return (
       <Layout title="Loading..." showHeader={false} showFooter={false}>
-        <Navbar profileId={parseInt(profileId!)} />
         <button onClick={() => navigate(-1)} className={styles.backBtn}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
@@ -140,7 +142,6 @@ export const StreamingCatalog = () => {
 
   return (
     <Layout title={title} showHeader={false} showFooter={false}>
-      <Navbar profileId={parseInt(profileId!)} profile={profile} />
       
       <button onClick={() => navigate(-1)} className={styles.backBtn}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">

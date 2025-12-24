@@ -9,10 +9,10 @@ import { useRouter } from 'vitepress'
 const router = useRouter()
 
 onMounted(() => {
-  router.go('/getting-started')
+  router.go('/usage')
 })
 </script>
 
 # Redirecting...
 
-If you are not redirected automatically, please click [here](/getting-started).
+If you are not redirected automatically, please click [here](/usage).

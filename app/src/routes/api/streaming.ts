@@ -300,11 +300,16 @@ streaming.get('/subtitles/:type/:id', async (c) => {
 })
 
 streaming.get('/search', async (c) => {
-  const { q, profileId } = c.req.query()
+  const { q, profileId, type, year, sort } = c.req.query()
   if (!q || !profileId) return c.json({ results: [] })
   
   try {
-    const results = await addonManager.search(q, parseInt(profileId))
+    const filters = {
+        type: type !== 'undefined' ? type : undefined,
+        year: year !== 'undefined' ? year : undefined,
+        sort: sort !== 'undefined' ? sort : undefined
+    }
+    const results = await addonManager.search(q, parseInt(profileId), filters)
     return c.json({ results })
   } catch (e) {
     console.error('Search API error:', e)
@@ -324,8 +329,9 @@ streaming.get('/catalog', async (c) => {
       items = result ? result.items : []
       const title = result ? result.title : ''
       return c.json({ items, title })
-    } else if (type) {
-      items = await addonManager.getFilteredItems(pId, type, genre, skipNum)
+    } else if (type || genre) {
+      const targetType = type || 'movie,series'
+      items = await addonManager.getFilteredItems(pId, targetType, genre, skipNum)
       return c.json({ items })
     }
     return c.json({ items })
@@ -397,6 +403,29 @@ streaming.post('/progress', async (c) => {
     return c.json({ success: true })
   } catch (e) {
     console.error('Failed to save progress', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+streaming.delete('/progress/:type/:id', async (c) => {
+  try {
+    const { type, id } = c.req.param()
+    const { profileId, season, episode } = c.req.query()
+    
+    if (!profileId) {
+      return c.json({ error: 'Missing defined profileId' }, 400)
+    }
+
+    watchHistoryDb.delete(
+      parseInt(profileId),
+      id,
+      season ? parseInt(season) : undefined,
+      episode ? parseInt(episode) : undefined
+    )
+
+    return c.json({ success: true })
+  } catch (e) {
+    console.error('Failed to delete progress', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -678,15 +707,19 @@ streaming.get('/dashboard', sessionMiddleware, async (c) => {
     // Enhance history with progress percentage
     const history = deduplicatedHistory.map(h => ({
       ...h,
+      season: h.season !== undefined && h.season >= 0 ? h.season : null,
+      episode: h.episode !== undefined && h.episode >= 0 ? h.episode : null,
       progressPercent: h.duration && h.duration > 0 && h.position ? Math.min(100, Math.round((h.position / h.duration) * 100)) : 0,
       // For series, include season/episode display info
-      episodeDisplay: h.season && h.episode ? `S${h.season}:E${h.episode}` : null,
+      episodeDisplay: h.meta_type === 'series' && h.season !== undefined && h.season >= 0 && h.episode !== undefined && h.episode >= 0 ? `S${h.season}:E${h.episode}` : null,
       lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
     }))
     
     // Use catalog metadata for lazy loading - don't fetch items here
     const catalogMetadata = await addonManager.getCatalogMetadata(pId)
     const trending = await addonManager.getTrending(pId)
+    const trendingMovies = await addonManager.getTrendingByType(pId, 'movie')
+    const trendingSeries = await addonManager.getTrendingByType(pId, 'series')
     
     // Determine if the fallback was used by checking enabled addons
     const enabledAddons = profileDb.getSettingsProfileId(pId) ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!) : [];
@@ -696,6 +729,8 @@ streaming.get('/dashboard', sessionMiddleware, async (c) => {
       catalogMetadata,
       history,
       trending,
+      trendingMovies,
+      trendingSeries,
       showFallbackToast,
       profile
     })

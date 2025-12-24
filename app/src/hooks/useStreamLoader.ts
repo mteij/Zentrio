@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Stream, Manifest } from '../services/addons/types'
+import { toast } from 'sonner'
 
 export type AddonStatus = 'idle' | 'loading' | 'done' | 'error'
 
@@ -134,6 +135,13 @@ export function useStreamLoader(): UseStreamLoaderResult {
 
     eventSource.addEventListener('addon-error', (e) => {
       const data = JSON.parse(e.data)
+
+      const errorMsg = data.error || 'Unknown error'
+      const isTimeout = errorMsg.toLowerCase().includes('timeout') || errorMsg.toLowerCase().includes('abort')
+      toast.error(`${data.addon.name} failed`, {
+        description: isTimeout ? 'Request timed out' : errorMsg
+      })
+
       setAddonStatuses(prev => {
         const next = new Map(prev)
         next.set(data.addon.id, {

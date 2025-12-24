@@ -113,7 +113,7 @@ export class AddonClient {
 
   private async fetchResource<T>(url: string, extractKey: keyof AddonResponse<any>): Promise<T> {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 15000)
+    const timeout = setTimeout(() => controller.abort(), 30000)
 
     try {
       const res = await fetch(url, { signal: controller.signal })

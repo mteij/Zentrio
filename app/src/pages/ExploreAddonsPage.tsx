@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Search, Filter, ArrowLeft, Download, Star, Settings, Trash2, Check, X } from 'lucide-react'
-import { SimpleLayout, Button, LoadingSpinner, AnimatedBackground } from '../components'
+import { SimpleLayout, Button, LoadingSpinner, AnimatedBackground, SkeletonAddonCard } from '../components'
 import styles from '../styles/Addons.module.css'
 import settingsStyles from '../styles/Settings.module.css'
 import { apiFetch } from '../lib/apiFetch'
@@ -29,20 +29,8 @@ interface InstalledAddon {
 // Recommended addons configuration
 const RECOMMENDED_ADDONS: Addon[] = [
     {
-        transportName: "Comet",
-        transportUrl: "https://comet.elfhosted.com/manifest.json",
-        manifest: {
-            id: "org.stremio.comet",
-            name: "Comet | Elfhosted",
-            version: "2.0.0",
-            description: "Stremio's fastest torrent/debrid search add-on.",
-            logo: "https://i.imgur.com/jmVoVMu.jpeg",
-            types: ["movie", "series"]
-        }
-    },
-    {
         transportName: "TMDB",
-        transportUrl: "https://94c8cb9f702d-tmdb-addon.baby-beamup.club/manifest.json",
+        transportUrl: "https://tmdb.zentrio.eu/manifest.json",
         manifest: {
             id: "org.stremio.tmdb",
             name: "TMDB",
@@ -53,8 +41,20 @@ const RECOMMENDED_ADDONS: Addon[] = [
         }
     },
     {
+        transportName: "Comet",
+        transportUrl: "https://comet.zentrio.eu/manifest.json",
+        manifest: {
+            id: "org.stremio.comet",
+            name: "Comet",
+            version: "2.0.0",
+            description: "Stremio's fastest torrent/debrid search add-on.",
+            logo: "https://i.imgur.com/jmVoVMu.jpeg",
+            types: ["movie", "series"]
+        }
+    },
+    {
         transportName: "Torz",
-        transportUrl: "https://stremthru.elfhosted.com/stremio/torz/manifest.json",
+        transportUrl: "https://stremthru.zentrio.eu/manifest.json",
         manifest: {
             id: "org.stremio.torz",
             name: "StremThru Torz",
@@ -102,6 +102,8 @@ const AddonCard = ({
     const installed = installedAddons.find(a => a.id === addon.manifest.id || a.manifest_url === addon.transportUrl);
     const isProcessing = processingAddonId === addon.transportUrl || (installed && processingAddonId === installed.id);
 
+    const isZentrioHosted = addon.transportUrl.includes('zentrio.eu');
+
     const cardClasses = [
         styles.addonCard,
         isRecommended && styles.addonCardRecommended,
@@ -130,6 +132,11 @@ const AddonCard = ({
                       <h3 className={styles.cardTitle} title={addon.manifest.name}>
                         {addon.manifest.name}
                       </h3>
+                      {isZentrioHosted && (
+                          <span className={styles.zentrioTag} title="Hosted by Zentrio">
+                              ZENTRIO
+                          </span>
+                      )}
                       {isRecommended && <Star size={14} className={styles.starIcon} fill="currentColor" />}
                       {installed && <Check size={14} className={styles.installedIcon} />}
                   </div>
@@ -428,8 +435,10 @@ export function ExploreAddonsPage() {
             </div>
 
             {loading ? (
-                <div className={styles.loadingContainer}>
-                    <LoadingSpinner fullScreen={false} />
+                <div className={styles.addonsGrid}>
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <SkeletonAddonCard key={i} />
+                    ))}
                 </div>
             ) : filteredAddons.length > 0 ? (
                 <div className={styles.addonsGrid}>

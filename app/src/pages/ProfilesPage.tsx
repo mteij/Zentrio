@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings, LogOut, Edit, X, Plus } from 'lucide-react'
-import { SimpleLayout, Button, ConfirmDialog, ProfileModal, LoadingSpinner, AnimatedBackground } from '../components'
+import { SimpleLayout, Button, ConfirmDialog, ProfileModal, AnimatedBackground, SkeletonProfile } from '../components'
 import { useAuthStore } from '../stores/authStore'
 import { apiFetch } from '../lib/apiFetch'
 import styles from './ProfilesPage.module.css'
+import { ContextMenu, ContextMenuItem } from '../components/ui/ContextMenu'
+import { useContextMenu } from '../hooks/useContextMenu'
 
 interface Profile {
   id: number
@@ -144,26 +146,21 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
               {editMode ? 'Select profile to edit:' : "Who's watching?"}
             </h2>
             
-            {loading ? (
-              <div style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <LoadingSpinner fullScreen={false} />
+{loading ? (
+              <div className={styles.profilesGrid} id="profilesGrid">
+                {[1, 2, 3].map((i) => (
+                  <SkeletonProfile key={i} />
+                ))}
               </div>
             ) : (
               <div className={styles.profilesGrid} id="profilesGrid">
                 {profiles.map(profile => (
-                  <div key={profile.id} className={styles.profileCard} onClick={() => handleProfileClick(profile)}>
-                    <div className={styles.profileAvatar}>
-                      <div id={`avatar-${profile.id}`}>
-                        <img 
-                          src={profile.avatar.startsWith('http') || profile.avatar.startsWith('data:') ? profile.avatar : `/api/avatar/${encodeURIComponent(profile.avatar)}?style=${encodeURIComponent(profile.avatar_style || 'bottts-neutral')}`} 
-                          alt={profile.name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </div>
-                    </div>
-                    <div className={styles.profileName}>{profile.name}</div>
-                    {profile.isDefault && <div className={styles.profileStatus}>Default</div>}
-                  </div>
+                  <ProfileCard 
+                    key={profile.id} 
+                    profile={profile} 
+                    onClick={handleProfileClick} 
+                    onEdit={handleEditProfile}
+                  />
                 ))}
                 
                 {/* Add Profile Button (only in edit mode or if no profiles) */}
@@ -251,5 +248,52 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
         variant="danger"
       />
     </SimpleLayout>
+  )
+}
+
+// Extracted ProfileCard component to handle its own context menu hook isolated from the list
+function ProfileCard({ profile, onClick, onEdit }: { 
+    profile: Profile, 
+    onClick: (p: Profile) => void,
+    onEdit: (p: Profile) => void 
+}) {
+  const { isOpen, position, closeMenu, triggerProps } = useContextMenu()
+
+  const items: ContextMenuItem[] = [
+    {
+        label: 'Edit Profile',
+        icon: <Edit size={16} />,
+        action: () => onEdit(profile)
+    }
+  ]
+
+  return (
+    <>
+      <div 
+        className={styles.profileCard} 
+        onClick={() => onClick(profile)}
+        {...triggerProps}
+      >
+        <div className={styles.profileAvatar}>
+            <div id={`avatar-${profile.id}`}>
+            <img 
+                src={profile.avatar.startsWith('http') || profile.avatar.startsWith('data:') ? profile.avatar : `/api/avatar/${encodeURIComponent(profile.avatar)}?style=${encodeURIComponent(profile.avatar_style || 'bottts-neutral')}`} 
+                alt={profile.name}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            </div>
+        </div>
+        <div className={styles.profileName}>{profile.name}</div>
+        {profile.isDefault && <div className={styles.profileStatus}>Default</div>}
+      </div>
+
+      <ContextMenu
+        isOpen={isOpen}
+        onClose={closeMenu}
+        position={position}
+        items={items}
+        title={profile.name}
+      />
+    </>
   )
 }

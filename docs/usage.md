@@ -1,77 +1,47 @@
 # Usage
 
-This page shows how to use Zentrio once it is running, either hosted or self‑hosted.
+## Profiles
 
-## 1. Profiles
+Profiles allow you to manage separate Stremio accounts and history within a single installation.
 
-Profiles let you keep separate Stremio credentials, addons and history.
+### Create a Profile
 
-### Creating a profile
+1. Click **New Profile** on the welcome screen.
+2. Enter a name and your Stremio credentials.
+3. Click **Save**.
 
-1. Open Zentrio in your browser.
-2. Click **New profile**.
-3. Enter a name and your Stremio credentials.
-4. Save. Zentrio will use this profile when opening Stremio Web.
+### Switch Profiles
 
-### Switching profiles
+Use the profile switcher in the top navigation bar to toggle between active profiles.
 
-- Use the profile switcher in the header.
-- Select the profile you want to use.
-- Stremio Web will be opened with that profile’s context.
+### Edit/Delete
 
-### Editing or deleting profiles
+Go to the **Profiles** page to edit credentials or remove a profile entirely.
 
-- Open **Profiles**.
-- Click a profile to edit its name or credentials.
-- Use the delete action to remove a profile you no longer need.
+## Settings & Customization
 
-## 2. Settings
+Configure your experience under the **Settings** menu.
 
-Settings affect how Zentrio behaves for your account.
+### Themes
 
-Typical options include:
+Zentrio comes with built-in themes like `zentrio` and `midnight`.
+To change the active theme:
 
-- Default profile on startup.
-- Whether to enable downloads (if available).
-- Language or localization options (if configured).
+1. Go to **Settings** -> **Theme**.
+2. Select your preferred look.
 
-## 3. Themes
+**Custom Themes**: Drop custom JSON theme files into the `themes` directory of your installation.
 
-Zentrio supports multiple themes so you can match your setup.
+## Mobile & PWA
 
-### Switching theme
+Zentrio works seamlessly on mobile devices.
 
-- Go to **Settings → Theme**.
-- Choose one of the built‑in themes (for example `zentrio`, `midnight`, `stremio`).
-- Changes apply instantly in the UI.
+### Android
 
-### Custom themes
+Download the dedicated APK from the [Releases](https://github.com/mteij/Zentrio/releases) page.
 
-Themes are defined as JSON files under the app’s `themes` directory.
+### IOS / Browser (PWA)
 
-To add a custom theme:
-
-1. Create a new JSON file following the structure of an existing theme.
-2. Restart the app if needed.
-3. Select the theme from the settings screen.
-
-## 4. Mobile and PWA
-
-You can use Zentrio on mobile via Android APK or as a PWA.
-
-### Android app
-
-- Download the latest APK from the [Releases](https://zentrio.eu/releases) page.
-- Install it on your device (you may need to enable installs from unknown sources).
-- Open the app and log in with your email.
-
-### PWA (Progressive Web App)
-
-- Open Zentrio in your mobile browser.
-- Use **Add to Home Screen** from the browser menu.
-- Launch it like a native app.
-
-## 5. Where to go next
-
-- To configure your server and environment variables, see [Self hosting with Docker](/self-hosting-docker) and [Environment variables](/environment).
-- For common questions and troubleshooting, see [FAQ](/faq).
+1. Navigate to your Zentrio instance in Safari or Chrome.
+2. Tap **Share** (iOS) or the menu button (Android).
+3. Select **Add to Home Screen**.

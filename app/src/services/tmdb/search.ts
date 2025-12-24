@@ -29,6 +29,14 @@ export async function getSearch(tmdbClient: TMDBClient, id: string, type: string
     include_adult: config.includeAdult
   }
 
+  if (config.year) {
+    if (type === 'movie') {
+      parameters.year = config.year
+    } else {
+      parameters.first_air_date_year = config.year
+    }
+  }
+
   if (config.ageRating) {
     parameters.certification_country = "US"
     switch(config.ageRating) {

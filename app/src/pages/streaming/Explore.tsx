@@ -1,128 +1,189 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Layout, Navbar, RatingBadge, LazyImage, StreamingRow, SkeletonRow, SkeletonCard } from '../../components'
+import { ArrowLeft, ChevronDown } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Layout, StreamingRow, SkeletonRow, Hero, SkeletonHero, LazyImage, RatingBadge, SkeletonCard } from '../../components'
+
 import { MetaPreview } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import styles from '../../styles/Streaming.module.css'
 
-interface CatalogSection {
-  title: string
-  items: MetaPreview[]
-  seeAllUrl?: string
+// -- Internal GenreRow Component --
+interface GenreRowProps {
+  genre: string
+  profileId: string
+  showImdbRatings: boolean
+  showAgeRatings: boolean
+  type?: 'movie' | 'series' | 'all'
 }
 
-interface ExploreData {
-  catalogs: CatalogSection[]
-  items: MetaPreview[]
-  filters: { types: string[], genres: string[] }
-  history: any[]
+const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: GenreRowProps) => {
+  const { data, isLoading } = useQuery({
+    queryKey: ['explore-genre', profileId, genre, type],
+    queryFn: async () => {
+      // Fetch specifically for this genre
+      // We limit to 20 items for the row
+      const typeParam = type && type !== 'all' ? type : 'movie,series'
+      const res = await fetch(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genre)}&skip=0`)
+      if (!res.ok) throw new Error('Failed to load genre')
+      return res.json() as Promise<{ items: MetaPreview[] }>
+    },
+    staleTime: 1000 * 60 * 60 // 1 hour
+  })
+
+  if (isLoading) {
+    return <SkeletonRow />
+  }
+
+  if (!data?.items || data.items.length === 0) {
+    return null
+  }
+
+  // Update seeAllUrl to include type if specified
+  const seeAllBase = `/explore/${profileId}?genre=${encodeURIComponent(genre)}`
+  const seeAllUrl = type && type !== 'all' ? `${seeAllBase}&type=${type}` : seeAllBase
+
+  return (
+    <StreamingRow
+      title={genre}
+      items={data.items}
+      profileId={profileId}
+      showImdbRatings={showImdbRatings}
+      showAgeRatings={showAgeRatings}
+      seeAllUrl={seeAllUrl}
+    />
+  )
+}
+
+// -- Main Explore Component --
+interface ExploreDashboardData {
+  trending: MetaPreview[]
+  trendingMovies?: MetaPreview[]
+  trendingSeries?: MetaPreview[]
   profile: any
 }
+
+interface FiltersData {
+  filters: { types: string[], genres: string[] }
+}
+
+const POPULAR_GENRES = ['Action', 'Adventure', 'Comedy', 'Science Fiction', 'Drama', 'Thriller', 'Animation', 'Fantasy', 'Crime', 'Mystery', 'Romance', 'Horror', 'Family', 'War', 'History']
 
 export const StreamingExplore = () => {
   const { profileId } = useParams<{ profileId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
-  const [data, setData] = useState<ExploreData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [items, setItems] = useState<MetaPreview[]>([])
+
+  // State for view toggle
+  const [viewMode, setViewMode] = useState<'all' | 'movie' | 'series'>('all')
+
+  // Sticky header state
+  const [isSticky, setIsSticky] = useState(false)
+
+  // If a genre is selected via URL, we show the filtered grid view.
+  const activeGenre = searchParams.get('genre')
+  const activeType = searchParams.get('type')
+
+  const isFilteredView = !!activeGenre || !!activeType
+
+  // Shuffle popular genres on mount to keep it fresh
+  const [shuffledGenres, setShuffledGenres] = useState<string[]>([])
+  useEffect(() => {
+    setShuffledGenres([...POPULAR_GENRES].sort(() => 0.5 - Math.random()))
+  }, [])
+
+  // Fetch Dashboard (for Trending/Top 10)
+  const { data: dashboardData, isLoading: loadingDash } = useQuery({
+    queryKey: ['dashboard', profileId],
+    queryFn: async () => {
+      const res = await fetch(`/api/streaming/dashboard?profileId=${profileId}`)
+      if (!res.ok) throw new Error('Failed to load dashboard')
+      return res.json() as Promise<ExploreDashboardData>
+    },
+    enabled: !isFilteredView
+  })
+
+  // Fetch Filters
+  const { data: filtersData, isLoading: loadingFilters } = useQuery({
+    queryKey: ['filters', profileId],
+    queryFn: async () => {
+      const res = await fetch(`/api/streaming/filters?profileId=${profileId}`)
+      if (!res.ok) throw new Error('Failed to load filters')
+      return res.json() as Promise<FiltersData>
+    }
+  })
+
+  // ... (Filtered view logic remains same) ...
+  const [filteredItems, setFilteredItems] = useState<MetaPreview[]>([])
+  const [loadingFiltered, setLoadingFiltered] = useState(false)
   const [skip, setSkip] = useState(0)
   const [hasMore, setHasMore] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-
-  const type = searchParams.get('type') || ''
-  const genre = searchParams.get('genre') || ''
 
   useEffect(() => {
-    if (!profileId) {
-      navigate('/profiles')
-      return
-    }
-    loadInitialData()
-  }, [profileId, type, genre])
-
-  const loadInitialData = async () => {
-    setLoading(true)
-    setItems([])
-    setSkip(0)
-    setHasMore(true)
-    try {
-      // Fetch filters and dashboard data (which includes profile)
-      const [filtersRes, dashboardRes] = await Promise.all([
-        fetch(`/api/streaming/filters?profileId=${profileId}`),
-        fetch(`/api/streaming/dashboard?profileId=${profileId}`)
-      ])
-      const filtersData = await filtersRes.json()
-      const dashboardData = await dashboardRes.json()
-
-      let fetchedItems: MetaPreview[] = []
-      let catalogs: CatalogSection[] = []
-
-      if (type || genre) {
-        const catalogRes = await fetch(`/api/streaming/catalog?profileId=${profileId}&type=${type}&genre=${genre}&skip=0`)
-        const catalogData = await catalogRes.json()
-        fetchedItems = catalogData.items || []
-      } else {
-        // If no filters, use catalogs from dashboard
-        catalogs = dashboardData.catalogs || []
+    if (isFilteredView && profileId) {
+      setLoadingFiltered(true)
+      setFilteredItems([])
+      setSkip(0)
+      setHasMore(true)
+      
+      const fetchFiltered = async () => {
+        try {
+            const typeParam = activeType || ''
+            const genreParam = activeGenre || ''
+            const res = await fetch(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=0`)
+            const data = await res.json()
+            setFilteredItems(data.items || [])
+            setSkip(data.items?.length || 0)
+            if ((data.items?.length || 0) < 20) setHasMore(false)
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setLoadingFiltered(false)
+        }
       }
-
-      setData({
-        filters: filtersData.filters,
-        items: fetchedItems,
-        catalogs,
-        history: [],
-        profile: dashboardData.profile || {}
-      })
-      setItems(fetchedItems)
-      setSkip(fetchedItems.length)
-      if (fetchedItems.length < 20) setHasMore(false)
-
-    } catch (err) {
-      console.error(err)
-      setError('Failed to load content')
-    } finally {
-      setLoading(false)
+      fetchFiltered()
     }
-  }
+  }, [isFilteredView, activeGenre, activeType, profileId])
 
   const loadMore = async () => {
-    if (loadingMore || !hasMore || (!type && !genre)) return
-    setLoadingMore(true)
+    if (loadingFiltered || !hasMore || !isFilteredView) return
+    const typeParam = activeType || ''
+    const genreParam = activeGenre || ''
     try {
-      const res = await fetch(`/api/streaming/catalog?profileId=${profileId}&type=${type}&genre=${genre}&skip=${skip}`)
-      const newData = await res.json()
-      
-      if (newData.items && newData.items.length > 0) {
-        setItems(prev => {
-            const existingIds = new Set(prev.map(i => i.id))
-            const uniqueNewItems = newData.items.filter((i: MetaPreview) => !existingIds.has(i.id))
-            return [...prev, ...uniqueNewItems]
-        })
-        setSkip(prev => prev + newData.items.length)
-        if (newData.items.length < 20) setHasMore(false)
-      } else {
-        setHasMore(false)
-      }
+        const res = await fetch(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=${skip}`)
+        const data = await res.json()
+        if (data.items && data.items.length > 0) {
+            setFilteredItems(prev => [...prev, ...data.items])
+            setSkip(prev => prev + data.items.length)
+            if (data.items.length < 20) setHasMore(false)
+        } else {
+            setHasMore(false)
+        }
     } catch (e) {
-      console.error('Failed to load more', e)
-    } finally {
-      setLoadingMore(false)
+        console.error(e)
     }
   }
 
-  // Infinite scroll handler
+  // Infinite scroll & Sticky Header detection
   useEffect(() => {
-    const handleScroll = () => {
-      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
-        loadMore()
+      const handleScroll = () => {
+        // Sticky Header: Threshold calculation.
+        // Assuming Hero is roughly 85vh and content overlaps by 100px.
+        // We want sticky state when header hits top. 
+        // Header sits at ~85vh - 100px.
+        // We trigger slightly before it hits top. 
+        const stickyThreshold = window.innerHeight * 0.75;
+        setIsSticky(window.scrollY > stickyThreshold);
+
+        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
+          loadMore()
+        }
       }
-    }
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [loadingMore, hasMore, skip, type, genre])
+      window.addEventListener('scroll', handleScroll)
+      return () => window.removeEventListener('scroll', handleScroll)
+  }, [loadingFiltered, hasMore, skip, isFilteredView, activeGenre, activeType])
+
 
   const updateFilter = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams)
@@ -134,161 +195,237 @@ export const StreamingExplore = () => {
     setSearchParams(newParams)
   }
 
-  if (loading) {
-    return (
-      <Layout title="Explore" showHeader={false} showFooter={false}>
-        <Navbar profileId={parseInt(profileId!)} activePage="explore" />
-        <div className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}>
-          <div className={styles.contentContainer} style={{ marginTop: '0' }}>
-            <div style={{ padding: '0 60px', marginBottom: '30px' }}>
-              <h1 style={{ fontSize: '3rem', fontWeight: '800', margin: 0 }}>Explore</h1>
+  // --- Render ---
+
+  if ((loadingDash && !isFilteredView) || loadingFilters) {
+     return (
+        <Layout title="Explore" showHeader={false} showFooter={false}>
+            <div className={styles.streamingLayout}>
+                <SkeletonHero />
+                <div className={styles.contentContainer} style={{ marginTop: '-100px' }}>
+                    <SkeletonRow />
+                    <SkeletonRow />
+                </div>
             </div>
-            {/* Skeleton filter tabs */}
-            <div style={{ padding: '0 60px', marginBottom: '40px', display: 'flex', gap: '16px' }}>
-              <div style={{ width: '120px', height: '44px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
-                <div className={styles.skeletonShimmer} />
-              </div>
-              <div style={{ width: '120px', height: '44px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
-                <div className={styles.skeletonShimmer} />
-              </div>
-            </div>
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-          </div>
-        </div>
-      </Layout>
-    )
+        </Layout>
+     )
   }
 
-  if (error || !data) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#141414', color: 'white' }}>
-        {error || 'Error loading explore'}
-      </div>
-    )
-  }
+  const genres = filtersData?.filters?.genres || []
+  const types = filtersData?.filters?.types || ['movie', 'series']
+  
+  const trending = dashboardData?.trending || []
+  const trendingMovies = dashboardData?.trendingMovies || []
+  const trendingSeries = dashboardData?.trendingSeries || []
 
-  const { filters, catalogs } = data
+  // Logic for display genres based on viewMode
+  // If ALL: show random mixed genres.
+  // If Movie: show random movie genres (technically just random genres that contain movies, usually broad).
+  // If Series: show random series genres.
+  // We don't strictly filter genres by type in backend here, but we can assume popular genres work for both or use GenreRow to fetch appropriately.
+  // GenreRow component calls `type=movie,series` by default. We should let it respect our viewMode!
+  
+  // We need to modify GenreRow to accept a type override or rely on its own logic.
+  // For now let's reuse GenreRow but maybe pass type?
+  // The internal GenreRow (lines 11-50) hardcodes `type=movie,series`. 
+  // We can't easily change it here without refactoring GenreRow or duplicating it. 
+  // Let's refactor GenreRow slightly to accept type prop.
+  
+  // Wait, I can't refactor GenreRow inside this replacement block easily if it's separate. 
+  // GenreRow is lines 18-49. I am replacing lines 51-325. 
+  // I will assume GenreRow will be updated separately or I will update it in a separate call if needed.
+  // Actually, I can update GenreRow later. For "All", mixed is fine.
+  // For "Movie", we want GenreRow to fetch `type=movie`. 
+  // For "Series", `type=series`.
+  // I will update GenreRow in a follow-up step.
+  
+  const displayGenres = genres.length > 0 
+    ? shuffledGenres.filter(g => genres.includes(g)).concat(genres.filter(g => !shuffledGenres.includes(g)))
+    : shuffledGenres
+  
+  const rowGenres = displayGenres.slice(0, 15)
 
+  const showHero = !isFilteredView && trending.length > 0
+  
   return (
     <Layout title="Explore" showHeader={false} showFooter={false}>
-      <Navbar profileId={parseInt(profileId!)} activePage="explore" profile={data.profile} />
-      
-      <div className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}>
-        <div className={styles.contentContainer} style={{ marginTop: '0' }}>
-          
-          <div style={{ padding: '0 60px', marginBottom: '30px' }}>
-            <h1 style={{ fontSize: '3rem', fontWeight: '800', margin: 0 }}>Explore</h1>
-          </div>
+        <div className={styles.streamingLayout} style={{ minHeight: '100vh' }}>
+            {/* Hero is always based on mixed trending or history - keeps page dynamic */}
+            {/* Or should Hero change based on Toggle? User didn't specify, but usually Hero implies "Featured". 
+                Let's keep Hero mixed for now as it's the "Main" feature. */}
+            {showHero && (
+                <Hero 
+                    items={trending} 
+                    profileId={profileId!} 
+                    showTrending={true}
+                    storageKey="exploreHeroIndex"
+                />
+            )}
 
-          {/* Filters Section */}
-          <div className="filters-section" style={{ padding: '0 60px', marginBottom: '40px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <select 
-              className="filter-select" 
-              value={type} 
-              onChange={(e) => updateFilter('type', e.target.value)}
-              style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#fff',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                outline: 'none'
-              }}
-            >
-              <option value="" style={{ color: '#000' }}>All Types</option>
-              {filters.types.map(t => (
-                <option key={t} value={t} style={{ color: '#000' }}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-              ))}
-            </select>
+            <div className={styles.contentContainer} style={{ marginTop: showHero ? undefined : '40px' }}>
+                
+                {/* Header / View Toggles / Filter Bar */}
+                <div 
+                    className={`
+                        sticky top-[var(--titlebar-height,0px)] z-50 transition-all duration-300
+                        flex items-center justify-between mb-8
+                        ${isSticky 
+                            ? 'bg-black/90 backdrop-blur-xl border-b border-white/10 py-4 shadow-2xl' 
+                            : 'bg-transparent py-0'
+                        }
+                        px-[60px]
+                    `}
+                >
+                     {isFilteredView ? (
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => { setSearchParams({}); setViewMode('all'); }}
+                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors backdrop-blur-md border border-white/10"
+                                aria-label="Go Back"
+                            >
+                                <ArrowLeft className="text-white w-5 h-5" />
+                            </button>
+                            <h1 className="text-3xl font-bold text-white">
+                                {activeGenre || (activeType ? (activeType === 'movie' ? 'Movies' : 'Series') : 'Explore')}
+                            </h1>
+                        </div>
+                     ) : (
+                         <div className="flex gap-2 p-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10">
+                            {(['all', 'movie', 'series'] as const).map(mode => (
+                                <button
+                                    key={mode}
+                                    onClick={() => setViewMode(mode)}
+                                    className={`px-6 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
+                                        viewMode === mode 
+                                        ? 'bg-white text-black shadow-lg scale-105' 
+                                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                                    }`}
+                                >
+                                    {mode === 'all' ? 'All' : mode === 'movie' ? 'Movies' : 'TV Shows'}
+                                </button>
+                            ))}
+                         </div>
+                     )}
 
-            <select 
-              className="filter-select" 
-              value={genre} 
-              onChange={(e) => updateFilter('genre', e.target.value)}
-              style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#fff',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                outline: 'none'
-              }}
-            >
-              <option value="" style={{ color: '#000' }}>All Genres</option>
-              {filters.genres.map(g => (
-                <option key={g} value={g} style={{ color: '#000' }}>{g}</option>
-              ))}
-            </select>
-          </div>
+                     {!isFilteredView && (
+                         // Filter Button (Genres)
+                         <div className="flex relative">
+                             <div className="relative">
+                                <select 
+                                    className="appearance-none bg-white/10 border border-white/10 text-white pl-6 pr-10 py-2.5 rounded-full backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer hover:bg-white/20 transition-all duration-300 text-sm font-semibold text-white/90"
+                                    onChange={(e) => updateFilter('genre', e.target.value)}
+                                    value=""
+                                >
+                                    <option value="" disabled selected>Genres</option>
+                                    {genres.map(g => (
+                                        <option key={g} value={g} className="text-black bg-white">{g}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+                             </div>
+                         </div>
+                     )}
+                </div>
 
-          {/* Filtered Results Grid */}
-          {items.length > 0 ? (
-             <div className={styles.contentRow}>
-               <div className={styles.rowHeader}>
-                 <h2 className={styles.rowTitle}>
-                   {genre ? `${genre} ` : ''}
-                   {type ? (type === 'movie' ? 'Movies' : 'Series') : 'Results'}
-                 </h2>
-               </div>
-                <div className={styles.mediaGrid}>
-                 {items.map(item => (
-                   <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
-                     <div className={styles.posterContainer}>
-                       {item.poster ? (
-                           <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
+                {isFilteredView ? (
+                    // GRID VIEW for Filtered Results
+                    <div className={styles.contentRow}>
+                         {loadingFiltered ? (
+                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 px-[60px]">
+                                 {[...Array(10)].map((_, i) => <SkeletonCard key={i} />)}
+                             </div>
+                         ) : filteredItems.length > 0 ? (
+                             <div className={styles.mediaGrid}>
+                                {filteredItems.map(item => (
+                                    <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
+                                        <div className={styles.posterContainer}>
+                                            <LazyImage src={item.poster || ''} alt={item.name} className={styles.posterImage} />
+                                             <div className={styles.badgesContainer}>
+                                                {showImdbRatings && item.imdbRating && (
+                                                    <RatingBadge rating={parseFloat(item.imdbRating)} />
+                                                )}
+                                             </div>
+                                            <div className={styles.cardOverlay}>
+                                                <div className={styles.cardTitle}>{item.name}</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                ))}
+                             </div>
                          ) : (
-                           <div className="flex items-center justify-center bg-gray-800 text-gray-400 w-full h-full p-2 text-center text-sm">{item.name}</div>
+                             <div className="text-center text-gray-500 py-20">No results found.</div>
                          )}
-                         <div className={styles.badgesContainer}>
-                           {showImdbRatings && item.imdbRating && (
-                             <RatingBadge rating={parseFloat(item.imdbRating)} />
-                           )}
-                           {/* @ts-ignore */}
-                           {showAgeRatings && (item.certification || item.rating || item.contentRating) && (
-                             <span className={styles.ageRatingBadge}>
-                               {/* @ts-ignore */}
-                               {item.certification || item.rating || item.contentRating}
-                             </span>
-                           )}
-                         </div>
-                         <div className={styles.cardOverlay}>
-                           <div className={styles.cardTitle}>{item.name}</div>
-                         </div>
-                       </div>
-                     </a>
-                   )
-                 )}
-               </div>
-               {loadingMore && <div className="text-center p-5 text-gray-500">Loading more...</div>}
-             </div>
-          ) : (
-            /* Default Catalogs View (if no filters or no results) */
-            <>
-              {catalogs.length === 0 && (type || genre) ? (
-                <div className="loading" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>No results found for these filters.</div>
-              ) : (
-                catalogs.map((section, idx) => (
-                  <StreamingRow
-                    key={idx}
-                    title={section.title}
-                    items={section.items}
-                    profileId={profileId!}
-                    showImdbRatings={showImdbRatings}
-                    showAgeRatings={showAgeRatings}
-                    seeAllUrl={section.seeAllUrl}
-                  />
-                ))
-              )}
-            </>
-          )}
+                    </div>
+                ) : (
+                    // VIEW MODE ROWS
+                    <>
+                         {/* All Mode: Show Both Movies and Series Top 10 */}
+                         {viewMode === 'all' && (
+                             <>
+                                {trendingMovies.length > 0 && (
+                                    <StreamingRow
+                                        title="Top 10 Movies Today"
+                                        items={trendingMovies}
+                                        profileId={profileId!}
+                                        showImdbRatings={showImdbRatings}
+                                        showAgeRatings={showAgeRatings}
+                                        isRanked={true}
+                                    />
+                                )}
+                                {trendingSeries.length > 0 && (
+                                    <StreamingRow
+                                        title="Top 10 Series Today"
+                                        items={trendingSeries}
+                                        profileId={profileId!}
+                                        showImdbRatings={showImdbRatings}
+                                        showAgeRatings={showAgeRatings}
+                                        isRanked={true}
+                                    />
+                                )}
+                             </>
+                         )}
+
+                        {/* Movie Mode: Show Only Movies Top 10 */}
+                         {viewMode === 'movie' && trendingMovies.length > 0 && (
+                            <StreamingRow
+                                title="Top 10 Movies Today"
+                                items={trendingMovies}
+                                profileId={profileId!}
+                                showImdbRatings={showImdbRatings}
+                                showAgeRatings={showAgeRatings}
+                                isRanked={true}
+                            />
+                         )}
+
+                        {/* Series Mode: Show Only Series Top 10 */}
+                         {viewMode === 'series' && trendingSeries.length > 0 && (
+                            <StreamingRow
+                                title="Top 10 Series Today"
+                                items={trendingSeries}
+                                profileId={profileId!}
+                                showImdbRatings={showImdbRatings}
+                                showAgeRatings={showAgeRatings}
+                                isRanked={true}
+                            />
+                         )}
+
+                         {/* Genre Rows - Pass viewMode as type */}
+                         {rowGenres.map(genre => (
+                             <GenreRow 
+                                key={`${genre}-${viewMode}`} 
+                                genre={genre} 
+                                profileId={profileId!} 
+                                showImdbRatings={showImdbRatings}
+                                showAgeRatings={showAgeRatings}
+                                type={viewMode === 'all' ? undefined : viewMode}
+                             />
+                         ))}
+                    </>
+                )}
+
+            </div>
         </div>
-      </div>
     </Layout>
   )
 }
+

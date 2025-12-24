@@ -2,7 +2,7 @@ import { useEffect, useState, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useLoginBehavior } from '../../hooks/useLoginBehavior'
-import { LoadingSpinner } from '../ui/LoadingSpinner'
+import { SplashScreen } from '../ui/SplashScreen'
 
 interface RouteGuardProps {
   children: ReactNode
@@ -56,7 +56,7 @@ export function ProtectedRoute({ children }: RouteGuardProps) {
   // Show loading ONLY while checking session initially
   // Do NOT show loading if we have already checked session (background refresh)
   if (!hasCheckedSession) {
-    return <LoadingSpinner fullScreen />
+    return <SplashScreen />
   }
 
   // Don't render children if not authenticated

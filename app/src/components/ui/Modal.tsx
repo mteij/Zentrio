@@ -12,6 +12,10 @@ interface ModalProps {
   maxWidth?: string;
 }
 
+import { createPortal } from 'react-dom';
+
+// ... (imports remain)
+
 export function Modal({ 
   id, 
   isOpen, 
@@ -44,10 +48,11 @@ export function Modal({
     return () => { document.body.style.overflow = 'unset'; };
   }, [isOpen]);
 
-  return (
+  // Using portal to ensure modal is always on top and not affected by parent transforms
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
             {/* Backdrop */}
             <motion.div 
                 initial={{ opacity: 0 }}
@@ -95,7 +100,8 @@ export function Modal({
             </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 

@@ -36,6 +36,11 @@ export const getServerUrl = () => {
       return "http://localhost:3000";
     }
 
+    if (import.meta.env.DEV && stored === "https://app.zentrio.eu") {
+        console.log('[auth-client] Dev mode + Official Server -> Using local proxy');
+        return `${window.location.origin}/api-cloud`;
+    }
+
     return stored || "https://app.zentrio.eu";
   }
 
@@ -57,10 +62,6 @@ export const getClientUrl = () => {
 
 export const authClient = createAuthClient({
   baseURL: getServerUrl(),
-  fetch: isTauri() ? async (url: RequestInfo | URL, init?: RequestInit) => {
-    const { fetch } = await import('@tauri-apps/plugin-http');
-    return fetch(url, init);
-  } : undefined,
   plugins: [
     twoFactorClient({
       onTwoFactorRedirect: () => {
