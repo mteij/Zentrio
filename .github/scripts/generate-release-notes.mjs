@@ -297,9 +297,7 @@ async function main() {
   const disclaimer = "\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.";
   writeFileSync('RELEASE_NOTES.md', notes + links + disclaimer, 'utf8');
   // Emit a small marker file if AI was actually used
-  if (usedAi) {
-    writeFileSync('.release_notes_ai.txt', 'nanogpt', 'utf8');
-  }
+
   console.log('Release notes written to RELEASE_NOTES.md');
 }
 
