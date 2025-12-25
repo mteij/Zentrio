@@ -4,21 +4,70 @@ on:
   push:
     branches:
       - main
+  workflow_call:
+    inputs:
+      version:
+        description: "Version to build (optional, defaults to package.json)"
+        required: false
+        type: string
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  # First, ensure the release exists before any builds start
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=$(node -e "console.log(require('./app/package.json').version)")
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      - name: Ensure release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "✅ Release $TAG already exists"
+          else
+            echo "📦 Creating draft release $TAG"
+            gh release create "$TAG" \
+              --draft \
+              --title "Zentrio $TAG" \
+              --notes "🚀 Release in progress... Build artifacts are being generated for all platforms (Windows, macOS, Linux, Android, iOS). This release will be updated automatically once all builds complete."
+          fi
+
   build-tauri:
+    needs: [create-release]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-13" # for iOS (more stable than macos-latest)
+          - platform: "macos-latest" # Apple Silicon runner for iOS
             args: "--target aarch64-apple-ios"
             name: "ios"
-          - platform: "macos-13" # for macOS (more stable for DMG bundling)
+          - platform: "macos-latest" # Apple Silicon runner for macOS
             args: "--target aarch64-apple-darwin"
             name: "macos"
           - platform: "ubuntu-22.04" # for Linux
@@ -91,10 +140,6 @@ jobs:
       - name: Install frontend dependencies
         run: cd app && npm install # Using npm install instead of bun for broader compatibility in CI
 
-      - name: Get version
-        run: |
-          echo "VERSION=$(node -e "console.log(require('./app/package.json').version)")" >> $GITHUB_ENV
-
       # Server Binary Builds
       - name: Build Server Binary (Linux)
         if: matrix.name == 'linux'
@@ -124,11 +169,7 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
         with:
           projectPath: ./app
-          tagName: app-v__VERSION__
-          releaseName: "App v__VERSION__"
-          releaseBody: "See the assets to download this version and install."
-          releaseDraft: true
-          prerelease: false
+          tagName: v__VERSION__
           args: ${{ matrix.args }}
 
       # Android Build
@@ -137,29 +178,31 @@ jobs:
         working-directory: ./app
         env:
           NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           # Decode keystore from base64
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          KEYSTORE_PATH="$(pwd)/keystore.jks"
 
+          # Initialize Android project
           bun tauri android init
-          bun tauri android build --apk true -- \
-            -Pandroid.injected.signing.store.file=$(pwd)/keystore.jks \
-            -Pandroid.injected.signing.store.password=$ANDROID_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$ANDROID_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$ANDROID_KEY_PASSWORD
+
+          # Configure signing via gradle.properties (not CLI flags)
+          GRADLE_PROPS="src-tauri/gen/android/gradle.properties"
+          echo "" >> "$GRADLE_PROPS"
+          echo "# Signing configuration" >> "$GRADLE_PROPS"
+          echo "android.injected.signing.store.file=$KEYSTORE_PATH" >> "$GRADLE_PROPS"
+          echo "android.injected.signing.store.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GRADLE_PROPS"
+          echo "android.injected.signing.key.alias=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GRADLE_PROPS"
+          echo "android.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GRADLE_PROPS"
+
+          # Build APK
+          bun tauri android build --apk
 
       - name: Upload Android Artifacts to Release
         if: matrix.name == 'android'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: app-v${{ env.VERSION }}
-          # We need to ensure the release exists or is created.
-          # tauri-action creates it. If Android runs faster, this might fail?
-          # Or softprops creates it if missing? It does.
-          draft: true
+          tag_name: ${{ needs.create-release.outputs.tag_name }}
           files: |
             app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
 
@@ -200,8 +243,7 @@ jobs:
         if: matrix.name == 'ios'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: app-v${{ env.VERSION }}
-          draft: true
+          tag_name: ${{ needs.create-release.outputs.tag_name }}
           files: |
             app/src-tauri/gen/apple/build/Release-iphoneos/*.app
             app/src-tauri/gen/apple/build/Release-iphoneos/*.ipa
