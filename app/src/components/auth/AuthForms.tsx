@@ -325,6 +325,9 @@ export function AuthForms({ mode }: AuthFormsProps) {
                 onChange={(e) => setEmail(e.target.value.toLowerCase())}
                 className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
                 placeholder="you@example.com"
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore
               />
             </div>
           </div>
@@ -335,15 +338,19 @@ export function AuthForms({ mode }: AuthFormsProps) {
               <div className="relative">
                 <Lock className="absolute left-3.5 top-3.5 w-5 h-5 text-zinc-500" />
                 <input
-                  type="password"
+                  type="text"
                   id="password"
                   name="password"
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  autoComplete="off"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
                   placeholder="••••••••"
+                  style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-bwignore
                 />
               </div>
             </div>

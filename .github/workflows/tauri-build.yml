@@ -95,6 +95,25 @@ jobs:
         run: |
           echo "VERSION=$(node -e "console.log(require('./app/package.json').version)")" >> $GITHUB_ENV
 
+      # Server Binary Builds
+      - name: Build Server Binary (Linux)
+        if: matrix.name == 'linux'
+        working-directory: ./app
+        run: |
+          bun build src/index.ts --compile --target bun-linux-x64 --outfile src-tauri/bin/zentrio-server-x86_64-unknown-linux-gnu
+
+      - name: Build Server Binary (Windows)
+        if: matrix.name == 'windows'
+        working-directory: ./app
+        run: |
+          bun build src/index.ts --compile --target bun-windows-x64 --outfile src-tauri/bin/zentrio-server-x86_64-pc-windows-msvc.exe
+
+      - name: Build Server Binary (macOS)
+        if: matrix.name == 'macos'
+        working-directory: ./app
+        run: |
+          bun build src/index.ts --compile --target bun-darwin-arm64 --outfile src-tauri/bin/zentrio-server-aarch64-apple-darwin
+
       # Desktop Build (Linux, Windows, macOS Desktop)
       - name: Build Tauri App (Desktop)
         if: matrix.name != 'android' && matrix.name != 'ios'

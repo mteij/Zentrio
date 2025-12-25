@@ -132,6 +132,10 @@ export function TwoFactorModal({
                   }
                 }}
                 disabled={loading}
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore
                 className="w-11 h-14 bg-black/20 border border-white/10 rounded-lg text-xl font-bold text-center text-white font-mono focus:outline-none focus:border-[#e50914] focus:ring-1 focus:ring-[#e50914] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               />
             ))}
@@ -172,6 +176,9 @@ export function TwoFactorModal({
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={loading}
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
             className="sr-only"
             aria-label="Two-factor authentication code"
           />

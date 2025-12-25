@@ -1,126 +1,194 @@
-import { useEffect, useState } from 'react'
-
 interface AnimatedBackgroundProps {
   className?: string
   image?: string
   fallbackColor?: string
   opacity?: number
+  /** Enable floating orbs effect */
+  showOrbs?: boolean
 }
 
 /**
- * Pure CSS animated gradient background - replaces Vanta.js
- * ~10KB vs ~100KB, hardware accelerated, zero layout shifts
+ * Premium animated gradient background with floating orbs
+ * Used for app pages (Profiles, Settings, Addons, etc.)
  */
-export function AnimatedBackground({ className = '', image, fallbackColor, opacity = 1 }: AnimatedBackgroundProps) {
-  // Hardcoded Zentrio Theme Colors
+export function AnimatedBackground({ 
+  className = '', 
+  image, 
+  fallbackColor, 
+  opacity = 1,
+  showOrbs = true,
+}: AnimatedBackgroundProps) {
+  // Brand colors
   const colors = {
-    primary: '#101010',
-    secondary: '#1a1a1a', 
-    tertiary: '#252525'
+    primary: '#0a0a0a',
+    accent: '#dc2626', // Zentrio red
   }
-  const speed = 45
 
   if (image) {
-      return (
-        <div className={`fixed inset-0 z-0 pointer-events-none ${className}`} style={{ top: 'var(--titlebar-height, 0px)', height: 'var(--app-height, 100vh)', background: fallbackColor || colors.primary }}>
-            <div 
-                className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
-                style={{
-                    backgroundImage: `url(${image})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    opacity: opacity
-                }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-3xl" />
-        </div>
-      )
+    return (
+      <div 
+        className={`fixed inset-0 z-0 pointer-events-none ${className}`} 
+        style={{ 
+          top: 'var(--titlebar-height, 0px)', 
+          height: 'var(--app-height, 100vh)', 
+          background: fallbackColor || colors.primary 
+        }}
+      >
+        <div 
+          className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
+          style={{
+            backgroundImage: `url(${image})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            opacity: opacity
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-2xl" />
+      </div>
+    )
   }
 
   return (
     <>
-      {/* Main animated gradient background */}
+      {/* Main background */}
       <div
         className={`fixed inset-0 z-0 pointer-events-none ${className}`}
         style={{
           top: 'var(--titlebar-height, 0px)',
           height: 'var(--app-height, 100vh)',
-          backgroundImage: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`,
-          backgroundSize: '400% 400%',
-          backgroundPosition: 'center',
-          animation: `backgroundPan ${speed}s ease infinite`
+          background: colors.primary,
         }}
       >
-        {/* Animated gradient overlay */}
+        {/* Large red glow - top right */}
         <div
-          className="absolute inset-0 opacity-40"
+          className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full"
           style={{
-            backgroundImage: `
-              radial-gradient(circle at 20% 50%, ${colors.primary}40 0%, transparent 50%),
-              radial-gradient(circle at 80% 80%, ${colors.secondary}30 0%, transparent 50%),
-              radial-gradient(circle at 40% 20%, ${colors.tertiary}20 0%, transparent 50%)
-            `,
-            animation: `gradientShift ${speed * 0.75}s ease infinite`
+            background: `radial-gradient(circle, ${colors.accent}25 0%, ${colors.accent}10 30%, transparent 70%)`,
+            filter: 'blur(80px)',
+            animation: 'pulseGlow 8s ease-in-out infinite',
+          }}
+        />
+        
+        {/* Medium red glow - bottom left */}
+        <div
+          className="absolute -bottom-20 -left-20 w-[400px] h-[400px] rounded-full"
+          style={{
+            background: `radial-gradient(circle, ${colors.accent}20 0%, ${colors.accent}08 40%, transparent 70%)`,
+            filter: 'blur(60px)',
+            animation: 'pulseGlow 10s ease-in-out infinite reverse',
+          }}
+        />
+        
+        {/* Subtle center glow */}
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full"
+          style={{
+            background: `radial-gradient(circle, ${colors.accent}08 0%, transparent 60%)`,
+            filter: 'blur(100px)',
           }}
         />
 
-        {/* Subtle noise texture overlay */}
+        {showOrbs && (
+          <>
+            {/* Floating orb 1 */}
+            <div
+              className="absolute w-32 h-32 rounded-full"
+              style={{
+                top: '20%',
+                right: '15%',
+                background: `radial-gradient(circle, ${colors.accent}40 0%, transparent 70%)`,
+                filter: 'blur(40px)',
+                animation: 'floatOrb1 15s ease-in-out infinite',
+              }}
+            />
+            
+            {/* Floating orb 2 */}
+            <div
+              className="absolute w-24 h-24 rounded-full"
+              style={{
+                bottom: '30%',
+                left: '10%',
+                background: `radial-gradient(circle, ${colors.accent}30 0%, transparent 70%)`,
+                filter: 'blur(30px)',
+                animation: 'floatOrb2 20s ease-in-out infinite',
+              }}
+            />
+            
+            {/* Floating orb 3 */}
+            <div
+              className="absolute w-16 h-16 rounded-full"
+              style={{
+                top: '60%',
+                right: '30%',
+                background: `radial-gradient(circle, ${colors.accent}35 0%, transparent 70%)`,
+                filter: 'blur(25px)',
+                animation: 'floatOrb3 12s ease-in-out infinite',
+              }}
+            />
+          </>
+        )}
+
+        {/* Subtle noise texture */}
         <div
-          className="absolute inset-0 opacity-[0.03]"
+          className="absolute inset-0 opacity-[0.02]"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' /%3E%3C/svg%3E")`,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' /%3E%3C/svg%3E")`,
             backgroundRepeat: 'repeat',
-            backgroundSize: '200px 200px'
-          }}
-        />
-
-        {/* Radial gradient vignette */}
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: 'radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.4) 100%)'
+            backgroundSize: '150px 150px',
           }}
         />
       </div>
 
-      {/* Keyframe animation inline styles */}
+      {/* Keyframe animations */}
       <style>{`
-        @keyframes backgroundPan {
-          0% {
-            background-position: 0% 50%;
+        @keyframes pulseGlow {
+          0%, 100% {
+            opacity: 0.8;
+            transform: scale(1);
           }
           50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
+            opacity: 1;
+            transform: scale(1.1);
           }
         }
 
-        @keyframes gradientShift {
+        @keyframes floatOrb1 {
           0%, 100% {
-            opacity: 0.7;
-            transform: translate(0, 0) scale(1);
+            transform: translate(0, 0);
+          }
+          25% {
+            transform: translate(-40px, 30px);
+          }
+          50% {
+            transform: translate(-20px, 60px);
+          }
+          75% {
+            transform: translate(30px, 20px);
+          }
+        }
+
+        @keyframes floatOrb2 {
+          0%, 100% {
+            transform: translate(0, 0);
           }
           33% {
-            opacity: 0.6;
-            transform: translate(30px, -30px) scale(1.1);
+            transform: translate(60px, -40px);
           }
           66% {
-            opacity: 0.8;
-            transform: translate(-20px, 20px) scale(0.95);
+            transform: translate(30px, 40px);
+          }
+        }
+
+        @keyframes floatOrb3 {
+          0%, 100% {
+            transform: translate(0, 0);
+          }
+          50% {
+            transform: translate(-50px, -30px);
           }
         }
       `}</style>
     </>
   )
 }
-
-/**
- * Example usage:
- * 
- * <AnimatedBackground variant="zentrio" />
- * <AnimatedBackground variant="purple" />
- * <AnimatedBackground variant="blue" />
- */

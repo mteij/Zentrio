@@ -28,16 +28,13 @@ export default defineConfig({
       // credentialless allows cross-origin images while still enabling SharedArrayBuffer
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
+      // Allow cross-origin requests to load resources from this server
+      'Cross-Origin-Resource-Policy': 'cross-origin',
     },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: false,
-      },
-      '/api-cloud': {
-        target: 'https://app.zentrio.eu',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api-cloud/, ''),
       },
     },
   },

@@ -123,6 +123,7 @@ app.get('/assets/*', async (c) => {
       'Cache-Control': 'public, max-age=31536000, immutable', // Long cache for hashed assets
       'Cross-Origin-Embedder-Policy': 'credentialless',
       'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
       'Accept-Ranges': 'bytes',
     }
 
@@ -162,6 +163,7 @@ app.get('/static/*', async (c) => {
       'Cache-Control': 'public, max-age=3600',
       'Cross-Origin-Embedder-Policy': 'credentialless',
       'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
       'Accept-Ranges': 'bytes',
     }
 

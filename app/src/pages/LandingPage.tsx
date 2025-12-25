@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { SimpleLayout, AnimatedBackground, Button, Input } from '../components'
+import { SimpleLayout, Button, Input, TitleBar } from '../components'
+import { ParticleBackground } from '../components/ui/ParticleBackground'
 import { Loader2, ArrowRight } from "lucide-react";
 import { authClient, getClientUrl } from '../lib/auth-client';
 import { apiFetch } from '../lib/apiFetch';
@@ -100,10 +101,11 @@ export function LandingPage({ version }: LandingPageProps) {
   };
 
   return (
-    <SimpleLayout title="Welcome to Zentrio" disableThemeSync={true} className="h-[100vh] h-[var(--app-height,100vh)] flex flex-col overflow-hidden">
-      <AnimatedBackground />
+    <>
+      <TitleBar />
+      <ParticleBackground />
       
-      <main className="flex-1 flex items-center justify-center relative z-10 p-4 w-full">
+      <main className="min-h-screen flex items-center justify-center relative z-10 p-4 w-full">
         <div className="w-full max-w-lg mx-auto">
           <div className="w-full flex flex-col items-center justify-center text-center relative z-10" data-tauri-drag-region>
             
@@ -244,6 +246,6 @@ export function LandingPage({ version }: LandingPageProps) {
           </a>
         </div>
       </footer>
-    </SimpleLayout>
+    </>
   )
 }

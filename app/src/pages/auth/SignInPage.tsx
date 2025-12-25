@@ -1,15 +1,23 @@
+import { motion } from "framer-motion";
 import { AuthForms } from "../../components/auth/AuthForms";
-import { AnimatedBackground, TitleBar } from "../../components";
+import { TitleBar } from "../../components";
+import { ParticleBackground } from "../../components/ui/ParticleBackground";
 
 export function SignInPage() {
-  // Note: Authenticated user redirect is now handled by PublicRoute wrapper
-  
   return (
     <>
       <TitleBar />
-      <AnimatedBackground />
-      <div className="h-[100vh] h-[var(--app-height,100vh)] w-full flex items-center justify-center p-4 relative z-10 overflow-hidden">
-         <AuthForms mode="signin" />
+      <ParticleBackground />
+      
+      <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-lg"
+        >
+          <AuthForms mode="signin" />
+        </motion.div>
       </div>
     </>
   );

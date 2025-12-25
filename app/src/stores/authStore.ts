@@ -76,6 +76,16 @@ export const useAuthStore = create<AuthState>()(
               error: null,
               lastActivity: Date.now(),
             })
+            
+            // Clear app mode and server URL to show onboarding wizard
+            // Import dynamically to avoid circular dependency
+            import('../lib/app-mode').then(({ appMode }) => {
+              appMode.clear()
+            })
+            localStorage.removeItem('zentrio_server_url')
+            
+            // Reload to show onboarding wizard
+            window.location.href = '/'
           }
         },
 

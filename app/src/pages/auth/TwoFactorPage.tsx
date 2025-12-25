@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from 'sonner';
-import { AnimatedBackground, TitleBar } from "../../components";
+import { TitleBar } from "../../components";
+import { ParticleBackground } from "../../components/ui/ParticleBackground";
 import { TwoFactorModal } from "../../components/auth/TwoFactorModal";
 import { authClient } from "../../lib/auth-client";
 import { useAuthStore } from "../../stores/authStore";
@@ -77,8 +78,8 @@ export function TwoFactorPage() {
     return (
       <>
         <TitleBar />
-        <AnimatedBackground />
-        <div className="h-[100vh] h-[var(--app-height,100vh)] w-full flex items-center justify-center p-4 relative z-10 overflow-hidden">
+        <ParticleBackground />
+        <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
           <div className="w-full max-w-md">
             <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
               <button
@@ -105,6 +106,10 @@ export function TwoFactorPage() {
                   placeholder="XXXX-XXXX"
                   className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-3 text-center font-mono text-xl text-white tracking-widest focus:outline-none focus:border-red-500 mb-4"
                   disabled={isLoading}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-bwignore
                 />
                 
                 {/* Trust This Device Checkbox */}
@@ -148,8 +153,8 @@ export function TwoFactorPage() {
   return (
     <>
       <TitleBar />
-      <AnimatedBackground />
-      <div className="h-[100vh] h-[var(--app-height,100vh)] w-full flex items-center justify-center p-4 relative z-10 overflow-hidden">
+      <ParticleBackground />
+      <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
         <div className="w-full max-w-md">
           <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
             <TwoFactorModal

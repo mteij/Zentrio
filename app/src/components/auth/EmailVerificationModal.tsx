@@ -160,6 +160,10 @@ export function EmailVerificationModal({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             disabled={parentIsLoading || isVerifying}
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore
             autoFocus
           />
         </div>

@@ -18,38 +18,33 @@ export const isTauri = () => {
   );
 };
 
+/**
+ * Get the server URL for API requests.
+ * - In Tauri: Uses the stored server URL (or localhost in dev)
+ * - In Web: Uses the current origin (same-origin requests)
+ */
 export const getServerUrl = () => {
   if (typeof window === "undefined") return "http://localhost:3000";
 
   if (isTauri()) {
     const stored = localStorage.getItem("zentrio_server_url");
-    // PROXY marker means use current origin (for dev mode with Vite proxy)
-    if (stored === "PROXY") {
-      console.log('[auth-client] Using PROXY mode, returning:', window.location.origin);
-      return window.location.origin;
-    }
-    console.log('[auth-client] Tauri mode, stored URL:', stored);
-
+    
     // In development, default to localhost if no server is selected
     if (!stored && import.meta.env.DEV) {
-      console.log('[auth-client] Host is DEV, defaulting to localhost:3000');
       return "http://localhost:3000";
-    }
-
-    if (import.meta.env.DEV && stored === "https://app.zentrio.eu") {
-        console.log('[auth-client] Dev mode + Official Server -> Using local proxy');
-        return `${window.location.origin}/api-cloud`;
     }
 
     return stored || "https://app.zentrio.eu";
   }
 
-  console.log('[auth-client] Non-Tauri mode, using origin:', window.location.origin);
+  // Web mode: use same origin
   return window.location.origin;
 };
 
-// Get the client URL for OAuth callback redirects
-// This ensures SSO redirects back to the frontend, not the API server
+/**
+ * Get the client URL for OAuth callback redirects.
+ * This ensures SSO redirects back to the frontend, not the API server.
+ */
 export const getClientUrl = () => {
   if (typeof window === "undefined") return "http://localhost:5173";
 
@@ -60,7 +55,8 @@ export const getClientUrl = () => {
   return window.location.origin;
 };
 
-export const authClient = createAuthClient({
+// Create the auth client configuration
+const createClient = () => createAuthClient({
   baseURL: getServerUrl(),
   plugins: [
     twoFactorClient({
@@ -71,4 +67,38 @@ export const authClient = createAuthClient({
     magicLinkClient(),
     emailOTPClient(),
   ],
+});
+
+// Type for the auth client (includes plugin types)
+type AuthClientType = ReturnType<typeof createClient>;
+
+// Auth client singleton - lazily initialized and can be reset
+let authClientInstance: AuthClientType | null = null;
+
+/**
+ * Get the Better Auth client instance.
+ * Uses lazy initialization so the server URL is read at first use, not module load.
+ */
+export function getAuthClient(): AuthClientType {
+  if (!authClientInstance) {
+    authClientInstance = createClient();
+  }
+  return authClientInstance;
+}
+
+/**
+ * Reset the auth client instance.
+ * Call this when the server URL changes to force recreation with new URL.
+ */
+export function resetAuthClient() {
+  authClientInstance = null;
+}
+
+// Legacy export for backward compatibility
+// Uses a Proxy to dynamically forward all property access to the lazily-initialized client
+// This ensures the client is created with the correct server URL at first use
+export const authClient = new Proxy({} as AuthClientType, {
+  get(_, prop) {
+    return (getAuthClient() as any)[prop];
+  }
 });

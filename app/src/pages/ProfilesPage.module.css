@@ -16,16 +16,6 @@
   overflow: hidden;
 }
 
-/* Translucent overlay above Vanta background */
-.profilesPage::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%);
-}
-
 /* Ensure content is above overlay */
 .profilesPage > * {
   position: relative;

@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { toast } from 'sonner'
-import { Server, Wrench, ArrowRight, Loader2 } from "lucide-react";
+import { Server, ArrowRight, Loader2 } from "lucide-react";
 import { getServerUrl, isTauri } from "../../lib/auth-client";
 
 interface ServerSelectorProps {
   onServerSelected: (url: string) => void;
-  showDevMode?: boolean;
 }
 
-export function ServerSelector({ onServerSelected, showDevMode = false }: ServerSelectorProps) {
+export function ServerSelector({ onServerSelected }: ServerSelectorProps) {
   const [url, setUrl] = useState("");
   const [checking, setChecking] = useState(false);
 
@@ -103,13 +102,7 @@ export function ServerSelector({ onServerSelected, showDevMode = false }: Server
     }
   };
   
-  const handleDevMode = () => {
-    // Use a special marker that tells auth-client to use the current origin
-    // This ensures requests go through the Vite proxy
-    localStorage.setItem("zentrio_server_url", "PROXY");
-    toast.success('Development Mode', { description: 'Using local development server' });
-    onServerSelected("PROXY");
-  };
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-white p-4">
@@ -177,15 +170,7 @@ export function ServerSelector({ onServerSelected, showDevMode = false }: Server
               Use Official Server
             </button>
             
-            {showDevMode && (
-              <button
-                onClick={handleDevMode}
-                className="!w-full flex items-center justify-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-medium !py-3 !rounded-md transition-all"
-              >
-                <Wrench className="w-4 h-4" />
-                Development Mode (localhost:3000)
-              </button>
-            )}
+
           </div>
         </div>
       </div>

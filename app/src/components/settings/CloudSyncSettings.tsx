@@ -4,6 +4,8 @@ import { Button, Input, ConfirmDialog } from '../index';
 import { createAuthClient } from "better-auth/client";
 import styles from '../../styles/Settings.module.css';
 import { apiFetch } from '../../lib/apiFetch';
+import { appMode } from '../../lib/app-mode';
+import { isTauri } from '../../lib/auth-client';
 
 interface SyncState {
   id: number;
@@ -24,11 +26,18 @@ export function CloudSyncSettings() {
   const [password, setPassword] = useState('');
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
 
+  // Check if in guest mode - cloud sync not available
+  const isGuestMode = appMode.isGuest();
+
   useEffect(() => {
+    if (isGuestMode) {
+      setLoading(false);
+      return;
+    }
     loadSyncState();
     const interval = setInterval(loadSyncState, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isGuestMode]);
 
   async function loadSyncState() {
     try {
@@ -54,7 +63,6 @@ export function CloudSyncSettings() {
 
     try {
       // Step 1: Authenticate with the remote server
-      // We use the auth client but point it to the remote server
       const remoteAuth = createAuthClient({
         baseURL: serverUrl
       });
@@ -69,16 +77,29 @@ export function CloudSyncSettings() {
       }
 
       // Step 2: Get a sync token from the remote server
-      // We need to make an authenticated request to the remote server
-      // The auth client handles the session cookie/token
-      const tokenResponse = await fetch(`${serverUrl}/api/sync/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // Important: include credentials to send the session cookie we just got
-        credentials: 'include' 
-      });
+      // For Tauri, use the Tauri HTTP plugin which handles cookies properly
+      // For web, use fetch with credentials
+      let tokenResponse: Response;
+      
+      if (isTauri()) {
+        // Use Tauri's HTTP plugin which handles cookies across origins
+        const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+        tokenResponse = await tauriFetch(`${serverUrl}/api/sync/token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } else {
+        // Web: use regular fetch with credentials
+        tokenResponse = await fetch(`${serverUrl}/api/sync/token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
+      }
 
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.json().catch(() => ({}));
@@ -153,6 +174,34 @@ export function CloudSyncSettings() {
 
   if (loading) {
     return <div className={styles.settingsCard}>Loading sync status...</div>;
+  }
+
+  // Guest mode: show upgrade option
+  if (isGuestMode) {
+    return (
+      <div className={styles.settingsCard}>
+        <h2 className={styles.sectionTitle}>Cloud Sync</h2>
+        <div className={styles.settingItem} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
+          <div className={styles.settingInfo}>
+            <h3>Upgrade to Connected Mode</h3>
+            <p>
+              You're currently using Guest Mode. Cloud sync, multiple profiles, and cross-device synchronization 
+              are available when connected to a Zentrio server.
+            </p>
+          </div>
+          <Button 
+            variant="primary" 
+            onClick={() => {
+              // Trigger upgrade flow
+              appMode.upgradeToConnected();
+              window.location.reload();
+            }}
+          >
+            Upgrade to Connected Mode
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const isConnected = syncState && syncState.auth_token;

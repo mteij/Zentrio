@@ -6,15 +6,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { ErrorBoundary } from './components'
 import { SplashScreen } from './components'
-import { ServerSelector } from './components/auth/ServerSelector'
 import { ProtectedRoute, PublicRoute } from './components/auth/AuthGuards'
-import { isTauri } from './lib/auth-client'
+import { isTauri, resetAuthClient } from './lib/auth-client'
 import { useState, useEffect } from 'react'
 import { preloadCommonRoutes } from './utils/route-preloader'
 // Initialize toast bridge for legacy window.addToast calls
 import './utils/toast'
 import { CastProvider } from './contexts/CastContext'
 import { StreamingHomeSkeleton, StreamingDetailsSkeleton } from './components/streaming/StreamingLoaders'
+
+import { appMode, AppMode } from './lib/app-mode'
+import { OnboardingWizard } from './components/onboarding'
 
 // Lazy load all pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage as React.ComponentType<{version?: string}> })))
@@ -49,10 +51,18 @@ const queryClient = new QueryClient({
 
 function AppRoutes() {
   const location = useLocation()
+  
+  // App mode state (guest vs connected)
+  const [mode, setMode] = useState<AppMode | null | 'web'>(() => {
+    // Web apps always use connected mode (same-origin auth)
+    if (!isTauri()) return 'web';
+    return appMode.get();
+  });
+  
+  // Server URL state (for connected mode in Tauri)
   const [serverUrl, setServerUrl] = useState<string | null>(() => {
-    // If not in Tauri, we don't need a specific server URL (uses origin)
-    // If in Tauri, we check if one is set.
-    if (!isTauri()) return "web"; 
+    if (!isTauri()) return "web";
+    if (appMode.isGuest()) return "guest"; // Guest mode uses local server
     return localStorage.getItem("zentrio_server_url");
   });
 
@@ -68,15 +78,22 @@ function AppRoutes() {
     console.log('AppRoutes: Location changed to', location.pathname)
   }, [location.pathname])
 
-  if (!serverUrl) {
-    const isDev = import.meta.env.DEV;
-    return <ServerSelector 
-      showDevMode={isDev}
-      onServerSelected={(url) => {
-        setServerUrl(url);
-        window.location.reload(); // Reload to re-initialize auth client with new URL
-      }} 
-    />;
+  // Handle onboarding completion
+  const handleOnboardingComplete = (selectedMode: AppMode, selectedServerUrl?: string) => {
+    setMode(selectedMode);
+    if (selectedMode === 'guest') {
+      setServerUrl('guest');
+    } else if (selectedServerUrl) {
+      setServerUrl(selectedServerUrl);
+      resetAuthClient();
+    }
+    // Navigate to the appropriate page
+    window.location.href = selectedMode === 'guest' ? '/streaming/guest' : '/profiles';
+  };
+
+  // First launch in Tauri - show onboarding wizard
+  if (isTauri() && (mode === null || (mode === 'connected' && !serverUrl))) {
+    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
   
   return (
