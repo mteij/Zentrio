@@ -52,11 +52,18 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
         }
         
         if (text) {
+          // Repeatedly strip HTML tags to handle nested/malformed tags (security fix)
+          let sanitizedText = text
+          let previousText = ''
+          while (sanitizedText !== previousText) {
+            previousText = sanitizedText
+            sanitizedText = sanitizedText.replace(/<[^>]*>/g, '')
+          }
           subtitles.push({
             id: `sub-${subtitleId++}`,
             start,
             end,
-            text: text.replace(/<[^>]*>/g, '') // Remove HTML tags
+            text: sanitizedText
           })
         }
       }
@@ -77,7 +84,14 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
         const timeLine = lines[1]
         if (timeLine.includes('-->')) {
           const [start, end] = timeLine.split('-->').map(t => parseTimestamp(t.trim().replace(',', '.')))
-          const text = lines.slice(2).join('\n').replace(/<[^>]*>/g, '')
+          // Repeatedly strip HTML tags to handle nested/malformed tags (security fix)
+          let sanitizedText = lines.slice(2).join('\n')
+          let previousText = ''
+          while (sanitizedText !== previousText) {
+            previousText = sanitizedText
+            sanitizedText = sanitizedText.replace(/<[^>]*>/g, '')
+          }
+          const text = sanitizedText
           
           subtitles.push({
             id: lines[0],

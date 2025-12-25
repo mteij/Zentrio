@@ -1,0 +1,9 @@
+name: "CodeQL Config"
+
+# Exclude third-party/vendor library files from analysis
+paths-ignore:
+  - "app/public/libav.js-zentrio/**"
+  - "app/node_modules/**"
+  - "**/node_modules/**"
+  - "**/*.min.js"
+  - "**/vendor/**"

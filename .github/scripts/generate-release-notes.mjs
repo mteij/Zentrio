@@ -164,7 +164,7 @@ async function generateWithNanoGPT(prompt, apiKey) {
   // NanoGPT OpenAI-compatible API with GLM 4.7
   const endpoint = 'https://nano-gpt.com/api/v1/chat/completions';
   const body = {
-    model: 'zai-org/glm-4.7:thinking',
+    model: 'zai-org/glm-4.7',
     messages: [
       {
         role: 'user',
