@@ -160,38 +160,37 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
   return sections.join('\n');
 }
 
-async function generateWithGemini(prompt, apiKey) {
-  // Gemini 2.5 Flash REST API
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+async function generateWithNanoGPT(prompt, apiKey) {
+  // NanoGPT OpenAI-compatible API with GLM 4.7
+  const endpoint = 'https://nano-gpt.com/api/v1/chat/completions';
   const body = {
-    contents: [
+    model: 'zai-org/glm-4.7:thinking',
+    messages: [
       {
-        parts: [{ text: prompt }],
+        role: 'user',
+        content: prompt,
       },
     ],
-    generationConfig: {
-      temperature: 0.3,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 4096,
-    },
+    temperature: 0.3,
+    max_tokens: 4096,
   };
 
   const res = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`Gemini API error ${res.status}: ${text}`);
+    throw new Error(`NanoGPT API error ${res.status}: ${text}`);
   }
 
   const data = await res.json();
-  const candidate = data?.candidates?.[0];
-  const parts = candidate?.content?.parts;
-  const text = Array.isArray(parts) && parts.length ? parts.map(p => p?.text || '').join('\n') : '';
+  const text = data?.choices?.[0]?.message?.content || '';
   return text.trim();
 }
 
@@ -201,54 +200,91 @@ async function main() {
   const prevTag = getPrevTag(tag);
   const commitLog = getCommitRange(prevTag);
 
+  // Parse semantic version to determine release type
+  const semverMatch = version.replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
+  const [, major, minor, patch] = semverMatch || ['0', '0', '0'];
+  const prevSemverMatch = (prevTag || '').replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
+  const [, prevMajor, prevMinor] = prevSemverMatch || ['0', '0', '0'];
+
+  let releaseType = 'patch';
+  let releaseContext = '';
+
+  if (prevSemverMatch && parseInt(major) > parseInt(prevMajor)) {
+    releaseType = 'major';
+    releaseContext = `This is a **MAJOR** release (${prevTag} → ${tag}). Major releases introduce significant new features, architectural changes, or breaking changes. The tone should be celebratory and highlight the milestone nature of this release.`;
+  } else if (prevSemverMatch && parseInt(minor) > parseInt(prevMinor)) {
+    releaseType = 'minor';
+    releaseContext = `This is a **MINOR** release (${prevTag} → ${tag}). Minor releases add new features and notable improvements while maintaining backward compatibility. Focus on new capabilities and enhancements.`;
+  } else {
+    releaseContext = `This is a **PATCH** release (${prevTag} → ${tag}). Patch releases focus on bug fixes, security patches, and small improvements. Keep the notes concise and focused on stability improvements.`;
+  }
+
+  const releaseGuidelines = {
+    major: [
+      `- Lead with an exciting, milestone-focused summary paragraph`,
+      `- Highlight breaking changes prominently with a dedicated "⚠️ Breaking Changes" section if applicable`,
+      `- Emphasize new major features with detailed explanations`,
+      `- Include a brief "Upgrade Guide" section if there are breaking changes`,
+      `- The tone should be celebratory but professional`,
+    ],
+    minor: [
+      `- Lead with a clear summary of new features and improvements`,
+      `- Focus on new capabilities and how they benefit users`,
+      `- Group changes logically with clear section headers`,
+      `- The tone should be informative and forward-looking`,
+    ],
+    patch: [
+      `- Keep the notes brief and to the point`,
+      `- Focus on what was fixed and improved`,
+      `- Consolidate related fixes into single bullet points where sensible`,
+      `- The tone should be straightforward and reassuring`,
+    ],
+  };
+
   const prompt = [
-    `You are an expert release notes writer for a developer tool web application (Zentrio).`,
-    `Write professional, concise, and technical GitHub release notes in Markdown for version ${tag}.`,
-    prevTag ? `This release includes changes since ${prevTag}.` : `This is the first release of Zentrio!`,
+    `You are an expert release notes writer for Zentrio, a modern streaming media application.`,
+    `Write clean, professional GitHub release notes in Markdown for version ${tag}.`,
+    ``,
+    releaseContext,
     ``,
     `Inputs:`,
     `- Version: ${tag}`,
-    prevTag ? `- Previous tag: ${prevTag}` : `- Previous tag: (none)`,
-    `- Commits (tab-separated: hash, date, subject, body):`,
-    commitLog || '(no commits detected)',
+    prevTag ? `- Previous version: ${prevTag}` : `- Previous version: (first release)`,
+    `- Commits (hash, date, subject, body):`,
+    commitLog || '(no commits)',
     ``,
-    `Guidelines:`,
-    `- Start with a professional summary paragraph that highlights the most important changes`,
-    `- Group changes into logical sections with emoji headers: 🚀 Features, 🐛 Bug Fixes, 💄 Improvements, 📝 Documentation, 🔧 Configuration, ⚙️ Chore`,
-    `- Process ALL commits provided - every commit deserves attention`,
-    `- Use commit bodies for additional context and technical details`,
-    `- Write clear, professional bullet points that explain the technical impact of each change`,
-    `- Include commit hashes and dates at the end of each bullet point for reference`,
-    `- Use formatting like **bold** for emphasis and \`code\` for technical terms`,
-    `- Keep the tone professional and direct. Avoid excessive emojis or overly casual language in the descriptions.`,
-    `- If there are many similar commits, group them into a single meaningful point`,
-    `- Do not invent changes - base everything strictly on provided commits`,
-    `- Do not include a top-level title; the GitHub release title already includes the version`,
-    `- Take your time to analyze each commit and understand its impact`,
+    `Format Guidelines:`,
+    ...releaseGuidelines[releaseType],
+    ``,
+    `General Rules:`,
+    `- Use these sections as needed: 🚀 Features, 🐛 Bug Fixes, 💄 Improvements, 🔧 Maintenance`,
+    `- Write clear, scannable bullet points`,
+    `- Use \`code formatting\` for technical terms, file names, and commands`,
+    `- Include commit hash references in parentheses at the end: (abc1234)`,
+    `- Do NOT include a title - GitHub adds one automatically`,
+    `- Do NOT invent changes - only document what's in the commits`,
+    `- Be concise - quality over quantity`,
   ].join('\n');
 
-  const apiKeySource =
-    process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' :
-    (process.env.GOOGLE_API_KEY ? 'GOOGLE_API_KEY' : '');
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  const apiKey = process.env.NANOGPT_API_KEY || '';
   let notes = '';
   let usedAi = false;
 
   if (apiKey) {
-    console.log(`[release-notes] Using Gemini via ${apiKeySource}`);
+    console.log('[release-notes] Using NanoGPT with GLM 4.7');
     try {
-      const ai = await generateWithGemini(prompt, apiKey);
+      const ai = await generateWithNanoGPT(prompt, apiKey);
       if (ai && ai.length > 20) {
         notes = ai.trim();
         usedAi = true;
       } else {
-        console.log('[release-notes] Gemini returned empty or too-short output, falling back to conventional notes.');
+        console.log('[release-notes] NanoGPT returned empty or too-short output, falling back to conventional notes.');
       }
     } catch (e) {
-      console.error('[release-notes] Gemini API call failed, falling back to conventional notes:', e?.message || e);
+      console.error('[release-notes] NanoGPT API call failed, falling back to conventional notes:', e?.message || e);
     }
   } else {
-    console.log('[release-notes] No Gemini API key found (GEMINI_API_KEY / GOOGLE_API_KEY), using conventional notes.');
+    console.log('[release-notes] No NANOGPT_API_KEY found, using conventional notes.');
   }
 
   if (!notes) {
@@ -262,7 +298,7 @@ async function main() {
   writeFileSync('RELEASE_NOTES.md', notes + links + disclaimer, 'utf8');
   // Emit a small marker file if AI was actually used
   if (usedAi) {
-    writeFileSync('.release_notes_ai.txt', apiKeySource.toLowerCase() || 'gemini', 'utf8');
+    writeFileSync('.release_notes_ai.txt', 'nanogpt', 'utf8');
   }
   console.log('Release notes written to RELEASE_NOTES.md');
 }

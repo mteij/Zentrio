@@ -37,7 +37,6 @@ jobs:
         run: |
           node -e "require('fs').appendFileSync(process.env.GITHUB_ENV, 'VERSION=' + require('./app/package.json').version + '\n')"
 
-
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -91,7 +90,7 @@ jobs:
       - name: Generate release notes
         if: steps.check_tag.outputs.exists != 'true'
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NANOGPT_API_KEY: ${{ secrets.NANOGPT_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node .github/scripts/generate-release-notes.mjs
 

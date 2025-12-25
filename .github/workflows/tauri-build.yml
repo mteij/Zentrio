@@ -15,10 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest" # for iOS
+          - platform: "macos-13" # for iOS (more stable than macos-latest)
             args: "--target aarch64-apple-ios"
             name: "ios"
-          - platform: "macos-latest" # for macOS
+          - platform: "macos-13" # for macOS (more stable for DMG bundling)
             args: "--target aarch64-apple-darwin"
             name: "macos"
           - platform: "ubuntu-22.04" # for Linux
@@ -49,7 +49,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin' || matrix.name == 'android' && 'aarch64-linux-android' || '' }}
+          targets: ${{ matrix.platform == 'macos-13' && 'aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin' || matrix.name == 'android' && 'aarch64-linux-android' || '' }}
 
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -137,9 +137,19 @@ jobs:
         working-directory: ./app
         env:
           NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          # Decode keystore from base64
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+
           bun tauri android init
-          bun tauri android build --apk true
+          bun tauri android build --apk true -- \
+            -Pandroid.injected.signing.store.file=$(pwd)/keystore.jks \
+            -Pandroid.injected.signing.store.password=$ANDROID_KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$ANDROID_KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$ANDROID_KEY_PASSWORD
 
       - name: Upload Android Artifacts to Release
         if: matrix.name == 'android'
@@ -159,9 +169,32 @@ jobs:
         working-directory: ./app
         run: |
           bun tauri ios init
-          # Patch generated project to force Manual signing
-          sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' src-tauri/gen/apple/zentrio.xcodeproj/project.pbxproj
-          bun tauri ios build --export-method debugging -- CODE_SIGN_STYLE="Manual" CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" PROVISIONING_PROFILE_SPECIFIER="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=""
+
+          # Aggressively patch generated project to disable all signing
+          PBXPROJ="src-tauri/gen/apple/zentrio.xcodeproj/project.pbxproj"
+
+          # Force Manual signing style
+          sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' "$PBXPROJ"
+
+          # Set DEVELOPMENT_TEAM to empty string for all occurrences
+          sed -i '' 's/DEVELOPMENT_TEAM = "[^"]*";/DEVELOPMENT_TEAM = "";/g' "$PBXPROJ"
+          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' "$PBXPROJ"
+
+          # Set CODE_SIGNING_ALLOWED to NO
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' "$PBXPROJ"
+
+          # Add CODE_SIGNING_ALLOWED = NO if not present (append to build settings)
+          sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Manual; CODE_SIGNING_ALLOWED = NO;/g' "$PBXPROJ"
+
+          # Build with all signing disabled
+          bun tauri ios build --export-method debugging -- \
+            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS=""
 
       - name: Upload iOS Artifacts to Release
         if: matrix.name == 'ios'
