@@ -33,7 +33,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "deb",
+      "rpm",
+      "nsis",
+      "app",
+      "dmg"
+    ],
     "externalBin": [
       "bin/zentrio-server"
     ],
