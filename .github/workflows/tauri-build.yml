@@ -64,9 +64,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest" # Apple Silicon runner for iOS
-            args: "--target aarch64-apple-ios"
-            name: "ios"
+          # iOS build temporarily disabled - requires Apple Developer account with code signing
+          # To enable: Set up APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_PROVISIONING_PROFILE secrets
+          # - platform: "macos-latest"
+          #   args: "--target aarch64-apple-ios"
+          #   name: "ios"
           - platform: "macos-latest" # Apple Silicon runner for macOS
             args: "--target aarch64-apple-darwin"
             name: "macos"
@@ -196,7 +198,7 @@ jobs:
           echo "android.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GRADLE_PROPS"
 
           # Build APK
-          bun tauri android build --apk
+          bun tauri android build --apk true
 
       - name: Upload Android Artifacts to Release
         if: matrix.name == 'android'

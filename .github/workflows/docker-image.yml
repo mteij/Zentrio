@@ -113,13 +113,27 @@ jobs:
         run: |
           gh release create "v${{ env.VERSION }}" -F RELEASE_NOTES.md -t "Zentrio v${{ env.VERSION }}" --latest
 
-      - name: Update GitHub release notes (if release exists)
+      - name: Update GitHub release notes (if release exists and notes are placeholder)
         if: steps.rel.outputs.exists == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Updating existing release v${{ env.VERSION }} with new release notes"
-          gh release edit "v${{ env.VERSION }}" --notes-file RELEASE_NOTES.md
+          # Check if existing notes are manually written
+          EXISTING_NOTES=$(gh release view "v${{ env.VERSION }}" --json body -q '.body' 2>/dev/null || echo "")
+
+          IS_PLACEHOLDER=false
+          if [ -z "$EXISTING_NOTES" ]; then
+            IS_PLACEHOLDER=true
+          elif echo "$EXISTING_NOTES" | grep -qE "Release in progress|Build artifacts are being generated|Automated release notes generation failed"; then
+            IS_PLACEHOLDER=true
+          fi
+
+          if [ "$IS_PLACEHOLDER" = "false" ] && [ -n "$EXISTING_NOTES" ]; then
+            echo "✅ Release v${{ env.VERSION }} already has custom release notes. Skipping overwrite."
+          else
+            echo "Updating existing release v${{ env.VERSION }} with generated release notes"
+            gh release edit "v${{ env.VERSION }}" --notes-file RELEASE_NOTES.md
+          fi
 
       - name: Trigger mobile build workflow
         if: steps.check_tag.outputs.exists != 'true' && steps.rel.outputs.exists != 'true'
