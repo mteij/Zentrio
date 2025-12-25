@@ -8,7 +8,8 @@ on:
       - "app/scripts/Dockerfile.libav"
 
 permissions:
-  contents: write
+  contents: read
+  packages: write
 
 jobs:
   build:
@@ -32,28 +33,41 @@ jobs:
           docker run --rm -v ${{ github.workspace }}/app/public/libav.js-zentrio:/dest libav-zentrio-builder
           ls -la app/public/libav.js-zentrio/
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: libav-zentrio
-          path: app/public/libav.js-zentrio/
-          retention-days: 90
+          node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@mteij"
 
-      - name: Create Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: libav-zentrio-${{ github.sha }}
-          name: libav.js Zentrio Variant
-          body: |
-            Custom libav.js variant with AC3/E-AC3 decoder support.
+      - name: Create package.json for publishing
+        run: |
+          cd app/public/libav.js-zentrio
+          cat > package.json << 'EOF'
+          {
+            "name": "@mteij/libav-zentrio",
+            "version": "6.8.${{ github.run_number }}",
+            "description": "Custom libav.js variant with AC3/E-AC3 decoder support for Zentrio",
+            "main": "libav-6.8-zentrio.js",
+            "files": [
+              "*.js",
+              "*.wasm",
+              "*.mjs"
+            ],
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/mteij/zentrio.git"
+            },
+            "publishConfig": {
+              "registry": "https://npm.pkg.github.com"
+            },
+            "license": "LGPL-2.1-or-later"
+          }
+          EOF
 
-            ## Files
-            - `libav-6.8-zentrio.js` - Main loader
-            - `libav-6.8-zentrio.wasm` - WASM binary
-
-            ## Usage
-            Download and place in `app/public/libav.js-zentrio/`
-          files: app/public/libav.js-zentrio/*
-          draft: false
-          prerelease: false
+      - name: Publish to GitHub Packages
+        run: |
+          cd app/public/libav.js-zentrio
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
