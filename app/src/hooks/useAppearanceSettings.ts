@@ -21,15 +21,12 @@ export function useAppearanceSettings() {
     }
 
     window.addEventListener('zentrio-settings-update', handleUpdate)
-    // Also listen to theme update as fallback/legacy if needed, but we'll try to be specific
-    window.addEventListener('zentrio-theme-update', handleUpdate)
     
     // Also listen for storage events (cross-tab sync)
     window.addEventListener('storage', handleUpdate)
 
     return () => {
       window.removeEventListener('zentrio-settings-update', handleUpdate)
-      window.removeEventListener('zentrio-theme-update', handleUpdate)
       window.removeEventListener('storage', handleUpdate)
     }
   }, [])

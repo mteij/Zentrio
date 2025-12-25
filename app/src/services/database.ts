@@ -355,11 +355,9 @@ const db = new Database(dbPath)
   CREATE TABLE IF NOT EXISTS appearance_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     settings_profile_id INTEGER REFERENCES settings_profiles(id) ON DELETE CASCADE,
-    theme_id TEXT DEFAULT 'zentrio',
     show_imdb_ratings BOOLEAN DEFAULT TRUE,
     show_age_ratings BOOLEAN DEFAULT TRUE,
     background_style TEXT DEFAULT 'vanta',
-    custom_theme_config TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     remote_id TEXT,
     dirty BOOLEAN DEFAULT FALSE,
@@ -684,11 +682,9 @@ export interface StreamSettings extends StreamConfig, SyncableEntity {}
 export interface AppearanceSettings extends SyncableEntity {
   id?: number
   settings_profile_id?: number
-  theme_id: string
   show_imdb_ratings: boolean
   show_age_ratings: boolean
   background_style: string
-  custom_theme_config?: string
 }
 
 // Hash password utility
@@ -2098,20 +2094,17 @@ export const appearanceDb = {
     const row = stmt.get(settingsProfileId) as any;
     
     if (row) {
-  return {
-    id: row.id,
-    settings_profile_id: row.settings_profile_id,
-    theme_id: row.theme_id,
-    show_imdb_ratings: !!row.show_imdb_ratings,
-    show_age_ratings: row.show_age_ratings !== null ? !!row.show_age_ratings : true,
-    background_style: row.background_style,
-    custom_theme_config: row.custom_theme_config
-  };
-}
+      return {
+        id: row.id,
+        settings_profile_id: row.settings_profile_id,
+        show_imdb_ratings: !!row.show_imdb_ratings,
+        show_age_ratings: row.show_age_ratings !== null ? !!row.show_age_ratings : true,
+        background_style: row.background_style
+      };
+    }
     
     // Default settings
     return {
-      theme_id: 'zentrio',
       show_imdb_ratings: true,
       show_age_ratings: true,
       background_style: 'vanta'
@@ -2125,11 +2118,9 @@ export const appearanceDb = {
         const fields: string[] = [];
         const values: any[] = [];
         
-        if (settings.theme_id !== undefined) { fields.push("theme_id = ?"); values.push(settings.theme_id); }
         if (settings.show_imdb_ratings !== undefined) { fields.push("show_imdb_ratings = ?"); values.push(settings.show_imdb_ratings ? 1 : 0); }
         if (settings.show_age_ratings !== undefined) { fields.push("show_age_ratings = ?"); values.push(settings.show_age_ratings ? 1 : 0); }
         if (settings.background_style !== undefined) { fields.push("background_style = ?"); values.push(settings.background_style); }
-        if (settings.custom_theme_config !== undefined) { fields.push("custom_theme_config = ?"); values.push(settings.custom_theme_config); }
         
         if (fields.length > 0) {
             fields.push('dirty = TRUE');
@@ -2140,16 +2131,14 @@ export const appearanceDb = {
         }
     } else {
         const stmt = db.prepare(`
-            INSERT INTO appearance_settings (settings_profile_id, theme_id, show_imdb_ratings, show_age_ratings, background_style, custom_theme_config, dirty)
-            VALUES (?, ?, ?, ?, ?, ?, TRUE)
+            INSERT INTO appearance_settings (settings_profile_id, show_imdb_ratings, show_age_ratings, background_style, dirty)
+            VALUES (?, ?, ?, ?, TRUE)
         `);
         stmt.run(
             settingsProfileId,
-            settings.theme_id || 'zentrio',
             settings.show_imdb_ratings !== undefined ? (settings.show_imdb_ratings ? 1 : 0) : 1,
             settings.show_age_ratings !== undefined ? (settings.show_age_ratings ? 1 : 0) : 1,
-            settings.background_style || 'vanta',
-            settings.custom_theme_config || null
+            settings.background_style || 'vanta'
         );
     }
   }

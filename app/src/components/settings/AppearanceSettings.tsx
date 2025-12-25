@@ -25,7 +25,6 @@ export function AppearanceSettings() {
       if (res.ok) {
         const data = await res.json()
         if (data.data) {
-          // Destructure to only keep relevant fields, ignoring legacy theme data
           const { show_imdb_ratings, show_age_ratings } = data.data
           setSettings({
             show_imdb_ratings: show_imdb_ratings ?? true,
