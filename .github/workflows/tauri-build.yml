@@ -159,7 +159,7 @@ jobs:
         working-directory: ./app
         run: |
           bun tauri ios init
-          bun tauri ios build --export-method debugging -- -allowProvisioningUpdates CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" CODE_SIGNING_REQUIRED=NO AD_HOC_CODE_SIGNING_ALLOWED=YES
+          bun tauri ios build --export-method debugging -- CODE_SIGN_STYLE="Manual" CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" PROVISIONING_PROFILE_SPECIFIER="" CODE_SIGNING_REQUIRED=NO AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Upload iOS Artifacts to Release
         if: matrix.name == 'ios'
