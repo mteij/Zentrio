@@ -71,20 +71,52 @@ function updateJsonFile(path: string, version: string) {
 
 function updateCargoToml(path: string, version: string) {
   try {
-    let content = readFileSync(path, 'utf-8');
+    const content = readFileSync(path, 'utf-8');
+    const lines = content.split(/\r?\n/);
     
-    // Regex to match version = "x.y.z" inside [package] section
-    // This is a simple regex and assumes standard Cargo.toml formatting
-    const versionRegex = /^version\s*=\s*"(.*)"/m;
+    let inPackageSection = false;
+    let versionLineIndex = -1;
+    let currentVersion: string | null = null;
     
-    const match = content.match(versionRegex);
-    if (match && match[1] === version) {
+    // Find the version line specifically in the [package] section
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Check for section headers
+      if (line.startsWith('[')) {
+        inPackageSection = line === '[package]';
+        continue;
+      }
+      
+      // Only look for version in [package] section
+      if (inPackageSection && line.startsWith('version')) {
+        const match = line.match(/^version\s*=\s*"(.*)"/);
+        if (match) {
+          currentVersion = match[1];
+          versionLineIndex = i;
+          break;
+        }
+      }
+    }
+    
+    if (versionLineIndex === -1) {
+      console.error(`Could not find version in [package] section of ${path}`);
+      return;
+    }
+    
+    if (currentVersion === version) {
       console.log(`Skipping ${path} (already at ${version})`);
       return;
     }
 
-    content = content.replace(versionRegex, `version = "${version}"`);
-    writeFileSync(path, content);
+    // Replace only the specific line
+    lines[versionLineIndex] = `version = "${version}"`;
+    
+    // Preserve original line endings
+    const hasWindowsLineEndings = content.includes('\r\n');
+    const newContent = lines.join(hasWindowsLineEndings ? '\r\n' : '\n');
+    
+    writeFileSync(path, newContent);
     console.log(`Updated ${path} to ${version}`);
     
     // Run cargo check to update Cargo.lock

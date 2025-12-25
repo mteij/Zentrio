@@ -1,6 +1,6 @@
 {
   "name": "zentrio",
-  "version": "2.0.0-1008",
+  "version": "0.1.0",
   "description": "Zentrio Desktop Application",
   "main": "src/main.rs",
   "scripts": {
