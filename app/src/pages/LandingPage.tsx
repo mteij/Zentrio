@@ -77,7 +77,12 @@ export function LandingPage({ version }: LandingPageProps) {
 
   useEffect(() => {
     apiFetch('/api/auth/providers')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
+        return res.json();
+      })
       .then(data => setProviders(data))
       .catch(err => console.error("Failed to fetch auth providers", err));
   }, []);

@@ -11,6 +11,8 @@ export const corsMiddleware = (origins?: string[]) => {
       'http://localhost:3000',
       'http://localhost:5173',
       'tauri://localhost',
+      'http://tauri.localhost',
+      'https://tauri.localhost',
       'https://localhost',
       cfg.APP_URL,
       cfg.CLIENT_URL
