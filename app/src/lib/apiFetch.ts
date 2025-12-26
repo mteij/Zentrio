@@ -1,9 +1,13 @@
 import { getServerUrl, isTauri } from './auth-client';
+import { appMode } from './app-mode';
+import { useAuthStore } from '../stores/authStore';
 
 /**
  * Fetch wrapper that prepends the server URL for Tauri apps.
  * In Tauri, relative paths like '/api/...' are converted to absolute URLs
  * pointing to the configured server. In web browsers, relative paths work normally.
+ * 
+ * Automatically adds X-Guest-Mode header when in guest mode.
  * 
  * @example
  * // In browser: fetches '/api/auth/providers'
@@ -22,8 +26,37 @@ export async function apiFetch(
     url = `${serverUrl}${url}`;
   }
   
+  // Add X-Guest-Mode header when in guest mode
+  const headers = new Headers(init?.headers);
+  if (appMode.isGuest()) {
+    headers.set('X-Guest-Mode', 'true');
+  }
+  
+  // Inject Bearer token if available (for Tauri cross-origin auth)
+  if (isTauri()) {
+      const token = useAuthStore.getState().session?.token;
+      if (token) {
+          headers.set('Authorization', `Bearer ${token}`);
+      }
+      
+      // Use Tauri Native Fetch
+      try {
+        const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+        
+        return tauriFetch(url, {
+          ...init,
+          headers,
+        });
+      } catch (e) {
+        // Fallback to browser fetch if Tauri HTTP plugin fails
+      }
+  }
+  
+
+
   return fetch(url, {
     ...init,
+    headers,
     credentials: 'include', // Ensure cookies are sent for auth
   });
 }

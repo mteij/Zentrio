@@ -1,4 +1,3 @@
-import { TitleBar } from './TitleBar'
 import { useEffect } from 'react'
 
 interface LayoutProps {
@@ -83,7 +82,6 @@ export function Layout({
 
   return (
     <div className={className}>
-      <TitleBar />
       {showHeader && <PageHeader />}
       <main>
         {children}
@@ -144,7 +142,6 @@ export function SimpleLayout({ title, children, className = '', disableThemeSync
 
   return (
     <div className={className}>
-      <TitleBar />
       {children}
     </div>
   )

@@ -1,36 +1,52 @@
 import { Hono } from 'hono'
-import { db, profileDb, profileProxySettingsDb, User, Profile } from '../../services/database'
-import { sessionMiddleware } from '../../middleware/session'
+import { db, profileDb, profileProxySettingsDb, userDb, User, Profile } from '../../services/database'
+import { optionalSessionMiddleware } from '../../middleware/session'
  
- const app = new Hono<{
-   Variables: {
-     user: User
-   }
- }>()
+const app = new Hono<{
+  Variables: {
+    user: User | null
+    guestMode: boolean
+    session: any
+  }
+}>()
  
- app.use('/*', sessionMiddleware)
+app.use('/*', optionalSessionMiddleware)
  
- // Profile Management API
- app.get('/', async (c) => {
-   const user = c.get('user')
-   const profiles = profileDb.findByUserId(user.id)
-   // Remove password from profiles
-   const sanitizedProfiles = profiles.map((p: Profile & { settings?: any }) => {
-     return p
-   })
-   return c.json(sanitizedProfiles)
- })
+// Profile Management API
+app.get('/', async (c) => {
+  const user = c.get('user')
+  const isGuestMode = c.get('guestMode')
+  
+  // In guest mode, get/create the guest user first
+  const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+  if (!effectiveUser) {
+    return c.json({ error: 'User not found' }, 401)
+  }
+  
+  const profiles = profileDb.findByUserId(effectiveUser.id)
+  // Remove password from profiles
+  const sanitizedProfiles = profiles.map((p: Profile & { settings?: any }) => {
+    return p
+  })
+  return c.json(sanitizedProfiles)
+})
  
  app.post('/', async (c) => {
    const user = c.get('user')
+   const isGuestMode = c.get('guestMode')
    const { name, avatar, avatarType, avatarStyle, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton, settingsProfileId } = await c.req.json()
  
    if (!name) {
      return c.json({ error: 'Profile name is required' }, 400)
    }
+   
+   const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+   if (!effectiveUser) {
+     return c.json({ error: 'User not found' }, 401)
+   }
  
   const profile = await profileDb.create({
-    user_id: user.id,
+    user_id: effectiveUser.id,
     name,
     avatar: avatar || name,
     avatar_type: avatarType || 'initials',
@@ -63,15 +79,21 @@ import { sessionMiddleware } from '../../middleware/session'
  
  app.put('/:id', async (c) => {
    const user = c.get('user')
+   const isGuestMode = c.get('guestMode')
    const profileId = parseInt(c.req.param('id'))
    const { name, avatar, avatarType, avatarStyle, nsfwFilterEnabled, ageRating, hideCalendarButton, hideAddonsButton, settingsProfileId } = await c.req.json()
 
    if (!name) {
      return c.json({ error: 'Profile name is required' }, 400)
    }
+   
+   const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+   if (!effectiveUser) {
+     return c.json({ error: 'User not found' }, 401)
+   }
  
    const profile = profileDb.findById(profileId)
-   if (profile?.user_id !== user.id) {
+   if (profile?.user_id !== effectiveUser.id) {
      return c.json({ error: 'Forbidden' }, 403)
    }
  
@@ -110,7 +132,13 @@ import { sessionMiddleware } from '../../middleware/session'
  
  app.delete('/:id', async (c) => {
    const user = c.get('user')
+   const isGuestMode = c.get('guestMode')
    const profileId = parseInt(c.req.param('id'))
+   
+   const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+   if (!effectiveUser) {
+     return c.json({ error: 'User not found' }, 401)
+   }
  
    const profile = profileDb.findById(profileId)
    
@@ -118,7 +146,7 @@ import { sessionMiddleware } from '../../middleware/session'
      return c.json({ error: 'Profile not found' }, 404)
    }
    
-   if (profile.user_id !== user.id) {
+   if (profile.user_id !== effectiveUser.id) {
      return c.json({ error: 'Forbidden' }, 403)
    }
 
@@ -149,9 +177,16 @@ import { sessionMiddleware } from '../../middleware/session'
  */
 app.get('/:id/settings', async (c) => {
   const user = c.get('user')
+  const isGuestMode = c.get('guestMode')
   const profileId = parseInt(c.req.param('id'))
+  
+  const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+  if (!effectiveUser) {
+    return c.json({ error: 'User not found' }, 401)
+  }
+  
   const profile = profileDb.findById(profileId)
-  if (profile?.user_id !== user.id) {
+  if (profile?.user_id !== effectiveUser.id) {
     return c.json({ error: 'Forbidden' }, 403)
   }
   const settings = profileProxySettingsDb.findByProfileId(profileId)
@@ -167,9 +202,16 @@ app.get('/:id/settings', async (c) => {
 app.put('/:id/settings', async (c) => {
   try {
     const user = c.get('user')
+    const isGuestMode = c.get('guestMode')
     const profileId = parseInt(c.req.param('id'))
+    
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) {
+      return c.json({ error: 'User not found' }, 401)
+    }
+    
     const profile = profileDb.findById(profileId)
-    if (profile?.user_id !== user.id) {
+    if (profile?.user_id !== effectiveUser.id) {
       return c.json({ error: 'Forbidden' }, 403)
     }
     const body = await c.req.json()

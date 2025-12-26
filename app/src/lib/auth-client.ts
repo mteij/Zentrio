@@ -14,7 +14,8 @@ declare global {
 
 export const isTauri = () => {
   return (
-    typeof window !== "undefined" && window.__TAURI_INTERNALS__ !== undefined
+    typeof window !== "undefined" && 
+    ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
   );
 };
 
@@ -26,14 +27,14 @@ export const isTauri = () => {
 export const getServerUrl = () => {
   if (typeof window === "undefined") return "http://localhost:3000";
 
+  // In development, ALWAYS use the local proxy (current origin) to avoid CORS issues
+  // The proxy in vite.config.ts will forward /api requests to http://localhost:3000
+  if (import.meta.env.DEV) {
+    return window.location.origin;
+  }
+
   if (isTauri()) {
     const stored = localStorage.getItem("zentrio_server_url");
-    
-    // In development, default to localhost if no server is selected
-    if (!stored && import.meta.env.DEV) {
-      return "http://localhost:3000";
-    }
-
     return stored || "https://app.zentrio.eu";
   }
 
@@ -55,9 +56,24 @@ export const getClientUrl = () => {
   return window.location.origin;
 };
 
+// Safe fetch wrapper that uses Tauri HTTP plugin in Tauri context
+const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    if (isTauri()) {
+        try {
+            const { fetch } = await import('@tauri-apps/plugin-http');
+            return fetch(input, init);
+        } catch (e) {
+            console.error('Failed to load Tauri HTTP plugin', e);
+            // Fallback to native fetch
+        }
+    }
+    return fetch(input, init);
+};
+
 // Create the auth client configuration
 const createClient = () => createAuthClient({
   baseURL: getServerUrl(),
+  fetch: safeFetch,
   plugins: [
     twoFactorClient({
       onTwoFactorRedirect: () => {

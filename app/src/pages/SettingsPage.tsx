@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter, AnimatedBackground } from '../components/index'
 import { authClient, getClientUrl } from '../lib/auth-client'
 import { apiFetch } from '../lib/apiFetch'
+import { appMode } from '../lib/app-mode'
 
 import { TwoFactorSetupModal } from '../components/auth/TwoFactorSetupModal'
 import { ServerConnectionIndicator } from '../components/auth/ServerConnectionIndicator'
@@ -33,6 +34,9 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   
+  // Check if in guest mode
+  const isGuestMode = appMode.isGuest()
+  
   // Modals state
   const [showUsernameModal, setShowUsernameModal] = useState(false)
   const [showEmailModal, setShowEmailModal] = useState(false)
@@ -55,6 +59,7 @@ export function SettingsPage() {
   const [linkedAccounts, setLinkedAccounts] = useState<{providerId: string, createdAt?: string}[]>([])
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({})
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null)
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null)
 
   // Scroll indicators state
   const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -88,10 +93,16 @@ export function SettingsPage() {
   }, [searchParams, setSearchParams])
 
   useEffect(() => {
+    // In guest mode, skip account-related API calls and default to appearance tab
+    if (isGuestMode) {
+      setLoading(false)
+      setActiveTab('appearance')
+      return
+    }
     loadProfile()
     loadTmdbApiKey()
     loadAvailableProviders()
-   }, [])
+   }, [isGuestMode])
 
   const loadAvailableProviders = async () => {
     try {
@@ -293,13 +304,90 @@ export function SettingsPage() {
   const handleLinkProvider = async (provider: string) => {
     setLinkingProvider(provider)
     try {
-      await authClient.linkSocial({
-        provider: provider as any,
-        callbackURL: getClientUrl() + '/settings'
-      })
+      // In Tauri, we need to use the system browser for OAuth, just like login
+      // The callback will go through native-redirect and deep link back
+      if ((window as any).__TAURI__) {
+        const { open } = await import('@tauri-apps/plugin-shell')
+        const serverUrl = localStorage.getItem('zentrio_server_url') || 'https://app.zentrio.eu'
+        
+        // First, get a link code from the server (this authenticates the browser session)
+        const codeRes = await apiFetch('/api/auth/link-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        if (!codeRes.ok) {
+          throw new Error('Failed to generate link code')
+        }
+        
+        const { linkCode } = await codeRes.json()
+        
+        if (!linkCode) {
+          throw new Error('No link code received')
+        }
+        
+        // Use link-proxy with the linkCode to establish browser session
+        const linkUrl = `${serverUrl}/api/auth/link-proxy?provider=${provider}&linkCode=${linkCode}&callbackURL=${encodeURIComponent(serverUrl + '/api/auth/native-redirect')}`
+        await open(linkUrl)
+        
+        // Show a toast explaining the flow
+        toast.info('Continue in Browser', { 
+          description: 'Complete the linking process in your browser. The app will update automatically.',
+          duration: 5000
+        })
+        
+        setLinkingProvider(null)
+      } else {
+        // Web: use authClient.linkSocial directly
+        await authClient.linkSocial({
+          provider: provider as any,
+          callbackURL: getClientUrl() + '/settings'
+        })
+      }
     } catch (e: any) {
       toast.error('Link Failed', { description: e.message || 'Failed to link account' })
       setLinkingProvider(null)
+    }
+  }
+
+  // Check if unlinking a provider is allowed
+  const canUnlinkProvider = (providerId: string): boolean => {
+    // Can unlink if user has password OR has another SSO linked
+    const otherSsoAccounts = linkedAccounts.filter(a => 
+      a.providerId !== providerId && a.providerId !== 'credential'
+    )
+    return hasPassword === true || otherSsoAccounts.length > 0
+  }
+
+  // Handler for unlinking SSO providers
+  const handleUnlinkProvider = async (provider: string) => {
+    // Show confirmation
+    const providerName = getProviderDisplayName(provider)
+    if (!confirm(`Are you sure you want to unlink ${providerName}? You won't be able to sign in with this account anymore.`)) {
+      return
+    }
+    
+    setUnlinkingProvider(provider)
+    try {
+      const res = await apiFetch(`/api/user/accounts/${provider}`, {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      
+      if (res.ok) {
+        toast.success('Account Unlinked', { description: `${providerName} has been unlinked from your account.` })
+        loadProfile() // Refresh linked accounts
+      } else {
+        const data = await res.json().catch(() => ({}))
+        toast.error('Unlink Failed', { description: data.message || 'Failed to unlink account' })
+      }
+    } catch (e: any) {
+      toast.error('Unlink Failed', { description: e.message || 'Failed to unlink account' })
+    } finally {
+      setUnlinkingProvider(null)
     }
   }
 
@@ -357,10 +445,12 @@ export function SettingsPage() {
                 <Play size={16} />
                 Streaming
               </button>
+              {!isGuestMode && (
               <button className={`${styles.tabBtn} ${activeTab === 'danger' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('danger')}>
                 <AlertTriangle size={16} />
                 Danger Zone
               </button>
+              )}
            </div>
            {canScrollRight && (
              <div className={`${styles.scrollIndicator} ${styles.scrollIndicatorRight}`}>
@@ -375,6 +465,9 @@ export function SettingsPage() {
             <div className={styles.settingsCard}>
               <h2 className={styles.sectionTitle}>Account</h2>
               
+              {/* Auth-only sections - hidden in guest mode */}
+              {!isGuestMode ? (
+              <>
               <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
                 <div className="flex-1 pr-4">
                   <h3 className="text-lg font-medium text-white mb-1">Username</h3>
@@ -434,15 +527,30 @@ export function SettingsPage() {
                     </span>
                   )}
                   
-                  {/* Linked SSO accounts */}
+                  {/* Linked SSO accounts with unlink button */}
                   {linkedAccounts.filter(a => a.providerId !== 'credential').map(acc => (
-                    <span 
+                    <div 
                       key={acc.providerId} 
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20"
                     >
                       <Check className="w-3 h-3" />
-                      {getProviderDisplayName(acc.providerId)}
-                    </span>
+                      <span>{getProviderDisplayName(acc.providerId)}</span>
+                      {/* Unlink button - always visible if unlinking is allowed */}
+                      {canUnlinkProvider(acc.providerId) && (
+                        <button
+                          onClick={() => handleUnlinkProvider(acc.providerId)}
+                          disabled={unlinkingProvider === acc.providerId}
+                          className="ml-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 hover:text-red-300 transition-all disabled:opacity-50"
+                          title={`Unlink ${getProviderDisplayName(acc.providerId)}`}
+                        >
+                          {unlinkingProvider === acc.providerId ? (
+                            <span className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <span className="text-xs font-bold leading-none">×</span>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   ))}
                   
                   {/* Available providers to link */}
@@ -461,9 +569,6 @@ export function SettingsPage() {
                     ))}
                 </div>
               </div>
-
-              {/* Login Behavior Setting */}
-              <LoginBehaviorSettings />
 
                <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
                 <div className="flex-1 pr-4">
@@ -490,7 +595,20 @@ export function SettingsPage() {
                   </Button>
                 </div>
                </div>
+              </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center border-b border-white/5">
+                  <User size={32} className="text-zinc-500 mb-3" />
+                  <p className="text-sm text-zinc-400 max-w-md">
+                    Account settings (username, email, password, 2FA) require signing in. Other settings are available below.
+                  </p>
+                </div>
+              )}
 
+              {/* Login Behavior Setting - visible in both modes */}
+              <LoginBehaviorSettings />
+
+              {/* TMDB API Key - visible in both modes */}
               <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
                 <div className="flex-1 pr-8">
                   <h3 className="text-lg font-medium text-white mb-1">TMDB API Key</h3>

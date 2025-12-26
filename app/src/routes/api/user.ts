@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { sessionMiddleware } from '../../middleware/session'
+import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { userDb, verifyPassword, profileProxySettingsDb, profileDb, streamDb, settingsProfileDb, type User } from '../../services/database'
 import { auth } from '../../services/auth'
 import { emailService } from '../../services/email'
@@ -10,25 +10,27 @@ import { ok, err, validate, schemas } from '../../utils/api'
 
 const app = new Hono<{
   Variables: {
-    user: User
+    user: User | null
+    guestMode: boolean
+    session: any
   }
 }>()
 
 // [GET /ping] Test route
 app.get('/ping', (c) => ok(c, { pong: true }))
 
-// Enforce session on all routes for this router
-app.use('*', sessionMiddleware)
-// CSRF-like guard mounted after session middleware
-app.use('*', csrfLikeGuard)
+// ========== Settings Profiles (Guest Mode Compatible) ==========
 
-// ========== Settings Profiles ==========
-
-// [GET /settings-profiles] List settings profiles for current user
-app.get('/settings-profiles', async (c) => {
+// These routes use optionalSessionMiddleware to support guest mode
+app.get('/settings-profiles', optionalSessionMiddleware, async (c) => {
   try {
     const user = c.get('user')
-    const profiles = settingsProfileDb.listByUserId(user.id)
+    const isGuestMode = c.get('guestMode')
+    
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    
+    const profiles = settingsProfileDb.listByUserId(effectiveUser.id)
     return ok(c, profiles)
   } catch (e) {
     console.error('Failed to list settings profiles:', e)
@@ -36,14 +38,17 @@ app.get('/settings-profiles', async (c) => {
   }
 })
 
-// [POST /settings-profiles] Create a new settings profile
-app.post('/settings-profiles', async (c) => {
+app.post('/settings-profiles', optionalSessionMiddleware, csrfLikeGuard, async (c) => {
   try {
     const user = c.get('user')
+    const isGuestMode = c.get('guestMode')
     const { name } = await c.req.json()
     if (!name) return err(c, 400, 'INVALID_INPUT', 'Name is required')
     
-    const profile = settingsProfileDb.create(user.id, name)
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    
+    const profile = settingsProfileDb.create(effectiveUser.id, name)
     return ok(c, profile)
   } catch (e) {
     console.error('Failed to create settings profile:', e)
@@ -51,16 +56,19 @@ app.post('/settings-profiles', async (c) => {
   }
 })
 
-// [PUT /settings-profiles/:id] Update a settings profile
-app.put('/settings-profiles/:id', async (c) => {
+app.put('/settings-profiles/:id', optionalSessionMiddleware, csrfLikeGuard, async (c) => {
   try {
     const user = c.get('user')
+    const isGuestMode = c.get('guestMode')
     const id = parseInt(c.req.param('id'))
     const { name } = await c.req.json()
     if (!name) return err(c, 400, 'INVALID_INPUT', 'Name is required')
     
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    
     const profile = settingsProfileDb.findById(id)
-    if (!profile || profile.user_id !== user.id) return err(c, 404, 'NOT_FOUND', 'Profile not found')
+    if (!profile || profile.user_id !== effectiveUser.id) return err(c, 404, 'NOT_FOUND', 'Profile not found')
     
     settingsProfileDb.update(id, name)
     return ok(c, { success: true })
@@ -70,14 +78,17 @@ app.put('/settings-profiles/:id', async (c) => {
   }
 })
 
-// [DELETE /settings-profiles/:id] Delete a settings profile
-app.delete('/settings-profiles/:id', async (c) => {
+app.delete('/settings-profiles/:id', optionalSessionMiddleware, csrfLikeGuard, async (c) => {
   try {
     const user = c.get('user')
+    const isGuestMode = c.get('guestMode')
     const id = parseInt(c.req.param('id'))
     
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    
     const profile = settingsProfileDb.findById(id)
-    if (!profile || profile.user_id !== user.id) return err(c, 404, 'NOT_FOUND', 'Profile not found')
+    if (!profile || profile.user_id !== effectiveUser.id) return err(c, 404, 'NOT_FOUND', 'Profile not found')
     
     if (profile.is_default) return err(c, 400, 'INVALID_OPERATION', 'Cannot delete default profile')
     
@@ -90,6 +101,11 @@ app.delete('/settings-profiles/:id', async (c) => {
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
+
+// ========== Protected Routes (Authenticated Only) ==========
+// Apply strict session middleware for all remaining routes
+app.use('*', sessionMiddleware)
+app.use('*', csrfLikeGuard)
 
 // ========== Streaming Settings ==========
 
@@ -468,6 +484,55 @@ app.get('/accounts', async (c) => {
     })))
   } catch (e) {
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  }
+})
+
+// [DELETE /accounts/:providerId] Unlink an SSO account
+app.delete('/accounts/:providerId', async (c) => {
+  try {
+    const user = c.get('user')
+    const providerId = c.req.param('providerId')
+    
+    if (!providerId) {
+      return err(c, 400, 'INVALID_INPUT', 'Provider ID is required')
+    }
+    
+    // Get all linked accounts
+    const accounts = userDb.findAccountsByUserId(user.id)
+    const accountToUnlink = accounts.find(a => a.providerId === providerId)
+    
+    if (!accountToUnlink) {
+      return err(c, 404, 'NOT_FOUND', 'Account not found')
+    }
+    
+    // Safeguard: Check if user can still login after unlinking
+    const hasPassword = userDb.hasPassword(user.id)
+    const otherSsoAccounts = accounts.filter(a => 
+      a.providerId !== providerId && a.providerId !== 'credential'
+    )
+    
+    // User can unlink if they have:
+    // 1. A password (can login with email/password)
+    // 2. OR another SSO account linked
+    if (!hasPassword && otherSsoAccounts.length === 0) {
+      return err(c, 400, 'CANNOT_UNLINK', 
+        'Cannot unlink this account. You need either a password or another linked account to sign in.')
+    }
+    
+    // Use Better Auth API to unlink the account
+    const result = await auth.api.unlinkAccount({
+      body: { providerId },
+      headers: c.req.raw.headers
+    })
+    
+    if (!result) {
+      return err(c, 500, 'SERVER_ERROR', 'Failed to unlink account')
+    }
+    
+    return ok(c, undefined, 'Account unlinked successfully')
+  } catch (e: any) {
+    console.error('Failed to unlink account:', e)
+    return err(c, 500, 'SERVER_ERROR', e.message || 'Failed to unlink account')
   }
 })
 

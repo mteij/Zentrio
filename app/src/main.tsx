@@ -1,10 +1,10 @@
 import './index.css'
 import React, { lazy, Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
-import { ErrorBoundary } from './components'
+import { ErrorBoundary, TitleBar } from './components'
 import { SplashScreen } from './components'
 import { ProtectedRoute, PublicRoute } from './components/auth/AuthGuards'
 import { isTauri, resetAuthClient } from './lib/auth-client'
@@ -51,6 +51,7 @@ const queryClient = new QueryClient({
 
 function AppRoutes() {
   const location = useLocation()
+  const navigate = useNavigate()
   
   // App mode state (guest vs connected)
   const [mode, setMode] = useState<AppMode | null | 'web'>(() => {
@@ -80,19 +81,26 @@ function AppRoutes() {
 
   // Handle onboarding completion
   const handleOnboardingComplete = (selectedMode: AppMode, selectedServerUrl?: string) => {
+    console.log('[AppRoutes] handleOnboardingComplete called', { selectedMode, selectedServerUrl });
+    // Persist completion state
+    appMode.set(selectedMode);
+    
     setMode(selectedMode);
     if (selectedMode === 'guest') {
       setServerUrl('guest');
     } else if (selectedServerUrl) {
+      localStorage.setItem('zentrio_server_url', selectedServerUrl); // Ensure persistence
       setServerUrl(selectedServerUrl);
       resetAuthClient();
     }
     // Navigate to the appropriate page
-    window.location.href = selectedMode === 'guest' ? '/streaming/guest' : '/profiles';
+    // Guest mode now goes to profiles page too, to allow profile selection/management
+    navigate('/profiles');
   };
 
   // First launch in Tauri - show onboarding wizard
-  if (isTauri() && (mode === null || (mode === 'connected' && !serverUrl))) {
+  // Skip if we are on the 2FA page (which happens during login flow)
+  if (isTauri() && (mode === null || (mode === 'connected' && !serverUrl)) && location.pathname !== '/two-factor') {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
   
@@ -186,6 +194,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <CastProvider>
           <BrowserRouter>
+            <TitleBar />
             <AppRoutes />
             <Toaster 
               theme="dark"

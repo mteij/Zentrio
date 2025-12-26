@@ -1,12 +1,10 @@
 import { motion } from "framer-motion";
 import { AuthForms } from "../../components/auth/AuthForms";
-import { TitleBar } from "../../components";
 import { ParticleBackground } from "../../components/ui/ParticleBackground";
 
 export function SignInPage() {
   return (
     <>
-      <TitleBar />
       <ParticleBackground />
       
       <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">

@@ -49,12 +49,24 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
 
   const loadProfiles = async () => {
     try {
-      const res = await apiFetch('/api/profiles')
+      const res = await apiFetch('/api/profiles');
+      // Log full response for debugging
+      console.log(`[ProfilesPage] API Response: ${res.status}`, { ok: res.ok, url: res.url });
+
       if (res.status === 401) {
-        // Session expired or invalid, clear auth state and redirect to landing
-        console.log('Session expired, redirecting to login...')
-        localStorage.removeItem('zentrio-auth-storage')
-        navigate('/')
+        // Session might be expired, try to refresh once
+        console.log('[ProfilesPage] Session expired (401), attempting refresh...');
+        const refreshed = await useAuthStore.getState().refreshSession();
+        console.log('[ProfilesPage] Refresh result:', refreshed);
+        
+        if (refreshed) {
+             console.log('[ProfilesPage] Refresh success, retrying loadProfiles...');
+             return loadProfiles();
+        }
+        
+        // If refresh failed, then redirect
+        console.log('[ProfilesPage] Refresh failed, redirecting to login...');
+        navigate('/');
         return
       }
       if (res.ok) {

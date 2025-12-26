@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src * data: blob: ws: wss:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; worker-src 'self' blob:; media-src 'self' https: blob:; font-src 'self' https://fonts.gstatic.com",
       "capabilities": [
         "default"
       ]
@@ -55,7 +55,8 @@
       "open": true
     },
     "deep-link": {
-      "customProtocol": true
+      "customProtocol": true,
+      "schemes": ["zentrio"]
     }
   }
 }

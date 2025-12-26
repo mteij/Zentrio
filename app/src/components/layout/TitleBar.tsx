@@ -1,5 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/apiFetch';
+import { getServerUrl } from '../../lib/auth-client';
+import { useAuthStore } from '../../stores/authStore';
 
 // Helper to check if we're running in Tauri
 const isTauri = () => {
@@ -8,9 +11,21 @@ const isTauri = () => {
   return !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__;
 };
 
+// Detect platform
+const getPlatform = (): 'macos' | 'windows' | 'linux' => {
+  if (typeof navigator === 'undefined') return 'windows';
+  const platform = navigator.platform?.toLowerCase() || '';
+  if (platform.includes('mac')) return 'macos';
+  if (platform.includes('linux')) return 'linux';
+  return 'windows';
+};
+
 export function TitleBar() {
   const [isVisible, setIsVisible] = useState(() => isTauri());
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [platform] = useState(getPlatform);
   const initialized = useRef(false);
+  const navigate = useNavigate();
   
   // Add body class once on mount if in Tauri
   useEffect(() => {
@@ -44,6 +59,14 @@ export function TitleBar() {
         }
 
         console.log('[TitleBar] Window controls initialized');
+        
+        // Track maximized state
+        const updateMaximizedState = async () => {
+          try {
+            setIsMaximized(await appWindow.isMaximized());
+          } catch (e) {}
+        };
+        updateMaximizedState();
 
         const minimizeBtn = document.getElementById('titlebar-minimize');
         const maximizeBtn = document.getElementById('titlebar-maximize');
@@ -60,9 +83,11 @@ export function TitleBar() {
           e.stopPropagation();
           try {
             if (await appWindow.isMaximized()) {
-              appWindow.unmaximize();
+              await appWindow.unmaximize();
+              setIsMaximized(false);
             } else {
-              appWindow.maximize();
+              await appWindow.maximize();
+              setIsMaximized(true);
             }
           } catch (err) {
             console.error('[TitleBar] Maximize toggle failed', err);
@@ -79,11 +104,9 @@ export function TitleBar() {
         maximizeBtn?.addEventListener('click', handleMaximize);
         closeBtn?.addEventListener('click', handleClose);
 
-        // Deep link listener
+        // Deep link listener for auth callbacks
         if (tauriGlobal.event?.listen) {
           tauriGlobal.event.listen('deep-link://new-url', async (event: any) => {
-            console.log('[TitleBar] Deep link received:', event.payload);
-            
             let url = '';
             if (Array.isArray(event.payload) && event.payload.length > 0) {
               url = event.payload[0];
@@ -94,19 +117,60 @@ export function TitleBar() {
             if (url && url.startsWith('zentrio://auth/callback')) {
               try {
                 const urlObj = new URL(url);
-                const sessionToken = urlObj.searchParams.get('session_token');
+                const authCode = urlObj.searchParams.get('auth_code');
                 
-                const res = await apiFetch('/api/auth/mobile-callback', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ url, sessionToken })
-                });
-                
-                const data = await res.json();
-                if (res.ok) {
-                  window.location.href = '/profiles';
+                if (authCode) {
+                  // Exchange secure authorization code for session
+                  const res = await apiFetch('/api/auth/mobile-callback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ authCode })
+                  });
+                  
+                  if (res.ok) {
+                    const data = await res.json();
+                    
+                    if (data.success && data.user) {
+                      // Store session directly to localStorage (auth store's persist key)
+                      // This bypasses the React state update which would trigger
+                      // OnboardingWizard's auto-complete effect
+                      const sessionData = {
+                        state: {
+                          user: data.user,
+                          session: {
+                            user: data.user,
+                            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                            token: data.token
+                          },
+                          isAuthenticated: true,
+                          isLoading: false,
+                          error: null,
+                          lastActivity: Date.now()
+                        },
+                        version: 0
+                      };
+                      localStorage.setItem('zentrio-auth-storage', JSON.stringify(sessionData));
+                      
+                      // Set app mode and navigate
+                      localStorage.setItem('zentrio_app_mode', 'connected');
+                      
+                      // Check if we're on settings page (account linking) vs initial login
+                      // For account linking, just reload to update the linked accounts list
+                      const currentPath = window.location.pathname;
+                      if (currentPath === '/settings') {
+                        // Account linking - just reload to refresh linked accounts
+                        window.location.reload();
+                      } else {
+                        // Initial login - navigate to profiles
+                        window.location.href = '/profiles';
+                      }
+                      return;
+                    }
+                  } else {
+                    console.error('[TitleBar] Auth code exchange failed');
+                  }
                 } else {
-                  console.error('[TitleBar] Auth callback failed', data);
+                  console.error('[TitleBar] No auth_code in callback URL');
                 }
               } catch (err) {
                 console.error('[TitleBar] Auth callback error', err);
@@ -127,80 +191,237 @@ export function TitleBar() {
     return null;
   }
 
+  const isMac = platform === 'macos';
+
   return (
     <>
-      <div id="app-titlebar" className="titlebar">
+      <div id="app-titlebar" className={`titlebar ${isMac ? 'titlebar-mac' : 'titlebar-win'}`}>
+        {/* macOS: Controls on left, then drag region */}
+        {isMac && (
+          <div className="titlebar-controls titlebar-controls-mac">
+            <div className="titlebar-button mac-close" id="titlebar-close" title="Close">
+              <svg width="8" height="8" viewBox="0 0 8 8">
+                <path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div className="titlebar-button mac-minimize" id="titlebar-minimize" title="Minimize">
+              <svg width="8" height="2" viewBox="0 0 8 2">
+                <path d="M0 1H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div className="titlebar-button mac-maximize" id="titlebar-maximize" title={isMaximized ? "Restore" : "Maximize"}>
+              <svg width="8" height="8" viewBox="0 0 8 8">
+                {isMaximized ? (
+                  <path d="M1 3L4 0.5L7 3L7 7.5H1V3Z" stroke="currentColor" fill="none" strokeWidth="1"/>
+                ) : (
+                  <path d="M0 4L4 0L8 4L8 8H0V4Z" stroke="currentColor" fill="none" strokeWidth="1"/>
+                )}
+              </svg>
+            </div>
+          </div>
+        )}
+
         <div className="titlebar-drag-region" data-tauri-drag-region>
-          <div className="titlebar-title">Zentrio</div>
-        </div>
-        <div className="titlebar-controls">
-          <div className="titlebar-button" id="titlebar-minimize">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14" />
-            </svg>
-          </div>
-          <div className="titlebar-button" id="titlebar-maximize">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-            </svg>
-          </div>
-          <div className="titlebar-button titlebar-close" id="titlebar-close">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6L6 18" />
-              <path d="M6 6l12 12" />
-            </svg>
+          <div className="titlebar-title">
+            <span className="titlebar-app-name">Zentrio</span>
           </div>
         </div>
+
+        {/* Windows/Linux: Controls on right */}
+        {!isMac && (
+          <div className="titlebar-controls titlebar-controls-win">
+            <div className="titlebar-button win-minimize" id="titlebar-minimize" title="Minimize">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <path d="M2 6H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div className="titlebar-button win-maximize" id="titlebar-maximize" title={isMaximized ? "Restore" : "Maximize"}>
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                {isMaximized ? (
+                  <>
+                    <rect x="3" y="1" width="8" height="8" rx="1" stroke="currentColor" fill="none" strokeWidth="1"/>
+                    <rect x="1" y="3" width="8" height="8" rx="1" stroke="currentColor" fill="var(--glass-bg)" strokeWidth="1"/>
+                  </>
+                ) : (
+                  <rect x="2" y="2" width="8" height="8" rx="1" stroke="currentColor" fill="none" strokeWidth="1.5"/>
+                )}
+              </svg>
+            </div>
+            <div className="titlebar-button win-close" id="titlebar-close" title="Close">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+          </div>
+        )}
       </div>
       <style dangerouslySetInnerHTML={{__html: `
+        /* =============================================================================
+           Modern Glassmorphism Title Bar
+           ============================================================================= */
+        
         .titlebar {
           height: 32px;
-          background: #141414;
+          background: var(--glass-bg, rgba(20, 20, 20, 0.75));
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
           user-select: none;
           display: flex;
-          justify-content: space-between;
           align-items: center;
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           z-index: 99999;
-          flex-shrink: 0;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         }
+
+        /* Drag Region */
         .titlebar-drag-region {
           flex: 1;
           height: 100%;
           display: flex;
           align-items: center;
-          padding-left: 16px;
+          justify-content: center;
           -webkit-app-region: drag;
+          app-region: drag;
         }
+
+        /* Title */
         .titlebar-title {
-            font-size: 12px;
-            color: #aaa;
-            pointer-events: none;
-            font-family: system-ui, -apple-system, sans-serif;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          pointer-events: none;
         }
+
+        .titlebar-app-name {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--text-muted, #888);
+          font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+          letter-spacing: 0.02em;
+          opacity: 0.7;
+          transition: opacity var(--transition-normal, 0.2s ease);
+        }
+
+        .titlebar:hover .titlebar-app-name {
+          opacity: 1;
+        }
+
+        /* Controls Container */
         .titlebar-controls {
           display: flex;
           -webkit-app-region: no-drag;
+          app-region: no-drag;
           z-index: 100000;
         }
-        .titlebar-button {
+
+        /* =============================================================================
+           Windows/Linux Style Controls
+           ============================================================================= */
+        
+        .titlebar-controls-win {
+          height: 100%;
+        }
+
+        .titlebar-win .titlebar-button {
           display: inline-flex;
           justify-content: center;
           align-items: center;
           width: 46px;
           height: 32px;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: background var(--transition-normal, 0.2s ease);
+          color: var(--text-muted, #888);
+        }
+
+        .titlebar-win .titlebar-button:hover {
+          color: var(--text, #fff);
+        }
+
+        .titlebar-win .win-minimize:hover,
+        .titlebar-win .win-maximize:hover {
+          background: var(--glass-bg-light, rgba(255, 255, 255, 0.1));
+        }
+
+        .titlebar-win .win-close:hover {
+          background: #e81123;
           color: #fff;
         }
-        .titlebar-button:hover {
-          background: rgba(255, 255, 255, 0.1);
+
+        /* =============================================================================
+           macOS Style Controls (Traffic Lights)
+           ============================================================================= */
+        
+        .titlebar-controls-mac {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding-left: 12px;
+          height: 100%;
         }
-        .titlebar-close:hover {
-          background: #e81123;
+
+        .titlebar-mac .titlebar-button {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all var(--transition-fast, 0.15s ease);
+        }
+
+        .titlebar-mac .titlebar-button svg {
+          opacity: 0;
+          transition: opacity var(--transition-fast, 0.15s ease);
+        }
+
+        .titlebar-mac:hover .titlebar-button svg {
+          opacity: 1;
+        }
+
+        .titlebar-mac .mac-close {
+          background: #ff5f57;
+          color: #4d0000;
+        }
+
+        .titlebar-mac .mac-close:hover {
+          background: #ff5f57;
+        }
+
+        .titlebar-mac .mac-minimize {
+          background: #febc2e;
+          color: #594d00;
+        }
+
+        .titlebar-mac .mac-minimize:hover {
+          background: #febc2e;
+        }
+
+        .titlebar-mac .mac-maximize {
+          background: #28c840;
+          color: #004d00;
+        }
+
+        .titlebar-mac .mac-maximize:hover {
+          background: #28c840;
+        }
+
+        /* Inactive state - grayed out buttons */
+        .titlebar-mac .titlebar-button:not(:hover) {
+          filter: saturate(0.7);
+        }
+
+        .titlebar-controls-mac:hover .titlebar-button {
+          filter: saturate(1);
+        }
+
+        /* Center title on macOS */
+        .titlebar-mac .titlebar-drag-region {
+          padding-right: 80px; /* Balance the left controls */
         }
       `}} />
     </>

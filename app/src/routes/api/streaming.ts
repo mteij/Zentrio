@@ -1,12 +1,14 @@
 import { Hono } from 'hono'
 import { addonManager } from '../../services/addons/addon-manager'
-import { streamDb, watchHistoryDb, profileDb, addonDb, listDb, type User } from '../../services/database'
-import { sessionMiddleware } from '../../middleware/session'
+import { streamDb, watchHistoryDb, profileDb, addonDb, listDb, userDb, type User } from '../../services/database'
+import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { ok, err } from '../../utils/api'
 
 const streaming = new Hono<{
   Variables: {
-    user: User
+    user: User | null
+    guestMode: boolean
+    session: any
   }
 }>()
 
@@ -632,10 +634,83 @@ streaming.get('/filters', sessionMiddleware, async (c) => {
     return err(c, 500, 'SERVER_ERROR', 'Failed to load filters')
   }
 })
-streaming.get('/dashboard', sessionMiddleware, async (c) => {
+streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
   try {
     const { profileId } = c.req.query()
+    const isGuestMode = c.get('guestMode') as boolean
     const user = c.get('user')
+    
+    // Guest mode handling: get/create the guest user's default profile
+    if (isGuestMode || profileId === 'guest') {
+      // Ensure guest user and default profile exist
+      const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+      const pId = guestDefaultProfile.id
+      
+      const profile = profileDb.findWithSettingsById(pId)
+      if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'Guest profile not found')
+
+      // Get real data for the guest profile
+      const rawHistory = watchHistoryDb.getByProfileId(pId)
+      
+      // Apply same history filtering as connected mode
+      const MIN_SECONDS_THRESHOLD = 120
+      const MIN_PERCENT_THRESHOLD = 5
+      const COMPLETED_PERCENT_THRESHOLD = 90
+      
+      const filteredHistory = rawHistory.filter(h => {
+        if (h.is_watched) return false
+        const progressPercent = h.duration && h.duration > 0 && h.position 
+          ? (h.position / h.duration) * 100 
+          : 0
+        if (progressPercent >= COMPLETED_PERCENT_THRESHOLD) return false
+        const meetsMinSeconds = h.position && h.position >= MIN_SECONDS_THRESHOLD
+        const meetsMinPercent = progressPercent >= MIN_PERCENT_THRESHOLD
+        return meetsMinSeconds || meetsMinPercent
+      })
+      
+      const deduplicatedHistory: typeof rawHistory = []
+      const seenSeries = new Set<string>()
+      for (const h of filteredHistory) {
+        if (h.meta_type === 'series') {
+          if (!seenSeries.has(h.meta_id)) {
+            seenSeries.add(h.meta_id)
+            deduplicatedHistory.push(h)
+          }
+        } else {
+          deduplicatedHistory.push(h)
+        }
+      }
+      
+      const history = deduplicatedHistory.map(h => ({
+        ...h,
+        season: h.season !== undefined && h.season >= 0 ? h.season : null,
+        episode: h.episode !== undefined && h.episode >= 0 ? h.episode : null,
+        progressPercent: h.duration && h.duration > 0 && h.position ? Math.min(100, Math.round((h.position / h.duration) * 100)) : 0,
+        episodeDisplay: h.meta_type === 'series' && h.season !== undefined && h.season >= 0 && h.episode !== undefined && h.episode >= 0 ? `S${h.season}:E${h.episode}` : null,
+        lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
+      }))
+      
+      // Get catalog metadata for the guest profile (uses Cinemeta fallback if no addons)
+      const catalogMetadata = await addonManager.getCatalogMetadata(pId)
+      const trending = await addonManager.getTrending(pId)
+      const trendingMovies = await addonManager.getTrendingByType(pId, 'movie')
+      const trendingSeries = await addonManager.getTrendingByType(pId, 'series')
+      
+      const enabledAddons = profileDb.getSettingsProfileId(pId) ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!) : [];
+      const showFallbackToast = enabledAddons.length === 0 && catalogMetadata.length === 0;
+      
+      return c.json({
+        catalogMetadata,
+        history,
+        trending,
+        trendingMovies,
+        trendingSeries,
+        showFallbackToast,
+        profile
+      })
+    }
+    
+    // Connected mode: require authentication
     if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
     let pId: number;

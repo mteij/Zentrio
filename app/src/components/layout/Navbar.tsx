@@ -6,7 +6,7 @@ import styles from '../../styles/Streaming.module.css'
 import { useState, useRef, useEffect } from 'react'
 
 interface NavbarProps {
-  profileId: number
+  profileId: number | string
   profile?: any
 }
 

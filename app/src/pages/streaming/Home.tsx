@@ -5,6 +5,7 @@ import { Layout, StreamingRow, LazyCatalogRow, SkeletonHero, SkeletonRow, Hero }
 import { MetaPreview } from '../../services/addons/types'
 import { WatchHistoryItem } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface CatalogMetadata {
   addon: { id: string; name: string; logo?: string }
@@ -23,7 +24,8 @@ interface DashboardData {
 }
 
 const fetchDashboard = async (profileId: string) => {
-  const res = await fetch(`/api/streaming/dashboard?profileId=${profileId}`)
+  console.log('[Home] fetchDashboard called for:', profileId);
+  const res = await apiFetch(`/api/streaming/dashboard?profileId=${profileId}`)
   if (!res.ok) {
     if (res.status === 401) {
       throw new Error('Unauthorized')

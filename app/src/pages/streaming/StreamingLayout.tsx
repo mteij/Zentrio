@@ -2,9 +2,11 @@ import { Outlet, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Navbar } from '../../components/layout/Navbar'
 import { useEffect } from 'react'
+import { apiFetch } from '../../lib/apiFetch'
 
 const fetchProfile = async (profileId: string) => {
-  const res = await fetch(`/api/streaming/dashboard?profileId=${profileId}`)
+  console.log('[StreamingLayout] fetchProfile called for:', profileId);
+  const res = await apiFetch(`/api/streaming/dashboard?profileId=${profileId}`)
   if (!res.ok) {
      if (res.status === 401) throw new Error('Unauthorized')
      throw new Error('Failed to load profile')
@@ -56,7 +58,7 @@ export const StreamingLayout = () => {
 
   return (
     <>
-      {!shouldHideNavbar && <Navbar profileId={parseInt(profileId!)} profile={profile} />}
+      {!shouldHideNavbar && <Navbar profileId={profileId === 'guest' ? 'guest' : parseInt(profileId!)} profile={profile} />}
       <Outlet />
     </>
   )

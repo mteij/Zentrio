@@ -799,6 +799,81 @@ export const userDb = {
     const result = stmt.run(...values)
 
     return result.changes > 0 ? userDb.findById(id) : undefined
+  },
+
+  /**
+   * Guest User Constants
+   * Used for local-only guest mode - all features work without cloud sync
+   */
+  GUEST_USER_ID: 'guest-local-user',
+  GUEST_USER_EMAIL: 'guest@local.zentrio',
+
+  /**
+   * Get or create the special guest user for local-only mode.
+   * This user is never synced to remote servers and enables all local features.
+   */
+  getOrCreateGuestUser: (): User => {
+    const existingUser = userDb.findById(userDb.GUEST_USER_ID)
+    if (existingUser) return existingUser
+
+    // Create the guest user
+    const now = new Date().toISOString()
+    const stmt = db.prepare(`
+      INSERT INTO user (id, email, name, emailVerified, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `)
+    stmt.run(
+      userDb.GUEST_USER_ID,
+      userDb.GUEST_USER_EMAIL,
+      'Guest',
+      true,
+      now,
+      now
+    )
+
+    return userDb.findById(userDb.GUEST_USER_ID)!
+  },
+
+  /**
+   * Ensure a default profile exists for the guest user.
+   * Creates one if none exists.
+   * Returns the default profile.
+   */
+  ensureGuestDefaultProfile: async (): Promise<Profile> => {
+    const guestUser = userDb.getOrCreateGuestUser()
+    const profiles = profileDb.findByUserId(guestUser.id)
+    
+    if (profiles.length > 0) {
+      // Return the default profile, or the first one
+      const defaultProfile = profiles.find(p => p.is_default) || profiles[0]
+      return defaultProfile
+    }
+
+    // Create a default settings profile for the guest
+    const settingsProfile = settingsProfileDb.create(guestUser.id, 'Default', true)
+
+    // Create a default profile for the guest
+    const profile = await profileDb.create({
+      user_id: guestUser.id,
+      name: 'Guest',
+      avatar: 'Guest',
+      avatar_type: 'initials',
+      avatar_style: 'bottts-neutral',
+      is_default: true,
+      settings_profile_id: settingsProfile.id
+    })
+
+    // Create proxy settings for the profile
+    profileProxySettingsDb.create({
+      profile_id: profile.id,
+      nsfw_filter_enabled: false,
+      nsfw_age_rating: 0,
+      hide_calendar_button: false,
+      hide_addons_button: false,
+      hero_banner_enabled: true
+    })
+
+    return profile
   }
 }
 

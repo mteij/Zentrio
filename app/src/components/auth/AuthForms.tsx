@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from 'sonner'
-import { authClient, getClientUrl } from "../../lib/auth-client";
+import { open } from "@tauri-apps/plugin-shell";
+import { authClient, getClientUrl, getServerUrl, isTauri } from "../../lib/auth-client";
 import { apiFetch, apiFetchJson } from "../../lib/apiFetch";
 import { 
   Mail, 
@@ -45,9 +46,10 @@ type AuthMode = "signin" | "signup";
 
 interface AuthFormsProps {
   mode: AuthMode;
+  onSuccess?: () => void;
 }
 
-export function AuthForms({ mode }: AuthFormsProps) {
+export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { getRedirectPath } = useLoginBehavior();
@@ -57,8 +59,6 @@ export function AuthForms({ mode }: AuthFormsProps) {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null); // Deprecated - use toasts
-  const [successMessage, setSuccessMessage] = useState<string | null>(null); // Deprecated - use toasts
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
@@ -94,12 +94,33 @@ export function AuthForms({ mode }: AuthFormsProps) {
   const handleSocialLogin = async (provider: "google" | "github" | "discord" | "oidc") => {
     try {
       setLoading(true);
-      setError(null);
       const redirectPath = getLoginBehaviorRedirectPath();
-      await authClient.signIn.social({
-        provider,
-        callbackURL: `${getClientUrl()}${redirectPath}`,
-      });
+      
+      // In Tauri, we use a custom scheme for the callback to handle deep linking
+      // This allows us to catch the callback in the running app instance
+      const callbackURL = isTauri() 
+        ? "zentrio://auth/callback" 
+        : `${getClientUrl()}${redirectPath}`;
+
+      if (isTauri()) {
+        // In Tauri, we open the social login in the default system browser
+        // This prevents the main window from navigating away (keeping titlebar visible)
+        // and allows for a smooth callback via deep linking
+        const serverUrl = getServerUrl();
+        // Use the login-proxy endpoint which handles the POST request requirement for Better Auth via system browser
+        // AND use /api/auth/native-redirect as the callbackURL which will handle the session handoff
+        const handoffUrl = `${serverUrl}/api/auth/native-redirect`;
+        const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
+        
+        await open(url);
+        // We don't need to do anything else, the deep link listener in TitleBar will handle the rest
+      } else {
+        // Web behavior
+        await authClient.signIn.social({
+          provider,
+          callbackURL,
+        });
+      }
     } catch (e: any) {
       toast.error('Login Failed', { description: e.message || 'Failed to initiate social login' })
       setLoading(false);
@@ -156,6 +177,26 @@ export function AuthForms({ mode }: AuthFormsProps) {
           // Update auth store with user data before navigating
           if (data?.user) {
             useAuthStore.getState().login(data.user);
+            
+            // If parent provided onSuccess handler, call it and skip default behavior
+            if (onSuccess) {
+                onSuccess();
+                return;
+            }
+
+            if (isTauri()) {
+                // Clear app mode to ensure Onboarding Wizard runs
+                localStorage.removeItem('zentrio_app_mode');
+                localStorage.removeItem('zentrio_server_url');
+
+                // Force reload if we were previously "uninitialized" to update AppRoutes
+                // Check if we need reload:
+                // If we are on /signin, AppRoutes was rendered.
+                // If we navigate to /, AppRoutes re-renders? 
+                // No, AppRoutes holds state. We must reload to update AppRoutes state.
+                window.location.reload(); 
+                return;
+            }
           }
           navigate(redirectPath);
         } 
@@ -189,6 +230,13 @@ export function AuthForms({ mode }: AuthFormsProps) {
                 if (data?.user) {
                   useAuthStore.getState().login(data.user);
                 }
+                
+                // If parent provided onSuccess handler, call it and skip default behavior
+                if (onSuccess) {
+                    onSuccess();
+                    return;
+                }
+
                 navigate(redirectPath);
              } else {
                  toast.warning('Missing Code', { description: 'Please enter the verification code' })
@@ -338,19 +386,15 @@ export function AuthForms({ mode }: AuthFormsProps) {
               <div className="relative">
                 <Lock className="absolute left-3.5 top-3.5 w-5 h-5 text-zinc-500" />
                 <input
-                  type="text"
+                  type="password"
                   id="password"
                   name="password"
-                  autoComplete="off"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
                   placeholder="••••••••"
-                  style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
-                  data-1p-ignore
-                  data-lpignore="true"
-                  data-bwignore
                 />
               </div>
             </div>

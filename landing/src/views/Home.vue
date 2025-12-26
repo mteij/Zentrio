@@ -1,6 +1,6 @@
 <template>
   <div class="home-view">
-    <ParticleBackground :color="isDark ? [229, 9, 20] : [229, 9, 20]" />
+    <ParticleBackground :color="[229, 9, 20]" />
 
     <header class="hero">
       <div class="container hero-container">
@@ -26,7 +26,7 @@
               <span class="btn-icon">▶</span> Launch Zentrio
             </a>
             <a
-              href="https://docs.zentrio.eu/getting-started"
+              href="https://docs.zentrio.eu/self-hosting"
               class="btn btn-secondary btn-lg"
             >
               Self Host
@@ -43,96 +43,24 @@
     </header>
 
     <main class="features-section">
-      <div class="container">
-        <div class="section-header text-center mb-16">
-          <h2 class="section-title">Engineered for Performance</h2>
-          <p class="section-subtitle">
-            Everything you need for a premium streaming experience.
-          </p>
-        </div>
-
-        <div class="glow-grid">
-          <GlowCard
-            v-for="(feature, index) in features"
-            :key="index"
-            v-bind="feature"
-            class="fade-in-up"
-            :style="{ 'animation-delay': index * 0.1 + 's' }"
-          />
-        </div>
+      <div class="section-header">
+        <h2 class="section-title fade-in-up">Engineered for Performance</h2>
+        <p class="section-subtitle fade-in-up" style="animation-delay: 0.1s">
+          Everything you need for a premium streaming experience.
+        </p>
       </div>
+
+      <BentoGrid />
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
 import ParticleBackground from "../components/ParticleBackground.vue";
 import AnimatedLogo from "../components/AnimatedLogo.vue";
-import GlowCard from "../components/GlowCard.vue";
-import {
-  Users,
-  MonitorPlay,
-  Puzzle,
-  RefreshCw,
-  Shield,
-  Smartphone,
-  Layers,
-} from "lucide-vue-next";
+import BentoGrid from "../components/BentoGrid.vue";
 
-const isDark = ref(true);
 const badges = ["v1.0.0", "Open Source", "Privacy Focused"];
-
-const features = [
-  {
-    icon: Layers,
-    title: "Modern Interface",
-    description:
-      "A clean, distraction-free design that puts your content first. Glassmorphic aesthetics meet functional precision.",
-    gradient:
-      "linear-gradient(135deg, rgba(236, 72, 153, 0.5), rgba(219, 39, 119, 0.5))",
-  },
-  {
-    icon: Users,
-    title: "Family Profiles",
-    description:
-      "Granular profile management. Keep watch history and recommendations separate for every household member.",
-    gradient:
-      "linear-gradient(135deg, rgba(168, 85, 247, 0.5), rgba(79, 70, 229, 0.5))",
-  },
-  {
-    icon: Shield,
-    title: "Privacy First",
-    description:
-      "Self-host with Docker. Your data never leaves your infrastructure unless you want it to.",
-    gradient:
-      "linear-gradient(135deg, rgba(16, 185, 129, 0.5), rgba(5, 150, 105, 0.5))",
-  },
-  {
-    icon: Puzzle,
-    title: "Addon Architecture",
-    description:
-      "Extend core functionality with community addons. Compatible with popular metadata and source providers.",
-    gradient:
-      "linear-gradient(135deg, rgba(249, 115, 22, 0.5), rgba(220, 38, 38, 0.5))",
-  },
-  {
-    icon: RefreshCw,
-    title: "Instant Sync",
-    description:
-      "Pick up exactly where you left off. State is synchronized in real-time across all connected clients.",
-    gradient:
-      "linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(14, 165, 233, 0.5))",
-  },
-  {
-    icon: Smartphone,
-    title: "Native PWA",
-    description:
-      "Install directly on your device. Responsive, touch-optimized, and feels like a native application.",
-    gradient:
-      "linear-gradient(135deg, rgba(229, 9, 20, 0.5), rgba(220, 38, 38, 0.5))",
-  },
-];
 </script>
 
 <style scoped>
@@ -218,12 +146,15 @@ const features = [
 
 /* Features Section */
 .features-section {
-  padding: 100px 0;
+  padding: 80px 0 120px;
+  position: relative;
+  z-index: 1;
 }
 
 .section-header {
   margin-bottom: 60px;
   text-align: center;
+  padding: 0 20px;
 }
 
 .section-title {
@@ -241,22 +172,13 @@ const features = [
   margin: 0 auto;
 }
 
-/* Glow Grid Layout */
-.glow-grid {
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 24px;
-}
-
-@media (min-width: 768px) {
-  .glow-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 768px) {
+  .section-title {
+    font-size: 2rem;
   }
-}
 
-@media (min-width: 1024px) {
-  .glow-grid {
-    grid-template-columns: repeat(3, 1fr);
+  .features-section {
+    padding: 60px 0 80px;
   }
 }
 </style>

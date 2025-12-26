@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { SimpleLayout, Button, Input, TitleBar } from '../components'
+import { SimpleLayout, Button, Input } from '../components'
 import { ParticleBackground } from '../components/ui/ParticleBackground'
 import { Loader2, ArrowRight } from "lucide-react";
 import { authClient, getClientUrl } from '../lib/auth-client';
@@ -102,7 +102,6 @@ export function LandingPage({ version }: LandingPageProps) {
 
   return (
     <>
-      <TitleBar />
       <ParticleBackground />
       
       <main className="min-h-screen flex items-center justify-center relative z-10 p-4 w-full">

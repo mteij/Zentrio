@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { Database } from "bun:sqlite";
-import { twoFactor, magicLink, emailOTP, openAPI, oidcProvider } from "better-auth/plugins";
+import { twoFactor, magicLink, emailOTP, openAPI, oidcProvider, bearer } from "better-auth/plugins";
 import { getConfig } from "./envParser";
 import { join, isAbsolute, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
@@ -109,7 +109,8 @@ export const auth = betterAuth({
         openAPI(),
         oidcProvider({
             loginPage: "/login",
-        })
+        }),
+        bearer()
     ],
     user: {
         changeEmail: {

@@ -6,9 +6,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { appMode } from '../../lib/app-mode';
-import { resetAuthClient, isTauri } from '../../lib/auth-client';
+import { resetAuthClient, isTauri, authClient } from '../../lib/auth-client';
 import { AuthForms } from '../auth/AuthForms';
 import { ParticleBackground } from '../ui/ParticleBackground';
+import { useAuthStore } from '../../stores/authStore';
 
 interface OnboardingWizardProps {
   onComplete: (mode: 'guest' | 'connected', serverUrl?: string) => void;
@@ -214,10 +215,46 @@ interface SetupSlideProps {
 
 function SetupSlide({ onComplete }: SetupSlideProps) {
   const [step, setStep] = useState<'server' | 'auth'>('server');
-  const [serverUrl, setServerUrl] = useState('https://app.zentrio.eu');
+  // Initialize from localStorage if available (persisted during server selection before SSO redirect)
+  const [serverUrl, setServerUrl] = useState(() => {
+    const saved = localStorage.getItem('zentrio_server_url');
+    return saved || 'https://app.zentrio.eu';
+  });
   const [customUrl, setCustomUrl] = useState('');
   const [checking, setChecking] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const { isAuthenticated, user } = useAuthStore();
+  
+  // Check if already authenticated when entering auth step
+  useEffect(() => {
+    const checkAuth = async () => {
+        try {
+            console.log('[Onboarding] Proactive auth check...');
+            const session = await authClient.getSession();
+            if (session.data?.user) {
+                console.log('[Onboarding] Session found, updating store...');
+                useAuthStore.getState().login(session.data.user, {
+                    user: session.data.user,
+                    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                    token: session.data.session?.token
+                });
+            }
+        } catch (e) {
+            console.error('[Onboarding] Proactive check failed (expected if not logged in)', e);
+        }
+    };
+    checkAuth();
+  }, []);
+
+  useEffect(() => {
+    console.log('[Onboarding] Auth check:', { step, isAuthenticated, user: !!user });
+    if (isAuthenticated && user) {
+        console.log('[Onboarding] Already authenticated, completing flow...');
+        // Just complete immediately if we are already authenticated
+        // This handles the social login redirect case
+        onComplete('connected', serverUrl);
+    }
+  }, [step, isAuthenticated, user, onComplete, serverUrl]);
   
   const handleServerConnect = async (url: string) => {
     setChecking(true);
@@ -375,7 +412,13 @@ function SetupSlide({ onComplete }: SetupSlideProps) {
             </motion.div>
             
             {/* Full AuthForms component - includes social login, magic link, OTP, etc. */}
-            <AuthForms mode={authMode} />
+            <AuthForms 
+                mode={authMode} 
+                onSuccess={() => {
+                    console.log('[Onboarding] AuthForms success callback');
+                    onComplete('connected', serverUrl);
+                }}
+            />
           </motion.div>
         )}
       </AnimatePresence>

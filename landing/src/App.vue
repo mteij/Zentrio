@@ -111,8 +111,8 @@ export default {
     },
   },
   created() {
-    // Check local storage or system preference
-    const savedTheme = localStorage.getItem("theme");
+    // Check local storage (shared with VitePress docs) or system preference
+    const savedTheme = localStorage.getItem("vitepress-theme-appearance");
     if (savedTheme) {
       this.isDark = savedTheme === "dark";
     } else {
@@ -123,9 +123,13 @@ export default {
   mounted() {
     window.addEventListener("scroll", this.handleScroll);
     this.handleScroll(); // Init
+
+    // Listen for theme changes from docs site or other tabs
+    window.addEventListener("storage", this.handleStorageChange);
   },
-  onUnmounted() {
+  beforeUnmount() {
     window.removeEventListener("scroll", this.handleScroll);
+    window.removeEventListener("storage", this.handleStorageChange);
   },
   methods: {
     handleScroll() {
@@ -133,8 +137,17 @@ export default {
     },
     toggleTheme() {
       this.isDark = !this.isDark;
-      localStorage.setItem("theme", this.isDark ? "dark" : "light");
+      localStorage.setItem(
+        "vitepress-theme-appearance",
+        this.isDark ? "dark" : "light"
+      );
       this.updateTheme();
+    },
+    handleStorageChange(e) {
+      if (e.key === "vitepress-theme-appearance" && e.newValue) {
+        this.isDark = e.newValue === "dark";
+        this.updateTheme();
+      }
     },
     updateTheme() {
       if (this.isDark) {
@@ -221,12 +234,13 @@ export default {
 }
 
 body {
-  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.6;
   color: var(--text);
   background-color: var(--bg);
   overflow-x: hidden;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  /* Smoother theme transition matching VitePress */
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 
 .landing-page {
@@ -258,27 +272,23 @@ body {
   padding: 0 20px;
 }
 
-/* Navbar */
+/* Navbar - Matches VitePress nav styling */
 .navbar {
-  padding: 20px 0;
-  position: fixed; /* Changed to fixed for sticky header like docs */
+  height: 64px;
+  display: flex;
+  align-items: center;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   z-index: 50;
-  transition: all 0.3s ease;
-  background-color: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-bottom: 1px solid transparent;
-}
-
-.navbar.scrolled {
+  /* Always show backdrop like VitePress */
   background-color: var(--nav-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--card-border);
-  padding: 12px 0; /* Slightly smaller on scroll */
+  /* Smooth theme transitions */
+  transition: background-color 0.5s ease, border-color 0.5s ease;
 }
 
 .nav-content {

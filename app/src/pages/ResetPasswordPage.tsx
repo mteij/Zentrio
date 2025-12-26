@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { TitleBar, Button, Input, Message } from '../components/index';
+import { Button, Input, Message } from '../components/index';
 import { ParticleBackground } from '../components/ui/ParticleBackground';
 
 interface ResetPasswordPageProps {}
@@ -7,7 +7,6 @@ interface ResetPasswordPageProps {}
 export function ResetPasswordPage({}: ResetPasswordPageProps) {
   return (
     <>
-      <TitleBar />
       <ParticleBackground />
       
       <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">

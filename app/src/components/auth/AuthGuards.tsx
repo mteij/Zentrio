@@ -23,56 +23,25 @@ interface RouteGuardProps {
 export function ProtectedRoute({ children }: RouteGuardProps) {
   const { isAuthenticated, isLoading } = useAuthStore()
   const navigate = useNavigate()
-  const [hasCheckedSession, setHasCheckedSession] = useState(false)
-  const [sessionValid, setSessionValid] = useState(false)
-  
   // Check if in guest mode - skip auth check entirely
   const isGuestMode = appMode.isGuest()
 
-  // Check session with server on mount
-  useEffect(() => {
-    // Guest mode: skip session check, allow access
-    if (isGuestMode) {
-      setSessionValid(true)
-      setHasCheckedSession(true)
-      return
-    }
-
-    const checkSession = async () => {
-      try {
-        // If already authenticated in store, verify it's still valid
-        // If not authenticated, try to refresh in case of SSO callback
-        const isValid = await useAuthStore.getState().refreshSession()
-        setSessionValid(isValid)
-      } catch (e) {
-        console.error('Session check failed', e)
-        setSessionValid(false)
-      } finally {
-        setHasCheckedSession(true)
-      }
-    }
-    
-    checkSession()
-
-  }, [isGuestMode])
-
-  // Redirect if session check completed and not authenticated (connected mode only)
+  // Redirect if not authenticated (connected mode only)
   useEffect(() => {
     if (isGuestMode) return // Don't redirect in guest mode
 
-    if (hasCheckedSession && !isLoading && !sessionValid && !isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       navigate('/', { replace: true })
     }
-  }, [hasCheckedSession, sessionValid, isAuthenticated, isLoading, navigate, isGuestMode])
+  }, [isAuthenticated, isLoading, navigate, isGuestMode])
 
   // Show loading ONLY while checking session initially
-  // Do NOT show loading if we have already checked session (background refresh)
-  if (!hasCheckedSession) {
+  if (isLoading) {
     return <SplashScreen />
   }
 
   // Don't render children if not authenticated (connected mode only)
-  if (!isGuestMode && !sessionValid && !isAuthenticated) {
+  if (!isGuestMode && !isAuthenticated) {
     return null
   }
 
@@ -103,9 +72,9 @@ export function PublicRoute({ children }: RouteGuardProps) {
   }, [])
 
   useEffect(() => {
-    // Guest mode: redirect to streaming with default profile
+    // Guest mode: redirect to profiles page
     if (hasHydrated && isGuestMode) {
-      navigate('/streaming/guest', { replace: true })
+      navigate('/profiles', { replace: true })
       return
     }
     

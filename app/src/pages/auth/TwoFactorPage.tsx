@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from 'sonner';
-import { TitleBar } from "../../components";
 import { ParticleBackground } from "../../components/ui/ParticleBackground";
 import { TwoFactorModal } from "../../components/auth/TwoFactorModal";
-import { authClient } from "../../lib/auth-client";
+import { authClient, isTauri } from "../../lib/auth-client";
 import { useAuthStore } from "../../stores/authStore";
 
 export function TwoFactorPage() {
@@ -25,6 +24,14 @@ export function TwoFactorPage() {
       // Re-check auth status after successful 2FA
       await refreshSession();
       toast.success("Two-factor verification successful");
+      
+      // In Tauri, ensure app mode is set and reload to update AppRoutes state
+      if (isTauri()) {
+        localStorage.setItem('zentrio_app_mode', 'connected');
+        window.location.href = '/profiles';
+        return;
+      }
+      
       navigate("/profiles");
     } catch (err: any) {
       setError(err.message || "Verification failed");
@@ -64,6 +71,14 @@ export function TwoFactorPage() {
       if (data) {
         await refreshSession();
         toast.success("Backup code verified");
+        
+        // In Tauri, ensure app mode is set and reload to update AppRoutes state
+        if (isTauri()) {
+          localStorage.setItem('zentrio_app_mode', 'connected');
+          window.location.href = '/profiles';
+          return;
+        }
+        
         navigate("/profiles");
       }
     } catch (err: any) {
@@ -77,7 +92,6 @@ export function TwoFactorPage() {
   if (showBackupCode) {
     return (
       <>
-        <TitleBar />
         <ParticleBackground />
         <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
           <div className="w-full max-w-md">
@@ -152,7 +166,6 @@ export function TwoFactorPage() {
 
   return (
     <>
-      <TitleBar />
       <ParticleBackground />
       <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
         <div className="w-full max-w-md">

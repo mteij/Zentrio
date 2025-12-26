@@ -21,6 +21,7 @@ interface User {
 interface Session {
   user: User
   expiresAt: Date
+  token?: string
 }
 
 interface AuthState {
@@ -36,9 +37,12 @@ interface AuthState {
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   clearError: () => void
-  refreshSession: () => Promise<boolean>
+  refreshSession: (token?: string) => Promise<boolean>
   checkSession: () => Promise<boolean>
 }
+
+// Session duration constant (24 hours)
+const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
 export const useAuthStore = create<AuthState>()(
   subscribeWithSelector(
@@ -55,7 +59,7 @@ export const useAuthStore = create<AuthState>()(
           const now = Date.now()
           set({
             user,
-            session: session || { user, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) }, // Default 24h
+            session: session || { user, expiresAt: new Date(Date.now() + SESSION_DURATION_MS) },
             isAuthenticated: true,
             error: null,
             lastActivity: now,
@@ -101,17 +105,29 @@ export const useAuthStore = create<AuthState>()(
 
         clearError: () => set({ error: null }),
 
-        refreshSession: async () => {
+        refreshSession: async (token?: string) => {
           try {
             set({ isLoading: true, error: null })
-            const session = await authClient.getSession()
+            
+            // Use provided token or fall back to stored token
+            const effectiveToken = token || get().session?.token;
+            
+            const headers: Record<string, string> = effectiveToken 
+                ? { 'Authorization': `Bearer ${effectiveToken}` } 
+                : {};
+                
+            const session = await authClient.getSession({
+                fetchOptions: {
+                    headers
+                }
+            })
             
             if (session?.data?.user) {
               const user = session.data.user
-              // Create a proper session object with expiresAt
               const sessionData = {
                 user,
-                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // Default 24h from now
+                expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
+                token: token || session.data.session?.token || get().session?.token
               }
               get().login(user, sessionData)
               return true
@@ -161,6 +177,13 @@ export const useAuthStore = create<AuthState>()(
           lastActivity: state.lastActivity,
         }),
         onRehydrateStorage: () => (state) => {
+          console.log('[AuthStore] Rehydrated:', { 
+              isAuthenticated: state?.isAuthenticated, 
+              hasUser: !!state?.user,
+              hasSession: !!state?.session,
+              hasToken: !!state?.session?.token
+          });
+          
           // Check session validity on rehydration
           if (state?.isAuthenticated) {
             state.checkSession().catch(console.error)
