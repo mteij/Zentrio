@@ -63,11 +63,10 @@
 /* ======================= */
 .streamingNavbar {
   position: fixed;
-  top: var(--titlebar-height, 0px);
+  top: 0;
   left: 0;
   width: 80px;
   height: 100vh;
-  height: var(--app-height, 100vh);
   background: rgba(10, 10, 10, 0.4); 
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -75,7 +74,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 30px 0 20px 0;
+  padding: calc(30px + var(--titlebar-height, 0px)) 0 20px 0;
   border-right: none;
   transition: all 0.3s ease;
 }
@@ -378,17 +377,16 @@
 }
 
 .streamingLayoutNoHero {
-  padding-top: 100px; /* Ensure content starts below header */
+  padding-top: calc(100px + var(--titlebar-height, 0px)); /* Ensure content starts below header and titlebar */
 }
 
 /* Page Ambient Background */
 .pageAmbientBackground {
   position: fixed;
-  top: var(--titlebar-height, 0px);
+  top: 0;
   left: 0;
   width: 100%;
-  height: 100vh;
-  height: var(--app-height, 100vh);
+  height: calc(100vh);
   z-index: 0;
   background-size: cover;
   background-position: center center; /* Better placement on large screens */

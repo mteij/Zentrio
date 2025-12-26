@@ -105,7 +105,7 @@ export function TwoFactorModal({
       </div>
       <form onSubmit={handleSubmit}>
         <div className="mb-6">
-          <div className="flex gap-2 justify-center mb-6">
+          <div className="flex gap-1.5 md:gap-2 justify-center mb-6">
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <input
                 key={index}
@@ -136,7 +136,7 @@ export function TwoFactorModal({
                 data-1p-ignore
                 data-lpignore="true"
                 data-bwignore
-                className="w-11 h-14 bg-black/20 border border-white/10 rounded-lg text-xl font-bold text-center text-white font-mono focus:outline-none focus:border-[#e50914] focus:ring-1 focus:ring-[#e50914] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-9 h-12 md:w-11 md:h-14 bg-black/20 border border-white/10 rounded-lg text-lg md:text-xl font-bold text-center text-white font-mono focus:outline-none focus:border-[#e50914] focus:ring-1 focus:ring-[#e50914] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               />
             ))}
           </div>

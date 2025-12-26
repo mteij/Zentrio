@@ -61,8 +61,7 @@ body {
 
 body.has-titlebar {
   --titlebar-height: 32px;
-  --app-height: calc(100vh - var(--titlebar-height));
-  padding-top: var(--titlebar-height);
+  --app-height: 100vh;
   min-height: 100vh;
   height: 100vh;
   overflow: hidden;
@@ -70,9 +69,8 @@ body.has-titlebar {
 }
 
 body.has-titlebar #root {
-  min-height: var(--app-height);
-  height: var(--app-height);
-  max-height: var(--app-height);
+  min-height: 100vh;
+  height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
 }

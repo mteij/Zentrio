@@ -14,20 +14,26 @@ fn get_server_port(state: tauri::State<ServerPort>) -> u16 {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-          let _ = app.get_webview_window("main").expect("no main window").set_focus();
-          if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
-              let _ = app.emit("deep-link://new-url", url);
-          }
-        }))
+        .plugin(tauri_plugin_deep_link::init());
+
+    #[cfg(not(mobile))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args: Vec<String>, _cwd| {
+            let _ = app.get_webview_window("main").expect("no main window").set_focus();
+            if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
+                let _ = app.emit("deep-link://new-url", url);
+            }
+        }));
+    }
+
+    builder
         .setup(|app| {
             // Explicitly register deep link scheme for development
             #[cfg(any(windows, target_os = "linux"))]
@@ -36,6 +42,21 @@ pub fn run() {
                    Ok(_) => println!("[DeepLink] Registered 'zentrio' scheme"),
                    Err(e) => println!("[DeepLink] Failed to register scheme: {}", e),
                };
+
+               // Check for deep link on startup
+               use std::env;
+               let args: Vec<String> = env::args().collect();
+               if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
+                   println!("[DeepLink] App started with URL: {}", url);
+                   let app_handle = app.handle().clone();
+                   let url = url.clone();
+                   // Emit event slightly later to ensure frontend is ready
+                   tauri::async_runtime::spawn(async move {
+                       // wait for frontend to load
+                       std::thread::sleep(std::time::Duration::from_millis(1500));
+                       let _ = app_handle.emit("deep-link://new-url", url);
+                   });
+               }
             }
 
             let port = 3000; // Default port, or find a free one

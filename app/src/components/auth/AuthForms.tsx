@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmailVerificationModal } from "./EmailVerificationModal";
-import { ServerConnectionIndicator } from "./ServerConnectionIndicator";
+
+import { BackButton } from "../ui/BackButton";
 import { useLoginBehavior, getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
 import { useSessionDuration } from "../../hooks/useSessionDuration";
 import { useAuthStore } from "../../stores/authStore";
@@ -90,6 +91,13 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       return () => clearTimeout(timer);
     }
   }, [resendSeconds]);
+
+  const handleChangeServer = () => {
+    localStorage.removeItem("zentrio_server_url");
+    localStorage.removeItem("zentrio_app_mode");
+    // Navigate to root to trigger server selector
+    window.location.href = '/';
+  };
 
   const handleSocialLogin = async (provider: "google" | "github" | "discord" | "oidc") => {
     try {
@@ -202,9 +210,13 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         } 
         else if (method === "magic-link") {
           const redirectPath = getLoginBehaviorRedirectPath();
+          const callbackURL = isTauri()
+            ? "zentrio://auth/magic-link"
+            : `${getClientUrl()}${redirectPath}`;
+
           const { data, error } = await authClient.signIn.magicLink({
             email,
-            callbackURL: `${getClientUrl()}${redirectPath}`
+            callbackURL
           });
           if (error) throw error;
           toast.success('Email Sent', { description: 'Magic link sent! Check your email.' })
@@ -284,14 +296,18 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             </div>
         </div>
       ) : (
-    <div className="w-full max-w-lg mx-auto">
+    <div className="w-full max-w-lg mx-auto relative">
+      {/* Back Button for Tauri (Change Server) */}
+      {isTauri() && (
+        <div className="absolute -top-12 left-0 md:-left-12 md:top-6 z-20">
+             <BackButton onClick={handleChangeServer} label="Change Server" />
+        </div>
+      )}
 
-      <div className="bg-black/40 backdrop-blur-md border border-white/10 !rounded-2xl !p-10 shadow-2xl">
+      <div className="bg-black/40 backdrop-blur-md border border-white/10 !rounded-2xl !p-6 md:!p-10 shadow-2xl transition-all duration-300 relative">
 
-
-
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent mb-2">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent mb-2">
             {mode === "signin" ? "Welcome Back" : "Create Account"}
           </h1>
           <p className="text-zinc-400 text-sm">
@@ -306,7 +322,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           <div className="flex p-1 bg-zinc-950/50 rounded-lg mb-6 border border-zinc-800/50">
             <button
               onClick={() => { setMethod("password"); setShowOtpInput(false); }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs md:text-sm font-medium rounded-md transition-all ${
                 method === "password" 
                   ? "bg-zinc-800 text-white shadow-sm" 
                   : "text-zinc-400 hover:text-zinc-200"
@@ -317,7 +333,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             </button>
             <button
               onClick={() => { setMethod("magic-link"); setShowOtpInput(false); }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs md:text-sm font-medium rounded-md transition-all ${
                 method === "magic-link" 
                   ? "bg-zinc-800 text-white shadow-sm" 
                   : "text-zinc-400 hover:text-zinc-200"
@@ -328,7 +344,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             </button>
             <button
               onClick={() => { setMethod("otp"); setShowOtpInput(false); }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs md:text-sm font-medium rounded-md transition-all ${
                 method === "otp" 
                   ? "bg-zinc-800 text-white shadow-sm" 
                   : "text-zinc-400 hover:text-zinc-200"
@@ -340,7 +356,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
 
           {mode === "signup" && (
             <div className="space-y-1.5">
@@ -353,7 +369,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="!w-full bg-white/5 border border-white/10 !rounded-md !px-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
+                className="!w-full bg-white/5 border border-white/10 !rounded-md !px-4 !py-2.5 md:!py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light text-sm md:text-base"
                 placeholder="johndoe"
               />
             </div>
@@ -362,7 +378,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           <div className="space-y-1.5">
             <label htmlFor="email" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Email</label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-3.5 w-5 h-5 text-zinc-500" />
+              <Mail className="absolute left-3.5 top-2.5 md:top-3.5 w-5 h-5 text-zinc-500" />
               <input
                 type="email"
                 id="email"
@@ -371,7 +387,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value.toLowerCase())}
-                className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
+                className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-2.5 md:!py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light text-sm md:text-base"
                 placeholder="you@example.com"
                 data-1p-ignore
                 data-lpignore="true"
@@ -384,7 +400,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             <div className="space-y-1.5">
               <label htmlFor="password" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider ml-1">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-3.5 w-5 h-5 text-zinc-500" />
+                <Lock className="absolute left-3.5 top-2.5 md:top-3.5 w-5 h-5 text-zinc-500" />
                 <input
                   type="password"
                   id="password"
@@ -393,7 +409,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light"
+                  className="!w-full bg-white/5 border border-white/10 !rounded-md !pl-10 !pr-4 !py-2.5 md:!py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all font-light text-sm md:text-base"
                   placeholder="••••••••"
                 />
               </div>
@@ -416,7 +432,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                 required
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                className="!w-full bg-white/5 border border-white/10 !rounded-md !px-4 !py-3 text-white text-center tracking-[0.5em] font-mono text-lg placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all"
+                className="!w-full bg-white/5 border border-white/10 !rounded-md !px-4 !py-2.5 md:!py-3 text-white text-center tracking-[0.5em] font-mono text-lg placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all"
                 placeholder="000000"
                 maxLength={6}
               />
@@ -440,7 +456,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           <button
             type="submit"
             disabled={loading}
-            className="!w-full bg-red-600 hover:bg-red-700 text-white font-medium !py-3 !rounded-md transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            className="!w-full bg-red-600 hover:bg-red-700 text-white font-medium !py-2.5 md:!py-3 !rounded-md transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed mt-2"
 
 
           >
@@ -457,7 +473,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           </button>
         </form>
 
-        <div className="relative my-8 flex items-center gap-4">
+        <div className="relative my-6 md:my-8 flex items-center gap-4">
           <div className="h-px flex-1 bg-white/10" />
           <span className="text-xs uppercase text-zinc-500 font-medium bg-transparent">Or continue with</span>
           <div className="h-px flex-1 bg-white/10" />
@@ -465,12 +481,12 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
 
 
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5 md:gap-3">
           {providers.google && (
             <button
               type="button"
               onClick={() => handleSocialLogin("google")}
-              className="flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-100 !py-2.5 !rounded-md transition-colors font-medium text-sm !w-full"
+              className="flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-100 !py-2 md:!py-2.5 !rounded-md transition-colors font-medium text-sm !w-full"
             >
               <GoogleIcon />
               Google
@@ -480,7 +496,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             <button
              type="button"
               onClick={() => handleSocialLogin("github")}
-              className="flex items-center justify-center gap-2 bg-[#24292F] text-white hover:bg-[#2b3137] !py-2.5 !rounded-md transition-colors font-medium text-sm !w-full"
+              className="flex items-center justify-center gap-2 bg-[#24292F] text-white hover:bg-[#2b3137] !py-2 md:!py-2.5 !rounded-md transition-colors font-medium text-sm !w-full"
             >
               <GitHubIcon />
               GitHub
@@ -490,7 +506,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             <button
              type="button"
                onClick={() => handleSocialLogin("discord")}
-               className="flex items-center justify-center gap-2 bg-[#5865F2] text-white hover:bg-[#4752C4] !py-2.5 !rounded-md transition-colors font-medium text-sm !w-full"
+               className="flex items-center justify-center gap-2 bg-[#5865F2] text-white hover:bg-[#4752C4] !py-2 md:!py-2.5 !rounded-md transition-colors font-medium text-sm !w-full"
             >
               <DiscordIcon />
                Discord
@@ -500,7 +516,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         </div>
 
         
-        <div className="mt-8 text-center text-sm text-zinc-500">
+        <div className="mt-6 md:mt-8 text-center text-sm text-zinc-500">
           {mode === "signin" ? (
             <p>
               Don't have an account?{" "}
@@ -523,8 +539,6 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             </p>
           )}
           
-          {/* Change Server option for Tauri/mobile apps */}
-          <ServerConnectionIndicator variant="inline" />
         </div>
       </div>
     </div>

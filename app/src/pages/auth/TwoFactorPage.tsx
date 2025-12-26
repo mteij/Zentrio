@@ -94,19 +94,19 @@ export function TwoFactorPage() {
       <>
         <ParticleBackground />
         <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
-          <div className="w-full max-w-md">
-            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-              <button
-                onClick={() => setShowBackupCode(false)}
-                className="text-zinc-400 hover:text-white mb-4 flex items-center gap-2"
-              >
-                ← Back to code entry
-              </button>
+        <div className="w-full max-w-md">
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 transition-all duration-300">
+            <button
+              onClick={() => setShowBackupCode(false)}
+              className="text-zinc-400 hover:text-white mb-4 flex items-center gap-2"
+            >
+              ← Back to code entry
+            </button>
               
-              <h2 className="text-white text-xl font-semibold mb-2">Enter Backup Code</h2>
-              <p className="text-zinc-400 text-sm mb-6">
-                Enter one of your backup codes to verify your identity
-              </p>
+            <h2 className="text-white text-xl font-semibold mb-2">Enter Backup Code</h2>
+            <p className="text-zinc-400 text-sm mb-6">
+              Enter one of your backup codes to verify your identity
+            </p>
               
               {error && (
                 <p className="text-red-500 mb-4 text-sm">{error}</p>
@@ -169,7 +169,7 @@ export function TwoFactorPage() {
       <ParticleBackground />
       <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
         <div className="w-full max-w-md">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 transition-all duration-300">
             <TwoFactorModal
               onBack={handleBack}
               onSuccess={handleSuccess}

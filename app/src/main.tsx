@@ -7,7 +7,11 @@ import { Toaster } from 'sonner'
 import { ErrorBoundary, TitleBar } from './components'
 import { SplashScreen } from './components'
 import { ProtectedRoute, PublicRoute } from './components/auth/AuthGuards'
-import { isTauri, resetAuthClient } from './lib/auth-client'
+import { isTauri, resetAuthClient, authClient } from './lib/auth-client'
+import { listen } from '@tauri-apps/api/event'
+import { toast } from 'sonner'
+import { apiFetch } from './lib/apiFetch'
+import { useAuthStore } from './stores/authStore'
 import { useState, useEffect } from 'react'
 import { preloadCommonRoutes } from './utils/route-preloader'
 // Initialize toast bridge for legacy window.addToast calls
@@ -78,6 +82,58 @@ function AppRoutes() {
   useEffect(() => {
     console.log('AppRoutes: Location changed to', location.pathname)
   }, [location.pathname])
+
+  // Handle Deep Links (Magic Link)
+  useEffect(() => {
+    if (isTauri()) {
+      const unlistenPromise = listen('deep-link://new-url', async (event) => {
+        const url = event.payload as string
+        console.log('[App] Deep link received:', url)
+        
+        if (url.startsWith('zentrio://auth/magic-link') || url.includes('token=')) {
+          try {
+            // Parse url to get token
+            const urlObj = new URL(url)
+            const token = urlObj.searchParams.get('token')
+            
+            if (token) {
+              toast.info('Verifying magic link...')
+              
+              // We must manually call the verify endpoint because authClient.signIn.magicLink 
+              // targets the initiation endpoint.
+              // We add a safe callbackURL to ensure the server redirects to a valid HTTP/Path 
+              // that the fetch client can handle (avoiding 'zentrio://' redirect loop issues in fetch)
+              await apiFetch(`/api/auth/magic-link/verify?token=${token}&callbackURL=/profiles`)
+              
+              toast.success('Signed in successfully')
+              
+              // Refresh auth state and update store
+              const { data } = await authClient.getSession();
+              if (data?.user) {
+                 useAuthStore.getState().login(data.user);
+                 
+                 // Update app mode to exit onboarding
+                 appMode.set('connected');
+                 setMode('connected');
+                 
+                 // Ensure server URL is set (it should be from previous steps, or default)
+                 const currentServer = localStorage.getItem('zentrio_server_url') || 'https://app.zentrio.eu';
+                 setServerUrl(currentServer);
+              }
+              navigate('/profiles')
+            }
+          } catch (e) {
+            console.error('Failed to handle magic link', e)
+            toast.error('Failed to sign in with magic link')
+          }
+        }
+      })
+      
+      return () => {
+        unlistenPromise.then(unlisten => unlisten())
+      }
+    }
+  }, [navigate])
 
   // Handle onboarding completion
   const handleOnboardingComplete = (selectedMode: AppMode, selectedServerUrl?: string) => {

@@ -262,10 +262,7 @@ export function TitleBar() {
         
         .titlebar {
           height: 32px;
-          background: var(--glass-bg, rgba(20, 20, 20, 0.75));
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.15) 60%, transparent 100%);
           user-select: none;
           display: flex;
           align-items: center;
@@ -274,7 +271,11 @@ export function TitleBar() {
           left: 0;
           right: 0;
           z-index: 99999;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+          transition: background 0.3s ease;
+        }
+
+        .titlebar:hover {
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.2) 60%, transparent 100%);
         }
 
         /* Drag Region */
@@ -283,7 +284,8 @@ export function TitleBar() {
           height: 100%;
           display: flex;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
+          padding-left: 16px;
           -webkit-app-region: drag;
           app-region: drag;
         }
@@ -417,11 +419,6 @@ export function TitleBar() {
 
         .titlebar-controls-mac:hover .titlebar-button {
           filter: saturate(1);
-        }
-
-        /* Center title on macOS */
-        .titlebar-mac .titlebar-drag-region {
-          padding-right: 80px; /* Balance the left controls */
         }
       `}} />
     </>

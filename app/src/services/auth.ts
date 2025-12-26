@@ -98,7 +98,15 @@ export const auth = betterAuth({
         }),
         magicLink({
             sendMagicLink: async ({ email, token, url }, request) => {
-                await emailService.sendMagicLink(email, url);
+                let magicLinkUrl = url;
+                // Check if the callback URL is for Tauri (zentrio://)
+                // The url is typically: baseURL + /magic-link/verify?token=...&callbackURL=...
+                if (url.includes('callbackURL=zentrio')) {
+                    // We want to skip the browser verification and directly open the app
+                    // Construct the direct deep link with the token
+                    magicLinkUrl = `zentrio://auth/magic-link?token=${token}`;
+                }
+                await emailService.sendMagicLink(email, magicLinkUrl);
             }
         }),
         emailOTP({

@@ -150,7 +150,7 @@ export function EmailVerificationModal({
         <div className="relative">
           <input
             ref={inputRef}
-            className="w-full bg-black/20 border border-white/10 rounded-xl py-4 px-2 text-center font-mono text-3xl tracking-[0.5em] text-white focus:outline-none focus:border-[#e50914] focus:ring-1 focus:ring-[#e50914] transition-all placeholder:tracking-normal placeholder:text-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-black/20 border border-white/10 rounded-xl py-3 md:py-4 px-2 text-center font-mono text-2xl md:text-3xl tracking-[0.3em] md:tracking-[0.5em] text-white focus:outline-none focus:border-[#e50914] focus:ring-1 focus:ring-[#e50914] transition-all placeholder:tracking-normal placeholder:text-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
@@ -172,7 +172,7 @@ export function EmailVerificationModal({
           variant="cta"
           onClick={() => handleVerify()}
           disabled={code.length !== 6 || parentIsLoading || isVerifying}
-          className="w-full !py-3 text-base font-bold"
+          className="w-full !py-2.5 md:!py-3 text-base font-bold"
         >
           {isVerifying ? 'Verifying...' : 'Verify Email'}
         </Button>

@@ -29,8 +29,8 @@ export function AnimatedBackground({
       <div 
         className={`fixed inset-0 z-0 pointer-events-none ${className}`} 
         style={{ 
-          top: 'var(--titlebar-height, 0px)', 
-          height: 'var(--app-height, 100vh)', 
+          top: 0, 
+          height: '100vh', 
           background: fallbackColor || colors.primary 
         }}
       >
@@ -55,8 +55,8 @@ export function AnimatedBackground({
       <div
         className={`fixed inset-0 z-0 pointer-events-none ${className}`}
         style={{
-          top: 'var(--titlebar-height, 0px)',
-          height: 'var(--app-height, 100vh)',
+          top: 0,
+          height: '100vh',
           background: colors.primary,
         }}
       >

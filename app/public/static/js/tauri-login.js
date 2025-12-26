@@ -340,12 +340,17 @@
                 magicLinkBtn.disabled = true;
                 magicLinkBtn.textContent = 'Sending...';
                 
+                let callbackURL = window.location.origin;
+                if (window.__TAURI__) {
+                    callbackURL = 'zentrio://auth/magic-link';
+                }
+
                 const res = await fetch('/api/auth/sign-in/magic-link', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         email,
-                        callbackURL: window.location.origin,
+                        callbackURL,
                         rememberMe: getRememberPref()
                     })
                 });

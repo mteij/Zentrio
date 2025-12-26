@@ -389,27 +389,11 @@ function SetupSlide({ onComplete }: SetupSlideProps) {
             exit={{ opacity: 0, x: -50 }}
             className="w-full max-w-lg"
           >
-            {/* Back button */}
-            <motion.button
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              onClick={() => setStep('server')}
-              className="mb-4 text-zinc-500 hover:text-white text-sm flex items-center gap-1 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Change server
-            </motion.button>
+            {/* Back button - Removed as AuthForms has its own */}
             
-            {/* Server indicator */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center mb-4"
-            >
-              <span className="text-sm text-zinc-500">
-                Connected to <span className="text-zinc-300">{serverUrl.replace('https://', '')}</span>
-              </span>
-            </motion.div>
+            {/* Server indicator - Moved higher up or kept? */}
+            
+
             
             {/* Full AuthForms component - includes social login, magic link, OTP, etc. */}
             <AuthForms 
@@ -529,20 +513,22 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         </motion.button>
       )}
       
-      {/* Progress dots */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex gap-2">
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setCurrentSlide(i)}
-            className={`w-2 h-2 rounded-full transition-all ${
-              i === currentSlide 
-                ? 'w-8 bg-red-500' 
-                : 'bg-white/20 hover:bg-white/40'
-            }`}
-          />
-        ))}
-      </div>
+      {/* Progress dots - Hide on setup slide */}
+      {slide.type !== 'setup' && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex gap-2">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentSlide(i)}
+              className={`w-2 h-2 rounded-full transition-all ${
+                i === currentSlide 
+                  ? 'w-8 bg-red-500' 
+                  : 'bg-white/20 hover:bg-white/40'
+              }`}
+            />
+          ))}
+        </div>
+      )}
       
       {/* Slide content */}
       <AnimatePresence mode="wait">
