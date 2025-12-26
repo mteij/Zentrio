@@ -15,7 +15,7 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmailVerificationModal } from "./EmailVerificationModal";
 
-import { BackButton } from "../ui/BackButton";
+
 import { useLoginBehavior, getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
 import { useSessionDuration } from "../../hooks/useSessionDuration";
 import { useAuthStore } from "../../stores/authStore";
@@ -92,12 +92,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     }
   }, [resendSeconds]);
 
-  const handleChangeServer = () => {
-    localStorage.removeItem("zentrio_server_url");
-    localStorage.removeItem("zentrio_app_mode");
-    // Navigate to root to trigger server selector
-    window.location.href = '/';
-  };
+
 
   const handleSocialLogin = async (provider: "google" | "github" | "discord" | "oidc") => {
     try {
@@ -297,12 +292,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         </div>
       ) : (
     <div className="w-full max-w-lg mx-auto relative">
-      {/* Back Button for Tauri (Change Server) */}
-      {isTauri() && (
-        <div className="absolute -top-12 left-0 md:-left-12 md:top-6 z-20">
-             <BackButton onClick={handleChangeServer} label="Change Server" />
-        </div>
-      )}
+
 
       <div className="bg-black/40 backdrop-blur-md border border-white/10 !rounded-2xl !p-6 md:!p-10 shadow-2xl transition-all duration-300 relative">
 

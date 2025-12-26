@@ -10,6 +10,7 @@ import { resetAuthClient, isTauri, authClient } from '../../lib/auth-client';
 import { AuthForms } from '../auth/AuthForms';
 import { ParticleBackground } from '../ui/ParticleBackground';
 import { useAuthStore } from '../../stores/authStore';
+import { BackButton } from '../ui/BackButton';
 
 interface OnboardingWizardProps {
   onComplete: (mode: 'guest' | 'connected', serverUrl?: string) => void;
@@ -285,6 +286,15 @@ function SetupSlide({ onComplete }: SetupSlideProps) {
       setChecking(false);
     }
   };
+
+  const handleChangeServer = () => {
+    localStorage.removeItem("zentrio_server_url");
+    localStorage.removeItem("zentrio_app_mode");
+    // Go back to server selection
+    setStep('server');
+    setServerUrl('');
+    setCustomUrl('');
+  };
   
   const handleGuestMode = () => {
     appMode.set('guest');
@@ -396,6 +406,14 @@ function SetupSlide({ onComplete }: SetupSlideProps) {
 
             
             {/* Full AuthForms component - includes social login, magic link, OTP, etc. */}
+            
+            {/* Back Button (Change Server) */}
+            {isTauri() && (
+               <div className="absolute -top-12 left-0 md:-left-12 md:top-6 z-20">
+                    <BackButton onClick={handleChangeServer} label="Change Server" />
+               </div>
+            )}
+
             <AuthForms 
                 mode={authMode} 
                 onSuccess={() => {

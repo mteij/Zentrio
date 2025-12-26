@@ -1,8 +1,16 @@
 import { motion } from "framer-motion";
 import { AuthForms } from "../../components/auth/AuthForms";
 import { ParticleBackground } from "../../components/ui/ParticleBackground";
+import { isTauri } from "../../lib/auth-client";
+import { BackButton } from "../../components/ui/BackButton";
 
 export function SignUpPage() {
+  const handleChangeServer = () => {
+    localStorage.removeItem("zentrio_server_url");
+    localStorage.removeItem("zentrio_app_mode");
+    window.location.href = '/';
+  };
+
   return (
     <>
       <ParticleBackground />
@@ -12,8 +20,13 @@ export function SignUpPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-lg"
+          className="w-full max-w-lg relative"
         >
+          {isTauri() && (
+             <div className="absolute -top-12 left-0 md:-left-12 md:top-6 z-20">
+                  <BackButton onClick={handleChangeServer} label="Change Server" />
+             </div>
+          )}
           <AuthForms mode="signup" />
         </motion.div>
       </div>

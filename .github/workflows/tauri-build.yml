@@ -22,6 +22,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag_name: ${{ steps.version.outputs.tag_name }}
+      release_id: ${{ steps.get_release_id.outputs.release_id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -57,6 +58,16 @@ jobs:
               --title "Zentrio $TAG" \
               --notes "🚀 Release in progress... Build artifacts are being generated for all platforms (Windows, macOS, Linux, Android, iOS). This release will be updated automatically once all builds complete."
           fi
+
+      - name: Get Release ID
+        id: get_release_id
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          RELEASE_ID=$(gh release view "$TAG" --json databaseId -q .databaseId)
+          echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
+          echo "Got Release ID: $RELEASE_ID"
 
   build-tauri:
     needs: [create-release]
@@ -172,6 +183,7 @@ jobs:
         with:
           projectPath: ./app
           tagName: v__VERSION__
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
 
       # Android Build
