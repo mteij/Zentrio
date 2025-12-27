@@ -30,6 +30,29 @@ app.get('/', async (c) => {
   })
   return c.json(sanitizedProfiles)
 })
+
+app.get('/:id', async (c) => {
+  const user = c.get('user')
+  const isGuestMode = c.get('guestMode')
+  const profileId = parseInt(c.req.param('id'))
+  
+  const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+  if (!effectiveUser) {
+    return c.json({ error: 'User not found' }, 401)
+  }
+
+  const profile = profileDb.findById(profileId)
+  
+  if (!profile) {
+    return c.json({ error: 'Profile not found' }, 404)
+  }
+  
+  if (profile.user_id !== effectiveUser.id) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  return c.json(profile)
+})
  
  app.post('/', async (c) => {
    const user = c.get('user')

@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { TrendingUp, Play, Info } from 'lucide-react'
 import { MetaPreview } from '../../services/addons/types'
+import { useAutoPlay } from '../../hooks/useAutoPlay'
+import { getPackId } from '../../services/addons/stream-service'
 import styles from '../../styles/Streaming.module.css'
 
 interface HeroProps {
@@ -15,6 +17,7 @@ interface HeroProps {
 
 export const Hero = ({ items, profileId, showTrending = false, storageKey = 'heroFeaturedIndex' }: HeroProps) => {
   const navigate = useNavigate()
+  const { startAutoPlay } = useAutoPlay()
   // State for cycling through featured items
   // Initialize from sessionStorage or use a placeholder (-1 means "needs initialization")
   const [featuredIndex, setFeaturedIndex] = useState(() => {
@@ -99,17 +102,25 @@ export const Hero = ({ items, profileId, showTrending = false, storageKey = 'her
 
   const handlePlay = (e: React.MouseEvent) => {
     e.preventDefault()
-    if (!showTrending && (featuredItem as any).lastStream) {
-        // It's a continue watching item with a stream state
-        navigate(`/streaming/${profileId}/player`, { 
-            state: { 
-                stream: (featuredItem as any).lastStream,
-                meta: { id: itemId, type: itemType, name: itemTitle, poster: itemPoster, season: (featuredItem as any).season, episode: (featuredItem as any).episode }
-            }
-        })
-    } else {
-        navigate(`/streaming/${profileId}/${itemType}/${itemId}`)
-    }
+    
+    const season = (featuredItem as any).season
+    const episode = (featuredItem as any).episode
+    const lastStream = (featuredItem as any).lastStream
+    
+    // Use unified auto-play hook with pack matching
+    startAutoPlay({
+      profileId,
+      meta: {
+        id: itemId,
+        type: itemType,
+        name: itemTitle,
+        poster: itemPoster
+      },
+      season,
+      episode,
+      lastStream,
+      preferredPackId: lastStream ? getPackId(lastStream) : null
+    })
   }
 
   // Calculate rank for interlaced lists (count items of same type up to current index)

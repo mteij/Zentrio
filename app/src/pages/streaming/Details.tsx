@@ -1,13 +1,17 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { Play, Plus, Check, ArrowLeft, Zap, HardDrive, Wifi, Eye, EyeOff, MoreVertical, ChevronUp } from 'lucide-react'
 
 import { Layout, LazyImage, RatingBadge, SkeletonDetails, SkeletonStreamList } from '../../components'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { ContextMenu } from '../../components/ui/ContextMenu'
+import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
+import { CompactStreamItem } from '../../components/features/CompactStreamItem'
 import { MetaDetail, Stream, Manifest } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import { useStreamLoader, FlatStream, AddonLoadingState } from '../../hooks/useStreamLoader'
+import { useStreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
+import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
@@ -36,7 +40,9 @@ interface StreamingDetailsData {
 export const StreamingDetails = () => {
   const { profileId, type, id } = useParams<{ profileId: string, type: string, id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
+  const streamDisplaySettings = useStreamDisplaySettings(profileId)
   const [data, setData] = useState<StreamingDetailsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -55,7 +61,9 @@ export const StreamingDetails = () => {
     isLoading: streamsLoading,
     isComplete: streamsComplete,
     totalCount,
+    cacheStatus,
     loadStreams: loadStreamsProgressive,
+    refreshStreams,
     reset: resetStreams
   } = useStreamLoader()
 
@@ -84,7 +92,7 @@ export const StreamingDetails = () => {
       const detailsData = await res.json()
       setData(detailsData)
       
-      if (detailsData.meta.type === 'series' && detailsData.meta.videos) {
+        if (detailsData.meta.type === 'series' && detailsData.meta.videos) {
         const seasons = Array.from(new Set(detailsData.meta.videos.map((v: any) => v.season || 0))).sort((a: any, b: any) => a - b) as number[]
         const filteredSeasons = seasons.length > 1 ? seasons.filter((s: number) => s !== 0) : seasons
         
@@ -97,11 +105,50 @@ export const StreamingDetails = () => {
           }
         }
         
-        setSelectedSeason(initialSeason)
-        setView('episodes')
+        // Check for auto-play intent
+        const shouldAutoPlay = location.state?.autoPlay
+        
+        if (shouldAutoPlay) {
+            // Clear autoPlay intent to prevent loop on back navigation
+            navigate('.', { replace: true, state: { ...location.state, autoPlay: false } })
+
+            // Determine episode to play
+            let targetSeason = location.state?.season || initialSeason
+            let targetEpisode = location.state?.episode
+            
+            // If explicit episode not provided, try to find next to watch or first
+            if (!targetEpisode) {
+                if (detailsData.lastWatchedEpisode) {
+                     // TODO: Logic to Increment? For now rely on state or default 1
+                     targetEpisode = detailsData.lastWatchedEpisode.episode
+                } else {
+                    targetEpisode = 1
+                }
+            }
+
+            toast.loading(`Finding best stream for S${targetSeason}:E${targetEpisode}...`, { id: 'autoplay-loading' })
+            setSelectedSeason(targetSeason)
+            setSelectedEpisode({ season: targetSeason, number: targetEpisode, title: location.state?.title || `Episode ${targetEpisode}` })
+            loadStreams(targetSeason, targetEpisode, undefined, true)
+            // Keep view on details (background loading)
+        } else {
+            setSelectedSeason(initialSeason)
+            setView('episodes')
+        }
+
       } else {
-        loadStreams(undefined, undefined, detailsData.meta.imdb_id || id)
-        setView('streams')
+        // Movie
+        const shouldAutoPlay = location.state?.autoPlay
+        
+        if (shouldAutoPlay) {
+            navigate('.', { replace: true, state: { ...location.state, autoPlay: false } })
+            toast.loading(`Finding best stream...`, { id: 'autoplay-loading' })
+            loadStreams(undefined, undefined, detailsData.meta.imdb_id || id, true)
+            // Keep view on details
+        } else {
+            loadStreams(undefined, undefined, detailsData.meta.imdb_id || id)
+            setView('streams')
+        }
       }
     } catch (err) {
       console.error(err)
@@ -130,13 +177,22 @@ export const StreamingDetails = () => {
   }
   
   // Handle auto-play when streams arrive
+  // Handle auto-play when streams arrive
   useEffect(() => {
     if (autoPlayRef.current && streams.length > 0) {
+      toast.dismiss('autoplay-loading')
       // streams is now a flat sorted list (FlatStream[])
-      handlePlay(streams[0].stream)
+      // Pass true to replace history (skip details page on back)
+      handlePlay(streams[0].stream, true)
       autoPlayRef.current = false
+    } else if (autoPlayRef.current && streamsComplete && streams.length === 0) {
+        // Fallback if no streams found
+        toast.dismiss('autoplay-loading')
+        toast.error('No auto-play streams found. Please select manually.')
+        setView('streams')
+        autoPlayRef.current = false
     }
-  }, [streams])
+  }, [streams, streamsComplete])
 
   // filteredStreams comes from hook - already sorted by backend sortIndex
   // totalStreamCount is now based on totalCount from hook
@@ -188,13 +244,42 @@ export const StreamingDetails = () => {
   const totalStreamCount = totalCount
 
 
+  // Quick play for episodes - uses unified auto-play hook
+  const { startAutoPlay } = useAutoPlay()
+  
   const handleQuickPlay = (season: number, number: number, title: string) => {
-    setSelectedEpisode({ season, number, title })
-    toast.loading(`Loading S${season}:E${number}...`, { id: 'stream-load' })
-    loadStreams(season, number, undefined, true)
+    if (!data) return
+    
+    // Use unified auto-play hook for background stream fetching
+    startAutoPlay({
+      profileId: profileId || '',
+      meta: {
+        id: data.meta.id,
+        type: data.meta.type,
+        name: data.meta.name,
+        poster: data.meta.poster
+      },
+      season,
+      episode: number
+    })
+  }
+  
+  // Movie auto-play handler
+  const handleMoviePlay = () => {
+    if (!data || !profileId) return
+    
+    startAutoPlay({
+      profileId,
+      meta: {
+        id: data.meta.id,
+        type: data.meta.type,
+        name: data.meta.name,
+        poster: data.meta.poster
+      }
+    })
   }
 
-  const handlePlay = (stream: Stream) => {
+  const handlePlay = (stream: Stream, replaceHistory = false) => {
     const meta = {
       id: data!.meta.id,
       type: data!.meta.type,
@@ -203,7 +288,7 @@ export const StreamingDetails = () => {
       season: selectedEpisode?.season,
       episode: selectedEpisode?.number
     }
-    navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`)
+    navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`, { replace: replaceHistory })
   }
 
   const handleEpisodeSelect = (season: number, number: number, title: string, autoPlay: boolean = false) => {
@@ -517,7 +602,7 @@ export const StreamingDetails = () => {
 
                 <div className={styles.detailsActions}>
                   {meta.type === 'movie' && (
-                      <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={() => loadStreams(undefined, undefined, undefined, true)}>
+                      <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={handleMoviePlay}>
                         <Play size={20} fill="currentColor" />
                         Play
                       </button>
@@ -754,7 +839,7 @@ export const StreamingDetails = () => {
                             background: 'rgba(255, 255, 255, 0.05)',
                             borderRadius: '8px'
                         }}>
-                            {/* Top row: Play Best button + total count */}
+                            {/* Top row: Play Best button + source count + refresh */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     {meta.type === 'series' && filteredStreams && filteredStreams.length > 0 && (
@@ -771,6 +856,12 @@ export const StreamingDetails = () => {
                                         {totalStreamCount > 0 ? `${totalStreamCount} sources` : streamsLoading ? 'Loading...' : 'No sources found'}
                                     </span>
                                 </div>
+                                {/* Refresh button */}
+                                <StreamRefreshButton
+                                    onRefresh={refreshStreams}
+                                    isLoading={streamsLoading}
+                                    cacheAgeMs={cacheStatus?.cacheAgeMs}
+                                />
                             </div>
                             
                             {/* Addon status chips - clickable to filter */}
@@ -834,56 +925,76 @@ export const StreamingDetails = () => {
                     {streamsLoading && streams.length === 0 ? (
                         <SkeletonStreamList />
                     ) : filteredStreams && filteredStreams.length > 0 ? (
-                        /* Flat sorted list when "All Sources" is selected */
+                        /* Render based on displayMode setting */
                         <div className="streams-list-wrapper">
-                            <div className={styles.streamList}>
-                                {filteredStreams.map(({ stream, addon }, idx) => {
-                                    const info = parseStreamInfo(stream)
-                                    return (
-                                        <div
+                            <div className={styles.streamList} style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: streamDisplaySettings.streamDisplayMode === 'classic' ? '12px' : '6px'
+                            }}>
+                                {streamDisplaySettings.streamDisplayMode !== 'classic' ? (
+                                    /* Compact modes - tag-based display */
+                                    filteredStreams.map((item, idx) => (
+                                        <CompactStreamItem
                                             key={idx}
-                                            className={`${styles.streamItem} ${info.isCached ? styles.streamCached : ''}`}
-                                            onClick={() => handlePlay(stream)}
-                                        >
-                                            <div className={styles.streamHeader}>
-                                                <div className={styles.streamName}>
-                                                    {stream.title || stream.name || `Stream ${idx + 1}`}
+                                            item={item}
+                                            onClick={() => handlePlay(item.stream)}
+                                            index={idx}
+                                            showAddonName={streamDisplaySettings.showAddonName}
+                                            mode={streamDisplaySettings.streamDisplayMode === 'compact-advanced' ? 'advanced' : 'simple'}
+                                        />
+                                    ))
+                                ) : (
+                                    /* Classic mode - addon title + description */
+                                    filteredStreams.map(({ stream, addon }, idx) => {
+                                        const info = parseStreamInfo(stream)
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className={`${styles.streamItem} ${info.isCached ? styles.streamCached : ''}`}
+                                                onClick={() => handlePlay(stream)}
+                                            >
+                                                <div className={styles.streamHeader}>
+                                                    <div className={styles.streamName}>
+                                                        {stream.title || stream.name || `Stream ${idx + 1}`}
+                                                    </div>
+                                                    <div className={styles.streamBadges}>
+                                                        {streamDisplaySettings.showAddonName && (
+                                                            <span className={styles.streamBadge} style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.7rem' }}>
+                                                                {addon.name}
+                                                            </span>
+                                                        )}
+                                                        {info.isCached && (
+                                                            <span className={`${styles.streamBadge} ${styles.badgeCached}`} title="Cached">
+                                                                <Zap size={12} />
+                                                            </span>
+                                                        )}
+                                                        {info.resolution && (
+                                                            <span className={`${styles.streamBadge} ${styles.badgeResolution}`}>
+                                                                {info.resolution}
+                                                            </span>
+                                                        )}
+                                                        {info.size && (
+                                                            <span className={`${styles.streamBadge} ${styles.badgeSize}`}>
+                                                                <HardDrive size={10} />
+                                                                {info.size}
+                                                            </span>
+                                                        )}
+                                                        {info.hasHDR && (
+                                                            <span className={`${styles.streamBadge} ${styles.badgeHDR}`}>HDR</span>
+                                                        )}
+                                                        {info.hasDV && (
+                                                            <span className={`${styles.streamBadge} ${styles.badgeDV}`}>DV</span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className={styles.streamBadges}>
-                                                    {/* Addon badge */}
-                                                    <span className={styles.streamBadge} style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.7rem' }}>
-                                                        {addon.name}
-                                                    </span>
-                                                    {info.isCached && (
-                                                        <span className={`${styles.streamBadge} ${styles.badgeCached}`} title="Cached">
-                                                            <Zap size={12} />
-                                                        </span>
-                                                    )}
-                                                    {info.resolution && (
-                                                        <span className={`${styles.streamBadge} ${styles.badgeResolution}`}>
-                                                            {info.resolution}
-                                                        </span>
-                                                    )}
-                                                    {info.size && (
-                                                        <span className={`${styles.streamBadge} ${styles.badgeSize}`}>
-                                                            <HardDrive size={10} />
-                                                            {info.size}
-                                                        </span>
-                                                    )}
-                                                    {info.hasHDR && (
-                                                        <span className={`${styles.streamBadge} ${styles.badgeHDR}`}>HDR</span>
-                                                    )}
-                                                    {info.hasDV && (
-                                                        <span className={`${styles.streamBadge} ${styles.badgeDV}`}>DV</span>
-                                                    )}
-                                                </div>
+                                                {streamDisplaySettings.showDescription && stream.description && (
+                                                    <div className={styles.streamDetails}>{stream.description}</div>
+                                                )}
                                             </div>
-                                            {stream.description && (
-                                                <div className={styles.streamDetails}>{stream.description}</div>
-                                            )}
-                                        </div>
-                                    )
-                                })}
+                                        )
+                                    })
+                                )}
                             </div>
                         </div>
                     ) : !streamsLoading ? (

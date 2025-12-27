@@ -87,50 +87,63 @@ export const StreamingLibrary = () => {
       navigate('/profiles')
       return
     }
-    loadLibrary()
+    
+    const controller = new AbortController()
+    loadLibrary(controller.signal)
+    
+    return () => {
+        controller.abort()
+    }
   }, [profileId])
 
   useEffect(() => {
-    // When listId changes in URL, update active list
+    // When listId changes in URL, or lists are loaded, update active list and items
+    let controller: AbortController | null = null
+
     if (listId && !loading) {
       const id = parseInt(listId)
       const found = myLists.find(l => l.id === id) ||
         accountSharedLists.find(l => l.id === id) ||
         profileSharedLists.find(l => l.id === id)
+      
       if (found) {
-        setActiveList(found)
-        loadItems(id)
+        if (activeList?.id !== found.id) {
+            setActiveList(found)
+        }
+        
+        // Always load items for the current list ID when it changes or lists are ready
+        // We use a controller to cancel previous requests if rapid switching occurs
+        controller = new AbortController()
+        loadItems(id, controller.signal)
       }
+    }
+
+    return () => {
+        controller?.abort()
     }
   }, [listId, myLists, accountSharedLists, profileSharedLists, loading])
 
-  const loadLibrary = async () => {
+  const loadLibrary = async (signal?: AbortSignal) => {
     setLoading(true)
     try {
-      // Fetch own lists
-      const listsRes = await apiFetch(`/api/lists?profileId=${profileId}`)
-      const listsData = await listsRes.json()
+      const [listsRes, sharedRes, profileSharedRes, pendingRes, availableRes] = await Promise.all([
+          apiFetch(`/api/lists?profileId=${profileId}`, { signal }),
+          apiFetch(`/api/lists/shared-for-profile/${profileId}`, { signal }),
+          apiFetch(`/api/lists/profile-shared/${profileId}`, { signal }),
+          apiFetch('/api/lists/pending-invites', { signal }),
+          apiFetch(`/api/lists/available-from-other-profiles/${profileId}`, { signal })
+      ])
       
-      // Fetch account-shared lists for this profile
-      const sharedRes = await apiFetch(`/api/lists/shared-for-profile/${profileId}`)
-      const sharedData = await sharedRes.json()
-      const sharedListsData = sharedData.lists || []
+      const [listsData, sharedData, profileSharedData, pendingData, availableData] = await Promise.all([
+          listsRes.json(),
+          sharedRes.json(),
+          profileSharedRes.json(),
+          pendingRes.json(),
+          availableRes.json()
+      ])
       
-      // Fetch profile-shared lists (within same account)
-      const profileSharedRes = await apiFetch(`/api/lists/profile-shared/${profileId}`)
-      const profileSharedData = await profileSharedRes.json()
-      const profileSharedData2 = profileSharedData.lists || []
-      
-      // Fetch pending invites
-      const pendingRes = await apiFetch('/api/lists/pending-invites')
-      const pendingData = await pendingRes.json()
-      setPendingInvites(pendingData.invites || [])
-      
-      // Fetch available shares from other profiles
-      const availableRes = await apiFetch(`/api/lists/available-from-other-profiles/${profileId}`)
-      const availableData = await availableRes.json()
-      setAvailableFromOtherProfiles(availableData.lists || [])
-      
+      if (signal?.aborted) return
+
       let ownLists = listsData.lists || []
       
       if (ownLists.length === 0) {
@@ -138,7 +151,8 @@ export const StreamingLibrary = () => {
         const createRes = await apiFetch('/api/lists', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profileId, name: 'My Library' })
+            body: JSON.stringify({ profileId, name: 'My Library' }),
+            signal
         })
         const createData = await createRes.json()
         if (createData.list) {
@@ -146,9 +160,14 @@ export const StreamingLibrary = () => {
         }
       }
       
+      const newAccountSharedLists = (sharedData.lists || []).filter((l: SharedList) => l.isLinkedToThisProfile);
+      const newProfileSharedLists = profileSharedData.lists || [];
+      
+      setPendingInvites(pendingData.invites || [])
+      setAvailableFromOtherProfiles(availableData.lists || [])
       setMyLists(ownLists)
-      setAccountSharedLists(sharedListsData.filter((l: SharedList) => l.isLinkedToThisProfile))
-      setProfileSharedLists(profileSharedData2)
+      setAccountSharedLists(newAccountSharedLists)
+      setProfileSharedLists(newProfileSharedLists)
       
       // Determine active list from URL or default
       let currentList: List | SharedList | ProfileSharedList | null = null
@@ -156,8 +175,8 @@ export const StreamingLibrary = () => {
       if (listId) {
         const id = parseInt(listId)
         currentList = ownLists.find((l: List) => l.id === id) ||
-          sharedListsData.find((l: SharedList) => l.id === id) ||
-          profileSharedData2.find((l: ProfileSharedList) => l.id === id) ||
+          newAccountSharedLists.find((l: SharedList) => l.id === id) ||
+          newProfileSharedLists.find((l: ProfileSharedList) => l.id === id) ||
           null
       }
       
@@ -165,37 +184,49 @@ export const StreamingLibrary = () => {
         currentList = ownLists[0]
       }
       
-      setActiveList(currentList)
-      
-      // Fetch items for active list
-      if (currentList?.id) {
-        loadItems(currentList.id)
-      } else {
-        setItems([])
+      if (currentList) {
+          setActiveList(currentList)
+          // Only load items here if we don't have a listId in URL (default list case)
+          // If we DO have listId, the useEffect will handle it when loading becomes false
+          if (!listId && currentList.id) {
+            loadItems(currentList.id, signal)
+          } else if (!currentList.id) {
+            setItems([])
+          }
       }
-    } catch (err) {
-      console.error(err)
-      setError('Failed to load library')
+      
+    } catch (err: any) {
+      if (err.name !== 'AbortError' && err.message !== 'Request cancelled' && !signal?.aborted) {
+          console.error(err)
+          setError('Failed to load library')
+      }
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) {
+          setLoading(false)
+      }
     }
   }
 
-  const loadItems = async (lid: number) => {
+  const loadItems = async (lid: number, signal?: AbortSignal) => {
     try {
-      const itemsRes = await apiFetch(`/api/lists/${lid}/items?profileId=${profileId}`)
+      const itemsRes = await apiFetch(`/api/lists/${lid}/items?profileId=${profileId}`, { signal })
       const itemsData = await itemsRes.json()
-      setItems(itemsData.items || [])
-    } catch (err) {
-      console.error(err)
-      setItems([])
+      if (!signal?.aborted) {
+        setItems(itemsData.items || [])
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError' && err.message !== 'Request cancelled' && !signal?.aborted) {
+          console.error(err)
+          setItems([])
+      }
     }
   }
 
-  const handleListClick = async (list: List | SharedList | ProfileSharedList) => {
-    setActiveList(list)
-    navigate(`/streaming/${profileId}/library/${list.id}`, { replace: true })
-    await loadItems(list.id)
+  const handleListClick = (list: List | SharedList | ProfileSharedList) => {
+    // Just navigate, let useEffect handle state update and fetching
+    if (activeList?.id !== list.id) {
+        navigate(`/streaming/${profileId}/library/${list.id}`, { replace: true })
+    }
   }
 
   const handleCreateList = async () => {

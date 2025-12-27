@@ -3,6 +3,7 @@ import { addonManager } from '../../services/addons/addon-manager'
 import { streamDb, watchHistoryDb, profileDb, addonDb, listDb, userDb, type User } from '../../services/database'
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { ok, err } from '../../utils/api'
+import { streamCache, StreamCache } from '../../services/addons/stream-cache'
 
 const streaming = new Hono<{
   Variables: {
@@ -187,7 +188,7 @@ streaming.get('/streams/:type/:id', async (c) => {
  */
 streaming.get('/streams-live/:type/:id', async (c) => {
   const { type, id } = c.req.param()
-  const { profileId, season, episode } = c.req.query()
+  const { profileId, season, episode, refresh } = c.req.query()
   const userAgent = c.req.header('user-agent') || ''
   const isApp = userAgent.includes('Tauri') || userAgent.includes('Capacitor') || userAgent.includes('ZentrioApp')
   const platform = isApp ? 'app' : 'web'
@@ -201,6 +202,21 @@ streaming.get('/streams-live/:type/:id', async (c) => {
   // Get stream processor settings for this profile
   const settingsProfileId = profileDb.getSettingsProfileId(parseInt(profileId))
   const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined
+  
+  // Build cache key
+  const cacheKey = StreamCache.buildKey(
+    type, 
+    id, 
+    parseInt(profileId), 
+    season ? parseInt(season) : undefined, 
+    episode ? parseInt(episode) : undefined
+  )
+  
+  // Check cache unless refresh=true
+  const forceRefresh = refresh === 'true'
+  if (forceRefresh) {
+    streamCache.invalidate(cacheKey)
+  }
 
   // Create a streaming response
   const stream = new ReadableStream({
@@ -208,24 +224,11 @@ streaming.get('/streams-live/:type/:id', async (c) => {
       const encoder = new TextEncoder()
       let isClosed = false
       
-      // Collect all raw results as they come in
-      const rawResults: { addon: { id: string, name: string, logo?: string }, streams: any[] }[] = []
-      
-      // Meta for processing
-      let meta: any = null
-      try {
-        meta = await addonManager.getMeta(type, id, parseInt(profileId))
-      } catch (e) {
-        // Fallback minimal meta
-        meta = { id, type, name: 'Unknown' }
-      }
-      
       const sendEvent = (event: string, data: any) => {
         if (isClosed) return
         try {
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
         } catch (e) {
-          // Stream might be closed
           isClosed = true
         }
       }
@@ -239,6 +242,35 @@ streaming.get('/streams-live/:type/:id', async (c) => {
           // Already closed
         }
       }
+      
+      // Check for cached results first
+      const cached = streamCache.get(cacheKey)
+      if (cached && cached.isComplete) {
+        const cacheAge = streamCache.getAge(cacheKey) || 0
+        sendEvent('cache-status', { fromCache: true, cacheAgeMs: cacheAge })
+        sendEvent('complete', {
+          allStreams: cached.streams,
+          totalCount: cached.streams.length,
+          fromCache: true
+        })
+        closeController()
+        return
+      }
+      
+      // Collect all raw results as they come in
+      const rawResults: { addon: { id: string, name: string, logo?: string }, streams: any[] }[] = []
+      
+      // Meta for processing
+      let meta: any = null
+      try {
+        meta = await addonManager.getMeta(type, id, parseInt(profileId))
+      } catch (e) {
+        // Fallback minimal meta
+        meta = { id, type, name: 'Unknown' }
+      }
+      
+      // Send cache-status event for fresh fetch
+      sendEvent('cache-status', { fromCache: false, cacheAgeMs: 0 })
       
       // Process all collected streams using StreamProcessor
       const processStreams = () => {
@@ -272,13 +304,25 @@ streaming.get('/streams-live/:type/:id', async (c) => {
         // Process through StreamProcessor (filter, sort, dedupe, limit)
         const processed = processor.process(flatStreams, meta)
         
-        // Assign sortIndex and format for frontend
+        // Assign sortIndex and format for frontend with parsed metadata
         return processed.map((p: any, index: number) => {
           if (!p.original.behaviorHints) p.original.behaviorHints = {}
           p.original.behaviorHints.sortIndex = index
           return {
             stream: p.original,
-            addon: { id: p.addon.id, name: p.addon.name, logo: p.addon.logo || p.addon.logo_url }
+            addon: { id: p.addon.id, name: p.addon.name, logo: p.addon.logo || p.addon.logo_url },
+            parsed: {
+              resolution: p.parsed.resolution,
+              encode: p.parsed.encode,
+              audioTags: p.parsed.audioTags,
+              audioChannels: p.parsed.audioChannels,
+              visualTags: p.parsed.visualTags,
+              sourceType: p.parsed.sourceType,
+              seeders: p.parsed.seeders,
+              size: p.parsed.size,
+              languages: p.parsed.languages,
+              isCached: p.parsed.isCached
+            }
           }
         })
       }
@@ -325,9 +369,19 @@ streaming.get('/streams-live/:type/:id', async (c) => {
 
         // All addons finished - send final processed list
         const finalStreams = processStreams()
+        
+        // Store in cache
+        streamCache.set(
+          cacheKey, 
+          finalStreams, 
+          true, 
+          rawResults.map(r => r.addon.id)
+        )
+        
         sendEvent('complete', { 
           allStreams: finalStreams,
-          totalCount: finalStreams.length
+          totalCount: finalStreams.length,
+          fromCache: false
         })
         closeController()
       } catch (e) {

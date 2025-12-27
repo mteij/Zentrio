@@ -10,6 +10,7 @@ const DEFAULT_TMDB_ADDON = 'zentrio://tmdb-addon'
 
 export class AddonManager {
   private clientCache = new Map<string, AddonClient>()
+  private idResolutionCache = new Map<string, string>() // Cache for IMDB -> TMDB ID resolution
 
   private normalizeUrl(url: string): string {
     if (url.endsWith('manifest.json')) {
@@ -111,7 +112,7 @@ export class AddonManager {
     }
 
     const addons = addonDb.getEnabledForProfile(settingsProfileId)
-    console.log(`[AddonManager] Found ${addons.length} enabled addons for profile ${profileId} (settings: ${settingsProfileId}):`, addons.map(a => a.name))
+    // console.log(`[AddonManager] Found ${addons.length} enabled addons for profile ${profileId} (settings: ${settingsProfileId}):`, addons.map(a => a.name))
     
     // If no addons enabled, check if we should enable default for this profile automatically
     if (addons.length === 0) {
@@ -185,61 +186,77 @@ export class AddonManager {
     const tmdbClient = profile?.user_id ? await tmdbService.getClient(profile.user_id) : null
     const hasTmdbKey = !!tmdbClient
 
-    for (const client of clients) {
-      if (!client.manifest) continue
-      for (const cat of client.manifest.catalogs) {
+    const fetchCatalog = async (client: AddonClient, cat: any) => {
         try {
-          if (cat.extra?.some(e => e.isRequired)) continue
-          
-          const settingsProfileId = profileDb.getSettingsProfileId(profileId);
-          const { appearanceDb } = require('../database');
-          const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
-          const config = {
-              enableAgeRating: appearance ? appearance.show_age_ratings : true,
-              showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
-          };
+            if (cat.extra?.some((e: any) => e.isRequired)) return null
 
-          let items = await client.getCatalog(cat.type, cat.id, {}, config)
-          const parentalSettings = this.getParentalSettings(profileId);
-          let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id);
-          
-          // Row filling logic: if not enough items, fetch more
-          if (parentalSettings.enabled && filteredItems.length < 20 && items.length > 0) {
-              let currentSkip = items.length; // Start skipping what we just fetched
-              let attempts = 0;
-              const maxAttempts = 3; // Prevent infinite loops
-              
-              while (filteredItems.length < 20 && attempts < maxAttempts) {
-                  try {
-                      // Some addons rely on 'skip', others might ignore it. 
-                      // For standard Stremio addons, skip should work.
-                      const nextItems = await client.getCatalog(cat.type, cat.id, { skip: currentSkip.toString() }, config);
-                      if (!nextItems || nextItems.length === 0) break;
-                      
-                      const nextFiltered = await this.filterContent(nextItems, parentalSettings, profile?.user_id);
-                      filteredItems = [...filteredItems, ...nextFiltered];
-                      currentSkip += nextItems.length;
-                      attempts++;
-                      
-                      // Safety break if we aren't getting anything new (infinite loop of same items?)
-                      // Standard addons shouldn't return same items for different skip, but who knows.
-                  } catch (e) {
-                      break; // Stop on error
-                  }
-              }
-          }
+            const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+            const { appearanceDb } = require('../database');
+            const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+            const config = {
+                enableAgeRating: appearance ? appearance.show_age_ratings : true,
+                showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+            };
 
-          results.push({
-            addon: client.manifest,
-            manifestUrl: client.manifestUrl,
-            catalog: cat,
-            items: filteredItems
-          })
+            let items = await client.getCatalog(cat.type, cat.id, {}, config)
+            const parentalSettings = this.getParentalSettings(profileId);
+            let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id);
+
+            // Row filling logic: if not enough items, fetch more
+            if (parentalSettings.enabled && filteredItems.length < 20 && items.length > 0) {
+                let currentSkip = items.length; // Start skipping what we just fetched
+                let attempts = 0;
+                const maxAttempts = 3; // Prevent infinite loops
+
+                while (filteredItems.length < 20 && attempts < maxAttempts) {
+                    try {
+                        // Some addons rely on 'skip', others might ignore it. 
+                        // For standard Stremio addons, skip should work.
+                        const nextItems = await client.getCatalog(cat.type, cat.id, { skip: currentSkip.toString() }, config);
+                        if (!nextItems || nextItems.length === 0) break;
+
+                        const nextFiltered = await this.filterContent(nextItems, parentalSettings, profile?.user_id);
+                        filteredItems = [...filteredItems, ...nextFiltered];
+                        currentSkip += nextItems.length;
+                        attempts++;
+
+                        // Safety break if we aren't getting anything new (infinite loop of same items?)
+                        // Standard addons shouldn't return same items for different skip, but who knows.
+                    } catch (e) {
+                        break; // Stop on error
+                    }
+                }
+            }
+
+            return {
+                addon: client.manifest!,
+                manifestUrl: client.manifestUrl,
+                catalog: cat,
+                items: filteredItems
+            }
         } catch (e) {
-          console.warn(`Failed to fetch catalog ${cat.id} from ${client.manifest.name}`, e)
+            console.warn(`Failed to fetch catalog ${cat.id} from ${client.manifest!.name}`, e)
+            return null
         }
-      }
     }
+
+    // Parallelize catalog fetching across all clients and catalogs
+    const promises: Promise<any>[] = []
+    
+    for (const client of clients) {
+        if (!client.manifest) continue
+        for (const cat of client.manifest.catalogs) {
+             const p = fetchCatalog(client, cat);
+             promises.push(p);
+        }
+    }
+    
+    const fetchedResults = await Promise.all(promises);
+    
+    // Filter out nulls
+    fetchedResults.forEach(r => {
+        if (r) results.push(r);
+    });
 
     // Sort results to prioritize Zentrio (TMDB) addon
     results.sort((a, b) => {
@@ -429,28 +446,41 @@ export class AddonManager {
     }
 
     // 3. Fallback to any client (old behavior)
-    for (const client of clients) {
-      if (!client.manifest) continue
-      try {
-        const cat = client.manifest.catalogs[0]
-        if (cat) {
-          const { appearanceDb } = require('../database');
-          const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
-          const config = {
-              enableAgeRating: appearance ? appearance.show_age_ratings : true,
-              showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
-          };
-
-          const items = await client.getCatalog(cat.type, cat.id, {}, config)
-          if (items && items.length > 0) {
-            const filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
-            const enriched = await this.enrichContent(filtered, profileId);
-            return enriched.slice(0, 10)
-          }
+    // 3. Fallback to any client (old behavior) - parallelized
+    const promises = clients.map(async (client) => {
+        if (!client.manifest) return null;
+        try {
+            const cat = client.manifest.catalogs[0]
+            if (cat) {
+              const { appearanceDb } = require('../database');
+              const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+              const config = {
+                  enableAgeRating: appearance ? appearance.show_age_ratings : true,
+                  showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+              };
+    
+              const items = await client.getCatalog(cat.type, cat.id, {}, config)
+              if (items && items.length > 0) {
+                const filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
+                // Note: enrichment here is fine as we only return one result set in the end
+                // But we are doing this for ALL clients concurrently, which is hefty but fast.
+                return filtered; // Defer enrichment until we pick one
+              }
+            }
+        } catch (e) {
+            // ignore
         }
-      } catch (e) {
-        // ignore
-      }
+        return null;
+    });
+
+    const allResults = await Promise.all(promises);
+    
+    // Find first valid result
+    for (const res of allResults) {
+        if (res && res.length > 0) {
+            const enriched = await this.enrichContent(res, profileId);
+            return enriched.slice(0, 10);
+        }
     }
     
     return []
@@ -558,41 +588,53 @@ export class AddonManager {
                 let tmdbId: string | null = null;
                 let type: 'movie' | 'series' = item.type === 'movie' ? 'movie' : 'series';
 
-                console.log('[Enrichment] Checking item:', item.id, item.type, 'Has cert:', !!cert);
+                // console.log('[Enrichment] Checking item:', item.id, item.type, 'Has cert:', !!cert);
 
                 if (item.id.startsWith('tmdb:')) {
                     tmdbId = item.id.split(':')[1];
                 } else if (item.id.startsWith('tt')) {
-                     // Resolve IMDB ID to TMDB ID
-                     const findResults = await tmdbClient.find({
-                         id: item.id,
-                         external_source: 'imdb_id'
-                     });
-                     
-                     if (type === 'movie' && findResults.movie_results?.length > 0) {
-                         tmdbId = findResults.movie_results[0].id.toString();
-                     } else if (type === 'series' && findResults.tv_results?.length > 0) {
-                         tmdbId = findResults.tv_results[0].id.toString();
+                     // Check cache first
+                     const cachedTmdbId = this.idResolutionCache.get(item.id);
+                     if (cachedTmdbId) {
+                        tmdbId = cachedTmdbId;
                      } else {
-                         // Fallback: try to guess type from results if type is ambiguous or we want to be robust
-                         if (findResults.movie_results?.length > 0) {
-                             tmdbId = findResults.movie_results[0].id.toString();
-                             type = 'movie';
-                         } else if (findResults.tv_results?.length > 0) {
-                             tmdbId = findResults.tv_results[0].id.toString();
-                             type = 'series';
-                         }
+                        // Resolve IMDB ID to TMDB ID
+                        const findResults = await tmdbClient.find({
+                            id: item.id,
+                            external_source: 'imdb_id'
+                        });
+                        
+                        if (type === 'movie' && findResults.movie_results?.length > 0) {
+                            tmdbId = findResults.movie_results[0].id.toString();
+                        } else if (type === 'series' && findResults.tv_results?.length > 0) {
+                            tmdbId = findResults.tv_results[0].id.toString();
+                        } else {
+                            // Fallback: try to guess type from results
+                            if (findResults.movie_results?.length > 0) {
+                                tmdbId = findResults.movie_results[0].id.toString();
+                                type = 'movie';
+                            } else if (findResults.tv_results?.length > 0) {
+                                tmdbId = findResults.tv_results[0].id.toString();
+                                type = 'series';
+                            }
+                        }
+                        
+                        // Cache the result if found
+                        if (tmdbId) {
+                            this.idResolutionCache.set(item.id, tmdbId);
+                            // console.log('[Enrichment] Resolved tt to tmdb:', item.id, '->', tmdbId);
+                        }
                      }
-                     console.log('[Enrichment] Resolved tt to tmdb:', item.id, '->', tmdbId);
                 }
 
                 if (tmdbId) {
                     // Use 'en-US' as default language for rating check
+                    // getAgeRating has its own cache, so this is fast
                     cert = await tmdbService.getAgeRating(tmdbClient, tmdbId, type, 'en-US');
-                    console.log('[Enrichment] Fetched cert for', tmdbId, ':', cert);
+                    // console.log('[Enrichment] Fetched cert for', tmdbId, ':', cert);
                 }
             } catch (e) {
-                console.warn('[Enrichment] Failed:', e);
+                // console.warn('[Enrichment] Failed:', e);
             }
         }
 
@@ -790,10 +832,10 @@ export class AddonManager {
       if (!shouldQuery) continue;
 
       try {
-        console.log(`[AddonManager] Trying ${client.manifest.name} for meta ${type}/${primaryId}`)
+        // console.log(`[AddonManager] Trying ${client.manifest.name} for meta ${type}/${primaryId}`)
         const meta = await client.getMeta(type, id, config)
         if (meta) {
-          console.log(`[AddonManager] Got meta from ${client.manifest.name} for ${type}/${primaryId}`)
+          // console.log(`[AddonManager] Got meta from ${client.manifest.name} for ${type}/${primaryId}`)
           return meta
         }
       } catch (e) {
@@ -1102,16 +1144,14 @@ export class AddonManager {
     const clients = await this.getClientsForProfile(profileId)
     const results: MetaPreview[] = []
 
-    for (const client of clients) {
-      if (!client.manifest) continue
+    const promises = clients.map(async (client) => {
+      if (!client.manifest) return []
       
       // Find a catalog that supports this type and (optionally) genre
       const catalog = client.manifest.catalogs.find(c => {
         if (c.type !== type) return false
         if (genre) {
           // Check if genre is supported. 
-          // Note: some addons use 'genre' extra without options (means any genre allowed)
-          // others specify options.
           return c.extra?.some(e => e.name === 'genre' && (!e.options || e.options.includes(genre)))
         }
         return true
@@ -1132,12 +1172,17 @@ export class AddonManager {
           };
 
           const items = await client.getCatalog(catalog.type, catalog.id, extra, config)
-          results.push(...items)
+          return items;
         } catch (e) {
           console.warn(`Failed to fetch filtered items from ${client.manifest.name}`, e)
+          return []
         }
       }
-    }
+      return []
+    });
+
+    const nestedResults = await Promise.all(promises);
+    nestedResults.forEach(r => results.push(...r));
     
     
     const parentalSettings = this.getParentalSettings(profileId);

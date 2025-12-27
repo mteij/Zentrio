@@ -92,6 +92,7 @@ export interface ParsedStream {
     seeders?: number
     isCached?: boolean
     streamType?: string // p2p, debrid, http, usenet
+    sourceType?: string // bluray, web, hdtv, cam, ts, tc, etc.
     filename?: string
     infoHash?: string
     title?: string
@@ -192,6 +193,88 @@ export class StreamProcessor {
     if (combined.match(/\b7\.1(?!\.?\d)\b/) || combined.match(/(?:dd|ddp|truehd|dts|dtshd|flac)7\.1/i)) parsed.audioChannels?.push('7.1')
     if (combined.match(/\b5\.1(?!\.?\d)\b/) || combined.match(/(?:dd|ddp|truehd|dts|dtshd|flac)5\.1/i)) parsed.audioChannels?.push('5.1')
     if (combined.match(/\b2\.0(?!\.?\d)\b/) || combined.match(/(?:aac|mp3|flac|dd|ddp)2\.0/i)) parsed.audioChannels?.push('2.0')
+
+    // Language Detection - Map ISO codes, full names, and flags to standardized names
+    const languageMap: Record<string, string> = {
+      // 2-letter ISO codes
+      'en': 'English', 'nl': 'Dutch', 'de': 'German', 'fr': 'French', 'es': 'Spanish',
+      'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'ja': 'Japanese', 'ko': 'Korean',
+      'zh': 'Chinese', 'ar': 'Arabic', 'hi': 'Hindi', 'tr': 'Turkish', 'pl': 'Polish',
+      'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish', 'fi': 'Finnish', 'cs': 'Czech',
+      'hu': 'Hungarian', 'ro': 'Romanian', 'el': 'Greek', 'he': 'Hebrew', 'th': 'Thai',
+      'vi': 'Vietnamese', 'id': 'Indonesian', 'uk': 'Ukrainian', 'bg': 'Bulgarian',
+      // Full names (lowercase for matching)
+      'english': 'English', 'dutch': 'Dutch', 'german': 'German', 'french': 'French',
+      'spanish': 'Spanish', 'italian': 'Italian', 'portuguese': 'Portuguese', 'russian': 'Russian',
+      'japanese': 'Japanese', 'korean': 'Korean', 'chinese': 'Chinese', 'mandarin': 'Chinese',
+      'cantonese': 'Chinese', 'arabic': 'Arabic', 'hindi': 'Hindi', 'turkish': 'Turkish',
+      'polish': 'Polish', 'swedish': 'Swedish', 'norwegian': 'Norwegian', 'danish': 'Danish',
+      'finnish': 'Finnish', 'czech': 'Czech', 'hungarian': 'Hungarian', 'romanian': 'Romanian',
+      'greek': 'Greek', 'hebrew': 'Hebrew', 'thai': 'Thai', 'vietnamese': 'Vietnamese',
+      'indonesian': 'Indonesian', 'ukrainian': 'Ukrainian', 'bulgarian': 'Bulgarian',
+      'latino': 'Spanish', 'castellano': 'Spanish', 'espanol': 'Spanish', 'español': 'Spanish',
+      // Flag emojis -> Language names (common ones)
+      '🇺🇸': 'English', '🇬🇧': 'English', '🇳🇱': 'Dutch', '🇩🇪': 'German', '🇫🇷': 'French',
+      '🇪🇸': 'Spanish', '🇮🇹': 'Italian', '🇵🇹': 'Portuguese', '🇧🇷': 'Portuguese',
+      '🇷🇺': 'Russian', '🇯🇵': 'Japanese', '🇰🇷': 'Korean', '🇨🇳': 'Chinese',
+      '🇸🇦': 'Arabic', '🇮🇳': 'Hindi', '🇹🇷': 'Turkish', '🇵🇱': 'Polish',
+      '🇸🇪': 'Swedish', '🇳🇴': 'Norwegian', '🇩🇰': 'Danish', '🇫🇮': 'Finnish'
+    }
+    
+    const detectedLanguages = new Set<string>()
+    
+    // Check for flag emojis first (they're distinctive) - use original strings to preserve emojis
+    const originalCombined = `${name} ${title} ${description}`
+    for (const [flag, lang] of Object.entries(languageMap)) {
+      if (flag.length > 2 && originalCombined.includes(flag)) { // Flags are unicode, > 2 chars
+        detectedLanguages.add(lang)
+      }
+    }
+    
+    // Check for language codes/names with word boundaries
+    for (const [code, lang] of Object.entries(languageMap)) {
+      if (code.length === 2) { // 2-letter ISO codes - common in addons like [EN] or 🇬🇧EN
+        const regex = new RegExp(`(?:^|[^a-z])${code}(?:$|[^a-z])`, 'i')
+        if (regex.test(combined)) {
+          detectedLanguages.add(lang)
+        }
+      } else if (code.length === 3) { // 3-letter codes 
+        const regex = new RegExp(`\\b${code}\\b`, 'i')
+        if (regex.test(combined)) {
+          detectedLanguages.add(lang)
+        }
+      } else if (code.length > 3) { // Full names (already lowercase in map)
+        if (combined.includes(code)) {
+          detectedLanguages.add(lang)
+        }
+      }
+    }
+    
+    parsed.languages = Array.from(detectedLanguages)
+
+    // Source Type (quality origin) - order matters, check specific first
+    // BluRay/UHD sources (highest quality)
+    if (combined.match(/\b(remux|bluray|blu-ray|bdrip|brrip|bdremux)\b/i)) {
+      parsed.sourceType = 'bluray'
+    }
+    // WEB sources (high quality)
+    else if (combined.match(/\b(web-?dl|webrip|web|amzn|nf|dsnp|hmax|atvp|pcok|hulu)\b/i)) {
+      parsed.sourceType = 'web'
+    }
+    // HDTV/DVD sources (medium quality)
+    else if (combined.match(/\b(hdtv|pdtv|dsr|dvdrip|dvd)\b/i)) {
+      parsed.sourceType = 'hdtv'
+    }
+    // CAM/TS/TC sources (low quality - should be deprioritized)
+    else if (combined.match(/\b(telesync|ts|telecine|tc|hdts|hdtc)\b/i)) {
+      parsed.sourceType = 'telesync'
+    }
+    else if (combined.match(/\b(cam|camrip|hdcam|hd-?cam|scr|screener|dvdscr|r5)\b/i)) {
+      parsed.sourceType = 'cam'
+    }
+    else {
+      parsed.sourceType = 'unknown'
+    }
 
     // Size (Regex for size like 1.5GB, 1000MB)
     const sizeMatch = combined.match(/(\d+(?:\.\d+)?)\s*(gb|mb|kb)/i)
@@ -384,6 +467,12 @@ export class StreamProcessor {
         
         if (!filters) return;
 
+        // Source type quality score (very important - deprioritize CAM/TS)
+        const sourceTypePriority: Record<string, number> = {
+          'bluray': 100, 'web': 80, 'hdtv': 60, 'unknown': 40, 'telesync': 10, 'cam': 5
+        }
+        s.score += sourceTypePriority[s.parsed.sourceType || 'unknown'] || 40
+
         // Preferred Resolution
         if (filters.resolution?.preferred && s.parsed.resolution) {
             const idx = filters.resolution.preferred.indexOf(s.parsed.resolution)
@@ -478,13 +567,22 @@ export class StreamProcessor {
             break
 
           case 'quality':
-            // Quality based on encode, visual tags, and user's quality preferences
-            // User's qualities list: ['BluRay/UHD', 'WEB/HD', 'DVD/TV/SAT', 'CAM/Screener', 'Unknown']
-            const userQualities = (this.config as any).qualities || []
+            // Quality based on source type, encode, visual tags
+            // Source type priority: bluray > web > hdtv > unknown > telesync > cam
+            const sourceTypePriority: Record<string, number> = {
+              'bluray': 100,
+              'web': 80,
+              'hdtv': 60,
+              'unknown': 40,
+              'telesync': 10,  // TS/TC are very low quality
+              'cam': 5         // CAM is lowest quality
+            }
             
             const getQualityScore = (stream: ParsedStream): number => {
-              const title = (stream.parsed.title || '').toLowerCase()
               let score = 0
+              
+              // Source type is the primary quality indicator
+              score += sourceTypePriority[stream.parsed.sourceType || 'unknown'] || 40
               
               // Score based on visual tags (HDR, DV, 10bit)
               score += (stream.parsed.visualTags?.length || 0) * 5
@@ -493,26 +591,6 @@ export class StreamProcessor {
               if (stream.parsed.encode?.includes('av1')) score += 15
               else if (stream.parsed.encode?.includes('hevc')) score += 10
               else if (stream.parsed.encode?.includes('avc')) score += 5
-              
-              // Score based on user's quality order
-              if (userQualities.length > 0) {
-                for (let i = 0; i < userQualities.length; i++) {
-                  const qual = userQualities[i].toLowerCase()
-                  if (qual.includes('bluray') && (title.includes('bluray') || title.includes('blu-ray') || title.includes('remux'))) {
-                    score += (userQualities.length - i) * 20
-                    break
-                  } else if (qual.includes('web') && (title.includes('web') || title.includes('webrip') || title.includes('webdl'))) {
-                    score += (userQualities.length - i) * 20
-                    break
-                  } else if (qual.includes('dvd') && (title.includes('dvd') || title.includes('hdtv') || title.includes('tv'))) {
-                    score += (userQualities.length - i) * 20
-                    break
-                  } else if (qual.includes('cam') && (title.includes('cam') || title.includes('screener') || title.includes('scr'))) {
-                    score += (userQualities.length - i) * 20
-                    break
-                  }
-                }
-              }
               
               return score
             }

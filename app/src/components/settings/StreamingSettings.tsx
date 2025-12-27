@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { ChevronDown, Monitor, Disc } from 'lucide-react'
 import { Button, Toggle, SettingsProfileSelector } from '../index'
 import styles from '../../styles/Settings.module.css'
+import { apiFetch } from '../../lib/apiFetch'
 
 
 interface StreamingSettingsData {
@@ -23,6 +24,12 @@ interface StreamingSettingsData {
     ratingLimit: string
   }
   sortingEnabled: boolean
+  // Playback settings
+  autoPlayWaitSeconds: number  // 5-30, default 10
+  // Stream display settings
+  showAddonName: boolean
+  showDescription: boolean
+  streamDisplayMode: 'compact-simple' | 'compact-advanced' | 'classic'
 }
 
 const DEFAULT_SETTINGS: StreamingSettingsData = {
@@ -43,7 +50,11 @@ const DEFAULT_SETTINGS: StreamingSettingsData = {
     enabled: false,
     ratingLimit: 'R'
   },
-  sortingEnabled: true
+  sortingEnabled: true,
+  autoPlayWaitSeconds: 10,
+  showAddonName: true,
+  showDescription: true,
+  streamDisplayMode: 'compact-simple'
 }
 
 const AVAILABLE_LANGUAGES = [
@@ -61,6 +72,14 @@ export function StreamingSettings() {
   const [showSortingContent, setShowSortingContent] = useState(false)
   const [languageToAdd, setLanguageToAdd] = useState('')
   const [draggedItem, setDraggedItem] = useState<{ type: string, index: number } | null>(null)
+  
+  // Local state for slider to prevent API spam/lag
+  const [localAutoPlayWait, setLocalAutoPlayWait] = useState<number>(10)
+
+  // Sync local slider state when settings load
+  useEffect(() => {
+    setLocalAutoPlayWait(settings.autoPlayWaitSeconds)
+  }, [settings.autoPlayWaitSeconds])
   
 
 
@@ -103,7 +122,7 @@ export function StreamingSettings() {
     if (!profileId) return
     try {
       setLoading(true)
-      const res = await fetch(`/api/streaming/settings?settingsProfileId=${profileId}`)
+      const res = await apiFetch(`/api/streaming/settings?settingsProfileId=${profileId}`)
       if (res.ok) {
         const data = await res.json()
         if (data.data) {
@@ -171,6 +190,18 @@ export function StreamingSettings() {
           if (loaded.parental) merged.parental = loaded.parental
           if (loaded.sortingEnabled !== undefined) merged.sortingEnabled = loaded.sortingEnabled
           if (loaded.qualities) merged.qualities = loaded.qualities // Keep qualities as is for now
+          
+          // Load playback settings
+          if (loaded.playback?.autoPlayMaxWaitMs) {
+            merged.autoPlayWaitSeconds = Math.round(loaded.playback.autoPlayMaxWaitMs / 1000)
+          }
+          
+          // Load stream display settings
+          if (loaded.streamDisplay) {
+            if (loaded.streamDisplay.showAddonName !== undefined) merged.showAddonName = loaded.streamDisplay.showAddonName
+            if (loaded.streamDisplay.showDescription !== undefined) merged.showDescription = loaded.streamDisplay.showDescription
+            if (loaded.streamDisplay.streamDisplayMode) merged.streamDisplayMode = loaded.streamDisplay.streamDisplayMode
+          }
 
           setSettings(merged)
         }
@@ -215,12 +246,21 @@ export function StreamingSettings() {
         // Custom fields
         parental: newSettings.parental,
         sortingEnabled: newSettings.sortingEnabled,
-        qualities: newSettings.qualities
+        qualities: newSettings.qualities,
+        // Playback and display settings
+        playback: {
+          autoPlayMaxWaitMs: newSettings.autoPlayWaitSeconds * 1000
+        },
+        streamDisplay: {
+          showAddonName: newSettings.showAddonName,
+          showDescription: newSettings.showDescription,
+          streamDisplayMode: newSettings.streamDisplayMode
+        }
     }
 
 
     try {
-      const res = await fetch(`/api/streaming/settings?settingsProfileId=${currentProfileId}`, {
+      const res = await apiFetch(`/api/streaming/settings?settingsProfileId=${currentProfileId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(streamConfig)
@@ -512,6 +552,67 @@ export function StreamingSettings() {
 
                 </div>
             )}
+        </div>
+
+        {/* Playback & Display Settings */}
+        <div className={`${styles.settingItem} !flex-col !items-start`} style={{ marginTop: '20px' }}>
+            <div className="w-full">
+                <h3 style={{ marginBottom: '16px' }}>Playback & Display</h3>
+                
+                {/* Auto-Play Wait Time */}
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>
+                        Auto-Play Wait Time: <strong>{localAutoPlayWait} seconds</strong>
+                    </label>
+                    <input
+                        type="range"
+                        min="5"
+                        max="30"
+                        step="1"
+                        value={localAutoPlayWait}
+                        onChange={(e) => setLocalAutoPlayWait(parseInt(e.target.value))}
+                        onMouseUp={() => updateSetting('autoPlayWaitSeconds', localAutoPlayWait)}
+                        onTouchEnd={() => updateSetting('autoPlayWaitSeconds', localAutoPlayWait)}
+                        style={{
+                            width: '100%',
+                            accentColor: 'var(--accent, #e50914)'
+                        }}
+                    />
+                    <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>
+                        How long to wait for streams before auto-selecting the best one
+                    </p>
+                </div>
+
+                {/* Stream Display Mode */}
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: '#ccc' }}>
+                        Stream Display Mode
+                    </label>
+                    <select
+                        value={settings.streamDisplayMode}
+                        onChange={(e) => updateSetting('streamDisplayMode', e.target.value as 'compact' | 'classic')}
+                        style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            borderRadius: '8px',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            color: '#fff',
+                            fontSize: '0.9rem',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <option value="compact-simple" style={{ background: '#1f2937' }}>Compact (Simple)</option>
+                        <option value="compact-advanced" style={{ background: '#1f2937' }}>Compact (Advanced)</option>
+                        <option value="classic" style={{ background: '#1f2937' }}>Classic</option>
+                    </select>
+                    <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>
+                        Simple: Essential tags only • Advanced: All parsed tags • Classic: Addon title + description
+                    </p>
+                </div>
+
+
+            </div>
         </div>
 
       </div>

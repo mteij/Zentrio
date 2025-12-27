@@ -31,6 +31,7 @@ export { ErrorBoundary } from './layout/ErrorBoundary'
 export { ProfileModal } from './features/ProfileModal'
 export { StreamingRow } from './features/StreamingRow'
 export { LazyCatalogRow } from './features/LazyCatalogRow'
+export { ContentCard } from './features/ContentCard'
 export { SettingsProfileSelector } from './features/SettingsProfileSelector'
 export { Hero } from './features/Hero'
 

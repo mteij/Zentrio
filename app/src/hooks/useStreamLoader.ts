@@ -16,6 +16,23 @@ export interface AddonLoadingState {
 export interface FlatStream {
   stream: Stream
   addon: { id: string, name: string, logo?: string }
+  parsed?: {
+    resolution?: string
+    encode?: string[]
+    audioTags?: string[]
+    audioChannels?: string[]
+    visualTags?: string[]
+    sourceType?: string
+    seeders?: number
+    size?: number  // in bytes
+    languages?: string[]
+    isCached?: boolean
+  }
+}
+
+export interface CacheStatus {
+  fromCache: boolean
+  cacheAgeMs: number
 }
 
 interface UseStreamLoaderResult {
@@ -27,14 +44,16 @@ interface UseStreamLoaderResult {
   isLoading: boolean
   isComplete: boolean
   totalCount: number
+  cacheStatus: CacheStatus | null
   loadStreams: (type: string, id: string, profileId: string, season?: number, episode?: number) => void
+  refreshStreams: () => void  // Force refresh, bypass cache
   reset: () => void
 }
 
 /**
  * Hook for progressive stream loading via SSE.
  * Streams addon results as they arrive, updating UI in real-time.
- * Provides globally sorted stream list and optional addon filtering.
+ * Provides globally sorted stream list, cache status, and optional addon filtering.
  */
 export function useStreamLoader(): UseStreamLoaderResult {
   const [streams, setStreams] = useState<FlatStream[]>([])
@@ -43,8 +62,18 @@ export function useStreamLoader(): UseStreamLoaderResult {
   const [isLoading, setIsLoading] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null)
   
   const eventSourceRef = useRef<EventSource | null>(null)
+  
+  // Store last request params for refresh
+  const lastRequestRef = useRef<{
+    type: string
+    id: string
+    profileId: string
+    season?: number
+    episode?: number
+  } | null>(null)
 
   // Filter streams by selected addon
   const filteredStreams = selectedAddon
@@ -66,6 +95,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     setIsLoading(false)
     setIsComplete(false)
     setTotalCount(0)
+    setCacheStatus(null)
   }, [])
 
   const loadStreams = useCallback((
@@ -73,10 +103,14 @@ export function useStreamLoader(): UseStreamLoaderResult {
     id: string,
     profileId: string,
     season?: number,
-    episode?: number
+    episode?: number,
+    forceRefresh: boolean = false
   ) => {
     // Close any existing connection
     eventSourceRef.current?.close()
+    
+    // Store request params for potential refresh
+    lastRequestRef.current = { type, id, profileId, season, episode }
     
     // Reset state
     setStreams([])
@@ -85,16 +119,29 @@ export function useStreamLoader(): UseStreamLoaderResult {
     setIsLoading(true)
     setIsComplete(false)
     setTotalCount(0)
+    setCacheStatus(null)
 
     // Build URL
     let url = `/api/streaming/streams-live/${type}/${id}?profileId=${profileId}`
     if (season !== undefined && episode !== undefined) {
       url += `&season=${season}&episode=${episode}`
     }
+    if (forceRefresh) {
+      url += '&refresh=true'
+    }
 
     // Create EventSource
     const eventSource = new EventSource(url)
     eventSourceRef.current = eventSource
+
+    // Listen for cache-status event
+    eventSource.addEventListener('cache-status', (e) => {
+      const data = JSON.parse(e.data)
+      setCacheStatus({
+        fromCache: data.fromCache,
+        cacheAgeMs: data.cacheAgeMs || 0
+      })
+    })
 
     eventSource.addEventListener('addon-start', (e) => {
       const data = JSON.parse(e.data)
@@ -161,6 +208,10 @@ export function useStreamLoader(): UseStreamLoaderResult {
         setStreams(data.allStreams)
         setTotalCount(data.totalCount || data.allStreams.length)
       }
+      // Update cache status with fromCache info from complete event
+      if (data.fromCache !== undefined) {
+        setCacheStatus(prev => prev ? { ...prev, fromCache: data.fromCache } : null)
+      }
       setIsLoading(false)
       setIsComplete(true)
       eventSource.close()
@@ -173,6 +224,14 @@ export function useStreamLoader(): UseStreamLoaderResult {
     })
   }, [])
 
+  // Refresh function - reloads with cache bypass
+  const refreshStreams = useCallback(() => {
+    const last = lastRequestRef.current
+    if (last) {
+      loadStreams(last.type, last.id, last.profileId, last.season, last.episode, true)
+    }
+  }, [loadStreams])
+
   return {
     streams,
     filteredStreams,
@@ -182,8 +241,10 @@ export function useStreamLoader(): UseStreamLoaderResult {
     isLoading,
     isComplete,
     totalCount,
-    loadStreams,
+    cacheStatus,
+    loadStreams: (type, id, profileId, season?, episode?) => 
+      loadStreams(type, id, profileId, season, episode, false),
+    refreshStreams,
     reset
   }
 }
-

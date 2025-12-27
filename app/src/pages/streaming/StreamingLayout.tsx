@@ -5,14 +5,24 @@ import { useEffect } from 'react'
 import { apiFetch } from '../../lib/apiFetch'
 
 const fetchProfile = async (profileId: string) => {
-  console.log('[StreamingLayout] fetchProfile called for:', profileId);
-  const res = await apiFetch(`/api/streaming/dashboard?profileId=${profileId}`)
+  // Use lightweight profile endpoint instead of heavy dashboard
+  if (profileId === 'guest') {
+    // For guest, we might need a specific handling or just use the list
+    // But let's assume /api/profiles/guest works or we handle it via ID if guest has IDs
+    // The previous code passed "guest" string, but profileId param is string.
+    // If it's literally "guest", we might need to fetch the guest profile differently or it might return the first guest profile?
+    // Actually, in the code `profileId === 'guest' ? 'guest' : parseInt(profileId!)`.
+    // If profileId is a number string, we fetch that.
+    return { name: 'Guest', avatar: 'guest', id: 'guest' }
+  }
+
+  const res = await apiFetch(`/api/profiles/${profileId}`)
   if (!res.ok) {
      if (res.status === 401) throw new Error('Unauthorized')
      throw new Error('Failed to load profile')
   }
-  const data = await res.json()
-  return data.profile
+  const profile = await res.json()
+  return profile
 }
 
 export const StreamingLayout = () => {
