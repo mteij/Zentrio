@@ -83,6 +83,7 @@ export interface Stream {
   behaviorHints?: {
     notWebReady?: boolean
     bingeGroup?: string
+    videoHash?: string
     proxyHeaders?: {
       request?: Record<string, string>
       response?: Record<string, string>
@@ -94,6 +95,9 @@ export interface Subtitle {
   id: string
   url: string
   lang: string
+  format?: string
+  display?: string
+  [key: string]: any
 }
 
 export interface AddonResponse<T> {

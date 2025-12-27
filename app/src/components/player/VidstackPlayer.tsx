@@ -24,6 +24,15 @@ import {
     DefaultVideoLayout,
     defaultLayoutIcons
 } from '@vidstack/react/player/layouts/default'
+import { 
+    Menu, 
+    Tooltip, 
+    useMediaRemote, 
+    useMediaStore, 
+    useMediaState,
+    type TextTrack
+} from '@vidstack/react'
+import { ChevronRight, Captions, Check } from 'lucide-react'
 
 // Import Vidstack styles
 import '@vidstack/react/player/styles/base.css'
@@ -39,6 +48,8 @@ export interface SubtitleTrack {
     src: string
     label: string
     language: string
+    type?: string
+    addonName?: string
     default?: boolean
 }
 
@@ -69,6 +80,130 @@ export interface VidstackPlayerProps {
     showCast?: boolean
 }
 
+function SubtitlesMenu({ tracks }: { tracks: SubtitleTrack[] }) {
+    const remote = useMediaRemote()
+    const textTrack = useMediaState('textTrack')
+    const store = useMediaStore()
+    
+    // Group tracks by language
+    const groupedTracks = useMemo(() => {
+        const groups: Record<string, { track: SubtitleTrack, index: number }[]> = {}
+        
+        tracks.forEach((track, index) => {
+            const lang = track.language || 'und'
+            if (!groups[lang]) groups[lang] = []
+            groups[lang].push({ track, index })
+        })
+        
+        return groups
+    }, [tracks])
+
+    // Get display name for language (using Intl.DisplayNames if available)
+    const getLangName = (code: string) => {
+        try {
+            return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || code
+        } catch {
+            return code
+        }
+    }
+
+    const currentTrackIndex = useMemo(() => {
+        if (!textTrack) return -1
+        // We need to find the index of the current textTrack in the Vidstack list
+        // and map it back to our tracks. 
+        // Note: Vidstack might add its own auto-generated tracks, so we need to be careful.
+        // But since we control the Track components, passing index should work if order is preserved.
+        return Array.from(store.textTracks).findIndex(t => t === textTrack)
+    }, [textTrack, store.textTracks])
+
+    return (
+        <Menu.Root>
+            <Menu.Button className="vds-menu-button vds-button">
+                <Captions className="vds-icon" />
+            </Menu.Button>
+
+            <Menu.Content className="vds-menu-items" placement="top" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <div className="vds-menu-title">Subtitles</div>
+                
+                {/* Off Option */}
+                <Menu.Item 
+                    className="vds-menu-item" 
+                    onClick={() => {
+                        if (currentTrackIndex !== -1) {
+                            (remote as any).changeTextTrackMode(currentTrackIndex, 'disabled')
+                        } else {
+                            // If no track is selected, ensure mode is disabled generally if possible, 
+                            // or just do nothing as it's already off.
+                            // Some versions might support -1 or similar.
+                            (remote as any).changeTextTrackMode(-1, 'disabled')
+                        }
+                    }}
+                >
+                    <span className="vds-menu-item-label">Off</span>
+                    {!textTrack && <Check className="vds-menu-item-icon" size={14} />}
+                </Menu.Item>
+
+                <div className="vds-menu-divider" />
+
+                {Object.entries(groupedTracks).map(([lang, groupTracks]) => {
+                    const langName = getLangName(lang)
+                    const isActiveLang = groupTracks.some(t => t.index === currentTrackIndex)
+                    
+                    return (
+                        <Menu.Root key={lang}>
+                            <Menu.Button className="vds-menu-item">
+                                <span className="vds-menu-item-label">{langName}</span>
+                                <div className="vds-menu-item-hint">
+                                    {groupTracks.length}
+                                </div>
+                                <ChevronRight className="vds-menu-item-icon" size={14} />
+                            </Menu.Button>
+                            
+                            <Menu.Content className="vds-menu-items" placement="right" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                <div className="vds-menu-title">{langName}</div>
+                                <Menu.RadioGroup value={isActiveLang ? currentTrackIndex.toString() : undefined}>
+                                    {groupTracks.map(({ track, index }) => (
+                                        <Menu.Radio 
+                                            className="vds-menu-item" 
+                                            key={index} 
+                                            value={index.toString()}
+                                            onSelect={() => {
+                                                // Disable current track if any
+                                                if (currentTrackIndex !== -1) {
+                                                    // This might not be needed if setting next track to showing auto-disables others
+                                                }
+                                                // We can't access textTracks[index].mode directly via remote?
+                                                // Try generic command
+                                                // Based on Vidstack internals, we might need to iterate or find the right command.
+                                                // Assuming changeTextTrackMode works if we pass index? 
+                                                // Actually, standard API is usually just changeTextTrackMode(mode) which affects *current* track.
+                                                // To CHANGE the current track, we usually use changeTextTrack(index).
+                                                // If TS says it doesn't exist, maybe it's `changeTextTrackKind`? No.
+                                                // Let's try casting for now as it might be a valid method missing in TS defs or I'm using an older version.
+                                                // Alternatively, use the player instance via ref if we had it, but we can't easily pass it here without props.
+                                                
+                                                // NOTE: Using 'any' cast to bypass TS error if method exists at runtime
+                                                (remote as any).changeTextTrack(index)
+                                                (remote as any).changeTextTrackMode('showing')
+                                            }}
+                                        >
+                                            <span className="vds-menu-item-label">
+                                                {track.type || 'Standard'}
+                                                {track.addonName ? ` (${track.addonName})` : ''}
+                                            </span>
+                                            <Check className="vds-radio-icon" size={14} />
+                                        </Menu.Radio>
+                                    ))}
+                                </Menu.RadioGroup>
+                            </Menu.Content>
+                        </Menu.Root>
+                    )
+                })}
+            </Menu.Content>
+        </Menu.Root>
+    )
+}
+
 type PlaybackMode = 'native' | 'hybrid' | 'probing'
 
 export function VidstackPlayer({
@@ -95,6 +230,12 @@ export function VidstackPlayer({
     
     // Playback mode: native (Vidstack), hybrid (custom engine), or probing
     const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(() => {
+        // Force native playback in Tauri
+        if (window.__TAURI__) {
+            console.log('[VidstackPlayer] Tauri environment detected - forcing native playback')
+            return 'native'
+        }
+
         // If URL looks like it might need hybrid playback, start probing
         if (mightNeedHybridPlayback(src)) {
             return 'probing'
@@ -108,6 +249,8 @@ export function VidstackPlayer({
     
     // Probe the file to check if we need hybrid playback
     useEffect(() => {
+        // Skip probing in Tauri
+        if (window.__TAURI__) return
         if (playbackMode !== 'probing' || !src) return
         
         // Skip if we've already completed probing for this src
@@ -383,7 +526,8 @@ export function VidstackPlayer({
         
         // Check if this might be an audio codec issue
         // If we haven't tried hybrid mode yet and the URL might need it
-        if (playbackMode === 'native' && mightNeedHybridPlayback(src)) {
+        // AND we are not in Tauri (where we want native only)
+        if (playbackMode === 'native' && mightNeedHybridPlayback(src) && !window.__TAURI__) {
             console.log('[VidstackPlayer] Native playback failed, trying hybrid mode...')
             setPlaybackMode('probing')
             return
@@ -506,7 +650,8 @@ export function VidstackPlayer({
                 <DefaultVideoLayout
                     icons={defaultLayoutIcons}
                     slots={{
-                        googleCastButton: showCast ? <CastButton /> : null
+                        googleCastButton: showCast ? <CastButton /> : null,
+                        captionButton: <SubtitlesMenu tracks={subtitles} />
                     }}
                 />
 
@@ -562,7 +707,8 @@ export function VidstackPlayer({
             <DefaultVideoLayout
                 icons={defaultLayoutIcons}
                 slots={{
-                    googleCastButton: showCast ? <CastButton /> : null
+                    googleCastButton: showCast ? <CastButton /> : null,
+                    captionButton: <SubtitlesMenu tracks={subtitles} />
                 }}
             />
         </MediaPlayer>

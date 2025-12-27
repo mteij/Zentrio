@@ -4,15 +4,25 @@
    ========================================================================== */
 
 /* Player Container */
+/* Player Container */
 .playerWrapper {
   position: relative;
   width: 100%;
   height: 100vh;
+  /* Reverted calc(100vh - var(--titlebar-height)) as it caused a gap */
   height: var(--app-height, 100vh);
   background: #000;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Force Vidstack player to fit and not overflow */
+:global(.vidstack-player) {
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    contain: strict;
 }
 
 .playerWrapper.fullscreen {

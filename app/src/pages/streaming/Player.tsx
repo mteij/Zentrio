@@ -65,6 +65,8 @@ export const StreamingPlayer = () => {
         src: string
         label: string
         language: string
+        type?: string
+        addonName?: string
         default?: boolean
     }>>([])
 
@@ -141,15 +143,19 @@ export const StreamingPlayer = () => {
                 try {
                     const contentId = parsedMeta.id
                     const contentType = parsedMeta.type
-                    const res = await fetch(`/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}`)
+                    const videoHash = parsedStream?.behaviorHints?.videoHash
+                    const hashParam = videoHash ? `&videoHash=${videoHash}` : ''
+                    const res = await fetch(`/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}${hashParam}`)
                     if (res.ok) {
                         const data = await res.json()
                         if (data.subtitles && Array.isArray(data.subtitles)) {
-                            data.subtitles.forEach((sub: { url: string; lang: string; addonName?: string }) => {
+                            data.subtitles.forEach((sub: { url: string; lang: string; addonName?: string; type?: string; format?: string }) => {
                                 tracks.push({
                                     src: sub.url,
                                     label: sub.addonName ? `${sub.lang} (${sub.addonName})` : sub.lang,
-                                    language: sub.lang || 'und'
+                                    language: sub.lang || 'und',
+                                    type: sub.type || sub.format, // Use type or format as type
+                                    addonName: sub.addonName
                                 })
                             })
                         }
