@@ -17,6 +17,7 @@ export default defineConfig({
         text: 'Documentation',
         items: [
           { text: 'Usage', link: '/usage' },
+          { text: 'Trakt Integration', link: '/trakt' },
           { text: 'Self Hosting', link: '/self-hosting' },
           { text: 'Development', link: '/development' },
           { text: 'Contributing', link: '/contributing' },

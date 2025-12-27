@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { Pencil } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Pencil, Tv, ExternalLink, Loader2, Check, Unplug, RefreshCw } from 'lucide-react'
 import { Button, FormGroup, Input, Modal, ConfirmDialog } from '../index'
 import { apiFetch } from '../../lib/apiFetch'
+import { toast } from 'sonner'
 
 // Avatar styles available in DiceBear
 const AVATAR_STYLES = [
@@ -48,6 +49,24 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
   const [showStylePicker, setShowStylePicker] = useState(false)
   const [activeProfileId, setActiveProfileId] = useState<number | null>(null)
 
+  // Trakt integration state
+  const [traktStatus, setTraktStatus] = useState<{
+    connected: boolean
+    available: boolean
+    username?: string
+  } | null>(null)
+  const [traktLoading, setTraktLoading] = useState(false)
+  const [showTraktConnect, setShowTraktConnect] = useState(false)
+  const [deviceCode, setDeviceCode] = useState<{
+    pollToken: string
+    userCode: string
+    verificationUrl: string
+    expiresIn: number
+    interval: number
+  } | null>(null)
+  const [polling, setPolling] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+
   useEffect(() => {
     if (isOpen) {
       loadSettingsProfiles()
@@ -72,6 +91,55 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
       }
     }
   }, [isOpen, profile])
+
+  // Fetch Trakt status when profile changes
+  const fetchTraktStatus = useCallback(async () => {
+    if (!profile?.id) {
+      setTraktStatus(null)
+      return
+    }
+    try {
+      const res = await apiFetch(`/api/trakt/status?profileId=${profile.id}`)
+      const data = await res.json()
+      setTraktStatus(data.data)
+    } catch (e) {
+      console.error('Failed to get Trakt status:', e)
+    }
+  }, [profile?.id])
+
+  useEffect(() => {
+    if (isOpen && profile?.id) {
+      fetchTraktStatus()
+    }
+  }, [isOpen, profile?.id, fetchTraktStatus])
+
+  // Polling for device code authorization
+  useEffect(() => {
+    if (!polling || !deviceCode) return
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await apiFetch(`/api/trakt/poll-token?pollToken=${deviceCode.pollToken}`)
+        const data = await res.json()
+        
+        if (data.data?.status === 'authorized') {
+          setPolling(false)
+          setDeviceCode(null)
+          setShowTraktConnect(false)
+          toast.success(`Connected to Trakt as ${data.data.username}`)
+          fetchTraktStatus()
+        } else if (data.data?.status === 'denied' || data.data?.status === 'expired') {
+          setPolling(false)
+          setDeviceCode(null)
+          toast.error(data.data.status === 'denied' ? 'Authorization denied' : 'Code expired')
+        }
+      } catch (e) {
+        console.error('Polling error:', e)
+      }
+    }, (deviceCode.interval || 5) * 1000)
+
+    return () => clearInterval(pollInterval)
+  }, [polling, deviceCode, fetchTraktStatus])
 
   const loadSettingsProfiles = async () => {
     try {
@@ -115,6 +183,74 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
   const handleStyleSelect = (newStyle: string) => {
     setAvatarStyle(newStyle)
     setShowStylePicker(false)
+  }
+
+  // Trakt functions
+  const startDeviceCode = async () => {
+    if (!profile?.id) return
+    setTraktLoading(true)
+    try {
+      const res = await apiFetch('/api/trakt/device-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: profile.id })
+      })
+      const data = await res.json()
+      
+      if (data.data?.userCode) {
+        setDeviceCode(data.data)
+        setPolling(true)
+      }
+    } catch (e) {
+      console.error('Device code error:', e)
+      toast.error('Failed to get device code')
+    } finally {
+      setTraktLoading(false)
+    }
+  }
+
+  const disconnectTrakt = async () => {
+    if (!profile?.id) return
+    setTraktLoading(true)
+    try {
+      await apiFetch('/api/trakt/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: profile.id })
+      })
+      toast.success('Disconnected from Trakt')
+      fetchTraktStatus()
+    } catch (e) {
+      console.error('Disconnect error:', e)
+      toast.error('Failed to disconnect')
+    } finally {
+      setTraktLoading(false)
+    }
+  }
+
+  const syncTrakt = async () => {
+    if (!profile?.id) return
+    setSyncing(true)
+    try {
+      const res = await apiFetch('/api/trakt/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: profile.id })
+      })
+      const data = await res.json()
+      if (data.data) {
+        const pulled = (data.data.pulled?.added || 0) + (data.data.pulled?.updated || 0)
+        const pushed = data.data.pushed?.synced || 0
+        toast.success(`Synced: ${pulled} pulled, ${pushed} pushed`)
+      } else {
+        toast.success('Sync completed')
+      }
+    } catch (e) {
+      console.error('Sync error:', e)
+      toast.error('Failed to sync')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const getAvatarUrl = (seed: string, style: string) => {
@@ -280,6 +416,64 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
                           ))}
                       </select>
                   </FormGroup>
+
+                  {/* Trakt Integration (only show for existing profiles) */}
+                  {profile && traktStatus?.available && (
+                    <div className="pt-2 border-t border-zinc-800">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
+                            <Tv className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">Trakt.tv</p>
+                            {traktStatus.connected ? (
+                              <p className="text-xs text-green-400">Connected as @{traktStatus.username}</p>
+                            ) : (
+                              <p className="text-xs text-white/50">Sync watch history & get recommendations</p>
+                            )}
+                          </div>
+                        </div>
+                        {traktStatus.connected ? (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="small"
+                              onClick={syncTrakt}
+                              disabled={traktLoading || syncing}
+                              className="text-xs"
+                            >
+                              {syncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                              <span className="ml-1">Sync</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="small"
+                              onClick={disconnectTrakt}
+                              disabled={traktLoading || syncing}
+                              className="text-xs"
+                            >
+                              {traktLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unplug className="w-3 h-3" />}
+                              <span className="ml-1">Disconnect</span>
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="small"
+                            onClick={() => setShowTraktConnect(true)}
+                            disabled={traktLoading}
+                            className="text-xs"
+                          >
+                            Connect
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
@@ -377,6 +571,82 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
                   Done
               </Button>
           </div>
+      </Modal>
+
+      {/* Trakt Connect Modal */}
+      <Modal
+        id="traktConnectModal"
+        isOpen={showTraktConnect}
+        onClose={() => {
+          setShowTraktConnect(false)
+          setDeviceCode(null)
+          setPolling(false)
+        }}
+        title="Connect Trakt.tv"
+      >
+        {deviceCode ? (
+          <div className="text-center space-y-4 py-4">
+            <p className="text-white/70 text-sm">
+              Enter this code at <span className="text-white font-medium">trakt.tv/activate</span>
+            </p>
+            
+            <div className="py-4 px-6 bg-white/5 rounded-2xl border border-white/10">
+              <div className="text-4xl font-mono font-bold text-white tracking-widest">
+                {deviceCode.userCode}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 text-sm text-white/50">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Waiting for authorization...
+            </div>
+
+            <a
+              href={deviceCode.verificationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors"
+            >
+              Open Trakt
+              <ExternalLink className="w-4 h-4" />
+            </a>
+
+            <button
+              onClick={() => {
+                setDeviceCode(null)
+                setPolling(false)
+              }}
+              className="block w-full text-sm text-white/50 hover:text-white transition-colors mt-2"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            <p className="text-white/70 text-sm">
+              Connect your Trakt.tv account to sync watch history and get personalized recommendations for this profile.
+            </p>
+            
+            <Button
+              type="button"
+              variant="primary"
+              onClick={startDeviceCode}
+              disabled={traktLoading}
+              className="w-full"
+            >
+              {traktLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Tv className="w-4 h-4 mr-2" />
+              )}
+              Get Device Code
+            </Button>
+
+            <p className="text-xs text-white/30 text-center">
+              You'll enter a code at trakt.tv/activate to authorize
+            </p>
+          </div>
+        )}
       </Modal>
     </>
   )

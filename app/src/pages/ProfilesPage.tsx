@@ -5,8 +5,7 @@ import { SimpleLayout, Button, ConfirmDialog, ProfileModal, AnimatedBackground, 
 import { useAuthStore } from '../stores/authStore'
 import { apiFetch } from '../lib/apiFetch'
 import styles from './ProfilesPage.module.css'
-import { ContextMenu, ContextMenuItem } from '../components/ui/ContextMenu'
-import { useContextMenu } from '../hooks/useContextMenu'
+import { ContextMenu } from '../components/ui/ContextMenu'
 
 interface Profile {
   id: number
@@ -269,22 +268,19 @@ function ProfileCard({ profile, onClick, onEdit }: {
     onClick: (p: Profile) => void,
     onEdit: (p: Profile) => void 
 }) {
-  const { isOpen, position, closeMenu, triggerProps } = useContextMenu()
-
-  const items: ContextMenuItem[] = [
-    {
-        label: 'Edit Profile',
-        icon: <Edit size={16} />,
-        action: () => onEdit(profile)
-    }
-  ]
-
   return (
-    <>
+    <ContextMenu
+        items={[
+            {
+                label: 'Edit Profile',
+                icon: Edit,
+                onClick: () => onEdit(profile)
+            }
+        ]}
+    >
       <div 
         className={styles.profileCard} 
         onClick={() => onClick(profile)}
-        {...triggerProps}
       >
         <div className={styles.profileAvatar}>
             <div id={`avatar-${profile.id}`}>
@@ -298,14 +294,6 @@ function ProfileCard({ profile, onClick, onEdit }: {
         <div className={styles.profileName}>{profile.name}</div>
         {profile.isDefault && <div className={styles.profileStatus}>Default</div>}
       </div>
-
-      <ContextMenu
-        isOpen={isOpen}
-        onClose={closeMenu}
-        position={position}
-        items={items}
-        title={profile.name}
-      />
-    </>
+    </ContextMenu>
   )
 }

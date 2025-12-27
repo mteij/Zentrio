@@ -118,7 +118,10 @@ export function getConfig() {
     OIDC_ISSUER,
     OIDC_DISPLAY_NAME,
     TMDB_API_KEY: process.env.TMDB_API_KEY,
-    RESEND_API_KEY: process.env.RESEND_API_KEY
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    // Trakt Integration
+    TRAKT_CLIENT_ID: process.env.TRAKT_CLIENT_ID,
+    TRAKT_CLIENT_SECRET: process.env.TRAKT_CLIENT_SECRET
   }
 }
 

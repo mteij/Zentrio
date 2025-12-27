@@ -6,12 +6,11 @@ import { MetaPreview } from '../../services/addons/types'
 import { LazyImage } from '../ui/LazyImage'
 import { RatingBadge } from '../ui/RatingBadge'
 import { SkeletonCard } from '../ui/SkeletonCard'
-import { ContextMenu, ContextMenuItem } from '../ui/ContextMenu'
-import { useContextMenu } from '../../hooks/useContextMenu'
+import { ContextMenu, ContextMenuItemOrSeparator } from '../ui/ContextMenu'
 import { ListSelectionModal } from './ListSelectionModal'
-import { Plus, Play, Trash2, Check, Eye } from 'lucide-react'
+import { Plus, Play, Trash2, Check, Eye, X } from 'lucide-react'
 import { apiFetch } from '../../lib/apiFetch'
-import { useAuthStore } from '../../stores/authStore' // Assuming we might need this or profileId is passed
+import { useAuthStore } from '../../stores/authStore'
 import styles from '../../styles/Streaming.module.css'
 
 interface CatalogMetadata {
@@ -76,9 +75,11 @@ export function LazyCatalogRow({
     ),
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     retry: 1, // Only retry once to avoid blocking on failing addons
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    enabled: !!metadata // Only run if metadata exists
   })
 
+  // ... (scroll logic remains same, implicit via context or simplified if needed, but keeping logic as is)
   const updateArrows = () => {
     if (containerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = containerRef.current
@@ -195,7 +196,6 @@ export function LazyCatalogRow({
   // Generate URL with fallback metadata for addons that don't provide meta resource
   const getItemUrl = (item: MetaPreview) => {
     const baseUrl = `/streaming/${profileId}/${item.type}/${item.id}`
-    // Create a minimal fallback object with essential display data
     const fallback = {
       id: item.id,
       type: item.type,
@@ -210,7 +210,6 @@ export function LazyCatalogRow({
     return `${baseUrl}?metaFallback=${fallbackParam}`
   }
 
-  // Don't render if error or empty after loading
   if (error || (!isLoading && items.length === 0)) {
     return null
   }
@@ -243,7 +242,6 @@ export function LazyCatalogRow({
         >
           <AnimatePresence mode="wait">
             {isLoading ? (
-              // Skeleton loading state
               <motion.div
                 key="skeleton"
                 initial={{ opacity: 1 }}
@@ -256,7 +254,6 @@ export function LazyCatalogRow({
                 ))}
               </motion.div>
             ) : (
-              // Loaded items with staggered fade-in
               <motion.div
                 key="items"
                 initial={{ opacity: 0 }}
@@ -322,60 +319,93 @@ function CatalogItem({
     profileId: string,
     metadata: CatalogMetadata
 }) {
-    const { isOpen, position, closeMenu, triggerProps } = useContextMenu()
     const [showListModal, setShowListModal] = useState(false)
     
     // Check if this row is a "Continue Watching" row or "Watch History"
-    // Usually these are identified by catalog type or ID. 
-    // metadata.catalog.type might be 'history' or similar? 
-    // Actually, looking at streaming.ts dashboard, history is served separately.
-    // But LazyCatalogRow might be used for history if we implement it that way.
-    // The user request specifically mentioned "remove from continue watching". 
-    // If this item has progress (which we don't know for sure in generic LazyCatalogRow unless passed in item), we might not show it.
-    // However, if the catalog is "Continue Watching", we should show it.
-    // For now, let's assume we can try to delete progress if the user asks, or only show it if we are confident.
-    // Since LazyCatalogRow is generic, let's show it if `item` has `progressPercent` (which it doesn't in MetaPreview usually) OR blindly show it?
-    // Blindly showing "Remove from Continue Watching" might be confusing if it's not in continue watching.
-    // Better: Only show "Add to List".
-    // Wait, the user asked for "remove from continue watching etc".
-    // I should check if the parent passed `isContinueWatching` prop? `LazyCatalogRow` doesn't have it in props definition currently.
-    // I'll add the menu item but maybe disable it if we don't think it applies?
-    // Let's add "Remove from Continue Watching" always, but maybe it only works if history exists.
-    
-    const contextItems: ContextMenuItem[] = [
+    const isHistory = metadata?.catalog?.type === 'history' || metadata?.catalog?.id === 'continue_watching'
+
+    // Local state for optimistic updates
+    const [isWatched, setIsWatched] = useState((item as any).isWatched);
+
+    useEffect(() => {
+        setIsWatched((item as any).isWatched);
+    }, [(item as any).isWatched]);
+
+    const toggleWatched = async () => {
+        const newWatchedState = !isWatched;
+        setIsWatched(newWatchedState);
+        (item as any).isWatched = newWatchedState;
+
+        try {
+            await apiFetch(newWatchedState ? '/api/streaming/mark-series-watched' : '/api/streaming/mark-watched', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    profileId: parseInt(profileId),
+                    metaId: item.id,
+                    metaType: item.type,
+                    watched: newWatchedState,
+                    season: item.type === 'series' ? -1 : undefined,
+                    episode: item.type === 'series' ? -1 : undefined
+                })
+            })
+            window.dispatchEvent(new CustomEvent('history-updated'))
+        } catch (e) {
+            console.error('Failed to mark as watched', e)
+            setIsWatched(!newWatchedState)
+        }
+    }
+
+    const markEpisodeWatched = async () => {
+         // @ts-ignore
+         if (!item.episodeDisplay) return;
+         // @ts-ignore
+         const match = item.episodeDisplay.match(/S(\d+):E(\d+)/);
+         if (!match) return;
+         
+         const season = parseInt(match[1]);
+         const episode = parseInt(match[2]);
+
+         try {
+             await apiFetch('/api/streaming/mark-watched', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     profileId: parseInt(profileId),
+                     metaId: item.id,
+                     metaType: item.type,
+                     watched: true,
+                     season,
+                     episode
+                 })
+             })
+             window.dispatchEvent(new CustomEvent('history-updated'))
+         } catch (e) {
+             console.error('Failed to mark episode watched', e)
+         }
+    }
+
+    const contextItems = [
         {
             label: 'Play',
-            icon: <Play size={16} />,
-            action: () => {
+            icon: Play,
+            onClick: () => {
                 window.location.href = getItemUrl(item)
             }
         },
         {
             label: 'View Details',
-            icon: <Eye size={16} />,
-            action: () => {
+            icon: Eye,
+            onClick: () => {
                 window.location.href = getItemUrl(item)
             }
         },
-        {
-            label: 'Add to List...',
-            icon: <Plus size={16} />,
-            action: () => setShowListModal(true)
-        }
-    ]
-
-    // Only show "Remove from Continue Watching" if this is a history/continue watching row
-    // we can check metadata.catalog.type.
-    // 'history' is usually the type for continue watching catalogs or similar.
-    // Let's also check if user explicity passed it via props (not available here)
-    // Checking type 'history' or 'continue_watching' seems safest for now.
-    // Also if the item has a 'progress' field (which might not be in MetaPreview but sometimes is attached).
-    if (metadata?.catalog?.type === 'history' || metadata?.catalog?.id === 'continue_watching') {
-         contextItems.push({
+        { type: 'separator' } as any,
+        isHistory ? {
             label: 'Remove from Continue Watching',
-            icon: <Trash2 size={16} />,
-            danger: true,
-            action: async () => {
+            icon: Trash2,
+            variant: 'danger',
+            onClick: async () => {
                 try {
                     await apiFetch(`/api/streaming/progress/${item.type}/${item.id}?profileId=${profileId}`, {
                         method: 'DELETE'
@@ -385,53 +415,135 @@ function CatalogItem({
                     console.error("Failed to remove progress", e)
                 }
             }
-        })
-    }
+        } : (
+            // If it's a series and has an active episode, show "Mark Episode" option too
+            // @ts-ignore
+            item.type === 'series' && item.episodeDisplay ? [
+                {
+                    // @ts-ignore
+                    label: `Mark ${item.episodeDisplay} Watched`,
+                    icon: Check,
+                    onClick: markEpisodeWatched
+                },
+                {
+                    label: isWatched ? 'Mark Series Unwatched' : 'Mark Series Watched',
+                    icon: isWatched ? X : Check,
+                    onClick: toggleWatched
+                }
+            ] : {
+                label: isWatched ? 'Mark as Unwatched' : 'Mark as Watched',
+                icon: isWatched ? X : Check,
+                onClick: toggleWatched
+            }
+        )
+    ].flat()
 
     return (
         <>
-            <a 
-                href={getItemUrl(item)} 
-                className={styles.mediaCard}
-                onClick={(e) => handleItemClick(e, item)}
-                onDragStart={handleDragStart}
-                draggable={false}
-                {...triggerProps}
-            >
-                <div className={styles.posterContainer}>
-                {item.poster ? (
-                    <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
-                ) : (
-                    <div className={styles.noPoster}>{item.name}</div>
-                )}
-                <div className={styles.badgesContainer}>
-                    {showImdbRatings && item.imdbRating && (
-                    <RatingBadge 
-                        rating={parseFloat(item.imdbRating)} 
-                        style={{ position: 'relative', top: 'auto', right: 'auto', marginBottom: '0' }}
-                    />
-                    )}
-                    {/* @ts-ignore */}
-                    {showAgeRatings && (item.certification || item.rating || item.contentRating) && (
-                    <span className={styles.ageRatingBadge}>
-                        {/* @ts-ignore */}
-                        {item.certification || item.rating || item.contentRating}
-                    </span>
-                    )}
-                </div>
-                <div className={styles.cardOverlay}>
-                    <div className={styles.cardTitle}>{item.name}</div>
-                </div>
-                </div>
-            </a>
-
-            <ContextMenu 
-                isOpen={isOpen}
-                onClose={closeMenu}
-                position={position}
+            <ContextMenu
                 items={contextItems}
-                title={item.name}
-            />
+            >
+                <a 
+                    href={getItemUrl(item)} 
+                    className={styles.mediaCard}
+                    onClick={(e) => handleItemClick(e, item)}
+                    onDragStart={handleDragStart}
+                    draggable={false}
+                >
+                    <div className={styles.posterContainer}>
+                    {item.poster ? (
+                        <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
+                    ) : (
+                        <div className={styles.noPoster}>{item.name}</div>
+                    )}
+                    
+                    {/* Watched Indicator */}
+                    {/* @ts-ignore */}
+                    {item.isWatched && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            background: 'rgba(0, 0, 0, 0.7)',
+                            color: '#4ade80',
+                            padding: '4px',
+                            borderRadius: '50%',
+                            backdropFilter: 'blur(4px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10
+                        }}>
+                            <Check size={14} strokeWidth={3} />
+                        </div>
+                    )}
+
+                    <div className={styles.badgesContainer}>
+                        {showImdbRatings && item.imdbRating && (
+                        <RatingBadge 
+                            rating={parseFloat(item.imdbRating)} 
+                            style={{ position: 'relative', top: 'auto', right: 'auto', marginBottom: '0' }}
+                        />
+                        )}
+                        {/* @ts-ignore */}
+                        {showAgeRatings && (item.certification || item.rating || item.contentRating) && (
+                        <span className={styles.ageRatingBadge}>
+                            {/* @ts-ignore */}
+                            {item.certification || item.rating || item.contentRating}
+                        </span>
+                        )}
+                    </div>
+                    
+                    {/* Progress bar */}
+                    {/* @ts-ignore */}
+                    {item.progressPercent !== undefined && item.progressPercent > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: '4px',
+                        background: 'rgba(0, 0, 0, 0.6)',
+                        borderBottomLeftRadius: '8px',
+                        borderBottomRightRadius: '8px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          /* @ts-ignore */
+                          width: `${item.progressPercent}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #8b5cf6, #a855f7)',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    )}
+
+                    {/* Episode badge for series */}
+                    {/* @ts-ignore */}
+                    {item.episodeDisplay && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        background: 'rgba(0, 0, 0, 0.7)',
+                        color: '#fff',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        backdropFilter: 'blur(4px)'
+                      }}>
+                        {/* @ts-ignore */}
+                        {item.episodeDisplay}
+                      </div>
+                    )}
+                    
+                    <div className={styles.cardOverlay}>
+                        <div className={styles.cardTitle}>{item.name}</div>
+                    </div>
+                    </div>
+                </a>
+            </ContextMenu>
             
             <ListSelectionModal
                 isOpen={showListModal}

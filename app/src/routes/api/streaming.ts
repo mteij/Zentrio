@@ -12,6 +12,76 @@ const streaming = new Hono<{
   }
 }>()
 
+// Helper to find and add next episode to continue watching
+async function ensureNextEpisodeInContinueWatching(
+  profileId: number, 
+  metaId: string, 
+  currentSeason: number, 
+  currentEpisode: number
+) {
+  try {
+    console.log(`[NextEpisode] Checking next episode for ${metaId} after S${currentSeason}E${currentEpisode}`)
+    
+    // 1. Get metadata to find next episode
+    // We assume 'series' type because only series have next episodes
+    const meta = await addonManager.getMeta('series', metaId, profileId)
+    if (!meta) {
+        console.log(`[NextEpisode] No metadata found for ${metaId}`)
+        return
+    }
+    if (!meta.videos || meta.videos.length === 0) {
+        console.log(`[NextEpisode] No videos found in metadata for ${metaId}`)
+        return
+    }
+
+    // 2. Find current video index
+    const sortedVideos = meta.videos.sort((a: any, b: any) => {
+      if (a.season !== b.season) return a.season - b.season
+      return a.episode - b.episode
+    })
+
+    const currentIndex = sortedVideos.findIndex((v: any) => v.season === currentSeason && v.episode === currentEpisode)
+    console.log(`[NextEpisode] Current index: ${currentIndex} / ${sortedVideos.length}`)
+    
+    // 3. Get next video if exists
+    if (currentIndex !== -1 && currentIndex < sortedVideos.length - 1) {
+      const nextVideo = sortedVideos[currentIndex + 1]
+      console.log(`[NextEpisode] Found next video: S${nextVideo.season}E${nextVideo.episode}`)
+      
+      // 4. Check if next video is already in history (started or watched)
+      const existingProgress = watchHistoryDb.getProgress(
+        profileId, 
+        metaId, 
+        nextVideo.season, 
+        nextVideo.episode
+      )
+
+      // Only insert if NO progress exists OR if it exists but is effectively empty (not watched, no position)
+      // This ensures we bump it to the top of "Continue Watching" even if a placeholder existed
+      if (!existingProgress || (!existingProgress.is_watched && !existingProgress.position)) {
+        
+        watchHistoryDb.upsert({
+          profile_id: profileId,
+          meta_id: metaId,
+          meta_type: 'series',
+          season: nextVideo.season,
+          episode: nextVideo.episode,
+          episode_id: nextVideo.id,
+          title: nextVideo.title || `Episode ${nextVideo.episode}`,
+          poster: meta.poster, // Series poster
+          duration: 0,
+          position: 0,
+          last_stream: null
+        })
+      }
+    } else {
+        console.log(`[NextEpisode] No next video found (last episode?)`)
+    }
+  } catch (e) {
+    console.error('[NextEpisode] Failed to ensure next episode:', e)
+  }
+}
+
 streaming.get('/settings', sessionMiddleware, async (c) => {
   try {
     const { profileId, settingsProfileId: querySettingsProfileId } = c.req.query()
@@ -392,14 +462,25 @@ streaming.post('/progress', async (c) => {
       last_stream: body.lastStream
     })
 
-    // Auto-mark as watched if position >= 90% of duration
-    if (duration && position && position >= duration * 0.9) {
+    // Auto-mark as watched if position >= 80% of duration (matches Trakt's threshold)
+    if (duration && position && position >= duration * 0.8) {
       watchHistoryDb.autoMarkWatched(
         parseInt(profileId),
         metaId,
         season !== undefined ? parseInt(season) : undefined,
         episode !== undefined ? parseInt(episode) : undefined
       )
+
+      // Auto-add next episode if this is a series
+      if (metaType === 'series' && season !== undefined && episode !== undefined) {
+         // Run in background
+         ensureNextEpisodeInContinueWatching(
+            parseInt(profileId),
+            metaId,
+            parseInt(season),
+            parseInt(episode)
+         )
+      }
     }
 
     return c.json({ success: true })
@@ -418,12 +499,19 @@ streaming.delete('/progress/:type/:id', async (c) => {
       return c.json({ error: 'Missing defined profileId' }, 400)
     }
 
-    watchHistoryDb.delete(
-      parseInt(profileId),
-      id,
-      season ? parseInt(season) : undefined,
-      episode ? parseInt(episode) : undefined
-    )
+    const pId = parseInt(profileId)
+
+    if (type === 'series' && season === undefined && episode === undefined) {
+      // Delete ALL history for this series
+      watchHistoryDb.deleteAllForSeries(pId, id)
+    } else {
+      watchHistoryDb.delete(
+        pId,
+        id,
+        season ? parseInt(season) : undefined,
+        episode ? parseInt(episode) : undefined
+      )
+    }
 
     return c.json({ success: true })
   } catch (e) {
@@ -490,16 +578,99 @@ streaming.post('/mark-watched', async (c) => {
       return c.json({ error: 'Missing required fields' }, 400)
     }
 
+    const pId = parseInt(profileId)
+    
     watchHistoryDb.markAsWatched(
-      parseInt(profileId),
+      pId,
       metaId,
       metaType,
       watched,
-      season !== undefined ? parseInt(season) : undefined,
       episode !== undefined ? parseInt(episode) : undefined
     )
 
-    return c.json({ success: true })
+    // If unmarking an episode, ensure the SERIES container is also unmarked
+    if (!watched && metaType === 'series') {
+        watchHistoryDb.markAsWatched(pId, metaId, 'series', false, -1, -1)
+    }
+
+    // Auto-add next episode if marking as watched for a series episode
+    if (watched && metaType === 'series' && season !== undefined && episode !== undefined) {
+        ensureNextEpisodeInContinueWatching(
+            pId,
+            metaId,
+            parseInt(season),
+            parseInt(episode)
+        )
+    }
+
+    // Sync to Trakt if connected and item has IMDB ID
+    let traktSynced = false
+    if (metaId.startsWith('tt')) {
+      const { traktAccountDb } = await import('../../services/database')
+      const account = traktAccountDb.getByProfileId(pId)
+      
+      if (account) {
+        try {
+          let accessToken = account.access_token
+          
+          // Refresh token if expired
+          if (traktAccountDb.isTokenExpired(pId)) {
+            const { traktClient } = await import('../../services/trakt')
+            const newTokens = await traktClient.refreshAccessToken(account.refresh_token)
+            const expiresAt = new Date((newTokens.created_at + newTokens.expires_in) * 1000)
+            traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
+            accessToken = newTokens.access_token
+          }
+
+          const { traktClient } = await import('../../services/trakt')
+          
+          if (watched) {
+            // Add to Trakt history
+            if (metaType === 'movie') {
+              await traktClient.addToHistory(accessToken, {
+                movies: [{ ids: { imdb: metaId }, watched_at: new Date().toISOString() }]
+              })
+            } else if (metaType === 'series' && season !== undefined && episode !== undefined) {
+              await traktClient.addToHistory(accessToken, {
+                shows: [{
+                  ids: { imdb: metaId },
+                  seasons: [{
+                    number: parseInt(season),
+                    episodes: [{ number: parseInt(episode), watched_at: new Date().toISOString() }]
+                  }]
+                }]
+              })
+            }
+            traktSynced = true
+            console.log(`[Trakt] Pushed watched: ${metaId} S${season}E${episode}`)
+          } else {
+            // Remove from Trakt history
+            if (metaType === 'movie') {
+              await traktClient.removeFromHistory(accessToken, {
+                movies: [{ ids: { imdb: metaId } }]
+              })
+            } else if (metaType === 'series' && season !== undefined && episode !== undefined) {
+              await traktClient.removeFromHistory(accessToken, {
+                shows: [{
+                  ids: { imdb: metaId },
+                  seasons: [{
+                    number: parseInt(season),
+                    episodes: [{ number: parseInt(episode) }]
+                  }]
+                }]
+              })
+            }
+            traktSynced = true
+            console.log(`[Trakt] Removed unwatched: ${metaId} S${season}E${episode}`)
+          }
+        } catch (e) {
+          console.error('[Trakt] Failed to sync mark-watched:', e)
+          // Don't fail the request, local change still succeeded
+        }
+      }
+    }
+
+    return c.json({ success: true, traktSynced })
   } catch (e) {
     console.error('Failed to mark as watched', e)
     return c.json({ error: 'Internal server error' }, 500)
@@ -516,8 +687,10 @@ streaming.post('/mark-season-watched', async (c) => {
       return c.json({ error: 'Missing required fields (need episodes array)' }, 400)
     }
 
+    const pId = parseInt(profileId)
+    
     watchHistoryDb.markSeasonWatched(
-      parseInt(profileId),
+      pId,
       metaId,
       metaType,
       parseInt(season),
@@ -525,9 +698,224 @@ streaming.post('/mark-season-watched', async (c) => {
       episodes.map((e: number) => parseInt(String(e)))
     )
 
-    return c.json({ success: true })
+    // Sync to Trakt if connected
+    let traktSynced = false
+    if (metaId.startsWith('tt')) {
+      const { traktAccountDb } = await import('../../services/database')
+      const account = traktAccountDb.getByProfileId(pId)
+      
+      if (account) {
+        try {
+          let accessToken = account.access_token
+          if (traktAccountDb.isTokenExpired(pId)) {
+            const { traktClient } = await import('../../services/trakt')
+            const newTokens = await traktClient.refreshAccessToken(account.refresh_token)
+            const expiresAt = new Date((newTokens.created_at + newTokens.expires_in) * 1000)
+            traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
+            accessToken = newTokens.access_token
+          }
+
+          const { traktClient } = await import('../../services/trakt')
+          const seasonData = {
+            number: parseInt(season),
+            episodes: episodes.map((ep: number) => ({ number: parseInt(String(ep)), watched_at: new Date().toISOString() }))
+          }
+          
+          if (watched) {
+            await traktClient.addToHistory(accessToken, {
+              shows: [{ ids: { imdb: metaId }, seasons: [seasonData] }]
+            })
+          } else {
+            await traktClient.removeFromHistory(accessToken, {
+              shows: [{ ids: { imdb: metaId }, seasons: [{ number: parseInt(season), episodes: episodes.map((ep: number) => ({ number: parseInt(String(ep)) })) }] }]
+            })
+          }
+          traktSynced = true
+          console.log(`[Trakt] ${watched ? 'Pushed' : 'Removed'} season ${season} (${episodes.length} episodes)`)
+        } catch (e) {
+          console.error('[Trakt] Failed to sync season watched:', e)
+        }
+      }
+    }
+
+    return c.json({ success: true, traktSynced })
   } catch (e) {
     console.error('Failed to mark season as watched', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Mark entire series as watched/unwatched (all episodes)
+streaming.post('/mark-series-watched', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { profileId, metaId, watched, allEpisodes } = body
+    
+    if (!profileId || !metaId || watched === undefined || !allEpisodes) {
+      return c.json({ error: 'Missing required fields (need allEpisodes array)' }, 400)
+    }
+
+    const pId = parseInt(profileId)
+    
+    // Mark each episode
+    for (const ep of allEpisodes) {
+      watchHistoryDb.markAsWatched(
+        pId,
+        metaId,
+        'series',
+        watched,
+        ep.season,
+        ep.episode
+      )
+    }
+
+    // Also mark the SERIES container as watched/unwatched
+    // This allows showing the checkmark on the series card itself
+    watchHistoryDb.markAsWatched(
+        pId, 
+        metaId, 
+        'series', 
+        watched, 
+        -1, 
+        -1
+    )
+
+    // Sync to Trakt if connected
+    let traktSynced = false
+    if (metaId.startsWith('tt') && allEpisodes.length > 0) {
+      const { traktAccountDb } = await import('../../services/database')
+      const account = traktAccountDb.getByProfileId(pId)
+      
+      if (account) {
+        try {
+          let accessToken = account.access_token
+          if (traktAccountDb.isTokenExpired(pId)) {
+            const { traktClient } = await import('../../services/trakt')
+            const newTokens = await traktClient.refreshAccessToken(account.refresh_token)
+            const expiresAt = new Date((newTokens.created_at + newTokens.expires_in) * 1000)
+            traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
+            accessToken = newTokens.access_token
+          }
+
+          const { traktClient } = await import('../../services/trakt')
+          
+          // Group episodes by season
+          const seasonMap = new Map<number, { number: number; watched_at?: string }[]>()
+          for (const ep of allEpisodes) {
+            if (!seasonMap.has(ep.season)) seasonMap.set(ep.season, [])
+            seasonMap.get(ep.season)!.push(watched ? { number: ep.episode, watched_at: new Date().toISOString() } : { number: ep.episode })
+          }
+          
+          const seasons = Array.from(seasonMap.entries()).map(([num, eps]) => ({ number: num, episodes: eps }))
+          
+          if (watched) {
+            await traktClient.addToHistory(accessToken, {
+              shows: [{ ids: { imdb: metaId }, seasons }]
+            })
+          } else {
+            await traktClient.removeFromHistory(accessToken, {
+              shows: [{ ids: { imdb: metaId }, seasons }]
+            })
+          }
+          traktSynced = true
+          console.log(`[Trakt] ${watched ? 'Pushed' : 'Removed'} entire series (${allEpisodes.length} episodes)`)
+        } catch (e) {
+          console.error('[Trakt] Failed to sync series watched:', e)
+        }
+      }
+    }
+
+    return c.json({ success: true, traktSynced, episodesUpdated: allEpisodes.length })
+  } catch (e) {
+    console.error('Failed to mark series as watched', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Mark all episodes before a specific episode as watched
+streaming.post('/mark-episodes-before', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { profileId, metaId, season, episode, watched, allEpisodes } = body
+    
+    if (!profileId || !metaId || season === undefined || episode === undefined || watched === undefined || !allEpisodes) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+
+    const pId = parseInt(profileId)
+    
+    // Filter episodes that come before the target episode
+    const episodesToMark = allEpisodes.filter((ep: { season: number; episode: number }) => {
+      if (ep.season < season) return true
+      if (ep.season === season && ep.episode < episode) return true
+      return false
+    })
+    
+    // Mark each episode
+    for (const ep of episodesToMark) {
+      watchHistoryDb.markAsWatched(
+        pId,
+        metaId,
+        'series',
+        watched,
+        ep.season,
+        ep.episode
+      )
+    }
+
+    // If unmarking episodes, ensure the SERIES container is also unmarked
+    if (!watched) {
+        watchHistoryDb.markAsWatched(pId, metaId, 'series', false, -1, -1)
+    }
+
+    // Sync to Trakt if connected
+    let traktSynced = false
+    if (metaId.startsWith('tt') && episodesToMark.length > 0) {
+      const { traktAccountDb } = await import('../../services/database')
+      const account = traktAccountDb.getByProfileId(pId)
+      
+      if (account) {
+        try {
+          let accessToken = account.access_token
+          if (traktAccountDb.isTokenExpired(pId)) {
+            const { traktClient } = await import('../../services/trakt')
+            const newTokens = await traktClient.refreshAccessToken(account.refresh_token)
+            const expiresAt = new Date((newTokens.created_at + newTokens.expires_in) * 1000)
+            traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
+            accessToken = newTokens.access_token
+          }
+
+          const { traktClient } = await import('../../services/trakt')
+          
+          // Group episodes by season
+          const seasonMap = new Map<number, { number: number; watched_at?: string }[]>()
+          for (const ep of episodesToMark) {
+            if (!seasonMap.has(ep.season)) seasonMap.set(ep.season, [])
+            seasonMap.get(ep.season)!.push(watched ? { number: ep.episode, watched_at: new Date().toISOString() } : { number: ep.episode })
+          }
+          
+          const seasons = Array.from(seasonMap.entries()).map(([num, eps]) => ({ number: num, episodes: eps }))
+          
+          if (watched) {
+            await traktClient.addToHistory(accessToken, {
+              shows: [{ ids: { imdb: metaId }, seasons }]
+            })
+          } else {
+            await traktClient.removeFromHistory(accessToken, {
+              shows: [{ ids: { imdb: metaId }, seasons }]
+            })
+          }
+          traktSynced = true
+          console.log(`[Trakt] ${watched ? 'Pushed' : 'Removed'} ${episodesToMark.length} episodes before S${season}E${episode}`)
+        } catch (e) {
+          console.error('[Trakt] Failed to sync episodes before:', e)
+        }
+      }
+    }
+
+    return c.json({ success: true, traktSynced, episodesUpdated: episodesToMark.length })
+  } catch (e) {
+    console.error('Failed to mark episodes before', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -665,7 +1053,17 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         if (progressPercent >= COMPLETED_PERCENT_THRESHOLD) return false
         const meetsMinSeconds = h.position && h.position >= MIN_SECONDS_THRESHOLD
         const meetsMinPercent = progressPercent >= MIN_PERCENT_THRESHOLD
-        return meetsMinSeconds || meetsMinPercent
+        
+        
+        // Allow series episodes with 0 progress (auto-added next episodes)
+        const isNextEpisode = h.meta_type === 'series' && (!h.position || h.position === 0)
+
+        // EXCLUDE S1E1 with 0 progress (unstarted shows shouldn't be in Continue Watching)
+        if (h.meta_type === 'series' && h.season === 1 && h.episode === 1 && (!h.position || h.position === 0)) {
+            return false
+        }
+
+        return meetsMinSeconds || meetsMinPercent || isNextEpisode
       })
       
       const deduplicatedHistory: typeof rawHistory = []
@@ -758,26 +1156,32 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
       const meetsMinSeconds = h.position && h.position >= MIN_SECONDS_THRESHOLD
       const meetsMinPercent = progressPercent >= MIN_PERCENT_THRESHOLD
       
-      return meetsMinSeconds || meetsMinPercent
+      // Allow series episodes with 0 progress (auto-added next episodes)
+      const isNextEpisode = h.meta_type === 'series' && (!h.position || h.position === 0)
+
+      // EXCLUDE S1E1 with 0 progress (unstarted shows shouldn't be in Continue Watching)
+      if (h.meta_type === 'series' && h.season === 1 && h.episode === 1 && (!h.position || h.position === 0)) {
+          return false
+      }
+
+      return meetsMinSeconds || meetsMinPercent || isNextEpisode
     })
     
-    // Deduplicate series to show only the latest episode per series
-    // Movies don't have duplicates since they're unique by meta_id
-    const deduplicatedHistory: typeof rawHistory = []
-    const seenSeries = new Set<string>()
-    
-    // filteredHistory is already sorted by updated_at DESC, so first occurrence is the latest
-    for (const h of filteredHistory) {
-      if (h.meta_type === 'series') {
-        if (!seenSeries.has(h.meta_id)) {
-          seenSeries.add(h.meta_id)
+      const deduplicatedHistory: typeof rawHistory = []
+      const seenSeries = new Set<string>()
+      
+      // filteredHistory is already sorted by updated_at DESC, so first occurrence is the latest
+      for (const h of filteredHistory) {
+        if (h.meta_type === 'series') {
+          if (!seenSeries.has(h.meta_id)) {
+            seenSeries.add(h.meta_id)
+            deduplicatedHistory.push(h)
+          }
+        } else {
+          // Movies and other types - include as-is
           deduplicatedHistory.push(h)
         }
-      } else {
-        // Movies and other types - include as-is
-        deduplicatedHistory.push(h)
       }
-    }
     
     // Enhance history with progress percentage
     const history = deduplicatedHistory.map(h => ({

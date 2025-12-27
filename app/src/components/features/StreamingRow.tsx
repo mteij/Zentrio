@@ -4,10 +4,9 @@ import { useNavigate } from 'react-router-dom'
 import { MetaPreview } from '../../services/addons/types'
 import { LazyImage } from '../ui/LazyImage'
 import { RatingBadge } from '../ui/RatingBadge'
-import { ContextMenu, ContextMenuItem } from '../ui/ContextMenu'
-import { useContextMenu } from '../../hooks/useContextMenu'
+import { ContextMenu } from '../ui/ContextMenu'
 import { ListSelectionModal } from './ListSelectionModal'
-import { Plus, Play, Trash2, Eye } from 'lucide-react'
+import { Plus, Play, Trash2, Eye, Check, X } from 'lucide-react'
 import { apiFetch } from '../../lib/apiFetch'
 import styles from '../../styles/Streaming.module.css'
 
@@ -46,6 +45,12 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
   }
 
   // ... (useEffect remains same, handled by diff context if possible or I'll retain it if I replace enough)
+  const [rowItems, setRowItems] = useState(items)
+
+  useEffect(() => {
+    setRowItems(items)
+  }, [items])
+
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -63,7 +68,24 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
       window.removeEventListener('resize', handleScroll)
       stopMomentum() // Clean up any ongoing momentum animation
     }
-  }, [items]) // Re-run if items change, as scrollWidth might change
+  }, [rowItems]) // Re-run if items change, as scrollWidth might change
+
+  const handleRemove = async (item: MetaPreview) => {
+    // Optimistic update
+    setRowItems(prev => prev.filter(i => i.id !== item.id))
+    
+    // Perform API call
+    try {
+        await apiFetch(`/api/streaming/progress/${item.type}/${item.id}?profileId=${profileId}`, {
+            method: 'DELETE'
+        })
+        // Dispatch event in case other components need to know (though we already updated UI locally)
+        window.dispatchEvent(new CustomEvent('history-updated'))
+    } catch (e) {
+        console.error("Failed to remove progress", e)
+        // Optionally revert state here if needed, but for "remove" it's usually fine to just log
+    }
+  }
 
   const stopMomentum = () => {
     if (rafIdRef.current) {
@@ -240,13 +262,14 @@ export function StreamingRow({ title, items, profileId, showImdbRatings = true, 
           onDragStart={handleDragStart}
           style={{ cursor: isDown ? 'grabbing' : 'grab', userSelect: 'none' }}
         >
-          {items.map((item, index) => (
+          {rowItems.map((item, index) => (
             <StreamingItem 
                 key={item.id}
                 item={item} 
                 getItemUrl={getItemUrl} 
                 handleItemClick={handleItemClick}
                 handleDragStart={handleDragStart}
+                onRemove={handleRemove}
                 showImdbRatings={showImdbRatings}
                 showAgeRatings={showAgeRatings}
                 isContinueWatching={isContinueWatching}
@@ -278,12 +301,14 @@ function StreamingItem({
     isContinueWatching,
     profileId,
     isRanked,
-    rank
+    rank,
+    onRemove
 }: { 
-    item: MetaPreview & { progressPercent?: number; episodeDisplay?: string }, 
+    item: MetaPreview & { progressPercent?: number; episodeDisplay?: string; lastStream?: any }, 
     getItemUrl: (i: MetaPreview) => string, 
     handleItemClick: (e: React.MouseEvent, i: any) => void,
     handleDragStart: (e: React.DragEvent) => void,
+    onRemove: (item: any) => void,
     showImdbRatings: boolean,
     showAgeRatings: boolean,
     isContinueWatching: boolean,
@@ -291,153 +316,245 @@ function StreamingItem({
     isRanked?: boolean,
     rank?: number
 }) {
-    const { isOpen, position, closeMenu, triggerProps } = useContextMenu()
     const [showListModal, setShowListModal] = useState(false)
     const navigate = useNavigate()
 
     // Handle play with smart source selection
     const handlePlay = async () => {
         // For continue watching items, they already have lastStream
-        if (isContinueWatching && (item as any).lastStream) {
+        if (isContinueWatching && item.lastStream) {
             navigate(`/streaming/${profileId}/player`, { 
                 state: { 
-                    stream: (item as any).lastStream,
+                    stream: item.lastStream,
                     meta: { id: item.id, type: item.type, name: item.name, poster: item.poster }
                 }
             })
             return
         }
         
-        // Otherwise go to details page (could enhance to fetch last stream from API)
+        // Otherwise go to details page
         window.location.href = getItemUrl(item)
     }
 
-    const contextItems: ContextMenuItem[] = [
+    // Local state for immediate UI feedback
+    const [isWatched, setIsWatched] = useState((item as any).isWatched);
+
+    useEffect(() => {
+        setIsWatched((item as any).isWatched);
+    }, [(item as any).isWatched]);
+
+    const toggleWatched = async () => {
+        const newWatchedState = !isWatched;
+        // Optimistic update
+        setIsWatched(newWatchedState);
+        // Also update parent list if possible (won't affect parent state deep down but helps local re-renders)
+        (item as any).isWatched = newWatchedState;
+
+        try {
+            await apiFetch(newWatchedState ? '/api/streaming/mark-series-watched' : '/api/streaming/mark-watched', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    profileId: parseInt(profileId),
+                    metaId: item.id,
+                    metaType: item.type,
+                    watched: newWatchedState,
+                    season: item.type === 'series' ? -1 : undefined,
+                    episode: item.type === 'series' ? -1 : undefined
+                })
+            })
+            
+            // Dispatch event to refresh home
+            window.dispatchEvent(new CustomEvent('history-updated'))
+        } catch (e) {
+            console.error('Failed to mark as watched', e)
+            setIsWatched(!newWatchedState) // Revert
+        }
+    }
+
+    const markEpisodeWatched = async () => {
+         if (!item.episodeDisplay) return;
+         // Parse S1:E5
+         const match = item.episodeDisplay.match(/S(\d+):E(\d+)/);
+         if (!match) return;
+         
+         const season = parseInt(match[1]);
+         const episode = parseInt(match[2]);
+
+         try {
+             await apiFetch('/api/streaming/mark-watched', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     profileId: parseInt(profileId),
+                     metaId: item.id,
+                     metaType: item.type,
+                     watched: true,
+                     season,
+                     episode
+                 })
+             })
+             window.dispatchEvent(new CustomEvent('history-updated'))
+         } catch (e) {
+             console.error('Failed to mark episode watched', e)
+         }
+    }
+
+    const removeFromContinueWatching = async () => {
+        onRemove(item)
+    }
+
+    const contextItems = [
         {
             label: 'Play',
-            icon: <Play size={16} />,
-            action: handlePlay
+            icon: Play,
+            onClick: handlePlay
         },
         {
             label: 'View Details',
-            icon: <Eye size={16} />,
-            action: () => {
+            icon: Eye,
+            onClick: () => {
                 window.location.href = getItemUrl(item)
             }
         },
+        { type: 'separator' } as any,
+        isContinueWatching ? {
+            label: 'Remove from Continue Watching',
+            icon: Trash2,
+            variant: 'danger',
+            onClick: removeFromContinueWatching
+        } : (
+            // If it's a series and has an active episode, show "Mark Episode" option too
+            item.type === 'series' && item.episodeDisplay ? [
+                {
+                    label: `Mark ${item.episodeDisplay} Watched`,
+                    icon: Check,
+                    onClick: markEpisodeWatched
+                },
+                {
+                    label: isWatched ? 'Mark Series Unwatched' : 'Mark Series Watched',
+                    icon: isWatched ? X : Check,
+                    onClick: toggleWatched
+                }
+            ] : {
+                label: isWatched ? 'Mark as Unwatched' : 'Mark as Watched',
+                icon: isWatched ? X : Check,
+                onClick: toggleWatched
+            }
+        ),
+        { type: 'separator' } as any,
         {
             label: 'Add to List...',
-            icon: <Plus size={16} />,
-            action: () => setShowListModal(true)
+            icon: Plus,
+            onClick: () => setShowListModal(true)
         }
-    ]
-
-    if (isContinueWatching) {
-        contextItems.push({
-            label: 'Remove from Continue Watching',
-            icon: <Trash2 size={16} />,
-            danger: true,
-            action: async () => {
-                try {
-                    await apiFetch(`/api/streaming/progress/${item.type}/${item.id}?profileId=${profileId}`, {
-                        method: 'DELETE'
-                    })
-                    window.dispatchEvent(new CustomEvent('history-updated'))
-                } catch (e) {
-                    console.error("Failed to remove progress", e)
-                }
-            }
-        })
-    }
+    ].flat()
 
     return (
         <>
-            <a 
-              href={getItemUrl(item)} 
-              className={`${styles.mediaCard} ${isRanked ? styles.rankedCard : ''}`}
-              onClick={(e) => handleItemClick(e, item)}
-              onDragStart={handleDragStart}
-              draggable={false}
-              {...triggerProps}
+            <ContextMenu
+                items={contextItems}
             >
-              {isRanked && rank && (
-                <span className={`${styles.rankNumber} ${rank === 10 ? styles.rankNumber10 : ''}`}>
-                    {rank}
-                </span>
-              )}
-              
-              <div className={styles.posterContainer}>
-                {item.poster ? (
-                  <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
-                ) : (
-                  <div className={styles.noPoster}>{item.name}</div>
-                )}
-                <div className={styles.badgesContainer}>
-                  {showImdbRatings && item.imdbRating && (
-                    <RatingBadge 
-                      rating={parseFloat(item.imdbRating)} 
-                      style={{ position: 'relative', top: 'auto', right: 'auto', marginBottom: '0' }}
-                    />
-                  )}
-                  {/* @ts-ignore */}
-                  {showAgeRatings && (item.certification || item.rating || item.contentRating) && (
-                    <span className={styles.ageRatingBadge}>
-                      {/* @ts-ignore */}
-                      {item.certification || item.rating || item.contentRating}
+                <a 
+                  href={getItemUrl(item)} 
+                  className={`${styles.mediaCard} ${isRanked ? styles.rankedCard : ''}`}
+                  onClick={(e) => handleItemClick(e, item)}
+                  onDragStart={handleDragStart}
+                  draggable={false}
+                >
+                  {isRanked && rank && (
+                    <span className={`${styles.rankNumber} ${rank === 10 ? styles.rankNumber10 : ''}`}>
+                        {rank}
                     </span>
                   )}
-                </div>
-                {/* Progress bar for continue watching */}
-                {isContinueWatching && item.progressPercent !== undefined && item.progressPercent > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '4px',
-                    background: 'rgba(0, 0, 0, 0.6)',
-                    borderBottomLeftRadius: '8px',
-                    borderBottomRightRadius: '8px',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{
-                      width: `${item.progressPercent}%`,
-                      height: '100%',
-                      background: 'linear-gradient(90deg, #8b5cf6, #a855f7)',
-                      transition: 'width 0.3s ease'
-                    }} />
-                  </div>
-                )}
-                {/* Episode badge for series */}
-                {isContinueWatching && item.episodeDisplay && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    left: '8px',
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    color: '#fff',
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    padding: '3px 8px',
-                    borderRadius: '4px',
-                    backdropFilter: 'blur(4px)'
-                  }}>
-                    {item.episodeDisplay}
-                  </div>
-                )}
-                <div className={styles.cardOverlay}>
-                  <div className={styles.cardTitle}>{item.name}</div>
-                </div>
-              </div>
-            </a>
+                  
+                  <div className={styles.posterContainer}>
+                    {item.poster ? (
+                      <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
+                    ) : (
+                      <div className={styles.noPoster}>{item.name}</div>
+                    )}
+                    
+                    {/* Watched Indicator - Top Left */}
+                    {/* @ts-ignore */}
+                    {item.isWatched && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            background: 'rgba(0, 0, 0, 0.7)',
+                            color: '#4ade80',
+                            padding: '4px',
+                            borderRadius: '50%',
+                            backdropFilter: 'blur(4px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10
+                        }}>
+                            <Check size={14} strokeWidth={3} />
+                        </div>
+                    )}
 
-            <ContextMenu 
-                isOpen={isOpen}
-                onClose={closeMenu}
-                position={position}
-                items={contextItems}
-                title={item.name}
-            />
+                    <div className={styles.badgesContainer}>
+                      {showImdbRatings && item.imdbRating && (
+                        <RatingBadge 
+                          rating={parseFloat(item.imdbRating)} 
+                          style={{ position: 'relative', top: 'auto', right: 'auto', marginBottom: '0' }}
+                        />
+                      )}
+                      {/* @ts-ignore */}
+                      {showAgeRatings && (item.ageRating || item.certification || item.rating || item.contentRating) && (
+                        <span className={styles.ageRatingBadge}>
+                          {/* @ts-ignore */}
+                          {item.ageRating || item.certification || item.rating || item.contentRating}
+                        </span>
+                      )}
+                    </div>
+                    {/* Progress bar */}
+                    {(isContinueWatching || (item.progressPercent !== undefined && item.progressPercent > 0)) && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: '4px',
+                        background: 'rgba(0, 0, 0, 0.6)',
+                        borderBottomLeftRadius: '8px',
+                        borderBottomRightRadius: '8px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${item.progressPercent}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #8b5cf6, #a855f7)',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    )}
+                    {/* Episode badge for series */}
+                    {item.episodeDisplay && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        background: 'rgba(0, 0, 0, 0.7)',
+                        color: '#fff',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        backdropFilter: 'blur(4px)'
+                      }}>
+                        {item.episodeDisplay}
+                      </div>
+                    )}
+                    <div className={styles.cardOverlay}>
+                      <div className={styles.cardTitle}>{item.name}</div>
+                    </div>
+                  </div>
+                </a>
+            </ContextMenu>
             
             <ListSelectionModal
                 isOpen={showListModal}

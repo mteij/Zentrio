@@ -92,6 +92,10 @@ export const StreamingPlayer = () => {
     const [shortVideoProgress, setShortVideoProgress] = useState(0)
     const shortVideoWarningDismissedRef = useRef(false)
 
+    // Trakt scrobbling state
+    const traktScrobbleStartedRef = useRef(false)
+    const lastScrobbleProgressRef = useRef(0)
+
     // Parse URL params or location state
     useEffect(() => {
         const initPlayer = async () => {
@@ -265,6 +269,31 @@ export const StreamingPlayer = () => {
                 }).catch(console.error)
             }
         }
+
+        // Trakt scrobbling - start if not already started
+        if (
+            meta &&
+            profileId &&
+            dur > 0 &&
+            !traktScrobbleStartedRef.current
+        ) {
+            traktScrobbleStartedRef.current = true
+            const progress = (currentTime / dur) * 100
+            
+            // Fire and forget - don't block playback
+            apiFetch('/api/trakt/scrobble/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    profileId,
+                    metaType: meta.type,
+                    imdbId: meta.id.startsWith('tt') ? meta.id : undefined,
+                    season: meta.season,
+                    episode: meta.episode,
+                    progress: Math.round(progress)
+                })
+            }).catch(() => {}) // Silently ignore errors
+        }
     }, [meta, profileId, nextEpisode, showShortVideoWarning, showNextEpisodePopup])
 
     // Handle video ended
@@ -274,12 +303,29 @@ export const StreamingPlayer = () => {
             clearInterval(countdownIntervalRef.current)
             countdownIntervalRef.current = null
         }
+
+        // Trakt scrobble stop (100% progress marks as watched)
+        if (meta && profileId && traktScrobbleStartedRef.current) {
+            apiFetch('/api/trakt/scrobble/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    profileId,
+                    metaType: meta.type,
+                    imdbId: meta.id.startsWith('tt') ? meta.id : undefined,
+                    season: meta.season,
+                    episode: meta.episode,
+                    progress: 100
+                })
+            }).catch(() => {})
+            traktScrobbleStartedRef.current = false
+        }
         
         if (nextEpisode) {
             // Auto-play next episode
             goToEpisode(nextEpisode)
         }
-    }, [nextEpisode])
+    }, [nextEpisode, meta, profileId])
 
     // Handle error
     const handleError = useCallback((error: Error) => {
@@ -336,6 +382,25 @@ export const StreamingPlayer = () => {
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [navigate])
+
+    // Cleanup scrobble on unmount (user navigating away)
+    useEffect(() => {
+        return () => {
+            if (meta && profileId && traktScrobbleStartedRef.current && duration > 0) {
+                const progress = (lastSavedProgressRef.current / duration) * 100
+                // Use navigator.sendBeacon for reliable delivery on page unload
+                const data = JSON.stringify({
+                    profileId,
+                    metaType: meta.type,
+                    imdbId: meta.id.startsWith('tt') ? meta.id : undefined,
+                    season: meta.season,
+                    episode: meta.episode,
+                    progress: Math.round(progress)
+                })
+                navigator.sendBeacon('/api/trakt/scrobble/stop', new Blob([data], { type: 'application/json' }))
+            }
+        }
+    }, [meta, profileId, duration])
 
     // Loading state
     if (loading) {

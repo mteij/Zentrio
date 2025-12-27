@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Play, Plus, Check, ArrowLeft, Zap, HardDrive, Wifi, Eye, EyeOff } from 'lucide-react'
+import { Play, Plus, Check, ArrowLeft, Zap, HardDrive, Wifi, Eye, EyeOff, MoreVertical, ChevronUp } from 'lucide-react'
 
 import { Layout, LazyImage, RatingBadge, SkeletonDetails, SkeletonStreamList } from '../../components'
+import { DropdownMenu } from '../../components/ui/DropdownMenu'
+import { ContextMenu } from '../../components/ui/ContextMenu'
 import { MetaDetail, Stream, Manifest } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import { useStreamLoader, FlatStream, AddonLoadingState } from '../../hooks/useStreamLoader'
@@ -231,8 +233,36 @@ export const StreamingDetails = () => {
     
     const newWatched = !currentlyWatched
     
+    // Optimistically update local state
+    const updateLocalState = (watched: boolean) => {
+      if (isMovie) {
+        setData(prev => prev ? {
+          ...prev,
+          watchProgress: {
+            ...(prev.watchProgress || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
+            isWatched: watched
+          }
+        } : prev)
+      } else if (season !== undefined && episode !== undefined) {
+        const key = `${season}-${episode}`
+        setData(prev => prev ? {
+          ...prev,
+          seriesProgress: {
+            ...(prev.seriesProgress || {}),
+            [key]: {
+              ...(prev.seriesProgress?.[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
+              isWatched: watched
+            }
+          }
+        } : prev)
+      }
+    }
+
+    // Update UI immediately
+    updateLocalState(newWatched)
+    
     try {
-      await apiFetch('/api/streaming/mark-watched', {
+      const res = await apiFetch('/api/streaming/mark-watched', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -245,30 +275,38 @@ export const StreamingDetails = () => {
         })
       })
       
-      // Update local state
-      if (isMovie) {
-        setData({
-          ...data,
-          watchProgress: {
-            ...(data.watchProgress || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
-            isWatched: newWatched
-          }
-        })
-      } else if (season !== undefined && episode !== undefined) {
-        const key = `${season}-${episode}`
-        setData({
-          ...data,
-          seriesProgress: {
-            ...(data.seriesProgress || {}),
-            [key]: {
-              ...(data.seriesProgress?.[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
-              isWatched: newWatched
+      const result = await res.json()
+      const traktSynced = result.traktSynced
+      
+      // Show toast with undo option
+      const episodeLabel = season !== undefined && episode !== undefined 
+        ? `S${season}:E${episode}` 
+        : data.meta.name
+      
+      if (newWatched) {
+        toast.success(
+          traktSynced ? `Marked ${episodeLabel} as watched (synced to Trakt)` : `Marked ${episodeLabel} as watched`,
+          {
+            duration: 5000,
+            action: {
+              label: 'Undo',
+              onClick: () => {
+                // Undo - mark as unwatched
+                toggleWatched(season, episode)
+              }
             }
           }
-        })
+        )
+      } else {
+        toast.success(
+          traktSynced ? `Marked ${episodeLabel} as unwatched (removed from Trakt)` : `Marked ${episodeLabel} as unwatched`,
+          { duration: 3000 }
+        )
       }
     } catch (e) {
       console.error('Failed to toggle watched status', e)
+      // Revert on error
+      updateLocalState(!newWatched)
       toast.error('Failed to update watched status')
     }
   }
@@ -282,7 +320,7 @@ export const StreamingDetails = () => {
       .map((v: any) => v.number || v.episode)
     
     try {
-      await apiFetch('/api/streaming/mark-season-watched', {
+      const res = await apiFetch('/api/streaming/mark-season-watched', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -295,6 +333,8 @@ export const StreamingDetails = () => {
         })
       })
       
+      const result = await res.json()
+      
       // Update local state for all episodes in the season
       const updatedProgress = { ...(data.seriesProgress || {}) }
       episodes.forEach((ep: number) => {
@@ -306,10 +346,108 @@ export const StreamingDetails = () => {
       })
       
       setData({ ...data, seriesProgress: updatedProgress })
-      toast.success(watched ? 'Season marked as watched' : 'Season marked as unwatched')
+      toast.success(
+        result.traktSynced
+          ? `Season ${season} ${watched ? 'marked as watched' : 'unmarked'} (synced to Trakt)`
+          : `Season ${season} ${watched ? 'marked as watched' : 'unmarked'}`
+      )
     } catch (e) {
       console.error('Failed to toggle season watched', e)
       toast.error('Failed to update season watched status')
+    }
+  }
+
+  // Mark entire series as watched
+  const markSeriesWatched = async (watched: boolean) => {
+    if (!data || !profileId || !data.meta.videos) return
+    
+    const allEpisodes = data.meta.videos.map((v: any) => ({
+      season: v.season,
+      episode: v.number || v.episode
+    }))
+    
+    try {
+      const res = await apiFetch('/api/streaming/mark-series-watched', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: parseInt(profileId),
+          metaId: id,
+          watched,
+          allEpisodes
+        })
+      })
+      
+      const result = await res.json()
+      
+      // Update local state for all episodes
+      const updatedProgress = { ...(data.seriesProgress || {}) }
+      allEpisodes.forEach((ep: { season: number; episode: number }) => {
+        const key = `${ep.season}-${ep.episode}`
+        updatedProgress[key] = {
+          ...(updatedProgress[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
+          isWatched: watched
+        }
+      })
+      
+      setData({ ...data, seriesProgress: updatedProgress })
+      toast.success(
+        result.traktSynced
+          ? `Series ${watched ? 'marked as watched' : 'unmarked'} (${result.episodesUpdated} episodes, synced to Trakt)`
+          : `Series ${watched ? 'marked as watched' : 'unmarked'} (${result.episodesUpdated} episodes)`
+      )
+    } catch (e) {
+      console.error('Failed to mark series as watched', e)
+      toast.error('Failed to update series watched status')
+    }
+  }
+
+  // Mark all episodes before a specific one as watched
+  const markEpisodesBefore = async (season: number, episode: number, watched: boolean) => {
+    if (!data || !profileId || !data.meta.videos) return
+    
+    const allEpisodes = data.meta.videos.map((v: any) => ({
+      season: v.season,
+      episode: v.number || v.episode
+    }))
+    
+    try {
+      const res = await apiFetch('/api/streaming/mark-episodes-before', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: parseInt(profileId),
+          metaId: id,
+          season,
+          episode,
+          watched,
+          allEpisodes
+        })
+      })
+      
+      const result = await res.json()
+      
+      // Update local state for marked episodes
+      const updatedProgress = { ...(data.seriesProgress || {}) }
+      allEpisodes.forEach((ep: { season: number; episode: number }) => {
+        if (ep.season < season || (ep.season === season && ep.episode < episode)) {
+          const key = `${ep.season}-${ep.episode}`
+          updatedProgress[key] = {
+            ...(updatedProgress[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }),
+            isWatched: watched
+          }
+        }
+      })
+      
+      setData({ ...data, seriesProgress: updatedProgress })
+      toast.success(
+        result.traktSynced
+          ? `Marked ${result.episodesUpdated} episodes before S${season}E${episode} (synced to Trakt)`
+          : `Marked ${result.episodesUpdated} episodes before S${season}E${episode}`
+      )
+    } catch (e) {
+      console.error('Failed to mark episodes before', e)
+      toast.error('Failed to update watched status')
     }
   }
 
@@ -391,6 +529,28 @@ export const StreamingDetails = () => {
                     {inLibrary ? <Check size={20} /> : <Plus size={20} />}
                     {inLibrary ? 'In List' : 'Add to List'}
                   </button>
+                  
+                  {/* Three-dot menu for movie/series actions */}
+                  <DropdownMenu
+                    items={meta.type === 'movie' ? [
+                      {
+                        label: data.watchProgress?.isWatched ? 'Mark as unwatched' : 'Mark as watched',
+                        icon: data.watchProgress?.isWatched ? EyeOff : Eye,
+                        onClick: () => toggleWatched()
+                      }
+                    ] : [
+                      {
+                        label: 'Mark series as watched',
+                        icon: Eye,
+                        onClick: () => markSeriesWatched(true)
+                      },
+                      {
+                        label: 'Mark series as unwatched',
+                        icon: EyeOff,
+                        onClick: () => markSeriesWatched(false)
+                      }
+                    ]}
+                  />
                 </div>
 
                 <p className={styles.detailsDescription}>{meta.description}</p>
@@ -456,99 +616,113 @@ export const StreamingDetails = () => {
                     const progressPercent = epProgress?.progressPercent ?? 0
                     
                     return (
-                      <div
+                      <ContextMenu
                         key={ep.id || `${ep.season}-${epNum}`}
-                        className={styles.episodeItem}
-                        onClick={() => handleEpisodeSelect(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`, false)}
-                        style={{ position: 'relative' }}
+                        items={[
+                          {
+                            label: 'Play',
+                            icon: Play,
+                            onClick: () => handleQuickPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
+                          },
+                          { type: 'separator' },
+                          {
+                            label: isWatched ? 'Mark as unwatched' : 'Mark as watched',
+                            icon: isWatched ? EyeOff : Eye,
+                            onClick: () => toggleWatched(ep.season, epNum)
+                          },
+                          {
+                            label: 'Mark all before this as watched',
+                            icon: ChevronUp,
+                            onClick: () => markEpisodesBefore(ep.season, epNum, true)
+                          }
+                        ]}
                       >
-                        <div className={styles.episodeThumbnail}>
-                          {ep.thumbnail ? (
-                            <LazyImage src={ep.thumbnail} alt={ep.title || ep.name || `Episode ${epNum}`} />
-                          ) : (
-                            <div className={styles.episodeThumbnailPlaceholder}>
-                              <Play size={24} />
-                            </div>
-                          )}
-                          <span className={styles.episodeNumber}>{epNum}</span>
-                          {/* Progress bar on thumbnail */}
-                          {progressPercent > 0 && !isWatched && (
-                            <div style={{
-                              position: 'absolute',
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              height: '3px',
-                              background: 'rgba(0, 0, 0, 0.6)'
-                            }}>
+                        <div
+                          className={styles.episodeItem}
+                          onClick={() => handleEpisodeSelect(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`, false)}
+                          style={{ position: 'relative' }}
+                        >
+                          <div className={styles.episodeThumbnail}>
+                            {ep.thumbnail ? (
+                              <LazyImage src={ep.thumbnail} alt={ep.title || ep.name || `Episode ${epNum}`} />
+                            ) : (
+                              <div className={styles.episodeThumbnailPlaceholder}>
+                                <Play size={24} />
+                              </div>
+                            )}
+                            <span className={styles.episodeNumber}>{epNum}</span>
+                            {/* Watched badge on thumbnail */}
+                            {isWatched && (
                               <div style={{
-                                width: `${progressPercent}%`,
-                                height: '100%',
-                                background: 'linear-gradient(90deg, #8b5cf6, #a855f7)'
-                              }} />
-                            </div>
-                          )}
-                        </div>
-                        <div className={styles.episodeContent}>
-                          <div className={styles.episodeHeader}>
-                            {/* Watched indicator */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleWatched(ep.season, epNum)
-                              }}
-                              style={{
+                                position: 'absolute',
+                                top: '6px',
+                                right: '6px',
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                background: 'rgba(34, 197, 94, 0.9)',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '24px',
-                                height: '24px',
-                                borderRadius: '50%',
-                                background: isWatched ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                                border: `1px solid ${isWatched ? '#22c55e' : 'rgba(255, 255, 255, 0.3)'}`,
-                                color: isWatched ? '#22c55e' : '#888',
-                                cursor: 'pointer',
-                                marginRight: '8px',
-                                flexShrink: 0
-                              }}
-                              title={isWatched ? 'Mark as unwatched' : 'Mark as watched'}
-                            >
-                              {isWatched ? <Check size={14} /> : <Eye size={14} />}
-                            </button>
-                            <span className={styles.episodeTitle} style={{ opacity: isWatched ? 0.7 : 1 }}>
-                              {ep.title || ep.name || `Episode ${epNum}`}
-                            </span>
-                            <button 
-                                className={styles.episodePlayBtn}
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleQuickPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
-                                }}
-                                title="Quick play"
-                            >
-                                <Play size={22} fill="currentColor" />
-                            </button>
-                          </div>
-                          <div className={styles.episodeMeta}>
-                            {showImdbRatings && ep.rating && (
-                              <span className={styles.episodeRating}>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="#f5c518"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                                {Number(ep.rating).toFixed(1)}
-                              </span>
+                                justifyContent: 'center'
+                              }}>
+                                <Check size={12} color="#fff" />
+                              </div>
                             )}
-                            {showAgeRatings && (ep.certification || ep.contentRating) && (
-                              <span className={styles.episodeAge}>{ep.certification || ep.contentRating}</span>
-                            )}
-                            {ep.runtime && <span className={styles.episodeRuntime}>{ep.runtime}</span>}
+                            {/* Progress bar on thumbnail */}
                             {progressPercent > 0 && !isWatched && (
-                              <span style={{ fontSize: '0.75rem', color: '#a855f7' }}>{progressPercent}% watched</span>
+                              <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: '3px',
+                                background: 'rgba(0, 0, 0, 0.6)'
+                              }}>
+                                <div style={{
+                                  width: `${progressPercent}%`,
+                                  height: '100%',
+                                  background: 'linear-gradient(90deg, #8b5cf6, #a855f7)'
+                                }} />
+                              </div>
                             )}
                           </div>
-                          {ep.overview && (
-                            <p className={styles.episodeDescription}>{ep.overview}</p>
-                          )}
+                          <div className={styles.episodeContent}>
+                            <div className={styles.episodeHeader}>
+                              <span className={styles.episodeTitle} style={{ opacity: isWatched ? 0.7 : 1 }}>
+                                {ep.title || ep.name || `Episode ${epNum}`}
+                              </span>
+                              <button 
+                                  className={styles.episodePlayBtn}
+                                  onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleQuickPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
+                                  }}
+                                  title="Quick play"
+                              >
+                                  <Play size={22} fill="currentColor" />
+                              </button>
+                            </div>
+                            <div className={styles.episodeMeta}>
+                              {showImdbRatings && ep.rating && (
+                                <span className={styles.episodeRating}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#f5c518"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                                  {Number(ep.rating).toFixed(1)}
+                                </span>
+                              )}
+                              {showAgeRatings && (ep.certification || ep.contentRating) && (
+                                <span className={styles.episodeAge}>{ep.certification || ep.contentRating}</span>
+                              )}
+                              {ep.runtime && <span className={styles.episodeRuntime}>{ep.runtime}</span>}
+                              {progressPercent > 0 && !isWatched && (
+                                <span style={{ fontSize: '0.75rem', color: '#a855f7' }}>{progressPercent}% watched</span>
+                              )}
+                            </div>
+                            {ep.overview && (
+                              <p className={styles.episodeDescription}>{ep.overview}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      </ContextMenu>
                     )
                   })}
                 </div>

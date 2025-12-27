@@ -1,8 +1,10 @@
 #[cfg(all(desktop, not(debug_assertions)))]
 use tauri_plugin_shell::ShellExt;
+#[cfg(any(windows, target_os = "linux"))]
 use tauri_plugin_deep_link::DeepLinkExt;
 use std::sync::Mutex;
 use tauri::Manager;
+#[cfg(desktop)]
 use tauri::Emitter;
 
 struct ServerPort(Mutex<u16>);
@@ -14,6 +16,7 @@ fn get_server_port(state: tauri::State<ServerPort>) -> u16 {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())

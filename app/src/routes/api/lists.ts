@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { listDb, userDb, profileDb, type User, type ListShare } from '../../services/database'
+import { listDb, userDb, profileDb, watchHistoryDb, type User, type ListShare } from '../../services/database'
 import { sessionMiddleware } from '../../middleware/session'
 import { emailService } from '../../services/email'
 import { getConfig } from '../../services/envParser'
@@ -61,7 +61,41 @@ lists.delete('/:id', async (c) => {
 // Get items in a list
 lists.get('/:id/items', async (c) => {
   const id = parseInt(c.req.param('id'))
+  const { profileId } = c.req.query()
   const items = listDb.getItems(id)
+
+  if (profileId) {
+    // Enrich with watch status
+    const distinctIds = new Set<string>()
+    items.forEach(i => {
+        distinctIds.add(i.meta_id)
+        if (i.meta_id.startsWith('tmdb:')) {
+            distinctIds.add(i.meta_id.replace('tmdb:', ''))
+        }
+    })
+    
+    // @ts-ignore
+    const ids = Array.from(distinctIds)
+    const statusMap = watchHistoryDb.getBatchStatus(parseInt(profileId), ids)
+    
+    const enrichedItems = items.map(item => {
+      let status = statusMap[item.meta_id]
+      if (!status && item.meta_id.startsWith('tmdb:')) {
+          status = statusMap[item.meta_id.replace('tmdb:', '')]
+      }
+      
+      if (status) {
+        return { 
+          ...item, 
+          is_watched: status.isWatched, 
+          progress_percent: status.progress 
+        }
+      }
+      return item
+    })
+    return c.json({ items: enrichedItems })
+  }
+
   return c.json({ items })
 })
 

@@ -48,15 +48,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.version.outputs.version }}"
-
+          
+          # Check if release exists
           if gh release view "$TAG" > /dev/null 2>&1; then
             echo "✅ Release $TAG already exists"
           else
-            echo "📦 Creating draft release $TAG"
-            gh release create "$TAG" \
-              --draft \
-              --title "Zentrio $TAG" \
-              --notes "🚀 Release in progress... Build artifacts are being generated for all platforms (Windows, macOS, Linux, Android, iOS). This release will be updated automatically once all builds complete."
+            # If triggered by push to main, create a draft release
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "📦 Creating draft release $TAG"
+              gh release create "$TAG" \
+                --draft \
+                --title "Zentrio $TAG" \
+                --notes "🚀 Release in progress... Build artifacts are being generated for all platforms (Windows, macOS, Linux, Android, iOS). This release will be updated automatically once all builds complete."
+            else
+              # If triggered by workflow_dispatch (from release.yml), the release should exist
+              echo "❌ Release $TAG does not exist. This workflow should be triggered by release.yml which creates the release first."
+              echo "Please ensure the release.yml workflow runs before this one."
+              exit 1
+            fi
           fi
 
       - name: Get Release ID

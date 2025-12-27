@@ -1,7 +1,7 @@
 import { AddonClient, RetryableError } from './client'
 import { ZentrioAddonClient } from './zentrio-client'
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
-import { addonDb, streamDb, profileDb, profileProxySettingsDb } from '../database'
+import { addonDb, streamDb, profileDb, profileProxySettingsDb, watchHistoryDb } from '../database'
 import { getConfig } from '../envParser'
 import { StreamProcessor, ParsedStream } from './stream-processor'
 import { tmdbService } from '../tmdb/index'
@@ -420,7 +420,8 @@ export class AddonManager {
         }
         
         if (combined.length > 0) {
-            return combined.slice(0, 20); // Return top 20 items available for the UI
+            const final = combined.slice(0, 20); // Return top 20 items available for the UI
+            return this.enrichContent(final, profileId);
         }
       } catch (e) {
         console.warn('Failed to fetch mixed trending from TMDB addon', e)
@@ -443,7 +444,8 @@ export class AddonManager {
           const items = await client.getCatalog(cat.type, cat.id, {}, config)
           if (items && items.length > 0) {
             const filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
-            return filtered.slice(0, 10)
+            const enriched = await this.enrichContent(filtered, profileId);
+            return enriched.slice(0, 10)
           }
         }
       } catch (e) {
@@ -479,7 +481,7 @@ export class AddonManager {
              const items = await tmdbClient.getCatalog(cat.type, cat.id, {}, config);
              if (items && items.length > 0) {
                  const filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
-                 return filtered.slice(0, 10);
+                 return this.enrichContent(filtered.slice(0, 10), profileId);
              }
         }
       } catch (e) {
@@ -550,15 +552,47 @@ export class AddonManager {
         // But doing this for every item in every catalog might be too slow on dashboard load.
         // Let's restrict to: if filtering enabled OR if we are enriching (maybe add a flag?)
         // For now, assume if we are here, we want to try our best.
-        if (!cert && tmdbClient && item.id.startsWith('tmdb:') && (parentalSettings.enabled || true)) { 
+        if (!cert && tmdbClient && (parentalSettings.enabled || true)) { 
              // We enable this always for now to fix "no badges" issue, effectively enriching on the fly.
             try {
-                const tmdbId = item.id.split(':')[1];
-                const type = item.type === 'movie' ? 'movie' : 'series';
-                // Use 'en-US' as default language for rating check
-                cert = await tmdbService.getAgeRating(tmdbClient, tmdbId, type, 'en-US');
+                let tmdbId: string | null = null;
+                let type: 'movie' | 'series' = item.type === 'movie' ? 'movie' : 'series';
+
+                console.log('[Enrichment] Checking item:', item.id, item.type, 'Has cert:', !!cert);
+
+                if (item.id.startsWith('tmdb:')) {
+                    tmdbId = item.id.split(':')[1];
+                } else if (item.id.startsWith('tt')) {
+                     // Resolve IMDB ID to TMDB ID
+                     const findResults = await tmdbClient.find({
+                         id: item.id,
+                         external_source: 'imdb_id'
+                     });
+                     
+                     if (type === 'movie' && findResults.movie_results?.length > 0) {
+                         tmdbId = findResults.movie_results[0].id.toString();
+                     } else if (type === 'series' && findResults.tv_results?.length > 0) {
+                         tmdbId = findResults.tv_results[0].id.toString();
+                     } else {
+                         // Fallback: try to guess type from results if type is ambiguous or we want to be robust
+                         if (findResults.movie_results?.length > 0) {
+                             tmdbId = findResults.movie_results[0].id.toString();
+                             type = 'movie';
+                         } else if (findResults.tv_results?.length > 0) {
+                             tmdbId = findResults.tv_results[0].id.toString();
+                             type = 'series';
+                         }
+                     }
+                     console.log('[Enrichment] Resolved tt to tmdb:', item.id, '->', tmdbId);
+                }
+
+                if (tmdbId) {
+                    // Use 'en-US' as default language for rating check
+                    cert = await tmdbService.getAgeRating(tmdbClient, tmdbId, type, 'en-US');
+                    console.log('[Enrichment] Fetched cert for', tmdbId, ':', cert);
+                }
             } catch (e) {
-                // ignore
+                console.warn('[Enrichment] Failed:', e);
             }
         }
 
@@ -621,6 +655,47 @@ export class AddonManager {
     }));
 
     return items.filter((_, index) => filteredItems[index]);
+  }
+
+  private async enrichContent(items: MetaPreview[], profileId: number): Promise<MetaPreview[]> {
+    if (items.length === 0) return items;
+    
+    // Get unique IDs and potential aliases (e.g. without tmdb: prefix)
+    const distinctIds = new Set<string>();
+    items.forEach(i => {
+        distinctIds.add(i.id);
+        if (i.id.startsWith('tmdb:')) {
+            distinctIds.add(i.id.replace('tmdb:', ''));
+        }
+    });
+
+    const ids = Array.from(distinctIds);
+    
+    try {
+        const statusMap = watchHistoryDb.getBatchStatus(profileId, ids);
+        
+        return items.map(item => {
+            // Try exact match, then stripped match
+            let status = statusMap[item.id];
+            if (!status && item.id.startsWith('tmdb:')) {
+                status = statusMap[item.id.replace('tmdb:', '')];
+            }
+            
+            if (status) {
+                // console.log('[EnrichContent] Match found for', item.id, status);
+                const enriched = { ...item } as any;
+                if (status.isWatched) enriched.isWatched = true;
+                if (status.progress > 0) enriched.progressPercent = status.progress;
+                if (status.lastStream) enriched.lastStream = status.lastStream;
+                if ((status as any).episodeDisplay) enriched.episodeDisplay = (status as any).episodeDisplay;
+                return enriched;
+            }
+            return item;
+        });
+    } catch (e) {
+        console.warn('Failed to enrich content with watch status', e);
+        return items;
+    }
   }
 
   async getMeta(type: string, id: string, profileId: number): Promise<MetaDetail | null> {
@@ -904,7 +979,8 @@ export class AddonManager {
     }
 
     const parentalSettings = this.getParentalSettings(profileId);
-    return this.filterContent(uniqueResults, parentalSettings, profile?.user_id);
+    const filtered = await this.filterContent(uniqueResults, parentalSettings, profile?.user_id);
+    return this.enrichContent(filtered, profileId);
   }
 
   async getCatalogItems(profileId: number, manifestUrl: string, type: string, id: string, skip?: number): Promise<{ title: string, items: MetaPreview[] } | null> {
@@ -957,7 +1033,7 @@ export class AddonManager {
       
       return {
         title: `${client.manifest.name} - ${catalog.name || catalog.type}`,
-        items: filteredItems
+        items: await this.enrichContent(filteredItems, profileId)
       }
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e)
@@ -1066,7 +1142,8 @@ export class AddonManager {
     
     const parentalSettings = this.getParentalSettings(profileId);
     const profile = profileDb.findById(profileId);
-    return this.filterContent(results, parentalSettings, profile?.user_id);
+    const filtered = await this.filterContent(results, parentalSettings, profile?.user_id);
+    return this.enrichContent(filtered, profileId);
   }
 
   async getStreams(type: string, id: string, profileId: number, season?: number, episode?: number, platform?: string): Promise<{ addon: Manifest, streams: Stream[] }[]> {
@@ -1450,7 +1527,7 @@ export class AddonManager {
         }
       }
 
-      return filteredItems
+      return this.enrichContent(filteredItems, profileId)
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e)
       console.error(`[AddonManager] Failed to fetch catalog ${catalogId} from ${manifestUrl}`, e)

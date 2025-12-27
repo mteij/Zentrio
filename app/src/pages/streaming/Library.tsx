@@ -183,7 +183,7 @@ export const StreamingLibrary = () => {
 
   const loadItems = async (lid: number) => {
     try {
-      const itemsRes = await apiFetch(`/api/lists/${lid}/items`)
+      const itemsRes = await apiFetch(`/api/lists/${lid}/items?profileId=${profileId}`)
       const itemsData = await itemsRes.json()
       setItems(itemsData.items || [])
     } catch (err) {

@@ -8,6 +8,7 @@ import addonsApiRoutes from './addons'
 import listsApiRoutes from './lists'
 import appearanceApiRoutes from './appearance'
 import syncApiRoutes from './sync'
+import traktApiRoutes from './trakt'
 import { getConfig } from '../../services/envParser'
 
 const app = new Hono()
@@ -22,6 +23,7 @@ app.route('/addons', addonsApiRoutes)
 app.route('/lists', listsApiRoutes)
 app.route('/appearance', appearanceApiRoutes)
 app.route('/sync', syncApiRoutes)
+app.route('/trakt', traktApiRoutes)
 
 // Environment Configuration now read via getConfig() within handlers
 

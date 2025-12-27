@@ -40,6 +40,7 @@ export interface MetaPreview {
   releaseInfo?: string
   imdbRating?: string
   released?: string
+  ageRating?: string
   posterShape?: 'regular' | 'square' | 'landscape'
   links?: {
     name: string

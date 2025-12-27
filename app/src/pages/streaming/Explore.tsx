@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ChevronDown } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { Layout, StreamingRow, SkeletonRow, Hero, SkeletonHero, LazyImage, RatingBadge, SkeletonCard } from '../../components'
+import { TraktRecommendationsRow } from '../../components/streaming/TraktRecommendationsRow'
 
 import { MetaPreview } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
@@ -24,9 +26,7 @@ const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: G
       // Fetch specifically for this genre
       // We limit to 20 items for the row
       const typeParam = type && type !== 'all' ? type : 'movie,series'
-      const res = await fetch(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genre)}&skip=0`)
-      if (!res.ok) throw new Error('Failed to load genre')
-      return res.json() as Promise<{ items: MetaPreview[] }>
+      return apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genre)}&skip=0`)
     },
     staleTime: 1000 * 60 * 60 // 1 hour
   })
@@ -97,9 +97,7 @@ export const StreamingExplore = () => {
   const { data: dashboardData, isLoading: loadingDash } = useQuery({
     queryKey: ['dashboard', profileId],
     queryFn: async () => {
-      const res = await fetch(`/api/streaming/dashboard?profileId=${profileId}`)
-      if (!res.ok) throw new Error('Failed to load dashboard')
-      return res.json() as Promise<ExploreDashboardData>
+      return apiFetchJson<ExploreDashboardData>(`/api/streaming/dashboard?profileId=${profileId}`)
     },
     enabled: !isFilteredView
   })
@@ -108,9 +106,7 @@ export const StreamingExplore = () => {
   const { data: filtersData, isLoading: loadingFilters } = useQuery({
     queryKey: ['filters', profileId],
     queryFn: async () => {
-      const res = await fetch(`/api/streaming/filters?profileId=${profileId}`)
-      if (!res.ok) throw new Error('Failed to load filters')
-      return res.json() as Promise<FiltersData>
+      return apiFetchJson<FiltersData>(`/api/streaming/filters?profileId=${profileId}`)
     }
   })
 
@@ -131,8 +127,7 @@ export const StreamingExplore = () => {
         try {
             const typeParam = activeType || ''
             const genreParam = activeGenre || ''
-            const res = await fetch(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=0`)
-            const data = await res.json()
+            const data = await apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=0`)
             setFilteredItems(data.items || [])
             setSkip(data.items?.length || 0)
             if ((data.items?.length || 0) < 20) setHasMore(false)
@@ -151,8 +146,7 @@ export const StreamingExplore = () => {
     const typeParam = activeType || ''
     const genreParam = activeGenre || ''
     try {
-        const res = await fetch(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=${skip}`)
-        const data = await res.json()
+        const data = await apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=${skip}`)
         if (data.items && data.items.length > 0) {
             setFilteredItems(prev => [...prev, ...data.items])
             setSkip(prev => prev + data.items.length)
@@ -316,7 +310,7 @@ export const StreamingExplore = () => {
                                     onChange={(e) => updateFilter('genre', e.target.value)}
                                     value=""
                                 >
-                                    <option value="" disabled selected>Genres</option>
+                                    <option value="" disabled>Genres</option>
                                     {genres.map(g => (
                                         <option key={g} value={g} className="text-black bg-white">{g}</option>
                                     ))}
@@ -407,6 +401,40 @@ export const StreamingExplore = () => {
                                 showAgeRatings={showAgeRatings}
                                 isRanked={true}
                             />
+                         )}
+
+                         {/* Trakt Recommendations - only shows if connected */}
+                         {viewMode === 'all' && (
+                           <>
+                             <TraktRecommendationsRow
+                               profileId={profileId!}
+                               type="movies"
+                               showImdbRatings={showImdbRatings}
+                               showAgeRatings={showAgeRatings}
+                             />
+                             <TraktRecommendationsRow
+                               profileId={profileId!}
+                               type="shows"
+                               showImdbRatings={showImdbRatings}
+                               showAgeRatings={showAgeRatings}
+                             />
+                           </>
+                         )}
+                         {viewMode === 'movie' && (
+                           <TraktRecommendationsRow
+                             profileId={profileId!}
+                             type="movies"
+                             showImdbRatings={showImdbRatings}
+                             showAgeRatings={showAgeRatings}
+                           />
+                         )}
+                         {viewMode === 'series' && (
+                           <TraktRecommendationsRow
+                             profileId={profileId!}
+                             type="shows"
+                             showImdbRatings={showImdbRatings}
+                             showAgeRatings={showAgeRatings}
+                           />
                          )}
 
                          {/* Genre Rows - Pass viewMode as type */}

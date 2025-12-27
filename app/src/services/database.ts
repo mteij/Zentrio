@@ -4,7 +4,7 @@ import * as bcrypt from 'bcryptjs'
 import { join, dirname, isAbsolute } from 'path'
 import { mkdirSync, existsSync } from 'fs'
 import { randomBytes, randomInt, createHash } from 'crypto'
-import { encrypt } from './encryption'
+import { encrypt, decrypt } from './encryption'
 import { getConfig } from './envParser'
 
 // Initialize SQLite database (honor DATABASE_URL to support Docker volume persistence)
@@ -373,6 +373,33 @@ const db = new Database(dbPath)
     last_sync_at DATETIME,
     is_syncing BOOLEAN DEFAULT FALSE
   );
+
+  -- Trakt Integration Tables
+  CREATE TABLE IF NOT EXISTS trakt_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL UNIQUE,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    trakt_user_id TEXT,
+    trakt_username TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS trakt_sync_state (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL UNIQUE,
+    last_history_sync DATETIME,
+    last_push_sync DATETIME,
+    sync_enabled BOOLEAN DEFAULT TRUE,
+    push_to_trakt BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_trakt_accounts_profile ON trakt_accounts(profile_id);
+  CREATE INDEX IF NOT EXISTS idx_trakt_sync_state_profile ON trakt_sync_state(profile_id);
  `);
 
  // Migrations: Add new columns to watch_history for existing databases
@@ -1397,16 +1424,86 @@ export const watchHistoryDb = {
   },
 
   autoMarkWatched: (profileId: number, metaId: string, season?: number, episode?: number): void => {
-    // Mark as watched if position >= 90% of duration
+    // Mark as watched if position >= 80% of duration (matches Trakt's threshold)
     const seasonVal = season ?? -1
     const episodeVal = episode ?? -1
     const stmt = db.prepare(`
       UPDATE watch_history 
       SET is_watched = TRUE, watched_at = CURRENT_TIMESTAMP, dirty = TRUE
       WHERE profile_id = ? AND meta_id = ? AND season = ? AND episode = ?
-        AND duration > 0 AND position >= (duration * 0.9) AND is_watched = FALSE
+        AND duration > 0 AND position >= (duration * 0.8) AND is_watched = FALSE
     `)
     stmt.run(profileId, metaId, seasonVal, episodeVal)
+  },
+
+  getBatchStatus: (profileId: number, metaIds: string[]): Record<string, { isWatched: boolean, progress: number, duration: number, lastStream?: any }> => {
+    if (metaIds.length === 0) return {}
+
+    // We fetch all history for these meta IDs
+    // For movies, it's 1:1.
+    // For series, we might have multiple entries. We want to know if "watched" (maybe checking if user marked series as watched?)
+    // or if "in progress" (any episode watched).
+    
+    // NOTE: This simple query fetches ALL history for provided meta IDs.
+    const placeHolders = metaIds.map(() => '?').join(',')
+    const stmt = db.prepare(`SELECT * FROM watch_history WHERE profile_id = ? AND meta_id IN (${placeHolders}) AND deleted_at IS NULL`)
+    
+    // @ts-ignore
+    const rows = stmt.all(profileId, ...metaIds) as WatchHistoryItem[]
+    const result: Record<string, { isWatched: boolean, progress: number, duration: number, lastStream?: any }> = {}
+    
+    for (const row of rows) {
+        if (!result[row.meta_id]) {
+            result[row.meta_id] = { isWatched: false, progress: 0, duration: 0 }
+        }
+        
+        // For Movies (root items)
+        if (row.season === -1 && row.episode === -1) {
+            result[row.meta_id].isWatched = Boolean(row.is_watched)
+            if (row.duration && row.position) {
+                 result[row.meta_id].progress = (row.position / row.duration) * 100
+                 result[row.meta_id].duration = row.duration
+            }
+            if (row.last_stream) {
+                 try {
+                    result[row.meta_id].lastStream = JSON.parse(row.last_stream)
+                 } catch (e) {}
+            }
+        } else {
+             // For Series: Find the most recently updated "In Progress" episode
+             // We mimic "Continue Watching" logic:
+             // 1. Skip completed episodes (is_watched or > 90%)
+             // 2. Skip minimal progress (< 120s AND < 5%)
+             
+             // If the series is ALREADY marked as watched (via container row -1/-1), don't overwrite that status
+             if (result[row.meta_id].isWatched) continue;
+
+             const progressPercent = (row.duration && row.position) ? (row.position / row.duration) * 100 : 0;
+             const isCompleted = row.is_watched || progressPercent >= 90;
+             const meetsMinThreshold = (row.position && row.position >= 120) || progressPercent >= 5;
+
+             if (!isCompleted && meetsMinThreshold) {
+                 const currentRowDate = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+                 const existingLastDate = (result[row.meta_id] as any)._lastUpdate || 0;
+
+                 if (currentRowDate > existingLastDate) {
+                     (result[row.meta_id] as any)._lastUpdate = currentRowDate;
+                     
+                     // Only overwrite isWatched if we are sure (which we are not, so we leave it false unless container set it)
+                     // result[row.meta_id].isWatched = false; 
+                     result[row.meta_id].progress = progressPercent;
+                     // @ts-ignore
+                     result[row.meta_id].episodeDisplay = `S${row.season}:E${row.episode}`;
+                     result[row.meta_id].lastStream = row.last_stream ? JSON.parse(row.last_stream) : undefined;
+                 }
+             }
+        }
+    }
+    // Cleanup temporary _lastUpdate
+    for (const key in result) {
+        delete (result[key] as any)._lastUpdate;
+    }
+    return result
   }
   ,
 
@@ -1426,7 +1523,17 @@ export const watchHistoryDb = {
     // For now, let's keep it specific to the item requested.
     
     return result.changes > 0
-  }
+  },
+
+  deleteAllForSeries: (profileId: number, metaId: string): void => {
+    // Soft delete all entries for this series (including 0-progress ones)
+    const stmt = db.prepare(`
+      UPDATE watch_history 
+      SET deleted_at = CURRENT_TIMESTAMP, dirty = TRUE, updated_at = CURRENT_TIMESTAMP 
+      WHERE profile_id = ? AND meta_id = ?
+    `)
+    stmt.run(profileId, metaId)
+  },
 }
 
 // List operations
@@ -2218,6 +2325,181 @@ export const appearanceDb = {
     }
   }
 };
+
+// ============================================================================
+// Trakt Integration Database Operations
+// ============================================================================
+
+import type { TraktAccount, TraktSyncState } from './trakt/types'
+
+export const traktAccountDb = {
+  // Get Trakt account for a profile
+  getByProfileId: (profileId: number): TraktAccount | null => {
+    const stmt = db.prepare('SELECT * FROM trakt_accounts WHERE profile_id = ?')
+    const row = stmt.get(profileId) as any
+    if (!row) return null
+    
+    // Decrypt tokens
+    try {
+      return {
+        ...row,
+        access_token: decrypt(row.access_token),
+        refresh_token: decrypt(row.refresh_token)
+      }
+    } catch (e) {
+      console.error('Failed to decrypt Trakt tokens:', e)
+      return null
+    }
+  },
+
+  // Create or update Trakt account for a profile
+  upsert: (profileId: number, data: {
+    access_token: string
+    refresh_token: string
+    expires_at: Date
+    trakt_user_id?: string
+    trakt_username?: string
+  }): TraktAccount => {
+    // Encrypt tokens before storing
+    const encryptedAccessToken = encrypt(data.access_token)
+    const encryptedRefreshToken = encrypt(data.refresh_token)
+    const expiresAt = data.expires_at.toISOString()
+
+    const existing = db.prepare('SELECT id FROM trakt_accounts WHERE profile_id = ?').get(profileId) as any
+
+    if (existing) {
+      const stmt = db.prepare(`
+        UPDATE trakt_accounts 
+        SET access_token = ?, refresh_token = ?, expires_at = ?, 
+            trakt_user_id = ?, trakt_username = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `)
+      stmt.run(
+        encryptedAccessToken,
+        encryptedRefreshToken,
+        expiresAt,
+        data.trakt_user_id || null,
+        data.trakt_username || null,
+        existing.id
+      )
+    } else {
+      const stmt = db.prepare(`
+        INSERT INTO trakt_accounts (profile_id, access_token, refresh_token, expires_at, trakt_user_id, trakt_username)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `)
+      stmt.run(
+        profileId,
+        encryptedAccessToken,
+        encryptedRefreshToken,
+        expiresAt,
+        data.trakt_user_id || null,
+        data.trakt_username || null
+      )
+    }
+
+    return traktAccountDb.getByProfileId(profileId)!
+  },
+
+  // Update tokens (after refresh)
+  updateTokens: (profileId: number, accessToken: string, refreshToken: string, expiresAt: Date): void => {
+    const encryptedAccessToken = encrypt(accessToken)
+    const encryptedRefreshToken = encrypt(refreshToken)
+
+    const stmt = db.prepare(`
+      UPDATE trakt_accounts 
+      SET access_token = ?, refresh_token = ?, expires_at = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE profile_id = ?
+    `)
+    stmt.run(encryptedAccessToken, encryptedRefreshToken, expiresAt.toISOString(), profileId)
+  },
+
+  // Delete Trakt account (disconnect)
+  delete: (profileId: number): void => {
+    db.prepare('DELETE FROM trakt_accounts WHERE profile_id = ?').run(profileId)
+    // Also delete sync state
+    db.prepare('DELETE FROM trakt_sync_state WHERE profile_id = ?').run(profileId)
+  },
+
+  // Check if token is expired or about to expire (within 1 hour)
+  isTokenExpired: (profileId: number): boolean => {
+    const account = traktAccountDb.getByProfileId(profileId)
+    if (!account) return true
+
+    const expiresAt = new Date(account.expires_at)
+    const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000)
+    return expiresAt <= oneHourFromNow
+  }
+}
+
+export const traktSyncStateDb = {
+  // Get sync state for a profile
+  getByProfileId: (profileId: number): TraktSyncState | null => {
+    const stmt = db.prepare('SELECT * FROM trakt_sync_state WHERE profile_id = ?')
+    const row = stmt.get(profileId) as any
+    if (!row) return null
+
+    return {
+      id: row.id,
+      profile_id: row.profile_id,
+      last_history_sync: row.last_history_sync,
+      last_push_sync: row.last_push_sync,
+      sync_enabled: !!row.sync_enabled,
+      push_to_trakt: !!row.push_to_trakt
+    }
+  },
+
+  // Get or create sync state with defaults
+  getOrCreate: (profileId: number): TraktSyncState => {
+    const existing = traktSyncStateDb.getByProfileId(profileId)
+    if (existing) return existing
+
+    const stmt = db.prepare(`
+      INSERT INTO trakt_sync_state (profile_id, sync_enabled, push_to_trakt)
+      VALUES (?, TRUE, TRUE)
+    `)
+    stmt.run(profileId)
+
+    return traktSyncStateDb.getByProfileId(profileId)!
+  },
+
+  // Update sync settings
+  updateSettings: (profileId: number, settings: { sync_enabled?: boolean; push_to_trakt?: boolean }): void => {
+    const fields: string[] = []
+    const values: any[] = []
+
+    if (settings.sync_enabled !== undefined) {
+      fields.push('sync_enabled = ?')
+      values.push(settings.sync_enabled ? 1 : 0)
+    }
+    if (settings.push_to_trakt !== undefined) {
+      fields.push('push_to_trakt = ?')
+      values.push(settings.push_to_trakt ? 1 : 0)
+    }
+
+    if (fields.length === 0) return
+
+    // Ensure record exists
+    traktSyncStateDb.getOrCreate(profileId)
+
+    values.push(profileId)
+    const stmt = db.prepare(`UPDATE trakt_sync_state SET ${fields.join(', ')} WHERE profile_id = ?`)
+    stmt.run(...values)
+  },
+
+  // Update last history sync timestamp
+  updateLastHistorySync: (profileId: number): void => {
+    traktSyncStateDb.getOrCreate(profileId)
+    const stmt = db.prepare('UPDATE trakt_sync_state SET last_history_sync = CURRENT_TIMESTAMP WHERE profile_id = ?')
+    stmt.run(profileId)
+  },
+
+  // Update last push sync timestamp
+  updateLastPushSync: (profileId: number): void => {
+    traktSyncStateDb.getOrCreate(profileId)
+    const stmt = db.prepare('UPDATE trakt_sync_state SET last_push_sync = CURRENT_TIMESTAMP WHERE profile_id = ?')
+    stmt.run(profileId)
+  }
+}
 
 // Export database instance for advanced queries if needed
 export { db }
