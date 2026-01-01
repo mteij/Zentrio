@@ -781,7 +781,7 @@ export function VidstackPlayer({
                             key={track.src || `sub-${index}`}
                             src={track.src}
                             kind="subtitles"
-                            srclang={track.language}
+                            srcLang={track.language}
                             label={track.label}
                             default={track.default}
                         />
@@ -856,7 +856,7 @@ export function VidstackPlayer({
                                     // Also play audio element if it exists
                                     const audioElement = engineRef.current.getAudioElement()
                                     if (audioElement) {
-                                        audioElement.play().catch(e =>
+                                        audioElement.play().catch((e: unknown) =>
                                             console.warn('[VidstackPlayer] Audio play error:', e)
                                         )
                                     }

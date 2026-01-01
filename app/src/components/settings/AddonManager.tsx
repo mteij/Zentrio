@@ -110,27 +110,10 @@ export function AddonManager() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [manifestUrl, setManifestUrl] = useState('')
   const [installing, setInstalling] = useState(false)
-  const [hasTmdbKey, setHasTmdbKey] = useState(false)
   const [draggedAddonId, setDraggedAddonId] = useState<string | null>(null)
   const [dragOverAddonId, setDragOverAddonId] = useState<string | null>(null)
 
   // Profile dialog state removed - handled by component
-
-  useEffect(() => {
-    checkTmdbKey()
-  }, [])
-
-  const checkTmdbKey = async () => {
-    try {
-        const res = await apiFetch('/api/user/tmdb-api-key')
-        if (res.ok) {
-            const data = await res.json()
-            setHasTmdbKey(!!data.data?.tmdb_api_key)
-        }
-    } catch (e) {
-        console.error('Failed to check TMDB key', e)
-    }
-  }
 
   // loadProfiles removed
 
@@ -195,10 +178,6 @@ export function AddonManager() {
   }
 
   const handleToggleWrapper = (addon: Addon, enabled: boolean) => {
-      if ((addon.manifest_url === 'zentrio://tmdb-addon' || addon.id === 'org.zentrio.tmdb') && enabled && !hasTmdbKey) {
-           toast.error('Missing API Key', { description: 'You must configure your TMDB API Key in Account settings before enabling this addon.' })
-           return
-       }
       handleToggleAddon(addon.id, enabled)
   }
 
@@ -386,7 +365,6 @@ export function AddonManager() {
                 ) : (
                     addons.map(addon => {
                         const isZentrio = addon.manifest_url === 'zentrio://tmdb-addon' || addon.id === 'org.zentrio.tmdb';
-                        const isDisabled = isZentrio && !hasTmdbKey;
                         
                         return (
                         <div 
@@ -405,7 +383,7 @@ export function AddonManager() {
                                     : isZentrio 
                                         ? '1px solid rgba(139, 92, 246, 0.3)' 
                                         : undefined,
-                                opacity: draggedAddonId === addon.id ? 0.5 : isDisabled ? 0.7 : 1,
+                                opacity: draggedAddonId === addon.id ? 0.5 : 1,
                                 cursor: 'grab',
                                 transform: dragOverAddonId === addon.id ? 'scale(1.01)' : 'scale(1)'
                             }}
@@ -441,7 +419,6 @@ export function AddonManager() {
                                     <div className={styles.addonName}>
                                         {addon.name} <span className={styles.addonVersion}>v{addon.version}</span>
                                         {isZentrio && <span style={{ fontSize: '0.65em', color: '#a78bfa', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2))', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Native</span>}
-                                        {isDisabled && <span className={styles.addonWarning}>Requires TMDB Key</span>}
                                     </div>
                                     <div className={styles.addonDescription}>
                                         {addon.description}
@@ -456,7 +433,6 @@ export function AddonManager() {
                                         size="small" 
                                         onClick={() => handleConfigureAddon(addon)}
                                         title="Configure"
-                                        disabled={isDisabled}
                                     >
                                         <Settings size={18} />
                                     </Button>

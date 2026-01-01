@@ -115,19 +115,13 @@ export class AddonManager {
     const addons = addonDb.getEnabledForProfile(settingsProfileId)
     // console.log(`[AddonManager] Found ${addons.length} enabled addons for profile ${profileId} (settings: ${settingsProfileId}):`, addons.map(a => a.name))
     
-    // If no addons enabled, check if we should enable default for this profile automatically
+    // If no addons enabled, auto-enable the default Zentrio addon
+    // (global TMDB key is always available)
     if (addons.length === 0) {
       const defaultAddon = addonDb.findByUrl(DEFAULT_TMDB_ADDON)
       if (defaultAddon) {
-          // Only auto-enable if user has TMDB key
-          const profile = profileDb.findById(profileId)
-          if (profile?.user_id) {
-             const tmdbClient = await tmdbService.getClient(profile.user_id)
-             if (tmdbClient) {
-                addonDb.enableForProfile(settingsProfileId, defaultAddon.id)
-                addons.push(defaultAddon)
-             }
-          }
+        addonDb.enableForProfile(settingsProfileId, defaultAddon.id)
+        addons.push(defaultAddon)
       }
     }
 
@@ -136,22 +130,8 @@ export class AddonManager {
 
     const profile = profileDb.findById(profileId)
     const userId = profile?.user_id
-    
-    // Check for TMDB Key
-    const tmdbClient = userId ? await tmdbService.getClient(userId) : null
-    const hasTmdbKey = !!tmdbClient
 
     for (const addon of addons) {
-      // Force disable Zentrio if no key
-      if (addon.manifest_url === DEFAULT_TMDB_ADDON && !hasTmdbKey) {
-          console.warn(`[AddonManager] Zentrio addon enabled but no TMDB key found. Forcefully disabling.`);
-          try {
-             addonDb.disableForProfile(settingsProfileId, addon.id)
-          } catch (e) {
-             console.error('Failed to auto-disable Zentrio addon', e)
-          }
-          continue;
-      }
 
       const normalizedUrl = this.normalizeUrl(addon.manifest_url)
       let client = this.clientCache.get(normalizedUrl)
@@ -182,10 +162,7 @@ export class AddonManager {
   async getCatalogs(profileId: number): Promise<{ addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[]> {
     const clients = await this.getClientsForProfile(profileId)
     let results: { addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[] = []
-
     const profile = profileDb.findById(profileId)
-    const tmdbClient = profile?.user_id ? await tmdbService.getClient(profile.user_id) : null
-    const hasTmdbKey = !!tmdbClient
 
     const fetchCatalog = async (client: AddonClient, cat: any) => {
         try {
@@ -268,117 +245,62 @@ export class AddonManager {
         return 0;
     });
 
-    // If no catalogs are found after checking all enabled addons, fallback logic
+    // If no catalogs are found after checking all enabled addons, fallback to Zentrio addon
+    // (global TMDB key is always available, so this should always work)
     if (results.length === 0) {
-      // 1. Try default Zentrio addon IF user has a key
-      if (hasTmdbKey) {
-          console.log(`[AddonManager] No catalogs found. Falling back to default TMDB addon.`);
-          const normalizedDefaultUrl = this.normalizeUrl(DEFAULT_TMDB_ADDON);
-          let defaultClient = this.clientCache.get(normalizedDefaultUrl);
-          if (!defaultClient) {
-            defaultClient = new ZentrioAddonClient(DEFAULT_TMDB_ADDON, profile?.user_id);
-            this.clientCache.set(normalizedDefaultUrl, defaultClient);
-          }
-          
-          try {
-            await defaultClient.init();
-            if (defaultClient.manifest) {
-              for (const cat of defaultClient.manifest.catalogs) {
-                if (cat.extra?.some(e => e.isRequired)) continue;
-                
-                const settingsProfileId = profileDb.getSettingsProfileId(profileId);
-                const { appearanceDb } = require('../database');
-                const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
-                const config = {
-                    enableAgeRating: appearance ? appearance.show_age_ratings : true,
-                    showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
-                };
-
-                let items = await defaultClient.getCatalog(cat.type, cat.id, {}, config);
-                const parentalSettings = this.getParentalSettings(profileId);
-                let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id);
-                
-                // Row filling logic
-                if (parentalSettings.enabled && filteredItems.length < 20 && items.length > 0) {
-                   let currentSkip = items.length;
-                   let attempts = 0;
-                   const maxAttempts = 3;
-                   while (filteredItems.length < 20 && attempts < maxAttempts) {
-                       try {
-                           const nextItems = await defaultClient.getCatalog(cat.type, cat.id, { skip: currentSkip.toString() }, config);
-                           if (!nextItems || nextItems.length === 0) break;
-                           const nextFiltered = await this.filterContent(nextItems, parentalSettings, profile?.user_id);
-                           filteredItems = [...filteredItems, ...nextFiltered];
-                           currentSkip += nextItems.length;
-                           attempts++;
-                       } catch (e) { break; }
-                   }
-                }
-
-                results.push({
-                  addon: defaultClient.manifest,
-                  manifestUrl: defaultClient.manifestUrl,
-                  catalog: cat,
-                  items: filteredItems
-                });
-              }
-            }
-          } catch (e) {
-            console.error('Failed to fetch catalogs from default TMDB addon fallback.', e);
-          }
+      console.log(`[AddonManager] No catalogs found. Falling back to default TMDB addon.`);
+      const normalizedDefaultUrl = this.normalizeUrl(DEFAULT_TMDB_ADDON);
+      let defaultClient = this.clientCache.get(normalizedDefaultUrl);
+      if (!defaultClient) {
+        defaultClient = new ZentrioAddonClient(DEFAULT_TMDB_ADDON, profile?.user_id);
+        this.clientCache.set(normalizedDefaultUrl, defaultClient);
       }
+      
+      try {
+        await defaultClient.init();
+        if (defaultClient.manifest) {
+          for (const cat of defaultClient.manifest.catalogs) {
+            if (cat.extra?.some(e => e.isRequired)) continue;
+            
+            const settingsProfileId = profileDb.getSettingsProfileId(profileId);
+            const { appearanceDb } = require('../database');
+            const appearance = settingsProfileId ? appearanceDb.getSettings(settingsProfileId) : undefined;
+            const config = {
+                enableAgeRating: appearance ? appearance.show_age_ratings : true,
+                showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
+            };
 
-      // 2. If default TMDB addon also failed or skipped (no key), fallback to Cinemeta
-      if (results.length === 0) {
-          console.log(`[AddonManager] No content available. Falling back to Cinemeta.`);
-          const cinemetaUrl = 'https://v3-cinemeta.strem.io/manifest.json';
-          let cinemetaClient = this.clientCache.get(cinemetaUrl);
-          if (!cinemetaClient) {
-              cinemetaClient = new AddonClient(cinemetaUrl);
-              this.clientCache.set(cinemetaUrl, cinemetaClient);
+            let items = await defaultClient.getCatalog(cat.type, cat.id, {}, config);
+            const parentalSettings = this.getParentalSettings(profileId);
+            let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id);
+            
+            // Row filling logic
+            if (parentalSettings.enabled && filteredItems.length < 20 && items.length > 0) {
+               let currentSkip = items.length;
+               let attempts = 0;
+               const maxAttempts = 3;
+               while (filteredItems.length < 20 && attempts < maxAttempts) {
+                   try {
+                       const nextItems = await defaultClient.getCatalog(cat.type, cat.id, { skip: currentSkip.toString() }, config);
+                       if (!nextItems || nextItems.length === 0) break;
+                       const nextFiltered = await this.filterContent(nextItems, parentalSettings, profile?.user_id);
+                       filteredItems = [...filteredItems, ...nextFiltered];
+                       currentSkip += nextItems.length;
+                       attempts++;
+                   } catch (e) { break; }
+               }
+            }
+
+            results.push({
+              addon: defaultClient.manifest,
+              manifestUrl: defaultClient.manifestUrl,
+              catalog: cat,
+              items: filteredItems
+            });
           }
-
-          try {
-              await cinemetaClient.init();
-              if (cinemetaClient.manifest) {
-                  for (const cat of cinemetaClient.manifest.catalogs) {
-                      // Cinemeta has 'top' and 'year' catalogs usually.
-                      // We only want simple ones to avoid clutter or errors.
-                      if (cat.extra?.some(e => e.isRequired)) continue;
-
-                      let items = await cinemetaClient.getCatalog(cat.type, cat.id, {});
-                      const parentalSettings = this.getParentalSettings(profileId);
-                      let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id);
-                      
-                      // Row filling logic
-                      if (parentalSettings.enabled && filteredItems.length < 20 && items.length > 0) {
-                          let currentSkip = items.length;
-                          let attempts = 0;
-                          const maxAttempts = 3;
-                          while (filteredItems.length < 20 && attempts < maxAttempts) {
-                              try {
-                                  // Cinemeta definitely supports skip
-                                  const nextItems = await cinemetaClient.getCatalog(cat.type, cat.id, { skip: currentSkip.toString() });
-                                  if (!nextItems || nextItems.length === 0) break;
-                                  const nextFiltered = await this.filterContent(nextItems, parentalSettings, profile?.user_id);
-                                  filteredItems = [...filteredItems, ...nextFiltered];
-                                  currentSkip += nextItems.length;
-                                  attempts++;
-                              } catch (e) { break; }
-                          }
-                      }
-
-                      results.push({
-                          addon: cinemetaClient.manifest,
-                          manifestUrl: cinemetaClient.manifestUrl,
-                          catalog: cat,
-                          items: filteredItems
-                      });
-                  }
-              }
-          } catch (e) {
-              console.error('Failed to fetch catalogs from Cinemeta fallback.', e);
-          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch catalogs from default TMDB addon fallback.', e);
       }
     }
 
@@ -783,10 +705,6 @@ export class AddonManager {
     const settingsProfileId = profileDb.getSettingsProfileId(profileId);
     const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined;
     const profile = profileDb.findById(profileId);
-    
-    // Check for TMDB Key
-    const tmdbClient = profile?.user_id ? await tmdbService.getClient(profile.user_id) : null
-    const hasTmdbKey = !!tmdbClient
 
     // Determine if this is a "standard" ID (IMDB/TMDB) or a custom addon ID
     // Standard IDs: tt* (IMDB), tmdb:* (TMDB)
@@ -822,10 +740,6 @@ export class AddonManager {
     // Pass 1: Try addons that support meta for this type and can handle this ID
     for (const client of sortedClients) {
       if (!client.manifest) continue
-      
-      // Skip Zentrio if no key
-      const isZentrio = client.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || client.manifest.id === 'org.zentrio.tmdb';
-      if (isZentrio && !hasTmdbKey) continue;
 
       // Check ID prefixes using the proper per-resource or manifest-level prefixes
       const idPrefixes = this.getResourceIdPrefixes(client.manifest, 'meta');
@@ -860,6 +774,7 @@ export class AddonManager {
                    shouldQuery = true;
                } else {
                    // Special case: Zentrio can handle IMDB IDs even if not explicitly in some lists
+                   const isZentrio = client.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || client.manifest.id === 'org.zentrio.tmdb';
                    if (primaryId.startsWith('tt') && isZentrio) {
                       shouldQuery = true;
                    }

@@ -1,4 +1,4 @@
-import { getClient, TMDBClient } from './client'
+import { getClient, getGlobalClient, hasGlobalTmdbKey, TMDBClient } from './client'
 import { getMeta, getAgeRating } from './meta'
 import { getCatalog } from './catalog'
 import { getSearch } from './search'
@@ -7,11 +7,14 @@ import { getEpisodes } from './episodes'
 import { getLogo, getTvLogo } from './logo'
 import { getGenreList } from './genres'
 import { getLanguages } from './languages'
+import { tmdbCache } from './cache'
 
 export { TMDBClient }
 
 export const tmdbService = {
   getClient,
+  getGlobalClient,
+  hasGlobalTmdbKey,
   getMeta,
   getAgeRating,
   getCatalog,
@@ -22,8 +25,5 @@ export const tmdbService = {
   getTvLogo,
   getGenreList,
   getLanguages,
-  
-  // Backward compatibility (partial)
-  // getAgeRating and getImdbRating are no longer exposed directly as they are integrated into getMeta
-  // If needed, we can re-export them or create wrappers
+  cache: tmdbCache,
 }

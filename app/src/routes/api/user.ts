@@ -113,6 +113,7 @@ app.use('*', csrfLikeGuard)
 app.get('/streaming-settings', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     // Get default profile for user
     const profile = profileDb.getDefault(user.id)
     if (!profile) {
@@ -130,6 +131,7 @@ app.get('/streaming-settings', async (c) => {
 app.put('/streaming-settings', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     const body = await c.req.json().catch(() => ({}))
     
     // Get default profile for user
@@ -158,6 +160,7 @@ app.put('/streaming-settings', async (c) => {
 app.get('/tmdb-api-key', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     // Fetch fresh user data to get the key
     const freshUser = userDb.findById(user.id)
     
@@ -184,6 +187,7 @@ app.get('/tmdb-api-key', async (c) => {
 app.put('/tmdb-api-key', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     const body = await c.req.json().catch(() => ({}))
     const validation = await validate(z.object({
       tmdb_api_key: z.string().nullable().optional()
@@ -386,6 +390,7 @@ function rateLimitUser(
 app.get('/settings', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     // Better Auth user object already has these fields if we configured additionalFields correctly
     // But let's fetch fresh from DB to be safe if needed, or just use the session user
     // Since we are using Better Auth session, user object in context is from Better Auth
@@ -407,6 +412,7 @@ app.put('/settings', async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}))
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     
     const validation = await validate(z.object({
       addonManagerEnabled: z.boolean().optional(),
@@ -451,6 +457,7 @@ app.put('/settings', async (c) => {
 app.get('/profile', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     const accounts = userDb.findAccountsByUserId(user.id)
     const hasPassword = userDb.hasPassword(user.id)
     
@@ -476,6 +483,7 @@ app.get('/profile', async (c) => {
 app.get('/accounts', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     const accounts = userDb.findAccountsByUserId(user.id)
     return ok(c, accounts.map(a => ({
       id: a.id,
@@ -491,6 +499,7 @@ app.get('/accounts', async (c) => {
 app.delete('/accounts/:providerId', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     const providerId = c.req.param('providerId')
     
     if (!providerId) {
@@ -547,6 +556,7 @@ app.put('/email', async (c) => {
 // [POST /email/initiate] Start email verification by sending OTP to new email
 app.post('/email/initiate', async (c) => {
   const user = c.get('user')
+  if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
   const { ip, userAgent } = getClientInfo(c)
   try {
     const body = await c.req.json().catch(() => ({}))
@@ -640,6 +650,7 @@ app.put('/password', async (c) => {
 app.post('/password/setup', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     
     // Only allow if user doesn't have a password
     if (userDb.hasPassword(user.id)) {
@@ -678,6 +689,7 @@ app.post('/password/setup', async (c) => {
 app.put('/username', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     const body = await c.req.json().catch(() => ({}))
     const validation = await validate(z.object({
       username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores and dashes')
@@ -750,6 +762,7 @@ app.put('/username', async (c) => {
 app.delete('/account', async (c) => {
   try {
     const user = c.get('user')
+    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     
     // Use Better Auth's deleteUser API
     const result = await auth.api.deleteUser({

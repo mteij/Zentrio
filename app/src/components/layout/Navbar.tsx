@@ -8,6 +8,8 @@ import { useState, useRef, useEffect } from 'react'
 interface NavbarProps {
   profileId: number | string
   profile?: any
+  /** Optional hint for skeletons/SSR; Navbar computes active state from location */
+  activePage?: string
 }
 
 export const Navbar = ({ profileId, profile }: NavbarProps) => {

@@ -5,8 +5,12 @@
  */
 import { userDb } from '../database'
 import { decrypt } from '../encryption'
+import { tmdbCache, type CacheType } from './cache'
 
 const TMDB_API_BASE = 'https://api.themoviedb.org/3'
+
+// Global client singleton (uses TMDB_API_KEY from env)
+let globalClient: TMDBClient | null = null
 
 export class TMDBClient {
   private apiKey: string
@@ -15,7 +19,27 @@ export class TMDBClient {
     this.apiKey = apiKey
   }
 
+  /**
+   * Determine cache type based on endpoint
+   */
+  private getCacheType(endpoint: string): CacheType {
+    if (endpoint.includes('/search/')) return 'SEARCH'
+    if (endpoint.includes('/trending/')) return 'TRENDING'
+    if (endpoint.includes('/season/') || endpoint.includes('/episode')) return 'EPISODES'
+    if (endpoint.includes('/release_dates') || endpoint.includes('/content_ratings')) return 'AGE_RATING'
+    if (endpoint.includes('/find/')) return 'FIND'
+    if (endpoint.includes('/genre/')) return 'GENRES'
+    if (endpoint.includes('/languages') || endpoint.includes('/translations')) return 'LANGUAGES'
+    return 'METADATA'
+  }
+
   private async fetch<T>(endpoint: string, params: Record<string, any> = {}): Promise<T> {
+    // Check cache first
+    const cached = tmdbCache.get<T>(endpoint, params)
+    if (cached !== null) {
+      return cached
+    }
+
     const url = new URL(`${TMDB_API_BASE}${endpoint}`)
     url.searchParams.append('api_key', this.apiKey)
     
@@ -30,7 +54,13 @@ export class TMDBClient {
       throw new Error(`TMDB API Error: ${response.status} ${response.statusText}`)
     }
 
-    return response.json()
+    const data = await response.json() as T
+
+    // Store in cache
+    const cacheType = this.getCacheType(endpoint)
+    tmdbCache.set(endpoint, params, data, cacheType)
+
+    return data
   }
 
   async getMovieReleaseDates(id: string) {
@@ -170,17 +200,53 @@ export class TMDBClient {
   }
 }
 
-export const getClient = async (userId: string): Promise<TMDBClient | null> => {
-  const user = userDb.findById(userId)
-  if (!user?.tmdbApiKey) return null
-
-  try {
-    const apiKey = decrypt(user.tmdbApiKey)
-    return new TMDBClient(apiKey)
-  } catch (error) {
-    console.error('Failed to decrypt TMDB API key:', error)
-    return null
+/**
+ * Get the global TMDB client using the server's TMDB_API_KEY.
+ * This is the primary way to get a client - always available.
+ */
+export function getGlobalClient(): TMDBClient {
+  if (!globalClient) {
+    const apiKey = process.env.TMDB_API_KEY
+    if (!apiKey) {
+      throw new Error('TMDB_API_KEY environment variable is required')
+    }
+    globalClient = new TMDBClient(apiKey)
   }
+  return globalClient
+}
+
+/**
+ * Check if the global TMDB API key is configured
+ */
+export function hasGlobalTmdbKey(): boolean {
+  return !!process.env.TMDB_API_KEY
+}
+
+/**
+ * Get a TMDB client for a specific user.
+ * - If user has their own API key configured, use it (for rate limit avoidance)
+ * - Otherwise, fall back to global client (always available)
+ * 
+ * This function now NEVER returns null when a global key is configured.
+ */
+export const getClient = async (userId?: string): Promise<TMDBClient> => {
+  // Try user's personal key first (if they want to avoid rate limits)
+  if (userId) {
+    const user = userDb.findById(userId)
+    if (user?.tmdbApiKey) {
+      try {
+        const apiKey = decrypt(user.tmdbApiKey)
+        if (apiKey && apiKey.length >= 32) {
+          return new TMDBClient(apiKey)
+        }
+      } catch (error) {
+        console.warn('Failed to decrypt user TMDB API key, falling back to global:', error)
+      }
+    }
+  }
+
+  // Fall back to global client
+  return getGlobalClient()
 }
 
 /**

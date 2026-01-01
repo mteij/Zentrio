@@ -52,6 +52,9 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [tmdbApiKey, setTmdbApiKey] = useState('')
+  const [tmdbKeyConfigured, setTmdbKeyConfigured] = useState(false)
+  const [editingTmdbKey, setEditingTmdbKey] = useState(false)
+  const [tmdbKeyInput, setTmdbKeyInput] = useState('')
 
   
   // Account linking state
@@ -142,6 +145,9 @@ export function SettingsPage() {
         const data = await res.json()
         if (data.data?.tmdb_api_key) {
             setTmdbApiKey(data.data.tmdb_api_key)
+            setTmdbKeyConfigured(true)
+        } else {
+            setTmdbKeyConfigured(false)
         }
       }
     } catch (e) {
@@ -149,7 +155,8 @@ export function SettingsPage() {
     }
   }
 
-  const handleUpdateTmdbApiKey = async () => {
+  const handleUpdateTmdbApiKey = async (clearKey?: boolean, keyValue?: string) => {
+    const keyToSave = clearKey ? '' : (keyValue ?? tmdbApiKey)
     try {
         const res = await apiFetch('/api/user/tmdb-api-key', {
             method: 'PUT',
@@ -157,13 +164,20 @@ export function SettingsPage() {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({ tmdb_api_key: tmdbApiKey })
+            body: JSON.stringify({ tmdb_api_key: keyToSave })
         })
         const data = await res.json().catch(() => ({}))
         if (res.ok) {
-            toast.success('Success', { description: 'TMDB API Key updated successfully' })
+            if (clearKey) {
+                setTmdbApiKey('')
+                setTmdbKeyConfigured(false)
+                toast.success('Success', { description: 'Personal API key removed' })
+            } else {
+                setTmdbApiKey(keyToSave)
+                setTmdbKeyConfigured(!!keyToSave)
+                toast.success('Success', { description: 'TMDB API Key updated successfully' })
+            }
         } else {
-            // Show specific error message from server
             const message = data.message || 'Failed to update TMDB API Key'
             toast.error('Update Failed', { description: message })
         }
@@ -611,9 +625,9 @@ export function SettingsPage() {
               {/* TMDB API Key - visible in both modes */}
               <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
                 <div className="flex-1 pr-8">
-                  <h3 className="text-lg font-medium text-white mb-1">TMDB API Key</h3>
+                  <h3 className="text-lg font-medium text-white mb-1">TMDB API Key (Optional)</h3>
                   <p className="text-sm text-zinc-400 max-w-xl">
-                    Enter your TMDB API key to enable advanced metadata features like age ratings and IMDb ratings.{' '}
+                    Zentrio uses a shared API key by default. Add your own key only if you experience rate limiting.{' '}
                     <a 
                       href="https://www.themoviedb.org/settings/api" 
                       target="_blank" 
@@ -621,23 +635,71 @@ export function SettingsPage() {
                       className="underline hover:opacity-80 transition-opacity"
                       style={{ color: 'var(--theme-color)' }}
                     >
-                      Get your API key here
+                      Get a free key here
                     </a>
                   </p>
                 </div>
-                <div className="flex items-center gap-4 shrink-0 w-full md:w-auto">
-                  <div className="flex gap-2 w-full md:w-72">
-                      <div className="flex-1">
-                        <Input
-                            type="password"
-                            value={tmdbApiKey}
-                            onChange={(e) => setTmdbApiKey(e.target.value)}
-                            placeholder="Enter TMDB API Key"
-                            className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
-                        />
-                      </div>
-                      <Button variant="secondary" onClick={handleUpdateTmdbApiKey}>Save</Button>
-                  </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {!editingTmdbKey ? (
+                    <>
+                      {tmdbKeyConfigured ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                          <Check className="w-3 h-3" />
+                          Personal key configured
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-700/50 text-zinc-300 border border-white/10">
+                          Using shared key
+                        </span>
+                      )}
+                      <Button 
+                        variant="secondary" 
+                        onClick={() => {
+                          setTmdbKeyInput(tmdbApiKey)
+                          setEditingTmdbKey(true)
+                        }}
+                      >
+                        {tmdbKeyConfigured ? 'Edit' : 'Add Key'}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        type="password"
+                        value={tmdbKeyInput}
+                        onChange={(e) => setTmdbKeyInput(e.target.value)}
+                        placeholder="Enter TMDB API Key"
+                        className="!w-48 md:!w-64 !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
+                        autoFocus
+                      />
+                      <Button 
+                        variant="primary" 
+                        onClick={async () => {
+                          await handleUpdateTmdbApiKey(false, tmdbKeyInput)
+                          setEditingTmdbKey(false)
+                        }}
+                      >
+                        Save
+                      </Button>
+                      {tmdbKeyConfigured && (
+                        <Button 
+                          variant="secondary" 
+                          onClick={async () => {
+                            await handleUpdateTmdbApiKey(true)
+                            setEditingTmdbKey(false)
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                      <Button 
+                        variant="secondary" 
+                        onClick={() => setEditingTmdbKey(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
 

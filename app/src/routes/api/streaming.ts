@@ -1001,7 +1001,7 @@ streaming.get('/details/:type/:id', sessionMiddleware, async (c) => {
           ...(fallbackData.genres && { genres: fallbackData.genres }),
           ...(fallbackData.released && { released: fallbackData.released }),
         }
-        console.log(`[Streaming] Using fallback meta for ${type}/${id}:`, meta.name)
+        console.log(`[Streaming] Using fallback meta for ${type}/${id}:`, meta?.name ?? 'Unknown')
       } catch (e) {
         console.warn('Failed to parse metaFallback:', e)
       }

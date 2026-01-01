@@ -21,7 +21,7 @@ import {
 } from '@vidstack/react/player/layouts/default'
 import { HybridEngine } from '../../services/hybrid-media/HybridEngine'
 import { TranscoderService } from '../../services/hybrid-media/TranscoderService'
-import type { StreamInfo, EngineState, MediaMetadata } from '../../services/hybrid-media/types'
+import type { StreamInfo, EngineState, MediaMetadata, StreamType, CodecInfo } from '../../services/hybrid-media/types'
 
 // Tauri detection - hybrid media service is web-only
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__
@@ -111,48 +111,67 @@ export function RareMediaProvider({
         setTranscodingProgress(null)
 
         // Probe media file first to get metadata
-        const metadata: MediaMetadata = await TranscoderService.probe(src)
-        const streams = (metadata.streams || []).map(s => ({
-          index: s.index,
-          codec: s.codec_name,
-          codecType: s.codec_type,
-          language: s.tags?.language || 'und',
-          title: s.tags?.title || '',
-          bitrate: s.bit_rate
-        } as StreamInfo))
+        const metadata = await TranscoderService.probe(src)
+        if (!metadata) {
+          throw new Error('Failed to probe media metadata')
+        }
 
-        setStreams(streams)
+        const durationSec = metadata.format?.duration ?? 0
+
+        const toCodecInfo = (s: { codec_id?: number; codec_name?: string }): CodecInfo => {
+          const codecName = (s.codec_name ?? 'unknown').toLowerCase()
+          return {
+            codecId: s.codec_id ?? 0,
+            codecName,
+            codecString: codecName
+          }
+        }
+
+        const detectedStreams: StreamInfo[] = (metadata.streams ?? []).flatMap((s) => {
+          const type = s.codec_type as StreamType | undefined
+          if (!type) return []
+
+          return [{
+            index: s.index,
+            type,
+            codec: toCodecInfo(s),
+            duration: durationSec,
+            bitrate: s.bit_rate,
+            width: s.width,
+            height: s.height,
+            sampleRate: s.sample_rate,
+            channels: s.channels
+          }]
+        })
+
+        setStreams(detectedStreams)
+        setDuration(durationSec)
 
         // Check if we actually need hybrid playback
-        const audioStream = streams.find(s => s.codecType === 'audio')
-        const needsHybrid = audioStream && (
-          audioStream.codec === 'flac' ||
-          audioStream.codec === 'vorbis' ||
-          audioStream.codec === 'dts' ||
-          audioStream.codec === 'ac3' ||
-          audioStream.codec === 'eac3' ||
-          audioStream.codec === 'truehd' ||
-          audioStream.codec === 'opus' // Some browsers don't support opus in mp4
+        const audioStream = detectedStreams.find(s => s.type === 'audio')
+        const audioCodec = audioStream?.codec.codecName
+
+        // Only enable hybrid playback for codecs commonly unsupported in browsers
+        const needsHybrid = !!audioCodec && (
+          audioCodec === 'flac' ||
+          audioCodec === 'dts' ||
+          audioCodec === 'ac3' ||
+          audioCodec === 'eac3' ||
+          audioCodec === 'truehd'
         )
 
         if (!needsHybrid) {
           // Audio is natively supported, use normal playback
-          console.log('[RareMediaProvider] Using native playback - audio codec:', audioStream?.codec)
+          console.log('[RareMediaProvider] Using native playback - audio codec:', audioCodec)
           setMediaSrc({ src, type: 'video/mp4' })
           setIsEngineReady(true)
-          onMetadataLoad?.(metadata.format?.duration || 0, streams)
+          onMetadataLoad?.(durationSec, detectedStreams)
           return
         }
 
         // Create engine with new API
-        console.log('[RareMediaProvider] Using hybrid playback - audio codec:', audioStream?.codec)
+        console.log('[RareMediaProvider] Using hybrid playback - audio codec:', audioCodec)
         const engine = new HybridEngine(src, metadata, {
-          onProgress: (data) => {
-            if (cancelled) return
-            if (data.type === 'segment') {
-              setTranscodingProgress(data.progress)
-            }
-          },
           onError: (error) => {
             if (cancelled) return
             onError?.(error)
@@ -161,14 +180,24 @@ export function RareMediaProvider({
         engineRef.current = engine
 
         // Event handlers
-        engine.addEventListener('statechange', (e: any) => {
+        engine.addEventListener('statechange', (e: Event) => {
           if (cancelled) return
-          setEngineState(e.detail.state)
+          const detail = (e as CustomEvent<{ state: EngineState }>).detail
+          setEngineState(detail.state)
         })
 
-        engine.addEventListener('timeupdate', (e: any) => {
+        engine.addEventListener('timeupdate', (e: Event) => {
           if (cancelled) return
-          onTimeUpdate?.(e.detail.currentTime, e.detail.duration)
+          const detail = (e as CustomEvent<{ currentTime: number; duration?: number }>).detail
+          onTimeUpdate?.(detail.currentTime, detail.duration ?? engine.getDuration())
+        })
+
+        engine.addEventListener('progress', (e: Event) => {
+          if (cancelled) return
+          const detail = (e as CustomEvent<{ progress: number }>).detail
+          if (typeof detail?.progress === 'number') {
+            setTranscodingProgress(Math.round(detail.progress * 100))
+          }
         })
 
         engine.addEventListener('ended', () => {
@@ -176,16 +205,17 @@ export function RareMediaProvider({
           onEnded?.()
         })
 
-        engine.addEventListener('error', (e: any) => {
+        engine.addEventListener('error', (e: Event) => {
           if (cancelled) return
-          onError?.(e.detail.error)
+          const detail = (e as CustomEvent<{ error: Error }>).detail
+          onError?.(detail.error)
         })
 
         setDuration(engine.getDuration())
         
         // We'll initialize when we have the video element
         setEngineState('ready')
-        onMetadataLoad?.(engine.getDuration(), streams)
+        onMetadataLoad?.(engine.getDuration(), detectedStreams)
         
       } catch (error) {
         if (cancelled) return
