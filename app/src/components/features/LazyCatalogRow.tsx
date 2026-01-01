@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, memo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -6,6 +6,7 @@ import { MetaPreview } from '../../services/addons/types'
 import { ContentCard, ContentItem } from './ContentCard'
 import { SkeletonCard } from '../ui/SkeletonCard'
 import { useScrollRow } from '../../hooks/useScrollRow'
+import { apiFetchJson } from '../../lib/apiFetch'
 import styles from '../../styles/Streaming.module.css'
 
 interface CatalogMetadata {
@@ -31,21 +32,20 @@ const fetchCatalogItems = async (
 ): Promise<MetaPreview[]> => {
   const params = new URLSearchParams({
     profileId,
-    manifestUrl: encodeURIComponent(manifestUrl),
+    manifestUrl,
     type,
     id
   })
-  const res = await fetch(`/api/streaming/catalog-items?${params}`)
-  if (!res.ok) throw new Error('Failed to fetch catalog')
-  const data = await res.json()
+  const data = await apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog-items?${params}`)
   return data.items || []
 }
 
 /**
  * Lazy-loading horizontal scrollable catalog row.
  * Fetches items on mount via React Query and displays with skeleton loading.
+ * Memoized to prevent unnecessary re-renders.
  */
-export function LazyCatalogRow({ 
+export const LazyCatalogRow = memo(function LazyCatalogRow({
   metadata, 
   profileId, 
   showImdbRatings = true, 
@@ -60,7 +60,8 @@ export function LazyCatalogRow({
       metadata.catalog.type,
       metadata.catalog.id
     ),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 1000 * 60 * 10, // 10 minutes - catalog items change rarely
+    gcTime: 1000 * 60 * 30, // 30 minutes
     retry: 1,
     refetchOnWindowFocus: false,
     enabled: !!metadata
@@ -119,7 +120,7 @@ export function LazyCatalogRow({
                 key="skeleton"
                 initial={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.5 }}
                 style={{ display: 'flex', gap: '20px' }}
               >
                 {Array.from({ length: 7 }).map((_, i) => (
@@ -131,16 +132,16 @@ export function LazyCatalogRow({
                 key="items"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.4 }}
+                transition={{ duration: 0.5 }}
                 style={{ display: 'flex', gap: '20px' }}
               >
                 {items.map((item, index) => (
-                  <motion.div 
-                    key={item.id}
+                  <motion.div
+                    key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ 
-                      duration: 0.3, 
+                    transition={{
+                      duration: 0.4,
                       delay: Math.min(index * 0.05, 0.3)
                     }}
                     style={{ flex: '0 0 auto', width: 180 }}
@@ -169,4 +170,12 @@ export function LazyCatalogRow({
       </div>
     </div>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if metadata or key props change
+  return (
+    prevProps.metadata === nextProps.metadata &&
+    prevProps.profileId === nextProps.profileId &&
+    prevProps.showImdbRatings === nextProps.showImdbRatings &&
+    prevProps.showAgeRatings === nextProps.showAgeRatings
+  )
+})

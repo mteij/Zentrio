@@ -24,14 +24,34 @@ export const auth = betterAuth({
     secret: cfg.AUTH_SECRET,
     baseURL: cfg.APP_URL,
     basePath: "/api/auth",
-    trustedOrigins: [
-        "tauri://localhost",
-        "zentrio://",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        cfg.APP_URL,
-        cfg.CLIENT_URL
-    ],
+    // Avoid production breakage when APP_URL/CLIENT_URL are misconfigured or when behind a reverse proxy.
+    // Better Auth allows a dynamic trustedOrigins callback; include request origin + request.url origin.
+    trustedOrigins: async (request) => {
+        const base = [
+            "tauri://localhost",
+            "zentrio://",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            cfg.APP_URL,
+            cfg.CLIENT_URL
+        ].filter(Boolean) as string[]
+
+        // request is undefined during initialization and auth.api calls
+        if (!request) return base
+
+        const out = new Set<string>(base)
+
+        const origin = request.headers.get("origin")
+        if (origin) out.add(origin)
+
+        try {
+            out.add(new URL(request.url).origin)
+        } catch {
+            // ignore
+        }
+
+        return Array.from(out)
+    },
     database: db,
     advanced: {
         defaultCookieAttributes: {

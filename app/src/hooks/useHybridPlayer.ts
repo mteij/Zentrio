@@ -24,6 +24,8 @@ export interface UseHybridPlayerOptions {
   onTimeUpdate?: (currentTime: number, duration: number) => void
   /** Callback on error */
   onError?: (error: Error) => void
+  /** Callback on transcoding progress */
+  onTranscodingProgress?: (progress: number) => void
 }
 
 export interface UseHybridPlayerReturn {
@@ -45,6 +47,8 @@ export interface UseHybridPlayerReturn {
   error: Error | null
   /** Whether hybrid playback is needed (has rare audio codec) */
   needsHybridPlayback: boolean
+  /** Transcoding progress (0-100) or null if not transcoding */
+  transcodingProgress: number | null
   
   // Actions
   play: () => Promise<void>
@@ -61,11 +65,11 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
     autoPlay = false,
     onEnded,
     onTimeUpdate,
-    onError
+    onError,
+    onTranscodingProgress
   } = options
 
   const engineRef = useRef<HybridEngine | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
   
   const [isReady, setIsReady] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -76,6 +80,7 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
   const [state, setState] = useState<EngineState>('idle')
   const [error, setError] = useState<Error | null>(null)
   const [needsHybridPlayback, setNeedsHybridPlayback] = useState(false)
+  const [transcodingProgress, setTranscodingProgress] = useState<number | null>(null)
 
   // Initialize engine when URL changes
   useEffect(() => {
@@ -118,6 +123,16 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
           onError?.(err)
         })
 
+        // Handle transcoding progress
+        engine.addEventListener('transcoding', (e: any) => {
+          if (e.detail.status === 'progress') {
+            setTranscodingProgress(e.detail.progress)
+            onTranscodingProgress?.(e.detail.progress)
+          } else if (e.detail.status === 'complete') {
+            setTranscodingProgress(null)
+          }
+        })
+
         // Initialize
         const detectedStreams = await engine.initialize(url)
         setStreams(detectedStreams)
@@ -127,10 +142,9 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
         // Attach video
         await engine.attachVideo(videoRef.current!)
 
-        // Create AudioContext on user gesture (autoPlay counts)
+        // Attach audio (FFmpeg handles transcoding internally)
         if (engine.requiresHybridPlayback) {
-          audioContextRef.current = new AudioContext()
-          await engine.attachAudio(audioContextRef.current)
+          await engine.attachAudio()
         }
 
         setIsReady(true)
@@ -156,22 +170,12 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
         engineRef.current.destroy()
         engineRef.current = null
       }
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-        audioContextRef.current = null
-      }
     }
   }, [url]) // Only re-initialize on URL change
 
   // Play handler
   const play = useCallback(async () => {
     if (!engineRef.current) return
-    
-    // Resume AudioContext if needed (required by browser autoplay policy)
-    if (audioContextRef.current?.state === 'suspended') {
-      await audioContextRef.current.resume()
-    }
-    
     await engineRef.current.start()
   }, [])
 
@@ -193,10 +197,6 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
       await engineRef.current.destroy()
       engineRef.current = null
     }
-    if (audioContextRef.current) {
-      await audioContextRef.current.close()
-      audioContextRef.current = null
-    }
     setIsReady(false)
     setIsPlaying(false)
     setStreams([])
@@ -213,6 +213,7 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
     state,
     error,
     needsHybridPlayback,
+    transcodingProgress,
     play,
     pause,
     seek,

@@ -8,6 +8,7 @@ import { Utils } from './utils'
 import { getLogo, getTvLogo } from './logo'
 import { getEpisodes } from './episodes'
 import { getRating } from '../imdb'
+import { toStandardAgeRating } from './age-ratings'
 
 const CACHE_TTL = 1000 * 60 * 60 // 1 hour
 const blacklistLogoUrls = ["https://assets.fanart.tv/fanart/tv/0/hdtvlogo/-60a02798b7eea.png"]
@@ -16,6 +17,8 @@ const ageRatingCache = new Map<string, { rating: string | null; timestamp: numbe
  
 const extractAgeRating = (res: any, type: string, language: string) => {
     const countryCode = language.split('-')[1]?.toUpperCase() || 'US' // Default to US if no country in language
+
+    let rawRating: string | null = null
 
     if (type === 'movie' && res.release_dates && res.release_dates.results) {
         // Helper to get cert from country result
@@ -32,54 +35,54 @@ const extractAgeRating = (res: any, type: string, language: string) => {
 
         // 1. Try requested country
         let countryRelease = res.release_dates.results.find((r: any) => r.iso_3166_1 === countryCode)
-        let cert = getCert(countryRelease)
-        if (cert) return cert
+        rawRating = getCert(countryRelease)
+        if (rawRating) return toStandardAgeRating(rawRating)
 
         // 2. Try US fallback (if not already checked)
         if (countryCode !== 'US') {
             countryRelease = res.release_dates.results.find((r: any) => r.iso_3166_1 === 'US')
-            cert = getCert(countryRelease)
-            if (cert) return cert
+            rawRating = getCert(countryRelease)
+            if (rawRating) return toStandardAgeRating(rawRating)
         }
 
-        // 3. Try Common Western Fallbacks
-        const fallbacks = ['GB', 'NL', 'DE', 'FR', 'CA', 'AU', 'NZ', 'IE']
+        // 3. Try Common Western Fallbacks (NL first, then others for data availability)
+        const fallbacks = ['NL', 'GB', 'DE', 'FR', 'CA', 'AU', 'NZ', 'IE']
         for (const code of fallbacks) {
             if (code === countryCode) continue // Already checked
             if (code === 'US') continue // Already checked
             countryRelease = res.release_dates.results.find((r: any) => r.iso_3166_1 === code)
-            cert = getCert(countryRelease)
-            if (cert) return cert
+            rawRating = getCert(countryRelease)
+            if (rawRating) return toStandardAgeRating(rawRating)
         }
         
         // 4. Last resort: ANY certification found
         for (const r of res.release_dates.results) {
-             cert = getCert(r)
-             if (cert) return cert
+             rawRating = getCert(r)
+             if (rawRating) return toStandardAgeRating(rawRating)
         }
 
     } else if (type === 'series' && res.content_ratings && res.content_ratings.results) {
         // 1. Try requested country
         let ratingObj = res.content_ratings.results.find((r: any) => r.iso_3166_1 === countryCode)
-        if (ratingObj && ratingObj.rating) return ratingObj.rating
+        if (ratingObj && ratingObj.rating) return toStandardAgeRating(ratingObj.rating)
 
         // 2. Try US fallback
         if (countryCode !== 'US') {
              ratingObj = res.content_ratings.results.find((r: any) => r.iso_3166_1 === 'US')
-             if (ratingObj && ratingObj.rating) return ratingObj.rating
+             if (ratingObj && ratingObj.rating) return toStandardAgeRating(ratingObj.rating)
         }
         
-        // 3. Try Common Fallbacks
-        const fallbacks = ['GB', 'NL', 'DE', 'FR', 'CA', 'AU', 'NZ', 'IE']
+        // 3. Try Common Fallbacks (NL first, then others for data availability)
+        const fallbacks = ['NL', 'GB', 'DE', 'FR', 'CA', 'AU', 'NZ', 'IE']
         for (const code of fallbacks) {
              if (code === countryCode) continue
              ratingObj = res.content_ratings.results.find((r: any) => r.iso_3166_1 === code)
-             if (ratingObj && ratingObj.rating) return ratingObj.rating
+             if (ratingObj && ratingObj.rating) return toStandardAgeRating(ratingObj.rating)
         }
 
         // 4. Last resort: Any
         ratingObj = res.content_ratings.results.find((r: any) => r.rating)
-        if (ratingObj) return ratingObj.rating
+        if (ratingObj) return toStandardAgeRating(ratingObj.rating)
     }
     return null
 }

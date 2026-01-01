@@ -390,17 +390,18 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
                   </FormGroup>
                   
                   <FormGroup label="Age Rating" htmlFor="ageRatingInput">
-                      <select 
-                          id="ageRatingInput" 
+                      <select
+                          id="ageRatingInput"
                           value={ageRating}
                           onChange={(e) => setAgeRating(parseInt(e.target.value))}
                           className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
                       >
-                          <option value="6">G (General Audiences)</option>
-                          <option value="9">PG (Parental Guidance)</option>
-                          <option value="12">PG-13 (Parents Strongly Cautioned)</option>
-                          <option value="16">R (Restricted)</option>
-                          <option value="18">NC-17 (Adults Only)</option>
+                          <option value="0">All Ages</option>
+                          <option value="6">6 years</option>
+                          <option value="9">9 years</option>
+                          <option value="12">12 years</option>
+                          <option value="16">16 years</option>
+                          <option value="18">18 years</option>
                       </select>
                   </FormGroup>
 

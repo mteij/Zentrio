@@ -117,7 +117,7 @@ export function AppearanceSettings() {
         <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
             <div className="flex-1 pr-4">
                 <h3 className="text-lg font-medium text-white mb-1">Show Age Ratings</h3>
-                <p className="text-sm text-zinc-400">Display age ratings (e.g., PG-13, R) on media cards.</p>
+                <p className="text-sm text-zinc-400">Display age ratings (e.g., AL, 12 years, 16 years) on media cards.</p>
             </div>
             <div className="flex items-center gap-4 shrink-0">
                 <Toggle

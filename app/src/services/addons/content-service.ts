@@ -6,41 +6,64 @@
 import { MetaPreview } from './types'
 import { profileProxySettingsDb, watchHistoryDb } from '../database'
 import { tmdbService } from '../tmdb/index'
+import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../tmdb/age-ratings'
 
-// Standard MPAA ratings in order of restrictiveness
-const RATINGS = ['G', 'PG', 'PG-13', 'R', 'NC-17'] as const
+// Standard age ratings in order of restrictiveness
+const RATINGS = AGE_RATINGS
 
-// Age to rating mapping
-const AGE_TO_RATING: Record<number, string> = {
-  6: 'G',
-  9: 'PG',
-  12: 'PG-13',
-  16: 'R',
-  18: 'NC-17'
+// Age to age rating mapping
+const AGE_TO_RATING: Record<number, AgeRating> = {
+  0: 'AL',
+  6: '6',
+  9: '9',
+  12: '12',
+  16: '16',
+  18: '18'
 }
 
-// Rating normalization mappings (various regional/TV ratings to MPAA equivalents)
+// Rating normalization mappings (various regional/TV ratings to standard equivalents)
+// This is now handled by the toStandardAgeRating function, but we keep some direct mappings for backward compatibility
 const RATING_MAPPINGS: Record<string, string> = {
-  // TV ratings (remove prefix)
-  'TV-Y': 'G', 'TV-Y7': 'G', 'TV-G': 'G', 'TV-PG': 'PG',
-  'TV-14': 'PG-13', 'TV-MA': 'NC-17',
-  'Y': 'G', 'Y7': 'G', 'MA': 'NC-17', '14': 'PG-13',
-  // UK (BBFC)
-  'U': 'G', '12': 'PG-13', '12A': 'PG-13', '15': 'R',
-  '18': 'NC-17', 'R18': 'NC-17', 'E': 'G', 'CAUTION': 'NC-17',
-  // Generic
-  'ALL': 'G', '0+': 'G', '6+': 'PG', '7+': 'PG', '9+': 'PG',
-  '12+': 'PG-13', '13+': 'PG-13', 'TEEN': 'PG-13', '14+': 'PG-13',
-  '16': 'R', 'MATURE': 'NC-17', 'ADULT': 'NC-17',
-  // Netherlands
-  'AL': 'G', '6': 'PG', '9': 'PG',
-  // USA (MPA)
-  'APPROVED': 'G'
+  // These will be converted to Kijkwijzer format by normalizeRating
+  'G': 'G',
+  'PG': 'PG',
+  'PG-13': 'PG-13',
+  'R': 'R',
+  'NC-17': 'NC-17',
+  'TV-Y': 'TV-Y',
+  'TV-Y7': 'TV-Y7',
+  'TV-G': 'TV-G',
+  'TV-PG': 'TV-PG',
+  'TV-14': 'TV-14',
+  'TV-MA': 'TV-MA',
+  'U': 'U',
+  '12': '12',
+  '12A': '12A',
+  '15': '15',
+  '18': '18',
+  'R18': 'R18',
+  'E': 'E',
+  'CAUTION': 'CAUTION',
+  'ALL': 'ALL',
+  '0+': '0+',
+  '6+': '6+',
+  '7+': '7+',
+  '9+': '9+',
+  '12+': '12+',
+  '13+': '13+',
+  '14+': '14+',
+  '16+': '16+',
+  '18+': '18+',
+  'TEEN': 'TEEN',
+  'MATURE': 'MATURE',
+  'ADULT': 'ADULT',
+  'AL': 'AL',
+  'APPROVED': 'APPROVED'
 }
 
 export interface ParentalSettings {
   enabled: boolean
-  ratingLimit: string
+  ratingLimit: AgeRating
 }
 
 export interface ContentEnrichment {
@@ -55,9 +78,9 @@ export interface ContentEnrichment {
  */
 export function getParentalSettings(profileId: number): ParentalSettings {
   const proxySettings = profileProxySettingsDb.findByProfileId(profileId)
-  const ratingLimit = proxySettings?.nsfw_age_rating 
-    ? (AGE_TO_RATING[proxySettings.nsfw_age_rating] || 'R') 
-    : 'R'
+  const ratingLimit = proxySettings?.nsfw_age_rating
+    ? (AGE_TO_RATING[proxySettings.nsfw_age_rating] || '18' as AgeRating)
+    : '18' as AgeRating
   
   return {
     enabled: proxySettings?.nsfw_filter_enabled ?? false,
@@ -66,23 +89,30 @@ export function getParentalSettings(profileId: number): ParentalSettings {
 }
 
 /**
- * Normalize a rating string to MPAA equivalent
+ * Normalize a rating string to standard age rating format
  */
-export function normalizeRating(rating: string | undefined | null): string | null {
+export function normalizeRating(rating: string | undefined | null): AgeRating | null {
   if (!rating) return null
   
+  // Convert to standard age rating format
+  const standardRating = toStandardAgeRating(rating)
+  
+  if (standardRating) {
+    return standardRating
+  }
+  
+  // Fallback: try to extract numeric age
   const upper = String(rating).toUpperCase().trim()
-  
-  // Remove TV- prefix if present
-  const withoutPrefix = upper.startsWith('TV-') ? upper.replace('TV-', '') : upper
-  
-  // Check direct mapping
-  if (RATING_MAPPINGS[upper]) return RATING_MAPPINGS[upper]
-  if (RATING_MAPPINGS[withoutPrefix]) return RATING_MAPPINGS[withoutPrefix]
-  
-  // Check if it's already a valid MPAA rating
-  if (RATINGS.includes(upper as any)) return upper
-  if (RATINGS.includes(withoutPrefix as any)) return withoutPrefix
+  const ageMatch = upper.match(/^(\d+)/)
+  if (ageMatch) {
+    const age = parseInt(ageMatch[1], 10)
+    if (age === 0) return 'AL'
+    if (age <= 6) return '6'
+    if (age <= 9) return '9'
+    if (age <= 12) return '12'
+    if (age <= 16) return '16'
+    return '18'
+  }
   
   return null
 }

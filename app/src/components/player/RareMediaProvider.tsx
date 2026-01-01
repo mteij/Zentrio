@@ -20,7 +20,11 @@ import {
   defaultLayoutIcons
 } from '@vidstack/react/player/layouts/default'
 import { HybridEngine } from '../../services/hybrid-media/HybridEngine'
-import type { StreamInfo, EngineState } from '../../services/hybrid-media/types'
+import { TranscoderService } from '../../services/hybrid-media/TranscoderService'
+import type { StreamInfo, EngineState, MediaMetadata } from '../../services/hybrid-media/types'
+
+// Tauri detection - hybrid media service is web-only
+const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__
 
 export interface SubtitleTrack {
   src: string
@@ -69,16 +73,25 @@ export function RareMediaProvider({
   autoPlay = true,
   slots = {}
 }: RareMediaProviderProps) {
+  // Hybrid media is not available in Tauri apps
+  if (isTauri) {
+    console.warn('[RareMediaProvider] Hybrid media is not available in Tauri apps')
+    return (
+      <div className="hybrid-error tauri-warning">
+        <p>This media format is not supported in this app.</p>
+      </div>
+    )
+  }
   const playerRef = useRef<MediaPlayerInstance>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const engineRef = useRef<HybridEngine | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
   
   const [isEngineReady, setIsEngineReady] = useState(false)
   const [engineState, setEngineState] = useState<EngineState>('idle')
   const [streams, setStreams] = useState<StreamInfo[]>([])
   const [duration, setDuration] = useState(0)
   const [mediaSrc, setMediaSrc] = useState<MediaSrc | null>(null)
+  const [transcodingProgress, setTranscodingProgress] = useState<number | null>(null)
 
   // Initialize engine when source changes
   useEffect(() => {
@@ -92,16 +105,59 @@ export function RareMediaProvider({
         if (engineRef.current) {
           await engineRef.current.destroy()
         }
-        if (audioContextRef.current) {
-          await audioContextRef.current.close()
-          audioContextRef.current = null
-        }
 
         setIsEngineReady(false)
         setEngineState('initializing')
+        setTranscodingProgress(null)
 
-        // Create engine
-        const engine = new HybridEngine()
+        // Probe media file first to get metadata
+        const metadata: MediaMetadata = await TranscoderService.probe(src)
+        const streams = (metadata.streams || []).map(s => ({
+          index: s.index,
+          codec: s.codec_name,
+          codecType: s.codec_type,
+          language: s.tags?.language || 'und',
+          title: s.tags?.title || '',
+          bitrate: s.bit_rate
+        } as StreamInfo))
+
+        setStreams(streams)
+
+        // Check if we actually need hybrid playback
+        const audioStream = streams.find(s => s.codecType === 'audio')
+        const needsHybrid = audioStream && (
+          audioStream.codec === 'flac' ||
+          audioStream.codec === 'vorbis' ||
+          audioStream.codec === 'dts' ||
+          audioStream.codec === 'ac3' ||
+          audioStream.codec === 'eac3' ||
+          audioStream.codec === 'truehd' ||
+          audioStream.codec === 'opus' // Some browsers don't support opus in mp4
+        )
+
+        if (!needsHybrid) {
+          // Audio is natively supported, use normal playback
+          console.log('[RareMediaProvider] Using native playback - audio codec:', audioStream?.codec)
+          setMediaSrc({ src, type: 'video/mp4' })
+          setIsEngineReady(true)
+          onMetadataLoad?.(metadata.format?.duration || 0, streams)
+          return
+        }
+
+        // Create engine with new API
+        console.log('[RareMediaProvider] Using hybrid playback - audio codec:', audioStream?.codec)
+        const engine = new HybridEngine(src, metadata, {
+          onProgress: (data) => {
+            if (cancelled) return
+            if (data.type === 'segment') {
+              setTranscodingProgress(data.progress)
+            }
+          },
+          onError: (error) => {
+            if (cancelled) return
+            onError?.(error)
+          }
+        })
         engineRef.current = engine
 
         // Event handlers
@@ -125,35 +181,11 @@ export function RareMediaProvider({
           onError?.(e.detail.error)
         })
 
-        // Initialize
-        const detectedStreams = await engine.initialize(src)
+        setDuration(engine.getDuration())
         
-        if (cancelled) {
-          engine.destroy()
-          return
-        }
-
-        setStreams(detectedStreams)
-        setDuration(engine.totalDuration)
-
-        // Check if we actually need hybrid playback
-        if (!engine.requiresHybridPlayback) {
-          // Audio is natively supported, use normal playback
-          console.log('[RareMediaProvider] Using native playback')
-          setMediaSrc({ src, type: 'video/mp4' })
-          await engine.destroy()
-          engineRef.current = null
-          setIsEngineReady(true)
-          onMetadataLoad?.(engine.totalDuration, detectedStreams)
-          return
-        }
-
-        // Need hybrid playback
-        console.log('[RareMediaProvider] Using hybrid playback')
-        
-        // We'll attach when we have the video element
+        // We'll initialize when we have the video element
         setEngineState('ready')
-        onMetadataLoad?.(engine.totalDuration, detectedStreams)
+        onMetadataLoad?.(engine.getDuration(), streams)
         
       } catch (error) {
         if (cancelled) return
@@ -179,12 +211,8 @@ export function RareMediaProvider({
         const engine = engineRef.current!
         const video = videoRef.current!
         
-        // Attach video
-        await engine.attachVideo(video)
-        
-        // Create and attach audio
-        audioContextRef.current = new AudioContext()
-        await engine.attachAudio(audioContextRef.current)
+        // Initialize engine with video element
+        await engine.initialize(video)
         
         setIsEngineReady(true)
 
@@ -195,13 +223,10 @@ export function RareMediaProvider({
 
         // Auto-play if requested
         if (autoPlay) {
-          if (audioContextRef.current.state === 'suspended') {
-            await audioContextRef.current.resume()
-          }
-          await engine.start()
+          await engine.play()
         }
       } catch (error) {
-        console.error('[RareMediaProvider] Attach error:', error)
+        console.error('[RareMediaProvider] Initialize error:', error)
         onError?.(error instanceof Error ? error : new Error(String(error)))
       }
     }
@@ -216,20 +241,13 @@ export function RareMediaProvider({
         engineRef.current.destroy()
         engineRef.current = null
       }
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-        audioContextRef.current = null
-      }
     }
   }, [])
 
   // Handle play from Vidstack
   const handlePlay = useCallback(async () => {
     if (engineRef.current) {
-      if (audioContextRef.current?.state === 'suspended') {
-        await audioContextRef.current.resume()
-      }
-      await engineRef.current.start()
+      await engineRef.current.play()
     }
   }, [])
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { AnimatePresence, motion } from 'framer-motion'
@@ -6,6 +6,7 @@ import { TrendingUp, Play, Info } from 'lucide-react'
 import { MetaPreview } from '../../services/addons/types'
 import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { getPackId } from '../../services/addons/stream-service'
+import { LazyImage } from '../ui/LazyImage'
 import styles from '../../styles/Streaming.module.css'
 
 interface HeroProps {
@@ -15,7 +16,7 @@ interface HeroProps {
   storageKey?: string // Key to save index in sessionStorage (optional)
 }
 
-export const Hero = ({ items, profileId, showTrending = false, storageKey = 'heroFeaturedIndex' }: HeroProps) => {
+export const Hero = memo(function Hero({ items, profileId, showTrending = false, storageKey = 'heroFeaturedIndex' }: HeroProps) {
   const navigate = useNavigate()
   const { startAutoPlay } = useAutoPlay()
   // State for cycling through featured items
@@ -132,17 +133,17 @@ export const Hero = ({ items, profileId, showTrending = false, storageKey = 'her
   return (
     <>
       <AnimatePresence mode="sync">
-        <motion.div 
+        <motion.div
           key={`ambient-${currentIndex}`}
-          className={styles.pageAmbientBackground} 
-          id="ambientBackground" 
+          className={styles.pageAmbientBackground}
+          id="ambientBackground"
           style={{
             backgroundImage: `url(${itemBg || itemPoster})`
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 1.2, ease: "easeInOut" }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
         />
       </AnimatePresence>
       
@@ -150,38 +151,53 @@ export const Hero = ({ items, profileId, showTrending = false, storageKey = 'her
         <div className={styles.heroBackdrop} id="heroBackdrop">
           <AnimatePresence mode="sync">
             {itemBg ? (
-              <motion.img 
+              <motion.div
                 key={`hero-bg-${currentIndex}`}
-                src={itemBg} 
-                alt="Hero Background" 
-                id="heroImage"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 1.2, ease: "easeInOut" }}
-                style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                style={{ position: 'absolute', width: '100%', height: '100%' }}
+              >
+                <LazyImage
+                  src={itemBg}
+                  alt="Hero Background"
+                  priority={true}
+                  blurAmount={0}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </motion.div>
             ) : itemPoster ? (
-              <motion.img 
+              <motion.div
                 key={`hero-poster-${currentIndex}`}
-                src={itemPoster} 
-                alt="Hero Background" 
-                id="heroImage" 
-                style={{ filter: 'blur(20px)', transform: 'scale(1.1)', position: 'absolute', width: '100%', height: '100%', objectFit: 'cover' }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 1.2, ease: "easeInOut" }}
-              />
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                style={{ position: 'absolute', width: '100%', height: '100%' }}
+              >
+                <LazyImage
+                  src={itemPoster}
+                  alt="Hero Background"
+                  priority={true}
+                  blurAmount={20}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    filter: 'blur(20px)',
+                    transform: 'scale(1.1)'
+                  }}
+                />
+              </motion.div>
             ) : (
-              <motion.div 
+              <motion.div
                 key={`hero-empty-${currentIndex}`}
-                style={{ width: '100%', height: '100%', background: '#141414', position: 'absolute' }} 
+                style={{ width: '100%', height: '100%', background: '#141414', position: 'absolute' }}
                 id="heroImage"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 1.2, ease: "easeInOut" }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
               />
             )}
           </AnimatePresence>
@@ -189,9 +205,9 @@ export const Hero = ({ items, profileId, showTrending = false, storageKey = 'her
         <div className={styles.heroOverlay}></div>
         <div className={styles.heroContent}>
           <AnimatePresence mode="wait">
-            <motion.div 
+            <motion.div
               key={`hero-info-${currentIndex}`}
-              className={styles.heroInfo} 
+              className={styles.heroInfo}
               id="heroInfo"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -243,4 +259,12 @@ export const Hero = ({ items, profileId, showTrending = false, storageKey = 'her
       </div>
     </>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if items or key props change
+  return (
+    prevProps.items === nextProps.items &&
+    prevProps.profileId === nextProps.profileId &&
+    prevProps.showTrending === nextProps.showTrending &&
+    prevProps.storageKey === nextProps.storageKey
+  )
+})

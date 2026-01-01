@@ -149,7 +149,7 @@ export const StreamingPlayer = () => {
                     const contentType = parsedMeta.type
                     const videoHash = parsedStream?.behaviorHints?.videoHash
                     const hashParam = videoHash ? `&videoHash=${videoHash}` : ''
-                    const res = await fetch(`/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}${hashParam}`)
+                    const res = await apiFetch(`/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}${hashParam}`)
                     if (res.ok) {
                         const data = await res.json()
                         if (data.subtitles && Array.isArray(data.subtitles)) {

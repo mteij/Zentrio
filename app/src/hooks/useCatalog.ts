@@ -62,13 +62,11 @@ export function useCatalog(options: UseCatalogOptions): UseCatalogResult {
         // Specific addon catalog
         const params = new URLSearchParams({
           profileId,
-          manifestUrl: encodeURIComponent(manifestUrl),
+          manifestUrl,
           type,
           id: catalogId
         })
-        const res = await fetch(`/api/streaming/catalog-items?${params}`)
-        if (!res.ok) throw new Error('Failed to fetch catalog')
-        const data = await res.json()
+        const data = await apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog-items?${params}`)
         return { items: data.items || [], hasMore: false }
       } else {
         // Generic catalog query with filters

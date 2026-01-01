@@ -191,6 +191,26 @@ app.get('/favicon.ico', async (c) => {
   }
 })
 
+// Service worker (legacy clients may still request /sw.js?v=...)
+// Serve the unregistering SW from /static/sw.js and disable caching to speed up removal/updates.
+app.get('/sw.js', async () => {
+  try {
+    // @ts-ignore
+    const filePath = join(import.meta.dir, 'static', 'sw.js')
+    // @ts-ignore
+    const file = Bun.file(filePath)
+
+    return new Response(file, {
+      headers: {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    })
+  } catch {
+    return new Response('Not Found', { status: 404 })
+  }
+})
+
 // Mount route modules
 app.route('/api', apiRoutes)            // API routes, including auth, profiles, user, avatar, health, stream
 app.route('/', viewRoutes)              // View routes (redirects, etc.)

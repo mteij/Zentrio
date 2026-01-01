@@ -5,6 +5,7 @@ import { addonDb, streamDb, profileDb, profileProxySettingsDb, watchHistoryDb } 
 import { getConfig } from '../envParser'
 import { StreamProcessor, ParsedStream } from './stream-processor'
 import { tmdbService } from '../tmdb/index'
+import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../tmdb/age-ratings'
 
 const DEFAULT_TMDB_ADDON = 'zentrio://tmdb-addon'
 
@@ -437,6 +438,52 @@ export class AddonManager {
         }
         
         if (combined.length > 0) {
+            // Row filling logic: if not enough items after filtering, fetch more
+            if (parentalSettings.enabled && combined.length < 10) {
+                let currentSkip = 20; // Start from where we left off (we fetched 20 initially)
+                let attempts = 0;
+                const maxAttempts = 5; // More attempts for trending to ensure we get enough
+
+                while (combined.length < 10 && attempts < maxAttempts) {
+                    try {
+                        const extraPromises: Promise<MetaPreview[]>[] = [];
+                        
+                        if (trendingMovieCat) {
+                            extraPromises.push(tmdbClient.getCatalog(trendingMovieCat.type, trendingMovieCat.id, { skip: currentSkip.toString() }, config)
+                                .then(items => this.filterContent(items, parentalSettings, profile?.user_id)));
+                        } else {
+                            extraPromises.push(Promise.resolve([]));
+                        }
+
+                        if (trendingSeriesCat) {
+                            extraPromises.push(tmdbClient.getCatalog(trendingSeriesCat.type, trendingSeriesCat.id, { skip: currentSkip.toString() }, config)
+                                .then(items => this.filterContent(items, parentalSettings, profile?.user_id)));
+                        } else {
+                            extraPromises.push(Promise.resolve([]));
+                        }
+
+                        const [extraMovies, extraSeries] = await Promise.all(extraPromises);
+                        
+                        // Interleave the new results
+                        const extraCombined: MetaPreview[] = [];
+                        const extraMaxLen = Math.max(extraMovies.length, extraSeries.length);
+                        
+                        for (let i = 0; i < extraMaxLen; i++) {
+                            if (i < extraMovies.length) extraCombined.push(extraMovies[i]);
+                            if (i < extraSeries.length) extraCombined.push(extraSeries[i]);
+                        }
+                        
+                        if (extraCombined.length === 0) break;
+                        
+                        combined.push(...extraCombined);
+                        currentSkip += 20; // We fetch 20 items per batch (10 movies + 10 series)
+                        attempts++;
+                    } catch (e) {
+                        break;
+                    }
+                }
+            }
+            
             const final = combined.slice(0, 20); // Return top 20 items available for the UI
             return this.enrichContent(final, profileId);
         }
@@ -508,9 +555,31 @@ export class AddonManager {
         const cat = tmdbClient.manifest?.catalogs.find(c => c.type === type && (c.id === 'tmdb.trending' || c.id === 'tmdb.top'));
         
         if (cat) {
-             const items = await tmdbClient.getCatalog(cat.type, cat.id, {}, config);
+             let items = await tmdbClient.getCatalog(cat.type, cat.id, {}, config);
              if (items && items.length > 0) {
-                 const filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
+                 let filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
+                 
+                 // Row filling logic: if not enough items after filtering, fetch more
+                 if (parentalSettings.enabled && filtered.length < 10) {
+                     let currentSkip = items.length;
+                     let attempts = 0;
+                     const maxAttempts = 5;
+                     
+                     while (filtered.length < 10 && attempts < maxAttempts) {
+                         try {
+                             const nextItems = await tmdbClient.getCatalog(cat.type, cat.id, { skip: currentSkip.toString() }, config);
+                             if (!nextItems || nextItems.length === 0) break;
+                             
+                             const nextFiltered = await this.filterContent(nextItems, parentalSettings, profile?.user_id);
+                             filtered = [...filtered, ...nextFiltered];
+                             currentSkip += nextItems.length;
+                             attempts++;
+                         } catch (e) {
+                             break;
+                         }
+                     }
+                 }
+                 
                  return this.enrichContent(filtered.slice(0, 10), profileId);
              }
         }
@@ -524,15 +593,16 @@ export class AddonManager {
 
   private getParentalSettings(profileId: number) {
       const proxySettings = profileProxySettingsDb.findByProfileId(profileId);
-      const ageMap: Record<number, string> = {
-          6: 'G',
-          9: 'PG',
-          12: 'PG-13',
-          16: 'R',
-          18: 'NC-17'
+      const ageMap: Record<number, AgeRating> = {
+          0: 'AL',
+          6: '6',
+          9: '9',
+          12: '12',
+          16: '16',
+          18: '18'
       };
-      // Default to R if unknown, but respecting enabled flag
-      const ratingLimit = proxySettings?.nsfw_age_rating ? (ageMap[proxySettings.nsfw_age_rating] || 'R') : 'R';
+      // Default to 18 if unknown, but respecting enabled flag
+      const ratingLimit = proxySettings?.nsfw_age_rating ? (ageMap[proxySettings.nsfw_age_rating] || '18' as AgeRating) : '18' as AgeRating;
       
       return {
           enabled: proxySettings?.nsfw_filter_enabled ?? false,
@@ -540,20 +610,20 @@ export class AddonManager {
       };
   }
 
-   private async filterContent(items: MetaPreview[], parentalSettings: { enabled: boolean, ratingLimit: string }, userId?: string): Promise<MetaPreview[]> {
+   private async filterContent(items: MetaPreview[], parentalSettings: { enabled: boolean, ratingLimit: AgeRating }, userId?: string): Promise<MetaPreview[]> {
     // If filtering is disabled, we still want to try to populate age ratings if they are missing
-    // But fetching them for ALL items might be slow if we do it here. 
+    // But fetching them for ALL items might be slow if we do it here.
     // However, the user complained "Badges are missing".
     // If we only fetch when filtering is enabled, then badges will be missing when filtering is disabled.
     // Ideally we should separate "enrichment" from "filtering".
     // But for now, let's just make sure that IF we find it, we save it.
     
     // We ALWAYS want to normalize/find ratings if we can, to show badges?
-    // Or only if filtering is enabled? 
+    // Or only if filtering is enabled?
     // The user has age limit set, so passing parentalSettings.enabled = true.
     
-    const ratingLimit = parentalSettings.ratingLimit || 'R';
-    const ratings = ['G', 'PG', 'PG-13', 'R', 'NC-17'];
+    const ratingLimit = parentalSettings.ratingLimit || '18' as AgeRating;
+    const ratings = AGE_RATINGS;
     const limitIndex = ratings.indexOf(ratingLimit);
     
     // Initialize TMDB client if user ID is provided
@@ -562,18 +632,18 @@ export class AddonManager {
     const filteredItems = await Promise.all(items.map(async (item) => {
         const itemAny = item as Record<string, any>;
         
-        // Try to find certification with country fallback (US -> GB -> NL)
+        // Try to find certification with country fallback (NL -> US -> GB)
         let cert = itemAny.ageRating || itemAny.certification || itemAny.rating || itemAny.contentRating || itemAny.info?.certification || itemAny.info?.rating;
 
         // If certification is an object (e.g. from TMDB sometimes), try to find by country
         if (typeof cert === 'object' && cert !== null) {
-            cert = (cert as Record<string, any>)['US'] || (cert as Record<string, any>)['GB'] || (cert as Record<string, any>)['NL'] || Object.values(cert)[0];
+            cert = (cert as Record<string, any>)['NL'] || (cert as Record<string, any>)['US'] || (cert as Record<string, any>)['GB'] || Object.values(cert)[0];
         }
         
         // Also check releaseInfo if it contains certification
         if (!cert && itemAny.releaseInfo && typeof itemAny.releaseInfo === 'string') {
             const parts = itemAny.releaseInfo.split('|').map((s: string) => s.trim());
-            const potentialRating = parts.find((p: string) => ratings.includes(p) || p.startsWith('TV-'));
+            const potentialRating = parts.find((p: string) => ratings.includes(p as AgeRating) || p.startsWith('TV-'));
             if (potentialRating) cert = potentialRating;
         }
 
@@ -582,7 +652,7 @@ export class AddonManager {
         // But doing this for every item in every catalog might be too slow on dashboard load.
         // Let's restrict to: if filtering enabled OR if we are enriching (maybe add a flag?)
         // For now, assume if we are here, we want to try our best.
-        if (!cert && tmdbClient && (parentalSettings.enabled || true)) { 
+        if (!cert && tmdbClient && (parentalSettings.enabled || true)) {
              // We enable this always for now to fix "no badges" issue, effectively enriching on the fly.
             try {
                 let tmdbId: string | null = null;
@@ -603,7 +673,7 @@ export class AddonManager {
                             id: item.id,
                             external_source: 'imdb_id'
                         });
-                        
+                         
                         if (type === 'movie' && findResults.movie_results?.length > 0) {
                             tmdbId = findResults.movie_results[0].id.toString();
                         } else if (type === 'series' && findResults.tv_results?.length > 0) {
@@ -618,7 +688,7 @@ export class AddonManager {
                                 type = 'series';
                             }
                         }
-                        
+                         
                         // Cache the result if found
                         if (tmdbId) {
                             this.idResolutionCache.set(item.id, tmdbId);
@@ -639,54 +709,22 @@ export class AddonManager {
         }
 
         if (cert) {
-            // Normalize cert
-            let certStr = String(cert).toUpperCase();
-            
-            // Map common variations
-            let mappedCert = certStr;
-            if (certStr.startsWith('TV-')) mappedCert = certStr.replace('TV-', '');
-            if (mappedCert === 'MA') mappedCert = 'NC-17';
-            if (mappedCert === '14') mappedCert = 'PG-13';
-            if (mappedCert === 'Y' || mappedCert === 'Y7') mappedCert = 'G';
-            
-            // UK (BBFC)
-            if (mappedCert === 'U') mappedCert = 'G';
-            if (mappedCert === '12' || mappedCert === '12A') mappedCert = 'PG-13';
-            if (mappedCert === '15') mappedCert = 'R';
-            if (mappedCert === '18' || mappedCert === 'R18' || mappedCert === 'CAUTION') mappedCert = 'NC-17';
-            if (mappedCert === 'E') mappedCert = 'G';
-
-            // UK (Non-BBFC / Additional)
-            if (mappedCert === 'ALL' || mappedCert === '0+') mappedCert = 'G';
-            if (mappedCert === '6+') mappedCert = 'PG';
-            if (mappedCert === '7+') mappedCert = 'PG';
-            if (mappedCert === '9+') mappedCert = 'PG';
-            if (mappedCert === '12+') mappedCert = 'PG-13';
-            if (mappedCert === '13+' || mappedCert === 'TEEN') mappedCert = 'PG-13';
-            if (mappedCert === '14+') mappedCert = 'PG-13';
-            if (mappedCert === '16') mappedCert = 'R';
-            if (mappedCert === 'MATURE' || mappedCert === 'ADULT') mappedCert = 'NC-17';
-
-            // Netherlands
-            if (mappedCert === 'AL') mappedCert = 'G';
-            if (mappedCert === '6') mappedCert = 'PG';
-            if (mappedCert === '9') mappedCert = 'PG';
-            if (mappedCert === '12') mappedCert = 'PG-13';
-            if (mappedCert === '14') mappedCert = 'PG-13';
-            if (mappedCert === '16') mappedCert = 'R';
-            if (mappedCert === '18') mappedCert = 'NC-17';
-            
-            // USA (MPA)
-            if (mappedCert === 'APPROVED') mappedCert = 'G';
-            
-            // ASSIGN BACK so the UI can see it! 
-            itemAny.certification = mappedCert; // Standardize on one property if possible, or update the one used in UI
-            // The UI looks for certification || rating || contentRating
-            
-            const itemRatingIndex = ratings.indexOf(mappedCert);
-            
-            if (parentalSettings.enabled && limitIndex !== -1) {
-                if (itemRatingIndex > limitIndex) return false;
+            // Convert to standard age rating format
+            const ageRating = toStandardAgeRating(cert);
+             
+            if (ageRating) {
+                // ASSIGN BACK so the UI can see it!
+                itemAny.certification = ageRating; // Standardize on one property if possible, or update the one used in UI
+                // The UI looks for certification || rating || contentRating
+                  
+                const itemRatingIndex = ratings.indexOf(ageRating);
+                 
+                if (parentalSettings.enabled && limitIndex !== -1) {
+                    if (itemRatingIndex > limitIndex) return false;
+                }
+            } else {
+                // If conversion failed, strict mode: hide content
+                if (parentalSettings.enabled) return false;
             }
         } else {
              // If no cert found, strict mode: hide content

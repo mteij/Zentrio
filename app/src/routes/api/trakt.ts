@@ -4,9 +4,10 @@
 import { Hono } from 'hono'
 import { randomBytes } from 'crypto'
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
-import { traktAccountDb, traktSyncStateDb, profileDb, type User } from '../../services/database'
+import { traktAccountDb, traktSyncStateDb, profileDb, profileProxySettingsDb, type User } from '../../services/database'
 import { traktClient, traktSyncService } from '../../services/trakt'
 import { addonManager } from '../../services/addons/addon-manager'
+import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../../services/tmdb/age-ratings'
 import { getConfig } from '../../services/envParser'
 import { ok, err } from '../../utils/api'
 
@@ -452,6 +453,21 @@ trakt.get('/recommendations', async (c) => {
       return ok(c, { items: [], connected: false })
     }
 
+    // Get parental settings for age rating filtering
+    const proxySettings = profileProxySettingsDb.findByProfileId(pId);
+    const ageMap: Record<number, AgeRating> = {
+      0: 'AL',
+      6: '6',
+      9: '9',
+      12: '12',
+      16: '16',
+      18: '18'
+    };
+    const parentalSettings = {
+      enabled: proxySettings?.nsfw_filter_enabled ?? false,
+      ratingLimit: proxySettings?.nsfw_age_rating ? (ageMap[proxySettings.nsfw_age_rating] || '18' as AgeRating) : '18' as AgeRating
+    };
+
     // Check if token needs refresh
     let accessToken = account.access_token
     if (traktAccountDb.isTokenExpired(pId)) {
@@ -466,7 +482,8 @@ trakt.get('/recommendations', async (c) => {
       }
     }
 
-    const limitNum = Math.min(parseInt(limit) || 20, 50)
+    // Fetch more items initially to account for filtering - aim for 50 to ensure we get 10+ filtered items
+    const limitNum = Math.min(parseInt(limit) || 50, 100)
 
     let items: any[] = []
     
@@ -516,7 +533,27 @@ trakt.get('/recommendations', async (c) => {
         return item
     }))
 
-    return ok(c, { items: hydratedItems, connected: true })
+    // Apply age rating filtering if parental controls are enabled
+    let filteredItems = hydratedItems;
+    if (parentalSettings.enabled) {
+      const ratings = AGE_RATINGS;
+      const limitIndex = ratings.indexOf(parentalSettings.ratingLimit);
+      
+      filteredItems = hydratedItems.filter((item: any) => {
+        const cert = item.ageRating || item.certification;
+        if (cert) {
+          const ageRating = toStandardAgeRating(cert);
+          if (ageRating) {
+            const itemRatingIndex = ratings.indexOf(ageRating);
+            return itemRatingIndex <= limitIndex;
+          }
+        }
+        // If no cert found, strict mode: hide content
+        return false;
+      });
+    }
+
+    return ok(c, { items: filteredItems, connected: true })
   } catch (e) {
     console.error('[Trakt] Recommendations failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to get recommendations')

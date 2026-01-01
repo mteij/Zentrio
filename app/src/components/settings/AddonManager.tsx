@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Puzzle, Settings, Trash2, X } from 'lucide-react'
+import { Puzzle, Settings, Trash2, X, Share2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Input, Toggle, SettingsProfileSelector } from '../index'
 import styles from '../../styles/Settings.module.css'
@@ -111,6 +111,8 @@ export function AddonManager() {
   const [manifestUrl, setManifestUrl] = useState('')
   const [installing, setInstalling] = useState(false)
   const [hasTmdbKey, setHasTmdbKey] = useState(false)
+  const [draggedAddonId, setDraggedAddonId] = useState<string | null>(null)
+  const [dragOverAddonId, setDragOverAddonId] = useState<string | null>(null)
 
   // Profile dialog state removed - handled by component
 
@@ -243,6 +245,91 @@ export function AddonManager() {
     setIsConfigModalOpen(true)
   }
 
+  const handleShareAddon = async (addon: Addon) => {
+    try {
+      await navigator.clipboard.writeText(addon.manifest_url)
+      toast.success('Link Copied', { description: `${addon.name} manifest URL copied to clipboard` })
+    } catch (e) {
+      console.error('Failed to copy to clipboard', e)
+      toast.error('Copy Failed', { description: 'Failed to copy link to clipboard' })
+    }
+  }
+
+  const handleReorderAddons = async (newAddons: Addon[]) => {
+    const addonIds = newAddons.map(a => parseInt(a.id))
+    try {
+      await apiFetch(`/api/addons/settings-profile/${currentProfileId}/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addonIds })
+      })
+    } catch (e) {
+      console.error('Failed to reorder addons', e)
+      toast.error('Reorder Failed', { description: 'Failed to save addon order' })
+      loadAddons(currentProfileId) // Revert on error
+    }
+  }
+
+  const handleDragStart = (e: React.DragEvent, addonId: string) => {
+    setDraggedAddonId(addonId)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e: React.DragEvent, addonId: string) => {
+    e.preventDefault()
+    if (draggedAddonId !== addonId) {
+      setDragOverAddonId(addonId)
+    }
+  }
+
+  const handleDragLeave = () => {
+    setDragOverAddonId(null)
+  }
+
+  const handleDrop = (e: React.DragEvent, targetAddonId: string) => {
+    e.preventDefault()
+    if (!draggedAddonId || draggedAddonId === targetAddonId) {
+      setDraggedAddonId(null)
+      setDragOverAddonId(null)
+      return
+    }
+
+    const draggedIndex = addons.findIndex(a => a.id === draggedAddonId)
+    const targetIndex = addons.findIndex(a => a.id === targetAddonId)
+
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    const newAddons = [...addons]
+    const [removed] = newAddons.splice(draggedIndex, 1)
+    newAddons.splice(targetIndex, 0, removed)
+
+    setAddons(newAddons)
+    handleReorderAddons(newAddons)
+
+    setDraggedAddonId(null)
+    setDragOverAddonId(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedAddonId(null)
+    setDragOverAddonId(null)
+  }
+
+  const handleMoveAddon = (addonId: string, direction: 'up' | 'down') => {
+    const index = addons.findIndex(a => a.id === addonId)
+    if (index === -1) return
+    
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= addons.length) return
+
+    const newAddons = [...addons]
+    const [removed] = newAddons.splice(index, 1)
+    newAddons.splice(newIndex, 0, removed)
+
+    setAddons(newAddons)
+    handleReorderAddons(newAddons)
+  }
+
   // handleCreateProfile, handleDeleteProfile, handleRenameProfile removed
 
   return (
@@ -302,36 +389,67 @@ export function AddonManager() {
                         const isDisabled = isZentrio && !hasTmdbKey;
                         
                         return (
-                        <div key={addon.id} className="addon-item" style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '15px',
-                            background: 'rgba(255,255,255,0.05)',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            opacity: isDisabled ? 0.7 : 1
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1, minWidth: 0 }}>
-                                {addon.logo ? (
-                                    <img src={addon.logo} alt={addon.name} style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }} />
+                        <div 
+                            key={addon.id} 
+                            className={`${styles.addonItem} addon-item`}
+                            draggable={true}
+                            onDragStart={(e) => handleDragStart(e, addon.id)}
+                            onDragOver={(e) => handleDragOver(e, addon.id)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, addon.id)}
+                            onDragEnd={handleDragEnd}
+                            style={{
+                                background: isZentrio ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))' : undefined,
+                                border: dragOverAddonId === addon.id 
+                                    ? '2px solid rgba(139, 92, 246, 0.6)' 
+                                    : isZentrio 
+                                        ? '1px solid rgba(139, 92, 246, 0.3)' 
+                                        : undefined,
+                                opacity: draggedAddonId === addon.id ? 0.5 : isDisabled ? 0.7 : 1,
+                                cursor: 'grab',
+                                transform: dragOverAddonId === addon.id ? 'scale(1.01)' : 'scale(1)'
+                            }}
+                        >
+                            {/* Reorder controls - separate from addonInfo for proper vertical centering */}
+                            <div className={styles.addonReorderControls}>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleMoveAddon(addon.id, 'up'); }}
+                                    disabled={addons.indexOf(addon) === 0}
+                                    title="Move up"
+                                >
+                                    <ChevronUp size={16} />
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleMoveAddon(addon.id, 'down'); }}
+                                    disabled={addons.indexOf(addon) === addons.length - 1}
+                                    title="Move down"
+                                >
+                                    <ChevronDown size={16} />
+                                </button>
+                            </div>
+                            <div className={styles.addonInfo}>
+                                {isZentrio ? (
+                                    <img className={styles.addonLogo} src="/static/logo/icon-192.png" alt="Zentrio" />
+                                ) : addon.logo ? (
+                                    <img className={styles.addonLogo} src={addon.logo} alt={addon.name} />
                                 ) : (
-                                    <div style={{ width: '40px', height: '40px', borderRadius: '4px', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div className={styles.addonLogoPlaceholder}>
                                         <Puzzle size={20} color="#555" />
                                     </div>
                                 )}
-                                <div style={{ minWidth: 0 }}>
-                                    <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        {addon.name} <span style={{ fontSize: '0.8em', color: '#888' }}>v{addon.version}</span>
-                                        {isDisabled && <span style={{ fontSize: '0.7em', color: '#ff6b6b', background: 'rgba(255,107,107,0.1)', padding: '2px 6px', borderRadius: '4px' }}>Requires TMDB Key</span>}
+                                <div className={styles.addonDetails}>
+                                    <div className={styles.addonName}>
+                                        {addon.name} <span className={styles.addonVersion}>v{addon.version}</span>
+                                        {isZentrio && <span style={{ fontSize: '0.65em', color: '#a78bfa', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2))', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Native</span>}
+                                        {isDisabled && <span className={styles.addonWarning}>Requires TMDB Key</span>}
                                     </div>
-                                    <div style={{ fontSize: '13px', color: '#aaa', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <div className={styles.addonDescription}>
                                         {addon.description}
                                     </div>
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div className={styles.addonActions}>
                                 {(addon.behavior_hints?.configurable || addon.behavior_hints?.configurationRequired) && (
                                     <Button 
                                         variant="secondary" 
@@ -341,6 +459,17 @@ export function AddonManager() {
                                         disabled={isDisabled}
                                     >
                                         <Settings size={18} />
+                                    </Button>
+                                )}
+                                
+                                {!addon.manifest_url.startsWith('zentrio://') && (
+                                    <Button 
+                                        variant="secondary" 
+                                        size="small" 
+                                        onClick={() => handleShareAddon(addon)}
+                                        title="Copy addon link"
+                                    >
+                                        <Share2 size={18} />
                                     </Button>
                                 )}
                                 

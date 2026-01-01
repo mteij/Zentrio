@@ -2,11 +2,11 @@
  * Hybrid Media Provider
  * 
  * Play video files with rare/unsupported audio codecs (FLAC, Vorbis, AC3, DTS)
- * directly in the browser without server-side transcoding.
+ * directly in the browser using FFmpeg WASM for transcoding.
  * 
  * Architecture:
  * - Video: Remuxed to fMP4 on-the-fly, fed to MSE
- * - Audio: Decoded via WASM (libav.js), played through AudioWorklet
+ * - Audio: Transcoded to AAC via FFmpeg WASM, played via HTMLAudioElement
  * - I/O: HTTP Range requests with chunked caching
  */
 
@@ -17,13 +17,11 @@ export type {
   CodecInfo,
   VideoPacket,
   AudioPacket,
-  DecodedAudioFrame,
   SeekRequest,
   EngineState,
   EngineEvents,
   NetworkReaderConfig,
   VideoRemuxerConfig,
-  AudioDecoderConfig,
   HybridEngineConfig,
   KeyframeEntry
 } from './types'
@@ -32,26 +30,25 @@ export type {
 export { HybridEngine } from './HybridEngine'
 export { NetworkReader } from './NetworkReader'
 export { VideoRemuxer } from './VideoRemuxer'
-export { AudioDecoder } from './AudioDecoder'
-export { AudioRingBuffer, RingBufferReader } from './AudioRingBuffer'
+export { TranscoderService } from './TranscoderService'
+export { AudioStreamTranscoder } from './AudioStreamTranscoder'
+export { Demuxer } from './Demuxer'
 
 /**
  * Quick check if a URL might need hybrid playback
- * 
- * Note: This is a heuristic based on file extension.
+ *
+ * Note: For debrid streams and unknown URLs, we should always probe
+ * since we can't determine codec from URL alone.
  * For accurate detection, use HybridEngine.initialize() and check requiresHybridPlayback
  */
 export function mightNeedHybridPlayback(url: string): boolean {
-  const ext = url.split('.').pop()?.toLowerCase()
-  
-  // Containers that commonly have rare audio codecs
-  const containerExts = ['mkv', 'webm', 'avi', 'mov', 'wmv', 'flv']
-  
-  return containerExts.includes(ext || '')
+  // Always probe - we can't reliably determine codec from URL
+  // Especially important for debrid streams which may have no extension
+  return true
 }
 
 /**
- * List of audio codecs that require WASM decoding
+ * List of audio codecs that require transcoding
  */
 export const RARE_AUDIO_CODECS = [
   'flac',

@@ -1,8 +1,7 @@
 /**
- * NetworkReader - HTTP Range Request Handler for libav.js
- * 
+ * NetworkReader - HTTP Range Request Handler
+ *
  * Provides chunked reading with caching for streaming demuxing.
- * Implements the read callback interface expected by libav.js.
  */
 
 import type { NetworkReaderConfig } from './types'
@@ -29,6 +28,7 @@ export class NetworkReader {
     this.maxCacheSize = config.maxCacheSize ?? 50
     this.prefetchCount = config.prefetchCount ?? 3
     this.timeout = config.timeout ?? 30000
+    this.abortController = new AbortController()
   }
 
   /**
@@ -40,10 +40,14 @@ export class NetworkReader {
    */
   async probe(): Promise<number> {
     try {
+      // Create a combined signal for timeout and manual abort
+      const timeoutSignal = AbortSignal.timeout(this.timeout)
+      const signal = this.mergeSignals(this.abortController!.signal, timeoutSignal)
+
       // Step 1: Get file size via HEAD
       const response = await fetch(this.url, {
         method: 'HEAD',
-        signal: AbortSignal.timeout(this.timeout)
+        signal
       })
 
       if (!response.ok) {
@@ -58,33 +62,68 @@ export class NetworkReader {
       this.fileSize = parseInt(contentLength, 10)
       console.log(`[NetworkReader] File size: ${(this.fileSize / 1024 / 1024).toFixed(2)} MB`)
 
+      // Check Accept-Ranges header
+      const acceptRanges = response.headers.get('Accept-Ranges')
+      if (acceptRanges === 'bytes') {
+        console.log('[NetworkReader] Server supports Range requests (confirmed via header)')
+        return this.fileSize
+      }
+
       // Step 2: Verify Range support with a real request (bytes=0-0)
-      // Some servers don't send Accept-Ranges header but do support it.
-      // Some consumers might send 200 OK for Range requests (bad).
+      // Only needed if Accept-Ranges header is missing
+      console.log('[NetworkReader] Accept-Ranges header missing, verifying with request...')
       try {
+        const verifySignal = this.mergeSignals(
+          this.abortController!.signal, 
+          AbortSignal.timeout(2000) // Reduced to 2s
+        )
+
         const rangeResponse = await fetch(this.url, {
             headers: { 'Range': 'bytes=0-0' },
-            signal: AbortSignal.timeout(5000) // Short timeout for check
+            signal: verifySignal
         })
 
         if (rangeResponse.status === 206) {
              console.log('[NetworkReader] Server supports Range requests (verified)')
         } else if (rangeResponse.status === 200) {
              console.warn('[NetworkReader] Server returned 200 OK for Range request. SEEKING WILL FAIL.')
-             // We can't throw here because maybe linear playback would still work, 
-             // but for a 1.8GB file, seeking to end for metadata will definitely crash/fail.
-             // We'll let `fetchChunk` handle the error when it happens.
         } else {
              console.warn(`[NetworkReader] Range check failed with status ${rangeResponse.status}`)
         }
       } catch (e) {
-          console.warn('[NetworkReader] Range check verification failed:', e)
+          console.warn('[NetworkReader] Range check verification failed (proceeding anyway):', e)
       }
       
       return this.fileSize
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw error // Propagate aborts
+      }
       throw new Error(`Failed to probe file: ${error}`)
     }
+  }
+
+  /**
+   * Helper to merge signals (fallback for AbortSignal.any)
+   */
+  private mergeSignals(signal1: AbortSignal, signal2: AbortSignal): AbortSignal {
+    if ((AbortSignal as any).any) {
+      return (AbortSignal as any).any([signal1, signal2])
+    }
+    
+    // Polyfill-ish approach
+    const controller = new AbortController()
+    
+    if (signal1.aborted || signal2.aborted) {
+      controller.abort()
+      return controller.signal
+    }
+
+    const onAbort = () => controller.abort()
+    signal1.addEventListener('abort', onAbort, { once: true })
+    signal2.addEventListener('abort', onAbort, { once: true })
+    
+    return controller.signal
   }
 
   /**
@@ -96,7 +135,6 @@ export class NetworkReader {
 
   /**
    * Read bytes from the file at the specified offset
-   * This is the main callback for libav.js
    */
   async read(offset: number, length: number): Promise<Uint8Array> {
     if (offset < 0 || offset >= this.fileSize) {
@@ -113,6 +151,9 @@ export class NetworkReader {
     // Fetch all required chunks
     const chunks: ArrayBuffer[] = []
     for (let chunkIndex = startChunk; chunkIndex <= endChunk; chunkIndex++) {
+      if (this.abortController?.signal.aborted) {
+        throw new Error('Aborted')
+      }
       const chunk = await this.getChunk(chunkIndex)
       chunks.push(chunk)
     }
@@ -177,11 +218,14 @@ export class NetworkReader {
     const start = chunkIndex * this.chunkSize
     const end = Math.min(start + this.chunkSize - 1, this.fileSize - 1)
 
+    const timeoutSignal = AbortSignal.timeout(this.timeout)
+    const signal = this.mergeSignals(this.abortController!.signal, timeoutSignal)
+
     const response = await fetch(this.url, {
       headers: {
         'Range': `bytes=${start}-${end}`
       },
-      signal: AbortSignal.timeout(this.timeout)
+      signal
     })
 
     if (!response.ok) {

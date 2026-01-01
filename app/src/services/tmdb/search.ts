@@ -7,6 +7,7 @@ import { TMDBClient } from './client'
 import { Utils } from './utils'
 import { getGenreList } from './genres'
 import { transliterate } from 'transliteration'
+import { AGE_RATINGS } from './age-ratings'
 
 function isNonLatin(text: string) {
   return /[^\u0000-\u007F]/.test(text)
@@ -38,19 +39,28 @@ export async function getSearch(tmdbClient: TMDBClient, id: string, type: string
   }
 
   if (config.ageRating) {
-    parameters.certification_country = "US"
+    // Use standard age ratings - try NL first, then US fallback for filtering
+    parameters.certification_country = "NL|US"
+    
+    // Map age ratings to certification filters
     switch(config.ageRating) {
-      case "G":
-        parameters.certification = type === "movie" ? "G" : "TV-G"
+      case "AL":
+        parameters.certification = type === "movie" ? "AL" : "AL"
         break
-      case "PG":
-        parameters.certification = type === "movie" ? ["G", "PG"].join("|") : ["TV-G", "TV-PG"].join("|")
+      case "6":
+        parameters.certification = type === "movie" ? ["AL", "6", "G", "TV-G"].join("|") : ["AL", "6", "TV-G"].join("|")
         break
-      case "PG-13":
-        parameters.certification = type === "movie" ? ["G", "PG", "PG-13"].join("|") : ["TV-G", "TV-PG", "TV-14"].join("|")
+      case "9":
+        parameters.certification = type === "movie" ? ["AL", "6", "9", "G", "PG", "TV-G", "TV-PG"].join("|") : ["AL", "6", "9", "TV-G", "TV-PG"].join("|")
         break
-      case "R":
-        parameters.certification = type === "movie" ? ["G", "PG", "PG-13", "R"].join("|") : ["TV-G", "TV-PG", "TV-14", "TV-MA"].join("|")
+      case "12":
+        parameters.certification = type === "movie" ? ["AL", "6", "9", "12", "G", "PG", "PG-13", "TV-G", "TV-PG", "TV-14"].join("|") : ["AL", "6", "9", "12", "TV-G", "TV-PG", "TV-14"].join("|")
+        break
+      case "16":
+        parameters.certification = type === "movie" ? ["AL", "6", "9", "12", "16", "G", "PG", "PG-13", "R", "TV-G", "TV-PG", "TV-14", "TV-MA"].join("|") : ["AL", "6", "9", "12", "16", "TV-G", "TV-PG", "TV-14", "TV-MA"].join("|")
+        break
+      case "18":
+        parameters.certification = type === "movie" ? ["AL", "6", "9", "12", "16", "18", "G", "PG", "PG-13", "R", "NC-17", "TV-G", "TV-PG", "TV-14", "TV-MA"].join("|") : ["AL", "6", "9", "12", "16", "18", "TV-G", "TV-PG", "TV-14", "TV-MA"].join("|")
         break
     }
   }

@@ -1,1011 +1,1079 @@
 /**
- * HybridEngine - Main Coordinator for Hybrid Media Playback
- * 
- * Orchestrates:
- * - libav.js for demuxing
- * - NetworkReader for HTTP Range I/O
- * - VideoRemuxer for MSE output
- * - AudioDecoder + AudioWorklet for audio output
+ * HybridEngine - Web-only hybrid playback engine
+ *
+ * Combines audio transcoding (via FFmpeg WASM) with direct video playback.
+ * Audio is transcoded to AAC, video is passed through to MSE.
+ *
+ * IMPORTANT: This only works in web browsers, not in Tauri apps.
  */
 
-import type {
-  StreamInfo,
-  VideoPacket,
-  AudioPacket,
-  CodecInfo,
-  EngineState,
-  HybridEngineConfig,
-  SeekRequest,
-  KeyframeEntry
-} from './types'
+import { FFmpeg } from '@ffmpeg/ffmpeg'
+import { toBlobURL } from '@ffmpeg/util'
 import { NetworkReader } from './NetworkReader'
-import { VideoRemuxer } from './VideoRemuxer'
-import { AudioDecoder } from './AudioDecoder'
-import { AudioRingBuffer } from './AudioRingBuffer'
+import { AudioStreamTranscoder } from './AudioStreamTranscoder'
+import type { HybridEngineConfig, StreamInfo, MediaMetadata, CombinedStreamInfo } from './types'
 
-// Codec ID constants from libav.js / FFmpeg
-const CODEC_ID_H264 = 27
-const CODEC_ID_HEVC = 173
-const CODEC_ID_VP9 = 167
-const CODEC_ID_AV1 = 225
-
-// Audio codec IDs (from FFmpeg's avcodec.h)
-const CODEC_ID_MP3 = 86017
-const CODEC_ID_AAC = 86018
-const CODEC_ID_FLAC = 86028
-const CODEC_ID_VORBIS = 86021
-const CODEC_ID_AC3 = 86019  // Note: Different from MP3
-const CODEC_ID_EAC3 = 86056
-const CODEC_ID_DTS = 86020
-const CODEC_ID_OPUS = 86076
-const CODEC_ID_PCM_S16LE = 65536
-const CODEC_ID_PCM_S24LE = 65543
-
-// Browsers typically support these natively via HTML5 audio/video
-const NATIVE_AUDIO_CODECS = new Set([
-  CODEC_ID_AAC,      // AAC
-  CODEC_ID_MP3,      // MP3
-  CODEC_ID_OPUS,     // Opus (in WebM/OGG containers)
-  CODEC_ID_VORBIS,   // Vorbis (in WebM/OGG containers)
-  CODEC_ID_PCM_S16LE, // PCM
-  CODEC_ID_PCM_S24LE, // PCM 24-bit
-])
+const CORE_URL = new URL('/ffmpeg/ffmpeg-core.js', import.meta.url).href
+const WASM_URL = new URL('/ffmpeg/ffmpeg-core.wasm', import.meta.url).href
 
 export class HybridEngine extends EventTarget {
-  private state: EngineState = 'idle'
-  private libav: any = null
-  private reader: NetworkReader | null = null
-  private videoRemuxer: VideoRemuxer | null = null
-  private audioDecoder: AudioDecoder | null = null
-  private audioRingBuffer: AudioRingBuffer | null = null
-  private audioContext: AudioContext | null = null
-  private audioWorkletNode: AudioWorkletNode | null = null
-  
-  private fmtCtx: number = 0
-  private videoStreamIndex: number = -1
-  private audioStreamIndex: number = -1
-  private streams: StreamInfo[] = []
-  private keyframeIndex: KeyframeEntry[] = []
-  private startTime: number = -1
-  
-  private isProcessing: boolean = false
-  private shouldStop: boolean = false
-  private currentTime: number = 0
-  private duration: number = 0
-  private videoElement: HTMLVideoElement | null = null
-  
+  private sourceUrl: string
+  private metadata: MediaMetadata
   private config: HybridEngineConfig
 
-  constructor(config: HybridEngineConfig = {}) {
+  private ffmpeg: FFmpeg | null = null
+  private audioTranscoder: AudioStreamTranscoder | null = null
+  private videoElement: HTMLVideoElement | null = null
+  private audioElement: HTMLAudioElement | null = null
+
+  private networkReader: NetworkReader | null = null
+  private videoStreamIndex: number | null = null
+  private audioStreamIndex: number | null = null
+
+  private isInitialized: boolean = false
+  private isPlaying: boolean = false
+  private currentTime: number = 0
+  private duration: number = 0
+
+  private needsTranscoding: boolean = false
+  private codecInfo: Map<number, { codecId: number; codecName: string; needsTranscode: boolean }> = new Map()
+
+  private mediaSource: MediaSource | null = null
+  private videoSourceBuffer: SourceBuffer | null = null
+  private pendingVideoSegments: ArrayBuffer[] = []
+  private isVideoAppending: boolean = false
+  private videoInitSegmentGenerated: boolean = false
+
+  private streamCache: Map<number, ArrayBuffer> = new Map()
+  private processedVideoChunks: number = 0
+
+  constructor(sourceUrl: string, metadata: MediaMetadata, config: HybridEngineConfig = {}) {
     super()
-    this.config = config
+    this.sourceUrl = sourceUrl
+    this.metadata = metadata
+    this.config = {
+      network: config.network,
+      video: config.video,
+      bufferSize: config.bufferSize ?? 100 * 1024 * 1024,
+      prefetchSize: config.prefetchSize ?? 50 * 1024 * 1024,
+      segmentSize: config.segmentSize ?? 10 * 1024 * 1024,
+      onProgress: config.onProgress,
+      onError: config.onError
+    }
+
+    // Check if we need hybrid playback
+    this.analyzeMetadata()
   }
 
   /**
-   * Initialize the engine with a media URL
+   * Analyze metadata to determine if hybrid playback is needed
    */
-  async initialize(url: string): Promise<StreamInfo[]> {
-    this.setState('initializing')
+  private analyzeMetadata(): void {
+    this.needsTranscoding = false
+    this.codecInfo.clear()
 
-    try {
-      // Create network reader
-      this.reader = new NetworkReader(url, this.config.network)
-      await this.reader.probe()
+    const streams = this.metadata.streams || []
+    let hasVideo = false
+    let hasAudio = false
 
-      // Import and initialize libav.js
-      // Try custom Zentrio variant first (includes AC3/E-AC3 decoders)
-      // Falls back to webcodecs variant if custom build not available
-      let LibAV: any
-      let variantName = 'webcodecs'
-      
-      try {
-        // Check if custom variant is available (built via scripts/build-libav.ps1)
-        const customResponse = await fetch('/libav.js-zentrio/libav-6.8.8.0-zentrio.js', { method: 'HEAD' })
-        if (customResponse.ok) {
-          // Load via dynamic script tag (Vite doesn't allow ES imports from /public)
-          await new Promise<void>((resolve, reject) => {
-            const script = document.createElement('script')
-            script.src = '/libav.js-zentrio/libav-6.8.8.0-zentrio.js'
-            script.onload = () => resolve()
-            script.onerror = () => reject(new Error('Failed to load custom libav.js'))
-            document.head.appendChild(script)
-          })
-          
-          // libav.js exposes itself as a global
-          LibAV = (window as any).LibAV
-          if (!LibAV) throw new Error('LibAV global not found')
-          
-          variantName = 'zentrio (AC3/E-AC3 enabled)'
-          console.log('[HybridEngine] Using custom Zentrio variant with AC3/E-AC3 support')
-        } else {
-          throw new Error('Custom variant not found')
-        }
-      } catch (e) {
-        // Fall back to standard webcodecs variant
-        LibAV = await import('@libav.js/variant-webcodecs')
-        LibAV = LibAV.default
-        console.log('[HybridEngine] Using standard webcodecs variant (AC3/E-AC3 not available)')
-      }
-      
-      // Try to initialize - use noworker mode for better compatibility
-      try {
-        this.libav = await LibAV.LibAV({ noworker: true })
-        console.log(`[HybridEngine] libav.js initialized (variant: ${variantName})`)
-      } catch (libavError) {
-        console.warn('[HybridEngine] Failed to initialize libav.js:', libavError)
-        throw new Error('libav.js initialization failed')
-      }
+    // Browser-supported audio codecs
+    const supportedAudioCodecs = ['aac', 'mp3', 'opus', 'vorbis', 'pcm_s16le', 'pcm_s24le', 'pcm_f32le']
+    // Browser-supported video codecs
+    const supportedVideoCodecs = ['h264', 'hevc', 'vp8', 'vp9', 'av1']
 
-      // Register custom I/O with libav
-      await this.registerCustomIO()
-
-      // Open demuxer (libav.js ff_init_demuxer_file only takes filename and optional format)
-      const [fmtCtx] = await this.libav.ff_init_demuxer_file('input.media')
-      this.fmtCtx = fmtCtx
-      
-      console.log('[HybridEngine] Demuxer opened, configuring probe options...')
-
-      // CRITICAL: Set probe options AFTER opening demuxer but BEFORE find_stream_info
-      // Use av_opt_set which IS exported (unlike AVFormatContext_probesize_s which isn't)
-      // av_opt_set signature: (obj, name, val, search_flags)
-      // AV_OPT_SEARCH_CHILDREN = 1 is needed for format options
-      //
-      // NOTE: We use smaller values here because:
-      // 1. We don't have an HEVC decoder (only parser), so video frame decoding will fail anyway
-      // 2. Matroska containers have duration/stream info in headers, minimal probing needed
-      // 3. Large values cause excessive "decoding for stream 0 failed" warnings
-      const probeSize = '5000000'  // 5 MB - enough to read container headers
-      const analyzeDuration = '5000000'  // 5 seconds in microseconds
-      
-      try {
-        if (this.libav.av_opt_set) {
-          // Set probesize - controls max data read to detect format
-          const ret1 = await this.libav.av_opt_set(fmtCtx, 'probesize', probeSize, 1)
-          console.log(`[HybridEngine] Set probesize=${probeSize}, result=${ret1}`)
-          
-          // Set analyzeduration - controls max time spent analyzing streams  
-          const ret2 = await this.libav.av_opt_set(fmtCtx, 'analyzeduration', analyzeDuration, 1)
-          console.log(`[HybridEngine] Set analyzeduration=${analyzeDuration}, result=${ret2}`)
-        } else {
-          console.warn('[HybridEngine] av_opt_set not available, using default probe options')
-        }
-      } catch (e) {
-        console.warn('[HybridEngine] Failed to set probe options:', e)
-      }
-
-      // Now perform stream analysis with our settings applied
-      const ret = await this.libav.avformat_find_stream_info(fmtCtx, 0)
-      if (ret < 0) {
-         console.warn('[HybridEngine] avformat_find_stream_info failed:', ret)
-      } else {
-         console.log('[HybridEngine] Stream analysis completed')
-      }
-
-      // Analyze streams
-      this.streams = await this.analyzeStreams()
-      
-      // Get duration - handle AV_NOPTS_VALUE (very large negative number when unknown)
-      let duration = await this.libav.AVFormatContext_duration(fmtCtx)
-      // AV_NOPTS_VALUE is 0x8000000000000000, which shows as a large negative number
-      // Duration should never be negative, so treat it as unknown/0
-      this.duration = duration > 0 ? duration / 1000000 : 0 // Convert from microseconds
-
-      // Fallback: try to get duration from individual streams if container duration is unknown
-      if (this.duration <= 0) {
-        console.log('[HybridEngine] Container duration unknown, checking streams...')
-        for (const stream of this.streams) {
-          if (stream.duration && stream.duration > 0) {
-            this.duration = stream.duration
-            console.log(`[HybridEngine] Using stream duration: ${this.duration}s`)
-            break
-          }
-        }
-      }
-
-      console.log('[HybridEngine] Streams detected:', this.streams)
-      console.log('[HybridEngine] Duration:', this.duration, 'seconds')
-
-      this.setState('ready')
-      this.dispatchEvent(new CustomEvent('streamsdetected', { 
-        detail: { streams: this.streams }
-      }))
-
-      return this.streams
-    } catch (error) {
-      this.setState('error')
-      throw error
-    }
-  }
-
-  /**
-   * Register custom I/O callbacks for libav.js
-   */
-  private async registerCustomIO(): Promise<void> {
-    if (!this.reader || !this.libav) {
-      throw new Error('Reader or libav not initialized')
-    }
-
-    const reader = this.reader
-    const libav = this.libav
-
-    // Create a block reader device (supports random access/seeking)
-    await libav.mkblockreaderdev('input.media', reader.size)
-
-    // Set up the block read callback
-    libav.onblockread = async (name: string, position: number, length: number) => {
-      if (name === 'input.media') {
-        try {
-          const data = await reader.read(position, length)
-          await libav.ff_block_reader_dev_send(name, position, data)
-        } catch (error) {
-          console.error('[HybridEngine] Block read error:', error)
-          // Send empty data on error
-          await libav.ff_block_reader_dev_send(name, position, new Uint8Array(0))
-        }
-      }
-    }
-  }
-
-  /**
-   * Analyze streams and extract metadata
-   */
-  private async analyzeStreams(): Promise<StreamInfo[]> {
-    const streams: StreamInfo[] = []
-    const numStreams = await this.libav.AVFormatContext_nb_streams(this.fmtCtx)
-
-    for (let i = 0; i < numStreams; i++) {
-      const stream = await this.libav.AVFormatContext_streams_a(this.fmtCtx, i)
-      const codecpar = await this.libav.AVStream_codecpar(stream)
-      
-      const codecType = await this.libav.AVCodecParameters_codec_type(codecpar)
-      const codecId = await this.libav.AVCodecParameters_codec_id(codecpar)
-
-      // Get stream-level duration (in stream time_base units)
-      const streamDuration = await this.libav.AVStream_duration(stream)
-      const timeBaseNum = await this.libav.AVStream_time_base_num(stream)
-      const timeBaseDen = await this.libav.AVStream_time_base_den(stream)
-      const timeBase = timeBaseDen > 0 ? timeBaseNum / timeBaseDen : 0
-      // Convert stream duration to seconds (handle AV_NOPTS_VALUE)
-      const streamDurationSeconds = (streamDuration > 0 && timeBase > 0) 
-        ? streamDuration * timeBase 
-        : 0
-
-      if (codecType === 0) { // AVMEDIA_TYPE_VIDEO
-        const width = await this.libav.AVCodecParameters_width(codecpar)
-        const height = await this.libav.AVCodecParameters_height(codecpar)
-        
-        // Create explicit Safe Level variable for CodecInfo
-        let safeLevel = await this.libav.AVCodecParameters_level(codecpar)
-        let profile = await this.libav.AVCodecParameters_profile(codecpar)
-
-        // Extract extradata (SPS/PPS)
-        let extradata: Uint8Array | undefined
-        const extradataSize = await this.libav.AVCodecParameters_extradata_size(codecpar)
-        if (extradataSize > 0) {
-          const extradataPtr = await this.libav.AVCodecParameters_extradata(codecpar)
-          extradata = await this.libav.copyout_u8(extradataPtr, extradataSize)
-          console.log(`[HybridEngine] Extracted extradata for video stream ${i}: ${extradataSize} bytes`)
-        } else {
-          console.warn(`[HybridEngine] No extradata for video stream ${i} - format detection might flap`)
-        }
-        
-        // Manual profile detection from extradata if libav fails
-        if ((profile <= 0 || profile === -99) && codecId === 173 && extradata && extradata.length > 5) {
-             // Check for hvcC (configurationVersion = 1)
-             if (extradata[0] === 1) {
-                 // hvcC format: [ver][profile_space_tier_idc]...
-                 // profile_idc is lower 5 bits of byte 1
-                 const profileIdc = extradata[1] & 0x1F
-                 console.log(`[HybridEngine] Parsed HEVC profile from hvcC: ${profileIdc}`)
-                 if (profileIdc > 0) profile = profileIdc
-             } else {
-                 console.warn('[HybridEngine] Extradata exists but not hvcC, basic profile detection skipped')
-             }
-        }
-
-        // Get codec string for MSE - NOW passing the potentially corrected profile
-        const codecString = await this.getVideoCodecString(codecId, codecpar, profile)
-
-        // Check for bit depth from pixel format
-        const format = await this.libav.AVCodecParameters_format(codecpar)
-        let bitDepth = 8
-        // Map common 10-bit formats or use profile
-        if (codecId === 173 && profile === 2) { // HEVC Main 10
-             bitDepth = 10
-        }
-
-        console.log(`[HybridEngine] Stream ${i}: codec=${codecId} profile=${profile} level=${safeLevel} fmt=${format}`)
-        // Map common 10-bit formats (e.g. AV_PIX_FMT_YUV420P10LE = 64?? need to check libav mapping)
-        // For now, assume if profile is Main 10, it's 10-bit
-        if (codecId === 173 && profile === 2) { // HEVC Main 10
-             bitDepth = 10
-        }
-
-        // Fix invalid level
-        if (safeLevel <= 0 && codecId === 173) {
-             safeLevel = 120
-        }
-        
-        const streamInfo: StreamInfo = {
-          index: i,
-          type: 'video',
-          codec: {
-            codecId,
-            codecName: this.getCodecName(codecId),
-            codecString,
-            extradata,
-            profileId: profile,
-            level: safeLevel,
-            bitDepth
-          },
-          width,
-          height,
-          duration: streamDurationSeconds
-        }
-
-        streams.push(streamInfo)
-        
-        if (this.videoStreamIndex === -1 && this.isRemuxableVideoCodec(codecId)) {
-          this.videoStreamIndex = i
-          console.log(`[HybridEngine] Selected video stream ${i}: ${streamInfo.codec.codecName}`)
-        }
-      } else if (codecType === 1) { // AVMEDIA_TYPE_AUDIO
-        const sampleRate = await this.libav.AVCodecParameters_sample_rate(codecpar)
-        const channels = await this.libav.AVCodecParameters_ch_layout_nb_channels(codecpar)
-        
-        const streamInfo: StreamInfo = {
-          index: i,
-          type: 'audio',
-          codec: {
-            codecId,
-            codecName: this.getCodecName(codecId),
-            codecString: ''
-          },
-          sampleRate,
-          channels,
-          duration: streamDurationSeconds
-        }
-
-        streams.push(streamInfo)
-
-        if (this.audioStreamIndex === -1 && !this.isNativeAudioCodec(codecId)) {
-          this.audioStreamIndex = i
-          console.log(`[HybridEngine] Selected audio stream ${i}: ${streamInfo.codec.codecName} (needs WASM decoding)`)
+    for (const stream of streams) {
+      if (stream.codec_type === 'video' && stream.index !== undefined) {
+        hasVideo = true
+        const codecName = (stream.codec_name || '').toLowerCase()
+        const needsTranscode = !supportedVideoCodecs.includes(codecName)
+        this.codecInfo.set(stream.index, {
+          codecId: stream.codec_id || 0,
+          codecName: codecName,
+          needsTranscode: needsTranscode
+        })
+        // Always set video stream index - we'll attempt playback with MSE
+        // even if codec is unsupported (MSE might still handle it or we'll get an error)
+        this.videoStreamIndex = stream.index
+      } else if (stream.codec_type === 'audio' && stream.index !== undefined) {
+        hasAudio = true
+        const codecName = (stream.codec_name || '').toLowerCase()
+        const needsTranscode = !supportedAudioCodecs.includes(codecName)
+        this.codecInfo.set(stream.index, {
+          codecId: stream.codec_id || 0,
+          codecName: codecName,
+          needsTranscode: needsTranscode
+        })
+        if (needsTranscode) {
+          this.audioStreamIndex = stream.index
         }
       }
     }
 
-    return streams
-  }
-
-  /**
-   * Check if video codec can be remuxed (not transcoded)
-   */
-  private isRemuxableVideoCodec(codecId: number): boolean {
-    return [CODEC_ID_H264, CODEC_ID_HEVC, CODEC_ID_VP9, CODEC_ID_AV1].includes(codecId)
-  }
-
-  /**
-   * Check if audio codec is natively supported
-   */
-  private isNativeAudioCodec(codecId: number): boolean {
-    return NATIVE_AUDIO_CODECS.has(codecId)
-  }
-
-  /**
-   * Get human-readable codec name
-   */
-  private getCodecName(codecId: number): string {
-    const names: Record<number, string> = {
-      [CODEC_ID_H264]: 'H.264',
-      [CODEC_ID_HEVC]: 'HEVC',
-      [CODEC_ID_VP9]: 'VP9',
-      [CODEC_ID_AV1]: 'AV1',
-      [CODEC_ID_MP3]: 'MP3',
-      [CODEC_ID_AAC]: 'AAC',
-      [CODEC_ID_FLAC]: 'FLAC',
-      [CODEC_ID_VORBIS]: 'Vorbis',
-      [CODEC_ID_AC3]: 'AC3',
-      [CODEC_ID_EAC3]: 'E-AC3',
-      [CODEC_ID_DTS]: 'DTS',
-      [CODEC_ID_OPUS]: 'Opus',
+    // Need transcoding if audio codec is unsupported
+    // Video should pass through if codec is supported
+    if (hasAudio && this.audioStreamIndex !== null) {
+      this.needsTranscoding = true
     }
-    return names[codecId] || `Unknown (${codecId})`
+
+    this.duration = this.metadata.format?.duration || 0
+
+    console.log('[HybridEngine] Analysis:', {
+      needsTranscoding: this.needsTranscoding,
+      videoStreamIndex: this.videoStreamIndex,
+      audioStreamIndex: this.audioStreamIndex,
+      codecInfo: Array.from(this.codecInfo.entries())
+    })
   }
 
   /**
-   * Get MSE-compatible codec string
+   * Initialize the engine
    */
-  private async getVideoCodecString(codecId: number, codecpar: number, profileOverride?: number): Promise<string> {
-    const profile = profileOverride ?? await this.libav.AVCodecParameters_profile(codecpar)
-    const level = await this.libav.AVCodecParameters_level(codecpar)
-
-    switch (codecId) {
-      case CODEC_ID_H264:
-        // AVC1: avc1.[profile][compatibility][level]
-        // Simplified fallback for now, ideally strictly map profile/level pairs
-        return 'avc1.640028' 
-      
-      case CODEC_ID_HEVC:
-        // HEVC: hev1.[profile].[tier].[level].[constraints]
-        // Profile 1 (Main) -> hev1.1.6.L...
-        // Profile 2 (Main 10) -> hev1.2.4.L... (Main 10)
-        
-        // Profiles from libavcodec/avcodec.h
-        const FF_PROFILE_HEVC_MAIN = 1
-        const FF_PROFILE_HEVC_MAIN_10 = 2
-        
-        // Handle invalid/unknown level (-99)
-        let safeLevel = level
-        if (safeLevel <= 0) {
-          // Robust fallback based on resolution
-          const width = await this.libav.AVCodecParameters_width(codecpar)
-          const height = await this.libav.AVCodecParameters_height(codecpar)
-          const pixels = width * height
-          
-          console.log(`[HybridEngine] HEVC Level check: level=${level}, size=${width}x${height} (${pixels})`)
-
-          if (pixels >= 3840 * 2160) { // 4K classification
-             console.warn(`[HybridEngine] Invalid HEVC level ${level} for 4K, defaulting to 153 (5.1)`)
-             safeLevel = 153 // Level 5.1
-          } else if (width >= 1920 || height >= 1080) { // 1080p classification (covers 1920x800 etc)
-             console.warn(`[HybridEngine] Invalid HEVC level ${level} for 1080p (width>=1920), defaulting to 123 (4.1)`)
-             safeLevel = 123 // Level 4.1
-          } else {
-             // If resolution is unknown or small, default to 5.1 anyway to be safe.
-             // Level 5.1 covers up to 4K @ 30fps and 4.0 content will play fine on a 5.1 decoder.
-             // This avoids the risk of 4.0 being too low for weird resolutions.
-             console.warn(`[HybridEngine] Invalid HEVC level ${level}, defaulting to 153 (5.1) for safety. Dimensions: ${width}x${height}`)
-             safeLevel = 153 // Level 5.1
-          }
-        }
-
-        if (profile === FF_PROFILE_HEVC_MAIN_10) {
-          // Main 10, typically High Tier (4)
-          // Switch to hvc1 tag for better compatibility (e.g. Windows/Android)
-          return `hvc1.2.4.L${safeLevel}.B0`
-        }
-        // Default to Main Profile, Main Tier (6)
-        return `hvc1.1.6.L${safeLevel}.B0`
-
-      case CODEC_ID_VP9:
-        return 'vp09.00.10.08'
-      
-      case CODEC_ID_AV1:
-        // AV1: av01.[profile].[level]M.[tier]
-        return 'av01.0.04M.08'
-        
-      default:
-        return 'avc1.640028'
-    }
-  }
-
-  /**
-   * Attach video element for MSE output
-   */
-  async attachVideo(video: HTMLVideoElement): Promise<void> {
+  async initialize(video: HTMLVideoElement): Promise<void> {
+    console.log('[HybridEngine] Initializing...')
     this.videoElement = video
-    
-    if (this.videoStreamIndex === -1) {
-      throw new Error('No remuxable video stream found')
+
+    // Initialize FFmpeg for audio transcoding
+    if (this.needsTranscoding) {
+      this.ffmpeg = new FFmpeg()
+      
+      this.ffmpeg.on('log', ({ message }) => {
+        console.log('[FFmpeg]', message)
+      })
+
+      this.ffmpeg.on('progress', ({ progress }) => {
+        this.dispatchEvent(new CustomEvent('progress', { detail: { progress } }))
+      })
+      // FFmpeg doesn't have an 'error' event, errors are handled via Promise rejection
+
+      console.log('[HybridEngine] Loading FFmpeg...')
+      await this.ffmpeg.load({
+        coreURL: await toBlobURL(CORE_URL, 'text/javascript'),
+        wasmURL: await toBlobURL(WASM_URL, 'application/wasm')
+      })
+      console.log('[HybridEngine] FFmpeg loaded')
     }
 
-    const videoStream = this.streams.find(s => s.index === this.videoStreamIndex)
-    if (!videoStream) {
+    // Set up MSE for video
+    if (this.videoStreamIndex !== null) {
+      await this.setupVideoMSE(video)
+    }
+
+    this.isInitialized = true
+    console.log('[HybridEngine] Initialized')
+  }
+
+  /**
+   * Set up MSE for video playback
+   */
+  private async setupVideoMSE(video: HTMLVideoElement): Promise<void> {
+    console.log('[HybridEngine] Setting up MSE for video...')
+
+    const stream = this.metadata.streams?.find((s: any) => s.index === this.videoStreamIndex)
+    if (!stream) {
       throw new Error('Video stream not found')
     }
 
-    // Create and attach video remuxer
-    this.videoRemuxer = new VideoRemuxer(this.config.video)
-    await this.videoRemuxer.attach(video, videoStream.codec, videoStream.width, videoStream.height)
+    // Create codec string
+    let codecString = 'avc1.42E01E' // Default H.264 Baseline
+    const codecName = (stream.codec_name || '').toLowerCase()
+    const profile = (stream.profile || '').toLowerCase()
 
-    // Mute video element (audio comes from worklet)
-    video.muted = true
-
-    // Sync engine state with video element events (allows UI controls to drive engine)
-    video.addEventListener('play', () => {
-      if (this.state !== 'playing') this.start()
-    })
-
-    video.addEventListener('pause', () => {
-       if (this.state === 'playing') this.pause()
-    })
-
-    video.addEventListener('seeking', () => {
-       // Only seek if the difference is significant to avoid micro-loops
-       if (Math.abs(video.currentTime - this.currentTime) > 0.5) {
-         this.seek(video.currentTime)
-       }
-    })
-    
-    console.log('[HybridEngine] Video attached and listeners registered')
-  }
-
-  /**
-   * Attach audio context for AudioWorklet output
-   */
-  async attachAudio(audioContext?: AudioContext): Promise<void> {
-    if (this.audioStreamIndex === -1) {
-      console.log('[HybridEngine] No audio stream to attach')
-      return
+    if (codecName === 'h264') {
+      if (profile.includes('high')) {
+        codecString = 'avc1.640028'
+      } else if (profile.includes('main')) {
+        codecString = 'avc1.4D401E'
+      } else {
+        codecString = 'avc1.42E01E' // Baseline
+      }
+    } else if (codecName === 'hevc' || codecName === 'h265') {
+      codecString = 'hev1.1.6.L93.B0'
+    } else if (codecName === 'vp9') {
+      codecString = 'vp09.00.10.08'
     }
 
-    const audioStream = this.streams.find(s => s.index === this.audioStreamIndex)
-    if (!audioStream) {
-      throw new Error('Audio stream not found')
+    const mimeType = `video/mp4; codecs="${codecString}"`
+
+    console.log('[HybridEngine] Using MIME type:', mimeType)
+
+    if (!MediaSource.isTypeSupported(mimeType)) {
+      console.warn('[HybridEngine] MIME type not supported, falling back:', mimeType)
+      // Try simpler codec
+      if (!MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
+        throw new Error('No supported video codec found')
+      }
     }
 
-    // Create or use provided AudioContext
-    this.audioContext = audioContext || new AudioContext()
-    
-    // Create ring buffer
-    this.audioRingBuffer = new AudioRingBuffer({
-      sampleRate: audioStream.sampleRate || 48000,
-      channels: audioStream.channels || 2,
-      durationSeconds: this.config.audio?.bufferDuration ?? 10
-    })
+    this.mediaSource = new MediaSource()
 
-    // Create audio decoder
-    this.audioDecoder = new AudioDecoder(this.audioRingBuffer, this.config.audio)
+    return new Promise((resolve, reject) => {
+      const handleSourceOpen = async () => {
+        try {
+          this.mediaSource!.removeEventListener('sourceopen', handleSourceOpen)
 
-    // Load worklet processor
-    const workletUrl = new URL('./audio-worklet-processor.ts', import.meta.url).href
-    await this.audioContext.audioWorklet.addModule(workletUrl)
+          this.videoSourceBuffer = this.mediaSource!.addSourceBuffer(mimeType)
+          this.videoSourceBuffer.mode = 'sequence'
 
-    // Create worklet node
-    this.audioWorkletNode = new AudioWorkletNode(
-      this.audioContext,
-      'hybrid-audio-processor',
-      {
-        processorOptions: {
-          capacity: this.audioRingBuffer.getBuffer().byteLength,
-          channels: audioStream.channels || 2,
-          sampleRate: audioStream.sampleRate || 48000
+          this.videoSourceBuffer.addEventListener('updateend', () => {
+            this.isVideoAppending = false
+            this.flushPendingVideoSegments()
+          })
+
+          this.videoSourceBuffer.addEventListener('error', (e) => {
+            console.error('[HybridEngine] Video SourceBuffer error:', e)
+            this.config.onError?.(new Error('Video buffer error'))
+          })
+
+          console.log('[HybridEngine] MSE setup complete')
+          resolve()
+        } catch (error) {
+          reject(error)
         }
       }
-    )
 
-    // Initialize worklet with SharedArrayBuffer
-    this.audioWorkletNode.port.postMessage({
-      type: 'init',
-      data: {
-        buffer: this.audioRingBuffer.getBuffer(),
-        capacity: (audioStream.sampleRate || 48000) * (audioStream.channels || 2) * 
-                  (this.config.audio?.bufferDuration ?? 10),
-        channels: audioStream.channels || 2
-      }
+      this.mediaSource!.addEventListener('sourceopen', handleSourceOpen)
+      video.src = URL.createObjectURL(this.mediaSource!)
     })
-
-    // Handle worklet messages
-    this.audioWorkletNode.port.onmessage = (event) => {
-      const { type, data } = event.data
-      
-      switch (type) {
-        case 'ready':
-          console.log('[HybridEngine] AudioWorklet ready')
-          break
-        case 'underrun':
-          console.warn('[HybridEngine] Audio underrun:', data.count)
-          break
-        case 'drift':
-          console.warn('[HybridEngine] Large audio drift:', data.driftMs, 'ms')
-          // Could trigger a hard resync here
-          break
-        case 'status':
-          // Periodic status update
-          break
-      }
-    }
-
-    // Connect to destination
-    this.audioWorkletNode.connect(this.audioContext.destination)
-
-    // Initialize audio decoder
-    const codecpar = await this.libav.AVFormatContext_streams_a(this.fmtCtx, this.audioStreamIndex)
-    const params = await this.libav.AVStream_codecpar(codecpar)
-    await this.audioDecoder.initialize(this.libav, audioStream.codec, params)
-
-    console.log('[HybridEngine] Audio attached')
   }
 
   /**
    * Start playback
    */
-  async start(): Promise<void> {
-    // If already playing, just return (idempotent)
-    if (this.state === 'playing') {
+  async play(): Promise<void> {
+    if (!this.isInitialized) {
+      throw new Error('HybridEngine not initialized')
+    }
+
+    console.log('[HybridEngine] Starting playback...')
+    console.log('[HybridEngine] Video stream index:', this.videoStreamIndex)
+    console.log('[HybridEngine] Audio stream index:', this.audioStreamIndex)
+    console.log('[HybridEngine] Needs transcoding:', this.needsTranscoding)
+    this.isPlaying = true
+
+    // Initialize network reader
+    this.networkReader = new NetworkReader(this.sourceUrl, {
+      chunkSize: this.config.segmentSize
+    })
+
+    await this.networkReader.probe()
+    console.log('[HybridEngine] Network reader probed successfully')
+
+    // Start streaming both audio and video
+    if (this.needsTranscoding && this.audioStreamIndex !== null) {
+      console.log('[HybridEngine] Starting audio streaming...')
+      this.startAudioStreaming()
+    } else {
+      console.log('[HybridEngine] Skipping audio streaming - transcoding:', this.needsTranscoding, 'audioIndex:', this.audioStreamIndex)
+    }
+
+    // Get container type to determine playback strategy
+    const container = (this.metadata.format?.format_name || '').toLowerCase()
+    const isDirectPlayback = container.includes('webm') || (!container.includes('mp4') && !container.includes('mov') && !container.includes('matroska'))
+
+    if (this.videoStreamIndex !== null) {
+      console.log('[HybridEngine] Starting video streaming...')
+      this.startVideoStreaming()
+    } else {
+      console.warn('[HybridEngine] Video stream index is null - cannot stream video')
+    }
+
+    // Only try to play immediately for direct playback modes (WebM or fallback)
+    // MSE-based playback needs data to be appended first
+    if (this.videoElement && isDirectPlayback) {
+      console.log('[HybridEngine] Attempting to play video element (direct playback)...')
+      try {
+        await this.videoElement.play()
+        console.log('[HybridEngine] Video element playing')
+      } catch (e) {
+        console.error('[HybridEngine] Video element play error:', e)
+        // Video might need user interaction first
+      }
+    } else if (this.videoElement) {
+      console.log('[HybridEngine] MSE-based playback - will start when data is available')
+    }
+
+    console.log('[HybridEngine] Playback started')
+  }
+
+  /**
+   * Start audio streaming (transcoded)
+   */
+  private async startAudioStreaming(): Promise<void> {
+    if (this.audioStreamIndex === null || !this.ffmpeg) return
+
+    console.log('[HybridEngine] Starting audio streaming...')
+
+    // Initialize audio transcoder
+    this.audioTranscoder = new AudioStreamTranscoder({
+      bitrate: '192k',
+      chunkSize: this.config.segmentSize,
+      initialBufferSize: 2 * 1024 * 1024 // 2MB to avoid FFmpeg WASM memory issues
+    })
+
+    const audioElement = await this.audioTranscoder.initialize(
+      this.sourceUrl,
+      this.audioStreamIndex
+    )
+
+    audioElement.addEventListener('timeupdate', () => {
+      this.currentTime = audioElement.currentTime
+      this.dispatchEvent(new CustomEvent('timeupdate', { detail: { currentTime: this.currentTime } }))
+    })
+
+    audioElement.addEventListener('ended', () => {
+      this.isPlaying = false
+      this.dispatchEvent(new Event('ended'))
+    })
+
+    audioElement.addEventListener('error', (e) => {
+      console.error('[HybridEngine] Audio error:', e)
+      this.config.onError?.(new Error('Audio playback error'))
+    })
+
+    this.audioElement = audioElement
+    
+    // Start the download and transcoding process
+    this.audioTranscoder.start().catch(e => {
+      console.error('[HybridEngine] Audio transcoder start error:', e)
+    })
+
+    // Listen for audio ready event from transcoder
+    this.audioTranscoder.addEventListener('audioready', () => {
+      console.log('[HybridEngine] Audio data ready for playback')
+      this.dispatchEvent(new CustomEvent('audioready', { detail: { audioElement } }))
+    })
+
+    // Don't auto-play - wait for user interaction
+    // The VidstackPlayer will handle play on user click
+  }
+
+  /**
+   * Start video streaming (direct via MSE)
+   */
+  private async startVideoStreaming(): Promise<void> {
+    console.log('[HybridEngine] startVideoStreaming called')
+    console.log('[HybridEngine] videoStreamIndex:', this.videoStreamIndex)
+    console.log('[HybridEngine] networkReader:', !!this.networkReader)
+    
+    if (this.videoStreamIndex === null) {
+      console.warn('[HybridEngine] Returning early - videoStreamIndex is null')
       return
     }
     
-    if (this.state !== 'ready' && this.state !== 'paused') {
-      throw new Error(`Cannot start from state: ${this.state}`)
+    if (!this.networkReader) {
+      console.warn('[HybridEngine] Returning early - networkReader is null')
+      return
     }
 
-    this.setState('playing')
-    this.shouldStop = false
+    console.log('[HybridEngine] Starting video streaming...')
+    console.log('[HybridEngine] Video stream index:', this.videoStreamIndex)
+    console.log('[HybridEngine] MediaSource readyState:', this.mediaSource?.readyState)
+    console.log('[HybridEngine] VideoSourceBuffer:', this.videoSourceBuffer ? 'exists' : 'null')
 
-    // Start packet processing first to fill buffers
-    this.processPackets()
+    // For now, we'll use a simpler approach: download the video file in chunks
+    // and append to MSE. This is not ideal for MKV containers but will work
+    // for MP4 files. For true streaming from MKV, we'd need a demuxer.
 
-    // Wait for sufficient audio buffer if we have an audio stream
-    if (this.audioStreamIndex !== -1 && this.audioRingBuffer) {
-      console.log('[HybridEngine] Buffering audio...')
-      let attempts = 0
-      // Buffer for up to 2000ms or until 0.5s of audio is buffered
-      while (attempts < 200 && this.audioRingBuffer.bufferedSeconds < 0.5 && !this.shouldStop) {
-        await new Promise(r => setTimeout(r, 10))
-        attempts++
-      }
-      console.log(`[HybridEngine] Buffered ${this.audioRingBuffer.bufferedSeconds.toFixed(3)}s (attempts: ${attempts})`)
-    }
-
-    // Start audio worklet
-    if (this.audioWorkletNode) {
-      this.audioWorkletNode.port.postMessage({ type: 'play' })
-    }
-
-    // Resume audio context if suspended
-    if (this.audioContext?.state === 'suspended') {
-      try {
-        await this.audioContext.resume()
-        console.log('[HybridEngine] AudioContext resumed successfully')
-      } catch (e) {
-        // This is expected if the user hasn't interacted with the page yet
-        console.warn('[HybridEngine] Audio available but autoplay blocked. Waiting for user interaction to resume audio.')
-        // Continue anyway - video should play, and next user interaction (play/pause) will retry resume
-      }
-    }
-
-    // Start video element
-    if (this.videoElement) {
-      this.videoElement.play().catch(e => console.warn('Autoplay blocked:', e))
+    // Check if container is MP4 (which can be streamed) or WebM (natively supported)
+    const container = (this.metadata.format?.format_name || '').toLowerCase()
+    console.log('[HybridEngine] Container format:', container)
+    
+    if (container.includes('mp4') || container.includes('mov')) {
+      // Direct streaming for MP4
+      console.log('[HybridEngine] Using MP4 direct streaming')
+      this.streamMP4Video()
+    } else if (container.includes('webm')) {
+      // WebM is natively supported by browsers - play directly
+      console.log('[HybridEngine] Using WebM direct playback (native browser support)')
+      this.playWebMDirectly()
+    } else if (container.includes('matroska') || container.includes('mkv')) {
+      // MKV needs remuxing to fMP4 for MSE
+      console.log('[HybridEngine] Using MKV remuxing to fMP4 for MSE')
+      await this.remuxMKVToMP4()
+    } else {
+      console.warn('[HybridEngine] Container type not directly streamable:', container)
+      // For other containers, try to download and play directly
+      console.log('[HybridEngine] Attempting direct video playback')
+      this.playVideoDirectly()
     }
   }
 
   /**
-   * Pause playback
+   * Stream MP4 video directly to MSE
    */
-  async pause(): Promise<void> {
-    if (this.state !== 'playing') return
-
-    this.setState('paused')
-    this.shouldStop = true
-
-    if (this.audioWorkletNode) {
-      this.audioWorkletNode.port.postMessage({ type: 'pause' })
+  private async streamMP4Video(): Promise<void> {
+    if (!this.networkReader || !this.mediaSource || this.mediaSource.readyState !== 'open') {
+      console.warn('[HybridEngine] Cannot stream MP4 - networkReader:', !!this.networkReader, 'mediaSource:', !!this.mediaSource, 'readyState:', this.mediaSource?.readyState)
+      return
     }
 
-    if (this.videoElement) {
-      this.videoElement.pause()
+    console.log('[HybridEngine] Streaming MP4 video...')
+    console.log('[HybridEngine] File size:', this.metadata.format?.size)
+
+    // For MP4, we can download chunks and append directly
+    // The browser's MSE will handle parsing
+    let offset = 0
+    const chunkSize = 5 * 1024 * 1024 // 5MB chunks
+
+    const fileSize = this.metadata.format?.size || 0
+    while (this.isPlaying && offset < fileSize) {
+      try {
+        const chunk = await this.networkReader.read(offset, chunkSize)
+        if (chunk.byteLength === 0) break
+
+        // Append to MSE
+        this.appendVideoSegment(chunk.buffer as ArrayBuffer)
+        
+        offset += chunk.byteLength
+        this.processedVideoChunks++
+
+        this.config.onProgress?.({
+          loaded: offset,
+          total: fileSize,
+          type: 'video'
+        })
+
+        // Wait a bit to let buffer catch up
+        if (this.videoSourceBuffer?.buffered && this.videoSourceBuffer.buffered.length > 0) {
+          const bufferedEnd = this.videoSourceBuffer.buffered.end(0)
+          if (this.videoElement) {
+            if (bufferedEnd - this.videoElement.currentTime > 30) {
+              // Too much buffered, wait
+              await new Promise(r => setTimeout(r, 500))
+            }
+          }
+        }
+
+        // Rate limit if needed
+        if (this.videoElement?.paused && this.videoSourceBuffer && this.videoSourceBuffer.buffered.length > 0) {
+          await new Promise(r => setTimeout(r, 100))
+        }
+      } catch (error) {
+        console.error('[HybridEngine] Error streaming video:', error)
+        break
+      }
+    }
+
+    console.log('[HybridEngine] Video streaming complete')
+  }
+
+  /**
+   * Play WebM video directly (native browser support)
+   * WebM is natively supported by modern browsers, so we can set the src directly
+   */
+  private async playWebMDirectly(): Promise<void> {
+    console.log('[HybridEngine] Playing WebM directly...')
+    
+    if (!this.videoElement) {
+      console.error('[HybridEngine] Video element not available')
+      return
+    }
+
+    // Store handlers on video element for cleanup
+    (this.videoElement as any).__webmHandlers = {
+      loadedmetadata: null,
+      error: null,
+      timeupdate: null,
+      ended: null,
+      errorHandler: null
+    }
+
+    // Get handlers reference for use in this method
+    const webmHandlers = (this.videoElement as any).__webmHandlers
+
+    // Set the source URL directly - browser will handle WebM natively
+    this.videoElement.src = this.sourceUrl
+    
+    // Wait for metadata to load
+    if (!this.videoElement) {
+      throw new Error('Video element not available')
+    }
+    
+    await new Promise<void>((resolve, reject) => {
+      const handleLoadedMetadata = () => {
+        this.videoElement!.removeEventListener('loadedmetadata', handleLoadedMetadata)
+        this.videoElement!.removeEventListener('error', handleError)
+        resolve()
+      }
+      
+      const handleError = (e: Event) => {
+        this.videoElement!.removeEventListener('loadedmetadata', handleLoadedMetadata)
+        this.videoElement!.removeEventListener('error', handleError)
+        reject(new Error('Failed to load WebM video'))
+      }
+      
+      webmHandlers.loadedmetadata = handleLoadedMetadata
+      webmHandlers.error = handleError
+      
+      this.videoElement!.addEventListener('loadedmetadata', handleLoadedMetadata)
+      this.videoElement!.addEventListener('error', handleError)
+      
+      // Set a timeout in case metadata never loads
+      setTimeout(() => {
+        this.videoElement!.removeEventListener('loadedmetadata', handleLoadedMetadata)
+        this.videoElement!.removeEventListener('error', handleError)
+        resolve() // Resolve anyway, let playback continue
+      }, 10000)
+    })
+    
+    console.log('[HybridEngine] WebM video loaded, duration:', this.videoElement.duration)
+    
+    // Update duration from actual video element
+    this.duration = this.videoElement.duration
+    
+    // Set up time update tracking
+    const timeUpdateHandler = () => {
+      this.currentTime = this.videoElement!.currentTime || 0
+      this.dispatchEvent(new CustomEvent('timeupdate', { detail: { currentTime: this.currentTime } }))
+    }
+    
+    const endedHandler = () => {
+      this.isPlaying = false
+      this.dispatchEvent(new Event('ended'))
+    }
+    
+    const errorHandler = (e: Event) => {
+      console.error('[HybridEngine] WebM playback error:', e)
+      this.config.onError?.(new Error('WebM playback error'))
+    }
+    
+    webmHandlers.timeupdate = timeUpdateHandler
+    webmHandlers.ended = endedHandler
+    webmHandlers.errorHandler = errorHandler
+    
+    this.videoElement!.addEventListener('timeupdate', timeUpdateHandler)
+    this.videoElement!.addEventListener('ended', endedHandler)
+    this.videoElement!.addEventListener('error', errorHandler)
+    
+    // Try to play
+    try {
+      await this.videoElement.play()
+      console.log('[HybridEngine] WebM playback started')
+    } catch (e) {
+      console.error('[HybridEngine] WebM play error:', e)
+      // Video might need user interaction first
+    }
+  }
+
+  /**
+   * Download full video file as fallback
+   */
+  private async downloadFullVideo(): Promise<void> {
+    console.log('[HybridEngine] Downloading full video file...')
+    console.log('[HybridEngine] Source URL:', this.sourceUrl.substring(0, 80))
+
+    try {
+      const response = await fetch(this.sourceUrl)
+      console.log('[HybridEngine] Fetch response status:', response.status, response.statusText)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const buffer = await response.arrayBuffer()
+      console.log('[HybridEngine] Downloaded buffer size:', buffer.byteLength, 'bytes')
+      
+      this.appendVideoSegment(buffer)
+      console.log('[HybridEngine] Full video downloaded and appended')
+      
+      // Try to play the video
+      if (this.videoElement) {
+        console.log('[HybridEngine] Attempting to play video element...')
+        try {
+          await this.videoElement.play()
+          console.log('[HybridEngine] Video element playing')
+        } catch (e) {
+          console.error('[HybridEngine] Video element play error:', e)
+        }
+      }
+    } catch (error) {
+      console.error('[HybridEngine] Error downloading full video:', error)
+      this.config.onError?.(error as Error)
+    }
+  }
+
+  /**
+   * Remux MKV to fMP4 for MSE playback
+   * Uses FFmpeg to convert the container format
+   * For large files, uses chunked download with progress feedback
+   */
+  private async remuxMKVToMP4(): Promise<void> {
+    console.log('[HybridEngine] Remuxing MKV to fMP4...')
+    
+    if (!this.ffmpeg) {
+      console.error('[HybridEngine] FFmpeg not available for remuxing')
+      this.playVideoDirectly()
+      return
+    }
+
+    if (!this.videoElement) {
+      console.error('[HybridEngine] Video element not available')
+      return
+    }
+
+    try {
+      // Generate unique filename for remuxed output
+      const timestamp = Date.now()
+      const random = Math.random().toString(36).substring(2, 8)
+      const inputFilename = `remux_input_${timestamp}_${random}.mkv`
+      const outputFilename = `remux_output_${timestamp}_${random}.mp4`
+
+      // Get file size first
+      console.log('[HybridEngine] Getting file size...')
+      const headResponse = await fetch(this.sourceUrl, { method: 'HEAD' })
+      const contentLength = parseInt(headResponse.headers.get('content-length') || '0')
+      const fileSizeMB = contentLength / 1024 / 1024
+      
+      console.log('[HybridEngine] File size:', fileSizeMB.toFixed(2), 'MB')
+
+      // For files larger than 500MB, warn and try direct playback first
+      if (fileSizeMB > 500) {
+        console.warn('[HybridEngine] Large file detected (>500MB), trying direct playback first...')
+        this.playVideoDirectly()
+        return
+      }
+
+      // Download the MKV file with progress
+      console.log('[HybridEngine] Downloading MKV file for remuxing...')
+      const response = await fetch(this.sourceUrl)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('Response body not available')
+      }
+
+      const chunks: Uint8Array[] = []
+      let downloadedBytes = 0
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        chunks.push(value)
+        downloadedBytes += value.length
+        
+        const percent = Math.round((downloadedBytes / contentLength) * 100)
+        if (percent % 10 === 0) {
+          console.log(`[HybridEngine] Downloading: ${percent}% (${(downloadedBytes / 1024 / 1024).toFixed(1)}MB)`)
+          this.config.onProgress?.({
+            loaded: downloadedBytes,
+            total: contentLength,
+            type: 'video'
+          })
+        }
+      }
+
+      // Combine chunks
+      const totalLength = chunks.reduce((sum, c) => sum + c.length, 0)
+      const mkvBuffer = new Uint8Array(totalLength)
+      let offset = 0
+      for (const chunk of chunks) {
+        mkvBuffer.set(chunk, offset)
+        offset += chunk.length
+      }
+
+      console.log('[HybridEngine] Downloaded MKV:', (mkvBuffer.byteLength / 1024 / 1024).toFixed(2), 'MB')
+
+      // Write input file to FFmpeg FS
+      await this.ffmpeg.writeFile(inputFilename, mkvBuffer)
+
+      // Remux to fMP4 (copy streams, just change container)
+      console.log('[HybridEngine] Starting FFmpeg remux...')
+      await this.ffmpeg.exec([
+        '-i', inputFilename,
+        '-c', 'copy', // Copy streams without re-encoding
+        '-movflags', 'frag_keyframe+empty_moov+default_base_moof', // fMP4 format
+        '-f', 'mp4',
+        outputFilename
+      ])
+
+      // Read the remuxed file
+      const remuxedData = await this.ffmpeg.readFile(outputFilename)
+      const remuxedBuffer = remuxedData instanceof Uint8Array
+        ? remuxedData.buffer
+        : new Uint8Array(remuxedData as any).buffer
+
+      console.log('[HybridEngine] Remuxed to fMP4:', (remuxedBuffer.byteLength / 1024 / 1024).toFixed(2), 'MB')
+
+      // Clean up FFmpeg files
+      try {
+        await this.ffmpeg.deleteFile(inputFilename)
+        await this.ffmpeg.deleteFile(outputFilename)
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+
+      // Append to MSE
+      this.appendVideoSegment(remuxedBuffer)
+      console.log('[HybridEngine] Remuxed video appended to MSE, waiting for MSE to process...')
+
+      // Wait for MSE to process the data before attempting playback
+      await new Promise<void>(resolve => {
+        const checkProcessed = () => {
+          if (!this.isVideoAppending && !this.videoSourceBuffer?.updating) {
+            resolve()
+          } else {
+            setTimeout(checkProcessed, 100)
+          }
+        }
+        checkProcessed()
+      })
+
+      console.log('[HybridEngine] MSE processed data, attempting playback...')
+
+      // Try to play after MSE has processed the data
+      if (this.videoElement && this.isPlaying) {
+        try {
+          await this.videoElement.play()
+          console.log('[HybridEngine] Remuxed video playing')
+        } catch (e) {
+          console.error('[HybridEngine] Remuxed video play error:', e)
+        }
+      }
+    } catch (error) {
+      console.error('[HybridEngine] Error remuxing MKV:', error)
+      this.config.onError?.(error as Error)
+      // Fallback to direct playback
+      this.playVideoDirectly()
+    }
+  }
+
+  /**
+   * Play video directly without MSE
+   * Fallback for unsupported containers
+   */
+  private playVideoDirectly(): void {
+    console.log('[HybridEngine] Playing video directly (fallback)...')
+    
+    if (!this.videoElement) {
+      console.error('[HybridEngine] Video element not available')
+      return
+    }
+
+    // Set source directly - browser will try to play it
+    this.videoElement.src = this.sourceUrl
+    
+    // Try to play
+    this.videoElement.play().catch(e => {
+      console.error('[HybridEngine] Direct playback error:', e)
+      this.config.onError?.(new Error('Direct playback failed'))
+    })
+  }
+
+  /**
+   * Append video segment to MSE
+   */
+  private appendVideoSegment(data: ArrayBuffer): void {
+    if (!this.videoSourceBuffer || !this.mediaSource || this.mediaSource.readyState !== 'open') {
+      return
+    }
+
+    if (this.isVideoAppending || this.videoSourceBuffer.updating) {
+      this.pendingVideoSegments.push(data)
+      return
+    }
+
+    try {
+      this.isVideoAppending = true
+      this.videoSourceBuffer.appendBuffer(data)
+    } catch (error: any) {
+      this.isVideoAppending = false
+      if (error.name === 'QuotaExceededError') {
+        console.warn('[HybridEngine] MSE quota exceeded, clearing buffer...')
+        // Clear some buffer and retry
+        if (this.videoSourceBuffer.buffered.length > 0) {
+          const currentTime = this.videoElement?.currentTime || 0
+          this.videoSourceBuffer.remove(0, currentTime - 10)
+          // Retry after buffer update
+          this.pendingVideoSegments.push(data)
+        }
+      } else {
+        console.error('[HybridEngine] Error appending video segment:', error)
+        this.config.onError?.(error as Error)
+      }
+    }
+  }
+
+
+  /**
+   * Flush pending video segments
+   */
+  private flushPendingVideoSegments(): void {
+    if (this.pendingVideoSegments.length > 0 &&
+        this.videoSourceBuffer &&
+        !this.videoSourceBuffer.updating &&
+        this.mediaSource?.readyState === 'open') {
+      const segment = this.pendingVideoSegments.shift()!
+      this.appendVideoSegment(segment)
+    } else if (this.pendingVideoSegments.length === 0 && this.videoElement) {
+      // All segments appended, try to play if not already playing
+      if (this.isPlaying && this.videoElement.paused) {
+        console.log('[HybridEngine] All video segments appended, attempting to play...')
+        this.videoElement.play().catch(e => {
+          console.warn('[HybridEngine] Video play after append failed:', e)
+        })
+      }
     }
   }
 
   /**
    * Seek to a specific time
    */
-  async seek(targetTime: number): Promise<void> {
-    console.log(`[HybridEngine] Seeking to ${targetTime}s`)
+  async seek(time: number): Promise<void> {
+    console.log('[HybridEngine] Seeking to:', time)
     
-    const wasPlaying = this.state === 'playing'
-    this.setState('seeking')
-    this.shouldStop = true
+    this.currentTime = time
 
-    // Wait for processing to stop
-    while (this.isProcessing) {
-      await new Promise(r => setTimeout(r, 10))
-    }
-
-    // Flush video remuxer
-    if (this.videoRemuxer) {
-      await this.videoRemuxer.flush()
-    }
-
-    // Flush audio decoder
-    if (this.audioDecoder) {
-      this.audioDecoder.flush()
-    }
-
-    // Reset audio ring buffer
-    if (this.audioRingBuffer) {
-      this.audioRingBuffer.reset()
-    }
-
-    // Reset worklet
-    if (this.audioWorkletNode) {
-      this.audioWorkletNode.port.postMessage({ type: 'reset' })
-    }
-
-    // Find nearest keyframe
-    const keyframe = this.findNearestKeyframe(targetTime)
-    const seekTarget = keyframe?.pts ?? targetTime
-
-    // Seek in libav
-    const seekTs = Math.floor(seekTarget * 1000000) // Convert to microseconds
-    await this.libav.av_seek_frame(
-      this.fmtCtx,
-      -1, // Any stream
-      seekTs,
-      1 // AVSEEK_FLAG_BACKWARD
-    )
-
-    // Update current time
-    this.currentTime = targetTime
-
-    // Clear network reader cache near old position
-    this.reader?.onSeek(seekTs)
-
-    this.setState(wasPlaying ? 'playing' : 'paused')
-    this.shouldStop = !wasPlaying
-
-    if (wasPlaying) {
-      this.processPackets()
-    }
-  }
-
-  /**
-   * Find the nearest keyframe before a given time
-   */
-  private findNearestKeyframe(time: number): KeyframeEntry | null {
-    if (this.keyframeIndex.length === 0) return null
-
-    // Binary search for nearest keyframe
-    let left = 0
-    let right = this.keyframeIndex.length - 1
-    let result: KeyframeEntry | null = null
-
-    while (left <= right) {
-      const mid = Math.floor((left + right) / 2)
-      if (this.keyframeIndex[mid].pts <= time) {
-        result = this.keyframeIndex[mid]
-        left = mid + 1
-      } else {
-        right = mid - 1
-      }
-    }
-
-    return result
-  }
-
-  /**
-   * Main packet processing loop
-   */
-  private async processPackets(): Promise<void> {
-    if (this.isProcessing) return
-    this.isProcessing = true
-
-    try {
-      const pkt = await this.libav.av_packet_alloc()
-      
-      while (!this.shouldStop) {
-        // Read next packet
-        const ret = await this.libav.av_read_frame(this.fmtCtx, pkt)
-        
-        if (ret < 0) {
-          // End of file or error
-          if (ret === -541478725) { // AVERROR_EOF
-            console.log('[HybridEngine] End of stream')
-            this.dispatchEvent(new CustomEvent('ended', {}))
-          } else {
-            console.error('[HybridEngine] Read error:', ret)
-          }
-          break
-        }
-
-        // Get packet info
-        const streamIndex = await this.libav.AVPacket_stream_index(pkt)
-        const pts = await this.libav.AVPacket_pts(pkt)
-        const dts = await this.libav.AVPacket_dts(pkt)
-        const flags = await this.libav.AVPacket_flags(pkt)
-        const data = await this.libav.ff_copyout_packet(pkt)
-
-        // Get time base for this stream
-        const stream = await this.libav.AVFormatContext_streams_a(this.fmtCtx, streamIndex)
-        const timeBaseNum = await this.libav.AVStream_time_base_num(stream)
-        const timeBaseDen = await this.libav.AVStream_time_base_den(stream)
-        const timeBase = timeBaseNum / timeBaseDen
-
-        let ptsSeconds = pts * timeBase
-        let dtsSeconds = dts * timeBase
-
-        // Normalize timestamps if they start at a large offset
-        if (this.startTime === -1) {
-             // Try to get global start time from format context first
-             // AVFormatContext.start_time is in AV_TIME_BASE units (microseconds usually, or 1/1,000,000)
-             // But checking libav docs, it is AV_TIME_BASE (1,000,000)
-             const fmtStartTime = await this.libav.AVFormatContext_start_time(this.fmtCtx)
-             // AV_NOPTS_VALUE check
-             if (fmtStartTime > -9223372036854775000 && fmtStartTime !== 0) {
-                 this.startTime = fmtStartTime / 1000000
-                 console.log(`[HybridEngine] Found container start time: ${this.startTime}s`)
-             } else {
-                 // Use first packet as zero point
-                 this.startTime = ptsSeconds
-                 console.log(`[HybridEngine] Using first packet as start time: ${this.startTime}s`)
-             }
-        }
-
-        if (this.startTime > 0) {
-            ptsSeconds = Math.max(0, ptsSeconds - this.startTime)
-            dtsSeconds = Math.max(0, dtsSeconds - this.startTime)
-        }
-
-        const isKeyframe = (flags & 1) !== 0
-
-        // Route packet based on stream
-        if (streamIndex === this.videoStreamIndex) {
-          // Video packet -> remuxer
-          const videoPacket: VideoPacket = {
-            streamIndex,
-            data: data.data,
-            pts: ptsSeconds,
-            dts: dtsSeconds,
-            isKeyframe
-          }
-
-          // Track keyframes for seeking
-          if (isKeyframe) {
-            this.keyframeIndex.push({
-              pts: ptsSeconds,
-              byteOffset: 0 // Would need to track actual byte offset
-            })
-          }
-
-          if (this.videoRemuxer) {
-            try {
-              await this.videoRemuxer.push(videoPacket)
-            } catch (remuxError) {
-              console.error('[HybridEngine] Video remux error:', remuxError)
+    // Flush video buffer for seeking
+    if (this.videoSourceBuffer && this.mediaSource?.readyState === 'open') {
+      try {
+        // Remove all buffered data
+        const buffered = this.videoSourceBuffer.buffered
+        if (buffered.length > 0) {
+          this.videoSourceBuffer.remove(0, buffered.end(buffered.length - 1))
+          
+          await new Promise<void>(resolve => {
+            const handler = () => {
+              this.videoSourceBuffer?.removeEventListener('updateend', handler)
+              resolve()
             }
-          }
-
-          this.currentTime = ptsSeconds
-        } else if (streamIndex === this.audioStreamIndex) {
-          // Audio packet -> decoder
-          const audioPacket: AudioPacket = {
-            streamIndex,
-            data: data.data,
-            pts: ptsSeconds,
-            dts: dtsSeconds
-          }
-
-          if (this.audioDecoder?.initialized) {
-            await this.audioDecoder.decode(audioPacket)
-          }
-        }
-
-        // Update video clock in worklet
-        if (this.audioWorkletNode && this.videoElement) {
-          this.audioWorkletNode.port.postMessage({
-            type: 'videoClock',
-            data: { time: this.videoElement.currentTime }
+            this.videoSourceBuffer?.addEventListener('updateend', handler)
           })
         }
-
-        // Emit time update
-        this.dispatchEvent(new CustomEvent('timeupdate', {
-          detail: { currentTime: this.currentTime, duration: this.duration }
-        }))
-
-        // Unref packet for reuse
-        await this.libav.av_packet_unref(pkt)
-
-        // Check buffer levels and potentially pause reading
-        // When AudioContext is suspended (waiting for user interaction), audio isn't being consumed
-        // so we need to slow down decoding significantly to avoid buffer overflow
-        if (this.audioRingBuffer) {
-          const fillLevel = this.audioRingBuffer.fillLevel
-          const isAudioSuspended = this.audioContext?.state === 'suspended'
-          
-          if (fillLevel > 0.95) {
-            // Buffer critically full - wait longer
-            await new Promise(r => setTimeout(r, 200))
-          } else if (fillLevel > 0.9) {
-            // Buffer nearly full - wait a bit
-            await new Promise(r => setTimeout(r, 100))
-          } else if (fillLevel > 0.7 && isAudioSuspended) {
-            // Buffer filling up and audio not playing - slow down significantly
-            await new Promise(r => setTimeout(r, 150))
-          }
-        }
+      } catch (error) {
+        console.error('[HybridEngine] Error flushing for seek:', error)
       }
+    }
 
-      await this.libav.av_packet_free_js(pkt)
-    } catch (error) {
-      console.error('[HybridEngine] Processing error:', error)
-      this.setState('error')
-    } finally {
-      this.isProcessing = false
+    // Seek audio
+    if (this.audioElement) {
+      this.audioElement.currentTime = time
+    }
+
+    // Restart streaming from new position
+    if (this.isPlaying) {
+      this.videoInitSegmentGenerated = false
+      this.processedVideoChunks = 0
+      // Note: For true seeking, we'd need to restart from a specific offset
+      // This is simplified for now
+    }
+
+    this.dispatchEvent(new CustomEvent('seeked', { detail: { time } }))
+  }
+
+  /**
+   * Pause playback
+   */
+  pause(): void {
+    this.isPlaying = false
+    this.audioElement?.pause()
+  }
+
+  /**
+   * Get current playback time
+   */
+  getCurrentTime(): number {
+    return this.currentTime
+  }
+
+  /**
+   * Get total duration
+   */
+  getDuration(): number {
+    return this.duration
+  }
+
+  /**
+   * Get the audio element for direct control
+   */
+  getAudioElement(): HTMLAudioElement | null {
+    return this.audioElement
+  }
+
+  /**
+   * Get stream information
+   */
+  async getStreamInfo(): Promise<CombinedStreamInfo | null> {
+    if (this.videoStreamIndex === null || !this.networkReader) {
+      return null
+    }
+
+    // NetworkReader doesn't have getStreamInfo, we use metadata directly
+    const videoStream = this.metadata.streams?.find((s: any) => s.index === this.videoStreamIndex)
+    const audioStream = this.metadata.streams?.find((s: any) => s.index === this.audioStreamIndex)
+
+    // Helper to create CodecInfo with codecString
+    const createCodecInfo = (stream: any): any => {
+      const info = this.codecInfo.get(stream.index)
+      if (!info) return null
+      
+      // Generate codec string based on codec name
+      let codecString = ''
+      const codecName = info.codecName.toLowerCase()
+      const profile = (stream.profile || '').toLowerCase()
+      
+      if (codecName === 'h264') {
+        if (profile.includes('high')) {
+          codecString = 'avc1.640028'
+        } else if (profile.includes('main')) {
+          codecString = 'avc1.4D401E'
+        } else {
+          codecString = 'avc1.42E01E'
+        }
+      } else if (codecName === 'hevc' || codecName === 'h265') {
+        codecString = 'hev1.1.6.L93.B0'
+      } else if (codecName === 'vp9') {
+        codecString = 'vp09.00.10.08'
+      } else if (codecName === 'vp8') {
+        codecString = 'vp08.00.10.08'
+      } else if (codecName === 'av1') {
+        codecString = 'av01.0.01M.08'
+      } else if (codecName === 'aac') {
+        codecString = 'mp4a.40.2'
+      } else if (codecName === 'opus') {
+        codecString = 'Opus'
+      } else if (codecName === 'vorbis') {
+        codecString = 'Vorbis'
+      } else {
+        codecString = codecName
+      }
+      
+      return {
+        codecId: info.codecId,
+        codecName: info.codecName,
+        codecString,
+        profile: stream.profile,
+        bitDepth: stream.bits_per_sample
+      }
+    }
+
+    return {
+      video: videoStream ? {
+        index: videoStream.index,
+        type: 'video',
+        codec: createCodecInfo(videoStream),
+        width: videoStream.width,
+        height: videoStream.height,
+        duration: this.duration
+      } : null,
+      audio: audioStream ? {
+        index: audioStream.index,
+        type: 'audio',
+        codec: createCodecInfo(audioStream),
+        sampleRate: audioStream.sample_rate,
+        channels: audioStream.channels,
+        duration: this.duration
+      } : null
     }
   }
 
   /**
-   * Destroy the engine and release all resources
+   * Clean up resources
    */
   async destroy(): Promise<void> {
-    this.setState('destroyed')
-    this.shouldStop = true
+    console.log('[HybridEngine] Destroying...')
 
-    // Wait for processing to stop
-    while (this.isProcessing) {
-      await new Promise(r => setTimeout(r, 10))
+    this.isPlaying = false
+
+    // Clean up audio
+    if (this.audioElement) {
+      this.audioElement.pause()
+      this.audioElement = null
     }
 
-    // Cleanup audio
-    if (this.audioWorkletNode) {
-      this.audioWorkletNode.port.postMessage({ type: 'destroy' })
-      this.audioWorkletNode.disconnect()
-      this.audioWorkletNode = null
+    if (this.audioTranscoder) {
+      await this.audioTranscoder.destroy()
+      this.audioTranscoder = null
     }
 
-    if (this.audioDecoder) {
-      this.audioDecoder.destroy()
-      this.audioDecoder = null
-    }
-
-    this.audioRingBuffer = null
-
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      try {
-        await this.audioContext.close()
-      } catch {
-        // Ignore close errors (may already be closed)
+    // Clean up WebM event handlers if present
+    if (this.videoElement && (this.videoElement as any).__webmHandlers) {
+      const handlers = (this.videoElement as any).__webmHandlers
+      if (handlers.loadedmetadata) {
+        this.videoElement.removeEventListener('loadedmetadata', handlers.loadedmetadata)
       }
-    }
-    this.audioContext = null
-
-    // Cleanup video
-    if (this.videoRemuxer) {
-      await this.videoRemuxer.destroy()
-      this.videoRemuxer = null
-    }
-
-    // Cleanup libav
-    if (this.libav && this.fmtCtx) {
-      await this.libav.avformat_close_input_js(this.fmtCtx)
-    }
-    this.libav = null
-
-    // Cleanup reader
-    if (this.reader) {
-      this.reader.destroy()
-      this.reader = null
+      if (handlers.error) {
+        this.videoElement.removeEventListener('error', handlers.error)
+      }
+      if (handlers.timeupdate) {
+        this.videoElement.removeEventListener('timeupdate', handlers.timeupdate)
+      }
+      if (handlers.ended) {
+        this.videoElement.removeEventListener('ended', handlers.ended)
+      }
+      if (handlers.errorHandler) {
+        this.videoElement.removeEventListener('error', handlers.errorHandler)
+      }
+      delete (this.videoElement as any).__webmHandlers
     }
 
-    this.streams = []
-    this.keyframeIndex = []
+    // Clean up video MSE
+    if (this.videoSourceBuffer && this.mediaSource?.readyState === 'open') {
+      try {
+        if (this.videoSourceBuffer.updating) {
+          await new Promise<void>(resolve => {
+            const handler = () => {
+              this.videoSourceBuffer?.removeEventListener('updateend', handler)
+              resolve()
+            }
+            this.videoSourceBuffer?.addEventListener('updateend', handler)
+          })
+        }
+        this.mediaSource.removeSourceBuffer(this.videoSourceBuffer)
+      } catch (e) {
+        // Ignore
+      }
+      this.videoSourceBuffer = null
+    }
+
+    if (this.mediaSource) {
+      if (this.mediaSource.readyState === 'open') {
+        try {
+          this.mediaSource.endOfStream()
+        } catch (e) {
+          // Ignore
+        }
+      }
+      this.mediaSource = null
+    }
+
+    if (this.videoElement?.src) {
+      URL.revokeObjectURL(this.videoElement.src)
+      this.videoElement.src = ''
+    }
+    
     this.videoElement = null
+
+    // Clean up FFmpeg
+    if (this.ffmpeg) {
+      try {
+        await this.ffmpeg.terminate()
+      } catch (e) {
+        // Ignore
+      }
+      this.ffmpeg = null
+    }
+
+    // Clean up network reader
+    if (this.networkReader) {
+      this.networkReader.destroy()
+      this.networkReader = null
+    }
+
+    this.isInitialized = false
+    this.pendingVideoSegments = []
+    this.streamCache.clear()
 
     console.log('[HybridEngine] Destroyed')
   }
 
   /**
-   * Update state and emit event
+   * Check if hybrid playback is required
    */
-  private setState(newState: EngineState): void {
-    if (this.state === newState) return
-    this.state = newState
-    this.dispatchEvent(new CustomEvent('statechange', { detail: { state: newState } }))
-  }
-
-  // Getters
-  get currentPlaybackTime(): number {
-    return this.currentTime
-  }
-
-  get totalDuration(): number {
-    return this.duration
-  }
-
-  get playbackState(): EngineState {
-    return this.state
-  }
-
-  get detectedStreams(): StreamInfo[] {
-    return this.streams
-  }
-
   get requiresHybridPlayback(): boolean {
-    // Returns true if there's an audio stream that can't be played natively
-    return this.audioStreamIndex !== -1
+    return this.needsTranscoding
   }
 }

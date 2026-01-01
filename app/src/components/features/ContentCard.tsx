@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MetaPreview } from '../../services/addons/types'
 import { LazyImage } from '../ui/LazyImage'
@@ -46,8 +46,9 @@ export interface ContentCardProps {
 /**
  * Unified media card component for streaming rows.
  * Handles poster display, badges, progress bars, context menus, and watched state.
+ * Memoized to prevent unnecessary re-renders.
  */
-export function ContentCard({
+export const ContentCard = memo(function ContentCard({
   item,
   profileId,
   showImdbRatings = true,
@@ -72,7 +73,7 @@ export function ContentCard({
   }, [item.isWatched])
 
   // Generate URL with fallback metadata
-  const getItemUrl = () => {
+  const getItemUrl = useCallback(() => {
     const baseUrl = `/streaming/${profileId}/${item.type}/${item.id}`
     const fallback = {
       id: item.id,
@@ -86,10 +87,10 @@ export function ContentCard({
     }
     const fallbackParam = encodeURIComponent(JSON.stringify(fallback))
     return `${baseUrl}?metaFallback=${fallbackParam}`
-  }
+  }, [profileId, item.id, item.type, item.name, item.poster, item.background, item.description, item.releaseInfo, item.imdbRating])
 
   // Handle play action
-  const handlePlay = async () => {
+  const handlePlay = useCallback(async () => {
     // Parse season/episode from item or episodeDisplay
     let season = item.season
     let episode = item.episode
@@ -116,10 +117,10 @@ export function ContentCard({
       lastStream: item.lastStream,
       preferredPackId: item.lastStream ? getPackId(item.lastStream) : null
     })
-  }
+  }, [profileId, item.id, item.type, item.name, item.poster, item.season, item.episode, item.episodeDisplay, item.lastStream, startAutoPlay])
 
   // Toggle watched state
-  const toggleWatched = async () => {
+  const toggleWatched = useCallback(async () => {
     const newWatchedState = !isWatched
     setIsWatched(newWatchedState)
     
@@ -141,10 +142,10 @@ export function ContentCard({
       console.error('Failed to mark as watched', e)
       setIsWatched(!newWatchedState)
     }
-  }
+  }, [isWatched, profileId, item.id, item.type])
 
   // Mark specific episode watched
-  const markEpisodeWatched = async () => {
+  const markEpisodeWatched = useCallback(async () => {
     if (!item.episodeDisplay) return
     const match = item.episodeDisplay.match(/S(\d+):E(\d+)/)
     if (!match) return
@@ -169,12 +170,12 @@ export function ContentCard({
     } catch (e) {
       console.error('Failed to mark episode watched', e)
     }
-  }
+  }, [item.episodeDisplay, profileId, item.id, item.type])
 
   // Remove from continue watching
-  const removeFromContinueWatching = () => {
+  const removeFromContinueWatching = useCallback(() => {
     onRemove?.(item)
-  }
+  }, [onRemove, item])
 
   // Build context menu items
   const contextItems = [
@@ -226,7 +227,7 @@ export function ContentCard({
   const ageRating = item.ageRating || item.certification || item.rating || item.contentRating
 
   // Handle link click
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
     if (onClick) {
       const result = onClick(e, item)
       if (result === false) {
@@ -234,7 +235,8 @@ export function ContentCard({
         return
       }
     }
-  }
+  }, [onClick, item])
+
 
   return (
     <>
@@ -349,4 +351,17 @@ export function ContentCard({
       />
     </>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if item or key props change
+  return (
+    prevProps.item === nextProps.item &&
+    prevProps.profileId === nextProps.profileId &&
+    prevProps.showImdbRatings === nextProps.showImdbRatings &&
+    prevProps.showAgeRatings === nextProps.showAgeRatings &&
+    prevProps.isContinueWatching === nextProps.isContinueWatching &&
+    prevProps.isRanked === nextProps.isRanked &&
+    prevProps.rank === nextProps.rank &&
+    prevProps.onRemove === nextProps.onRemove &&
+    prevProps.onClick === nextProps.onClick
+  )
+})

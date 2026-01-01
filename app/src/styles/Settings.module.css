@@ -472,6 +472,38 @@
   flex-shrink: 0;
 }
 
+.addonReorderControls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.addonReorderControls button {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.addonReorderControls button:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.addonReorderControls button:disabled {
+  color: #444;
+  cursor: default;
+}
+
 /* ============================================
    Theme Tile
    ============================================ */
@@ -588,6 +620,56 @@
 
   .container {
     padding: 0 16px;
+  }
+
+  /* Addon Item Mobile Styles */
+  .addonItem {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .addonInfo {
+    flex: 1 1 100%;
+    gap: 10px;
+    order: 1;
+  }
+
+  .addonReorderControls {
+    order: 0;
+    align-self: center;
+  }
+
+  .addonReorderControls button {
+    padding: 6px !important;
+  }
+
+  .addonActions {
+    flex: 1 1 100%;
+    order: 2;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .addonLogo,
+  .addonLogoPlaceholder {
+    width: 36px;
+    height: 36px;
+  }
+
+  .addonDetails {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .addonName {
+    font-size: var(--text-sm, 0.875rem);
+    flex-wrap: wrap;
+  }
+
+  .addonDescription {
+    font-size: var(--text-xs, 0.75rem);
   }
 }
 

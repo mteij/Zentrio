@@ -1,12 +1,46 @@
 /**
  * Hybrid Media Provider - Type Definitions
- * 
+ *
  * Core types for the hybrid playback engine that handles
  * video remuxing and audio decoding for rare codecs.
  */
 
 /** Stream type identifier */
 export type StreamType = 'video' | 'audio' | 'subtitle'
+
+/** Media metadata from stream analysis */
+export interface MediaMetadata {
+  streams?: MediaStream[]
+  format?: MediaFormat
+}
+
+/** Individual stream info */
+export interface MediaStream {
+  index: number
+  codec_type?: StreamType
+  codec_name?: string
+  codec_id?: number
+  profile?: string
+  width?: number
+  height?: number
+  channels?: number
+  sample_rate?: number
+  bit_rate?: number
+  tags?: {
+    language?: string
+    title?: string
+    [key: string]: any
+  }
+}
+
+/** Format info */
+export interface MediaFormat {
+  format_name?: string
+  format_long_name?: string
+  duration?: number
+  size?: number
+  bit_rate?: number
+}
 
 /** Codec information extracted from stream */
 export interface CodecInfo {
@@ -41,6 +75,12 @@ export interface StreamInfo {
   bitrate?: number
 }
 
+/** Combined stream info result */
+export interface CombinedStreamInfo {
+  video?: StreamInfo | null
+  audio?: StreamInfo | null
+}
+
 /** Raw video packet from demuxer */
 export interface VideoPacket {
   streamIndex: number
@@ -58,15 +98,6 @@ export interface AudioPacket {
   pts: number
   dts: number
   duration?: number
-}
-
-/** Decoded audio frame (PCM) */
-export interface DecodedAudioFrame {
-  samples: Float32Array[]  // Per-channel samples
-  pts: number
-  sampleRate: number
-  channels: number
-  samplesPerChannel: number
 }
 
 /** Seek operation parameters */
@@ -96,6 +127,16 @@ export interface EngineEvents {
   'buffering': { isBuffering: boolean }
   'error': { error: Error }
   'ended': {}
+  'audioready': { audioElement: HTMLAudioElement }
+  'seeked': { time: number }
+  'progress': { progress: number }
+}
+
+/** Progress event data */
+export interface ProgressData {
+  loaded: number
+  total: number
+  type: 'video' | 'audio'
 }
 
 /** Network reader configuration */
@@ -104,6 +145,7 @@ export interface NetworkReaderConfig {
   maxCacheSize?: number    // Max cache entries (default: 50)
   prefetchCount?: number   // Chunks to prefetch ahead (default: 3)
   timeout?: number         // Request timeout ms (default: 30000)
+  bufferSize?: number      // Buffer size in bytes
 }
 
 /** Video remuxer configuration */
@@ -112,18 +154,15 @@ export interface VideoRemuxerConfig {
   bufferAhead?: number      // Seconds to buffer ahead (default: 30)
 }
 
-/** Audio decoder configuration */
-export interface AudioDecoderConfig {
-  bufferDuration?: number   // Ring buffer duration (default: 10s)
-  sampleRate?: number       // Output sample rate (default: 48000)
-  channels?: number         // Output channels (default: 2)
-}
-
 /** Hybrid engine configuration */
 export interface HybridEngineConfig {
   network?: NetworkReaderConfig
   video?: VideoRemuxerConfig
-  audio?: AudioDecoderConfig
+  bufferSize?: number      // Buffer size in bytes
+  prefetchSize?: number     // Prefetch size in bytes
+  segmentSize?: number      // Segment size in bytes
+  onProgress?: (data: ProgressData) => void
+  onError?: (error: Error) => void
 }
 
 /** Keyframe index entry for seeking */

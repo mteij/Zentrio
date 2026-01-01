@@ -43,10 +43,13 @@ export const StreamingHome = () => {
     queryKey: ['dashboard', profileId],
     queryFn: () => fetchDashboard(profileId!),
     enabled: !!profileId,
+    staleTime: 1000 * 60 * 5, // 5 minutes - cache dashboard data
+    gcTime: 1000 * 60 * 30, // 30 minutes - keep in memory
     retry: (failureCount, error) => {
       if (error.message === 'Unauthorized') return false
       return failureCount < 2
-    }
+    },
+    refetchOnWindowFocus: false
   })
 
   useEffect(() => {

@@ -28,7 +28,9 @@ const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: G
       const typeParam = type && type !== 'all' ? type : 'movie,series'
       return apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genre)}&skip=0`)
     },
-    staleTime: 1000 * 60 * 60 // 1 hour
+    staleTime: 1000 * 60 * 60, // 1 hour - genre data rarely changes
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false
   })
 
   if (isLoading) {
@@ -78,8 +80,6 @@ export const StreamingExplore = () => {
   // State for view toggle
   const [viewMode, setViewMode] = useState<'all' | 'movie' | 'series'>('all')
 
-  // Sticky header state
-  const [isSticky, setIsSticky] = useState(false)
 
   // If a genre is selected via URL, we show the filtered grid view.
   const activeGenre = searchParams.get('genre')
@@ -99,7 +99,10 @@ export const StreamingExplore = () => {
     queryFn: async () => {
       return apiFetchJson<ExploreDashboardData>(`/api/streaming/dashboard?profileId=${profileId}`)
     },
-    enabled: !isFilteredView
+    enabled: !isFilteredView,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 30, // 30 minutes
+    refetchOnWindowFocus: false
   })
 
   // Fetch Filters
@@ -107,7 +110,10 @@ export const StreamingExplore = () => {
     queryKey: ['filters', profileId],
     queryFn: async () => {
       return apiFetchJson<FiltersData>(`/api/streaming/filters?profileId=${profileId}`)
-    }
+    },
+    staleTime: 1000 * 60 * 10, // 10 minutes - filters change rarely
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false
   })
 
   // ... (Filtered view logic remains same) ...
@@ -159,17 +165,10 @@ export const StreamingExplore = () => {
     }
   }
 
-  // Infinite scroll & Sticky Header detection
+  // Infinite scroll for filtered view
   useEffect(() => {
       const handleScroll = () => {
-        // Sticky Header: Threshold calculation.
-        // Assuming Hero is roughly 85vh and content overlaps by 100px.
-        // We want sticky state when header hits top. 
-        // Header sits at ~85vh - 100px.
-        // We trigger slightly before it hits top. 
-        const stickyThreshold = window.innerHeight * 0.75;
-        setIsSticky(window.scrollY > stickyThreshold);
-
+        // Infinite scroll
         if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
           loadMore()
         }
@@ -256,70 +255,53 @@ export const StreamingExplore = () => {
                 />
             )}
 
-            <div className={styles.contentContainer} style={{ marginTop: showHero ? undefined : '40px' }}>
-                
-                {/* Header / View Toggles / Filter Bar */}
-                <div 
-                    className={`
-                        sticky top-[var(--titlebar-height,0px)] z-50 transition-all duration-300
-                        flex items-center justify-between mb-8
-                        ${isSticky 
-                            ? 'bg-black/90 backdrop-blur-xl border-b border-white/10 py-4 shadow-2xl' 
-                            : 'bg-transparent py-0'
-                        }
-                        px-[60px]
-                    `}
-                >
-                     {isFilteredView ? (
-                        <div className="flex items-center gap-4">
-                            <button 
-                                onClick={() => { setSearchParams({}); setViewMode('all'); }}
-                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors backdrop-blur-md border border-white/10"
-                                aria-label="Go Back"
+            {/* Fixed Header / View Toggles / Filter Bar */}
+            <div className={styles.exploreHeader}>
+                 {isFilteredView ? (
+                    <div className={styles.exploreFilteredHeader}>
+                        <button 
+                            onClick={() => { setSearchParams({}); setViewMode('all'); }}
+                            className={styles.exploreBackBtn}
+                            aria-label="Go Back"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                        <h1 className={styles.exploreFilteredTitle}>
+                            {activeGenre || (activeType ? (activeType === 'movie' ? 'Movies' : 'Series') : 'Explore')}
+                        </h1>
+                    </div>
+                 ) : (
+                     <div className={styles.exploreToggleGroup}>
+                        {(['all', 'movie', 'series'] as const).map(mode => (
+                            <button
+                                key={mode}
+                                onClick={() => setViewMode(mode)}
+                                className={`${styles.exploreToggleBtn} ${viewMode === mode ? styles.exploreToggleBtnActive : ''}`}
                             >
-                                <ArrowLeft className="text-white w-5 h-5" />
+                                {mode === 'all' ? 'All' : mode === 'movie' ? 'Movies' : 'TV Shows'}
                             </button>
-                            <h1 className="text-3xl font-bold text-white">
-                                {activeGenre || (activeType ? (activeType === 'movie' ? 'Movies' : 'Series') : 'Explore')}
-                            </h1>
-                        </div>
-                     ) : (
-                         <div className="flex gap-2 p-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10">
-                            {(['all', 'movie', 'series'] as const).map(mode => (
-                                <button
-                                    key={mode}
-                                    onClick={() => setViewMode(mode)}
-                                    className={`px-6 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
-                                        viewMode === mode 
-                                        ? 'bg-white text-black shadow-lg scale-105' 
-                                        : 'text-white/70 hover:text-white hover:bg-white/10'
-                                    }`}
-                                >
-                                    {mode === 'all' ? 'All' : mode === 'movie' ? 'Movies' : 'TV Shows'}
-                                </button>
-                            ))}
-                         </div>
-                     )}
+                        ))}
+                     </div>
+                 )}
 
-                     {!isFilteredView && (
-                         // Filter Button (Genres)
-                         <div className="flex relative">
-                             <div className="relative">
-                                <select 
-                                    className="appearance-none bg-white/10 border border-white/10 text-white pl-6 pr-10 py-2.5 rounded-full backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer hover:bg-white/20 transition-all duration-300 text-sm font-semibold text-white/90"
-                                    onChange={(e) => updateFilter('genre', e.target.value)}
-                                    value=""
-                                >
-                                    <option value="" disabled>Genres</option>
-                                    {genres.map(g => (
-                                        <option key={g} value={g} className="text-black bg-white">{g}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
-                             </div>
-                         </div>
-                     )}
-                </div>
+                 {!isFilteredView && (
+                     <div className={styles.exploreGenreSelect}>
+                        <select 
+                            className={styles.exploreGenreSelectInput}
+                            onChange={(e) => updateFilter('genre', e.target.value)}
+                            value=""
+                        >
+                            <option value="" disabled>Genres</option>
+                            {genres.map(g => (
+                                <option key={g} value={g}>{g}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className={styles.exploreGenreIcon} />
+                     </div>
+                 )}
+            </div>
+
+            <div className={styles.contentContainer} style={{ marginTop: showHero ? '0' : '100px' }}>
 
                 {isFilteredView ? (
                     // GRID VIEW for Filtered Results
@@ -330,8 +312,8 @@ export const StreamingExplore = () => {
                              </div>
                          ) : filteredItems.length > 0 ? (
                              <div className={styles.mediaGrid}>
-                                {filteredItems.map(item => (
-                                    <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
+                                {filteredItems.map((item, index) => (
+                                    <a key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
                                         <div className={styles.posterContainer}>
                                             <LazyImage src={item.poster || ''} alt={item.name} className={styles.posterImage} />
                                              <div className={styles.badgesContainer}>

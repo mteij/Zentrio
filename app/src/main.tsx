@@ -47,8 +47,13 @@ const ShareInvitePage = lazy(() => import('./pages/ShareInvitePage').then(m => (
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh for 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes - garbage collection time
       retry: 1,
+      refetchOnWindowFocus: false, // Don't refetch on window focus for streaming data
+      // Note: Don't set refetchOnMount: false globally - it breaks initial data loading
+      // Individual queries can set refetchOnMount: false if they have pre-fetched data
+      refetchOnReconnect: true, // Only refetch on network reconnect
     },
   },
 })

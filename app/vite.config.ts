@@ -12,12 +12,61 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: [
+      // FFmpeg WASM needs to be excluded for proper loading
       '@ffmpeg/ffmpeg', 
       '@ffmpeg/util',
-      // libav.js needs to be excluded to properly load WASM files
-      '@libav.js/variant-webcodecs',
-      'libav.js'
     ],
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: false,
+    // Increase chunk size limit to reduce warnings (but we'll optimize)
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // Split React ecosystem
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'react-vendor'
+          }
+          
+          // Split React Router
+          if (id.includes('node_modules/react-router')) {
+            return 'router-vendor'
+          }
+          
+          // Split Vidstack and media libraries
+          if (id.includes('node_modules/@vidstack') || id.includes('node_modules/media-icons')) {
+            return 'media-vendor'
+          }
+          
+          // Split FFmpeg WASM and libav.js - these are huge
+          if (id.includes('node_modules/@ffmpeg') || id.includes('node_modules/@libav')) {
+            return 'ffmpeg-vendor'
+          }
+          
+          // Split TanStack Query
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'query-vendor'
+          }
+          
+          // Split UI libraries
+          if (id.includes('node_modules/lucide') || id.includes('node_modules/framer-motion')) {
+            return 'ui-vendor'
+          }
+          
+          // Split other utilities
+          if (id.includes('node_modules/zod') || id.includes('node_modules/lz-string')) {
+            return 'utils-vendor'
+          }
+          
+          // Auth libraries
+          if (id.includes('node_modules/better-auth') || id.includes('node_modules/bcryptjs')) {
+            return 'auth-vendor'
+          }
+        },
+      },
+    },
   },
   server: {
     host: true, // Listen on all network interfaces for Tauri Android
@@ -37,9 +86,5 @@ export default defineConfig({
         changeOrigin: false,
       },
     },
-  },
-  build: {
-    outDir: 'dist',
-    emptyOutDir: false,
   },
 })

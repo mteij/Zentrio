@@ -1,8 +1,9 @@
 import { Outlet, useParams, useNavigate, useLocation } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navbar } from '../../components/layout/Navbar'
 import { useEffect } from 'react'
-import { apiFetch } from '../../lib/apiFetch'
+import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
+import { preloadCommonRoutes } from '../../utils/route-preloader'
 
 const fetchProfile = async (profileId: string) => {
   // Use lightweight profile endpoint instead of heavy dashboard
@@ -46,6 +47,30 @@ export const StreamingLayout = () => {
       navigate('/')
     }
   }, [error, navigate])
+
+  // Preload all streaming route chunks AND prefetch data on mount for instant navigation
+  const queryClient = useQueryClient()
+  
+  useEffect(() => {
+    if (!profileId) return
+    
+    // Preload route chunks (code splitting)
+    preloadCommonRoutes()
+    
+    // Prefetch dashboard data (used by both Home and Explore)
+    queryClient.prefetchQuery({
+      queryKey: ['dashboard', profileId],
+      queryFn: () => apiFetchJson(`/api/streaming/dashboard?profileId=${profileId}`),
+      staleTime: 1000 * 60 * 5 // 5 minutes
+    })
+    
+    // Prefetch filters data (used by Explore)
+    queryClient.prefetchQuery({
+      queryKey: ['filters', profileId],
+      queryFn: () => apiFetchJson(`/api/streaming/filters?profileId=${profileId}`),
+      staleTime: 1000 * 60 * 10 // 10 minutes
+    })
+  }, [profileId, queryClient])
 
   // Determine if we are on a page where the navbar should be hidden
   // Player page: ends with /player

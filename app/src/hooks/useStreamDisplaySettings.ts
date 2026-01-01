@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { apiFetch } from '../lib/apiFetch'
 
 export interface StreamDisplaySettings {
   showAddonName: boolean
@@ -25,7 +26,7 @@ export function useStreamDisplaySettings(profileId: string | undefined): StreamD
 
     const fetchSettings = async () => {
       try {
-        const res = await fetch(`/api/streaming/settings?profileId=${profileId}`)
+        const res = await apiFetch(`/api/streaming/settings?profileId=${profileId}`)
         if (res.ok) {
           const data = await res.json()
           if (data.data) {
@@ -50,4 +51,3 @@ export function useStreamDisplaySettings(profileId: string | undefined): StreamD
 
   return settings
 }
-

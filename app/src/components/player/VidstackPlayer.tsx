@@ -41,8 +41,18 @@ import '@vidstack/react/player/styles/default/layouts/video.css'
 
 // Custom components for slots
 import { CastButton } from './CastButton'
-import { HybridEngine } from '../../services/hybrid-media/HybridEngine'
-import { mightNeedHybridPlayback } from '../../services/hybrid-media'
+
+// Lazy load hybrid media engine to reduce initial bundle size
+// This is only loaded when hybrid playback is actually needed
+const HybridEnginePromise = import('../../services/hybrid-media/HybridEngine').then(m => m.HybridEngine)
+const mightNeedHybridPlaybackPromise = import('../../services/hybrid-media').then(m => m.mightNeedHybridPlayback)
+
+// Global cache to prevent re-probing on remounts
+// Maps URL -> 'native' | 'hybrid' | 'failed'
+const probeCache = new Map<string, { mode: 'native' | 'hybrid', duration?: number }>()
+
+// Track in-flight probes to deduplicate requests
+const pendingProbes = new Map<string, Promise<{ mode: 'native' | 'hybrid', duration?: number }>>()
 
 export interface SubtitleTrack {
     src: string
@@ -109,10 +119,10 @@ function SubtitlesMenu({ tracks }: { tracks: SubtitleTrack[] }) {
 
     const currentTrackIndex = useMemo(() => {
         if (!textTrack) return -1
-        // We need to find the index of the current textTrack in the Vidstack list
+        // We need to find index of current textTrack in Vidstack list
         // and map it back to our tracks. 
         // Note: Vidstack might add its own auto-generated tracks, so we need to be careful.
-        // But since we control the Track components, passing index should work if order is preserved.
+        // But since we control Track components, passing index should work if order is preserved.
         return Array.from(store.textTracks).findIndex(t => t === textTrack)
     }, [textTrack, store.textTracks])
 
@@ -174,13 +184,13 @@ function SubtitlesMenu({ tracks }: { tracks: SubtitleTrack[] }) {
                                                 }
                                                 // We can't access textTracks[index].mode directly via remote?
                                                 // Try generic command
-                                                // Based on Vidstack internals, we might need to iterate or find the right command.
+                                                // Based on Vidstack internals, we might need to iterate or find right command.
                                                 // Assuming changeTextTrackMode works if we pass index? 
                                                 // Actually, standard API is usually just changeTextTrackMode(mode) which affects *current* track.
                                                 // To CHANGE the current track, we usually use changeTextTrack(index).
                                                 // If TS says it doesn't exist, maybe it's `changeTextTrackKind`? No.
                                                 // Let's try casting for now as it might be a valid method missing in TS defs or I'm using an older version.
-                                                // Alternatively, use the player instance via ref if we had it, but we can't easily pass it here without props.
+                                                // Alternatively, use player instance via ref if we had it, but we can't easily pass it here without props.
                                                 
                                                 // NOTE: Using 'any' cast to bypass TS error if method exists at runtime
                                                 (remote as any).changeTextTrack(index)
@@ -221,8 +231,7 @@ export function VidstackPlayer({
 }: VidstackPlayerProps) {
     const playerRef = useRef<MediaPlayerInstance>(null)
     const hybridVideoRef = useRef<HTMLVideoElement>(null)
-    const engineRef = useRef<HybridEngine | null>(null)
-    const audioContextRef = useRef<AudioContext | null>(null)
+    const engineRef = useRef<any>(null)
     
     // Prevent React Strict Mode from re-probing or re-initializing
     const probeCompletedRef = useRef(false)
@@ -236,26 +245,53 @@ export function VidstackPlayer({
             return 'native'
         }
 
-        // If URL looks like it might need hybrid playback, start probing
-        if (mightNeedHybridPlayback(src)) {
-            return 'probing'
+        // Check cache first
+        const cached = probeCache.get(src)
+        if (cached) {
+            console.log(`[VidstackPlayer] Using cached probe result for ${src.slice(0, 50)}...: ${cached.mode}`)
+            if (cached.mode === 'hybrid') {
+                 return 'probing' 
+            }
+            return cached.mode as PlaybackMode
         }
+
+        // If URL looks like it might need hybrid playback, start probing
+        // We'll check this after loading helper function
         return 'native'
     })
     
     const [hybridReady, setHybridReady] = useState(false)
     const [hybridDuration, setHybridDuration] = useState(0)
+    const [hybridCurrentTime, setHybridCurrentTime] = useState(0)
     const [hybridPlaying, setHybridPlaying] = useState(false)
+    const [showControls, setShowControls] = useState(true)
     
-    // Probe the file to check if we need hybrid playback
+    // Probe file to check if we need hybrid playback
     useEffect(() => {
         // Skip probing in Tauri
-        if (window.__TAURI__) return
-        if (playbackMode !== 'probing' || !src) return
+        if (window.__TAURI__) {
+            console.log('[VidstackPlayer] Skipping probe - running in Tauri environment')
+            return
+        }
         
-        // Skip if we've already completed probing for this src
+        // Check cache (again, in case it populated while mounting)
+        const cached = probeCache.get(src)
+        if (cached) {
+             console.log('[VidstackPlayer] Using cached probe result:', cached.mode, 'duration:', cached.duration)
+             if (cached.mode === 'hybrid') {
+                 setHybridDuration(cached.duration || 0)
+                 setPlaybackMode('hybrid')
+                 if (cached.duration) onMetadataLoad?.(cached.duration)
+             } else {
+                 setPlaybackMode('native')
+             }
+             probeCompletedRef.current = true
+             return
+        }
+
+        // Skip if we've already completed probing for this src locally
         if (probeCompletedRef.current && engineRef.current) {
-            console.log('[VidstackPlayer] Skipping probe - already completed')
+            console.log('[VidstackPlayer] Skipping probe - already completed locally')
             setPlaybackMode('hybrid')
             return
         }
@@ -264,32 +300,87 @@ export function VidstackPlayer({
 
         const probeFile = async () => {
             try {
-                console.log('[VidstackPlayer] Probing file for audio codec compatibility...')
+                console.log('[VidstackPlayer] Starting probe for:', src.substring(0, 80))
                 
-                const engine = new HybridEngine()
-                const streams = await engine.initialize(src)
+                // Lazy load hybrid media dependencies
+                const [HybridEngine, mightNeedHybridPlayback, TranscoderServiceModule] = await Promise.all([
+                    HybridEnginePromise,
+                    mightNeedHybridPlaybackPromise,
+                    import('../../services/hybrid-media/TranscoderService').catch((err) => {
+                        console.error('[VidstackPlayer] Failed to load TranscoderService:', err)
+                        return null
+                    })
+                ])
                 
-                if (cancelled) {
-                    engine.destroy()
+                console.log('[VidstackPlayer] Dependencies loaded')
+                
+                // Check if we even need to probe
+                if (!mightNeedHybridPlayback(src)) {
+                    console.log('[VidstackPlayer] mightNeedHybridPlayback returned false')
+                    probeCache.set(src, { mode: 'native' })
+                    setPlaybackMode('native')
+                    probeCompletedRef.current = true
                     return
                 }
+                console.log('[VidstackPlayer] mightNeedHybridPlayback returned true, continuing probe')
+                
+                // Probe file to get metadata
+                let metadata = null
+                if (TranscoderServiceModule && TranscoderServiceModule.TranscoderService) {
+                    const TranscoderService = TranscoderServiceModule.TranscoderService
+                    if (typeof TranscoderService.probe === 'function') {
+                        console.log('[VidstackPlayer] Calling TranscoderService.probe()...')
+                        metadata = await TranscoderService.probe(src)
+                        console.log('[VidstackPlayer] Probe returned metadata:', metadata ? 'found' : 'null')
+                    }
+                }
+                
+                if (cancelled) {
+                    console.log('[VidstackPlayer] Probe cancelled')
+                    return
+                }
+
+                if (!metadata) {
+                    console.log('[VidstackPlayer] No metadata returned from probe, using native playback')
+                    probeCache.set(src, { mode: 'native' })
+                    setPlaybackMode('native')
+                    probeCompletedRef.current = true
+                    return
+                }
+               
+                console.log('[VidstackPlayer] Creating HybridEngine with metadata...')
+                // Create engine with metadata
+                const engine = new HybridEngine(src, metadata)
+
+                console.log('[VidstackPlayer] engine.requiresHybridPlayback:', engine.requiresHybridPlayback)
 
                 if (engine.requiresHybridPlayback) {
                     console.log('[VidstackPlayer] File requires hybrid playback (unsupported audio codec)')
                     engineRef.current = engine
                     probeCompletedRef.current = true
-                    setHybridDuration(engine.totalDuration)
+                   
+                    // Cache result
+                    const duration = engine.getDuration()
+                    probeCache.set(src, { mode: 'hybrid', duration })
+                   
+                    setHybridDuration(duration)
                     setPlaybackMode('hybrid')
-                    onMetadataLoad?.(engine.totalDuration)
+                    onMetadataLoad?.(duration)
                 } else {
-                    console.log('[VidstackPlayer] File can use native playback')
-                    engine.destroy()
+                    console.log('[VidstackPlayer] File can use native playback (supported codecs)')
+                    // Engine not needed, cleanup
                     probeCompletedRef.current = true
+                   
+                    // Cache result
+                    probeCache.set(src, { mode: 'native' })
+                   
                     setPlaybackMode('native')
                 }
             } catch (error) {
-                console.warn('[VidstackPlayer] Probe failed, falling back to native:', error)
+                console.error('[VidstackPlayer] Probe failed with exception:', error)
                 if (!cancelled) {
+                    // Cache failure as native to avoid retry loops
+                    probeCache.set(src, { mode: 'native' })
                     setPlaybackMode('native')
                 }
             }
@@ -300,7 +391,7 @@ export function VidstackPlayer({
         return () => {
             cancelled = true
         }
-    }, [src, playbackMode])
+    }, [src, onMetadataLoad])
 
     // Initialize hybrid engine when in hybrid mode
     useEffect(() => {
@@ -318,7 +409,7 @@ export function VidstackPlayer({
             hybridInitializedRef.current = true
             const engine = engineRef.current!
             
-            // Wait for the video element ref to be populated
+            // Wait for video element ref to be populated
             let retries = 0
             while (!hybridVideoRef.current && retries < 20) {
                 await new Promise(r => setTimeout(r, 50))
@@ -331,83 +422,70 @@ export function VidstackPlayer({
             }
 
             try {
-                // Attach video
-                await engine.attachVideo(video)
+                // Initialize engine with video element
+                console.log('[VidstackPlayer] Initializing hybrid engine with video element...')
+                await engine.initialize(video)
+                console.log('[VidstackPlayer] Hybrid engine initialized')
 
-                // Try to attach audio - this may fail if SharedArrayBuffer is not available
-                // or if the audio codec is not supported (e.g., E-AC3/DTS)
-                try {
-                    audioContextRef.current = new AudioContext()
-                    await engine.attachAudio(audioContextRef.current)
-                } catch (audioError) {
-                    // SharedArrayBuffer, AudioWorklet, or codec not available
-                    // Fall back to native playback (video will play, audio may not work)
-                    console.warn('[VidstackPlayer] Audio setup failed, falling back to native playback:', audioError)
-                    
-                    // Close AudioContext first (before engine.destroy which might try to close it)
-                    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                        try {
-                            await audioContextRef.current.close()
-                        } catch {
-                            // Ignore close errors
-                        }
-                    }
-                    audioContextRef.current = null
-                    
-                    // Cleanup engine (it should handle gracefully that audio wasn't fully set up)
-                    await engine.destroy()
-                    engineRef.current = null
-                    
-                    // Switch to native playback mode
+                // Set duration
+                const duration = engine.getDuration()
+                setHybridDuration(duration)
+                console.log('[VidstackPlayer] Duration set:', duration)
+
+                // Listen to engine events
+                engine.addEventListener('audioready', (e: any) => {
+                    console.log('[VidstackPlayer] Audio data ready for playback')
+                    setHybridReady(true)
+                    // Don't auto-play - wait for user interaction
+                })
+                 
+                engine.addEventListener('timeupdate', (e: any) => {
+                    const { currentTime } = e.detail
+                    setHybridCurrentTime(currentTime)
+                    onTimeUpdate?.(currentTime, duration)
+                })
+                 
+                engine.addEventListener('ended', () => {
+                    onEnded?.()
+                    setHybridPlaying(false)
+                })
+                 
+                engine.addEventListener('error', (e: any) => {
+                    console.error('[VidstackPlayer] Hybrid engine error:', e.detail.error)
+                    // Fall back to native playback
                     setPlaybackMode('native')
-                    return
-                }
+                    onError?.(e.detail.error)
+                })
 
                 if (cancelled) return
-
-                if (cancelled) return
-
-                // Note: We don't need manual event listeners for timeupdate/ended anymore
-                // because Vidstack listens to the native video element events directly.
-                // HybridEngine now syncs its state with the video element events.
 
                 // Seek to start time
                 if (startTime > 0) {
+                    console.log('[VidstackPlayer] Seeking to start time:', startTime)
                     await engine.seek(startTime)
                 }
 
-                setHybridReady(true)
-
                 // Auto-play
                 if (autoPlay) {
+                    console.log('[VidstackPlayer] Starting autoplay...')
                     try {
-                        // We rely on the engine.start() to handle audio resuming
-                        await engine.start()
+                        await engine.play()
+                        console.log('[VidstackPlayer] Autoplay started successfully')
                     } catch (e) {
-                        console.warn('[VidstackPlayer] Autoplay start failed:', e)
+                        console.warn('[VidstackPlayer] Autoplay failed:', e)
                     }
                 }
 
                 console.log('[VidstackPlayer] Hybrid playback initialized')
             } catch (error) {
                 console.error('[VidstackPlayer] Hybrid init failed, falling back to native:', error)
-                
-                // Close AudioContext first (check state to avoid double-close)
-                if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                    try {
-                        await audioContextRef.current.close()
-                    } catch {
-                        // Ignore close errors
-                    }
-                }
-                audioContextRef.current = null
-                
+                 
                 // Cleanup engine
                 if (engineRef.current) {
                     await engineRef.current.destroy()
                     engineRef.current = null
                 }
-                
+                 
                 // Switch to native playback
                 setPlaybackMode('native')
                 onError?.(error instanceof Error ? error : new Error(String(error)))
@@ -419,7 +497,7 @@ export function VidstackPlayer({
         return () => {
             cancelled = true
         }
-    }, [playbackMode, autoPlay, startTime])
+    }, [playbackMode, autoPlay, startTime, onTimeUpdate, onError])
 
     // Ref to store cleanup timeout (for cancellation on Strict Mode remount)
     const cleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -433,6 +511,98 @@ export function VidstackPlayer({
         }
     }, [])
 
+    // Define keyboard handlers here before using them
+    const handleHybridPlay = useCallback(async () => {
+        if (engineRef.current) {
+            await engineRef.current.play()
+            setHybridPlaying(true)
+        }
+    }, [])
+
+    const handleHybridPause = useCallback(() => {
+        if (engineRef.current) {
+            engineRef.current.pause()
+            setHybridPlaying(false)
+        }
+    }, [])
+
+    const handleHybridSeek = useCallback(async (time: number) => {
+        if (engineRef.current) {
+            await engineRef.current.seek(time)
+        }
+    }, [])
+
+    // Keyboard shortcuts for hybrid mode
+    useEffect(() => {
+        if (playbackMode !== 'hybrid') return
+
+        const handleKeyDown = async (e: KeyboardEvent) => {
+            // Ignore if typing in an input
+            if ((e.target as HTMLElement).tagName === 'INPUT' ||
+                (e.target as HTMLElement).tagName === 'TEXTAREA') {
+                return
+            }
+
+            switch (e.key) {
+                case ' ':
+                case 'k':
+                    e.preventDefault()
+                    if (engineRef.current) {
+                        if (hybridPlaying) {
+                            await handleHybridPause()
+                        } else {
+                            await handleHybridPlay()
+                        }
+                    }
+                    break
+                case 'ArrowLeft':
+                    e.preventDefault()
+                    const seekBack = Math.max(0, hybridCurrentTime - 5)
+                    setHybridCurrentTime(seekBack)
+                    await handleHybridSeek(seekBack)
+                    break
+                case 'ArrowRight':
+                    e.preventDefault()
+                    const seekForward = Math.min(hybridDuration, hybridCurrentTime + 5)
+                    setHybridCurrentTime(seekForward)
+                    await handleHybridSeek(seekForward)
+                    break
+                case 'f':
+                    e.preventDefault()
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen()
+                    } else {
+                        document.documentElement.requestFullscreen()
+                    }
+                    break
+                case 'm':
+                    e.preventDefault()
+                    if (hybridVideoRef.current) {
+                        hybridVideoRef.current.muted = !hybridVideoRef.current.muted
+                    }
+                    break
+            }
+        }
+
+        const handleMouseMove = () => {
+            setShowControls(true)
+            // Hide controls after 3 seconds of inactivity
+            setTimeout(() => {
+                if (hybridPlaying) {
+                    setShowControls(false)
+                }
+            }, 3000)
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('mousemove', handleMouseMove)
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('mousemove', handleMouseMove)
+        }
+    }, [playbackMode, hybridPlaying, hybridCurrentTime, hybridDuration, handleHybridPlay, handleHybridPause, handleHybridSeek])
+
     // Cleanup on unmount or src change
     // Use a timeout to avoid destroying during React Strict Mode's quick unmount/remount
     useEffect(() => {
@@ -440,13 +610,7 @@ export function VidstackPlayer({
             // Delay cleanup slightly to allow Strict Mode remount to cancel it
             cleanupTimeoutRef.current = setTimeout(() => {
                 console.log('[VidstackPlayer] Running delayed cleanup')
-                // Close AudioContext first (check state to avoid double-close)
-                if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                    audioContextRef.current.close().catch(() => {})
-                }
-                audioContextRef.current = null
-                
-                // Then destroy engine
+                // Destroy engine
                 if (engineRef.current) {
                     engineRef.current.destroy()
                     engineRef.current = null
@@ -520,43 +684,26 @@ export function VidstackPlayer({
     }, [src])
     
     // Handle player errors (native mode) - detect audio issues
-    const handlePlayerError = useCallback((event: any) => {
+    const handlePlayerError = useCallback(async (event: any) => {
         const detail = event?.detail
         console.error('[VidstackPlayer] Error:', detail?.message || event)
         
         // Check if this might be an audio codec issue
-        // If we haven't tried hybrid mode yet and the URL might need it
+        // If we haven't tried hybrid mode yet and URL might need it
         // AND we are not in Tauri (where we want native only)
-        if (playbackMode === 'native' && mightNeedHybridPlayback(src) && !window.__TAURI__) {
-            console.log('[VidstackPlayer] Native playback failed, trying hybrid mode...')
-            setPlaybackMode('probing')
-            return
+        if (playbackMode === 'native' && !window.__TAURI__) {
+            // Lazy load helper function
+            const mightNeedHybridPlayback = await mightNeedHybridPlaybackPromise
+            if (mightNeedHybridPlayback(src)) {
+                console.log('[VidstackPlayer] Native playback failed, trying hybrid mode...')
+                setPlaybackMode('probing')
+                return
+            }
         }
         
         onError?.(detail instanceof Error ? detail : new Error(detail?.message || 'Playback error'))
     }, [onError, playbackMode, src])
 
-    // Hybrid mode controls
-    const handleHybridPlay = useCallback(async () => {
-        if (engineRef.current) {
-            if (audioContextRef.current?.state === 'suspended') {
-                await audioContextRef.current.resume()
-            }
-            await engineRef.current.start()
-        }
-    }, [])
-
-    const handleHybridPause = useCallback(async () => {
-        if (engineRef.current) {
-            await engineRef.current.pause()
-        }
-    }, [])
-
-    const handleHybridSeek = useCallback(async (time: number) => {
-        if (engineRef.current) {
-            await engineRef.current.seek(time)
-        }
-    }, [])
 
     // Loading state while probing
     if (playbackMode === 'probing') {
@@ -615,63 +762,208 @@ export function VidstackPlayer({
     // The video.src will be set by HybridEngine's MediaSource, not by Vidstack.
     if (playbackMode === 'hybrid') {
         return (
-            <MediaPlayer
-                ref={playerRef}
-                title={title}
-                autoPlay={false}
-                playsInline
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={handleEnded}
-                onError={handlePlayerError}
-                className="vidstack-player hybrid-mode"
-                style={{ backgroundColor: '#000' }}
-            >
-                <MediaProvider>
-                    {/* Explicit video element for hybrid mode - HybridEngine will set src */}
-                    <video 
-                        ref={hybridVideoRef}
-                        playsInline
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    />
-                    {poster && <Poster className="vds-poster" src={poster} alt={title || ''} />}
+            <div className="vidstack-player hybrid-mode" style={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                backgroundColor: '#000',
+                overflow: 'hidden'
+            }}>
+                {/* Explicit video element for hybrid mode - HybridEngine will set src */}
+                <video
+                    ref={hybridVideoRef}
+                    playsInline
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                >
+                    {/* Subtitle tracks must be children of video element */}
                     {subtitles.map((track, index) => (
-                        <Track
+                        <track
                             key={track.src || `sub-${index}`}
                             src={track.src}
                             kind="subtitles"
+                            srclang={track.language}
                             label={track.label}
-                            language={track.language}
                             default={track.default}
                         />
                     ))}
-                </MediaProvider>
+                </video>
+                
+                {/* Poster */}
+                {poster && !hybridReady && (
+                    <img
+                        src={poster}
+                        alt={title || ''}
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            zIndex: 1
+                        }}
+                    />
+                )}
 
-                {/* Standard Vidstack Layout */}
-                <DefaultVideoLayout
-                    icons={defaultLayoutIcons}
-                    slots={{
-                        googleCastButton: showCast ? <CastButton /> : null,
-                        captionButton: <SubtitlesMenu tracks={subtitles} />
-                    }}
-                />
+                {/* Loading overlay when hybrid not ready */}
+                {!hybridReady && (
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        zIndex: 40,
+                        color: 'white'
+                    }}>
+                        <div style={{
+                            width: 48,
+                            height: 48,
+                            border: '3px solid rgba(255,255,255,0.3)',
+                            borderTopColor: 'white',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite',
+                            marginBottom: '1rem'
+                        }} />
+                        <span>Preparing audio transcoding...</span>
+                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    </div>
+                )}
 
-                {/* Hybrid mode indicator overlay */}
-                <div style={{
-                    position: 'absolute',
-                    top: 16,
-                    right: 16,
-                    padding: '4px 8px',
-                    backgroundColor: 'rgba(255, 165, 0, 0.8)',
-                    borderRadius: 4,
-                    fontSize: 12,
-                    color: 'black',
-                    fontWeight: 'bold',
-                    zIndex: 50,
-                    pointerEvents: 'none'
-                }}>
-                    HYBRID AUDIO
-                </div>
-            </MediaPlayer>
+                {/* Hybrid Controls Overlay */}
+                {hybridReady && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            zIndex: 50,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                        }}
+                        onClick={async () => {
+                            // Toggle play/pause
+                            if (engineRef.current) {
+                                if (hybridPlaying) {
+                                    await handleHybridPause()
+                                    setHybridPlaying(false)
+                                } else {
+                                    // First play requires user interaction
+                                    await handleHybridPlay()
+                                    setHybridPlaying(true)
+                                    // Also play audio element if it exists
+                                    const audioElement = engineRef.current.getAudioElement()
+                                    if (audioElement) {
+                                        audioElement.play().catch(e =>
+                                            console.warn('[VidstackPlayer] Audio play error:', e)
+                                        )
+                                    }
+                                }
+                            }
+                        }}
+                    >
+                        {/* Center Play/Pause Button */}
+                        {!hybridPlaying && (
+                            <div style={{
+                                width: 64,
+                                height: 64,
+                                borderRadius: '50%',
+                                backgroundColor: 'rgba(0,0,0,0.6)',
+                                border: '2px solid white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: '24px',
+                                paddingLeft: '4px' // Optical center for play triangle
+                            }}>
+                                ▶
+                            </div>
+                        )}
+                        
+                        {/* Hybrid Badge */}
+                        <div style={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            padding: '4px 8px',
+                            backgroundColor: 'rgba(255, 165, 0, 0.8)',
+                            borderRadius: 4,
+                            fontSize: 12,
+                            color: 'black',
+                            fontWeight: 'bold',
+                            pointerEvents: 'none'
+                        }}>
+                            HYBRID AUDIO
+                        </div>
+
+                        {/* Cast Button */}
+                        <div style={{
+                            position: 'absolute',
+                            top: 16,
+                            left: 16,
+                            pointerEvents: 'auto'
+                        }}>
+                            <CastButton />
+                        </div>
+
+
+                        {/* Bottom Controls Bar */}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                padding: '20px',
+                                background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px',
+                                cursor: 'default',
+                                opacity: showControls ? 1 : 0,
+                                transition: 'opacity 0.3s ease'
+                            }}
+                            onClick={(e) => e.stopPropagation()} // Prevent play/pause toggle
+                        >
+                            {/* Seek Bar */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                                <span style={{ color: 'white', fontSize: '12px', minWidth: '40px' }}>
+                                    {new Date(hybridCurrentTime * 1000).toISOString().slice(14, 19)}
+                                </span>
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={hybridDuration || 100}
+                                    value={hybridCurrentTime}
+                                    onChange={(e) => {
+                                        const time = parseFloat(e.target.value)
+                                        setHybridCurrentTime(time)
+                                        handleHybridSeek(time)
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        height: '4px',
+                                        accentColor: 'orange',
+                                        cursor: 'pointer'
+                                    }}
+                                />
+                                <span style={{ color: 'white', fontSize: '12px', minWidth: '40px' }}>
+                                    {new Date((hybridDuration || 0) * 1000).toISOString().slice(14, 19)}
+                                </span>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+                                <span>Press space to play/pause</span>
+                                <span>← → to seek</span>
+                                <span>F for fullscreen</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         )
     }
 

@@ -1,91 +1,178 @@
 /**
  * Route Preloader Utility
- * Preloads route chunks to make transitions instant
+ * 
+ * Preloads routes that are likely to be accessed soon to improve perceived performance.
+ * This helps with code-split routes by loading them in the background.
  */
 
-type RoutePreloader = () => Promise<any>
-
-// Map of route paths to their preload functions
-const routePreloaders: Record<string, RoutePreloader> = {
-  '/': () => import('../pages/LandingPage'),
-  '/signin': () => import('../pages/auth/SignInPage'),
-  '/register': () => import('../pages/auth/SignUpPage'),
-  '/profiles': () => import('../pages/ProfilesPage'),
-  '/settings': () => import('../pages/SettingsPage'),
-  '/settings/explore-addons': () => import('../pages/ExploreAddonsPage'),
-  'streaming-home': () => import('../pages/streaming/Home'),
-  'streaming-explore': () => import('../pages/streaming/Explore'),
-  'streaming-library': () => import('../pages/streaming/Library'),
-  'streaming-search': () => import('../pages/streaming/Search'),
-  'streaming-catalog': () => import('../pages/streaming/Catalog'),
-  'streaming-details': () => import('../pages/streaming/Details'),
-  'streaming-player': () => import('../pages/streaming/Player'),
-}
-
-// Track which routes have been preloaded
-const preloadedRoutes = new Set<string>()
+type PreloadRoute = () => Promise<any>
 
 /**
- * Preload a specific route chunk
+ * Routes to preload after the app mounts.
+ * These are ordered by likelihood of being accessed.
  */
-export function preloadRoute(routeKey: string): void {
-  if (preloadedRoutes.has(routeKey)) {
-    return // Already preloaded
-  }
-
-  const preloader = routePreloaders[routeKey]
-  if (preloader) {
-    preloader()
-      .then(() => {
-        preloadedRoutes.add(routeKey)
-      })
-      .catch((error) => {
-        console.warn(`Failed to preload route: ${routeKey}`, error)
-      })
-  }
-}
-
-/**
- * Preload multiple routes
- */
-export function preloadRoutes(routeKeys: string[]): void {
-  routeKeys.forEach(preloadRoute)
-}
-
-/**
- * Preload routes based on user navigation patterns
- * Call this on mount or after successful auth
- */
-export function preloadCommonRoutes(): void {
-  // Preload frequently accessed routes after initial load
-  setTimeout(() => {
-    preloadRoutes([
-      '/profiles',
-      '/settings',
-      'streaming-home',
-      'streaming-explore',
-    ])
-  }, 1000) // Wait 1 second to not interfere with initial page load
-}
-
-/**
- * Hook to preload route on element hover (link prefetching)
- */
-export function createHoverPreloader(routeKey: string) {
-  let hasPreloaded = false
+const ROUTES_TO_PRELOAD: PreloadRoute[] = [
+  // Most common routes first
+  () => import('../pages/streaming/Home'),
+  () => import('../pages/streaming/Explore'),
+  () => import('../pages/streaming/Library'),
+  () => import('../pages/streaming/Search'),
   
-  return {
-    onMouseEnter: () => {
-      if (!hasPreloaded) {
-        preloadRoute(routeKey)
-        hasPreloaded = true
-      }
-    },
-    onFocus: () => {
-      if (!hasPreloaded) {
-        preloadRoute(routeKey)
-        hasPreloaded = true
-      }
-    },
+  // Secondary routes
+  () => import('../pages/streaming/Details'),
+  () => import('../pages/SettingsPage'),
+  () => import('../pages/ProfilesPage'),
+  
+  // Less common routes
+  () => import('../pages/ExploreAddonsPage'),
+]
+
+/**
+ * Preloads common routes in the background after a small delay.
+ * This ensures the initial render is not blocked while still improving
+ * navigation speed for common user flows.
+ */
+export function preloadCommonRoutes() {
+  // Delay preloading to allow initial render to complete
+  const PRELOAD_DELAY = 2000 // 2 seconds
+
+  const timer = setTimeout(() => {
+    // Use requestIdleCallback if available to load during browser idle periods
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        preloadRoutesWithIdleCallback()
+      }, { timeout: 5000 })
+    } else {
+      // Fallback: preload after delay
+      preloadRoutesWithTimeout()
+    }
+  }, PRELOAD_DELAY)
+
+  return () => clearTimeout(timer)
+}
+
+/**
+ * Preloads routes using requestIdleCallback for optimal performance
+ */
+function preloadRoutesWithIdleCallback() {
+  let index = 0
+
+  function preloadNext() {
+    if (index >= ROUTES_TO_PRELOAD.length) return
+
+    const route = ROUTES_TO_PRELOAD[index]
+    index++
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(
+        () => {
+          route().catch(() => {
+            // Silently ignore preload errors - they'll be caught on actual navigation
+          })
+          preloadNext()
+        },
+        { timeout: 3000 }
+      )
+    }
   }
+
+  preloadNext()
+}
+
+/**
+ * Preloads routes with a staggered timeout
+ * Used as fallback when requestIdleCallback is not available
+ */
+function preloadRoutesWithTimeout() {
+  ROUTES_TO_PRELOAD.forEach((route, index) => {
+    const delay = index * 500 // Stagger by 500ms
+    
+    setTimeout(() => {
+      route().catch(() => {
+        // Silently ignore preload errors
+      })
+    }, delay)
+  })
+}
+
+/**
+ * Preloads a specific route immediately
+ * Useful for prefetching routes when the user hovers over a link
+ */
+export function preloadRoute(routeLoader: PreloadRoute) {
+  // Use requestIdleCallback if available
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => {
+      routeLoader().catch(() => {})
+    })
+  } else {
+    // Fallback: setTimeout with small delay
+    setTimeout(() => {
+      routeLoader().catch(() => {})
+    }, 100)
+  }
+}
+
+/**
+ * Creates hover-based preloader for routes
+ * Used by Navbar to preload routes when user hovers over navigation items
+ */
+export function createHoverPreloader(routeName: string) {
+  let preloadTriggered = false
+
+  const handleMouseEnter = () => {
+    if (preloadTriggered || !shouldPreload()) return
+    preloadTriggered = true
+    
+    // Map route names to actual imports
+    const routeMap: Record<string, PreloadRoute> = {
+      'streaming-home': () => import('../pages/streaming/Home'),
+      'streaming-explore': () => import('../pages/streaming/Explore'),
+      'streaming-library': () => import('../pages/streaming/Library'),
+      'streaming-search': () => import('../pages/streaming/Search'),
+      '/profiles': () => import('../pages/ProfilesPage'),
+    }
+
+    const routeLoader = routeMap[routeName]
+    if (routeLoader) {
+      preloadRoute(routeLoader)
+    }
+  }
+
+  const handleFocus = () => {
+    handleMouseEnter()
+  }
+
+  return {
+    onMouseEnter: handleMouseEnter,
+    onFocus: handleFocus,
+  }
+}
+
+/**
+ * Preloads the player page with higher priority
+ * This should be called when the user clicks on a content item
+ */
+export function preloadPlayer() {
+  // Higher priority preload - load immediately but non-blocking
+  requestAnimationFrame(() => {
+    import('../pages/streaming/Player').catch(() => {})
+  })
+}
+
+/**
+ * Connection-aware preloading
+ * Only preload if the user has a good connection
+ */
+export function shouldPreload() {
+  const connection = (navigator as any).connection
+  if (!connection) return true // Assume true if API not available
+
+  // Don't preload on slow connections or if data saver is enabled
+  if (connection.saveData) return false
+  if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') {
+    return false
+  }
+
+  return true
 }

@@ -31,10 +31,12 @@ class SmtpProvider implements EmailProvider {
     secure: boolean
     auth: { user: string; pass: string }
   } | string) {
+    // Keep SMTP timeouts short in production; slow/unreachable SMTP shouldn't block auth flows.
+    const timeoutMs = Number(process.env.EMAIL_SMTP_TIMEOUT_MS ?? 8000)
     const defaults = {
-      connectionTimeout: 30000, // 30 seconds
-      greetingTimeout: 30000,   // 30 seconds
-      socketTimeout: 30000      // 30 seconds
+      connectionTimeout: timeoutMs,
+      greetingTimeout: timeoutMs,
+      socketTimeout: timeoutMs
     }
 
     if (typeof config === 'string') {
@@ -55,13 +57,17 @@ class SmtpProvider implements EmailProvider {
     try {
       // Wrap sendMail in a promise race to enforce a strict timeout
       // (in case nodemailer's internal timeouts fail to trigger)
+      const hardTimeoutMs = Number(process.env.EMAIL_SEND_TIMEOUT_MS ?? 10000)
       await Promise.race([
         this.transporter.sendMail({
           ...options,
           envelope: { from: options.from, to: options.to }
         }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('SMTP sendMail timed out after 35s')), 35000)
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`SMTP sendMail timed out after ${hardTimeoutMs}ms`)),
+            hardTimeoutMs
+          )
         )
       ])
       console.log(`[email] sent to ${options.to} in ${Date.now() - start}ms`)
@@ -121,44 +127,121 @@ class DevFallbackProvider implements EmailProvider {
 // =============================================================================
 
 class EmailService {
-  private provider?: EmailProvider
+  private providers?: EmailProvider[]
+  private providerLastFailure = new Map<string, number>()
 
-  private getProvider(): EmailProvider {
-    if (this.provider) return this.provider
+  private getProviderBackoffMs(): number {
+    return Number(process.env.EMAIL_PROVIDER_BACKOFF_MS ?? 5 * 60 * 1000) // 5 minutes
+  }
 
-    // Priority 1: SMTP URL
+  private inBackoff(providerName: string): boolean {
+    const last = this.providerLastFailure.get(providerName)
+    if (!last) return false
+    return Date.now() - last < this.getProviderBackoffMs()
+  }
+
+  private markFailure(providerName: string) {
+    this.providerLastFailure.set(providerName, Date.now())
+  }
+
+  private buildProviders(): EmailProvider[] {
     const smtpUrl = (process.env.SMTP_URL || process.env.EMAIL_URL || '').trim()
-    if (smtpUrl) {
-      console.log('[email] Using SMTP provider (URL)')
-      this.provider = new SmtpProvider(smtpUrl)
-      return this.provider
-    }
 
-    // Priority 2: SMTP individual settings
-    const host = process.env.EMAIL_HOST || ''
-    const user = process.env.EMAIL_USER || ''
-    const pass = process.env.EMAIL_PASS || ''
-    if (host && user && pass) {
+    const host = (process.env.EMAIL_HOST || '').trim()
+    const user = (process.env.EMAIL_USER || '').trim()
+    const pass = (process.env.EMAIL_PASS || '').trim()
+
+    const resendApiKey = (process.env.RESEND_API_KEY || '').trim()
+
+    const smtpConfigured = !!smtpUrl || (!!host && !!user && !!pass)
+    const resendConfigured = !!resendApiKey
+
+    // Selection:
+    // - EMAIL_PROVIDER=resend|smtp|auto (default auto)
+    // - auto prefers Resend if configured (fast, no SMTP networking), else SMTP
+    const pref = (process.env.EMAIL_PROVIDER || 'auto').trim().toLowerCase()
+
+    const smtpProvider = () => {
+      if (smtpUrl) {
+        console.log('[email] Using SMTP provider (URL)')
+        return new SmtpProvider(smtpUrl)
+      }
       const port = parseInt(process.env.EMAIL_PORT || '587', 10)
       const secure = process.env.EMAIL_SECURE !== undefined
         ? process.env.EMAIL_SECURE === 'true'
         : port === 465
       console.log(`[email] Using SMTP provider (${host}:${port})`)
-      this.provider = new SmtpProvider({ host, port, secure, auth: { user, pass } })
-      return this.provider
+      return new SmtpProvider({ host, port, secure, auth: { user, pass } })
     }
 
-    // Priority 3: Resend
-    const resendApiKey = (process.env.RESEND_API_KEY || '').trim()
-    if (resendApiKey) {
+    const resendProvider = () => {
       console.log('[email] Using Resend provider')
-      this.provider = new ResendProvider(resendApiKey)
-      return this.provider
+      return new ResendProvider(resendApiKey)
     }
 
-    // Fallback: Dev mode (no actual emails sent)
-    this.provider = new DevFallbackProvider()
-    return this.provider
+    const providers: EmailProvider[] = []
+
+    const pushSmtp = () => {
+      if (smtpConfigured) providers.push(smtpProvider())
+    }
+    const pushResend = () => {
+      if (resendConfigured) providers.push(resendProvider())
+    }
+
+    if (pref === 'resend') {
+      pushResend()
+      pushSmtp()
+    } else if (pref === 'smtp') {
+      pushSmtp()
+      pushResend()
+    } else {
+      // auto
+      if (resendConfigured) pushResend()
+      else pushSmtp()
+      // Add the other as failover
+      if (providers.length === 0) {
+        pushSmtp()
+        pushResend()
+      } else if (providers[0].name === 'Resend') {
+        pushSmtp()
+      } else {
+        pushResend()
+      }
+    }
+
+    if (providers.length === 0) {
+      // Fallback: Dev mode (no actual emails sent)
+      providers.push(new DevFallbackProvider())
+    }
+
+    return providers
+  }
+
+  private getProviders(): EmailProvider[] {
+    if (!this.providers) {
+      this.providers = this.buildProviders()
+    }
+    return this.providers
+  }
+
+  private async sendViaProviders(options: SendMailOptions): Promise<void> {
+    let lastErr: unknown = null
+
+    for (const provider of this.getProviders()) {
+      if (this.inBackoff(provider.name)) {
+        continue
+      }
+
+      try {
+        await provider.sendMail(options)
+        return
+      } catch (e) {
+        lastErr = e
+        this.markFailure(provider.name)
+      }
+    }
+
+    throw (lastErr instanceof Error ? lastErr : new Error('Failed to send email (all providers failed)'))
   }
 
   // Strict, conservative recipient validation
@@ -191,7 +274,7 @@ class EmailService {
       const { appUrl, from } = this.getEmailConfig()
       const to = this.validateRecipient(email)
       
-      await this.getProvider().sendMail({
+      await this.sendViaProviders({
         from,
         to,
         subject: 'Your secure sign-in link • Zentrio',
@@ -231,7 +314,7 @@ class EmailService {
       const { appUrl, from } = this.getEmailConfig()
       const to = this.validateRecipient(email)
       
-      await this.getProvider().sendMail({
+      await this.sendViaProviders({
         from,
         to,
         subject: 'Your verification code • Zentrio',
@@ -269,7 +352,7 @@ class EmailService {
       const { appUrl, from } = this.getEmailConfig()
       const to = this.validateRecipient(email)
       
-      await this.getProvider().sendMail({
+      await this.sendViaProviders({
         from,
         to,
         subject: 'Welcome to Zentrio 🎬',
@@ -307,7 +390,7 @@ class EmailService {
       const { appUrl, from } = this.getEmailConfig()
       const to = this.validateRecipient(email)
       
-      await this.getProvider().sendMail({
+      await this.sendViaProviders({
         from,
         to,
         subject: 'Verify your email • Zentrio',
@@ -347,7 +430,7 @@ class EmailService {
       const { appUrl, from } = this.getEmailConfig()
       const to = this.validateRecipient(email)
       
-      await this.getProvider().sendMail({
+      await this.sendViaProviders({
         from,
         to,
         subject: 'Reset your password • Zentrio',
@@ -392,7 +475,7 @@ class EmailService {
       const { appUrl, from } = this.getEmailConfig()
       const to = this.validateRecipient(recipientEmail)
       
-      await this.getProvider().sendMail({
+      await this.sendViaProviders({
         from,
         to,
         subject: `${senderName} shared a list with you • Zentrio`,

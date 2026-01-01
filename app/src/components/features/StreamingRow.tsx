@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { MetaPreview } from '../../services/addons/types'
@@ -23,8 +23,9 @@ interface StreamingRowProps {
 /**
  * Horizontal scrollable row of media items.
  * Used for Continue Watching, Top 10, and similar static rows.
+ * Memoized to prevent unnecessary re-renders.
  */
-export function StreamingRow({ 
+export const StreamingRow = memo(function StreamingRow({
   title, 
   items, 
   profileId, 
@@ -56,7 +57,7 @@ export function StreamingRow({
   } = useScrollRow({ items: rowItems })
 
   // Handle item removal (for continue watching)
-  const handleRemove = async (item: ContentItem) => {
+  const handleRemove = useCallback(async (item: ContentItem) => {
     // Optimistic update
     setRowItems(prev => prev.filter(i => i.id !== item.id))
     
@@ -68,10 +69,10 @@ export function StreamingRow({
     } catch (e) {
       console.error("Failed to remove progress", e)
     }
-  }
+  }, [profileId])
 
   // Handle item click - prevent if dragging, auto-play for continue watching
-  const handleItemClick = (e: React.MouseEvent, item: ContentItem) => {
+  const handleItemClick = useCallback((e: React.MouseEvent, item: ContentItem) => {
     if (isDragging()) {
       e.preventDefault()
       e.stopPropagation()
@@ -110,7 +111,7 @@ export function StreamingRow({
       
       return false
     }
-  }
+  }, [isContinueWatching, isDragging, startAutoPlay, profileId])
 
   return (
     <div className={styles.contentRow}>
@@ -135,8 +136,8 @@ export function StreamingRow({
           style={{ cursor: isDown ? 'grabbing' : 'grab', userSelect: 'none' }}
         >
           {rowItems.map((item, index) => (
-            <ContentCard 
-              key={item.id}
+            <ContentCard
+              key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
               item={item}
               profileId={profileId}
               showImdbRatings={showImdbRatings}
@@ -160,4 +161,15 @@ export function StreamingRow({
       </div>
     </div>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if items, title, or key props change
+  return (
+    prevProps.items === nextProps.items &&
+    prevProps.title === nextProps.title &&
+    prevProps.profileId === nextProps.profileId &&
+    prevProps.showImdbRatings === nextProps.showImdbRatings &&
+    prevProps.showAgeRatings === nextProps.showAgeRatings &&
+    prevProps.isContinueWatching === nextProps.isContinueWatching &&
+    prevProps.isRanked === nextProps.isRanked
+  )
+})

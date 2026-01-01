@@ -153,8 +153,8 @@ export const StreamingSearch = () => {
                 <div style={{ padding: '60px', color: '#aaa', fontSize: '1.2rem' }}>No results found for "{query}".</div>
             ) : (
                 <div className={styles.mediaGrid}>
-                    {results.map(item => (
-                        <a key={item.id} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
+                    {results.map((item, index) => (
+                        <a key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
                             <div className={styles.posterContainer}>
                                 {item.poster ? (
                                     <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />

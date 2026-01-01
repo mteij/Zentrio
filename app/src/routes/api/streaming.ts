@@ -481,7 +481,7 @@ streaming.get('/catalog-items', async (c) => {
   try {
     const items = await addonManager.getSingleCatalog(
       parseInt(profileId),
-      decodeURIComponent(manifestUrl),
+      manifestUrl,
       type,
       id
     )
