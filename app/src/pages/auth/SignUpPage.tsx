@@ -1,10 +1,26 @@
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 import { AuthForms } from "../../components/auth/AuthForms";
 import { ParticleBackground } from "../../components/ui/ParticleBackground";
 import { isTauri } from "../../lib/auth-client";
 import { BackButton } from "../../components/ui/BackButton";
 
 export function SignUpPage() {
+  // Force reload if cross-origin isolated (breaks password managers)
+  useEffect(() => {
+      if (window.crossOriginIsolated) {
+          console.log('[SignUp] Cross-origin isolated, reloading to disable for extensions...')
+           if (!sessionStorage.getItem('reloading_for_extensions')) {
+              sessionStorage.setItem('reloading_for_extensions', 'true')
+              window.location.reload()
+          } else {
+               sessionStorage.removeItem('reloading_for_extensions')
+          }
+      } else {
+          sessionStorage.removeItem('reloading_for_extensions')
+      }
+  }, [])
+
   const handleChangeServer = () => {
     localStorage.removeItem("zentrio_server_url");
     localStorage.removeItem("zentrio_app_mode");

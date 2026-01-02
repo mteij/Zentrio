@@ -67,10 +67,19 @@ export const securityHeaders = async (c: Context, next: Next) => {
   c.header('X-Content-Type-Options', 'nosniff')
   c.header('X-XSS-Protection', '1; mode=block')
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
-  // same-origin-allow-popups enables SharedArrayBuffer while allowing extension popups
-  c.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-  c.header('Cross-Origin-Embedder-Policy', 'credentialless')
-  c.header('Cross-Origin-Resource-Policy', 'cross-origin')
+  
+  // Conditional Isolation Headers - ENABLED ONLY FOR PLAYER
+  // Regex to match /streaming/:profileId/player
+  // We check c.req.path
+  const isPlayerRoute = /^\/streaming\/[^/]+\/player/.test(c.req.path)
+
+  if (isPlayerRoute) {
+    // same-origin-allow-popups enables SharedArrayBuffer while allowing extension popups
+    // (Though for max FFMPEG stability, strict 'same-origin' might be better, but we stick to allow-popups for now)
+    c.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+    c.header('Cross-Origin-Embedder-Policy', 'credentialless')
+    c.header('Cross-Origin-Resource-Policy', 'cross-origin')
+  }
 
   // Avoid overriding proxy responses
   const alreadyProxied = c.res?.headers?.get('X-Zentrio-Proxy')

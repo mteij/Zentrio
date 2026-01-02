@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import styles from '../../styles/Player.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import { isTauri } from '../../lib/auth-client'
 
 // Threshold for "short video" warning (videos under 5 minutes)
 const SHORT_VIDEO_THRESHOLD = 300 // 5 minutes in seconds
@@ -95,6 +96,28 @@ export const StreamingPlayer = () => {
     // Trakt scrobbling state
     const traktScrobbleStartedRef = useRef(false)
     const lastScrobbleProgressRef = useRef(0)
+
+    // Force reload if not cross-origin isolated (needed for FFMPEG)
+    useEffect(() => {
+        // Skip for Tauri (uses native playback)
+        if (isTauri()) return
+
+        if (!window.crossOriginIsolated) {
+            console.log('[Player] Not cross-origin isolated, reloading to enable...')
+            // Prevent infinite reload loops with a session storage flag, although the server should handle it
+            if (!sessionStorage.getItem('reloading_for_isolation')) {
+                sessionStorage.setItem('reloading_for_isolation', 'true')
+                window.location.reload()
+            } else {
+                 // If we reloaded and still failed, clear the flag to avoid getting stuck, but log error
+                 console.error('[Player] Failed to enable isolation after reload')
+                 sessionStorage.removeItem('reloading_for_isolation')
+            }
+        } else {
+            // We are isolated, clear the flag
+            sessionStorage.removeItem('reloading_for_isolation')
+        }
+    }, [])
 
     // Parse URL params or location state
     useEffect(() => {
