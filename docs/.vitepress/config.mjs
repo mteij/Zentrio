@@ -18,7 +18,17 @@ export default defineConfig({
         items: [
           { text: 'Usage', link: '/usage' },
           { text: 'Trakt Integration', link: '/trakt' },
-          { text: 'Self Hosting', link: '/self-hosting' },
+          { 
+            text: 'Self Hosting', 
+            link: '/self-hosting',
+            collapsed: false,
+            items: [
+              { text: 'Google SSO', link: '/self-hosting/sso/google' },
+              { text: 'Discord SSO', link: '/self-hosting/sso/discord' },
+              { text: 'GitHub SSO', link: '/self-hosting/sso/github' },
+              { text: 'Authentik SSO', link: '/self-hosting/sso/authentik' }
+            ]
+          },
           { text: 'Development', link: '/development' },
           { text: 'Contributing', link: '/contributing' },
           { text: 'Story', link: '/story' }

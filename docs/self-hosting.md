@@ -47,19 +47,14 @@ Required for password resets and invitations.
 
 Zentrio supports OIDC for social login.
 
-#### Setup
+See the specific guides for setting up each provider:
 
-1. Create an OAuth app with your provider (e.g., Google, GitHub).
-2. Set the callback URL to `https://your-domain.com/api/auth/callback/{provider}`.
-3. Add the provider configuration to your `.env`:
+- [Google](./self-hosting/sso/google.md)
+- [Discord](./self-hosting/sso/discord.md)
+- [GitHub](./self-hosting/sso/github.md)
+- [Authentik](./self-hosting/sso/authentik.md)
 
-```bash
-# Example: Google
-AUTH_GOOGLE_ID=your-client-id
-AUTH_GOOGLE_SECRET=your-client-secret
-```
-
-Supported providers: `GOOGLE`, `GITHUB`, `DISCORD`. Prefix variables with `AUTH_{PROVIDER}_`.
+Supported providers: `GOOGLE`, `GITHUB`, `DISCORD`, `AUTHENTIK`. Prefix variables with `AUTH_{PROVIDER}_`.
 
 ## Docker Compose
 
