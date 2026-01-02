@@ -1,9 +1,8 @@
 name: Build Tauri App
 
 on:
-  push:
-    branches:
-      - main
+  repository_dispatch:
+    types: [tauri-build]
   workflow_call:
     inputs:
       version:
@@ -11,6 +10,11 @@ on:
         required: false
         type: string
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (optional, defaults to package.json)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -34,7 +38,9 @@ jobs:
       - name: Get version
         id: version
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
+          if [ -n "${{ github.event.client_payload.version }}" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+          elif [ -n "${{ inputs.version }}" ]; then
             VERSION="${{ inputs.version }}"
           else
             VERSION=$(node -e "console.log(require('./app/package.json').version)")
@@ -53,19 +59,10 @@ jobs:
           if gh release view "$TAG" > /dev/null 2>&1; then
             echo "✅ Release $TAG already exists"
           else
-            # If triggered by push to main, create a draft release
-            if [ "${{ github.event_name }}" = "push" ]; then
-              echo "📦 Creating draft release $TAG"
-              gh release create "$TAG" \
-                --draft \
-                --title "Zentrio $TAG" \
-                --notes "🚀 Release in progress... Build artifacts are being generated for all platforms (Windows, macOS, Linux, Android, iOS). This release will be updated automatically once all builds complete."
-            else
-              # If triggered by workflow_dispatch (from release.yml), the release should exist
-              echo "❌ Release $TAG does not exist. This workflow should be triggered by release.yml which creates the release first."
-              echo "Please ensure the release.yml workflow runs before this one."
-              exit 1
-            fi
+            echo "❌ Release $TAG does not exist."
+            echo "This workflow should be triggered by release.yml which creates the release first."
+            echo "If running manually, ensure the release tag v$VERSION exists."
+            exit 1
           fi
 
       - name: Get Release ID
