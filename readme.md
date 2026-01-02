@@ -1,7 +1,5 @@
 # Zentrio
 
-## <b>Please do not currently use! Under heavy development</b>
-
 <div align="center">
   <img src="app/public/static/logo/icon-512.png" alt="Zentrio Icon" width="256" height="256" />
 
@@ -23,9 +21,7 @@
 <details>
 <summary><font size="+2"><b>⚠️ Disclaimer: Built with AI</b></font></summary>
 
-Zentrio was built with substantial assistance from AI tooling, guided by an engineering student exploring what these tools make possible.
-
-Although the project is maintained with care, it remains experimental and may contain imperfections. **Please use it at your own risk.**
+Zentrio was built with substantial assistance from AI tooling, guided by an engineering student exploring what these tools make possible. I invite everyone to try Zentrio with the thought that it might contain imperfections. **Please use it at your own risk.**
 
 </details>
 
@@ -40,28 +36,15 @@ For deployment, self-hosting, and development setup instructions, refer to the d
 
 ## 📖 What is Zentrio?
 
-Zentrio is a modern, self-hosted streaming platform that brings your content together. Built as a standalone application with a focus on user experience, customization, and privacy.
+Zentrio is a modern, self-hosted streaming platform improving upon similar existing platforms with features like multi-profile support, a Stremio compatible addon system and a downloads feature (Coming soon).
 
-### ✨ Features
+### The story behind Zentrio
 
-- **👥 Multi-Profile Support** - Create separate profiles with unique preferences, watch history, and settings
-- **🎨 Modern UI** - A clean, glassmorphic interface designed for immersion
-- **🧩 Addon Ecosystem** - Extend functionality with community addons (Stremio-compatible)
-- **📱 Cross-Platform** - Web, Desktop (Windows/macOS/Linux), Android, iOS, and PWA
-- **☁️ Cloud Sync** - Sync your settings and progress across devices
-- **🔐 Flexible Auth** - Email/password, OAuth (Google, GitHub, Discord), and 2FA support
-- **🎬 Built-in Player** - Stream content with HLS, DASH, and direct playback support
-- **🔒 Privacy-Focused** - Self-host your data, encrypted and secure
+Zentrio started as a weekend project inspired by a [community feature request](https://github.com/Stremio/stremio-features/issues/622) for profile management. Initially it was an application that proxied stremio web in a hacky way while allowing users to switch profiles easily. However, after stumbling upon the limitations of this concept, I decided to build a standalone platform to my liking.
 
-<!-- <div align="center">
-  <img src="app/public/static/media/profiles.png" alt="Zentrio Profiles" width="800" />
-</div> -->
+### Vibe-coding and my POV
 
-## 📜 Origin Story
-
-Zentrio started as a weekend project inspired by a [community feature request](https://github.com/Stremio/stremio-features/issues/622) for profile management. What began as a simple profile switcher evolved into something much larger.
-
-As development progressed, the vision expanded beyond its original scope. A truly great experience required more than just profile switching—it needed a dedicated interface, better content discovery, and a cohesive design. Today, Zentrio stands as its own independent streaming platform with support for community addons.
+Zentrio was made possible by todays modern technologies and AI tools, insinuating that Zentrio is largly vibe coded and more a proof of concept for AI in software development than a finished product. Feel free to enjoy Zentrio or stay far away if you are critical about this.
 
 ## 📄 License
 
