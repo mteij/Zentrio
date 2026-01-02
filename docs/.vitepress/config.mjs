@@ -17,7 +17,6 @@ export default defineConfig({
         text: 'Documentation',
         items: [
           { text: 'Usage', link: '/usage' },
-          { text: 'Trakt Integration', link: '/trakt' },
           { 
             text: 'Self Hosting', 
             link: '/self-hosting',
@@ -30,8 +29,7 @@ export default defineConfig({
             ]
           },
           { text: 'Development', link: '/development' },
-          { text: 'Contributing', link: '/contributing' },
-          { text: 'Story', link: '/story' }
+          { text: 'Contributing', link: '/contributing' }
         ]
       }
     ],
