@@ -4,6 +4,9 @@
  * Transcodes unsupported audio codecs (DTS, TrueHD, etc.) to AAC
  * using FFmpeg WASM, enabling playback in any browser.
  *
+ * IMPORTANT: This service is NOT supported in Tauri apps.
+ * Tauri uses native system decoders which support more codecs than browsers.
+ *
  * Architecture:
  * 1. Receives audio stream URL + codec info
  * 2. Downloads audio data in chunks
@@ -14,6 +17,14 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 import type { MediaMetadata, MediaStream, MediaFormat } from './types'
+
+/**
+ * Check if running in Tauri environment
+ */
+function isTauriEnvironment(): boolean {
+  return typeof window !== 'undefined' &&
+         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+}
 
 // Codec ID constants matching HybridEngine
 const CODEC_ID_DTS = 86020
@@ -87,8 +98,15 @@ class TranscoderServiceClass {
 
   /**
    * Load FFmpeg WASM module
+   *
+   * IMPORTANT: Will throw an error if called in Tauri environment
    */
   async load(): Promise<void> {
+    // Guard: Hybrid playback is not supported in Tauri
+    if (isTauriEnvironment()) {
+      throw new Error('FFmpeg WASM is not supported in Tauri apps. Use native playback instead.')
+    }
+
     if (this.isLoaded) return
     if (this.loadPromise) return this.loadPromise
 
@@ -477,8 +495,15 @@ class TranscoderServiceClass {
 
   /**
    * Check if transcoding is supported in this browser
+   *
+   * IMPORTANT: Always returns false in Tauri environment
    */
   isSupported(): boolean {
+    // Transcoding is not supported in Tauri
+    if (isTauriEnvironment()) {
+      return false
+    }
+    
     // Check for SharedArrayBuffer (required for FFmpeg WASM)
     return typeof SharedArrayBuffer !== 'undefined'
   }

@@ -108,7 +108,18 @@ export class AddonClient {
     // videoHash is optional but often used for OpenSubtitles
     const hashPart = videoHash ? `/${videoHash}` : ''
     const url = `${this.baseUrl}/subtitles/${type}/${id}${hashPart}.json`
-    return this.fetchResource<Subtitle[]>(url, 'subtitles')
+    
+    const addonName = this.manifest?.name || 'Unknown'
+    console.log(`[AddonClient] ${addonName} fetching subtitles from: ${url}`)
+    
+    try {
+      const result = await this.fetchResource<Subtitle[]>(url, 'subtitles')
+      console.log(`[AddonClient] ${addonName} returned ${Array.isArray(result) ? result.length : 0} subtitles`)
+      return result
+    } catch (e) {
+      console.error(`[AddonClient] ${addonName} failed to fetch subtitles:`, e)
+      throw e
+    }
   }
 
   private async fetchResource<T>(url: string, extractKey: keyof AddonResponse<any>): Promise<T> {

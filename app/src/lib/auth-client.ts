@@ -27,9 +27,15 @@ export const isTauri = () => {
 export const getServerUrl = () => {
   if (typeof window === "undefined") return "http://localhost:3000";
 
-  // In development, ALWAYS use the local proxy (current origin) to avoid CORS issues
-  // The proxy in vite.config.ts will forward /api requests to http://localhost:3000
+  // In development mode...
   if (import.meta.env.DEV) {
+    // In Tauri (desktop or Android), use localhost:3000 directly
+    // On Android, this works with ADB reverse port forwarding
+    // On desktop, this also works as the server runs locally
+    if (isTauri()) {
+      return "http://localhost:3000";
+    }
+    // In web browser dev mode, use same origin (Vite proxy handles /api)
     return window.location.origin;
   }
 
@@ -58,13 +64,40 @@ export const getClientUrl = () => {
 
 // Safe fetch wrapper that uses Tauri HTTP plugin in Tauri context
 const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    console.log('[safeFetch] Request to:', url, init?.method || 'GET');
+    
     if (isTauri()) {
         try {
-            const { fetch } = await import('@tauri-apps/plugin-http');
-            return fetch(input, init);
-        } catch (e) {
-            console.error('Failed to load Tauri HTTP plugin', e);
-            // Fallback to native fetch
+            const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+            console.log('[safeFetch] Using Tauri HTTP plugin');
+            
+            // Ensure headers are properly passed
+            const headers = new Headers(init?.headers);
+            
+            // Set default Content-Type for JSON if body exists and not already set
+            if (init?.body && !headers.has('Content-Type')) {
+                if (typeof init.body === 'string') {
+                    try {
+                        JSON.parse(init.body);
+                        headers.set('Content-Type', 'application/json');
+                    } catch {
+                        // Not JSON, don't set
+                    }
+                }
+            }
+            
+            const response = await tauriFetch(url, {
+                ...init,
+                headers,
+            });
+            console.log('[safeFetch] Response status:', response.status);
+            return response;
+        } catch (e: any) {
+            console.error('[safeFetch] Tauri HTTP plugin error:', e);
+            console.error('[safeFetch] Error details:', e?.message || e?.toString?.() || JSON.stringify(e));
+            // Re-throw with more context instead of silent fallback
+            throw new Error(`Network request failed: ${e?.message || 'Unknown error'} (URL: ${url})`);
         }
     }
     return fetch(input, init);

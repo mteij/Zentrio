@@ -32,6 +32,8 @@ export const auth = betterAuth({
             "zentrio://",
             "http://localhost:3000",
             "http://localhost:5173",
+            "http://tauri.localhost",
+            "https://tauri.localhost",
             cfg.APP_URL,
             cfg.CLIENT_URL
         ].filter(Boolean) as string[]

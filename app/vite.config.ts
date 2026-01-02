@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Check if building for Tauri (native app)
+const isTauriBuild = process.env.TAURI === 'true' || process.argv.includes('--tauri')
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -13,7 +16,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: [
       // FFmpeg WASM needs to be excluded for proper loading
-      '@ffmpeg/ffmpeg', 
+      '@ffmpeg/ffmpeg',
       '@ffmpeg/util',
     ],
   },
@@ -41,7 +44,8 @@ export default defineConfig({
           }
           
           // Split FFmpeg WASM and libav.js - these are huge
-          if (id.includes('node_modules/@ffmpeg') || id.includes('node_modules/@libav')) {
+          // EXCLUDE from Tauri builds - not needed for native playback
+          if (!isTauriBuild && (id.includes('node_modules/@ffmpeg') || id.includes('node_modules/@libav'))) {
             return 'ffmpeg-vendor'
           }
           
@@ -68,6 +72,8 @@ export default defineConfig({
       },
     },
   },
+  // Exclude FFmpeg WASM files from being copied to dist in Tauri builds
+  publicDir: isTauriBuild ? false : 'public',
   server: {
     host: true, // Listen on all network interfaces for Tauri Android
     port: 5173,

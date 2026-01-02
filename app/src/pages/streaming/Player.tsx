@@ -130,7 +130,14 @@ export const StreamingPlayer = () => {
 
                 // Load inline subtitles from stream
                 const tracks: typeof subtitleTracks = []
+                console.log('[Player] === Starting subtitle loading ===')
+                console.log('[Player] Content ID:', parsedMeta.id)
+                console.log('[Player] Content Type:', parsedMeta.type)
+                console.log('[Player] Profile ID:', profileId)
+                console.log('[Player] Stream subtitles:', parsedStream.subtitles)
+                
                 if (parsedStream.subtitles && Array.isArray(parsedStream.subtitles)) {
+                    console.log('[Player] Processing inline subtitles, count:', parsedStream.subtitles.length)
                     parsedStream.subtitles.forEach((sub: { url: string; lang: string }, i: number) => {
                         if (sub?.url) {
                             tracks.push({
@@ -141,7 +148,10 @@ export const StreamingPlayer = () => {
                             })
                         }
                     })
+                } else {
+                    console.log('[Player] No inline subtitles found')
                 }
+                console.log('[Player] Inline subtitles loaded:', tracks.length)
 
                 // Fetch subtitles from addon services
                 try {
@@ -149,10 +159,15 @@ export const StreamingPlayer = () => {
                     const contentType = parsedMeta.type
                     const videoHash = parsedStream?.behaviorHints?.videoHash
                     const hashParam = videoHash ? `&videoHash=${videoHash}` : ''
-                    const res = await apiFetch(`/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}${hashParam}`)
+                    const subtitleUrl = `/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}${hashParam}`
+                    console.log('[Player] Fetching subtitles from:', subtitleUrl)
+                    const res = await apiFetch(subtitleUrl)
+                    console.log('[Player] Subtitle API response status:', res.status)
                     if (res.ok) {
                         const data = await res.json()
+                        console.log('[Player] Subtitle API response data:', data)
                         if (data.subtitles && Array.isArray(data.subtitles)) {
+                            console.log('[Player] Adding', data.subtitles.length, 'subtitles from API')
                             data.subtitles.forEach((sub: { url: string; lang: string; addonName?: string; type?: string; format?: string }) => {
                                 tracks.push({
                                     src: sub.url,
@@ -162,12 +177,30 @@ export const StreamingPlayer = () => {
                                     addonName: sub.addonName
                                 })
                             })
+                        } else {
+                            console.log('[Player] API response has no subtitles array')
                         }
+                    } else {
+                        console.warn('[Player] Subtitle API returned non-OK status:', res.status)
                     }
                 } catch (e) {
-                    console.warn('Failed to fetch addon subtitles', e)
+                    console.warn('[Player] Failed to fetch addon subtitles', e)
                 }
 
+                console.log('[Player] Total subtitle tracks loaded:', tracks.length)
+                console.log('[Player] Final subtitle tracks:', tracks)
+                console.log('[Player] === Finished subtitle loading ===')
+                
+                if (tracks.length === 0) {
+                    console.warn('[Player] ⚠️ No subtitles available')
+                    console.warn('[Player] Reason: No addon provides subtitle resources for this content.')
+                    console.warn('[Player] Solution: Install a subtitle addon like OpenSubtitles:')
+                    console.warn('[Player]   1. Go to Settings > Addons')
+                    console.warn('[Player]   2. Add: https://github.com/openSubtitles/stremio-addon/manifest.json')
+                    console.warn('[Player]   3. Enable the subtitle addon')
+                    console.warn('[Player] Most torrent/debrid addons do NOT provide subtitles.')
+                }
+                
                 setSubtitleTracks(tracks)
             } catch (e) {
                 console.error('Failed to initialize player', e)

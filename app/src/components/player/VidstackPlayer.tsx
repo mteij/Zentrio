@@ -24,15 +24,16 @@ import {
     DefaultVideoLayout,
     defaultLayoutIcons
 } from '@vidstack/react/player/layouts/default'
-import { 
-    Menu, 
-    Tooltip, 
-    useMediaRemote, 
-    useMediaStore, 
+import {
+    Menu,
+    Tooltip,
+    useMediaRemote,
+    useMediaStore,
     useMediaState,
+    useCaptionOptions,
     type TextTrack
 } from '@vidstack/react'
-import { ChevronRight, Captions, Check } from 'lucide-react'
+import { ChevronRight, Captions, Check, Music, Volume2 } from 'lucide-react'
 
 // Import Vidstack styles
 import '@vidstack/react/player/styles/base.css'
@@ -90,23 +91,85 @@ export interface VidstackPlayerProps {
     showCast?: boolean
 }
 
+function AudioTracksMenu() {
+    const remote = useMediaRemote()
+    const audioTracks = useMediaState('audioTracks')
+    const currentAudioTrack = useMediaState('audioTrack')
+
+    // Debug: log audio tracks
+    console.log('[AudioTracksMenu] Audio tracks:', audioTracks)
+    console.log('[AudioTracksMenu] Current audio track:', currentAudioTrack)
+
+    // Get display name for language
+    const getLangName = (code: string) => {
+        try {
+            return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || code
+        } catch {
+            return code
+        }
+    }
+
+    // Always render the button, show info about available tracks
+    const hasAudioTracks = audioTracks && audioTracks.length > 0
+    const hasMultipleAudioTracks = audioTracks && audioTracks.length > 1
+
+    return (
+        <Menu.Root>
+            <Menu.Button className="vds-menu-button vds-button" aria-label="Audio tracks">
+                <Music className="vds-icon" />
+            </Menu.Button>
+
+            <Menu.Content className="vds-menu-items" placement="top" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <div className="vds-menu-title">Audio</div>
+                
+                {!hasAudioTracks ? (
+                    <div style={{ padding: '12px', color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>
+                        No audio tracks detected
+                    </div>
+                ) : (
+                    <Menu.RadioGroup value={currentAudioTrack?.id?.toString() || ''}>
+                        {audioTracks.map((track) => (
+                            <Menu.Radio
+                                key={track.id}
+                                value={track.id.toString()}
+                                className="vds-menu-item"
+                                onSelect={() => {
+                                    // Audio track IDs are typically numbers, but we need to ensure we're passing the right type
+                                    // The track.id is typically a number for audio tracks
+                                    (remote as any).changeAudioTrack(typeof track.id === 'number' ? track.id : parseInt(track.id.toString()))
+                                }}
+                            >
+                            <span className="vds-menu-item-label">
+                                {track.label || getLangName(track.language || 'und')}
+                                {track.language && track.label && ` (${getLangName(track.language)})`}
+                            </span>
+                            <Check className="vds-radio-icon" size={14} />
+                        </Menu.Radio>
+                    ))}
+                    </Menu.RadioGroup>
+                )}
+                
+                {/* Info about audio tracks */}
+                {hasAudioTracks && !hasMultipleAudioTracks && (
+                    <div style={{ padding: '12px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '8px' }}>
+                        Note: This video has a single audio track. Multiple audio tracks appear only if the video file contains multiple audio streams.
+                    </div>
+                )}
+            </Menu.Content>
+        </Menu.Root>
+    )
+}
+
 function SubtitlesMenu({ tracks }: { tracks: SubtitleTrack[] }) {
     const remote = useMediaRemote()
+    const captionOptions = useCaptionOptions()
     const textTrack = useMediaState('textTrack')
-    const store = useMediaStore()
-    
-    // Group tracks by language
-    const groupedTracks = useMemo(() => {
-        const groups: Record<string, { track: SubtitleTrack, index: number }[]> = {}
-        
-        tracks.forEach((track, index) => {
-            const lang = track.language || 'und'
-            if (!groups[lang]) groups[lang] = []
-            groups[lang].push({ track, index })
-        })
-        
-        return groups
-    }, [tracks])
+    const textTracks = useMediaState('textTracks')
+
+    // Debug: log caption options and tracks
+    console.log('[SubtitlesMenu] Caption options:', captionOptions)
+    console.log('[SubtitlesMenu] Text tracks from state:', textTracks)
+    console.log('[SubtitlesMenu] Prop tracks:', tracks)
 
     // Get display name for language (using Intl.DisplayNames if available)
     const getLangName = (code: string) => {
@@ -117,98 +180,97 @@ function SubtitlesMenu({ tracks }: { tracks: SubtitleTrack[] }) {
         }
     }
 
-    const currentTrackIndex = useMemo(() => {
-        if (!textTrack) return -1
-        // We need to find index of current textTrack in Vidstack list
-        // and map it back to our tracks. 
-        // Note: Vidstack might add its own auto-generated tracks, so we need to be careful.
-        // But since we control Track components, passing index should work if order is preserved.
-        return Array.from(store.textTracks).findIndex(t => t === textTrack)
-    }, [textTrack, store.textTracks])
+    // Check if we have caption options from media OR tracks from props
+    // useCaptionOptions() returns tracks detected in the media
+    // tracks prop contains subtitle URLs we want to add
+    const hasCaptionOptions = captionOptions && captionOptions.length > 0
+    const hasPropTracks = tracks && tracks.length > 0
+    const hasTextTracks = textTracks && textTracks.length > 0
+    const hasAnySubtitles = hasCaptionOptions || hasPropTracks || hasTextTracks
+
+    // Current selected track value
+    const currentValue = textTrack ? textTrack.language || textTrack.label || '' : 'off'
 
     return (
         <Menu.Root>
-            <Menu.Button className="vds-menu-button vds-button">
-                <Captions className="vds-icon" />
+            <Menu.Button className="vds-menu-button vds-button" aria-label="Subtitles" style={{ display: 'flex' }}>
+                <Captions className="vds-icon" size={20} />
             </Menu.Button>
 
             <Menu.Content className="vds-menu-items" placement="top" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                 <div className="vds-menu-title">Subtitles</div>
                 
-                {/* Off Option */}
-                <Menu.Item 
-                    className="vds-menu-item" 
-                    onClick={() => {
-                        if (currentTrackIndex !== -1) {
-                            (remote as any).changeTextTrackMode(currentTrackIndex, 'disabled')
-                        } else {
-                            // If no track is selected, ensure mode is disabled generally if possible, 
-                            // or just do nothing as it's already off.
-                            // Some versions might support -1 or similar.
-                            (remote as any).changeTextTrackMode(-1, 'disabled')
-                        }
-                    }}
-                >
-                    <span className="vds-menu-item-label">Off</span>
-                    {!textTrack && <Check className="vds-menu-item-icon" size={14} />}
-                </Menu.Item>
+                {!hasAnySubtitles ? (
+                    <div style={{ padding: '12px', color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>
+                        <div style={{ marginBottom: '8px' }}>No subtitles available</div>
+                        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+                            Install a subtitle addon (e.g., OpenSubtitles) to load external subtitles
+                        </div>
+                    </div>
+                ) : (
+                    <Menu.RadioGroup value={currentValue}>
+                        {/* Off Option */}
+                        <Menu.Radio
+                            value="off"
+                            className="vds-menu-item"
+                            onSelect={() => {
+                                // Disable subtitles by changing text track
+                                (remote as any).changeTextTrack(-1)
+                            }}
+                        >
+                            <span className="vds-menu-item-label">Off</span>
+                            {!textTrack && <Check className="vds-radio-icon" size={14} />}
+                        </Menu.Radio>
 
-                <div className="vds-menu-divider" />
+                        <div className="vds-menu-divider" />
 
-                {Object.entries(groupedTracks).map(([lang, groupTracks]) => {
-                    const langName = getLangName(lang)
-                    const isActiveLang = groupTracks.some(t => t.index === currentTrackIndex)
-                    
-                    return (
-                        <Menu.Root key={lang}>
-                            <Menu.Button className="vds-menu-item">
-                                <span className="vds-menu-item-label">{langName}</span>
-                                <div className="vds-menu-item-hint">
-                                    {groupTracks.length}
-                                </div>
-                                <ChevronRight className="vds-menu-item-icon" size={14} />
-                            </Menu.Button>
-                            
-                            <Menu.Content className="vds-menu-items" placement="right" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                <div className="vds-menu-title">{langName}</div>
-                                <Menu.RadioGroup value={isActiveLang ? currentTrackIndex.toString() : undefined}>
-                                    {groupTracks.map(({ track, index }) => (
-                                        <Menu.Radio 
-                                            className="vds-menu-item" 
-                                            key={index} 
-                                            value={index.toString()}
-                                            onSelect={() => {
-                                                // Disable current track if any
-                                                if (currentTrackIndex !== -1) {
-                                                    // This might not be needed if setting next track to showing auto-disables others
-                                                }
-                                                // We can't access textTracks[index].mode directly via remote?
-                                                // Try generic command
-                                                // Based on Vidstack internals, we might need to iterate or find right command.
-                                                // Assuming changeTextTrackMode works if we pass index? 
-                                                // Actually, standard API is usually just changeTextTrackMode(mode) which affects *current* track.
-                                                // To CHANGE the current track, we usually use changeTextTrack(index).
-                                                // If TS says it doesn't exist, maybe it's `changeTextTrackKind`? No.
-                                                // Let's try casting for now as it might be a valid method missing in TS defs or I'm using an older version.
-                                                // Alternatively, use player instance via ref if we had it, but we can't easily pass it here without props.
-                                                
-                                                // NOTE: Using 'any' cast to bypass TS error if method exists at runtime
-                                                (remote as any).changeTextTrack(index)
-                                                (remote as any).changeTextTrackMode('showing')
-                                            }}
-                                        >
-                                            <span className="vds-menu-item-label">
-                                                {track.type || 'Standard'}
-                                                {track.addonName ? ` (${track.addonName})` : ''}
-                                            </span>
-                                            <Check className="vds-radio-icon" size={14} />
-                                        </Menu.Radio>
-                                    ))}
-                                </Menu.RadioGroup>
-                            </Menu.Content>
-                        </Menu.Root>
-                    )
-                })}
+                        {/* Subtitle Tracks from caption options (detected in media) */}
+                        {hasCaptionOptions && captionOptions.map((option) => (
+                            <Menu.Radio
+                                key={option.value}
+                                value={option.value}
+                                className="vds-menu-item"
+                                onSelect={option.select}
+                            >
+                                <span className="vds-menu-item-label">
+                                    {option.label}
+                                </span>
+                                <Check className="vds-radio-icon" size={14} />
+                            </Menu.Radio>
+                        ))}
+
+                        {/* External subtitle tracks from props */}
+                        {/* These should appear in textTracks after Track components render */}
+                        {hasTextTracks && !hasCaptionOptions && textTracks.map((track: any, index: number) => {
+                            // Skip the "off" option if it exists
+                            if (track.kind === 'subtitles' && track.language) {
+                                return (
+                                    <Menu.Radio
+                                        key={`external-${index}`}
+                                        value={track.language}
+                                        className="vds-menu-item"
+                                        onSelect={() => {
+                                            (remote as any).changeTextTrack(index)
+                                        }}
+                                    >
+                                        <span className="vds-menu-item-label">
+                                            {track.label || getLangName(track.language)}
+                                        </span>
+                                        <Check className="vds-radio-icon" size={14} />
+                                    </Menu.Radio>
+                                )
+                            }
+                            return null
+                        })}
+
+                        {/* Show message if we have prop tracks but no caption options or text tracks */}
+                        {hasPropTracks && !hasCaptionOptions && !hasTextTracks && (
+                            <div style={{ padding: '12px', color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>
+                                {tracks.length} subtitle(s) loaded but not yet detected
+                            </div>
+                        )}
+                    </Menu.RadioGroup>
+                )}
             </Menu.Content>
         </Menu.Root>
     )
@@ -229,6 +291,10 @@ export function VidstackPlayer({
     autoPlay = true,
     showCast = true
 }: VidstackPlayerProps) {
+    // Debug: log subtitles when they change
+    useEffect(() => {
+        console.log('[VidstackPlayer] Subtitles prop updated:', subtitles)
+    }, [subtitles])
     const playerRef = useRef<MediaPlayerInstance>(null)
     const hybridVideoRef = useRef<HTMLVideoElement>(null)
     const engineRef = useRef<any>(null)
@@ -1000,9 +1066,11 @@ export function VidstackPlayer({
                 icons={defaultLayoutIcons}
                 slots={{
                     googleCastButton: showCast ? <CastButton /> : null,
-                    captionButton: <SubtitlesMenu tracks={subtitles} />
+                    captionButton: <SubtitlesMenu tracks={subtitles} />,
+                    beforeFullscreenButton: <AudioTracksMenu />
                 }}
-            />
+            >
+            </DefaultVideoLayout>
         </MediaPlayer>
     )
 }

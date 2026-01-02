@@ -358,21 +358,21 @@ function SetupSlide({ onComplete }: SetupSlideProps) {
                     <div className="h-px flex-1 bg-white/10" />
                   </div>
                   
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
                       placeholder="https://your-server.com"
                       value={customUrl}
                       onChange={(e) => setCustomUrl(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && customUrl && handleServerConnect(customUrl)}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                      className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500/50"
                     />
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleServerConnect(customUrl)}
                       disabled={!customUrl || checking}
-                      className="px-6 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all disabled:opacity-50"
+                      className="flex-shrink-0 px-6 py-3 sm:py-0 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center"
                     >
                       <ArrowRight className="w-5 h-5" />
                     </motion.button>
@@ -492,7 +492,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const slide = slides[currentSlide];
   
   return (
-    <div className="fixed inset-0 bg-black text-white overflow-hidden">
+    <div 
+      className="fixed inset-0 bg-black text-white overflow-hidden"
+      style={{
+        paddingTop: 'var(--safe-area-inset-top)',
+        paddingBottom: 'var(--safe-area-inset-bottom)',
+        paddingLeft: 'var(--safe-area-inset-left)',
+        paddingRight: 'var(--safe-area-inset-right)',
+      }}
+    >
       <ParticleBackground />
       
       {/* Skip button */}
@@ -501,7 +509,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           onClick={skipToSetup}
-          className="absolute top-6 right-6 z-50 text-zinc-500 hover:text-white text-sm transition-colors flex items-center gap-1"
+          className="absolute right-6 z-50 text-zinc-500 hover:text-white text-sm transition-colors flex items-center gap-1"
+          style={{ top: 'calc(var(--safe-area-inset-top, 0px) + 1.5rem)' }}
         >
           Skip
           <ChevronRight className="w-4 h-4" />
@@ -548,7 +557,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         </div>
       )}
       
-      {/* Slide content */}
+      {/* Slide content with swipe gesture support */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlide}
@@ -557,6 +566,23 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           exit={{ opacity: 0, x: -100 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           className="relative z-10"
+          // Enable horizontal drag for swipe gestures on non-setup slides
+          drag={slide.type !== 'setup' ? 'x' : false}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={(event, info) => {
+            // Detect swipe direction based on velocity and offset
+            const swipeThreshold = 50;
+            const velocityThreshold = 500;
+            
+            if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+              // Swiped left -> go to next slide
+              nextSlide();
+            } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+              // Swiped right -> go to previous slide
+              prevSlide();
+            }
+          }}
         >
           {slide.type === 'welcome' && <WelcomeSlide />}
           {slide.type === 'feature' && (

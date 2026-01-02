@@ -1,14 +1,25 @@
 /**
  * Hybrid Media Provider
- * 
+ *
  * Play video files with rare/unsupported audio codecs (FLAC, Vorbis, AC3, DTS)
  * directly in the browser using FFmpeg WASM for transcoding.
- * 
+ *
+ * IMPORTANT: Hybrid playback is NOT supported in Tauri apps.
+ * Tauri uses native system decoders which support more codecs than browsers.
+ *
  * Architecture:
  * - Video: Remuxed to fMP4 on-the-fly, fed to MSE
  * - Audio: Transcoded to AAC via FFmpeg WASM, played via HTMLAudioElement
  * - I/O: HTTP Range requests with chunked caching
  */
+
+/**
+ * Check if running in Tauri environment
+ */
+export function isTauriEnvironment(): boolean {
+  return typeof window !== 'undefined' &&
+         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+}
 
 // Core types
 export type {
@@ -40,8 +51,15 @@ export { Demuxer } from './Demuxer'
  * Note: For debrid streams and unknown URLs, we should always probe
  * since we can't determine codec from URL alone.
  * For accurate detection, use HybridEngine.initialize() and check requiresHybridPlayback
+ *
+ * IMPORTANT: Always returns false in Tauri environment
  */
 export function mightNeedHybridPlayback(url: string): boolean {
+  // Hybrid playback is not supported in Tauri - always return false
+  if (isTauriEnvironment()) {
+    return false
+  }
+  
   // Always probe - we can't reliably determine codec from URL
   // Especially important for debrid streams which may have no extension
   return true

@@ -1,14 +1,25 @@
 /**
  * useHybridPlayer - React hook for hybrid media playback
- * 
+ *
  * Provides a simple interface for using the HybridEngine
  * with automatic cleanup and state management.
+ *
+ * IMPORTANT: Hybrid playback is NOT supported in Tauri apps.
+ * Tauri uses native system decoders which support more codecs than browsers.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { HybridEngine } from '../services/hybrid-media/HybridEngine'
 import { TranscoderService } from '../services/hybrid-media/TranscoderService'
 import type { StreamInfo, EngineState, HybridEngineConfig, StreamType, CodecInfo, MediaMetadata } from '../services/hybrid-media/types'
+
+/**
+ * Check if running in Tauri environment
+ */
+function isTauri(): boolean {
+  return typeof window !== 'undefined' &&
+         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+}
 
 export interface UseHybridPlayerOptions {
   /** Media URL to play */
@@ -119,6 +130,15 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
 
     const initEngine = async () => {
       try {
+        // Guard: Hybrid playback is not supported in Tauri
+        if (isTauri()) {
+          const error = new Error('Hybrid playback is not supported in Tauri apps. Use native playback instead.')
+          setError(error)
+          setState('error')
+          onError?.(error)
+          return
+        }
+
         setIsReady(false)
         setIsPlaying(false)
         setIsBuffering(false)

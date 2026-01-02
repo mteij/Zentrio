@@ -21,6 +21,11 @@ export const corsMiddleware = (origins?: string[]) => {
     const allowedOrigins = origins || defaultOrigins
     const origin = c.req.header('origin')
     
+    // Debug CORS in development
+    if (process.env.NODE_ENV !== 'production' && origin && !allowedOrigins.includes(origin)) {
+        console.log(`[CORS] Blocking origin: ${origin}. Allowed:`, allowedOrigins)
+    }
+
     // Handle CORS headers
     const corsHeaders: Record<string, string> = {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
@@ -31,7 +36,10 @@ export const corsMiddleware = (origins?: string[]) => {
     }
     
     // Set origin header if origin is allowed
-    if (origin && allowedOrigins.includes(origin)) {
+    // Clean trailing slash from origin just in case
+    const cleanOrigin = origin?.endsWith('/') ? origin.slice(0, -1) : origin;
+    
+    if (origin && (allowedOrigins.includes(origin) || (cleanOrigin && allowedOrigins.includes(cleanOrigin)))) {
       corsHeaders['Access-Control-Allow-Origin'] = origin
     }
     

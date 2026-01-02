@@ -11,8 +11,8 @@ const isTauri = () => {
   return !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__;
 };
 
-// Detect platform
-const getPlatform = (): 'macos' | 'windows' | 'linux' => {
+// Detect desktop platform (for titlebar styling)
+const getDesktopPlatform = (): 'macos' | 'windows' | 'linux' => {
   if (typeof navigator === 'undefined') return 'windows';
   const platform = navigator.platform?.toLowerCase() || '';
   if (platform.includes('mac')) return 'macos';
@@ -23,9 +23,34 @@ const getPlatform = (): 'macos' | 'windows' | 'linux' => {
 export function TitleBar() {
   const [isVisible, setIsVisible] = useState(() => isTauri());
   const [isMaximized, setIsMaximized] = useState(false);
-  const [platform] = useState(getPlatform);
+  const [isMobilePlatform, setIsMobilePlatform] = useState(false);
+  const [platform] = useState(getDesktopPlatform);
   const initialized = useRef(false);
   const navigate = useNavigate();
+  
+  // Detect mobile platform (Android/iOS) to hide titlebar
+  useEffect(() => {
+    const detectMobilePlatform = async () => {
+      if (!isTauri()) return;
+      
+      try {
+        const { platform: getPlatform } = await import('@tauri-apps/plugin-os');
+        const os = await getPlatform();
+        
+        if (os === 'android' || os === 'ios') {
+          setIsMobilePlatform(true);
+          // Add mobile class to body for CSS safe area handling
+          document.body.classList.add('is-mobile');
+          document.body.classList.remove('has-titlebar');
+        }
+      } catch (e) {
+        // Plugin not available or not in Tauri - ignore
+        console.log('[TitleBar] OS detection failed:', e);
+      }
+    };
+    
+    detectMobilePlatform();
+  }, []);
   
   // Add body class once on mount if in Tauri
   useEffect(() => {
@@ -186,8 +211,8 @@ export function TitleBar() {
     initTauri();
   }, [isVisible]);
 
-  // Don't render anything if not in Tauri
-  if (!isVisible) {
+  // Don't render anything if not in Tauri or on mobile platform
+  if (!isVisible || isMobilePlatform) {
     return null;
   }
 

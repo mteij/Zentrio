@@ -48,7 +48,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.version.outputs.version }}"
-          
+
           # Check if release exists
           if gh release view "$TAG" > /dev/null 2>&1; then
             echo "✅ Release $TAG already exists"
@@ -120,14 +120,19 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
-          targets: ${{ matrix.platform == 'macos-13' && 'aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin' || matrix.name == 'android' && 'aarch64-linux-android' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || matrix.name == 'android' && 'aarch64-linux-android' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./app/src-tauri -> target"
 
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
-        # Added wget and curl for linuxdeploy
+        # Dependencies per Tauri v2 docs + additional tools for linuxdeploy
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libfuse2 file wget curl patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev libfuse2 file wget curl patchelf
 
       - name: Setup Java (Android only)
         if: matrix.name == 'android'
@@ -205,6 +210,9 @@ jobs:
           # Decode keystore from base64
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
           KEYSTORE_PATH="$(pwd)/keystore.jks"
+
+          # Generate icons to ensure Android resources are up to date
+          bun tauri icon src-tauri/icon.png
 
           # Initialize Android project
           bun tauri android init

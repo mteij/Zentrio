@@ -5,6 +5,7 @@
  * Audio is transcoded to AAC, video is passed through to MSE.
  *
  * IMPORTANT: This only works in web browsers, not in Tauri apps.
+ * Tauri uses native system decoders which support more codecs than browsers.
  */
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
@@ -12,6 +13,14 @@ import { toBlobURL } from '@ffmpeg/util'
 import { NetworkReader } from './NetworkReader'
 import { AudioStreamTranscoder } from './AudioStreamTranscoder'
 import type { HybridEngineConfig, StreamInfo, MediaMetadata, CombinedStreamInfo } from './types'
+
+/**
+ * Check if running in Tauri environment
+ */
+function isTauriEnvironment(): boolean {
+  return typeof window !== 'undefined' &&
+         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+}
 
 const CORE_URL = new URL('/ffmpeg/ffmpeg-core.js', import.meta.url).href
 const WASM_URL = new URL('/ffmpeg/ffmpeg-core.wasm', import.meta.url).href
@@ -49,6 +58,12 @@ export class HybridEngine extends EventTarget {
 
   constructor(sourceUrl: string, metadata: MediaMetadata, config: HybridEngineConfig = {}) {
     super()
+    
+    // Guard: Hybrid playback is not supported in Tauri
+    if (isTauriEnvironment()) {
+      throw new Error('HybridEngine is not supported in Tauri apps. Use native playback instead.')
+    }
+    
     this.sourceUrl = sourceUrl
     this.metadata = metadata
     this.config = {

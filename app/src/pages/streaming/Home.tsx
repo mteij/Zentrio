@@ -18,6 +18,8 @@ interface CatalogMetadata {
 interface DashboardData {
   catalogMetadata: CatalogMetadata[]
   history: WatchHistoryItem[]
+  // Enriched hero item for Continue Watching (so it matches Top 10/trending banners)
+  continueWatchingHero?: MetaPreview | null
   trending: MetaPreview[]
   showFallbackToast: boolean
   profile: any
@@ -65,13 +67,21 @@ export const StreamingHome = () => {
   // Requirement: Banner from first entry in continue watching if available, otherwise Top 10
   const heroConfig = useMemo(() => {
     if (!data) return { items: [], showTrending: false }
-    const { history, trending } = data
+    const { continueWatchingHero, history, trending } = data
+
+    // Prefer server-enriched Continue Watching hero so it matches Top 10 banners
+    if (continueWatchingHero) {
+      return {
+        items: [continueWatchingHero],
+        showTrending: false
+      }
+    }
     
+    // Fallback (legacy): use first continue watching item (may miss banner fields)
     if (history.length > 0) {
-      // Use the first continue watching item
-      return { 
-        items: [history[0]] as unknown as MetaPreview[], 
-        showTrending: false 
+      return {
+        items: [history[0]] as unknown as MetaPreview[],
+        showTrending: false
       }
     }
     

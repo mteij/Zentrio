@@ -1384,28 +1384,50 @@ export class AddonManager {
     const clients = await this.getClientsForProfile(profileId)
     const results: { addon: Manifest, subtitles: Subtitle[] }[] = []
 
+    console.log(`[AddonManager] getSubtitles called for ${type}/${id}, videoHash: ${videoHash || 'none'}`)
+    console.log(`[AddonManager] Available clients: ${clients.length}`)
+
     const promises = clients.map(async (client) => {
-      if (!client.manifest) return
+      if (!client.manifest) {
+        console.log(`[AddonManager] Client has no manifest, skipping`)
+        return
+      }
 
       // Use proper resource checking that handles object resources
-      if (!this.supportsResource(client.manifest, 'subtitles', type)) return
+      const supportsSubtitles = this.supportsResource(client.manifest, 'subtitles', type)
+      if (!supportsSubtitles) {
+        console.log(`[AddonManager] ${client.manifest.name} does NOT support subtitles resource`)
+        return
+      }
       
       // Check ID prefixes using the proper per-resource or manifest-level prefixes
-      if (!this.canHandleId(client.manifest, 'subtitles', id)) return
+      const canHandleId = this.canHandleId(client.manifest, 'subtitles', id)
+      if (!canHandleId) {
+        console.log(`[AddonManager] ${client.manifest.name} cannot handle ID ${id}`)
+        return
+      }
 
       try {
-        console.log(`Requesting subtitles from ${client.manifest.name} for ${type}/${id}`)
+        console.log(`[AddonManager] Requesting subtitles from ${client.manifest.name} for ${type}/${id}`)
         const subtitles = await client.getSubtitles(type, id, videoHash)
-        console.log(`Received ${subtitles ? subtitles.length : 0} subtitles from ${client.manifest.name}`)
+        console.log(`[AddonManager] Received ${subtitles ? subtitles.length : 0} subtitles from ${client.manifest.name}`)
         if (subtitles && subtitles.length > 0) {
           results.push({ addon: client.manifest, subtitles })
         }
       } catch (e) {
-        console.warn(`Failed to fetch subtitles from ${client.manifest.name}`, e)
+        console.warn(`[AddonManager] Failed to fetch subtitles from ${client.manifest.name}:`, e)
       }
     })
 
     await Promise.allSettled(promises)
+    console.log(`[AddonManager] Total subtitle results: ${results.length}`)
+    
+    if (results.length === 0) {
+      console.warn('[AddonManager] No subtitle results from any addon. Consider installing a subtitle addon like:')
+      console.warn('[AddonManager] - OpenSubtitles: https://github.com/openSubtitles/stremio-addon')
+      console.warn('[AddonManager] Most torrent/video streaming addons do NOT provide subtitles.')
+    }
+    
     return results
   }
 

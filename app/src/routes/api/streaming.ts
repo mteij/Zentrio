@@ -406,22 +406,56 @@ streaming.get('/subtitles/:type/:id', async (c) => {
   const { profileId, videoHash } = c.req.query()
   
   if (!profileId) {
+    console.log('[Subtitles] No profileId provided')
     return c.json({ subtitles: [] })
   }
   
+  const debugInfo: any = {
+    profileId,
+    type,
+    id,
+    videoHash,
+    timestamp: new Date().toISOString()
+  }
+  
   try {
+    console.log(`[Subtitles] Fetching for ${type}/${id} with videoHash: ${videoHash || 'none'}`)
     const results = await addonManager.getSubtitles(type, id, parseInt(profileId), videoHash)
+    
+    debugInfo.addonsQueried = results.length
+    debugInfo.addonResults = results.map(r => ({
+      name: r.addon.name,
+      count: r.subtitles.length,
+      supportsSubtitles: r.addon.resources?.includes('subtitles') || r.addon.resources?.some((res: any) => res?.name === 'subtitles')
+    }))
+    
+    console.log(`[Subtitles] Received ${results.length} addon results`)
+    results.forEach(r => {
+      console.log(`[Subtitles] ${r.addon.name}: ${r.subtitles.length} subtitles`)
+    })
+    
     // Flatten subtitles from all addons into a single list with addon info
-    const subtitles = results.flatMap(r => 
+    const subtitles = results.flatMap(r =>
       r.subtitles.map(s => ({
         ...s,
         addonName: r.addon.name
       }))
     )
-    return c.json({ subtitles })
+    
+    debugInfo.totalSubtitles = subtitles.length
+    
+    console.log(`[Subtitles] Total subtitles: ${subtitles.length}`)
+    if (subtitles.length === 0) {
+      console.warn('[Subtitles] No subtitles available. Consider installing a subtitle addon like OpenSubtitles.')
+      debugInfo.message = 'No subtitle results from any addon'
+    }
+    
+    // Include debug info in response
+    return c.json({ subtitles, debug: debugInfo })
   } catch (e) {
-    console.error('Subtitles API error:', e)
-    return c.json({ subtitles: [] })
+    console.error('[Subtitles] API error:', e)
+    debugInfo.error = e instanceof Error ? e.message : String(e)
+    return c.json({ subtitles: [], debug: debugInfo })
   }
 })
 
@@ -1141,6 +1175,57 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         episodeDisplay: h.meta_type === 'series' && h.season !== undefined && h.season >= 0 && h.episode !== undefined && h.episode >= 0 ? `S${h.season}:E${h.episode}` : null,
         lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
       }))
+
+      // Continue Watching Hero (enriched via addonManager -> uses global TMDB key fallback)
+      let continueWatchingHero: any = null
+      if (deduplicatedHistory.length > 0) {
+        const h = deduplicatedHistory[0]
+        const season = h.season !== undefined && h.season >= 0 ? h.season : null
+        const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
+        const episodeDisplay = h.meta_type === 'series' && season !== null && episode !== null ? `S${season}:E${episode}` : null
+        let lastStream: any = null
+        try {
+          lastStream = h.last_stream ? JSON.parse(h.last_stream) : null
+        } catch (_) {
+          lastStream = null
+        }
+
+        try {
+          const meta = await addonManager.getMeta(h.meta_type, h.meta_id, pId)
+          if (meta) {
+            continueWatchingHero = {
+              id: (meta as any).id,
+              type: (meta as any).type,
+              name: (meta as any).name,
+              poster: (meta as any).poster,
+              background: (meta as any).background,
+              logo: (meta as any).logo,
+              description: (meta as any).description,
+              releaseInfo: (meta as any).releaseInfo,
+              imdbRating: (meta as any).imdbRating,
+              season,
+              episode,
+              episodeDisplay,
+              lastStream
+            }
+          }
+        } catch (e) {
+          console.warn('[Dashboard] Failed to build continueWatchingHero (guest mode):', e)
+        }
+
+        if (!continueWatchingHero) {
+          continueWatchingHero = {
+            id: h.meta_id,
+            type: h.meta_type,
+            name: h.title || 'Unknown',
+            poster: h.poster,
+            season,
+            episode,
+            episodeDisplay,
+            lastStream
+          }
+        }
+      }
       
       // Get catalog metadata for the guest profile (uses Cinemeta fallback if no addons)
       const catalogMetadata = await addonManager.getCatalogMetadata(pId)
@@ -1154,6 +1239,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
       return c.json({
         catalogMetadata,
         history,
+        continueWatchingHero,
         trending,
         trendingMovies,
         trendingSeries,
@@ -1247,6 +1333,57 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
       episodeDisplay: h.meta_type === 'series' && h.season !== undefined && h.season >= 0 && h.episode !== undefined && h.episode >= 0 ? `S${h.season}:E${h.episode}` : null,
       lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
     }))
+
+    // Continue Watching Hero (enriched via addonManager -> uses global TMDB key fallback)
+    let continueWatchingHero: any = null
+    if (deduplicatedHistory.length > 0) {
+      const h = deduplicatedHistory[0]
+      const season = h.season !== undefined && h.season >= 0 ? h.season : null
+      const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
+      const episodeDisplay = h.meta_type === 'series' && season !== null && episode !== null ? `S${season}:E${episode}` : null
+      let lastStream: any = null
+      try {
+        lastStream = h.last_stream ? JSON.parse(h.last_stream) : null
+      } catch (_) {
+        lastStream = null
+      }
+
+      try {
+        const meta = await addonManager.getMeta(h.meta_type, h.meta_id, pId)
+        if (meta) {
+          continueWatchingHero = {
+            id: (meta as any).id,
+            type: (meta as any).type,
+            name: (meta as any).name,
+            poster: (meta as any).poster,
+            background: (meta as any).background,
+            logo: (meta as any).logo,
+            description: (meta as any).description,
+            releaseInfo: (meta as any).releaseInfo,
+            imdbRating: (meta as any).imdbRating,
+            season,
+            episode,
+            episodeDisplay,
+            lastStream
+          }
+        }
+      } catch (e) {
+        console.warn('[Dashboard] Failed to build continueWatchingHero:', e)
+      }
+
+      if (!continueWatchingHero) {
+        continueWatchingHero = {
+          id: h.meta_id,
+          type: h.meta_type,
+          name: h.title || 'Unknown',
+          poster: h.poster,
+          season,
+          episode,
+          episodeDisplay,
+          lastStream
+        }
+      }
+    }
     
     // Use catalog metadata for lazy loading - don't fetch items here
     const catalogMetadata = await addonManager.getCatalogMetadata(pId)
@@ -1261,6 +1398,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
     return c.json({
       catalogMetadata,
       history,
+      continueWatchingHero,
       trending,
       trendingMovies,
       trendingSeries,

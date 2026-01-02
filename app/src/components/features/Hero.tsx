@@ -88,6 +88,13 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
   const itemPoster = featuredItem.poster
   const itemType = (featuredItem as any).meta_type || (featuredItem as any).type
   const itemId = (featuredItem as any).meta_id || (featuredItem as any).id
+  const itemSeason = (featuredItem as any).season
+  const itemEpisode = (featuredItem as any).episode
+
+  // Key animations off the actual item, not the index.
+  // Continue Watching often stays at index 0 but changes (episode/progress),
+  // which can look like "weird" animation if keys don't change.
+  const featuredKey = `${itemType}-${itemId}-${itemSeason ?? ''}-${itemEpisode ?? ''}`
   
   // Dynamic Button Logic
   let playButtonText = "Play Now"
@@ -134,7 +141,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
     <>
       <AnimatePresence mode="sync">
         <motion.div
-          key={`ambient-${currentIndex}`}
+          key={`ambient-${featuredKey}`}
           className={styles.pageAmbientBackground}
           id="ambientBackground"
           style={{
@@ -152,7 +159,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
           <AnimatePresence mode="sync">
             {itemBg ? (
               <motion.div
-                key={`hero-bg-${currentIndex}`}
+                key={`hero-bg-${featuredKey}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -169,7 +176,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
               </motion.div>
             ) : itemPoster ? (
               <motion.div
-                key={`hero-poster-${currentIndex}`}
+                key={`hero-poster-${featuredKey}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -191,7 +198,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
               </motion.div>
             ) : (
               <motion.div
-                key={`hero-empty-${currentIndex}`}
+                key={`hero-empty-${featuredKey}`}
                 style={{ width: '100%', height: '100%', background: '#141414', position: 'absolute' }}
                 id="heroImage"
                 initial={{ opacity: 0 }}
@@ -206,7 +213,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
         <div className={styles.heroContent}>
           <AnimatePresence mode="wait">
             <motion.div
-              key={`hero-info-${currentIndex}`}
+              key={`hero-info-${featuredKey}`}
               className={styles.heroInfo}
               id="heroInfo"
               initial={{ opacity: 0, y: 20 }}

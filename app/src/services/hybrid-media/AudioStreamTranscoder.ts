@@ -1,17 +1,28 @@
 /**
  * AudioStreamTranscoder - Parallel Download + FFmpeg WASM Transcoding
- * 
+ *
  * Downloads source file in chunks while transcoding in parallel:
  * 1. Start downloading in 50MB chunks
  * 2. After initial buffer (500MB or 10%), start first transcode
  * 3. Continue downloading while transcoding runs
  * 4. Final transcode with complete file when download finishes
- * 
+ *
+ * IMPORTANT: This service is NOT supported in Tauri apps.
+ * Tauri uses native system decoders which support more codecs than browsers.
+ *
  * Video is NOT transcoded - handled separately by VideoRemuxer.
  */
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
+
+/**
+ * Check if running in Tauri environment
+ */
+function isTauriEnvironment(): boolean {
+  return typeof window !== 'undefined' &&
+         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+}
 
 export interface AudioTranscoderConfig {
   /** Chunk size for downloads (default: 50MB) */
@@ -54,6 +65,12 @@ export class AudioStreamTranscoder extends EventTarget {
 
   constructor(config: AudioTranscoderConfig = {}) {
     super()
+    
+    // Guard: Hybrid playback is not supported in Tauri
+    if (isTauriEnvironment()) {
+      throw new Error('AudioStreamTranscoder is not supported in Tauri apps. Use native playback instead.')
+    }
+    
     this.config = {
       chunkSize: config.chunkSize ?? 50 * 1024 * 1024, // 50MB
       bitrate: config.bitrate ?? '192k',
