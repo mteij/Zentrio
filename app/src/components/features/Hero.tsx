@@ -111,10 +111,16 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
   const handlePlay = (e: React.MouseEvent) => {
     e.preventDefault()
     
-    const season = (featuredItem as any).season
-    const episode = (featuredItem as any).episode
+    let season = (featuredItem as any).season
+    let episode = (featuredItem as any).episode
     const lastStream = (featuredItem as any).lastStream
     
+    // Default to S1 E1 for series if no progress found (e.g. trending items)
+    if (itemType === 'series' && (season == null || episode == null)) {
+        season = 1
+        episode = 1
+    }
+
     // Use unified auto-play hook with pack matching
     startAutoPlay({
       profileId,
@@ -145,7 +151,10 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
           className={styles.pageAmbientBackground}
           id="ambientBackground"
           style={{
-            backgroundImage: `url(${itemBg || itemPoster})`
+            backgroundImage: `url(${itemBg || itemPoster})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -164,14 +173,24 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.6, ease: "easeOut" }}
-                style={{ position: 'absolute', width: '100%', height: '100%' }}
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  top: 0,
+                  left: 0
+                }}
               >
                 <LazyImage
                   src={itemBg}
                   alt="Hero Background"
                   priority={true}
                   blurAmount={0}
-                  style={{ width: '100%', height: '100%' }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    minHeight: '100%'
+                  }}
                 />
               </motion.div>
             ) : itemPoster ? (
@@ -181,7 +200,13 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.6, ease: "easeOut" }}
-                style={{ position: 'absolute', width: '100%', height: '100%' }}
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  top: 0,
+                  left: 0
+                }}
               >
                 <LazyImage
                   src={itemPoster}
@@ -191,8 +216,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
                   style={{
                     width: '100%',
                     height: '100%',
-                    filter: 'blur(20px)',
-                    transform: 'scale(1.1)'
+                    minHeight: '100%'
                   }}
                 />
               </motion.div>

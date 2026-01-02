@@ -84,13 +84,15 @@ export class AddonClient {
 
   async getMeta(type: string, id: string, config: Record<string, any> = {}): Promise<MetaDetail> {
     if (!this.manifest) await this.init()
-    const url = `${this.baseUrl}/meta/${type}/${id}.json`
+    const safeId = encodeURIComponent(id)
+    const url = `${this.baseUrl}/meta/${type}/${safeId}.json`
     return this.fetchResource<MetaDetail>(url, 'meta')
   }
 
   async getStreams(type: string, id: string): Promise<Stream[]> {
     if (!this.manifest) await this.init()
-    const url = `${this.baseUrl}/stream/${type}/${id}.json`
+    const safeId = encodeURIComponent(id)
+    const url = `${this.baseUrl}/stream/${type}/${safeId}.json`
     const streams = await this.fetchResource<Stream[]>(url, 'streams')
     
     // Check if the addon returned a "please wait" type response

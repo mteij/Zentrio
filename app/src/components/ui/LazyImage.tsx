@@ -77,7 +77,7 @@ export const LazyImage = ({
         backgroundColor: placeholderColor,
         position: 'relative',
         overflow: 'hidden',
-        minHeight: style?.height || '200px', // Default minimum height
+        minHeight: style?.height || '200px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -88,12 +88,18 @@ export const LazyImage = ({
           src={src}
           alt={alt}
           loading={priority ? 'eager' : 'lazy'}
+          draggable={false}
           onLoad={handleLoad}
           onError={handleError}
           style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
             width: '100%',
-            height: style?.height || 'auto',
-            objectFit: style?.height ? 'cover' : 'contain',
+            height: style?.height || '100%',
+            minHeight: style?.height || '100%',
+            objectFit: style?.height ? 'cover' : 'cover',
+            objectPosition: 'center',
             display: 'block',
             filter: isLoaded ? 'none' : `blur(${blurAmount}px)`,
             transition: 'filter 0.3s ease-out',

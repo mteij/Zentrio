@@ -257,7 +257,9 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
     if (seed.startsWith('http') || seed.startsWith('data:')) {
       return seed
     }
-    return `/api/avatar/${encodeURIComponent(seed)}?style=${encodeURIComponent(style)}`
+    // Fix: Prevent 404 errors by using a default seed if none provided
+    const seedToUse = seed || 'preview'
+    return `/api/avatar/${encodeURIComponent(seedToUse)}?style=${encodeURIComponent(style)}`
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

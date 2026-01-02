@@ -1585,6 +1585,7 @@ export const listDb = {
         poster = COALESCE(excluded.poster, list_items.poster),
         imdb_rating = COALESCE(excluded.imdb_rating, list_items.imdb_rating),
         dirty = TRUE,
+        deleted_at = NULL,
         updated_at = CURRENT_TIMESTAMP
     `)
     stmt.run(data.list_id, data.meta_id, data.type, data.title || null, data.poster || null, data.imdb_rating ? parseFloat(data.imdb_rating as any) : null)

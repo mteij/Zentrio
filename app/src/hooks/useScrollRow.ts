@@ -36,8 +36,9 @@ export interface UseScrollRowResult {
  * Hook for horizontal scroll rows with drag-to-scroll and momentum.
  * Extracted from StreamingRow and LazyCatalogRow to eliminate duplication.
  */
+
 export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
-  const { items, multiplier = 2.5, friction = 0.95 } = options
+  const { items, multiplier = 1, friction = 0.95 } = options
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [showLeftArrow, setShowLeftArrow] = useState(false)
@@ -68,6 +69,10 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
       cancelAnimationFrame(rafIdRef.current)
       rafIdRef.current = null
     }
+    // Restore smooth scroll when momentum stops
+    if (containerRef.current) {
+      containerRef.current.style.removeProperty('scroll-behavior')
+    }
   }, [])
 
   // Update arrows on scroll, resize, and item changes
@@ -92,6 +97,9 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
   const scroll = useCallback((direction: 'left' | 'right') => {
     if (containerRef.current) {
       stopMomentum()
+      // Ensure smooth scroll is enabled for button clicks (CSS handles it usually, but just in case we stripped it)
+      containerRef.current.style.removeProperty('scroll-behavior')
+      
       const scrollAmount = containerRef.current.clientWidth * 0.8
       containerRef.current.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
@@ -100,18 +108,6 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
     }
   }, [stopMomentum])
 
-  // Mouse handlers for drag scrolling
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!containerRef.current) return
-    stopMomentum()
-    setIsDown(true)
-    isDraggingRef.current = false
-    startXRef.current = e.pageX - containerRef.current.offsetLeft
-    scrollLeftRef.current = containerRef.current.scrollLeft
-    lastPageXRef.current = e.pageX
-    lastMoveTimeRef.current = Date.now()
-    velocityRef.current = 0
-  }, [stopMomentum])
 
   const handleMouseUp = useCallback(() => {
     setIsDown(false)
@@ -131,20 +127,24 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
         }
       }
       rafIdRef.current = requestAnimationFrame(applyMomentum)
+    } else {
+      stopMomentum()
     }
 
     // Clear dragging flag after a tick (to prevent click)
     setTimeout(() => {
       isDraggingRef.current = false
     }, 0)
+
+    // Remove global listeners
+    document.removeEventListener('mousemove', handleGlobalMouseMove as any)
+    document.removeEventListener('mouseup', handleMouseUp)
   }, [friction, stopMomentum])
 
-  const handleMouseLeave = useCallback(() => {
-    if (isDown) handleMouseUp()
-  }, [isDown, handleMouseUp])
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDown || !containerRef.current) return
+  // Define handleGlobalMouseMove outside so it can be referenced in handleMouseDown
+  // We use a ref to access the latest state/refs without re-binding
+  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
+    if (!containerRef.current) return
     e.preventDefault()
     
     const x = e.pageX - containerRef.current.offsetLeft
@@ -156,6 +156,8 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
     }
 
     if (isDraggingRef.current) {
+      // Disable smooth scrolling during direct manipulation
+      containerRef.current.style.scrollBehavior = 'auto'
       containerRef.current.scrollLeft = scrollLeftRef.current - walk
       
       // Calculate velocity for momentum
@@ -169,7 +171,28 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
         lastPageXRef.current = e.pageX
       }
     }
-  }, [isDown, multiplier])
+  }, [multiplier])
+
+  // Mouse handlers for drag scrolling
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!containerRef.current) return
+    stopMomentum()
+    
+    // Disable smooth scrolling immediately on interaction start
+    containerRef.current.style.scrollBehavior = 'auto'
+
+    setIsDown(true)
+    isDraggingRef.current = false
+    startXRef.current = e.pageX - containerRef.current.offsetLeft
+    scrollLeftRef.current = containerRef.current.scrollLeft
+    lastPageXRef.current = e.pageX
+    lastMoveTimeRef.current = Date.now()
+    velocityRef.current = 0
+
+    // Attach global listeners
+    document.addEventListener('mousemove', handleGlobalMouseMove as any)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [stopMomentum, handleMouseUp, handleGlobalMouseMove])
 
   // Prevent native drag
   const handleDragStart = useCallback((e: React.DragEvent) => {
@@ -182,6 +205,14 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
     return isDraggingRef.current
   }, [])
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove as any)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [handleMouseUp, handleGlobalMouseMove])
+
   return {
     containerRef,
     showLeftArrow,
@@ -190,11 +221,8 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
     scroll,
     handlers: {
       onMouseDown: handleMouseDown,
-      onMouseLeave: handleMouseLeave,
-      onMouseUp: handleMouseUp,
-      onMouseMove: handleMouseMove,
       onDragStart: handleDragStart
-    },
+    } as any, 
     isDragging
   }
 }

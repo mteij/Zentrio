@@ -125,7 +125,9 @@ export const ContentCard = memo(function ContentCard({
     setIsWatched(newWatchedState)
     
     try {
-      await apiFetch(newWatchedState ? '/api/streaming/mark-series-watched' : '/api/streaming/mark-watched', {
+      const endpoint = item.type === 'series' ? '/api/streaming/mark-series-watched' : '/api/streaming/mark-watched'
+      
+      await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -243,7 +245,7 @@ export const ContentCard = memo(function ContentCard({
       <ContextMenu items={contextItems}>
         <a 
           href={getItemUrl()} 
-          className={`${styles.mediaCard} ${isRanked ? styles.rankedCard : ''}`}
+          className={styles.mediaCard}
           onClick={handleClick}
           onDragStart={onDragStart}
           draggable={false}

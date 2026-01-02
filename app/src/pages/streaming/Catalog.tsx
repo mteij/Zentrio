@@ -128,12 +128,38 @@ export const StreamingCatalog = () => {
     )
   }
 
-  // Dedup items
+  // Dedup and sort items
   const allItems = data?.pages.reduce((acc: MetaPreview[], page) => {
-    const existingIds = new Set(acc.map(i => i.id))
-    const uniqueNew = page.items.filter((i: MetaPreview) => !existingIds.has(i.id))
+    // Use composite key (id-season-episode) for better deduplication of series episodes
+    const existingKeys = new Set(acc.map(i => {
+      const season = (i as any).season || 0
+      const episode = (i as any).episode || (i as any).number || 0
+      return `${i.id}-${season}-${episode}`
+    }))
+    
+    const uniqueNew = page.items.filter((i: MetaPreview) => {
+      const season = (i as any).season || 0
+      const episode = (i as any).episode || (i as any).number || 0
+      const key = `${i.id}-${season}-${episode}`
+      return !existingKeys.has(key)
+    })
+    
     return [...acc, ...uniqueNew]
   }, []) || []
+
+  // Sort episodes by season and episode number for series
+  if (allItems.length > 0 && allItems[0].type === 'series') {
+    allItems.sort((a, b) => {
+      const seasonA = (a as any).season || 0
+      const seasonB = (b as any).season || 0
+      const episodeA = (a as any).episode || (a as any).number || 0
+      const episodeB = (b as any).episode || (b as any).number || 0
+      
+      // Sort by season first, then episode
+      if (seasonA !== seasonB) return seasonA - seasonB
+      return episodeA - episodeB
+    })
+  }
 
   // Get title from first page if available, otherwise construct fallback
   const firstPageTitle = data?.pages[0]?.title

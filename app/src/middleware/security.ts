@@ -51,12 +51,12 @@ export const corsMiddleware = (origins?: string[]) => {
       })
     }
     
-    // Set CORS headers for all other requests
+    await next()
+    
+    // Set CORS headers AFTER next() to ensure they persist on raw Response objects
     Object.entries(corsHeaders).forEach(([key, value]) => {
       c.header(key, value)
     })
-    
-    await next()
   }
 }
 

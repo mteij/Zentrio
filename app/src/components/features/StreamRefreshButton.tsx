@@ -32,32 +32,38 @@ export function StreamRefreshButton({
       disabled={isLoading}
       title={cacheAgeMs ? `Cached ${formatCacheAge(cacheAgeMs)} - Click to refresh` : 'Refresh streams'}
       style={{
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
-        gap: '6px',
-        padding: '6px 12px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        borderRadius: '6px',
-        color: '#fff',
-        fontSize: '0.85rem',
+        gap: '4px',
+        padding: '4px 8px',
+        background: 'transparent',
+        border: 'none',
+        borderRadius: '4px',
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: '0.75rem',
         cursor: isLoading ? 'wait' : 'pointer',
-        opacity: isLoading ? 0.6 : 1,
-        transition: 'all 0.2s ease'
+        opacity: isLoading ? 0.5 : 1,
+        transition: 'all 0.15s ease'
+      }}
+      onMouseEnter={(e) => {
+        if (!isLoading) {
+          e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)'
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)'
+        e.currentTarget.style.background = 'transparent'
       }}
     >
       <RefreshCw 
-        size={14} 
+        size={12} 
         style={{ 
           animation: isLoading ? 'spin 1s linear infinite' : 'none' 
         }} 
       />
-      {cacheAgeMs !== null && cacheAgeMs !== undefined && cacheAgeMs > 0 ? (
-        <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>
-          {formatCacheAge(cacheAgeMs)}
-        </span>
-      ) : (
-        <span>Refresh</span>
+      {cacheAgeMs !== null && cacheAgeMs !== undefined && cacheAgeMs > 0 && (
+        <span>{formatCacheAge(cacheAgeMs)}</span>
       )}
     </button>
   )

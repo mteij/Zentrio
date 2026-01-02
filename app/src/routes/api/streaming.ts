@@ -248,6 +248,24 @@ streaming.get('/streams-live/:type/:id', async (c) => {
       if (cached && cached.isComplete) {
         const cacheAge = streamCache.getAge(cacheKey) || 0
         sendEvent('cache-status', { fromCache: true, cacheAgeMs: cacheAge })
+
+        // When serving from cache, also emit per-addon events so the UI can show provider chips
+        // (otherwise it only shows "N sources" without addon/provider context).
+        const addonCounts = new Map<string, { addon: { id: string; name: string; logo?: string }, count: number }>()
+        for (const item of cached.streams || []) {
+          const addon = item?.addon
+          if (!addon?.id) continue
+          const existing = addonCounts.get(addon.id)
+          if (existing) existing.count += 1
+          else addonCounts.set(addon.id, { addon, count: 1 })
+        }
+
+        for (const { addon, count } of addonCounts.values()) {
+          sendEvent('addon-start', { addon })
+          // No need to include allStreams here; "complete" will send the full list once
+          sendEvent('addon-result', { addon, count })
+        }
+
         sendEvent('complete', {
           allStreams: cached.streams,
           totalCount: cached.streams.length,
@@ -730,7 +748,7 @@ streaming.post('/mark-watched', async (c) => {
               })
             }
             traktSynced = true
-            console.log(`[Trakt] Pushed watched: ${metaId} S${season}E${episode}`)
+            console.log(`[Trakt] Pushed watched: ${metaId}${metaType === 'series' ? ` S${season}E${episode}` : ''}`)
           } else {
             // Remove from Trakt history
             if (metaType === 'movie') {
@@ -837,13 +855,34 @@ streaming.post('/mark-season-watched', async (c) => {
 streaming.post('/mark-series-watched', async (c) => {
   try {
     const body = await c.req.json()
-    const { profileId, metaId, watched, allEpisodes } = body
+    let { profileId, metaId, watched, allEpisodes } = body
     
-    if (!profileId || !metaId || watched === undefined || !allEpisodes) {
-      return c.json({ error: 'Missing required fields (need allEpisodes array)' }, 400)
+    if (!profileId || !metaId || watched === undefined) {
+      return c.json({ error: 'Missing required fields' }, 400)
     }
 
     const pId = parseInt(profileId)
+
+    // If allEpisodes is missing, fetch from metadata
+    if (!allEpisodes || !Array.isArray(allEpisodes)) {
+        try {
+            console.log(`[MarkSeries] allEpisodes missing for ${metaId}, fetching metadata...`)
+            const meta = await addonManager.getMeta('series', metaId, pId)
+            if (meta && meta.videos) {
+                allEpisodes = meta.videos.map((v: any) => ({
+                    season: v.season,
+                    episode: v.number || v.episode
+                }))
+                console.log(`[MarkSeries] Retrieved ${allEpisodes.length} episodes from metadata`)
+            } else {
+                console.warn(`[MarkSeries] No metadata or videos found for ${metaId}`)
+                allEpisodes = []
+            }
+        } catch (e) {
+            console.error(`[MarkSeries] Failed to fetch metadata for ${metaId}:`, e)
+            return c.json({ error: 'Failed to retrieve series episodes' }, 500)
+        }
+    }
     
     // Mark each episode
     for (const ep of allEpisodes) {

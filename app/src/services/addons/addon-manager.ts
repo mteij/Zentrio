@@ -736,6 +736,68 @@ export class AddonManager {
         enableAgeRating: appearance ? appearance.show_age_ratings : true,
         showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
     };
+
+    // Stremio can show addon-provided duplicates, but the list should still be ordered S1..SX, E1..EX.
+    // We therefore:
+    // - keep duplicates (no dedupe),
+    // - sanitize stream/release blobs that some addons wrongly embed into meta videos,
+    // - apply a stable sort by (season, episode), pushing unknowns (0/NaN) to the end.
+    const normalizeMetaVideos = (videos: any[]): any[] => {
+      if (!Array.isArray(videos) || videos.length === 0) return []
+
+      const looksLikeStreamText = (text: unknown): boolean => {
+        if (typeof text !== 'string') return false
+        const t = text.toLowerCase()
+        if (t.includes('full title:')) return true
+        if (t.includes('size:')) return true
+        if (/\b\d+(?:\.\d+)?\s*(gb|mb)\b/i.test(text)) return true
+        if (t.includes('seeders') || t.includes('magnet:') || t.includes('infohash') || t.includes('hash:')) return true
+        return false
+      }
+
+      const getSeason = (v: any) => {
+        const n = Number(v?.season ?? 0)
+        return Number.isFinite(n) ? n : 0
+      }
+
+      const getEpisode = (v: any) => {
+        const n = Number(v?.episode ?? v?.number ?? 0)
+        return Number.isFinite(n) ? n : 0
+      }
+
+      const sanitized = videos.map((v: any, idx: number) => {
+        const out: any = { ...(v || {}) }
+
+        // Streams must come from the /stream resource per Stremio protocol.
+        if ('streams' in out) delete out.streams
+
+        // Drop obvious stream/release blobs that sometimes appear in meta video overviews.
+        if (looksLikeStreamText(out.overview)) delete out.overview
+        if (looksLikeStreamText(out.description)) delete out.description
+
+        out.__zentrioOrder = idx
+        return out
+      })
+
+      // Stable sort: season asc (0 last), episode asc (0 last), then original order.
+      sanitized.sort((a: any, b: any) => {
+        const sa = getSeason(a)
+        const sb = getSeason(b)
+        if (sa === 0 && sb !== 0) return 1
+        if (sb === 0 && sa !== 0) return -1
+        if (sa !== sb) return sa - sb
+
+        const ea = getEpisode(a)
+        const eb = getEpisode(b)
+        if (ea === 0 && eb !== 0) return 1
+        if (eb === 0 && ea !== 0) return -1
+        if (ea !== eb) return ea - eb
+
+        return Number(a.__zentrioOrder ?? 0) - Number(b.__zentrioOrder ?? 0)
+      })
+
+      return sanitized.map(({ __zentrioOrder, ...rest }: any) => rest)
+    }
     
     // Pass 1: Try addons that support meta for this type and can handle this ID
     for (const client of sortedClients) {
@@ -788,6 +850,9 @@ export class AddonManager {
         // console.log(`[AddonManager] Trying ${client.manifest.name} for meta ${type}/${primaryId}`)
         const meta = await client.getMeta(type, id, config)
         if (meta) {
+          if (Array.isArray((meta as any).videos)) {
+            ;(meta as any).videos = normalizeMetaVideos((meta as any).videos)
+          }
           // console.log(`[AddonManager] Got meta from ${client.manifest.name} for ${type}/${primaryId}`)
           return meta
         }
@@ -818,7 +883,12 @@ export class AddonManager {
 
             try {
                 const meta = await client.getMeta(type, id, config)
-                if (meta) return meta
+                if (meta) {
+                  if (Array.isArray((meta as any).videos)) {
+                    ;(meta as any).videos = normalizeMetaVideos((meta as any).videos)
+                  }
+                  return meta
+                }
             } catch (e) {
                 console.debug(`[AddonManager] getMeta (pass 2) failed for ${client.manifest.name}:`, e instanceof Error ? e.message : e)
             }
@@ -843,7 +913,12 @@ export class AddonManager {
          try {
              if (!zentrioClient.manifest) await zentrioClient.init();
              const meta = await zentrioClient.getMeta(type, id, config);
-             if (meta) return meta;
+             if (meta) {
+               if (Array.isArray((meta as any).videos)) {
+                 ;(meta as any).videos = normalizeMetaVideos((meta as any).videos)
+               }
+               return meta;
+             }
          } catch (e) {
              console.warn(`Fallback to Zentrio Client failed for ${id}`, e);
          }
@@ -868,7 +943,12 @@ export class AddonManager {
                 
                 if (cinemetaClient.manifest?.resources.includes('meta') && cinemetaClient.manifest?.types.includes(type)) {
                      const meta = await cinemetaClient.getMeta(type, id)
-                     if (meta) return meta
+                     if (meta) {
+                       if (Array.isArray((meta as any).videos)) {
+                         ;(meta as any).videos = normalizeMetaVideos((meta as any).videos)
+                       }
+                       return meta
+                     }
                 }
             } catch (e) {
                 console.warn(`Fallback to Cinemeta failed for ${type}/${id}`, e);
@@ -1061,7 +1141,13 @@ export class AddonManager {
             genreExtra.options.forEach(g => {
               // Filter out years (4 digits)
               if (!/^\d{4}$/.test(g)) {
-                genres.add(g)
+                // Normalize TV genres to Movie genres for the dropdown
+                let finalGenre = g
+                if (g === 'Action & Adventure') finalGenre = 'Action'
+                else if (g === 'Sci-Fi & Fantasy') finalGenre = 'Science Fiction'
+                else if (g === 'War & Politics') finalGenre = 'War'
+                
+                genres.add(finalGenre)
               }
             })
           }
@@ -1155,24 +1241,107 @@ export class AddonManager {
       return []
     }
 
-    const videoId = (type === 'series' && season !== undefined && episode !== undefined) ? `${id}:${season}:${episode}` : id
+    // Resolve meta once so we can:
+    // - Prefer addon-compatible base IDs (custom id vs imdb_id) per addon idPrefixes
+    // - For series, resolve the *episode video id* via meta.videos[].id (Stremio-style)
+    let metaForId: MetaDetail | null = null
+    try {
+      metaForId = await this.getMeta(type, id, profileId)
+    } catch {
+      metaForId = null
+    }
+
+    const candidateBaseIds = Array.from(new Set(
+      [id, metaForId?.id, metaForId?.imdb_id].filter(Boolean)
+    )) as string[]
+
+    const resolveSeriesVideoId = (baseId: string): string => {
+      if (type !== 'series' || season === undefined || episode === undefined) return baseId
+
+      // If we're using the same base id we fetched meta for, attempt to resolve via meta.videos[].id
+      if (
+        metaForId &&
+        (baseId === id || baseId === metaForId.id) &&
+        Array.isArray((metaForId as any).videos)
+      ) {
+        const match = (metaForId.videos as any[]).find(v => {
+          const vSeason = Number(v.season ?? 0)
+          const vEpisode = Number(v.episode ?? v.number ?? 0)
+          return vSeason === season && vEpisode === episode
+        })
+        if (match?.id) return String(match.id)
+      }
+
+      // Fallback to the conventional scheme used by many addons (Cinemeta, etc.)
+      return `${baseId}:${season}:${episode}`
+    }
+
+    const getMovieVideoIdsFromAddonMeta = async (client: AddonClient, baseId: string): Promise<string[]> => {
+      // Some addons implement "movie selection" via meta.videos and/or behaviorHints.defaultVideoId.
+      // In those cases, /stream must be called with the *video id*, not the parent meta id.
+      if (type !== 'movie') return []
+      if (!client.manifest) return []
+
+      try {
+        if (!this.supportsResource(client.manifest, 'meta', 'movie')) return []
+        if (!this.canHandleId(client.manifest, 'meta', baseId)) return []
+
+        const addonMeta = await client.getMeta('movie', baseId)
+        if (!addonMeta) return []
+
+        const ids: string[] = []
+        const defaultVideoId = (addonMeta as any)?.behaviorHints?.defaultVideoId
+        if (typeof defaultVideoId === 'string' && defaultVideoId.trim()) ids.push(defaultVideoId.trim())
+
+        if (Array.isArray((addonMeta as any).videos)) {
+          for (const v of (addonMeta as any).videos) {
+            if (v?.id) ids.push(String(v.id))
+          }
+        }
+
+        // unique, keep order
+        return Array.from(new Set(ids)).filter(Boolean)
+      } catch {
+        return []
+      }
+    }
 
     // Helper function to fetch streams with retry support
     const fetchStreamsWithRetry = async (client: AddonClient, maxRetries: number = 3): Promise<void> => {
       if (!client.manifest) return
-      
+
       // Use proper resource checking that handles object resources
       if (!this.supportsResource(client.manifest, 'stream', type)) return
-      
-      // Check ID prefixes using the proper per-resource or manifest-level prefixes
-      if (!this.canHandleId(client.manifest, 'stream', id)) return
+
+      // Pick the first candidate base ID that this addon can handle
+      const baseId = candidateBaseIds.find(cid => this.canHandleId(client.manifest!, 'stream', cid))
+      if (!baseId) return
+
+      const resolvedVideoId = resolveSeriesVideoId(baseId)
 
       let attempt = 0
       while (attempt < maxRetries) {
         try {
-          console.log(`[${client.manifest.name}] Requesting streams for ${type}/${videoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
-          const streams = await client.getStreams(type, videoId)
+          console.log(`[${client.manifest.name}] Requesting streams for ${type}/${resolvedVideoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
+          let streams = await client.getStreams(type, resolvedVideoId)
           console.log(`[${client.manifest.name}] Received ${streams ? streams.length : 0} streams`)
+
+          // Movie-selection fallback: if base-id stream call returns empty, try video ids from addon meta
+          if (type === 'movie' && (!streams || streams.length === 0)) {
+            const altVideoIds = await getMovieVideoIdsFromAddonMeta(client, baseId)
+            for (const vid of altVideoIds) {
+              try {
+                console.log(`[${client.manifest.name}] Retrying movie streams via meta video id: ${vid}`)
+                const s2 = await client.getStreams('movie', vid)
+                if (s2 && s2.length > 0) {
+                  streams = [...(streams || []), ...s2]
+                }
+              } catch {
+                // ignore per-id failures; continue
+              }
+            }
+          }
+
           if (streams && streams.length > 0) {
             rawResults.push({ addon: client.manifest, streams })
           }
@@ -1332,8 +1501,65 @@ export class AddonManager {
       return
     }
 
-    const videoId = (type === 'series' && season !== undefined && episode !== undefined) 
-      ? `${id}:${season}:${episode}` : id
+    // Resolve meta once so we can:
+    // - Prefer addon-compatible base IDs (custom id vs imdb_id) per addon idPrefixes
+    // - For series, resolve the *episode video id* via meta.videos[].id (Stremio-style)
+    let metaForId: MetaDetail | null = null
+    try {
+      metaForId = await this.getMeta(type, id, profileId)
+    } catch {
+      metaForId = null
+    }
+
+    const candidateBaseIds = Array.from(new Set(
+      [id, metaForId?.id, metaForId?.imdb_id].filter(Boolean)
+    )) as string[]
+
+    const resolveSeriesVideoId = (baseId: string): string => {
+      if (type !== 'series' || season === undefined || episode === undefined) return baseId
+
+      if (
+        metaForId &&
+        (baseId === id || baseId === metaForId.id) &&
+        Array.isArray((metaForId as any).videos)
+      ) {
+        const match = (metaForId.videos as any[]).find(v => {
+          const vSeason = Number(v.season ?? 0)
+          const vEpisode = Number(v.episode ?? v.number ?? 0)
+          return vSeason === season && vEpisode === episode
+        })
+        if (match?.id) return String(match.id)
+      }
+
+      return `${baseId}:${season}:${episode}`
+    }
+
+    const getMovieVideoIdsFromAddonMeta = async (client: AddonClient, baseId: string): Promise<string[]> => {
+      if (type !== 'movie') return []
+      if (!client.manifest) return []
+
+      try {
+        if (!this.supportsResource(client.manifest, 'meta', 'movie')) return []
+        if (!this.canHandleId(client.manifest, 'meta', baseId)) return []
+
+        const addonMeta = await client.getMeta('movie', baseId)
+        if (!addonMeta) return []
+
+        const ids: string[] = []
+        const defaultVideoId = (addonMeta as any)?.behaviorHints?.defaultVideoId
+        if (typeof defaultVideoId === 'string' && defaultVideoId.trim()) ids.push(defaultVideoId.trim())
+
+        if (Array.isArray((addonMeta as any).videos)) {
+          for (const v of (addonMeta as any).videos) {
+            if (v?.id) ids.push(String(v.id))
+          }
+        }
+
+        return Array.from(new Set(ids)).filter(Boolean)
+      } catch {
+        return []
+      }
+    }
 
     // Fetch streams from each addon and callback as they complete
     const fetchFromAddon = async (client: AddonClient): Promise<void> => {
@@ -1341,9 +1567,12 @@ export class AddonManager {
 
       // Use proper resource checking that handles object resources
       if (!this.supportsResource(client.manifest, 'stream', type)) return
-      
-      // Check ID prefixes using the proper per-resource or manifest-level prefixes
-      if (!this.canHandleId(client.manifest, 'stream', id)) return
+
+      // Pick the first candidate base ID that this addon can handle
+      const baseId = candidateBaseIds.find(cid => this.canHandleId(client.manifest!, 'stream', cid))
+      if (!baseId) return
+
+      const resolvedVideoId = resolveSeriesVideoId(baseId)
 
       // Notify that this addon is starting
       callbacks?.onAddonStart?.(client.manifest)
@@ -1353,9 +1582,24 @@ export class AddonManager {
 
       while (attempt < maxRetries) {
         try {
-          console.log(`[${client.manifest.name}] Requesting streams for ${type}/${videoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
-          const streams = await client.getStreams(type, videoId)
+          console.log(`[${client.manifest.name}] Requesting streams for ${type}/${resolvedVideoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
+          let streams = await client.getStreams(type, resolvedVideoId)
           console.log(`[${client.manifest.name}] Received ${streams ? streams.length : 0} streams`)
+
+          if (type === 'movie' && (!streams || streams.length === 0)) {
+            const altVideoIds = await getMovieVideoIdsFromAddonMeta(client, baseId)
+            for (const vid of altVideoIds) {
+              try {
+                console.log(`[${client.manifest.name}] Retrying movie streams via meta video id: ${vid}`)
+                const s2 = await client.getStreams('movie', vid)
+                if (s2 && s2.length > 0) {
+                  streams = [...(streams || []), ...s2]
+                }
+              } catch {
+                // ignore per-id failures
+              }
+            }
+          }
           
           // Callback with results (even if empty)
           callbacks?.onAddonResult?.(client.manifest, streams || [])

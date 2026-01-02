@@ -39,6 +39,7 @@ interface AuthState {
   clearError: () => void
   refreshSession: (token?: string) => Promise<boolean>
   checkSession: () => Promise<boolean>
+  reset: () => void
 }
 
 // Session duration constant (24 hours)
@@ -51,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
         user: null,
         session: null,
         isAuthenticated: false,
-        isLoading: false,
+        isLoading: true, // Default to true so we wait for session check
         error: null,
         lastActivity: Date.now(),
 
@@ -61,9 +62,23 @@ export const useAuthStore = create<AuthState>()(
             user,
             session: session || { user, expiresAt: new Date(Date.now() + SESSION_DURATION_MS) },
             isAuthenticated: true,
+            isLoading: false,
             error: null,
             lastActivity: now,
           })
+        },
+
+        // Clean up state without forcing a reload/redirect loop
+        // Used internally when session is invalid
+        reset: () => {
+             set({
+              user: null,
+              session: null,
+              isAuthenticated: false,
+              isLoading: false,
+              error: null,
+              lastActivity: Date.now(),
+            })
         },
 
         logout: async () => {
@@ -73,13 +88,8 @@ export const useAuthStore = create<AuthState>()(
           } catch (error) {
             console.error('Error during sign out:', error)
           } finally {
-            set({
-              user: null,
-              session: null,
-              isAuthenticated: false,
-              error: null,
-              lastActivity: Date.now(),
-            })
+            // Use internal reset to clear state
+            get().reset()
             
             // Clear app mode and server URL to show onboarding wizard
             // Import dynamically to avoid circular dependency
@@ -132,14 +142,14 @@ export const useAuthStore = create<AuthState>()(
               get().login(user, sessionData)
               return true
             } else {
-              // Session expired or invalid
-              await get().logout()
+              // Session expired or invalid - just reset state, don't force infinite reload loop
+              get().reset()
               return false
             }
           } catch (error) {
             console.error('Error refreshing session:', error)
             set({ error: 'Failed to refresh session' })
-            await get().logout()
+            get().reset()
             return false
           } finally {
             set({ isLoading: false })
@@ -151,7 +161,9 @@ export const useAuthStore = create<AuthState>()(
           
           // Check if session exists and hasn't expired
           if (!session) {
-            return false
+            // Even if no local session, we might have a server cookie (SSO case)
+            // So we should try to refresh once if we are loading
+            return await get().refreshSession()
           }
 
           const now = Date.now()
@@ -179,14 +191,13 @@ export const useAuthStore = create<AuthState>()(
         onRehydrateStorage: () => (state) => {
           console.log('[AuthStore] Rehydrated:', { 
               isAuthenticated: state?.isAuthenticated, 
-              hasUser: !!state?.user,
-              hasSession: !!state?.session,
-              hasToken: !!state?.session?.token
+              forceCheck: true
           });
           
-          // Check session validity on rehydration
-          if (state?.isAuthenticated) {
-            state.checkSession().catch(console.error)
+          // ALWAYS check session on rehydration to handle SSO redirects
+          // This will verify with the server (cookies) even if localStorage is empty
+          if (state) {
+              state.refreshSession().catch(console.error)
           }
         },
       }

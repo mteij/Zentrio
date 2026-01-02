@@ -1,12 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { Play, Plus, Check, ArrowLeft, Zap, HardDrive, Wifi, Eye, EyeOff, MoreVertical, ChevronUp } from 'lucide-react'
+import { Play, Plus, Check, ArrowLeft, Zap, HardDrive, Wifi, Eye, EyeOff, MoreVertical, ChevronUp, Youtube, Info, List } from 'lucide-react'
 
 import { Layout, LazyImage, RatingBadge, SkeletonDetails, SkeletonStreamList } from '../../components'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { ContextMenu } from '../../components/ui/ContextMenu'
 import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
 import { CompactStreamItem } from '../../components/features/CompactStreamItem'
+import { CastCard } from '../../components/features/CastCard'
+import { InfoModal } from '../../components/features/InfoModal'
+import { ListSelectionModal } from '../../components/features/ListSelectionModal'
 import { MetaDetail, Stream, Manifest } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import { useStreamLoader, FlatStream, AddonLoadingState } from '../../hooks/useStreamLoader'
@@ -50,6 +53,9 @@ export const StreamingDetails = () => {
   const [episodes, setEpisodes] = useState<any[]>([])
   const [view, setView] = useState<'details' | 'episodes' | 'streams'>('details')
   const [selectedEpisode, setSelectedEpisode] = useState<{ season: number, number: number, title: string } | null>(null)
+  const [showInfoModal, setShowInfoModal] = useState(false)
+  const [showListModal, setShowListModal] = useState(false)
+  const [inList, setInList] = useState(false)
   
   // Progressive stream loading hook
   const {
@@ -74,7 +80,24 @@ export const StreamingDetails = () => {
       return
     }
     loadDetails()
+    checkListStatus()
   }, [profileId, type, id])
+
+  const checkListStatus = async () => {
+    // Prefer using loaded data meta.id, fallback to params id
+    const checkId = data?.meta?.id || id
+    if (!profileId || !checkId) return
+    
+    try {
+      const res = await apiFetch(`/api/lists/check/${encodeURIComponent(checkId)}?profileId=${profileId}&t=${Date.now()}`)
+      if (res.ok) {
+        const data = await res.json()
+        setInList(data.listIds.length > 0)
+      }
+    } catch (e) {
+      console.error("Failed to check list status", e)
+    }
+  }
 
   const loadDetails = async () => {
     try {
@@ -143,10 +166,10 @@ export const StreamingDetails = () => {
         if (shouldAutoPlay) {
             navigate('.', { replace: true, state: { ...location.state, autoPlay: false } })
             toast.loading(`Finding best stream...`, { id: 'autoplay-loading' })
-            loadStreams(undefined, undefined, detailsData.meta.imdb_id || id, true)
+            loadStreams(undefined, undefined, undefined, true)
             // Keep view on details
         } else {
-            loadStreams(undefined, undefined, detailsData.meta.imdb_id || id)
+            loadStreams(undefined, undefined, undefined)
             setView('streams')
         }
       }
@@ -164,7 +187,9 @@ export const StreamingDetails = () => {
   const loadStreams = (season?: number, episode?: number, overrideId?: string, autoPlay: boolean = false) => {
     autoPlayRef.current = autoPlay
     
-    const fetchId = overrideId || data?.meta.imdb_id || id
+    // Do not force imdb_id here; addons may require custom IDs.
+    // Backend will resolve the best addon-compatible ID (custom vs imdb_id) per addon.
+    const fetchId = overrideId || id
     if (!fetchId || !profileId) return
     
     loadStreamsProgressive(
@@ -572,13 +597,18 @@ export const StreamingDetails = () => {
 
       <div className={styles.detailsContainer}>
         <div className={styles.pageAmbientBackground} style={{
-          backgroundImage: `url(${meta.background || meta.poster})`
+          backgroundImage: `url(${meta.background || meta.poster})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
         }}></div>
+
+
 
         <div className={styles.detailsContent}>
           <div className={styles.detailsPoster}>
             {meta.poster ? (
-              <LazyImage src={meta.poster} alt={meta.name} />
+              <img src={meta.poster} alt={meta.name} />
             ) : (
               <div style={{ width: '100%', height: '100%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {meta.name}
@@ -590,7 +620,16 @@ export const StreamingDetails = () => {
             {/* Hide metadata only for series when viewing streams (since movies show streams as main page) */}
             {!(meta.type === 'series' && view === 'streams') && (
               <>
-                <h1 className={styles.detailsTitle}>{meta.name}</h1>
+                {/* TMDB styled title banner (logo) when available, otherwise text title */}
+                {meta.logo ? (
+                  <img 
+                    src={meta.logo} 
+                    alt={meta.name} 
+                    className={styles.detailsLogo}
+                  />
+                ) : (
+                  <h1 className={styles.detailsTitle}>{meta.name}</h1>
+                )}
                 
                 <div className={styles.detailsMetaRow}>
                   {meta.released && <span className={styles.metaBadge}>{String(meta.released).split('-')[0]}</span>}
@@ -601,49 +640,86 @@ export const StreamingDetails = () => {
                 </div>
 
                 <div className={styles.detailsActions}>
+                  {/* Primary Play button */}
                   {meta.type === 'movie' && (
                       <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={handleMoviePlay}>
                         <Play size={20} fill="currentColor" />
                         Play
                       </button>
                   )}
+                  
+                  {/* Icon buttons for secondary actions */}
+                  {meta.trailerStreams && meta.trailerStreams.length > 0 && (
+                    <button 
+                      className={styles.iconBtn}
+                      onClick={() => {
+                        const trailer = meta.trailerStreams![0]
+                        const stream = { ytId: trailer.ytId }
+                        const trailerMeta = {
+                          id: meta.id,
+                          type: meta.type,
+                          name: `${meta.name} - Trailer`,
+                          poster: meta.poster
+                        }
+                        navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(trailerMeta))}`)
+                      }}
+                      title="Watch Trailer"
+                    >
+                      <Youtube size={20} />
+                    </button>
+                  )}
+                  
                   <button
-                    className={`${styles.actionBtn} ${styles.btnSecondaryGlass} ${inLibrary ? 'active' : ''}`}
-                    onClick={toggleLibrary}
+                    className={styles.iconBtn}
+                    onClick={() => setShowListModal(true)}
+                    title={inList ? "Manage Lists (Added)" : "Add to List"}
                   >
-                    {inLibrary ? <Check size={20} /> : <Plus size={20} />}
-                    {inLibrary ? 'In List' : 'Add to List'}
+                    {inList ? <Check size={20} className="text-green-500" /> : <List size={20} />}
                   </button>
                   
-                  {/* Three-dot menu for movie/series actions */}
+                  {/* Three-dot menu for additional actions */}
                   <DropdownMenu
-                    items={meta.type === 'movie' ? [
-                      {
-                        label: data.watchProgress?.isWatched ? 'Mark as unwatched' : 'Mark as watched',
-                        icon: data.watchProgress?.isWatched ? EyeOff : Eye,
-                        onClick: () => toggleWatched()
-                      }
-                    ] : [
-                      {
-                        label: 'Mark series as watched',
-                        icon: Eye,
-                        onClick: () => markSeriesWatched(true)
-                      },
-                      {
-                        label: 'Mark series as unwatched',
-                        icon: EyeOff,
-                        onClick: () => markSeriesWatched(false)
-                      }
+                    items={[
+                      // Cast & Crew option (if available)
+                      ...(meta.app_extras?.cast || meta.director ? [{
+                        label: 'Cast & Crew',
+                        icon: Info,
+                        onClick: () => setShowInfoModal(true)
+                      }] : []),
+                      // Watch status options
+                      ...(meta.type === 'movie' ? [
+                        {
+                          label: data.watchProgress?.isWatched ? 'Mark as unwatched' : 'Mark as watched',
+                          icon: data.watchProgress?.isWatched ? EyeOff : Eye,
+                          onClick: () => toggleWatched()
+                        }
+                      ] : [
+                        {
+                          label: 'Mark series as watched',
+                          icon: Eye,
+                          onClick: () => markSeriesWatched(true)
+                        },
+                        {
+                          label: 'Mark series as unwatched',
+                          icon: EyeOff,
+                          onClick: () => markSeriesWatched(false)
+                        }
+                      ])
                     ]}
                   />
                 </div>
 
+                {/* Genres inline with description */}
+                {meta.genres && meta.genres.length > 0 && (
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', marginBottom: '12px' }}>
+                    {meta.genres
+                      .filter(genre => !['PG', 'PG-13', 'R', 'NC-17', 'G', 'TV-Y', 'TV-Y7', 'TV-G', 'TV-PG', 'TV-14', 'TV-MA', 'NR', 'UR', '12', '12A', '15', '18', 'U', 'R13', 'R16', 'R18', 'M', 'MA15+', 'R18+', '6', '9', '16'].includes(genre))
+                      .slice(0, 4)
+                      .join(' • ')}
+                  </p>
+                )}
+
                 <p className={styles.detailsDescription}>{meta.description}</p>
-                
-                <div className="cast-info" style={{ marginBottom: '30px', color: '#ccc' }}>
-                  {meta.director && <p style={{ marginBottom: '8px' }}><strong>Director:</strong> {meta.director.join(', ')}</p>}
-                  {meta.cast && <p><strong>Cast:</strong> {meta.cast.join(', ')}</p>}
-                </div>
               </>
             )}
 
@@ -832,93 +908,100 @@ export const StreamingDetails = () => {
                     {(addonStatuses.size > 0 || streams.length > 0) && (
                         <div style={{
                             display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px',
-                            marginBottom: '16px',
-                            padding: '12px',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            borderRadius: '8px'
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '16px',
+                            marginBottom: '20px',
+                            flexWrap: 'wrap'
                         }}>
-                            {/* Top row: Play Best button + source count + refresh */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    {meta.type === 'series' && filteredStreams && filteredStreams.length > 0 && (
-                                        <button 
-                                            className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
-                                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                            onClick={() => handlePlay(filteredStreams[0].stream)}
-                                        >
-                                            <Play size={16} fill="currentColor" />
-                                            Play Best
-                                        </button>
-                                    )}
-                                    <span style={{ fontSize: '0.9rem', color: '#9ca3af' }}>
-                                        {totalStreamCount > 0 ? `${totalStreamCount} sources` : streamsLoading ? 'Loading...' : 'No sources found'}
-                                    </span>
-                                </div>
-                                {/* Refresh button */}
-                                <StreamRefreshButton
-                                    onRefresh={refreshStreams}
-                                    isLoading={streamsLoading}
-                                    cacheAgeMs={cacheStatus?.cacheAgeMs}
-                                />
-                            </div>
-                            
-                            {/* Addon status chips - clickable to filter */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {/* Left side: Source count + addon chips */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                {/* Play Best button for series */}
+                                {meta.type === 'series' && filteredStreams && filteredStreams.length > 0 && (
+                                    <button 
+                                        className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
+                                        style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                        onClick={() => handlePlay(filteredStreams[0].stream)}
+                                    >
+                                        <Play size={16} fill="currentColor" />
+                                        Play Best
+                                    </button>
+                                )}
+                                
+                                {/* Source count */}
+                                <span style={{ 
+                                    fontSize: '0.85rem', 
+                                    color: '#9ca3af',
+                                    fontWeight: 500
+                                }}>
+                                    {totalStreamCount > 0 ? `${totalStreamCount} sources` : streamsLoading ? 'Loading...' : 'No sources'}
+                                </span>
+
+                                {/* Subtle separator */}
+                                {addonStatuses.size > 0 && (
+                                    <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
+                                )}
+
+                                {/* Addon chips - subtle inline pills */}
                                 {Array.from(addonStatuses.values()).map((addon) => (
-                                    <div
+                                    <button
                                         key={addon.id}
                                         onClick={() => {
-                                            // Toggle filter: if already selected, clear; otherwise set
-                                            setSelectedAddon(selectedAddon === addon.id ? null : addon.id)
+                                            if (addon.status === 'done') {
+                                                setSelectedAddon(selectedAddon === addon.id ? null : addon.id)
+                                            }
                                         }}
                                         style={{
-                                            display: 'flex',
+                                            display: 'inline-flex',
                                             alignItems: 'center',
-                                            gap: '6px',
+                                            gap: '5px',
                                             padding: '4px 10px',
-                                            borderRadius: '16px',
+                                            borderRadius: '20px',
+                                            border: 'none',
                                             cursor: addon.status === 'done' ? 'pointer' : 'default',
                                             background: selectedAddon === addon.id
-                                                ? 'rgba(99, 102, 241, 0.3)' // Highlight selected
-                                                : addon.status === 'done' 
-                                                    ? 'rgba(34, 197, 94, 0.15)' 
-                                                    : addon.status === 'error' 
-                                                        ? 'rgba(239, 68, 68, 0.15)' 
-                                                        : 'rgba(255, 255, 255, 0.1)',
-                                            fontSize: '0.8rem',
+                                                ? 'rgba(139, 92, 246, 0.25)'
+                                                : 'rgba(255, 255, 255, 0.06)',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 500,
                                             color: selectedAddon === addon.id
-                                                ? '#a5b4fc' // Selected color
+                                                ? '#c4b5fd'
                                                 : addon.status === 'done' 
-                                                    ? '#22c55e' 
+                                                    ? 'rgba(255, 255, 255, 0.7)' 
                                                     : addon.status === 'error' 
-                                                        ? '#ef4444' 
-                                                        : '#9ca3af',
-                                            border: selectedAddon === addon.id ? '1px solid #6366f1' : '1px solid transparent',
-                                            transition: 'all 0.2s ease'
+                                                        ? '#f87171' 
+                                                        : 'rgba(255, 255, 255, 0.5)',
+                                            transition: 'all 0.15s ease',
+                                            outline: selectedAddon === addon.id ? '1px solid rgba(139, 92, 246, 0.5)' : 'none'
                                         }}
                                     >
                                         {addon.status === 'loading' && (
                                             <span style={{
-                                                width: '12px',
-                                                height: '12px',
-                                                border: '2px solid currentColor',
+                                                width: '10px',
+                                                height: '10px',
+                                                border: '1.5px solid currentColor',
                                                 borderTopColor: 'transparent',
                                                 borderRadius: '50%',
                                                 animation: 'spin 1s linear infinite',
                                                 display: 'inline-block'
                                             }} />
                                         )}
-                                        {addon.status === 'done' && <Check size={12} />}
-                                        {addon.status === 'error' && <span>✕</span>}
+                                        {addon.status === 'done' && <Check size={10} strokeWidth={3} />}
+                                        {addon.status === 'error' && <span style={{ fontSize: '0.6rem' }}>✕</span>}
                                         <span>{addon.name}</span>
                                         {addon.status === 'done' && addon.streamCount !== undefined && (
-                                            <span style={{ opacity: 0.7 }}>({addon.streamCount})</span>
+                                            <span style={{ opacity: 0.6 }}>{addon.streamCount}</span>
                                         )}
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
+
+                            {/* Right side: Refresh button */}
+                            <StreamRefreshButton
+                                onRefresh={refreshStreams}
+                                isLoading={streamsLoading}
+                                cacheAgeMs={cacheStatus?.cacheAgeMs}
+                            />
                         </div>
                     )}
 
@@ -1014,6 +1097,33 @@ export const StreamingDetails = () => {
           </div>
         </div>
       </div>
+
+      {/* Info Modal for cast, director, etc. */}
+      <InfoModal
+        isOpen={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        title={meta.name}
+        director={meta.director}
+        cast={meta.app_extras?.cast}
+        country={meta.country}
+        runtime={meta.runtime}
+        released={meta.released}
+      />
+
+      {/* List Selection Modal */}
+      <ListSelectionModal
+        isOpen={showListModal}
+        onClose={() => setShowListModal(false)}
+        profileId={parseInt(profileId!)}
+        item={{
+          id: meta.id,
+          type: meta.type,
+          name: meta.name,
+          poster: meta.poster,
+          imdbRating: meta.imdbRating
+        }}
+        onChange={checkListStatus}
+      />
     </Layout>
   )
 }

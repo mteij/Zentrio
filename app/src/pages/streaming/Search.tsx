@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Loader2, Filter, ArrowUpDown } from 'lucide-react'
-import { Layout, Navbar, RatingBadge, LazyImage, AnimatedBackground } from '../../components'
+import { Layout, AnimatedBackground } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
+import { ContentCard, ContentItem } from '../../components/features/ContentCard'
 import styles from '../../styles/Streaming.module.css'
 
 export const StreamingSearch = () => {
@@ -66,8 +67,6 @@ export const StreamingSearch = () => {
       }
       setSearchParams(newParams)
   }
-
-  const showImdbRatings = true // Default
 
   // Determine background image from first result
   const heroImage = results.length > 0 ? (results[0].background || results[0].poster) : undefined;
@@ -154,21 +153,11 @@ export const StreamingSearch = () => {
             ) : (
                 <div className={styles.mediaGrid}>
                     {results.map((item, index) => (
-                        <a key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
-                            <div className={styles.posterContainer}>
-                                {item.poster ? (
-                                    <LazyImage src={item.poster} alt={item.name} className={styles.posterImage} />
-                                ) : (
-                                    <div className="flex items-center justify-center bg-gray-800 text-gray-400 w-full h-full p-2 text-center text-sm">{item.name}</div>
-                                )}
-                                {showImdbRatings && item.imdbRating && (
-                                    <RatingBadge rating={parseFloat(item.imdbRating)} />
-                                )}
-                                <div className={styles.cardOverlay}>
-                                    <div className={styles.cardTitle}>{item.name}</div>
-                                </div>
-                            </div>
-                        </a>
+                        <ContentCard 
+                          key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()} 
+                          item={item as ContentItem} 
+                          profileId={profileId!} 
+                        />
                     ))}
                 </div>
             )}

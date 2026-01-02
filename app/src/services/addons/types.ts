@@ -49,6 +49,17 @@ export interface MetaPreview {
   }[]
 }
 
+export interface CastMember {
+  name: string
+  character: string
+  photo: string | null
+}
+
+export interface TrailerStream {
+  title: string
+  ytId: string
+}
+
 export interface MetaDetail extends MetaPreview {
   genres?: string[]
   director?: string[]
@@ -57,6 +68,10 @@ export interface MetaDetail extends MetaPreview {
   country?: string
   imdb_id?: string
   videos?: MetaVideo[]
+  trailerStreams?: TrailerStream[]
+  app_extras?: {
+    cast?: CastMember[]
+  }
 }
 
 export interface MetaVideo {

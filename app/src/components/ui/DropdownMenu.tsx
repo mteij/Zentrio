@@ -91,13 +91,16 @@ export const DropdownMenu = ({ items, triggerIcon, className = '' }: DropdownMen
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '8px',
-          background: 'rgba(255, 255, 255, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          borderRadius: '8px',
+          width: '44px',
+          height: '44px',
+          padding: '0',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderRadius: '50%',
           color: '#fff',
           cursor: 'pointer',
-          transition: 'all 0.2s'
+          transition: 'all 0.2s',
+          flexShrink: 0
         }}
       >
         {triggerIcon || <MoreVertical size={20} />}

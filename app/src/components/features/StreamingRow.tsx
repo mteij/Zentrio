@@ -136,19 +136,23 @@ export const StreamingRow = memo(function StreamingRow({
           style={{ cursor: isDown ? 'grabbing' : 'grab', userSelect: 'none' }}
         >
           {rowItems.map((item, index) => (
-            <ContentCard
+            <div 
               key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
-              item={item}
-              profileId={profileId}
-              showImdbRatings={showImdbRatings}
-              showAgeRatings={showAgeRatings}
-              isContinueWatching={isContinueWatching}
-              isRanked={isRanked}
-              rank={index + 1}
-              onRemove={handleRemove}
-              onDragStart={handlers.onDragStart}
-              onClick={handleItemClick}
-            />
+              className={`${styles.cardWrapper} ${isRanked ? styles.rankedWrapper : ''}`}
+            >
+              <ContentCard
+                item={item}
+                profileId={profileId}
+                showImdbRatings={showImdbRatings}
+                showAgeRatings={showAgeRatings}
+                isContinueWatching={isContinueWatching}
+                isRanked={isRanked}
+                rank={index + 1}
+                onRemove={handleRemove}
+                onDragStart={handlers.onDragStart}
+                onClick={handleItemClick}
+              />
+            </div>
           ))}
         </div>
 

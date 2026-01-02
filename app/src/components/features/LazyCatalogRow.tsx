@@ -144,7 +144,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
                       duration: 0.4,
                       delay: Math.min(index * 0.05, 0.3)
                     }}
-                    style={{ flex: '0 0 auto', width: 180 }}
+                    className={styles.cardWrapper}
                   >
                     <ContentCard 
                       item={item as ContentItem}

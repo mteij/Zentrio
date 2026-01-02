@@ -11,6 +11,7 @@ interface ListSelectionModalProps {
   onClose: () => void
   profileId: number
   item: MetaPreview
+  onChange?: () => void
 }
 
 interface List {
@@ -18,7 +19,7 @@ interface List {
   name: string
 }
 
-export function ListSelectionModal({ isOpen, onClose, profileId, item }: ListSelectionModalProps) {
+export function ListSelectionModal({ isOpen, onClose, profileId, item, onChange }: ListSelectionModalProps) {
   const [lists, setLists] = useState<List[]>([])
   const [selectedLists, setSelectedLists] = useState<number[]>([]) // Lists the item is already in
   const [loading, setLoading] = useState(true)
@@ -49,7 +50,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item }: ListSel
 
   const checkInLists = async () => {
     try {
-      const res = await apiFetch(`/api/lists/check/${item.id}?profileId=${profileId}`)
+      const res = await apiFetch(`/api/lists/check/${encodeURIComponent(item.id)}?profileId=${profileId}&t=${Date.now()}`)
       if (res.ok) {
         const data = await res.json()
         setSelectedLists(data.listIds)
@@ -72,7 +73,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item }: ListSel
     try {
       if (isSelected) {
         // Remove
-        await apiFetch(`/api/lists/${listId}/items/${item.id}`, { method: 'DELETE' })
+        await apiFetch(`/api/lists/${listId}/items/${encodeURIComponent(item.id)}`, { method: 'DELETE' })
       } else {
         // Add
         await apiFetch(`/api/lists/${listId}/items`, {
@@ -86,6 +87,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item }: ListSel
           })
         })
       }
+      onChange?.()
     } catch (e) {
       // Revert on error
       console.error("Failed to toggle list item", e)
@@ -119,6 +121,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item }: ListSel
         
         // Auto-add item to new list
         handleToggleList(data.list.id)
+        onChange?.()
       }
     } catch (e) {
       console.error("Failed to create list", e)

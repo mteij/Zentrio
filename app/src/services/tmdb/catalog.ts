@@ -207,8 +207,24 @@ function findProvider(providerId: string) {
   return provider
 }
 
+const TV_GENRE_MAP: Record<string, string> = {
+  "Action": "Action & Adventure",
+  "Adventure": "Action & Adventure",
+  "Science Fiction": "Sci-Fi & Fantasy",
+  "Fantasy": "Sci-Fi & Fantasy",
+  "War": "War & Politics",
+}
+
 function findGenreId(genreName: string, genreList: any[]) {
-  const genreData = genreList.find(genre => genre.name === genreName)
+  // Try exact match first
+  let genreData = genreList.find(genre => genre.name === genreName)
+  
+  // If not found, try mapping (mostly for TV series)
+  if (!genreData && TV_GENRE_MAP[genreName]) {
+    const mappedName = TV_GENRE_MAP[genreName]
+    genreData = genreList.find(genre => genre.name === mappedName)
+  }
+
   return genreData ? genreData.id : undefined
 }
 
@@ -258,7 +274,9 @@ async function buildParameters(tmdbClient: TMDBClient, type: string, language: s
   } else {
     switch (id) {
       case "tmdb.top":
-        parameters.with_genres = genre ? findGenreId(genre, genreList) : undefined
+        const matched = genre ? findGenreId(genre, genreList) : undefined
+        // Removed validation logging
+        parameters.with_genres = matched
         if (type === "series") {
           parameters.watch_region = language.split("-")[1]
           parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy"
