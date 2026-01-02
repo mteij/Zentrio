@@ -11,6 +11,8 @@ import syncApiRoutes from './sync'
 import traktApiRoutes from './trakt'
 import { getConfig } from '../../services/envParser'
 
+import { db } from '../../services/database'
+
 const app = new Hono()
 
 // Mount sub-routers under /api/*
@@ -57,13 +59,49 @@ app.get('/stream', (c) => {
 // Health check
 app.get('/health', (c) => {
   const { DATABASE_URL, AUTH_SECRET } = getConfig()
+  
+  // Gather stats
+  let stats = {}
+  try {
+    const userCount = (db.prepare('SELECT COUNT(*) as count FROM user').get() as { count: number }).count
+    const profileCount = (db.prepare('SELECT COUNT(*) as count FROM profiles').get() as { count: number }).count
+    const addonCount = (db.prepare('SELECT COUNT(*) as count FROM addons').get() as { count: number }).count
+    const activeSessions = (db.prepare('SELECT COUNT(*) as count FROM proxy_sessions WHERE is_active = 1').get() as { count: number }).count
+    const watchedItems = (db.prepare('SELECT COUNT(*) as count FROM watch_history WHERE is_watched = 1').get() as { count: number }).count
+
+    stats = {
+      users: userCount,
+      profiles: profileCount,
+      addons: addonCount,
+      active_sessions: activeSessions,
+      watched_items: watchedItems
+    }
+  } catch (e) {
+    console.error('Failed to fetch health stats', e)
+    stats = { error: 'Failed to fetch stats' }
+  }
+
+  // Get version safely
+  let version = 'unknown'
+  try {
+    // @ts-ignore
+    const pkg = require('../../../package.json')
+    version = pkg.version
+  } catch {}
+
   return c.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
+    app: {
+      version,
+      uptime: process.uptime(),
+      memory: process.memoryUsage().rss
+    },
     environment: {
       database: DATABASE_URL ? 'configured' : 'not configured',
       auth: AUTH_SECRET ? 'configured' : 'not configured',
     },
+    stats
   })
 })
 
