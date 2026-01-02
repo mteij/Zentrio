@@ -23,10 +23,10 @@ export default defineConfig({
             link: '/self-hosting',
             collapsed: false,
             items: [
-              { text: 'Google SSO', link: '/self-hosting/sso/google' },
-              { text: 'Discord SSO', link: '/self-hosting/sso/discord' },
-              { text: 'GitHub SSO', link: '/self-hosting/sso/github' },
-              { text: 'Authentik SSO', link: '/self-hosting/sso/authentik' }
+              { text: 'Google', link: '/self-hosting/sso/google' },
+              { text: 'Discord', link: '/self-hosting/sso/discord' },
+              { text: 'GitHub', link: '/self-hosting/sso/github' },
+              { text: 'OpenID Connect', link: '/self-hosting/sso/openid' }
             ]
           },
           { text: 'Development', link: '/development' },

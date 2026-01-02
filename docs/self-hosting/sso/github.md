@@ -1,4 +1,4 @@
-# GitHub SSO
+# GitHub
 
 To enable GitHub Sign-In, you need to create an OAuth App in your GitHub settings.
 

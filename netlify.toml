@@ -1,0 +1,7 @@
+[build]
+  base = "docs"
+  command = "bun run build"
+  publish = ".vitepress/dist"
+
+[context.production.environment]
+  NODE_VERSION = "20"

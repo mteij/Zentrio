@@ -1,4 +1,4 @@
-# Discord SSO
+# Discord
 
 To enable Discord Sign-In, you need to create an application in the Discord Developer Portal.
 

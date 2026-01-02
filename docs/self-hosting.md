@@ -52,9 +52,9 @@ See the specific guides for setting up each provider:
 - [Google](./self-hosting/sso/google.md)
 - [Discord](./self-hosting/sso/discord.md)
 - [GitHub](./self-hosting/sso/github.md)
-- [Authentik](./self-hosting/sso/authentik.md)
+- [OpenID Connect](./self-hosting/sso/openid.md)
 
-Supported providers: `GOOGLE`, `GITHUB`, `DISCORD`, `AUTHENTIK`. Prefix variables with `AUTH_{PROVIDER}_`.
+Supported providers: `GOOGLE`, `GITHUB`, `DISCORD`, `OPENID`. Prefix variables with `AUTH_{PROVIDER}_`.
 
 ## Docker Compose
 

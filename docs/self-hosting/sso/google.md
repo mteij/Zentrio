@@ -1,4 +1,4 @@
-# Google SSO
+# Google
 
 To enable Google Sign-In, you need to create a project in the Google Cloud Console.
 
