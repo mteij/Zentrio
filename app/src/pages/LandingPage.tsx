@@ -46,6 +46,9 @@ export function LandingPage({ version }: LandingPageProps) {
 
   // Note: Authenticated user redirect is now handled by PublicRoute wrapper
 
+
+  const [stats, setStats] = useState<{ users: number; profiles: number } | null>(null)
+
   useEffect(() => {
     // Typewriter effect
     let i = 0
@@ -60,6 +63,16 @@ export function LandingPage({ version }: LandingPageProps) {
       }
     }
     type()
+
+    // Fetch stats
+    apiFetch('/api/health')
+      .then(res => res.json())
+      .then(data => {
+        if (data.stats) {
+          setStats(data.stats)
+        }
+      })
+      .catch(console.error)
   }, [])
 
   const [providers, setProviders] = useState<{
@@ -129,6 +142,24 @@ export function LandingPage({ version }: LandingPageProps) {
                   <div className="text-xl text-gray-400 font-mono tracking-wide">
                     <span id="typewriter-text">{typewriterText}</span><span className="animate-pulse text-purple-500">|</span>
                   </div>
+                  
+                  {stats && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1, duration: 0.8 }}
+                      className="absolute bottom-12 flex items-center gap-6 text-sm font-medium text-white/40"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                        <span>{stats.users.toLocaleString()} Users</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                        <span>{stats.profiles.toLocaleString()} Profiles</span>
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div
