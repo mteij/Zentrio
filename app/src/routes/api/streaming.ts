@@ -495,6 +495,26 @@ streaming.get('/search', async (c) => {
   }
 })
 
+/**
+ * Catalog-based search endpoint (Stremio-style).
+ * Returns results grouped by catalog source for row-based display.
+ */
+streaming.get('/search-catalogs', async (c) => {
+  const { q, profileId, type } = c.req.query()
+  if (!q || !profileId) return c.json({ catalogs: [] })
+  
+  try {
+    const filters = {
+      type: type !== 'undefined' ? type : undefined
+    }
+    const catalogs = await addonManager.searchByCatalog(q, parseInt(profileId), filters)
+    return c.json({ catalogs })
+  } catch (e) {
+    console.error('Catalog search API error:', e)
+    return c.json({ catalogs: [] })
+  }
+})
+
 streaming.get('/catalog', async (c) => {
   const { profileId, manifestUrl, type, id, skip, genre } = c.req.query()
   const pId = parseInt(profileId)

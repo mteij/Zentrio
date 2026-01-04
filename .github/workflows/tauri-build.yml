@@ -29,6 +29,8 @@ jobs:
       release_id: ${{ steps.get_release_id.outputs.release_id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -102,6 +104,9 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.create-release.outputs.tag_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -193,7 +198,7 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
         with:
           projectPath: ./app
-          tagName: v__VERSION__
+          tagName: ${{ needs.create-release.outputs.tag_name }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
 
@@ -208,11 +213,11 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
           KEYSTORE_PATH="$(pwd)/keystore.jks"
 
-          # Generate icons to ensure Android resources are up to date
-          bun tauri icon src-tauri/icon.png
-
           # Initialize Android project
           bun tauri android init
+
+          # Generate icons to ensure Android resources are up to date
+          bun tauri icon src-tauri/icon.png
 
           # Configure signing via gradle.properties (not CLI flags)
           GRADLE_PROPS="src-tauri/gen/android/gradle.properties"

@@ -336,6 +336,11 @@ export const StreamingPlayer = () => {
             traktScrobbleStartedRef.current = true
             const progress = (currentTime / dur) * 100
             
+            // Extract IDs
+            const isImdb = meta.id.startsWith('tt')
+            const imdbId = isImdb ? meta.id : undefined
+            const tmdbId = !isImdb ? meta.id.replace(/^tmdb:/, '') : undefined
+
             // Fire and forget - don't block playback
             apiFetch('/api/trakt/scrobble/start', {
                 method: 'POST',
@@ -343,7 +348,8 @@ export const StreamingPlayer = () => {
                 body: JSON.stringify({
                     profileId,
                     metaType: meta.type,
-                    imdbId: meta.id.startsWith('tt') ? meta.id : undefined,
+                    imdbId,
+                    tmdbId,
                     season: meta.season,
                     episode: meta.episode,
                     progress: Math.round(progress)
@@ -362,13 +368,19 @@ export const StreamingPlayer = () => {
 
         // Trakt scrobble stop (100% progress marks as watched)
         if (meta && profileId && traktScrobbleStartedRef.current) {
+            // Extract IDs
+            const isImdb = meta.id.startsWith('tt')
+            const imdbId = isImdb ? meta.id : undefined
+            const tmdbId = !isImdb ? meta.id.replace(/^tmdb:/, '') : undefined
+
             apiFetch('/api/trakt/scrobble/stop', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     profileId,
                     metaType: meta.type,
-                    imdbId: meta.id.startsWith('tt') ? meta.id : undefined,
+                    imdbId,
+                    tmdbId,
                     season: meta.season,
                     episode: meta.episode,
                     progress: 100
@@ -444,11 +456,18 @@ export const StreamingPlayer = () => {
         return () => {
             if (meta && profileId && traktScrobbleStartedRef.current && duration > 0) {
                 const progress = (lastSavedProgressRef.current / duration) * 100
+                
+                // Extract IDs
+                const isImdb = meta.id.startsWith('tt')
+                const imdbId = isImdb ? meta.id : undefined
+                const tmdbId = !isImdb ? meta.id.replace(/^tmdb:/, '') : undefined
+
                 // Use navigator.sendBeacon for reliable delivery on page unload
                 const data = JSON.stringify({
                     profileId,
                     metaType: meta.type,
-                    imdbId: meta.id.startsWith('tt') ? meta.id : undefined,
+                    imdbId,
+                    tmdbId,
                     season: meta.season,
                     episode: meta.episode,
                     progress: Math.round(progress)

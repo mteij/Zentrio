@@ -42,6 +42,7 @@ import '@vidstack/react/player/styles/default/layouts/video.css'
 
 // Custom components for slots
 import { CastButton } from './CastButton'
+import { toast } from '../../utils/toast'
 
 // Lazy load hybrid media engine to reduce initial bundle size
 // This is only loaded when hybrid playback is actually needed
@@ -161,115 +162,232 @@ function AudioTracksMenu() {
 }
 
 function SubtitlesMenu({ tracks }: { tracks: SubtitleTrack[] }) {
+    // We only need remote for turning off subtitles (setting track -1)
     const remote = useMediaRemote()
     const captionOptions = useCaptionOptions()
+    // Use textTrack only to see what is currently active
     const textTrack = useMediaState('textTrack')
-    const textTracks = useMediaState('textTracks')
+    const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
 
-    // Debug: log caption options and tracks
-    console.log('[SubtitlesMenu] Caption options:', captionOptions)
-    console.log('[SubtitlesMenu] Text tracks from state:', textTracks)
-    console.log('[SubtitlesMenu] Prop tracks:', tracks)
+    // Helper to extract clean language code
+    const getCleanLang = useCallback((track: any) => {
+        // 1. Trust explicit language property if valid (2-3 chars usually, not ":subtitles-...")
+        if (track.language && track.language.length < 5 && !track.language.includes(':')) {
+            return track.language
+        }
+        
+        // 2. Try to parse from ID/Value if it looks like ":subtitles-ita"
+        // Format seen: ":subtitles-ita (opensubtitles v3)" or just "subtitles-ita"
+        const idToCheck = track.value || track.id || ''
+        const match = idToCheck.match(/subtitles-([a-z]{2,3})\b/)
+        if (match) return match[1]
+        
+        return track.language || 'unknown'
+    }, [])
 
-    // Get display name for language (using Intl.DisplayNames if available)
-    const getLangName = (code: string) => {
+    // Helper to get display name
+    const getLangName = useCallback((code: string) => {
         try {
+            if (!code || code === 'off' || code === 'unknown') return 'Unknown'
             return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || code
         } catch {
             return code
         }
-    }
+    }, [])
 
-    // Check if we have caption options from media OR tracks from props
-    // useCaptionOptions() returns tracks detected in the media
-    // tracks prop contains subtitle URLs we want to add
-    const hasCaptionOptions = captionOptions && captionOptions.length > 0
-    const hasPropTracks = tracks && tracks.length > 0
-    const hasTextTracks = textTracks && textTracks.length > 0
-    const hasAnySubtitles = hasCaptionOptions || hasPropTracks || hasTextTracks
+    // Process all available tracks into a structured format
+    // We strictly use captionOptions as they represent the tracks Vidstack is aware of and can select.
+    const processedTracks = useMemo(() => {
+        const byLanguage: Record<string, any[]> = {}
+        const allLangs = new Set<string>()
 
-    // Current selected track value
-    const currentValue = textTrack ? textTrack.language || textTrack.label || '' : 'off'
+        if (captionOptions) {
+            captionOptions.forEach(opt => {
+                if (opt.value === 'off') return
+                const lang = getCleanLang(opt)
+                if (!byLanguage[lang]) byLanguage[lang] = []
+                
+                // Prevent duplicate IDs within the same language group
+                // This prevents "two children with same key" errors if addons return duplicates
+                if (!byLanguage[lang].some(t => t.id === opt.value)) {
+                    byLanguage[lang].push({
+                        id: opt.value,
+                        label: opt.label,
+                        src: 'native',
+                        select: opt.select,
+                        selected: opt.selected,
+                        // Store option for direct selection
+                        option: opt
+                    })
+                }
+                allLangs.add(lang)
+            })
+        }
+
+        return {
+            byLanguage,
+            languages: Array.from(allLangs).sort((a, b) => getLangName(a).localeCompare(getLangName(b)))
+        }
+    }, [captionOptions, getLangName, getCleanLang])
+
+    // Current selected language
+    const currentLang = textTrack?.language || (textTrack?.mode === 'showing' ? 'unknown' : null)
+    
+    // Auto-select language category
+    useEffect(() => {
+        if (selectedLanguage) return
+        if (currentLang && processedTracks.byLanguage[currentLang]) {
+            setSelectedLanguage(currentLang)
+            return
+        }
+        if (processedTracks.languages.length > 0) {
+            setSelectedLanguage(processedTracks.languages[0])
+        }
+    }, [currentLang, processedTracks, selectedLanguage])
+
+    const hasAnySubtitles = processedTracks.languages.length > 0
 
     return (
         <Menu.Root>
+            {/* Global style to hide the default Captions menu item in the Settings menu (duplicate) */}
+             <style>{`
+                /* Hide the Captions item in the main settings menu */
+                .vds-menu-items [data-testid="captions-menu-item"],
+                .vds-menu-item[aria-label="Captions"],
+                .vds-menu-item[aria-label="Subtitles"],
+                .vds-menu-item[data-section="captions"],
+                /* Try to target by icon presence if supported */
+                .vds-menu-item:has(svg.vds-icon-captions),
+                .vds-menu-item:has([aria-label="Captions"]) {
+                   display: none !important;
+                }
+            `}</style>
+            
             <Menu.Button className="vds-menu-button vds-button" aria-label="Subtitles" style={{ display: 'flex' }}>
                 <Captions className="vds-icon" size={20} />
             </Menu.Button>
 
-            <Menu.Content className="vds-menu-items" placement="top" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                <div className="vds-menu-title">Subtitles</div>
+            <Menu.Content className="vds-menu-items" placement="top" style={{ 
+                width: '600px', 
+                height: '400px', 
+                maxHeight: '80vh',
+                maxWidth: '90vw',
+                display: 'flex', 
+                flexDirection: 'column',
+                padding: 0,
+                overflow: 'hidden'
+            }}>
+                <div className="vds-menu-title" style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    Subtitles
+                </div>
                 
                 {!hasAnySubtitles ? (
-                    <div style={{ padding: '12px', color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>
-                        <div style={{ marginBottom: '8px' }}>No subtitles available</div>
-                        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
-                            Install a subtitle addon (e.g., OpenSubtitles) to load external subtitles
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.7)' }}>
+                        <div>No subtitles available</div>
+                        <div style={{ fontSize: '12px', marginTop: '8px', opacity: 0.7 }}>
+                            Install a subtitle addon (e.g. OpenSubtitles)
                         </div>
                     </div>
                 ) : (
-                    <Menu.RadioGroup value={currentValue}>
-                        {/* Off Option */}
-                        <Menu.Radio
-                            value="off"
-                            className="vds-menu-item"
-                            onSelect={() => {
-                                // Disable subtitles by changing text track
-                                (remote as any).changeTextTrack(-1)
-                            }}
-                        >
-                            <span className="vds-menu-item-label">Off</span>
-                            {!textTrack && <Check className="vds-radio-icon" size={14} />}
-                        </Menu.Radio>
-
-                        <div className="vds-menu-divider" />
-
-                        {/* Subtitle Tracks from caption options (detected in media) */}
-                        {hasCaptionOptions && captionOptions.map((option) => (
-                            <Menu.Radio
-                                key={option.value}
-                                value={option.value}
-                                className="vds-menu-item"
-                                onSelect={option.select}
+                    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                        {/* Left Column: Languages */}
+                        <div style={{ 
+                            width: '200px', 
+                            borderRight: '1px solid rgba(255,255,255,0.1)', 
+                            overflowY: 'auto',
+                            backgroundColor: 'rgba(0,0,0,0.2)'
+                        }}>
+                             {/* Off Option - Fixed at top */}
+                            <div 
+                                className="vds-menu-item" 
+                                style={{ 
+                                    padding: '10px 16px', 
+                                    cursor: 'pointer',
+                                    backgroundColor: !textTrack || textTrack.mode === 'disabled' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                }}
+                                onClick={() => {
+                                     (remote as any).changeTextTrack(-1)
+                                     toast.success('Subtitles turned off')
+                                }}
                             >
-                                <span className="vds-menu-item-label">
-                                    {option.label}
-                                </span>
-                                <Check className="vds-radio-icon" size={14} />
-                            </Menu.Radio>
-                        ))}
-
-                        {/* External subtitle tracks from props */}
-                        {/* These should appear in textTracks after Track components render */}
-                        {hasTextTracks && !hasCaptionOptions && textTracks.map((track: any, index: number) => {
-                            // Skip the "off" option if it exists
-                            if (track.kind === 'subtitles' && track.language) {
-                                return (
-                                    <Menu.Radio
-                                        key={`external-${index}`}
-                                        value={track.language}
-                                        className="vds-menu-item"
-                                        onSelect={() => {
-                                            (remote as any).changeTextTrack(index)
-                                        }}
-                                    >
-                                        <span className="vds-menu-item-label">
-                                            {track.label || getLangName(track.language)}
-                                        </span>
-                                        <Check className="vds-radio-icon" size={14} />
-                                    </Menu.Radio>
-                                )
-                            }
-                            return null
-                        })}
-
-                        {/* Show message if we have prop tracks but no caption options or text tracks */}
-                        {hasPropTracks && !hasCaptionOptions && !hasTextTracks && (
-                            <div style={{ padding: '12px', color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>
-                                {tracks.length} subtitle(s) loaded but not yet detected
+                                <span className="vds-menu-item-label">Off</span>
+                                {(!textTrack || textTrack.mode === 'disabled') && <Check className="vds-radio-icon" size={14} />}
                             </div>
-                        )}
-                    </Menu.RadioGroup>
+
+                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0' }} />
+
+                             {/* Language List */}
+                             {processedTracks.languages.map(lang => (
+                                 <div 
+                                    key={lang}
+                                    className="vds-menu-item"
+                                    style={{ 
+                                        padding: '10px 16px', 
+                                        cursor: 'pointer',
+                                        backgroundColor: selectedLanguage === lang ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                                        opacity: currentLang === lang ? 1 : 0.8
+                                    }}
+                                    onClick={() => setSelectedLanguage(lang)}
+                                 >
+                                     <span className="vds-menu-item-label">
+                                         {getLangName(lang)}
+                                         <span style={{ fontSize: '10px', marginLeft: '6px', opacity: 0.5 }}>
+                                             {processedTracks.byLanguage[lang].length}
+                                         </span>
+                                     </span>
+                                     {currentLang === lang && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--media-brand)', marginLeft: 'auto' }} />}
+                                 </div>
+                             ))}
+                        </div>
+
+                        {/* Right Column: Tracks for selected language */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+                            {!selectedLanguage ? (
+                                <div style={{ padding: '20px', textAlign: 'center', opacity: 0.5 }}>Select a language</div>
+                            ) : (
+                                <div>
+                                    <div style={{ 
+                                        padding: '8px 12px', 
+                                        fontSize: '12px', 
+                                        fontWeight: 'bold', 
+                                        color: 'var(--media-brand)',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.5px'
+                                    }}>
+                                        {getLangName(selectedLanguage)}
+                                    </div>
+                                    <Menu.RadioGroup value={textTrack?.id || ''}>
+                                        {processedTracks.byLanguage[selectedLanguage].map((track, i) => (
+                                            <Menu.Radio
+                                                key={`${track.id}-${i}`}
+                                                value={track.id}
+                                                className="vds-menu-item"
+                                                style={{ padding: '8px 12px', borderRadius: '4px' }}
+                                                onSelect={() => {
+                                                    // ALWAYS use option.select() - it handles internal logic correctly
+                                                    if (track.option && track.option.select) {
+                                                        track.option.select()
+                                                        toast.success(`Subtitle set to ${track.label}`)
+                                                    } else {
+                                                        console.error('Track missing select method:', track)
+                                                        toast.error('Failed to select subtitle')
+                                                    }
+                                                }}
+                                            >
+                                                <span className="vds-menu-item-label" style={{ fontSize: '13px' }}>
+                                                    {track.label}
+                                                </span>
+                                                <Check className="vds-radio-icon" size={14} />
+                                            </Menu.Radio>
+                                        ))}
+                                    </Menu.RadioGroup>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 )}
             </Menu.Content>
         </Menu.Root>

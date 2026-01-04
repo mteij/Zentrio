@@ -16,6 +16,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
   const location = useLocation()
   const navigate = useNavigate()
   const [showOverlay, setShowOverlay] = useState(false)
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false)
   const overlayInputRef = useRef<HTMLInputElement>(null)
   
   // Create hover preloaders for each route
@@ -27,14 +28,28 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
 
   useEffect(() => {
     if (showOverlay && overlayInputRef.current) {
-        // slight initial delay for animation
-        setTimeout(() => overlayInputRef.current?.focus(), 100)
+        setTimeout(() => overlayInputRef.current?.focus(), 50)
     }
   }, [showOverlay])
 
   const handleSearchClick = (e: React.MouseEvent) => {
     e.preventDefault()
     setShowOverlay(true)
+  }
+
+  // Navigate to search page immediately when user types
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    if (value.trim()) {
+      setIsAnimatingOut(true)
+      // Navigate immediately - search page will handle focus
+      navigate(`/streaming/${profileId}/search?q=${encodeURIComponent(value)}&from=overlay`)
+      // Clean up overlay after a brief moment
+      setTimeout(() => {
+        setShowOverlay(false)
+        setIsAnimatingOut(false)
+      }, 100)
+    }
   }
 
   const handleOverlaySubmit = (e: React.FormEvent) => {
@@ -133,16 +148,20 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
             className={styles.searchOverlay} 
             id="searchOverlay"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1, display: 'flex' }}
+            animate={{ opacity: isAnimatingOut ? 0 : 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.15 }}
           >
             <motion.div 
                 className={styles.searchContainer}
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={{ 
+                  scale: 1, 
+                  opacity: isAnimatingOut ? 0 : 1,
+                  y: isAnimatingOut ? -200 : 0
+                }}
+                exit={{ opacity: 0, y: -100 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
             >
               <Search className={styles.searchIcon} />
               <form onSubmit={handleOverlaySubmit}>
@@ -152,7 +171,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
                   name="q"
                   placeholder="Search movies & series..."
                   autoComplete="off"
-                  defaultValue={new URLSearchParams(location.search).get('q') || ''}
+                  onChange={handleInputChange}
                 />
               </form>
               <button 
@@ -160,7 +179,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
                 onClick={() => setShowOverlay(false)}
                 aria-label="Close Search"
               >
-                <X size={32} />
+                <X size={20} />
               </button>
             </motion.div>
           </motion.div>

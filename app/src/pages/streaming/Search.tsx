@@ -1,22 +1,79 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Loader2, Filter, ArrowUpDown } from 'lucide-react'
+import { Search, Loader2 } from 'lucide-react'
 import { Layout, AnimatedBackground } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
-import { ContentCard, ContentItem } from '../../components/features/ContentCard'
+import { SearchCatalogRow } from '../../components/features/SearchCatalogRow'
 import styles from '../../styles/Streaming.module.css'
+
+interface CatalogSearchResult {
+  addon: { id: string; name: string; logo?: string }
+  catalog: { type: string; id: string; name?: string }
+  items: MetaPreview[]
+}
 
 export const StreamingSearch = () => {
   const { profileId } = useParams<{ profileId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [results, setResults] = useState<MetaPreview[]>([])
+  const [catalogResults, setCatalogResults] = useState<CatalogSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const hasAutoFocused = useRef(false)
   
   const query = searchParams.get('q') || ''
   const typeParam = searchParams.get('type') || 'all'
-  const sortParam = searchParams.get('sort') || 'relevance'
+  const fromOverlay = searchParams.get('from') === 'overlay'
+  
+  // Local input state for controlled input
+  const [inputValue, setInputValue] = useState(query)
+  
+  // Track if we should maintain focus after URL changes
+  const shouldMaintainFocus = useRef(false)
+  
+  // Immediately focus input with cursor at end when coming from overlay
+  useLayoutEffect(() => {
+    if (inputRef.current && !hasAutoFocused.current) {
+      hasAutoFocused.current = true
+      shouldMaintainFocus.current = true
+      inputRef.current.focus()
+      // Move cursor to end of text
+      const len = inputRef.current.value.length
+      inputRef.current.setSelectionRange(len, len)
+    }
+  }, [])
+  
+  // Clean up the 'from' param separately to avoid focus issues
+  useEffect(() => {
+    if (fromOverlay) {
+      const newParams = new URLSearchParams(searchParams)
+      newParams.delete('from')
+      setSearchParams(newParams, { replace: true })
+    }
+  }, [fromOverlay, searchParams, setSearchParams])
+  
+  // Re-apply focus after URL param changes if we're in "maintain focus" mode
+  useLayoutEffect(() => {
+    if (shouldMaintainFocus.current && inputRef.current) {
+      // Use requestAnimationFrame to ensure DOM is settled
+      requestAnimationFrame(() => {
+        if (inputRef.current && document.activeElement !== inputRef.current) {
+          inputRef.current.focus()
+          const len = inputRef.current.value.length
+          inputRef.current.setSelectionRange(len, len)
+        }
+      })
+    }
+  }, [searchParams])
+  
+  // Sync inputValue with URL query on external changes
+  useEffect(() => {
+    setInputValue(query)
+  }, [query])
+
+  // Ref to track the latest search request and cancel stale ones
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!profileId) {
@@ -24,43 +81,85 @@ export const StreamingSearch = () => {
       return
     }
     if (query) {
-      performSearch(query, typeParam, sortParam)
+      performSearch(query, typeParam)
     } else {
-      setResults([])
+      setCatalogResults([])
     }
-  }, [profileId, query, typeParam, sortParam])
+  }, [profileId, query, typeParam])
+  
+  // Debounce effect: update URL after 300ms of no typing
+  useEffect(() => {
+    // Don't debounce if input matches current query (prevents loops)
+    if (inputValue === query) return
+    
+    const timer = setTimeout(() => {
+      if (inputValue.trim()) {
+        const newParams = new URLSearchParams(searchParams)
+        newParams.set('q', inputValue)
+        setSearchParams(newParams, { replace: true })
+      } else if (query) {
+        // Clear query if input is empty
+        const newParams = new URLSearchParams(searchParams)
+        newParams.delete('q')
+        setSearchParams(newParams, { replace: true })
+      }
+    }, 300)
+    
+    return () => clearTimeout(timer)
+  }, [inputValue, query, searchParams, setSearchParams])
 
-  const performSearch = async (q: string, type: string, sort: string) => {
+  const performSearch = async (q: string, type: string) => {
+    // Cancel any previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    
+    // Create new abort controller for this request
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     setLoading(true)
     setError('')
     try {
-      let url = `/api/streaming/search?profileId=${profileId}&q=${encodeURIComponent(q)}`
+      let url = `/api/streaming/search-catalogs?profileId=${profileId}&q=${encodeURIComponent(q)}`
       if (type && type !== 'all') url += `&type=${type}`
-      if (sort && sort !== 'relevance') url += `&sort=${sort}`
       
-      const res = await fetch(url)
+      const res = await fetch(url, { signal: controller.signal })
       const data = await res.json()
-      setResults(data.results || [])
+      
+      // Only update state if this request wasn't aborted
+      if (!controller.signal.aborted) {
+        setCatalogResults(data.catalogs || [])
+      }
     } catch (err) {
+      // Ignore abort errors
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
       console.error(err)
       setError('Failed to search')
     } finally {
-      setLoading(false)
+      // Only set loading false if this request wasn't aborted
+      // (aborted means a newer request took over)
+      if (!controller.signal.aborted) {
+        setLoading(false)
+      }
     }
   }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    const formData = new FormData(e.target as HTMLFormElement)
-    const q = formData.get('q') as string
-    if (q) {
-      setSearchParams({ q, type: typeParam, sort: sortParam })
+    // Immediately update URL on Enter (skip debounce)
+    if (inputValue.trim()) {
+      const newParams = new URLSearchParams(searchParams)
+      newParams.set('q', inputValue)
+      setSearchParams(newParams, { replace: true })
     }
   }
 
   const handleFilterChange = (key: string, value: string) => {
       const newParams = new URLSearchParams(searchParams)
-      if (value && value !== 'all' && value !== 'relevance') {
+      if (value && value !== 'all') {
           newParams.set(key, value)
       } else {
           newParams.delete(key)
@@ -68,8 +167,10 @@ export const StreamingSearch = () => {
       setSearchParams(newParams)
   }
 
-  // Determine background image from first result
-  const heroImage = results.length > 0 ? (results[0].background || results[0].poster) : undefined;
+  // Determine background image from first result of first catalog
+  const heroImage = catalogResults.length > 0 && catalogResults[0].items.length > 0 
+    ? (catalogResults[0].items[0].background || catalogResults[0].items[0].poster) 
+    : undefined;
 
   return (
     <Layout title="Search" showHeader={false} showFooter={false}>
@@ -80,89 +181,95 @@ export const StreamingSearch = () => {
         key={heroImage || 'no-hero'} 
       />
       <div className={`${styles.streamingLayout} ${styles.searchLayout}`}>
-        <div className={styles.searchHeader} style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(20px)',
-          padding: '16px 60px',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: '12px',
-          width: '100%'
-        }}>
-          <div className="relative flex-1 max-w-md">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
-            <form onSubmit={handleSearch} id="searchForm" className="w-full">
+        {/* Search Header - Matches Explore page styling */}
+        <div className={styles.exploreHeader}>
+          {/* Search Input with glassmorphic styling */}
+          <div className={styles.exploreToggleGroup} style={{ padding: '6px', minWidth: '320px', maxWidth: '480px', flex: 1, display: 'flex', alignItems: 'center' }}>
+            <Search 
+              size={18} 
+              style={{
+                marginLeft: '12px',
+                color: 'rgba(255,255,255,0.5)',
+                flexShrink: 0
+              }} 
+            />
+            <form onSubmit={handleSearch} id="searchForm" style={{ flex: 1 }}>
               <input
+                ref={inputRef}
                 type="text"
                 name="q"
                 id="searchInput"
                 placeholder="Search..."
-                defaultValue={query}
-                autoFocus
-                className="w-full bg-white/10 border border-white/20 rounded-lg py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:bg-white/20 transition-colors placeholder:text-white/30"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
                 autoComplete="off"
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '8px 12px',
+                  fontSize: '0.95rem',
+                  color: '#fff',
+                  outline: 'none'
+                }}
               />
             </form>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="relative">
-                <select 
-                    value={typeParam}
-                    onChange={(e) => handleFilterChange('type', e.target.value)}
-                    className="appearance-none bg-white/10 border border-white/20 rounded-lg px-4 py-2 pr-8 text-sm text-white focus:outline-none focus:bg-white/20 transition-colors cursor-pointer hover:bg-white/20"
+          {/* Right side: Type toggles */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Type Filter - Same as Explore toggles */}
+            <div className={styles.exploreToggleGroup}>
+              {(['all', 'movie', 'series'] as const).map(type => (
+                <button
+                  key={type}
+                  onClick={() => handleFilterChange('type', type)}
+                  className={`${styles.exploreToggleBtn} ${typeParam === type ? styles.exploreToggleBtnActive : ''}`}
                 >
-                    <option value="all" className="bg-gray-900">All Types</option>
-                    <option value="movie" className="bg-gray-900">Movies</option>
-                    <option value="series" className="bg-gray-900">Series</option>
-                </select>
-                <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
-            </div>
-
-            <div className="relative">
-                <select 
-                    value={sortParam}
-                    onChange={(e) => handleFilterChange('sort', e.target.value)}
-                    className="appearance-none bg-white/10 border border-white/20 rounded-lg px-4 py-2 pr-8 text-sm text-white focus:outline-none focus:bg-white/20 transition-colors cursor-pointer hover:bg-white/20"
-                >
-                    <option value="relevance" className="bg-gray-900">Relevance</option>
-                    <option value="newest" className="bg-gray-900">Newest</option>
-                    <option value="oldest" className="bg-gray-900">Oldest</option>
-                    <option value="rating" className="bg-gray-900">Rating</option>
-                </select>
-                <ArrowUpDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
+                  {type === 'all' ? 'All' : type === 'movie' ? 'Movies' : 'Series'}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        {query && (
-          <div className={styles.contentContainer} style={{ marginTop: 0 }}>
-            {results.length > 0 && <h1 style={{ padding: '0 60px', marginBottom: '30px', marginTop: '30px', fontSize: '1.5rem', fontWeight: '600', color: '#fff' }}>Results for "{query}"</h1>}
-            
-            {loading ? (
-                <div className="flex justify-center p-10">
-                    <Loader2 className="animate-spin" size={40} />
-                </div>
-            ) : results.length === 0 ? (
-                <div style={{ padding: '60px', color: '#aaa', fontSize: '1.2rem' }}>No results found for "{query}".</div>
-            ) : (
-                <div className={styles.mediaGrid}>
-                    {results.map((item, index) => (
-                        <ContentCard 
-                          key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()} 
-                          item={item as ContentItem} 
-                          profileId={profileId!} 
-                        />
-                    ))}
-                </div>
-            )}
-          </div>
-        )}
+        <div className={styles.contentContainer} style={{ marginTop: '100px' }}>
+          {query && catalogResults.length > 0 && (
+            <h1 style={{ 
+              padding: '0 60px', 
+              marginBottom: '30px', 
+              fontSize: '1.5rem', 
+              fontWeight: '600', 
+              color: '#fff'
+            }}>
+              Results for "{query}"
+            </h1>
+          )}
+          
+          {loading ? (
+              <div className="flex justify-center p-10">
+                  <Loader2 className="animate-spin" size={40} />
+              </div>
+          ) : !query ? (
+              <div style={{ padding: '60px', color: '#aaa', fontSize: '1.2rem', textAlign: 'center' }}>
+                Start typing to search for movies and series...
+              </div>
+          ) : catalogResults.length === 0 ? (
+              <div style={{ padding: '60px', color: '#aaa', fontSize: '1.2rem' }}>No results found for "{query}".</div>
+          ) : (
+              <div className={styles.catalogRows}>
+                {catalogResults.map((result) => (
+                  <SearchCatalogRow
+                    key={`${result.addon.id}-${result.catalog.id}`}
+                    addon={result.addon}
+                    catalog={result.catalog}
+                    items={result.items}
+                    profileId={profileId!}
+                  />
+                ))}
+              </div>
+          )}
+        </div>
       </div>
     </Layout>
   )

@@ -108,7 +108,7 @@ export class AddonClient {
     if (!this.manifest) await this.init()
     // Subtitles resource path: /subtitles/{type}/{id}/{videoHash}.json
     // videoHash is optional but often used for OpenSubtitles
-    const hashPart = videoHash ? `/${videoHash}` : ''
+    const hashPart = videoHash ? `/videoHash=${encodeURIComponent(videoHash)}` : ''
     const url = `${this.baseUrl}/subtitles/${type}/${id}${hashPart}.json`
     
     const addonName = this.manifest?.name || 'Unknown'
