@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from 'sonner'
-import { open } from "@tauri-apps/plugin-shell";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { authClient, getClientUrl, getServerUrl, isTauri } from "../../lib/auth-client";
 import { apiFetch, apiFetchJson } from "../../lib/apiFetch";
 import { 
@@ -115,7 +115,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         const handoffUrl = `${serverUrl}/api/auth/native-redirect`;
         const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
         
-        await open(url);
+        await openUrl(url);
         // We don't need to do anything else, the deep link listener in TitleBar will handle the rest
       } else {
         // Web behavior
@@ -177,9 +177,15 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             callbackURL: `${getClientUrl()}${redirectPath}`
           });
           if (error) throw error;
-          // Update auth store with user data before navigating
+          // Update auth store with user data AND session token before navigating
+          // For Tauri, the token is required for Bearer auth since cookies don't work cross-origin
           if (data?.user) {
-            useAuthStore.getState().login(data.user);
+            const sessionData = data.token ? {
+              user: data.user,
+              expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+              token: data.token
+            } : undefined;
+            useAuthStore.getState().login(data.user, sessionData);
             
             // If parent provided onSuccess handler, call it and skip default behavior
             if (onSuccess) {
@@ -233,9 +239,14 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                     otp
                 });
                 if (error) throw error;
-                // Update auth store with user data before navigating
+                // Update auth store with user data AND session token before navigating
                 if (data?.user) {
-                  useAuthStore.getState().login(data.user);
+                  const sessionData = data.token ? {
+                    user: data.user,
+                    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                    token: data.token
+                  } : undefined;
+                  useAuthStore.getState().login(data.user, sessionData);
                 }
                 
                 // If parent provided onSuccess handler, call it and skip default behavior

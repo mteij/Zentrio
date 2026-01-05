@@ -104,12 +104,25 @@ body.is-mobile {
   padding-right: var(--safe-area-inset-right);
   /* No titlebar on mobile */
   --titlebar-height: 0px;
+  
+  /* LOCK BODY SCROLL - Critical for preventing rubber banding */
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body.is-mobile #root {
   /* Adjust height to account for safe area padding */
   min-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
   height: 100%;
+  
+  /* Enable scroll on root instead of body */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Ensure fixed elements respect safe areas on mobile */
@@ -120,3 +133,4 @@ body.is-mobile .fixed-header {
 body.is-mobile .fixed-bottom {
   bottom: var(--safe-area-inset-bottom);
 }
+

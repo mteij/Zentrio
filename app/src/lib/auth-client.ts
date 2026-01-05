@@ -65,12 +65,10 @@ export const getClientUrl = () => {
 // Safe fetch wrapper that uses Tauri HTTP plugin in Tauri context
 const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    console.log('[safeFetch] Request to:', url, init?.method || 'GET');
     
     if (isTauri()) {
         try {
             const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-            console.log('[safeFetch] Using Tauri HTTP plugin');
             
             // Ensure headers are properly passed
             const headers = new Headers(init?.headers);
@@ -87,11 +85,25 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
                 }
             }
             
+            // Inject Bearer token if available (for Tauri cross-origin auth)
+            // This is critical for 2FA and other auth operations where cookies don't work
+            if (!headers.has('Authorization')) {
+                try {
+                    // Dynamic import to avoid circular dependency
+                    const { useAuthStore } = await import('../stores/authStore');
+                    const token = useAuthStore.getState().session?.token;
+                    if (token) {
+                        headers.set('Authorization', `Bearer ${token}`);
+                    }
+                } catch (e) {
+                    // Ignore - authStore might not be available yet
+                }
+            }
+            
             const response = await tauriFetch(url, {
                 ...init,
                 headers,
             });
-            console.log('[safeFetch] Response status:', response.status);
             return response;
         } catch (e: any) {
             console.error('[safeFetch] Tauri HTTP plugin error:', e);

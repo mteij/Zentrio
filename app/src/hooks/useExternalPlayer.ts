@@ -37,8 +37,8 @@ export function useExternalPlayer() {
 
     if (player === 'system' && isTauri) {
       try {
-        const { open } = await import('@tauri-apps/plugin-shell')
-        await open(url)
+        const { openUrl } = await import('@tauri-apps/plugin-opener')
+        await openUrl(url)
         return { success: true, message: 'Opened in system player' }
       } catch (error) {
         console.error('Failed to open in system player:', error)

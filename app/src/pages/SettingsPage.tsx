@@ -321,7 +321,7 @@ export function SettingsPage() {
       // In Tauri, we need to use the system browser for OAuth, just like login
       // The callback will go through native-redirect and deep link back
       if ((window as any).__TAURI__) {
-        const { open } = await import('@tauri-apps/plugin-shell')
+        const { openUrl } = await import('@tauri-apps/plugin-opener')
         const serverUrl = localStorage.getItem('zentrio_server_url') || 'https://app.zentrio.eu'
         
         // First, get a link code from the server (this authenticates the browser session)
@@ -342,7 +342,7 @@ export function SettingsPage() {
         
         // Use link-proxy with the linkCode to establish browser session
         const linkUrl = `${serverUrl}/api/auth/link-proxy?provider=${provider}&linkCode=${linkCode}&callbackURL=${encodeURIComponent(serverUrl + '/api/auth/native-redirect')}`
-        await open(linkUrl)
+        await openUrl(linkUrl)
         
         // Show a toast explaining the flow
         toast.info('Continue in Browser', { 

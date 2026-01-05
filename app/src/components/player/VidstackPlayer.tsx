@@ -97,10 +97,6 @@ function AudioTracksMenu() {
     const audioTracks = useMediaState('audioTracks')
     const currentAudioTrack = useMediaState('audioTrack')
 
-    // Debug: log audio tracks
-    console.log('[AudioTracksMenu] Audio tracks:', audioTracks)
-    console.log('[AudioTracksMenu] Current audio track:', currentAudioTrack)
-
     // Get display name for language
     const getLangName = (code: string) => {
         try {

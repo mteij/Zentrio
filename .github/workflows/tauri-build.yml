@@ -217,7 +217,11 @@ jobs:
           bun tauri android init
 
           # Generate icons to ensure Android resources are up to date
-          bun tauri icon src-tauri/icon.png
+          bun tauri icon src-tauri/icons/icon.png
+
+          # Patch MainActivity.kt to disable WebView overscroll (rubber banding)
+          # Removed as it was reported ineffective
+
 
           # Configure signing via gradle.properties (not CLI flags)
           GRADLE_PROPS="src-tauri/gen/android/gradle.properties"
