@@ -1,5 +1,7 @@
 target
 bin/
 gen/
+# Preserve MainActivity.kt for Android WebView customizations
+!gen/android/app/src/main/java/**/MainActivity.kt
 data/
 node_modules/

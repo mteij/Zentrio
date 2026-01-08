@@ -77,6 +77,13 @@
   padding: calc(30px + var(--titlebar-height, 0px)) 0 20px 0;
   border-right: none;
   transition: all 0.3s ease;
+  /* Prevent rubber banding/overscroll from affecting navbar */
+  touch-action: none;
+  overflow: hidden;
+  overscroll-behavior: none;
+  contain: layout style;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 /* Remove soft fade effect */
@@ -288,6 +295,7 @@
   .streamingNavbar {
     top: auto;
     bottom: 20px;
+    bottom: calc(20px + var(--safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%) translateZ(0); /* Keep centering + GPU layer */
     width: auto;
@@ -304,6 +312,10 @@
     justify-content: center;
     gap: 10px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    /* Reinforced: prevent touch-scroll effects on mobile navbar */
+    touch-action: none;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   .navLogo {
