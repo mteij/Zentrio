@@ -21,6 +21,7 @@ import { StreamingHomeSkeleton, StreamingDetailsSkeleton } from './components/st
 
 import { appMode, AppMode } from './lib/app-mode'
 import { OnboardingWizard } from './components/onboarding'
+import { AppLifecycleProvider } from './lib/app-lifecycle'
 
 // Lazy load all pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage as React.ComponentType<{version?: string}> })))
@@ -64,16 +65,26 @@ function AppRoutes() {
   
   // App mode state (guest vs connected)
   const [mode, setMode] = useState<AppMode | null | 'web'>(() => {
+    const tauriDetected = isTauri();
+    const storedMode = appMode.get();
+    console.log('[AppRoutes] Initializing mode:', { 
+      isTauri: tauriDetected, 
+      storedMode,
+      hasTauriInternals: typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__,
+      hasTauriGlobal: typeof window !== 'undefined' && !!(window as any).__TAURI__
+    });
     // Web apps always use connected mode (same-origin auth)
-    if (!isTauri()) return 'web';
-    return appMode.get();
+    if (!tauriDetected) return 'web';
+    return storedMode;
   });
   
   // Server URL state (for connected mode in Tauri)
   const [serverUrl, setServerUrl] = useState<string | null>(() => {
     if (!isTauri()) return "web";
     if (appMode.isGuest()) return "guest"; // Guest mode uses local server
-    return localStorage.getItem("zentrio_server_url");
+    const stored = localStorage.getItem("zentrio_server_url");
+    console.log('[AppRoutes] Initializing serverUrl:', { stored, isGuest: appMode.isGuest() });
+    return stored;
   });
 
   // Preload common routes after mount
@@ -159,16 +170,50 @@ function AppRoutes() {
     navigate('/profiles');
   };
 
+  // Get auth loading state for Tauri loading gate
+  const { isLoading: authLoading, isAuthenticated } = useAuthStore();
+
+  // Calculate if we should show onboarding (needs to be before hooks for consistent order)
+  const isTauriApp = isTauri();
+  const isGuestMode = appMode.isGuest();
+  const shouldShowOnboarding = isTauriApp && (mode === null || (mode === 'connected' && !serverUrl)) && location.pathname !== '/two-factor';
+
+  // Tauri apps: Show splash screen while auth is loading
+  // This prevents the landing page from ever flashing
+  // NOTE: Must be AFTER all hooks but BEFORE any conditional returns (except onboarding)
+  useEffect(() => {
+    // Skip if onboarding wizard will be shown or if still loading
+    if (shouldShowOnboarding || authLoading) return;
+    
+    if (isTauriApp && mode && mode !== 'web' && location.pathname === '/') {
+      // Redirect based on auth state
+      if (isAuthenticated || isGuestMode) {
+        console.log('[AppRoutes] Tauri app at root (authenticated/guest), redirecting to /profiles');
+        navigate('/profiles', { replace: true });
+      } else {
+        console.log('[AppRoutes] Tauri app at root (not authenticated), redirecting to /signin');
+        navigate('/signin', { replace: true });
+      }
+    }
+  }, [location.pathname, mode, navigate, shouldShowOnboarding, authLoading, isAuthenticated, isGuestMode, isTauriApp]);
+
   // First launch in Tauri - show onboarding wizard
   // Skip if we are on the 2FA page (which happens during login flow)
-  if (isTauri() && (mode === null || (mode === 'connected' && !serverUrl)) && location.pathname !== '/two-factor') {
+  if (shouldShowOnboarding) {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
+  }
+
+  // Tauri loading gate: Wait for auth state before rendering routes
+  // This prevents the web landing page from flashing on app reopen
+  if (isTauriApp && authLoading && location.pathname === '/') {
+    console.log('[AppRoutes] Tauri app waiting for auth state...');
+    return <SplashScreen />;
   }
   
   return (
     <Routes>
       {/* Public routes - redirect authenticated users based on login behavior */}
-      <Route path="/" element={<Suspense fallback={<SplashScreen />}><PublicRoute><LandingPage version="2.0.0" /></PublicRoute></Suspense>} />
+      <Route path="/" element={<Suspense fallback={<SplashScreen />}><PublicRoute><LandingPage version={__APP_VERSION__} /></PublicRoute></Suspense>} />
       <Route path="/signin" element={<Suspense fallback={<SplashScreen />}><PublicRoute><SignInPage /></PublicRoute></Suspense>} />
       <Route path="/register" element={<Suspense fallback={<SplashScreen />}><PublicRoute><SignUpPage /></PublicRoute></Suspense>} />
       <Route path="/two-factor" element={<Suspense fallback={<SplashScreen />}><TwoFactorPage /></Suspense>} />
@@ -254,23 +299,25 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <CastProvider>
-          <BrowserRouter>
-            <TitleBar />
-            <AppRoutes />
-            <Toaster 
-              theme="dark"
-              position="top-right"
-              richColors
-              closeButton
-              toastOptions={{
-                style: {
-                  background: 'rgba(20, 20, 20, 0.95)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)',
-                },
-              }}
-            />
-          </BrowserRouter>
+          <AppLifecycleProvider>
+            <BrowserRouter>
+              <TitleBar />
+              <AppRoutes />
+              <Toaster 
+                theme="dark"
+                position="top-right"
+                richColors
+                closeButton
+                toastOptions={{
+                  style: {
+                    background: 'rgba(20, 20, 20, 0.95)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)',
+                  },
+                }}
+              />
+            </BrowserRouter>
+          </AppLifecycleProvider>
         </CastProvider>
       </QueryClientProvider>
     </ErrorBoundary>

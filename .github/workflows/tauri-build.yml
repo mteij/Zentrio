@@ -213,14 +213,32 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
           KEYSTORE_PATH="$(pwd)/keystore.jks"
 
-          # Initialize Android project
+          # Initialize Android project (creates fresh gen/android/ with default icons)
           bun tauri android init
 
-          # Generate icons to ensure Android resources are up to date
+          # Generate icons - MUST run after android init to overwrite default icons
+          # The tauri icon command generates icons for all platforms including Android mipmap
+          echo "📱 Generating app icons from src-tauri/icons/icon.png..."
           bun tauri icon src-tauri/icons/icon.png
 
-          # Patch MainActivity.kt to disable WebView overscroll (rubber banding)
-          # Removed as it was reported ineffective
+          # Set dark background color for adaptive icon (instead of default white)
+          echo "🎨 Setting dark icon background color..."
+          COLORS_FILE="src-tauri/gen/android/app/src/main/res/values/colors.xml"
+          if [ -f "$COLORS_FILE" ]; then
+            # Replace the ic_launcher_background color with dark gray
+            sed -i 's/#FFFFFF/#121212/g' "$COLORS_FILE"
+            echo "✅ Updated icon background to dark (#121212)"
+            cat "$COLORS_FILE"
+          fi
+
+          # Verify Android icons were generated correctly
+          echo "✅ Verifying Android icon resources were generated..."
+          if [ -d "src-tauri/gen/android/app/src/main/res/mipmap-hdpi" ]; then
+            echo "Found mipmap directories:"
+            ls -la src-tauri/gen/android/app/src/main/res/mipmap-*/
+          else
+            echo "⚠️ Warning: Android mipmap directories not found!"
+          fi
 
 
           # Configure signing via gradle.properties (not CLI flags)
@@ -232,8 +250,34 @@ jobs:
           echo "android.injected.signing.key.alias=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GRADLE_PROPS"
           echo "android.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GRADLE_PROPS"
 
-          # Build APK
+          # Build Universal APK (all architectures)
           bun tauri android build --apk true
+
+          # Build ARM64-only APK (smaller, for modern devices)
+          bun tauri android build --apk true --target aarch64
+
+      - name: Rename Android APKs
+        if: matrix.name == 'android'
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+
+          # Rename Universal APK
+          UNIVERSAL_DIR="app/src-tauri/gen/android/app/build/outputs/apk/universal/release"
+          if [ -f "$UNIVERSAL_DIR/app-universal-release.apk" ]; then
+            mv "$UNIVERSAL_DIR/app-universal-release.apk" "$UNIVERSAL_DIR/Zentrio_${VERSION}_android-universal.apk"
+            echo "✅ Renamed Universal APK to Zentrio_${VERSION}_android-universal.apk"
+          fi
+
+          # Rename ARM64 APK
+          ARM64_DIR="app/src-tauri/gen/android/app/build/outputs/apk/arm64/release"
+          if [ -f "$ARM64_DIR/app-arm64-release.apk" ]; then
+            mv "$ARM64_DIR/app-arm64-release.apk" "$ARM64_DIR/Zentrio_${VERSION}_android-arm64.apk"
+            echo "✅ Renamed ARM64 APK to Zentrio_${VERSION}_android-arm64.apk"
+          fi
+
+          # List all APKs for debugging
+          echo "📦 Available APKs:"
+          find app/src-tauri/gen/android -name "*.apk" -type f
 
       - name: Upload Android Artifacts to Release
         if: matrix.name == 'android'
@@ -241,7 +285,8 @@ jobs:
         with:
           tag_name: ${{ needs.create-release.outputs.tag_name }}
           files: |
-            app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            app/src-tauri/gen/android/app/build/outputs/apk/universal/release/Zentrio_*.apk
+            app/src-tauri/gen/android/app/build/outputs/apk/arm64/release/Zentrio_*.apk
 
       # iOS Build
       - name: Build iOS

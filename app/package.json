@@ -1,6 +1,6 @@
 {
   "name": "zentrio",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "license": "MIT",
   "description": "Zentrio - Stream Your Way",
   "scripts": {
@@ -19,6 +19,7 @@
     "tauri:android:dev": "tauri android dev",
     "tauri:android:build": "tauri android build",
     "android:setup": "powershell -ExecutionPolicy Bypass -File scripts/android-setup.ps1",
+    "android:ports": "bun run scripts/android-ports.ts",
     "sync-version": "bun run scripts/sync-version.ts",
     "postversion": "bun run sync-version"
   },
@@ -40,6 +41,7 @@
     "@tauri-apps/plugin-os": "^2.3.2",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.3",
+    "@tauri-apps/plugin-store": "^2.4.1",
     "@types/bcryptjs": "^3.0.0",
     "@types/hls.js": "^0.13.3",
     "@types/nodemailer": "^7.0.3",

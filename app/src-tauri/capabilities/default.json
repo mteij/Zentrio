@@ -42,6 +42,7 @@
     "os:default",
     "process:default",
     "opener:default",
-    "deep-link:default"
+    "deep-link:default",
+    "store:default"
   ]
 }
