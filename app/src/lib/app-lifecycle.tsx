@@ -20,7 +20,7 @@ export function useAppLifecycle() {
 
   // Check connectivity on first load (Tauri Android only)
   useEffect(() => {
-    if (!isTauri() || hasCheckedConnectivity.current) return;
+    if (!isTauri() || !import.meta.env.DEV || hasCheckedConnectivity.current) return;
     hasCheckedConnectivity.current = true;
 
     const checkConnectivity = async () => {
@@ -61,16 +61,14 @@ export function useAppLifecycle() {
       if (document.visibilityState === 'visible') {
         const timeSinceLastChange = Date.now() - lastVisibilityChange.current;
         
-        // Only revalidate if the app was in background for more than 30 seconds
-        // This prevents unnecessary API calls when quickly switching apps
-        if (timeSinceLastChange > 30000 && isAuthenticated) {
-          console.log('[AppLifecycle] App resumed after', Math.round(timeSinceLastChange / 1000), 'seconds, revalidating session...');
+        // Only revalidate if the app was in background for more than 1 second
+        // We check regardless of isAuthenticated to catch SSO logins that happened in browser
+        if (timeSinceLastChange > 1000) {
+          console.log('[AppLifecycle] App resumed after', Math.round(timeSinceLastChange / 1000), 'seconds, checking session...');
           try {
             const valid = await refreshSession();
             if (valid) {
-              console.log('[AppLifecycle] Session still valid');
-            } else {
-              console.log('[AppLifecycle] Session expired, user will need to re-authenticate');
+              console.log('[AppLifecycle] Session valid/restored');
             }
           } catch (e) {
             console.error('[AppLifecycle] Failed to revalidate session:', e);
@@ -91,8 +89,8 @@ export function useAppLifecycle() {
         const { listen } = await import('@tauri-apps/api/event');
         const unlisten = await listen('tauri://focus', async () => {
           const timeSinceLastChange = Date.now() - lastVisibilityChange.current;
-          if (timeSinceLastChange > 30000 && isAuthenticated) {
-            console.log('[AppLifecycle] Window focused, revalidating session...');
+          if (timeSinceLastChange > 1000) {
+            console.log('[AppLifecycle] Window focused, checking session...');
             await refreshSession();
           }
           lastVisibilityChange.current = Date.now();

@@ -1,6 +1,6 @@
 {
   "name": "zentrio",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "license": "MIT",
   "description": "Zentrio - Stream Your Way",
   "scripts": {
@@ -16,7 +16,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:android:init": "tauri android init",
-    "tauri:android:dev": "tauri android dev",
+    "tauri:android:dev": "bun run android:ports && tauri android dev",
     "tauri:android:build": "tauri android build",
     "android:setup": "powershell -ExecutionPolicy Bypass -File scripts/android-setup.ps1",
     "android:ports": "bun run scripts/android-ports.ts",

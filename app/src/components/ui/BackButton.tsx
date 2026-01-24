@@ -6,9 +6,14 @@ interface BackButtonProps {
   onClick?: () => void
   label?: string
   className?: string
+  /** 
+   * 'floating' = fixed position (default for settings)
+   * 'static' = inline/block flow (for custom layout)
+   */
+  variant?: 'floating' | 'static'
 }
 
-export function BackButton({ to, onClick, label = 'Back', className = '' }: BackButtonProps) {
+export function BackButton({ to, onClick, label = 'Back', className = '', variant = 'floating' }: BackButtonProps) {
   const navigate = useNavigate()
 
   const handleClick = () => {
@@ -24,7 +29,7 @@ export function BackButton({ to, onClick, label = 'Back', className = '' }: Back
   return (
     <button
       onClick={handleClick}
-      className={`${styles.backBtn} ${className}`}
+      className={`${variant === 'floating' ? styles.backBtn : styles.backBtnStatic} ${className}`}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
         <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>

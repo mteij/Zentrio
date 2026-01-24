@@ -350,9 +350,10 @@
   cursor: pointer;
   font-size: var(--text-sm, 0.875rem);
   font-weight: 500;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-decoration: none;
   box-shadow: var(--shadow-md, 0 8px 20px rgba(0, 0, 0, 0.3));
+  transition-property: background, border-color, transform, box-shadow, color;
+  transition-duration: 0.3s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .backBtn:hover {
@@ -797,7 +798,43 @@
   margin-bottom: 15px;
 }
 
-.sectionHeader h3 {
+
+/* Static version of back button (reuses visual styles) */
+.backBtnStatic {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--glass-bg, rgba(20, 20, 20, 0.8));
+  backdrop-filter: blur(var(--glass-blur-lg, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg, 20px));
+  color: var(--text, white);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-full, 9999px);
+  cursor: pointer;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  transition-property: background, border-color, transform, box-shadow, color;
+  transition-duration: 0.3s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  box-shadow: var(--shadow-md, 0 8px 20px rgba(0, 0, 0, 0.3));
+}
+
+.backBtnStatic:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  color: white;
+}
+
+.backBtnStatic svg {
+  transition: transform 0.3s ease;
+}
+
+.backBtnStatic:hover svg {
+  transform: translateX(-4px);
   font-size: var(--text-base, 1rem);
   font-weight: 600;
   display: flex;

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Eye, FolderInput, Trash2, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { useNavigate } from 'react-router-dom'
 import { ListItem, List, ListShare } from '../../services/database'
 import { apiFetch } from '../../lib/apiFetch'
 import { LazyImage, RatingBadge } from '../index'
@@ -13,31 +14,31 @@ interface SharedList extends List {
   isLinkedToThisProfile?: boolean
 }
 
-interface LibraryItemCardProps {
+export interface LibraryItemCardProps {
   item: ListItem
   profileId: string
   currentListId: number
-  lists: List[]
-  sharedLists: SharedList[]
+  // Pass available lists for moving instead of raw lists to avoid calc in every child
+  moveTargetLists: Array<List | SharedList> 
   isOwner: boolean
   canRemove: boolean
   canAdd: boolean
   showImdbRatings: boolean
-  onRemove: () => void
+  onRemove: (metaId: string) => void
 }
 
-export function LibraryItemCard({
+export const LibraryItemCard = memo(function LibraryItemCard({
   item,
   profileId,
   currentListId,
-  lists,
-  sharedLists,
+  moveTargetLists,
   isOwner,
   canRemove,
   canAdd,
   showImdbRatings,
   onRemove
 }: LibraryItemCardProps) {
+  const navigate = useNavigate()
   const [showMoveModal, setShowMoveModal] = useState(false)
 
   const handleRemove = async () => {
@@ -46,7 +47,7 @@ export function LibraryItemCard({
         method: 'DELETE'
       })
       toast.success('Removed from list')
-      onRemove()
+      onRemove(item.meta_id)
     } catch (e) {
       console.error('Failed to remove item:', e)
       toast.error('Failed to remove item')
@@ -72,7 +73,7 @@ export function LibraryItemCard({
         method: 'DELETE'
       })
       toast.success('Moved to list')
-      onRemove()
+      onRemove(item.meta_id)
       setShowMoveModal(false)
     } catch (e) {
       console.error('Failed to move item:', e)
@@ -80,21 +81,12 @@ export function LibraryItemCard({
     }
   }
 
-  // Get lists that user can add to (excluding current)
-  const moveTargetLists = [
-    ...lists.filter(l => l.id !== currentListId),
-    ...sharedLists.filter(l => 
-      l.id !== currentListId && 
-      (l.share.permission === 'add' || l.share.permission === 'full')
-    )
-  ]
-
   const contextItems: ContextMenuItemOrSeparator[] = [
     {
       label: 'View Details',
       icon: Eye,
       onClick: () => {
-        window.location.href = `/streaming/${profileId}/${item.type}/${item.meta_id}`
+        navigate(`/streaming/${profileId}/${item.type}/${item.meta_id}`)
       }
     }
   ]
@@ -113,22 +105,25 @@ export function LibraryItemCard({
     contextItems.push({
       label: 'Remove from List',
       icon: Trash2,
-      variant: 'danger',  // Assuming 'danger' variant is supported or 'variant' prop
+      variant: 'danger', 
       onClick: handleRemove
     })
   }
   
   // Local state for optimistic updates
-  const [isWatched, setIsWatched] = useState((item as any).is_watched);
+  // @ts-ignore
+  const [isWatched, setIsWatched] = useState(item.is_watched);
 
   useEffect(() => {
-    setIsWatched((item as any).is_watched);
-  }, [(item as any).is_watched]);
+    // @ts-ignore
+    setIsWatched(item.is_watched);
+  }, [item]); // simplified dependency
 
   const toggleWatched = async () => {
     const newWatchedState = !isWatched;
     setIsWatched(newWatchedState);
-    (item as any).is_watched = newWatchedState;
+    // @ts-ignore
+    item.is_watched = newWatchedState;
 
     try {
       await apiFetch(newWatchedState ? '/api/streaming/mark-series-watched' : '/api/streaming/mark-watched', {
@@ -202,11 +197,18 @@ export function LibraryItemCard({
     })
   }
 
+  // Handle main card click
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(`/streaming/${profileId}/${item.type}/${item.meta_id}`);
+  }
+
   return (
     <>
       <ContextMenu items={contextItems}>
         <a 
           href={`/streaming/${profileId}/${item.type}/${item.meta_id}`} 
+          onClick={handleCardClick}
           className={styles.mediaCard}
         >
           <div className={styles.posterContainer}>
@@ -217,8 +219,7 @@ export function LibraryItemCard({
             )}
             
             {/* Watched Indicator */}
-            {/* @ts-ignore */}
-            {(item as any).is_watched && (
+            {isWatched && (
                 <div style={{
                     position: 'absolute',
                     top: '8px',
@@ -303,4 +304,4 @@ export function LibraryItemCard({
       )}
     </>
   )
-}
+})

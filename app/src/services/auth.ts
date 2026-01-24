@@ -58,13 +58,13 @@ export const auth = betterAuth({
     advanced: {
         defaultCookieAttributes: {
             sameSite: "lax",
-            secure: true,
+            secure: cfg.APP_URL?.startsWith("https") ?? false,
         },
         crossSubDomainCookies: {
             enabled: true
         },
         cookiePrefix: "better-auth",
-        useSecureCookies: true
+        useSecureCookies: cfg.APP_URL?.startsWith("https") ?? false
     },
     session: {
         cookieCache: {

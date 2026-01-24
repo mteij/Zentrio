@@ -6,20 +6,8 @@ import { isTauri } from "../../lib/auth-client";
 import { BackButton } from "../../components/ui/BackButton";
 
 export function SignInPage() {
-  // Force reload if cross-origin isolated (breaks password managers)
-  useEffect(() => {
-      if (window.crossOriginIsolated) {
-          console.log('[SignIn] Cross-origin isolated, reloading to disable for extensions...')
-           if (!sessionStorage.getItem('reloading_for_extensions')) {
-              sessionStorage.setItem('reloading_for_extensions', 'true')
-              window.location.reload()
-          } else {
-               sessionStorage.removeItem('reloading_for_extensions')
-          }
-      } else {
-          sessionStorage.removeItem('reloading_for_extensions')
-      }
-  }, [])
+  // Force reload removed to prevent infinite loop
+  // Cross-origin isolation is handled by server headers
 
   const handleChangeServer = () => {
     localStorage.removeItem("zentrio_server_url");
@@ -32,17 +20,17 @@ export function SignInPage() {
       <ParticleBackground />
       
       <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
+        {isTauri() && (
+           <div className="fixed top-0 left-0 z-50 p-4 pt-[calc(1rem+env(safe-area-inset-top))]">
+                <BackButton onClick={handleChangeServer} label="Change Server" variant="static" />
+           </div>
+        )}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="w-full max-w-lg relative"
         >
-          {isTauri() && (
-             <div className="absolute -top-12 left-0 md:-left-12 md:top-6 z-20">
-                  <BackButton onClick={handleChangeServer} label="Change Server" />
-             </div>
-          )}
           <AuthForms mode="signin" />
         </motion.div>
       </div>

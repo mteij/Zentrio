@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Plus, Share2, Users, LogOut, Library as LibraryIcon, Trash2, Mail, Check, X as XIcon, UserPlus, ChevronDown, ChevronRight, Lock, Globe, User, MoreVertical } from 'lucide-react'
@@ -399,6 +399,23 @@ export const StreamingLibrary = () => {
   }, [items])
 
   const showImdbRatings = true
+
+  // Memoize the available lists for moving items to reduce calculation in children
+  const moveTargetLists = useMemo(() => {
+    if (!activeList) return []
+    return [
+      ...myLists.filter(l => l.id !== activeList.id),
+      ...accountSharedLists.filter(l => 
+        l.id !== activeList.id && 
+        (l.share.permission === 'add' || l.share.permission === 'full')
+      )
+    ]
+  }, [activeList, myLists, accountSharedLists])
+
+  const handleRemoveItem = useCallback((metaId: string) => {
+    setItems(current => current.filter(i => i.meta_id !== metaId))
+  }, [])
+
 
   if (loading) {
     return (
@@ -1085,15 +1102,12 @@ export const StreamingLibrary = () => {
                   item={item}
                   profileId={profileId!}
                   currentListId={activeList?.id || 0}
-                  lists={myLists}
-                  sharedLists={accountSharedLists}
+                  moveTargetLists={moveTargetLists}
                   isOwner={isOwner}
                   canRemove={canRemove}
                   canAdd={canAdd}
                   showImdbRatings={showImdbRatings}
-                  onRemove={() => {
-                    setItems(items.filter(i => i.meta_id !== item.meta_id))
-                  }}
+                  onRemove={handleRemoveItem}
                 />
               ))}
             </div>

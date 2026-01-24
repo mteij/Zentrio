@@ -455,14 +455,16 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           </div>
 
           <button
-            type="submit"
-            disabled={loading}
+            type={loading ? "button" : "submit"}
+            onClick={loading ? (e) => { e.preventDefault(); setLoading(false); } : undefined}
+            disabled={false}
             className="!w-full bg-red-600 hover:bg-red-700 text-white font-medium !py-2.5 md:!py-3 !rounded-md transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-
-
           >
             {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-sm">Cancel</span>
+              </>
             ) : (
               <>
                 {mode === "signin" 

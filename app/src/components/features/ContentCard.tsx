@@ -190,7 +190,7 @@ export const ContentCard = memo(function ContentCard({
       label: 'View Details',
       icon: Eye,
       onClick: () => {
-        window.location.href = getItemUrl()
+        navigate(getItemUrl())
       }
     },
     { type: 'separator' } as any,
@@ -237,7 +237,11 @@ export const ContentCard = memo(function ContentCard({
         return
       }
     }
-  }, [onClick, item])
+    
+    // Use client-side navigation
+    e.preventDefault()
+    navigate(getItemUrl())
+  }, [onClick, item, navigate, getItemUrl])
 
 
   return (
