@@ -169,6 +169,10 @@ jobs:
       - name: Install frontend dependencies
         run: cd app && npm install # Using npm install instead of bun for broader compatibility in CI
 
+      - name: Sync Tauri plugin versions
+        working-directory: ./app
+        run: bun run sync:tauri-plugins
+
       # Server Binary Builds
       - name: Build Server Binary (Linux)
         if: matrix.name == 'linux'
