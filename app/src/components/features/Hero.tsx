@@ -21,58 +21,46 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
   const { startAutoPlay } = useAutoPlay()
   // State for cycling through featured items
   // Initialize from sessionStorage or use a placeholder (-1 means "needs initialization")
+  // Initialize from sessionStorage or random
   const [featuredIndex, setFeaturedIndex] = useState(() => {
-    if (!storageKey) return 0
-    const stored = sessionStorage.getItem(storageKey)
-    return stored !== null ? parseInt(stored, 10) : -1 
-  })
-
-  // Generate random index excluding current
-  const getRandomIndex = useCallback((currentIdx: number, length: number) => {
-    if (length <= 1) return 0
-    let newIdx = Math.floor(Math.random() * (length - 1))
-    if (newIdx >= currentIdx) newIdx++
-    return newIdx
-  }, [])
-
-  // Initialize with random index on first data load, or validate stored index
-  useEffect(() => {
-    if (items.length === 0) return
+    if (items.length === 0) return 0
     
-    if (featuredIndex === -1 || featuredIndex >= items.length) {
-      if (storageKey) {
-        // Pick a random index on first load or if stored index is invalid
-        const randomIdx = Math.floor(Math.random() * items.length)
-        setFeaturedIndex(randomIdx)
-        sessionStorage.setItem(storageKey, randomIdx.toString())
-      } else {
-        setFeaturedIndex(0)
+    // Check storage first
+    if (storageKey) {
+      const stored = sessionStorage.getItem(storageKey)
+      if (stored !== null) {
+        const idx = parseInt(stored, 10)
+        // Verify valid
+        if (idx >= 0 && idx < items.length) return idx
       }
     }
-  }, [items.length, featuredIndex, storageKey])
-
-  // Persist index changes to sessionStorage
-  useEffect(() => {
-    if (storageKey && featuredIndex >= 0) {
-      sessionStorage.setItem(storageKey, featuredIndex.toString())
+    
+    // Default to random
+    const randomIdx = Math.floor(Math.random() * items.length)
+    if (storageKey) {
+        sessionStorage.setItem(storageKey, randomIdx.toString())
     }
-  }, [featuredIndex, storageKey])
+    return randomIdx
+  })
 
   // Cycle through items randomly every minute
   useEffect(() => {
     if (items.length <= 1) return
     
-    // Don't cycle if it's continue watching (single item usually, or specific intent)
-    // But if items > 1 and not strict continue watching?
-    // User requested "Continue Watching Banner", which implies single item or static top one.
-    // Existing logic cycles. If items.length is 1 (common for continue watch top pick), it won't cycle.
-    
+    // Generate random index excluding current
+    const getRandomIndex = (currentIdx: number, length: number) => {
+        if (length <= 1) return 0
+        let newIdx = Math.floor(Math.random() * (length - 1))
+        if (newIdx >= currentIdx) newIdx++
+        return newIdx
+    }
+
     const interval = setInterval(() => {
       setFeaturedIndex(prev => getRandomIndex(prev, items.length))
     }, 60000) // 1 minute
 
     return () => clearInterval(interval)
-  }, [items.length, getRandomIndex])
+  }, [items.length])
 
   // Ensure index is valid (in case items change)
   const currentIndex = featuredIndex >= items.length ? 0 : (featuredIndex < 0 ? 0 : featuredIndex)
@@ -251,8 +239,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
                   <span id="trendingText">#{correctRank} Trending {itemType === 'movie' ? 'Movie' : 'Series'} Today</span>
                 </div>
               )}
-              {/* @ts-ignore */}
-              {featuredItem.logo ? (
+              {(featuredItem as any).logo ? (
                  <img 
                     src={(featuredItem as any).logo} 
                     alt={itemTitle} 

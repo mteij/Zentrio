@@ -136,7 +136,7 @@ export function EmailVerificationModal({
       <div className="mb-6">
         <h3 className="text-white text-xl font-semibold mb-2">Verify Your Email</h3>
         <p className="text-zinc-400 text-sm">
-          We've sent a 6-digit code to <span className="text-white font-medium">{email}</span>
+          We&apos;ve sent a 6-digit code to <span className="text-white font-medium">{email}</span>
         </p>
         
         {(localError || parentError) && (
@@ -193,7 +193,7 @@ export function EmailVerificationModal({
         <div className="space-y-1">
           <p className="text-zinc-300 text-xs font-medium">Check your spam folder</p>
           <p className="text-zinc-500 text-xs leading-relaxed">
-            If you don't see the email within a few minutes, please check your spam or junk folder.
+            If you don&apos;t see the email within a few minutes, please check your spam or junk folder.
           </p>
         </div>
       </div>

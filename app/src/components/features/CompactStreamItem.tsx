@@ -74,6 +74,19 @@ function getResolutionColor(res?: string): string {
   }
 }
 
+const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    padding: '10px 0',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+  }}>
+    <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem' }}>{label}</span>
+    <span style={{ color: '#fff', fontSize: '0.85rem', textAlign: 'right' }}>{value}</span>
+  </div>
+)
+
 /**
  * Info Overlay Modal - Clean, minimal glassmorphism
  */
@@ -90,19 +103,6 @@ function InfoOverlay({ item, onClose }: { item: FlatStream; onClose: () => void 
   const encode = parsed?.encode || []
   const languages = parsed?.languages || []
   const isCached = parsed?.isCached
-
-  const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div style={{ 
-      display: 'flex', 
-      justifyContent: 'space-between', 
-      alignItems: 'center',
-      padding: '10px 0',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-    }}>
-      <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem' }}>{label}</span>
-      <span style={{ color: '#fff', fontSize: '0.85rem', textAlign: 'right' }}>{value}</span>
-    </div>
-  )
 
   return createPortal(
     <div

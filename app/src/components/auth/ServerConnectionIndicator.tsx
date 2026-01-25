@@ -34,7 +34,7 @@ export function ServerConnectionIndicator({ variant = 'inline' }: ServerConnecti
           <div className="flex-1 pr-4">
             <h3 className="text-lg font-medium text-white mb-1">Leave Guest Mode</h3>
             <p className="text-sm text-zinc-400">
-              You're currently in guest mode. Connect to a server to unlock cloud sync, 
+              You&apos;re currently in guest mode. Connect to a server to unlock cloud sync, 
               profile sharing, and full account features.
             </p>
           </div>

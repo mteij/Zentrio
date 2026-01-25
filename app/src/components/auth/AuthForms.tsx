@@ -522,7 +522,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         <div className="mt-6 md:mt-8 text-center text-sm text-zinc-500">
           {mode === "signin" ? (
             <p>
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <button 
                 onClick={() => navigate("/register")}
                 className="text-white hover:underline font-medium"

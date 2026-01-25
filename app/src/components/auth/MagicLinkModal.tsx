@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import { Button } from '../index'
 import { toast } from '../../utils/toast'
 
@@ -19,16 +18,8 @@ export function MagicLinkModal({
   isLoading = false,
   error
 }: MagicLinkModalProps) {
-  const [canResend, setCanResend] = useState(false)
-
-  useEffect(() => {
-    // Handle resend timer
-    if (resendSeconds > 0) {
-      setCanResend(false)
-    } else {
-      setCanResend(true)
-    }
-  }, [resendSeconds])
+  // Derive canResend directly from resendSeconds
+  const canResend = resendSeconds <= 0
 
   const handleResend = () => {
     if (canResend && !isLoading) {
@@ -54,7 +45,7 @@ export function MagicLinkModal({
       </div>
       <div style={{ marginBottom: 30 }}>
         <h3 style={{ color: '#fff', marginBottom: 10 }}>Magic Link Sent!</h3>
-        <p style={{ color: '#b3b3b3', marginBottom: 20 }}>We've sent a magic link to {email}</p>
+        <p style={{ color: '#b3b3b3', marginBottom: 20 }}>We&apos;ve sent a magic link to {email}</p>
         <p style={{ color: '#b3b3b3', fontSize: '0.9rem' }}>Click the link in your email to sign in automatically.</p>
         {error && (
           <p style={{ color: '#ef4444', marginTop: 16, fontSize: '0.9rem' }}>

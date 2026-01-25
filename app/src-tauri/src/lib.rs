@@ -1,11 +1,11 @@
-#[cfg(all(desktop, not(debug_assertions)))]
-use tauri_plugin_shell::ShellExt;
-#[cfg(any(windows, target_os = "linux"))]
-use tauri_plugin_deep_link::DeepLinkExt;
 use std::sync::Mutex;
-use tauri::Manager;
 #[cfg(desktop)]
 use tauri::Emitter;
+use tauri::Manager;
+#[cfg(any(windows, target_os = "linux"))]
+use tauri_plugin_deep_link::DeepLinkExt;
+#[cfg(all(desktop, not(debug_assertions)))]
+use tauri_plugin_shell::ShellExt;
 
 struct ServerPort(Mutex<u16>);
 
@@ -31,12 +31,17 @@ pub fn run() {
 
     #[cfg(not(mobile))]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args: Vec<String>, _cwd| {
-            let _ = app.get_webview_window("main").expect("no main window").set_focus();
-            if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
-                let _ = app.emit("deep-link://new-url", url);
-            }
-        }));
+        builder = builder.plugin(tauri_plugin_single_instance::init(
+            |app, args: Vec<String>, _cwd| {
+                let _ = app
+                    .get_webview_window("main")
+                    .expect("no main window")
+                    .set_focus();
+                if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
+                    let _ = app.emit("deep-link://new-url", url);
+                }
+            },
+        ));
     }
 
     builder
@@ -44,25 +49,25 @@ pub fn run() {
             // Explicitly register deep link scheme for development
             #[cfg(any(windows, target_os = "linux"))]
             {
-               match app.deep_link().register("zentrio") {
-                   Ok(_) => println!("[DeepLink] Registered 'zentrio' scheme"),
-                   Err(e) => println!("[DeepLink] Failed to register scheme: {}", e),
-               };
+                match app.deep_link().register("zentrio") {
+                    Ok(_) => println!("[DeepLink] Registered 'zentrio' scheme"),
+                    Err(e) => println!("[DeepLink] Failed to register scheme: {}", e),
+                };
 
-               // Check for deep link on startup
-               use std::env;
-               let args: Vec<String> = env::args().collect();
-               if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
-                   println!("[DeepLink] App started with URL: {}", url);
-                   let app_handle = app.handle().clone();
-                   let url = url.clone();
-                   // Emit event slightly later to ensure frontend is ready
-                   tauri::async_runtime::spawn(async move {
-                       // wait for frontend to load
-                       std::thread::sleep(std::time::Duration::from_millis(1500));
-                       let _ = app_handle.emit("deep-link://new-url", url);
-                   });
-               }
+                // Check for deep link on startup
+                use std::env;
+                let args: Vec<String> = env::args().collect();
+                if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
+                    println!("[DeepLink] App started with URL: {}", url);
+                    let app_handle = app.handle().clone();
+                    let url = url.clone();
+                    // Emit event slightly later to ensure frontend is ready
+                    tauri::async_runtime::spawn(async move {
+                        // wait for frontend to load
+                        std::thread::sleep(std::time::Duration::from_millis(1500));
+                        let _ = app_handle.emit("deep-link://new-url", url);
+                    });
+                }
             }
 
             let port = 3000; // Default port, or find a free one

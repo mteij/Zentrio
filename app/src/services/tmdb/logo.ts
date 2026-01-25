@@ -4,8 +4,9 @@
  * Licensed under Apache License 2.0
  */
 import { TMDBClient } from './client'
+import { getConfig } from '../envParser'
 
-const FANART_API_KEY = process.env.FANART_API_KEY || ''
+const FANART_API_KEY = getConfig().FANART_API_KEY
 const FANART_BASE_URL = "http://webservice.fanart.tv/v3/"
 
 class FanartTvApi {

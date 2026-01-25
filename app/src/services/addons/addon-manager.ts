@@ -191,7 +191,7 @@ export class AddonManager {
 
   async getCatalogs(profileId: number): Promise<{ addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[]> {
     const clients = await this.getClientsForProfile(profileId)
-    let results: { addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[] = []
+    const results: { addon: Manifest, manifestUrl: string, catalog: any, items: MetaPreview[] }[] = []
     const profile = profileDb.findById(profileId)
 
     const fetchCatalog = async (client: AddonClient, cat: any) => {
@@ -206,7 +206,7 @@ export class AddonManager {
                 showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
             };
 
-            let items = await client.getCatalog(cat.type, cat.id, {}, config)
+            const items = await client.getCatalog(cat.type, cat.id, {}, config)
             const parentalSettings = this.getParentalSettings(profileId);
             let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id);
 
@@ -300,7 +300,7 @@ export class AddonManager {
                 showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
             };
 
-            let items = await defaultClient.getCatalog(cat.type, cat.id, {}, config);
+            const items = await defaultClient.getCatalog(cat.type, cat.id, {}, config);
             const parentalSettings = this.getParentalSettings(profileId);
             let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id);
             
@@ -507,7 +507,7 @@ export class AddonManager {
         const cat = tmdbClient.manifest?.catalogs.find(c => c.type === type && (c.id === 'tmdb.trending' || c.id === 'tmdb.top'));
         
         if (cat) {
-             let items = await tmdbClient.getCatalog(cat.type, cat.id, {}, config);
+             const items = await tmdbClient.getCatalog(cat.type, cat.id, {}, config);
              if (items && items.length > 0) {
                  let filtered = await this.filterContent(items, parentalSettings, profile?.user_id);
                  
@@ -1058,7 +1058,7 @@ export class AddonManager {
     }
     
     // Deduplicate final results from all sources
-    let uniqueResults = Array.from(new Map(results.map(item => [item.id, item])).values());
+    const uniqueResults = Array.from(new Map(results.map(item => [item.id, item])).values());
 
     // Apply client-side sorting if requested
     if (filters?.sort && filters.sort !== 'relevance') {
@@ -1200,7 +1200,7 @@ export class AddonManager {
           showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
       };
 
-      let items = await client.getCatalog(type, id, extra, config)
+      const items = await client.getCatalog(type, id, extra, config)
       let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id);
       
       // If we filtered out items and have less than expected (e.g. < 20), try fetching next page
@@ -1983,7 +1983,7 @@ export class AddonManager {
         showAgeRatingInGenres: appearance ? appearance.show_age_ratings : true
       }
 
-      let items = await client.getCatalog(catalogType, catalogId, {}, config)
+      const items = await client.getCatalog(catalogType, catalogId, {}, config)
       const parentalSettings = this.getParentalSettings(profileId)
       const profile = profileDb.findById(profileId)
       let filteredItems = await this.filterContent(items, parentalSettings, profile?.user_id)

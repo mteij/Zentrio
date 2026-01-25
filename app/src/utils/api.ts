@@ -8,7 +8,7 @@ export interface ApiResponse<T = any> {
   error?: {
     code: string
     message: string
-    details?: any
+    details?: unknown
   }
   message?: string
 }
@@ -31,7 +31,7 @@ export const err = (
   status: 400 | 401 | 403 | 404 | 409 | 410 | 429 | 500,
   code: string,
   message: string,
-  details?: any
+  details?: unknown
 ) => {
   return c.json(
     {

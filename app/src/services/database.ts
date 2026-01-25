@@ -2214,7 +2214,7 @@ export const streamDb = {
     // We now use settings_profile_id
     // Fallback to profile_id for backward compatibility if needed, but migration should have handled it
     const stmt = db.prepare('SELECT * FROM stream_settings WHERE settings_profile_id = ?');
-    let row = stmt.get(settingsProfileId) as any;
+    const row = stmt.get(settingsProfileId) as any;
     
     if (row && row.config) {
       try {

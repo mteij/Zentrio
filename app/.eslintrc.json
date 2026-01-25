@@ -1,0 +1,52 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "plugins": [
+    "react",
+    "react-hooks",
+    "@typescript-eslint"
+  ],
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "no-empty": "warn",
+    "react/no-unescaped-entities": "warn",
+    "react-hooks/rules-of-hooks": "warn",
+    "@typescript-eslint/ban-ts-comment": "warn",
+    "no-case-declarations": "warn",
+    "@typescript-eslint/no-require-imports": "warn",
+    "no-useless-catch": "warn",
+    "no-constant-condition": "warn",
+    "react-hooks/immutability": "warn",
+    "react-hooks/set-state-in-effect": "warn",
+    "react-hooks/refs": "warn",
+    "@typescript-eslint/no-empty-object-type": "warn",
+    "no-empty-pattern": "warn",
+    "prefer-const": "warn",
+    "no-useless-escape": "warn"
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "ignorePatterns": ["dist", "node_modules", "scripts", "src-tauri"]
+}

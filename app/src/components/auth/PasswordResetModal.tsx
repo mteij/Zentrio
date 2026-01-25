@@ -111,7 +111,7 @@ export function PasswordResetModal({
         <div style={{ marginBottom: 30 }}>
           <h3 style={{ color: '#fff', marginBottom: 10 }}>Reset Email Sent!</h3>
           <p style={{ color: '#b3b3b3', marginBottom: 20 }}>
-            We've sent a password reset link to {email}
+            We&apos;ve sent a password reset link to {email}
           </p>
           <p style={{ color: '#b3b3b3', fontSize: '0.9rem' }}>
             Check your inbox and click the link to reset your password.
@@ -167,7 +167,7 @@ export function PasswordResetModal({
       <div style={{ marginBottom: 20 }}>
         <h3 style={{ color: '#fff', marginBottom: 10 }}>Reset Password</h3>
         <p style={{ color: '#b3b3b3', marginBottom: 20 }}>
-          Enter your email address and we'll send you a link to reset your password.
+          Enter your email address and we&apos;ll send you a link to reset your password.
         </p>
         {error && (
           <p style={{ color: '#ef4444', marginBottom: 16, fontSize: '0.9rem' }}>

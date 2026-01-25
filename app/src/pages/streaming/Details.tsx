@@ -136,7 +136,7 @@ export const StreamingDetails = () => {
             navigate('.', { replace: true, state: { ...location.state, autoPlay: false } })
 
             // Determine episode to play
-            let targetSeason = location.state?.season || initialSeason
+            const targetSeason = location.state?.season || initialSeason
             let targetEpisode = location.state?.episode
             
             // If explicit episode not provided, try to find next to watch or first

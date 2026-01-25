@@ -64,14 +64,23 @@ export function getConfig() {
 
   const PORT = Number(process.env.PORT ?? 3000)
   const DATABASE_URL = process.env.DATABASE_URL ?? './data/zentrio.db'
-  const AUTH_SECRET = process.env.AUTH_SECRET ?? 'super-secret-key-change-in-production'
-  // Server-side: never in Tauri context. Use environment variables or defaults.
+  const isProduction = process.env.NODE_ENV === 'production'
+  const getSecret = (key: string, fallback: string) => {
+    const val = process.env[key]
+    if (val) return val
+    if (isProduction) {
+      throw new Error(`MISSING REQUIRED SECRET IN PRODUCTION: ${key}`)
+    }
+    return fallback
+  }
+
+  const AUTH_SECRET = getSecret('AUTH_SECRET', 'super-secret-key-change-in-production')
   const APP_URL = process.env.APP_URL ?? `http://localhost:${PORT}`
   
   // Client URL (for redirects and CORS)
   const CLIENT_URL = process.env.CLIENT_URL ?? 'http://localhost:5173'
 
-  const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY ?? 'super-secret-key-change-in-production'
+  const ENCRYPTION_KEY = getSecret('ENCRYPTION_KEY', 'super-secret-key-change-in-production')
   // Rate limit settings (configurable via environment variables)
   const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000)
   const RATE_LIMIT_LIMIT = Number(process.env.RATE_LIMIT_LIMIT ?? 100)
@@ -120,8 +129,28 @@ export function getConfig() {
     TMDB_API_KEY: process.env.TMDB_API_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     // Trakt Integration
+    // Trakt Integration
     TRAKT_CLIENT_ID: process.env.TRAKT_CLIENT_ID,
-    TRAKT_CLIENT_SECRET: process.env.TRAKT_CLIENT_SECRET
+    TRAKT_CLIENT_SECRET: process.env.TRAKT_CLIENT_SECRET,
+
+    // IMDB
+    IMDB_UPDATE_INTERVAL_HOURS: Number(process.env.IMDB_UPDATE_INTERVAL_HOURS || 24),
+
+    // Fanart
+    FANART_API_KEY: process.env.FANART_API_KEY || '',
+
+    // Email / SMTP
+    EMAIL_SMTP_TIMEOUT_MS: Number(process.env.EMAIL_SMTP_TIMEOUT_MS ?? 8000),
+    EMAIL_SEND_TIMEOUT_MS: Number(process.env.EMAIL_SEND_TIMEOUT_MS ?? 10000),
+    EMAIL_PROVIDER_BACKOFF_MS: Number(process.env.EMAIL_PROVIDER_BACKOFF_MS ?? 5 * 60 * 1000),
+    SMTP_URL: (process.env.SMTP_URL || process.env.EMAIL_URL || '').trim(),
+    EMAIL_HOST: (process.env.EMAIL_HOST || '').trim(),
+    EMAIL_USER: (process.env.EMAIL_USER || '').trim(),
+    EMAIL_PASS: (process.env.EMAIL_PASS || '').trim(),
+    EMAIL_PORT: parseInt(process.env.EMAIL_PORT || '587', 10),
+    EMAIL_SECURE: process.env.EMAIL_SECURE !== undefined ? process.env.EMAIL_SECURE === 'true' : false,
+    EMAIL_PROVIDER: (process.env.EMAIL_PROVIDER || 'auto').trim().toLowerCase(),
+    EMAIL_FROM: process.env.EMAIL_FROM || 'noreply@zentrio.app'
   }
 }
 

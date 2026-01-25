@@ -157,7 +157,7 @@ export const useAuthStore = create<AuthState>()(
         },
 
         checkSession: async () => {
-          const { session, lastActivity } = get()
+          const { session } = get()
           
           // Check if session exists and hasn't expired
           if (!session) {

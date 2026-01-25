@@ -159,7 +159,7 @@ function validateSyncToken(token: string): { userId: string } | null {
 app.post('/push', async (c) => {
   try {
     // Try to get session from cookies first (for web requests)
-    let session = await auth.api.getSession({
+    const session = await auth.api.getSession({
       headers: c.req.raw.headers
     })
     
@@ -202,7 +202,7 @@ app.post('/push', async (c) => {
 app.get('/pull', async (c) => {
   try {
     // Try to get session from cookies first (for web requests)
-    let session = await auth.api.getSession({
+    const session = await auth.api.getSession({
       headers: c.req.raw.headers
     })
     

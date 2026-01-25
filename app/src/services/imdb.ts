@@ -194,8 +194,7 @@ let schedulerInterval: Timer | null = null
 
 export function initImdbService() {
   const config = getConfig()
-  // @ts-ignore - Custom env var not in typed config yet
-  const updateIntervalHours = Number(process.env.IMDB_UPDATE_INTERVAL_HOURS || 24)
+  const updateIntervalHours = config.IMDB_UPDATE_INTERVAL_HOURS
   
   logger.info(`Initializing IMDb service (Update interval: ${updateIntervalHours}h)`)
 

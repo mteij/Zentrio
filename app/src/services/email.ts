@@ -1,5 +1,6 @@
 import * as nodemailer from 'nodemailer'
 import { Resend } from 'resend'
+import { getConfig } from './envParser'
 
 // =============================================================================
 // Email Provider Interface
@@ -32,7 +33,8 @@ class SmtpProvider implements EmailProvider {
     auth: { user: string; pass: string }
   } | string) {
     // Keep SMTP timeouts short in production; slow/unreachable SMTP shouldn't block auth flows.
-    const timeoutMs = Number(process.env.EMAIL_SMTP_TIMEOUT_MS ?? 8000)
+    const cfg = getConfig()
+    const timeoutMs = cfg.EMAIL_SMTP_TIMEOUT_MS
     const defaults = {
       connectionTimeout: timeoutMs,
       greetingTimeout: timeoutMs,
@@ -57,7 +59,8 @@ class SmtpProvider implements EmailProvider {
     try {
       // Wrap sendMail in a promise race to enforce a strict timeout
       // (in case nodemailer's internal timeouts fail to trigger)
-      const hardTimeoutMs = Number(process.env.EMAIL_SEND_TIMEOUT_MS ?? 10000)
+      const cfg = getConfig()
+      const hardTimeoutMs = cfg.EMAIL_SEND_TIMEOUT_MS
       await Promise.race([
         this.transporter.sendMail({
           ...options,
@@ -131,7 +134,7 @@ class EmailService {
   private providerLastFailure = new Map<string, number>()
 
   private getProviderBackoffMs(): number {
-    return Number(process.env.EMAIL_PROVIDER_BACKOFF_MS ?? 5 * 60 * 1000) // 5 minutes
+    return getConfig().EMAIL_PROVIDER_BACKOFF_MS
   }
 
   private inBackoff(providerName: string): boolean {
@@ -145,13 +148,14 @@ class EmailService {
   }
 
   private buildProviders(): EmailProvider[] {
-    const smtpUrl = (process.env.SMTP_URL || process.env.EMAIL_URL || '').trim()
+    const cfg = getConfig()
+    const smtpUrl = cfg.SMTP_URL
 
-    const host = (process.env.EMAIL_HOST || '').trim()
-    const user = (process.env.EMAIL_USER || '').trim()
-    const pass = (process.env.EMAIL_PASS || '').trim()
+    const host = cfg.EMAIL_HOST
+    const user = cfg.EMAIL_USER
+    const pass = cfg.EMAIL_PASS
 
-    const resendApiKey = (process.env.RESEND_API_KEY || '').trim()
+    const resendApiKey = cfg.RESEND_API_KEY || ''
 
     const smtpConfigured = !!smtpUrl || (!!host && !!user && !!pass)
     const resendConfigured = !!resendApiKey
@@ -159,17 +163,15 @@ class EmailService {
     // Selection:
     // - EMAIL_PROVIDER=resend|smtp|auto (default auto)
     // - auto prefers Resend if configured (fast, no SMTP networking), else SMTP
-    const pref = (process.env.EMAIL_PROVIDER || 'auto').trim().toLowerCase()
+    const pref = cfg.EMAIL_PROVIDER
 
     const smtpProvider = () => {
       if (smtpUrl) {
         console.log('[email] Using SMTP provider (URL)')
         return new SmtpProvider(smtpUrl)
       }
-      const port = parseInt(process.env.EMAIL_PORT || '587', 10)
-      const secure = process.env.EMAIL_SECURE !== undefined
-        ? process.env.EMAIL_SECURE === 'true'
-        : port === 465
+      const port = cfg.EMAIL_PORT
+      const secure = cfg.EMAIL_SECURE
       console.log(`[email] Using SMTP provider (${host}:${port})`)
       return new SmtpProvider({ host, port, secure, auth: { user, pass } })
     }
@@ -264,8 +266,9 @@ class EmailService {
   }
 
   private getEmailConfig() {
-    const appUrl = process.env.APP_URL || 'http://localhost:3000'
-    const from = process.env.EMAIL_FROM || 'noreply@zentrio.app'
+    const cfg = getConfig()
+    const appUrl = cfg.APP_URL
+    const from = cfg.EMAIL_FROM
     return { appUrl, from }
   }
 

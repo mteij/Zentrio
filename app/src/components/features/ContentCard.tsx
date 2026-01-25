@@ -69,8 +69,11 @@ export const ContentCard = memo(function ContentCard({
 
   // Sync with prop changes
   useEffect(() => {
-    setIsWatched(item.isWatched)
-  }, [item.isWatched])
+    if (item.isWatched !== isWatched) {
+      const timer = setTimeout(() => setIsWatched(item.isWatched), 0)
+      return () => clearTimeout(timer)
+    }
+  }, [item.isWatched, isWatched])
 
   // Generate URL with fallback metadata
   const getItemUrl = useCallback(() => {

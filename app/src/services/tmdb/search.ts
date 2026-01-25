@@ -10,6 +10,7 @@ import { transliterate } from 'transliteration'
 import { AGE_RATINGS } from './age-ratings'
 
 function isNonLatin(text: string) {
+  // eslint-disable-next-line no-control-regex
   return /[^\u0000-\u007F]/.test(text)
 }
 
@@ -21,7 +22,7 @@ export async function getSearch(tmdbClient: TMDBClient, id: string, type: string
 
   // AI Search skipped as per plan (requires gemini service)
   
-  let searchResults: any[] = []
+  const searchResults: any[] = []
   const genreList = await getGenreList(tmdbClient, language, type)
 
   const parameters: any = {

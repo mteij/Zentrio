@@ -735,18 +735,20 @@ export function VidstackPlayer({
                         }
                     }
                     break
-                case 'ArrowLeft':
+                case 'ArrowLeft': {
                     e.preventDefault()
                     const seekBack = Math.max(0, hybridCurrentTime - 5)
                     setHybridCurrentTime(seekBack)
                     await handleHybridSeek(seekBack)
                     break
-                case 'ArrowRight':
+                }
+                case 'ArrowRight': {
                     e.preventDefault()
                     const seekForward = Math.min(hybridDuration, hybridCurrentTime + 5)
                     setHybridCurrentTime(seekForward)
                     await handleHybridSeek(seekForward)
                     break
+                }
                 case 'f':
                     e.preventDefault()
                     if (document.fullscreenElement) {

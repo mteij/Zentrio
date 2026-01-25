@@ -6,6 +6,7 @@
 import { userDb } from '../database'
 import { decrypt } from '../encryption'
 import { tmdbCache, type CacheType } from './cache'
+import { getConfig } from '../envParser'
 
 const TMDB_API_BASE = 'https://api.themoviedb.org/3'
 
@@ -201,12 +202,12 @@ export class TMDBClient {
 }
 
 /**
- * Get the global TMDB client using the server's TMDB_API_KEY.
+ * Get the global client using the server's TMDB_API_KEY.
  * This is the primary way to get a client - always available.
  */
 export function getGlobalClient(): TMDBClient {
   if (!globalClient) {
-    const apiKey = process.env.TMDB_API_KEY
+    const apiKey = getConfig().TMDB_API_KEY
     if (!apiKey) {
       throw new Error('TMDB_API_KEY environment variable is required')
     }
@@ -219,7 +220,7 @@ export function getGlobalClient(): TMDBClient {
  * Check if the global TMDB API key is configured
  */
 export function hasGlobalTmdbKey(): boolean {
-  return !!process.env.TMDB_API_KEY
+  return !!getConfig().TMDB_API_KEY
 }
 
 /**

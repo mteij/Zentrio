@@ -1,0 +1,48 @@
+name: Quality Check
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: cd app && bun install
+
+      - name: Type Check
+        run: cd app && bun run type-check
+
+      - name: Lint (ESLint)
+        run: cd app && bun run lint
+
+      - name: Unit Tests
+        run: cd app && bun run test
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./app/src-tauri -> target"
+
+      - name: Rust Formatting
+        run: cd app/src-tauri && cargo fmt -- --check
+
+      - name: Rust Linting (Clippy)
+        run: cd app/src-tauri && cargo clippy -- -D warnings
