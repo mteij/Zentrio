@@ -2,6 +2,14 @@
 
 This directory contains automation scripts for managing the Zentrio project.
 
+## Quick Sync
+
+**`bun run sync`** - Runs both sync scripts in the correct order:
+1. Syncs application version across project files (`sync-version.ts`)
+2. Syncs Tauri plugin versions between Rust crates and NPM packages (`sync-tauri-plugins.ts`)
+
+Use this command for a complete sync before committing or building.
+
 ## sync-version.ts
 
 Synchronizes the application version across all project files:

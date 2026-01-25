@@ -20,9 +20,9 @@
     "tauri:android:build": "tauri android build",
     "android:setup": "powershell -ExecutionPolicy Bypass -File scripts/android-setup.ps1",
     "android:ports": "bun run scripts/android-ports.ts",
-    "sync-version": "bun run scripts/sync-version.ts",
+    "sync:version": "bun run scripts/sync-version.ts",
     "sync:tauri-plugins": "bun run scripts/sync-tauri-plugins.ts",
-    "postversion": "bun run sync-version && bun run sync:tauri-plugins",
+    "sync": "bun run sync:version && bun run sync:tauri-plugins",
     "lint": "eslint src --ext .ts,.tsx --report-unused-disable-directives",
     "test": "vitest run"
   },

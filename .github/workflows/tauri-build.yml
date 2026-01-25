@@ -167,11 +167,12 @@ jobs:
           echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$NDK_TOOLCHAIN/aarch64-linux-android24-clang" >> $GITHUB_ENV
 
       - name: Install frontend dependencies
-        run: cd app && npm install # Using npm install instead of bun for broader compatibility in CI
-
-      - name: Sync Tauri plugin versions
         working-directory: ./app
-        run: bun run sync:tauri-plugins
+        run: bun install
+
+      - name: Sync versions
+        working-directory: ./app
+        run: bun run sync
 
       # Server Binary Builds
       - name: Build Server Binary (Linux)
