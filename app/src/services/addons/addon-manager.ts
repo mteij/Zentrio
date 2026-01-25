@@ -1,17 +1,19 @@
 import { AddonClient, RetryableError } from './client'
 import { ZentrioAddonClient } from './zentrio-client'
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
-import { addonDb, streamDb, profileDb, profileProxySettingsDb, watchHistoryDb } from '../database'
+import { addonDb, streamDb, profileDb } from '../database'
 import { getConfig } from '../envParser'
 import { StreamProcessor, ParsedStream } from './stream-processor'
 import { tmdbService } from '../tmdb/index'
-import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../tmdb/age-ratings'
+import { type AgeRating } from '../tmdb/age-ratings'
+// Extracted helper modules
+import { getParentalSettings, filterContent, enrichContent, idResolutionCache } from './content-filter'
+import { normalizeMetaVideos } from './meta-normalizer'
 
 const DEFAULT_TMDB_ADDON = 'zentrio://tmdb-addon'
 
 export class AddonManager {
   private clientCache = new Map<string, AddonClient>()
-  private idResolutionCache = new Map<string, string>() // Cache for IMDB -> TMDB ID resolution
   private tmdbToImdbCache = new Map<string, string>() // Cache for TMDB -> IMDB ID resolution
 
   private normalizeUrl(url: string): string {
@@ -543,191 +545,19 @@ export class AddonManager {
     return [];
   }
 
+  // Delegate to extracted content-filter module
   private getParentalSettings(profileId: number) {
-      const proxySettings = profileProxySettingsDb.findByProfileId(profileId);
-      const ageMap: Record<number, AgeRating> = {
-          0: 'AL',
-          6: '6',
-          9: '9',
-          12: '12',
-          16: '16',
-          18: '18'
-      };
-      // Default to 18 if unknown, but respecting enabled flag
-      const ratingLimit = proxySettings?.nsfw_age_rating ? (ageMap[proxySettings.nsfw_age_rating] || '18' as AgeRating) : '18' as AgeRating;
-      
-      return {
-          enabled: proxySettings?.nsfw_filter_enabled ?? false,
-          ratingLimit
-      };
+    return getParentalSettings(profileId);
   }
 
-   private async filterContent(items: MetaPreview[], parentalSettings: { enabled: boolean, ratingLimit: AgeRating }, userId?: string): Promise<MetaPreview[]> {
-    // If filtering is disabled, we still want to try to populate age ratings if they are missing
-    // But fetching them for ALL items might be slow if we do it here.
-    // However, the user complained "Badges are missing".
-    // If we only fetch when filtering is enabled, then badges will be missing when filtering is disabled.
-    // Ideally we should separate "enrichment" from "filtering".
-    // But for now, let's just make sure that IF we find it, we save it.
-    
-    // We ALWAYS want to normalize/find ratings if we can, to show badges?
-    // Or only if filtering is enabled?
-    // The user has age limit set, so passing parentalSettings.enabled = true.
-    
-    const ratingLimit = parentalSettings.ratingLimit || '18' as AgeRating;
-    const ratings = AGE_RATINGS;
-    const limitIndex = ratings.indexOf(ratingLimit);
-    
-    // Initialize TMDB client if user ID is provided
-    const tmdbClient = userId ? await tmdbService.getClient(userId) : null;
-
-    const filteredItems = await Promise.all(items.map(async (item) => {
-        const itemAny = item as Record<string, any>;
-        
-        // Try to find certification with country fallback (NL -> US -> GB)
-        let cert = itemAny.ageRating || itemAny.certification || itemAny.rating || itemAny.contentRating || itemAny.info?.certification || itemAny.info?.rating;
-
-        // If certification is an object (e.g. from TMDB sometimes), try to find by country
-        if (typeof cert === 'object' && cert !== null) {
-            cert = (cert as Record<string, any>)['NL'] || (cert as Record<string, any>)['US'] || (cert as Record<string, any>)['GB'] || Object.values(cert)[0];
-        }
-        
-        // Also check releaseInfo if it contains certification
-        if (!cert && itemAny.releaseInfo && typeof itemAny.releaseInfo === 'string') {
-            const parts = itemAny.releaseInfo.split('|').map((s: string) => s.trim());
-            const potentialRating = parts.find((p: string) => ratings.includes(p as AgeRating) || p.startsWith('TV-'));
-            if (potentialRating) cert = potentialRating;
-        }
-
-        // If no cert found and we have TMDB client, try to fetch it
-        // We do this regardless of filtering enabled, so we can show badges?
-        // But doing this for every item in every catalog might be too slow on dashboard load.
-        // Let's restrict to: if filtering enabled OR if we are enriching (maybe add a flag?)
-        // For now, assume if we are here, we want to try our best.
-        if (!cert && tmdbClient && (parentalSettings.enabled || true)) {
-             // We enable this always for now to fix "no badges" issue, effectively enriching on the fly.
-            try {
-                let tmdbId: string | null = null;
-                let type: 'movie' | 'series' = item.type === 'movie' ? 'movie' : 'series';
-
-                // console.log('[Enrichment] Checking item:', item.id, item.type, 'Has cert:', !!cert);
-
-                if (item.id.startsWith('tmdb:')) {
-                    tmdbId = item.id.split(':')[1];
-                } else if (item.id.startsWith('tt')) {
-                     // Check cache first
-                     const cachedTmdbId = this.idResolutionCache.get(item.id);
-                     if (cachedTmdbId) {
-                        tmdbId = cachedTmdbId;
-                     } else {
-                        // Resolve IMDB ID to TMDB ID
-                        const findResults = await tmdbClient.find({
-                            id: item.id,
-                            external_source: 'imdb_id'
-                        });
-                         
-                        if (type === 'movie' && findResults.movie_results?.length > 0) {
-                            tmdbId = findResults.movie_results[0].id.toString();
-                        } else if (type === 'series' && findResults.tv_results?.length > 0) {
-                            tmdbId = findResults.tv_results[0].id.toString();
-                        } else {
-                            // Fallback: try to guess type from results
-                            if (findResults.movie_results?.length > 0) {
-                                tmdbId = findResults.movie_results[0].id.toString();
-                                type = 'movie';
-                            } else if (findResults.tv_results?.length > 0) {
-                                tmdbId = findResults.tv_results[0].id.toString();
-                                type = 'series';
-                            }
-                        }
-                         
-                        // Cache the result if found
-                        if (tmdbId) {
-                            this.idResolutionCache.set(item.id, tmdbId);
-                            // console.log('[Enrichment] Resolved tt to tmdb:', item.id, '->', tmdbId);
-                        }
-                     }
-                }
-
-                if (tmdbId) {
-                    // Use 'en-US' as default language for rating check
-                    // getAgeRating has its own cache, so this is fast
-                    cert = await tmdbService.getAgeRating(tmdbClient, tmdbId, type, 'en-US');
-                    // console.log('[Enrichment] Fetched cert for', tmdbId, ':', cert);
-                }
-            } catch (e) {
-                // console.warn('[Enrichment] Failed:', e);
-            }
-        }
-
-        if (cert) {
-            // Convert to standard age rating format
-            const ageRating = toStandardAgeRating(cert);
-             
-            if (ageRating) {
-                // ASSIGN BACK so the UI can see it!
-                itemAny.certification = ageRating; // Standardize on one property if possible, or update the one used in UI
-                // The UI looks for certification || rating || contentRating
-                  
-                const itemRatingIndex = ratings.indexOf(ageRating);
-                 
-                if (parentalSettings.enabled && limitIndex !== -1) {
-                    if (itemRatingIndex > limitIndex) return false;
-                }
-            } else {
-                // If conversion failed, strict mode: hide content
-                if (parentalSettings.enabled) return false;
-            }
-        } else {
-             // If no cert found, strict mode: hide content
-             if (parentalSettings.enabled) return false;
-        }
-        
-        return true;
-    }));
-
-    return items.filter((_, index) => filteredItems[index]);
+  // Delegate to extracted content-filter module
+  private async filterContent(items: MetaPreview[], parentalSettings: { enabled: boolean, ratingLimit: AgeRating }, userId?: string): Promise<MetaPreview[]> {
+    return filterContent(items, parentalSettings, userId);
   }
 
+  // Delegate to extracted content-filter module
   private async enrichContent(items: MetaPreview[], profileId: number): Promise<MetaPreview[]> {
-    if (items.length === 0) return items;
-    
-    // Get unique IDs and potential aliases (e.g. without tmdb: prefix)
-    const distinctIds = new Set<string>();
-    items.forEach(i => {
-        distinctIds.add(i.id);
-        if (i.id.startsWith('tmdb:')) {
-            distinctIds.add(i.id.replace('tmdb:', ''));
-        }
-    });
-
-    const ids = Array.from(distinctIds);
-    
-    try {
-        const statusMap = watchHistoryDb.getBatchStatus(profileId, ids);
-        
-        return items.map(item => {
-            // Try exact match, then stripped match
-            let status = statusMap[item.id];
-            if (!status && item.id.startsWith('tmdb:')) {
-                status = statusMap[item.id.replace('tmdb:', '')];
-            }
-            
-            if (status) {
-                // console.log('[EnrichContent] Match found for', item.id, status);
-                const enriched = { ...item } as any;
-                if (status.isWatched) enriched.isWatched = true;
-                if (status.progress > 0) enriched.progressPercent = status.progress;
-                if (status.lastStream) enriched.lastStream = status.lastStream;
-                if ((status as any).episodeDisplay) enriched.episodeDisplay = (status as any).episodeDisplay;
-                return enriched;
-            }
-            return item;
-        });
-    } catch (e) {
-        console.warn('Failed to enrich content with watch status', e);
-        return items;
-    }
+    return enrichContent(items, profileId);
   }
 
   async getMeta(type: string, id: string, profileId: number): Promise<MetaDetail | null> {

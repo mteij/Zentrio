@@ -1,15 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { Play, Plus, Check, ArrowLeft, Zap, HardDrive, Wifi, Eye, EyeOff, MoreVertical, ChevronUp, Youtube, Info, List } from 'lucide-react'
-
-import { Layout, LazyImage, RatingBadge, SkeletonDetails, SkeletonStreamList } from '../../components'
-import { DropdownMenu } from '../../components/ui/DropdownMenu'
-import { ContextMenu } from '../../components/ui/ContextMenu'
-import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
-import { CompactStreamItem } from '../../components/features/CompactStreamItem'
-import { CastCard } from '../../components/features/CastCard'
+import { Layout, SkeletonDetails } from '../../components'
 import { InfoModal } from '../../components/features/InfoModal'
 import { ListSelectionModal } from '../../components/features/ListSelectionModal'
+
+import { DetailsHeader } from '../../components/details/DetailsHeader'
+import { EpisodeList } from '../../components/details/EpisodeList'
+import { StreamSelector } from '../../components/details/StreamSelector'
 import { MetaDetail, Stream, Manifest } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import { useStreamLoader, FlatStream, AddonLoadingState } from '../../hooks/useStreamLoader'
@@ -223,47 +220,7 @@ export const StreamingDetails = () => {
   // totalStreamCount is now based on totalCount from hook
 
 
-  // Helper to parse stream information
-  const parseStreamInfo = (stream: Stream) => {
-    const name = stream.name || ''
-    const title = stream.title || ''
-    const desc = stream.description || ''
-    const combined = `${name} ${title} ${desc}`.toLowerCase()
-    
-    // Resolution
-    let resolution = ''
-    if (combined.includes('4k') || combined.includes('2160p')) resolution = '4K'
-    else if (combined.includes('1080p')) resolution = '1080p'
-    else if (combined.includes('720p')) resolution = '720p'
-    else if (combined.includes('480p')) resolution = '480p'
-    
-    // Size
-    const sizeMatch = combined.match(/(\d+(?:\.\d+)?)\s*(gb|mb)/i)
-    let size = ''
-    if (sizeMatch) {
-      const val = parseFloat(sizeMatch[1])
-      const unit = sizeMatch[2].toUpperCase()
-      size = `${val} ${unit}`
-    }
-    
-    // Cached status
-    const cachedIndicators = ['cached', '⚡', '+', '✓', 'instant', 'your media', '[tb+]']
-    const uncachedIndicators = ['⬇️', '⬇', '⏳', 'uncached', 'download']
-    
-    const isExplicitlyUncached = uncachedIndicators.some(indicator => 
-      combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
-    )
-    
-    const isCached = !isExplicitlyUncached && cachedIndicators.some(indicator => 
-      combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
-    )
-    
-    // HDR/DV
-    const hasHDR = combined.includes('hdr')
-    const hasDV = combined.includes('dv') || combined.includes('dolby vision')
-    
-    return { resolution, size, isCached, hasHDR, hasDV }
-  }
+
 
   // Count total streams - use totalCount from hook (which tracks unfiltered count)
   const totalStreamCount = totalCount
@@ -595,507 +552,57 @@ export const StreamingDetails = () => {
         Back
       </button>
 
+
       <div className={styles.detailsContainer}>
-        <div className={styles.pageAmbientBackground} style={{
-          backgroundImage: `url(${meta.background || meta.poster})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}></div>
+        <DetailsHeader
+          meta={meta}
+          data={data}
+          profileId={profileId!}
+          view={view}
+          showImdbRatings={showImdbRatings}
+          showAgeRatings={showAgeRatings}
+          onMoviePlay={handleMoviePlay}
+          onShowListModal={() => setShowListModal(true)}
+          inList={inList}
+          onShowInfoModal={() => setShowInfoModal(true)}
+          onToggleWatched={() => toggleWatched()}
+          onMarkSeriesWatched={markSeriesWatched}
+        >
+          {meta.type === 'series' && view === 'episodes' && (
+            <EpisodeList
+              meta={meta}
+              seriesProgress={data.seriesProgress}
+              selectedSeason={selectedSeason || 1} // Fallback to season 1 if undefined
+              setSelectedSeason={setSelectedSeason}
+              onToggleWatched={toggleWatched}
+              onToggleSeasonWatched={toggleSeasonWatched}
+              onMarkEpisodesBefore={markEpisodesBefore}
+              onPlay={handleQuickPlay}
+              onSelect={handleEpisodeSelect}
+              showImdbRatings={showImdbRatings}
+              showAgeRatings={showAgeRatings}
+            />
+          )}
 
-
-
-        <div className={styles.detailsContent}>
-          <div className={styles.detailsPoster}>
-            {meta.poster ? (
-              <img src={meta.poster} alt={meta.name} />
-            ) : (
-              <div style={{ width: '100%', height: '100%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {meta.name}
-              </div>
-            )}
-          </div>
-
-          <div className={styles.detailsInfo}>
-            {/* Hide metadata only for series when viewing streams (since movies show streams as main page) */}
-            {!(meta.type === 'series' && view === 'streams') && (
-              <>
-                {/* TMDB styled title banner (logo) when available, otherwise text title */}
-                {meta.logo ? (
-                  <img 
-                    src={meta.logo} 
-                    alt={meta.name} 
-                    className={styles.detailsLogo}
-                  />
-                ) : (
-                  <h1 className={styles.detailsTitle}>{meta.name}</h1>
-                )}
-                
-                <div className={styles.detailsMetaRow}>
-                  {meta.released && <span className={styles.metaBadge}>{String(meta.released).split('-')[0]}</span>}
-                  {meta.runtime && <span className={styles.metaBadge}>{meta.runtime}</span>}
-                  {showImdbRatings && meta.imdbRating && <span className={styles.metaBadge} style={{ background: '#f5c518', color: '#000' }}>IMDb {meta.imdbRating}</span>}
-                  {/* @ts-ignore */}
-                  {showAgeRatings && (meta.certification || meta.rating || meta.contentRating) && <span className={styles.metaBadge} style={{ border: '1px solid #fff' }}>{(meta.certification || meta.rating || meta.contentRating)}</span>}
-                </div>
-
-                <div className={styles.detailsActions}>
-                  {/* Primary Play button */}
-                  {meta.type === 'movie' && (
-                      <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={handleMoviePlay}>
-                        <Play size={20} fill="currentColor" />
-                        Play
-                      </button>
-                  )}
-                  
-                  {/* Icon buttons for secondary actions */}
-                  {meta.trailerStreams && meta.trailerStreams.length > 0 && (
-                    <button 
-                      className={styles.iconBtn}
-                      onClick={() => {
-                        const trailer = meta.trailerStreams![0]
-                        const stream = { ytId: trailer.ytId }
-                        const trailerMeta = {
-                          id: meta.id,
-                          type: meta.type,
-                          name: `${meta.name} - Trailer`,
-                          poster: meta.poster
-                        }
-                        navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(trailerMeta))}`)
-                      }}
-                      title="Watch Trailer"
-                    >
-                      <Youtube size={20} />
-                    </button>
-                  )}
-                  
-                  <button
-                    className={styles.iconBtn}
-                    onClick={() => setShowListModal(true)}
-                    title={inList ? "Manage Lists (Added)" : "Add to List"}
-                  >
-                    {inList ? <Check size={20} className="text-green-500" /> : <List size={20} />}
-                  </button>
-                  
-                  {/* Three-dot menu for additional actions */}
-                  <DropdownMenu
-                    items={[
-                      // Cast & Crew option (if available)
-                      ...(meta.app_extras?.cast || meta.director ? [{
-                        label: 'Cast & Crew',
-                        icon: Info,
-                        onClick: () => setShowInfoModal(true)
-                      }] : []),
-                      // Watch status options
-                      ...(meta.type === 'movie' ? [
-                        {
-                          label: data.watchProgress?.isWatched ? 'Mark as unwatched' : 'Mark as watched',
-                          icon: data.watchProgress?.isWatched ? EyeOff : Eye,
-                          onClick: () => toggleWatched()
-                        }
-                      ] : [
-                        {
-                          label: 'Mark series as watched',
-                          icon: Eye,
-                          onClick: () => markSeriesWatched(true)
-                        },
-                        {
-                          label: 'Mark series as unwatched',
-                          icon: EyeOff,
-                          onClick: () => markSeriesWatched(false)
-                        }
-                      ])
-                    ]}
-                  />
-                </div>
-
-                {/* Genres inline with description */}
-                {meta.genres && meta.genres.length > 0 && (
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', marginBottom: '12px' }}>
-                    {meta.genres
-                      .filter(genre => !['PG', 'PG-13', 'R', 'NC-17', 'G', 'TV-Y', 'TV-Y7', 'TV-G', 'TV-PG', 'TV-14', 'TV-MA', 'NR', 'UR', '12', '12A', '15', '18', 'U', 'R13', 'R16', 'R18', 'M', 'MA15+', 'R18+', '6', '9', '16'].includes(genre))
-                      .slice(0, 4)
-                      .join(' • ')}
-                  </p>
-                )}
-
-                <p className={styles.detailsDescription}>{meta.description}</p>
-              </>
-            )}
-
-            {meta.type === 'series' && view === 'episodes' && meta.videos && (
-              <div className="series-episodes-container">
-                <div className="season-selector" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <select 
-                    value={selectedSeason || ''} 
-                    onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
-                    style={{ color: '#fff', background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '8px 16px', borderRadius: '8px', outline: 'none' }}
-                  >
-                    {(() => {
-                      const seasons = Array.from(new Set(meta.videos.map((v: any) => v.season || 0))).sort((a: any, b: any) => a - b);
-                      const filteredSeasons = seasons.length > 1 ? seasons.filter((s: any) => s !== 0) : seasons;
-                      return filteredSeasons.map((season: any) => (
-                        <option key={season} value={season} style={{ color: '#000' }}>Season {season}</option>
-                      ));
-                    })()}
-                  </select>
-                  {/* Mark Season Watched Button */}
-                  {selectedSeason && (() => {
-                    const seasonEps = meta.videos.filter((v: any) => v.season === selectedSeason)
-                    const allWatched = seasonEps.every((ep: any) => {
-                      const epNum = ep.episode ?? ep.number
-                      return data.seriesProgress?.[`${ep.season}-${epNum}`]?.isWatched
-                    })
-                    return (
-                      <button
-                        onClick={() => toggleSeasonWatched(selectedSeason, !allWatched)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '8px 12px',
-                          background: allWatched ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                          border: `1px solid ${allWatched ? 'rgba(34, 197, 94, 0.4)' : 'rgba(255, 255, 255, 0.2)'}`,
-                          borderRadius: '8px',
-                          color: allWatched ? '#22c55e' : '#fff',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem'
-                        }}
-                        title={allWatched ? 'Mark season as unwatched' : 'Mark season as watched'}
-                      >
-                        {allWatched ? <EyeOff size={16} /> : <Eye size={16} />}
-                        {allWatched ? 'Unwatch Season' : 'Watch Season'}
-                      </button>
-                    )
-                  })()}
-                </div>
-                <div className={styles.episodeList}>
-                  {meta.videos.filter((v: any) => v.season === selectedSeason).map((ep: any) => {
-                    const epNum = ep.episode ?? ep.number
-                    const epProgress = data.seriesProgress?.[`${ep.season}-${epNum}`]
-                    const isWatched = epProgress?.isWatched ?? false
-                    const progressPercent = epProgress?.progressPercent ?? 0
-                    
-                    return (
-                      <ContextMenu
-                        key={ep.id || `${ep.season}-${epNum}`}
-                        items={[
-                          {
-                            label: 'Play',
-                            icon: Play,
-                            onClick: () => handleQuickPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
-                          },
-                          { type: 'separator' },
-                          {
-                            label: isWatched ? 'Mark as unwatched' : 'Mark as watched',
-                            icon: isWatched ? EyeOff : Eye,
-                            onClick: () => toggleWatched(ep.season, epNum)
-                          },
-                          {
-                            label: 'Mark all before this as watched',
-                            icon: ChevronUp,
-                            onClick: () => markEpisodesBefore(ep.season, epNum, true)
-                          }
-                        ]}
-                      >
-                        <div
-                          className={styles.episodeItem}
-                          onClick={() => handleEpisodeSelect(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`, false)}
-                          style={{ position: 'relative' }}
-                        >
-                          <div className={styles.episodeThumbnail}>
-                            {ep.thumbnail ? (
-                              <LazyImage src={ep.thumbnail} alt={ep.title || ep.name || `Episode ${epNum}`} />
-                            ) : (
-                              <div className={styles.episodeThumbnailPlaceholder}>
-                                <Play size={24} />
-                              </div>
-                            )}
-                            <span className={styles.episodeNumber}>{epNum}</span>
-                            {/* Watched badge on thumbnail */}
-                            {isWatched && (
-                              <div style={{
-                                position: 'absolute',
-                                top: '6px',
-                                right: '6px',
-                                width: '20px',
-                                height: '20px',
-                                borderRadius: '50%',
-                                background: 'rgba(34, 197, 94, 0.9)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}>
-                                <Check size={12} color="#fff" />
-                              </div>
-                            )}
-                            {/* Progress bar on thumbnail */}
-                            {progressPercent > 0 && !isWatched && (
-                              <div style={{
-                                position: 'absolute',
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                height: '3px',
-                                background: 'rgba(0, 0, 0, 0.6)'
-                              }}>
-                                <div style={{
-                                  width: `${progressPercent}%`,
-                                  height: '100%',
-                                  background: 'linear-gradient(90deg, #8b5cf6, #a855f7)'
-                                }} />
-                              </div>
-                            )}
-                          </div>
-                          <div className={styles.episodeContent}>
-                            <div className={styles.episodeHeader}>
-                              <span className={styles.episodeTitle} style={{ opacity: isWatched ? 0.7 : 1 }}>
-                                {ep.title || ep.name || `Episode ${epNum}`}
-                              </span>
-                              <button 
-                                  className={styles.episodePlayBtn}
-                                  onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleQuickPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
-                                  }}
-                                  title="Quick play"
-                              >
-                                  <Play size={22} fill="currentColor" />
-                              </button>
-                            </div>
-                            <div className={styles.episodeMeta}>
-                              {showImdbRatings && ep.rating && (
-                                <span className={styles.episodeRating}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#f5c518"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                                  {Number(ep.rating).toFixed(1)}
-                                </span>
-                              )}
-                              {showAgeRatings && (ep.certification || ep.contentRating) && (
-                                <span className={styles.episodeAge}>{ep.certification || ep.contentRating}</span>
-                              )}
-                              {ep.runtime && <span className={styles.episodeRuntime}>{ep.runtime}</span>}
-                              {progressPercent > 0 && !isWatched && (
-                                <span style={{ fontSize: '0.75rem', color: '#a855f7' }}>{progressPercent}% watched</span>
-                              )}
-                            </div>
-                            {ep.overview && (
-                              <p className={styles.episodeDescription}>{ep.overview}</p>
-                            )}
-                          </div>
-                        </div>
-                      </ContextMenu>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {view === 'streams' && (
-                <div className={styles.streamsContainer}>
-                    {meta.type === 'series' && (
-                        <div className="flex items-center gap-4 mb-5">
-                            <button onClick={() => setView('episodes')} className={`${styles.actionBtn} ${styles.btnSecondaryGlass}`} style={{ padding: '8px 16px' }}>
-                                <ArrowLeft size={16} />
-                                Back
-                            </button>
-                            <h2 style={{ margin: 0, fontSize: '1.2rem' }}>
-                                {selectedEpisode ? `S${selectedEpisode.season}:E${selectedEpisode.number} - ${selectedEpisode.title}` : 'Streams'}
-                            </h2>
-                        </div>
-                    )}
-
-                    {/* Unified Addon Status + Controls Bar */}
-                    {(addonStatuses.size > 0 || streams.length > 0) && (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '16px',
-                            marginBottom: '20px',
-                            flexWrap: 'wrap'
-                        }}>
-                            {/* Left side: Source count + addon chips */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                {/* Play Best button for series */}
-                                {meta.type === 'series' && filteredStreams && filteredStreams.length > 0 && (
-                                    <button 
-                                        className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
-                                        style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                        onClick={() => handlePlay(filteredStreams[0].stream)}
-                                    >
-                                        <Play size={16} fill="currentColor" />
-                                        Play Best
-                                    </button>
-                                )}
-                                
-                                {/* Source count */}
-                                <span style={{ 
-                                    fontSize: '0.85rem', 
-                                    color: '#9ca3af',
-                                    fontWeight: 500
-                                }}>
-                                    {totalStreamCount > 0 ? `${totalStreamCount} sources` : streamsLoading ? 'Loading...' : 'No sources'}
-                                </span>
-
-                                {/* Subtle separator */}
-                                {addonStatuses.size > 0 && (
-                                    <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
-                                )}
-
-                                {/* Addon chips - subtle inline pills */}
-                                {Array.from(addonStatuses.values()).map((addon) => (
-                                    <button
-                                        key={addon.id}
-                                        onClick={() => {
-                                            if (addon.status === 'done') {
-                                                setSelectedAddon(selectedAddon === addon.id ? null : addon.id)
-                                            }
-                                        }}
-                                        style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '5px',
-                                            padding: '4px 10px',
-                                            borderRadius: '20px',
-                                            border: 'none',
-                                            cursor: addon.status === 'done' ? 'pointer' : 'default',
-                                            background: selectedAddon === addon.id
-                                                ? 'rgba(139, 92, 246, 0.25)'
-                                                : 'rgba(255, 255, 255, 0.06)',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 500,
-                                            color: selectedAddon === addon.id
-                                                ? '#c4b5fd'
-                                                : addon.status === 'done' 
-                                                    ? 'rgba(255, 255, 255, 0.7)' 
-                                                    : addon.status === 'error' 
-                                                        ? '#f87171' 
-                                                        : 'rgba(255, 255, 255, 0.5)',
-                                            transition: 'all 0.15s ease',
-                                            outline: selectedAddon === addon.id ? '1px solid rgba(139, 92, 246, 0.5)' : 'none'
-                                        }}
-                                    >
-                                        {addon.status === 'loading' && (
-                                            <span style={{
-                                                width: '10px',
-                                                height: '10px',
-                                                border: '1.5px solid currentColor',
-                                                borderTopColor: 'transparent',
-                                                borderRadius: '50%',
-                                                animation: 'spin 1s linear infinite',
-                                                display: 'inline-block'
-                                            }} />
-                                        )}
-                                        {addon.status === 'done' && <Check size={10} strokeWidth={3} />}
-                                        {addon.status === 'error' && <span style={{ fontSize: '0.6rem' }}>✕</span>}
-                                        <span>{addon.name}</span>
-                                        {addon.status === 'done' && addon.streamCount !== undefined && (
-                                            <span style={{ opacity: 0.6 }}>{addon.streamCount}</span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Right side: Refresh button */}
-                            <StreamRefreshButton
-                                onRefresh={refreshStreams}
-                                isLoading={streamsLoading}
-                                cacheAgeMs={cacheStatus?.cacheAgeMs}
-                            />
-                        </div>
-                    )}
-
-                    {streamsLoading && streams.length === 0 ? (
-                        <SkeletonStreamList />
-                    ) : filteredStreams && filteredStreams.length > 0 ? (
-                        /* Render based on displayMode setting */
-                        <div className="streams-list-wrapper">
-                            <div className={styles.streamList} style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: streamDisplaySettings.streamDisplayMode === 'classic' ? '12px' : '6px'
-                            }}>
-                                {streamDisplaySettings.streamDisplayMode !== 'classic' ? (
-                                    /* Compact modes - tag-based display */
-                                    filteredStreams.map((item, idx) => (
-                                        <CompactStreamItem
-                                            key={idx}
-                                            item={item}
-                                            onClick={() => handlePlay(item.stream)}
-                                            index={idx}
-                                            showAddonName={streamDisplaySettings.showAddonName}
-                                            mode={streamDisplaySettings.streamDisplayMode === 'compact-advanced' ? 'advanced' : 'simple'}
-                                        />
-                                    ))
-                                ) : (
-                                    /* Classic mode - addon title + description */
-                                    filteredStreams.map(({ stream, addon }, idx) => {
-                                        const info = parseStreamInfo(stream)
-                                        return (
-                                            <div
-                                                key={idx}
-                                                className={`${styles.streamItem} ${info.isCached ? styles.streamCached : ''}`}
-                                                onClick={() => handlePlay(stream)}
-                                            >
-                                                <div className={styles.streamHeader}>
-                                                    <div className={styles.streamName}>
-                                                        {stream.title || stream.name || `Stream ${idx + 1}`}
-                                                    </div>
-                                                    <div className={styles.streamBadges}>
-                                                        {streamDisplaySettings.showAddonName && (
-                                                            <span className={styles.streamBadge} style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.7rem' }}>
-                                                                {addon.name}
-                                                            </span>
-                                                        )}
-                                                        {info.isCached && (
-                                                            <span className={`${styles.streamBadge} ${styles.badgeCached}`} title="Cached">
-                                                                <Zap size={12} />
-                                                            </span>
-                                                        )}
-                                                        {info.resolution && (
-                                                            <span className={`${styles.streamBadge} ${styles.badgeResolution}`}>
-                                                                {info.resolution}
-                                                            </span>
-                                                        )}
-                                                        {info.size && (
-                                                            <span className={`${styles.streamBadge} ${styles.badgeSize}`}>
-                                                                <HardDrive size={10} />
-                                                                {info.size}
-                                                            </span>
-                                                        )}
-                                                        {info.hasHDR && (
-                                                            <span className={`${styles.streamBadge} ${styles.badgeHDR}`}>HDR</span>
-                                                        )}
-                                                        {info.hasDV && (
-                                                            <span className={`${styles.streamBadge} ${styles.badgeDV}`}>DV</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                {streamDisplaySettings.showDescription && stream.description && (
-                                                    <div className={styles.streamDetails}>{stream.description}</div>
-                                                )}
-                                            </div>
-                                        )
-                                    })
-                                )}
-                            </div>
-                        </div>
-                    ) : !streamsLoading ? (
-                        <div className="flex flex-col items-center justify-center py-16 px-4 bg-white/5 rounded-xl border border-white/5 text-center">
-                            <div className="bg-white/10 p-4 rounded-full mb-4">
-                                <Wifi size={32} className="text-gray-400 opacity-50" />
-                            </div>
-                            <h3 className="text-lg font-medium text-white mb-2">No streams found</h3>
-                            <p className="text-sm text-gray-400 max-w-md">
-                                We couldn't find any streams for this content. Try adjusting your filters or checking your installed addons.
-                            </p>
-                        </div>
-                    ) : null}
-                </div>
-            )}
-
-          </div>
-        </div>
+          {view === 'streams' && (
+            <StreamSelector
+              meta={meta}
+              streams={streams}
+              filteredStreams={filteredStreams}
+              selectedEpisode={selectedEpisode}
+              addonStatuses={addonStatuses}
+              selectedAddon={selectedAddon}
+              setSelectedAddon={setSelectedAddon}
+              totalStreamCount={totalStreamCount}
+              streamsLoading={streamsLoading}
+              cacheStatus={cacheStatus}
+              streamDisplaySettings={streamDisplaySettings}
+              onRefresh={refreshStreams}
+              onPlay={handlePlay}
+              onBack={() => setView('episodes')}
+            />
+          )}
+        </DetailsHeader>
       </div>
 
       {/* Info Modal for cast, director, etc. */}

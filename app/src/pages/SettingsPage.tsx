@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { User, Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Check, Link, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react'
+import { User, Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter, AnimatedBackground } from '../components/index'
 import { authClient, getClientUrl } from '../lib/auth-client'
@@ -14,6 +14,8 @@ import { StreamingSettings } from '../components/settings/StreamingSettings'
 import { DangerZoneSettings } from '../components/settings/DangerZoneSettings'
 import { AddonManager } from '../components/settings/AddonManager'
 import { LoginBehaviorSettings } from '../components/settings/LoginBehaviorSettings'
+import { TmdbSettings } from '../components/settings/TmdbSettings'
+import { LinkedAccountsSettings } from '../components/settings/LinkedAccountsSettings'
 import styles from '../styles/Settings.module.css'
 
 // Error message mappings for account linking errors
@@ -53,8 +55,6 @@ export function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [tmdbApiKey, setTmdbApiKey] = useState('')
   const [tmdbKeyConfigured, setTmdbKeyConfigured] = useState(false)
-  const [editingTmdbKey, setEditingTmdbKey] = useState(false)
-  const [tmdbKeyInput, setTmdbKeyInput] = useState('')
 
   
   // Account linking state
@@ -364,14 +364,7 @@ export function SettingsPage() {
     }
   }
 
-  // Check if unlinking a provider is allowed
-  const canUnlinkProvider = (providerId: string): boolean => {
-    // Can unlink if user has password OR has another SSO linked
-    const otherSsoAccounts = linkedAccounts.filter(a => 
-      a.providerId !== providerId && a.providerId !== 'credential'
-    )
-    return hasPassword === true || otherSsoAccounts.length > 0
-  }
+
 
   // Handler for unlinking SSO providers
   const handleUnlinkProvider = async (provider: string) => {
@@ -526,65 +519,19 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              {/* Linked Accounts */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
-                <div className="flex-1 pr-4">
-                  <h3 className="text-lg font-medium text-white mb-1">Linked Accounts</h3>
-                  <p className="text-sm text-zinc-400">Sign-in methods connected to your account</p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  {/* Email & Password badge */}
-                  {hasPassword && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                      <Check className="w-3 h-3" />
-                      Email
-                    </span>
-                  )}
-                  
-                  {/* Linked SSO accounts with unlink button */}
-                  {linkedAccounts.filter(a => a.providerId !== 'credential').map(acc => (
-                    <div 
-                      key={acc.providerId} 
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20"
-                    >
-                      <Check className="w-3 h-3" />
-                      <span>{getProviderDisplayName(acc.providerId)}</span>
-                      {/* Unlink button - always visible if unlinking is allowed */}
-                      {canUnlinkProvider(acc.providerId) && (
-                        <button
-                          onClick={() => handleUnlinkProvider(acc.providerId)}
-                          disabled={unlinkingProvider === acc.providerId}
-                          className="ml-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 hover:text-red-300 transition-all disabled:opacity-50"
-                          title={`Unlink ${getProviderDisplayName(acc.providerId)}`}
-                        >
-                          {unlinkingProvider === acc.providerId ? (
-                            <span className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <span className="text-xs font-bold leading-none">×</span>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  
-                  {/* Available providers to link */}
-                  {(['google', 'github', 'discord', 'oidc'] as const)
-                    .filter(provider => availableProviders[provider] && !linkedAccounts.find(a => a.providerId === provider))
-                    .map(provider => (
-                      <button 
-                        key={provider}
-                        onClick={() => handleLinkProvider(provider)}
-                        disabled={linkingProvider === provider}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-700/50 text-zinc-300 border border-white/10 hover:bg-zinc-600/50 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Link className="w-3 h-3" />
-                        {linkingProvider === provider ? 'Linking...' : getProviderDisplayName(provider)}
-                      </button>
-                    ))}
-                </div>
-              </div>
 
-               <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
+              {/* Linked Accounts */}
+              <LinkedAccountsSettings
+                linkedAccounts={linkedAccounts}
+                availableProviders={availableProviders}
+                hasPassword={hasPassword}
+                linkingProvider={linkingProvider}
+                unlinkingProvider={unlinkingProvider}
+                onLink={handleLinkProvider}
+                onUnlink={handleUnlinkProvider}
+              />
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
                 <div className="flex-1 pr-4">
                   <h3 className="text-lg font-medium text-white mb-1">Two-Factor Authentication</h3>
                   <p className="text-sm text-zinc-400">
@@ -623,85 +570,11 @@ export function SettingsPage() {
               <LoginBehaviorSettings />
 
               {/* TMDB API Key - visible in both modes */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">
-                <div className="flex-1 pr-8">
-                  <h3 className="text-lg font-medium text-white mb-1">TMDB API Key (Optional)</h3>
-                  <p className="text-sm text-zinc-400 max-w-xl">
-                    Zentrio uses a shared API key by default. Add your own key only if you experience rate limiting.{' '}
-                    <a 
-                      href="https://www.themoviedb.org/settings/api" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="underline hover:opacity-80 transition-opacity"
-                      style={{ color: 'var(--theme-color)' }}
-                    >
-                      Get a free key here
-                    </a>
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {!editingTmdbKey ? (
-                    <>
-                      {tmdbKeyConfigured ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                          <Check className="w-3 h-3" />
-                          Personal key configured
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-700/50 text-zinc-300 border border-white/10">
-                          Using shared key
-                        </span>
-                      )}
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => {
-                          setTmdbKeyInput(tmdbApiKey)
-                          setEditingTmdbKey(true)
-                        }}
-                      >
-                        {tmdbKeyConfigured ? 'Edit' : 'Add Key'}
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        type="password"
-                        value={tmdbKeyInput}
-                        onChange={(e) => setTmdbKeyInput(e.target.value)}
-                        placeholder="Enter TMDB API Key"
-                        className="!w-48 md:!w-64 !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
-                        autoFocus
-                      />
-                      <Button 
-                        variant="primary" 
-                        onClick={async () => {
-                          await handleUpdateTmdbApiKey(false, tmdbKeyInput)
-                          setEditingTmdbKey(false)
-                        }}
-                      >
-                        Save
-                      </Button>
-                      {tmdbKeyConfigured && (
-                        <Button 
-                          variant="secondary" 
-                          onClick={async () => {
-                            await handleUpdateTmdbApiKey(true)
-                            setEditingTmdbKey(false)
-                          }}
-                        >
-                          Remove
-                        </Button>
-                      )}
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => setEditingTmdbKey(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <TmdbSettings
+                apiKey={tmdbApiKey}
+                isConfigured={tmdbKeyConfigured}
+                onUpdate={handleUpdateTmdbApiKey}
+              />
 
               {/* Server Connection - only shown in Tauri/mobile apps */}
               <ServerConnectionIndicator variant="card" />
