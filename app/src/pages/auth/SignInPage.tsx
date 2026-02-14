@@ -21,7 +21,7 @@ export function SignInPage() {
       
       <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
         {isTauri() && (
-           <div className="fixed top-0 left-0 z-50 p-4 pt-[calc(1rem+env(safe-area-inset-top))]">
+           <div className="fixed top-0 left-0 z-50 px-4 pt-[max(24px,env(safe-area-inset-top,0px))]">
                 <BackButton onClick={handleChangeServer} label="Change Server" variant="static" />
            </div>
         )}

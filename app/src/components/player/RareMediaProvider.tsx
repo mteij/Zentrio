@@ -24,6 +24,7 @@ import { TranscoderService } from '../../services/hybrid-media/TranscoderService
 import type { StreamInfo, EngineState, MediaMetadata, StreamType, CodecInfo } from '../../services/hybrid-media/types'
 
 // Tauri detection - hybrid media service is web-only
+// In Tauri, native playback is used instead
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__
 
 export interface SubtitleTrack {
@@ -73,12 +74,12 @@ export function RareMediaProvider({
   autoPlay = true,
   slots = {}
 }: RareMediaProviderProps) {
-  // Hybrid media is not available in Tauri apps
+  // Hybrid media is not available in Tauri apps - uses native playback instead
   if (isTauri) {
-    console.warn('[RareMediaProvider] Hybrid media is not available in Tauri apps')
+    console.warn('[RareMediaProvider] Hybrid media is not available in Tauri apps - use native playback')
     return (
       <div className="hybrid-error tauri-warning">
-        <p>This media format is not supported in this app.</p>
+        <p>Hybrid playback is disabled in Tauri. Use native VidstackPlayer instead.</p>
       </div>
     )
   }

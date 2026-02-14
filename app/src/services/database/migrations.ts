@@ -12,7 +12,9 @@ const columnMigrations = [
   "ALTER TABLE watch_history ADD COLUMN watched_at DATETIME DEFAULT NULL",
   "ALTER TABLE watch_history ADD COLUMN last_stream TEXT DEFAULT NULL",
   // List sharing support
-  "ALTER TABLE lists ADD COLUMN is_default BOOLEAN DEFAULT FALSE"
+  "ALTER TABLE lists ADD COLUMN is_default BOOLEAN DEFAULT FALSE",
+  // Addons: logo_url support
+  "ALTER TABLE addons ADD COLUMN logo_url TEXT"
 ]
 
 for (const sql of columnMigrations) {
@@ -21,6 +23,14 @@ for (const sql of columnMigrations) {
   } catch (e) {
     // Column already exists, ignore
   }
+}
+
+// Backfill season/episode defaults for pre-migration rows
+try {
+  db.exec('UPDATE watch_history SET season = -1 WHERE season IS NULL')
+  db.exec('UPDATE watch_history SET episode = -1 WHERE episode IS NULL')
+} catch (e) {
+  // Ignore if columns do not exist yet
 }
 
 // Migration: Update UNIQUE constraint from (profile_id, meta_id) to composite constraint

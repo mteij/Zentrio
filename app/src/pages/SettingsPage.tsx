@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { User, Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { User, Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Check, ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { SimpleLayout, Button, Modal, FormGroup, Input, ModalWithFooter, AnimatedBackground } from '../components/index'
 import { authClient, getClientUrl } from '../lib/auth-client'
@@ -16,6 +16,10 @@ import { AddonManager } from '../components/settings/AddonManager'
 import { LoginBehaviorSettings } from '../components/settings/LoginBehaviorSettings'
 import { TmdbSettings } from '../components/settings/TmdbSettings'
 import { LinkedAccountsSettings } from '../components/settings/LinkedAccountsSettings'
+import { UsernameModal } from '../components/settings/modals/UsernameModal'
+import { EmailModal } from '../components/settings/modals/EmailModal'
+import { PasswordModal } from '../components/settings/modals/PasswordModal'
+import { UpdateSettings } from '../components/settings/UpdateSettings'
 import styles from '../styles/Settings.module.css'
 
 // Error message mappings for account linking errors
@@ -43,16 +47,9 @@ export function SettingsPage() {
   const [showUsernameModal, setShowUsernameModal] = useState(false)
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [showOTPModal, setShowOTPModal] = useState(false)
   const [showTwoFactorSetupModal, setShowTwoFactorSetupModal] = useState(false)
-  
+
   // Form state
-  const [newUsername, setNewUsername] = useState('')
-  const [newEmail, setNewEmail] = useState('')
-  const [otpCode, setOtpCode] = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [tmdbApiKey, setTmdbApiKey] = useState('')
   const [tmdbKeyConfigured, setTmdbKeyConfigured] = useState(false)
 
@@ -184,133 +181,6 @@ export function SettingsPage() {
     } catch (e) {
         console.error(e)
         toast.error('Network Error', { description: 'Failed to update TMDB API Key' })
-    }
-  }
-
-  const handleUpdateUsername = async () => {
-    try {
-        const res = await apiFetch('/api/user/username', {
-            method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ username: newUsername })
-        })
-        if (res.ok) {
-            loadProfile()
-            setShowUsernameModal(false)
-        } else {
-            toast.error('Update Failed', { description: 'Failed to update username' })
-        }
-    } catch (e) {
-        console.error(e)
-    }
-  }
-
-  const handleInitiateEmailChange = async () => {
-    try {
-        const res = await apiFetch('/api/user/email/initiate', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ newEmail })
-        })
-        if (res.ok) {
-            setShowEmailModal(false)
-            setShowOTPModal(true)
-        } else {
-            toast.error('Email Change Failed', { description: 'Failed to initiate email change' })
-        }
-    } catch (e) {
-        console.error(e)
-    }
-  }
-
-  const handleVerifyEmail = async () => {
-    try {
-        const res = await apiFetch('/api/user/email/verify', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ newEmail, code: otpCode })
-        })
-        if (res.ok) {
-            loadProfile()
-            setShowOTPModal(false)
-            toast.success('Success', { description: 'Email updated successfully' })
-        } else {
-            toast.error('Verification Failed', { description: 'Invalid code' })
-        }
-    } catch (e) {
-        console.error(e)
-    }
-  }
-
-  const handleUpdatePassword = async () => {
-    if (newPassword !== confirmPassword) {
-        toast.warning('Validation Error', { description: 'Passwords do not match' })
-        return
-    }
-    try {
-        const res = await apiFetch('/api/user/password', {
-            method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ oldPassword: currentPassword, newPassword })
-        })
-        if (res.ok) {
-            setShowPasswordModal(false)
-            setCurrentPassword('')
-            setNewPassword('')
-            setConfirmPassword('')
-            toast.success('Success', { description: 'Password updated successfully' })
-        } else {
-            toast.error('Update Failed', { description: 'Failed to update password' })
-        }
-    } catch (e) {
-        console.error(e)
-    }
-  }
-
-  // Handler for SSO-only accounts setting their first password
-  const handleSetupPassword = async () => {
-    if (newPassword !== confirmPassword) {
-        toast.warning('Validation Error', { description: 'Passwords do not match' })
-        return
-    }
-    if (newPassword.length < 8) {
-        toast.warning('Validation Error', { description: 'Password must be at least 8 characters' })
-        return
-    }
-    try {
-        const res = await apiFetch('/api/user/password/setup', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ password: newPassword })
-        })
-        if (res.ok) {
-            setShowPasswordModal(false)
-            setNewPassword('')
-            setConfirmPassword('')
-            setHasPassword(true)
-            toast.success('Success', { description: 'Password set successfully' })
-        } else {
-            const data = await res.json().catch(() => ({}))
-            toast.error('Setup Failed', { description: data.message || 'Failed to set password' })
-        }
-    } catch (e) {
-        console.error(e)
-        toast.error('Error', { description: 'Failed to set password' })
     }
   }
 
@@ -458,6 +328,10 @@ export function SettingsPage() {
                 Danger Zone
               </button>
               )}
+              <button className={`${styles.tabBtn} ${activeTab === 'about' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('about')}>
+                <Info size={16} />
+                About
+              </button>
            </div>
            {canScrollRight && (
              <div className={`${styles.scrollIndicator} ${styles.scrollIndicatorRight}`}>
@@ -589,128 +463,34 @@ export function SettingsPage() {
         {activeTab === 'appearance' && <AppearanceSettings />}
         {activeTab === 'streaming' && <StreamingSettings />}
         {activeTab === 'danger' && <DangerZoneSettings />}
+        {activeTab === 'about' && <UpdateSettings />}
 
       </div>
 
       {/* Modals */}
-      {showUsernameModal && (
-        <ModalWithFooter
-            id="usernameModal"
-            title="Change Username"
-            isOpen={showUsernameModal}
-            onClose={() => setShowUsernameModal(false)}
-            footer={
-                <>
-                    <Button variant="secondary" onClick={() => setShowUsernameModal(false)}>Cancel</Button>
-                    <Button variant="primary" onClick={handleUpdateUsername}>Update</Button>
-                </>
-            }
-        >
-            <FormGroup label="New Username">
-                <Input 
-                    type="text" 
-                    value={newUsername} 
-                    onChange={(e) => setNewUsername(e.target.value)} 
-                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
-                />
-            </FormGroup>
-        </ModalWithFooter>
-      )}
+      <UsernameModal 
+        isOpen={showUsernameModal} 
+        onClose={() => setShowUsernameModal(false)} 
+        onSuccess={loadProfile} 
+      />
 
-      {showEmailModal && (
-        <ModalWithFooter
-            id="emailModal"
-            title="Change Email"
-            isOpen={showEmailModal}
-            onClose={() => setShowEmailModal(false)}
-            footer={
-                <>
-                    <Button variant="secondary" onClick={() => setShowEmailModal(false)}>Cancel</Button>
-                    <Button variant="primary" onClick={handleInitiateEmailChange}>Continue</Button>
-                </>
-            }
-        >
-            <FormGroup label="New Email">
-                <Input 
-                    type="email" 
-                    value={newEmail} 
-                    onChange={(e) => setNewEmail(e.target.value)} 
-                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
-                />
-            </FormGroup>
-        </ModalWithFooter>
-      )}
+      <EmailModal 
+        isOpen={showEmailModal} 
+        onClose={() => setShowEmailModal(false)} 
+        onSuccess={() => {
+            // Email change initiated - verification link sent
+            // User needs to check their email and click the link
+        }} 
+      />
 
-      {showOTPModal && (
-        <Modal id="otpModal" title="Verify Email" isOpen={showOTPModal} onClose={() => setShowOTPModal(false)}>
-            <div className={styles.otpContainer}>
-                <p>Enter the code sent to {newEmail}</p>
-                <Input 
-                    type="text" 
-                    value={otpCode} 
-                    onChange={(e) => setOtpCode(e.target.value)} 
-                    placeholder="Code" 
-                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
-                />
-                <Button variant="primary" onClick={handleVerifyEmail} style={{ marginTop: '10px' }}>Verify</Button>
-            </div>
-        </Modal>
-      )}
-
-      {showPasswordModal && (
-        <ModalWithFooter
-            id="passwordModal"
-            title={hasPassword ? "Change Password" : "Set Password"}
-            isOpen={showPasswordModal}
-            onClose={() => { 
-              setShowPasswordModal(false)
-              setCurrentPassword('')
-              setNewPassword('')
-              setConfirmPassword('')
-            }}
-            footer={
-                <>
-                    <Button variant="secondary" onClick={() => { 
-                      setShowPasswordModal(false)
-                      setCurrentPassword('')
-                      setNewPassword('')
-                      setConfirmPassword('')
-                    }}>Cancel</Button>
-                    <Button variant="primary" onClick={hasPassword ? handleUpdatePassword : handleSetupPassword}>
-                      {hasPassword ? 'Update' : 'Set Password'}
-                    </Button>
-                </>
-            }
-        >
-            {hasPassword && (
-              <FormGroup label="Current Password">
-                  <Input 
-                      type="password" 
-                      value={currentPassword} 
-                      onChange={(e) => setCurrentPassword(e.target.value)} 
-                      className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
-                  />
-              </FormGroup>
-            )}
-            <FormGroup label="New Password">
-                <Input 
-                    type="password" 
-                    value={newPassword} 
-                    onChange={(e) => setNewPassword(e.target.value)} 
-                    placeholder={hasPassword ? undefined : "At least 8 characters"}
-                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
-                />
-            </FormGroup>
-            <FormGroup label="Confirm Password">
-                <Input 
-                    type="password" 
-                    value={confirmPassword} 
-                    onChange={(e) => setConfirmPassword(e.target.value)} 
-                    className="!w-full !bg-zinc-900 !border !border-zinc-700 !rounded-lg !px-3 !py-2 !text-white focus:outline-none focus:border-red-500 transition-colors"
-                />
-            </FormGroup>
-        </ModalWithFooter>
-      )}
+      <PasswordModal 
+        isOpen={showPasswordModal} 
+        onClose={() => setShowPasswordModal(false)} 
+        hasPassword={hasPassword ?? false}
+        onSuccess={() => {
+            if (!hasPassword) setHasPassword(true)
+        }}
+      />
 
       {showTwoFactorSetupModal && (
         <TwoFactorSetupModal 

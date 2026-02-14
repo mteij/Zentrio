@@ -12,11 +12,6 @@ export const addonDb = {
     logo_url?: string
     behavior_hints?: any
   }): Addon => {
-    // Check if logo_url column exists (it might not in older DBs)
-    try {
-        db.exec("ALTER TABLE addons ADD COLUMN logo_url TEXT");
-    } catch (e) {}
-
     const stmt = db.prepare(`
       INSERT INTO addons (manifest_url, name, version, description, logo, logo_url, behavior_hints)
       VALUES (?, ?, ?, ?, ?, ?, ?)

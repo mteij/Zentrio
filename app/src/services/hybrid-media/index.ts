@@ -43,6 +43,8 @@ export { NetworkReader } from './NetworkReader'
 export { VideoRemuxer } from './VideoRemuxer'
 export { TranscoderService } from './TranscoderService'
 export { AudioStreamTranscoder } from './AudioStreamTranscoder'
+export { ChunkedAudioTranscoder } from './ChunkedAudioTranscoder'
+export { StreamingAudioTranscoder } from './StreamingAudioTranscoder'
 export { Demuxer } from './Demuxer'
 
 /**

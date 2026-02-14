@@ -83,8 +83,8 @@ export const auth = betterAuth({
         sendOnSignUp: true,
         autoSignInAfterVerification: true,
         async sendVerificationEmail({ user, url, token }: any, request: any) {
-            // We use OTP now, but keep this as fallback or for specific flows if needed
-            // The actual OTP sending is handled by emailOTP plugin
+            // Send verification email for email change flow
+            await emailService.sendVerificationEmail(user.email, url);
         },
     },
     socialProviders: {

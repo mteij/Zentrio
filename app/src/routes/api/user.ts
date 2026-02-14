@@ -4,7 +4,8 @@ import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/s
 import { userDb, verifyPassword, profileProxySettingsDb, profileDb, streamDb, settingsProfileDb, type User } from '../../services/database'
 import { auth } from '../../services/auth'
 import { emailService } from '../../services/email'
-import { createHash } from 'crypto'
+import { getConfig } from '../../services/envParser'
+import { createHash, randomBytes } from 'crypto'
 import { encrypt, decrypt } from '../../services/encryption'
 import { ok, err, validate, schemas } from '../../utils/api'
 
@@ -546,6 +547,11 @@ app.delete('/accounts/:providerId', async (c) => {
 })
 
 // ========== Email change flow ==========
+// Custom implementation because better-auth's changeEmail requires standard emailVerification
+// which is disabled when using emailOTP plugin
+
+// In-memory store for email change tokens (userId -> { newEmail, token, expiresAt })
+const emailChangeTokens = new Map<string, { newEmail: string; token: string; expiresAt: number }>()
 
 // [PUT /email] Deprecated direct update
 app.put('/email', async (c) => {
@@ -553,7 +559,7 @@ app.put('/email', async (c) => {
   return err(c, 410, 'DEPRECATED', 'Use /api/user/email/initiate and /verify')
 })
 
-// [POST /email/initiate] Start email verification by sending OTP to new email
+// [POST /email/initiate] Start email verification by sending verification link to new email
 app.post('/email/initiate', async (c) => {
   const user = c.get('user')
   if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
@@ -576,10 +582,6 @@ app.post('/email/initiate', async (c) => {
     }
 
     // Per-user rate limit: 5/hour, min 30s between attempts
-    // Cast user.id to number if rateLimitUser expects number, or update rateLimitUser to accept string
-    // Since we changed user.id to string in database.ts, we should update rateLimitUser or cast if it was numeric ID before.
-    // Let's update rateLimitUser to accept string or number.
-    // But here, let's just cast to any to bypass for now as we are deprecating this endpoint anyway
     if (!rateLimitUser(user.id as any, 'email_initiate', { max: 5, windowMs: 60 * 60 * 1000, minIntervalMs: 30 * 1000 })) {
       console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'RATE_LIMITED' }))
       return err(c, 429, 'RATE_LIMITED', 'Too many requests. Try later.')
@@ -592,30 +594,116 @@ app.post('/email/initiate', async (c) => {
       return err(c, 409, 'EMAIL_IN_USE', 'Unable to process request')
     }
 
-    // Use Better Auth to change email
-    const res = await auth.api.changeEmail({
-            body: {
-                newEmail,
-                callbackURL: c.req.header('User-Agent')?.includes('Tauri') ? 'tauri://localhost' : '/settings'
-            },
-            headers: c.req.raw.headers
-        })
-
-    if (!res.status) {
-        return err(c, 400, 'INVALID_INPUT', 'Failed to initiate email change')
+    // Generate verification token
+    const token = randomBytes(32).toString('hex')
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    
+    // Store token
+    emailChangeTokens.set(user.id, { newEmail, token, expiresAt })
+    
+    // Determine callback URL based on client type
+    const isTauri = c.req.header('User-Agent')?.includes('Tauri')
+    const cfg = getConfig()
+    const baseUrl = isTauri ? 'tauri://localhost' : cfg.CLIENT_URL
+    const verificationUrl = `${baseUrl}/api/user/email/verify?token=${token}&userId=${user.id}`
+    
+    // Send verification email to new email address
+    const emailSent = await emailService.sendVerificationEmail(newEmail, verificationUrl)
+    
+    if (!emailSent) {
+      emailChangeTokens.delete(user.id)
+      console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, targetEmailHash: hashEmail(newEmail), errorCode: 'EMAIL_SEND_FAILED' }))
+      return err(c, 500, 'SERVER_ERROR', 'Failed to send verification email')
     }
 
     console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'success', ip, userAgent, targetEmailHash: hashEmail(newEmail) }))
     return ok(c, { type: 'link' }, 'Verification link sent to new email')
-  } catch (_e) {
-    console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'SERVER_ERROR' }))
-    return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
+  } catch (e: any) {
+    const errorMessage = e?.message || 'Unknown error'
+    console.error('Email change initiation failed:', errorMessage)
+    console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'SERVER_ERROR', errorMessage }))
+    return err(c, 500, 'SERVER_ERROR', 'Failed to initiate email change')
   }
 })
 
-// [POST /email/verify] Verify OTP, update email, and invalidate sessions
+// [GET /email/verify] Verify email change token and update email
+app.get('/email/verify', async (c) => {
+  try {
+    const token = c.req.query('token')
+    const userId = c.req.query('userId')
+    
+    if (!token || !userId) {
+      return c.text('Invalid verification link', 400)
+    }
+    
+    const stored = emailChangeTokens.get(userId)
+    if (!stored || stored.token !== token) {
+      return c.text('Invalid or expired verification link', 400)
+    }
+    
+    if (Date.now() > stored.expiresAt) {
+      emailChangeTokens.delete(userId)
+      return c.text('Verification link has expired', 400)
+    }
+    
+    // Check if email is still available
+    const existing = userDb.findByEmail(stored.newEmail)
+    if (existing && existing.id !== userId) {
+      emailChangeTokens.delete(userId)
+      return c.text('Email address is no longer available', 409)
+    }
+    
+    // Update email in database
+    const updated = await userDb.update(userId, { email: stored.newEmail })
+    if (!updated) {
+      return c.text('Failed to update email', 500)
+    }
+    
+    // Clean up token
+    emailChangeTokens.delete(userId)
+    
+    // Redirect to settings page
+    const isTauri = c.req.header('User-Agent')?.includes('Tauri')
+    const cfg = getConfig()
+    const redirectUrl = isTauri ? 'tauri://localhost/settings' : `${cfg.CLIENT_URL}/settings`
+    
+    return c.html(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Email Verified</title>
+        <style>
+          body { font-family: system-ui, sans-serif; background: #09090b; color: #e4e4e7; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+          .container { text-align: center; padding: 2rem; }
+          h1 { color: #22c55e; margin-bottom: 1rem; }
+          p { margin-bottom: 2rem; }
+          a { color: #dc2626; text-decoration: none; }
+          a:hover { text-decoration: underline; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>✓ Email Verified</h1>
+          <p>Your email has been successfully changed to ${stored.newEmail}.</p>
+          <p><a href="${redirectUrl}">Go to Settings</a></p>
+        </div>
+        <script>
+          setTimeout(() => {
+            window.location.href = '${redirectUrl}';
+          }, 3000);
+        </script>
+      </body>
+      </html>
+    `)
+  } catch (e: any) {
+    console.error('Email verification failed:', e)
+    return c.text('Verification failed', 500)
+  }
+})
+
+// [POST /email/verify] Legacy endpoint - now returns error
 app.post('/email/verify', async (c) => {
-    return err(c, 500, 'SERVER_ERROR', 'Please use the new settings page to change email.')
+    return err(c, 410, 'DEPRECATED', 'Please use the verification link sent to your email.')
 })
 
 // ========== Password change ==========

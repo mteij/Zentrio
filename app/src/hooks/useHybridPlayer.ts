@@ -15,6 +15,7 @@ import type { StreamInfo, EngineState, HybridEngineConfig, StreamType, CodecInfo
 
 /**
  * Check if running in Tauri environment
+ * Hybrid playback is disabled in Tauri - uses native playback instead
  */
 function isTauri(): boolean {
   return typeof window !== 'undefined' &&

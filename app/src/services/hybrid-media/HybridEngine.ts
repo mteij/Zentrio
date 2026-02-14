@@ -11,7 +11,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
 import { NetworkReader } from './NetworkReader'
-import { AudioStreamTranscoder } from './AudioStreamTranscoder'
+import { StreamingAudioTranscoder } from './StreamingAudioTranscoder'
 import type { HybridEngineConfig, StreamInfo, MediaMetadata, CombinedStreamInfo } from './types'
 
 /**
@@ -31,7 +31,7 @@ export class HybridEngine extends EventTarget {
   private config: HybridEngineConfig
 
   private ffmpeg: FFmpeg | null = null
-  private audioTranscoder: AudioStreamTranscoder | null = null
+  private audioTranscoder: StreamingAudioTranscoder | null = null
   private videoElement: HTMLVideoElement | null = null
   private audioElement: HTMLAudioElement | null = null
 
@@ -252,6 +252,50 @@ export class HybridEngine extends EventTarget {
   }
 
   /**
+   * Helper method to play audio element with proper error handling
+   */
+  private playAudioElement(): void {
+    if (!this.audioElement) {
+      console.warn('[HybridEngine] playAudioElement called but no audio element')
+      return
+    }
+
+    // Ensure audio is configured correctly
+    this.audioElement.volume = 1.0
+    this.audioElement.muted = false
+    
+    console.log('[HybridEngine] Playing audio element...')
+    console.log('[HybridEngine]   - readyState:', this.audioElement.readyState)
+    console.log('[HybridEngine]   - paused:', this.audioElement.paused)
+    console.log('[HybridEngine]   - volume:', this.audioElement.volume)
+    console.log('[HybridEngine]   - muted:', this.audioElement.muted)
+    console.log('[HybridEngine]   - currentTime:', this.audioElement.currentTime)
+    console.log('[HybridEngine]   - duration:', this.audioElement.duration)
+    
+    // Try to sync with video if available
+    if (this.videoElement && this.videoElement.currentTime > 0) {
+      console.log('[HybridEngine] Syncing audio to video time:', this.videoElement.currentTime)
+      this.audioElement.currentTime = this.videoElement.currentTime
+    }
+    
+    this.audioElement.play()
+      .then(() => {
+        console.log('[HybridEngine] Audio playback started successfully!')
+        console.log('[HybridEngine] Audio is now playing:', !this.audioElement?.paused)
+      })
+      .catch(e => {
+        console.error('[HybridEngine] Audio play() failed:', e)
+        console.error('[HybridEngine] Error name:', e.name)
+        console.error('[HybridEngine] Error message:', e.message)
+        
+        // If it's a NotAllowedError, the user hasn't interacted yet
+        if (e.name === 'NotAllowedError') {
+          console.warn('[HybridEngine] Audio blocked by autoplay policy - waiting for user interaction')
+        }
+      })
+  }
+
+  /**
    * Start playback
    */
   async play(): Promise<void> {
@@ -273,10 +317,23 @@ export class HybridEngine extends EventTarget {
     await this.networkReader.probe()
     console.log('[HybridEngine] Network reader probed successfully')
 
+    // Check file size for audio transcoding
+    // With streaming/chunked transcoding, we can handle larger files
+    const fileSize = this.metadata.format?.size || 0
+    const fileSizeMB = fileSize / (1024 * 1024)
+    const MAX_AUDIO_TRANSCODE_SIZE_MB = 10 * 1024 // 10GB limit (streaming handles large files now)
+    
+    console.log(`[HybridEngine] File size: ${fileSizeMB.toFixed(0)}MB`)
+    
     // Start streaming both audio and video
     if (this.needsTranscoding && this.audioStreamIndex !== null) {
-      console.log('[HybridEngine] Starting audio streaming...')
-      this.startAudioStreaming()
+      if (fileSizeMB > MAX_AUDIO_TRANSCODE_SIZE_MB) {
+        console.warn(`[HybridEngine] File extremely large (${fileSizeMB.toFixed(0)}MB > ${MAX_AUDIO_TRANSCODE_SIZE_MB}MB)`)
+        console.warn('[HybridEngine] Skipping audio transcoding - use desktop app for best results')
+      } else {
+        console.log(`[HybridEngine] Starting streaming audio transcoding (${fileSizeMB.toFixed(0)}MB file)...`)
+        this.startAudioStreaming()
+      }
     } else {
       console.log('[HybridEngine] Skipping audio streaming - transcoding:', this.needsTranscoding, 'audioIndex:', this.audioStreamIndex)
     }
@@ -308,27 +365,43 @@ export class HybridEngine extends EventTarget {
     }
 
     console.log('[HybridEngine] Playback started')
+
+    // If audio element is already ready (transcoding finished), start playing it now
+    if (this.isPlaying && this.audioElement && this.audioElement.readyState >= 2) {
+      console.log('[HybridEngine] Audio already ready, starting playback now')
+      this.playAudioElement()
+    }
   }
 
   /**
-   * Start audio streaming (transcoded)
+   * Start audio streaming (transcoded using progressive download)
    */
   private async startAudioStreaming(): Promise<void> {
     if (this.audioStreamIndex === null || !this.ffmpeg) return
 
-    console.log('[HybridEngine] Starting audio streaming...')
+    console.log('[HybridEngine] Starting progressive audio streaming...')
 
-    // Initialize audio transcoder
-    this.audioTranscoder = new AudioStreamTranscoder({
+    // Initialize streaming audio transcoder
+    // For files < 200MB: downloads full file, transcodes, appends to MSE
+    // For files > 200MB: downloads in chunks, transcodes progressively
+    // IMPORTANT: Pass shared FFmpeg instance to avoid memory conflicts
+    this.audioTranscoder = new StreamingAudioTranscoder({
       bitrate: '192k',
-      chunkSize: this.config.segmentSize,
-      initialBufferSize: 2 * 1024 * 1024 // 2MB to avoid FFmpeg WASM memory issues
+      initialBufferSize: 5 * 1024 * 1024, // 5MB before playback starts
+      maxFullDownloadSize: 200 * 1024 * 1024, // 200MB threshold
+      ffmpegInstance: this.ffmpeg || undefined // Share FFmpeg instance
     })
 
     const audioElement = await this.audioTranscoder.initialize(
       this.sourceUrl,
-      this.audioStreamIndex
+      this.audioStreamIndex,
+      this.duration
     )
+
+    // Enable A/V sync and seek handling
+    if (this.videoElement) {
+      this.audioTranscoder.syncWithVideo(this.videoElement)
+    }
 
     audioElement.addEventListener('timeupdate', () => {
       this.currentTime = audioElement.currentTime
@@ -347,7 +420,7 @@ export class HybridEngine extends EventTarget {
 
     this.audioElement = audioElement
     
-    // Start the download and transcoding process
+    // Start the transcoding process
     this.audioTranscoder.start().catch(e => {
       console.error('[HybridEngine] Audio transcoder start error:', e)
     })
@@ -355,7 +428,27 @@ export class HybridEngine extends EventTarget {
     // Listen for audio ready event from transcoder
     this.audioTranscoder.addEventListener('audioready', () => {
       console.log('[HybridEngine] Audio data ready for playback')
+      console.log('[HybridEngine] Audio element readyState:', this.audioElement?.readyState)
+      console.log('[HybridEngine] Audio element paused:', this.audioElement?.paused)
+      console.log('[HybridEngine] Audio element volume:', this.audioElement?.volume)
+      console.log('[HybridEngine] Audio element muted:', this.audioElement?.muted)
+      
       this.dispatchEvent(new CustomEvent('audioready', { detail: { audioElement } }))
+      
+      // If we're already playing, start audio playback immediately
+      if (this.isPlaying && this.audioElement) {
+        console.log('[HybridEngine] Starting audio playback (engine already playing)')
+        this.playAudioElement()
+      }
+    })
+
+    // Also listen for canplay as a backup trigger
+    audioElement.addEventListener('canplay', () => {
+      console.log('[HybridEngine] Audio canplay event fired')
+      if (this.isPlaying && this.audioElement && this.audioElement.paused) {
+        console.log('[HybridEngine] Audio canplay - attempting to play')
+        this.playAudioElement()
+      }
     })
 
     // Don't auto-play - wait for user interaction
@@ -416,6 +509,8 @@ export class HybridEngine extends EventTarget {
   /**
    * Stream MP4 video directly to MSE
    */
+  private hasVideoStartedPlaying: boolean = false
+
   private async streamMP4Video(): Promise<void> {
     if (!this.networkReader || !this.mediaSource || this.mediaSource.readyState !== 'open') {
       console.warn('[HybridEngine] Cannot stream MP4 - networkReader:', !!this.networkReader, 'mediaSource:', !!this.mediaSource, 'readyState:', this.mediaSource?.readyState)
@@ -429,8 +524,11 @@ export class HybridEngine extends EventTarget {
     // The browser's MSE will handle parsing
     let offset = 0
     const chunkSize = 5 * 1024 * 1024 // 5MB chunks
+    const MIN_BUFFER_TO_START = 2 * 1024 * 1024 // 2MB minimum before starting playback
 
     const fileSize = this.metadata.format?.size || 0
+    let bufferedAmount = 0
+
     while (this.isPlaying && offset < fileSize) {
       try {
         const chunk = await this.networkReader.read(offset, chunkSize)
@@ -440,6 +538,7 @@ export class HybridEngine extends EventTarget {
         this.appendVideoSegment(chunk.buffer as ArrayBuffer)
         
         offset += chunk.byteLength
+        bufferedAmount += chunk.byteLength
         this.processedVideoChunks++
 
         this.config.onProgress?.({
@@ -447,6 +546,25 @@ export class HybridEngine extends EventTarget {
           total: fileSize,
           type: 'video'
         })
+
+        // Start playing video once we have enough buffer and audio is ready
+        if (!this.hasVideoStartedPlaying &&
+            bufferedAmount >= MIN_BUFFER_TO_START &&
+            this.videoElement &&
+            this.videoElement.paused) {
+          const bufferReady = this.videoSourceBuffer &&
+                             this.videoSourceBuffer.buffered &&
+                             this.videoSourceBuffer.buffered.length > 0 &&
+                             this.videoSourceBuffer.buffered.end(0) > 0.5 // At least 0.5s buffered
+          
+          if (bufferReady) {
+            console.log('[HybridEngine] Starting video playback (buffer ready)')
+            this.videoElement.play().catch(e => {
+              console.warn('[HybridEngine] Video play error:', e)
+            })
+            this.hasVideoStartedPlaying = true
+          }
+        }
 
         // Wait a bit to let buffer catch up
         if (this.videoSourceBuffer?.buffered && this.videoSourceBuffer.buffered.length > 0) {
@@ -609,12 +727,12 @@ export class HybridEngine extends EventTarget {
 
   /**
    * Remux MKV to fMP4 for MSE playback
-   * Uses FFmpeg to convert the container format
-   * For large files, uses chunked download with progress feedback
+   * For files < 300MB: download full file and remux
+   * For files >= 300MB: use direct playback (browser may handle it)
    */
   private async remuxMKVToMP4(): Promise<void> {
     console.log('[HybridEngine] Remuxing MKV to fMP4...')
-    
+
     if (!this.ffmpeg) {
       console.error('[HybridEngine] FFmpeg not available for remuxing')
       this.playVideoDirectly()
@@ -627,54 +745,50 @@ export class HybridEngine extends EventTarget {
     }
 
     try {
-      // Generate unique filename for remuxed output
-      const timestamp = Date.now()
-      const random = Math.random().toString(36).substring(2, 8)
-      const inputFilename = `remux_input_${timestamp}_${random}.mkv`
-      const outputFilename = `remux_output_${timestamp}_${random}.mp4`
-
       // Get file size first
       console.log('[HybridEngine] Getting file size...')
       const headResponse = await fetch(this.sourceUrl, { method: 'HEAD' })
       const contentLength = parseInt(headResponse.headers.get('content-length') || '0')
       const fileSizeMB = contentLength / 1024 / 1024
-      
+
       console.log('[HybridEngine] File size:', fileSizeMB.toFixed(2), 'MB')
 
-      // For files larger than 500MB, warn and try direct playback first
-      if (fileSizeMB > 500) {
-        console.warn('[HybridEngine] Large file detected (>500MB), trying direct playback first...')
+      // For large files, use direct playback (browser may handle MKV natively)
+      const MAX_REMUX_SIZE = 300 * 1024 * 1024 // 300MB
+      if (contentLength > MAX_REMUX_SIZE) {
+        console.log('[HybridEngine] File too large for remuxing, using direct playback')
         this.playVideoDirectly()
         return
       }
 
-      // Download the MKV file with progress
-      console.log('[HybridEngine] Downloading MKV file for remuxing...')
+      // Download full file with progress
+      console.log('[HybridEngine] Downloading MKV file...')
       const response = await fetch(this.sourceUrl)
+      
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-      
+
       const reader = response.body?.getReader()
       if (!reader) {
         throw new Error('Response body not available')
       }
 
       const chunks: Uint8Array[] = []
-      let downloadedBytes = 0
+      let receivedLength = 0
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        
+
         chunks.push(value)
-        downloadedBytes += value.length
-        
-        const percent = Math.round((downloadedBytes / contentLength) * 100)
+        receivedLength += value.length
+
+        const percent = Math.round((receivedLength / contentLength) * 100)
         if (percent % 10 === 0) {
-          console.log(`[HybridEngine] Downloading: ${percent}% (${(downloadedBytes / 1024 / 1024).toFixed(1)}MB)`)
+          console.log(`[HybridEngine] Downloaded: ${percent}%`)
           this.config.onProgress?.({
-            loaded: downloadedBytes,
+            loaded: receivedLength,
             total: contentLength,
             type: 'video'
           })
@@ -682,50 +796,71 @@ export class HybridEngine extends EventTarget {
       }
 
       // Combine chunks
-      const totalLength = chunks.reduce((sum, c) => sum + c.length, 0)
-      const mkvBuffer = new Uint8Array(totalLength)
+      const mkvData = new Uint8Array(receivedLength)
       let offset = 0
       for (const chunk of chunks) {
-        mkvBuffer.set(chunk, offset)
+        mkvData.set(chunk, offset)
         offset += chunk.length
       }
 
-      console.log('[HybridEngine] Downloaded MKV:', (mkvBuffer.byteLength / 1024 / 1024).toFixed(2), 'MB')
+      console.log(`[HybridEngine] Downloaded ${(receivedLength / 1024 / 1024).toFixed(1)}MB, remuxing...`)
 
-      // Write input file to FFmpeg FS
-      await this.ffmpeg.writeFile(inputFilename, mkvBuffer)
+      // Remux full file
+      await this.remuxFullMKV(mkvData)
 
-      // Remux to fMP4 (copy streams, just change container)
-      console.log('[HybridEngine] Starting FFmpeg remux...')
-      await this.ffmpeg.exec([
+    } catch (error) {
+      console.error('[HybridEngine] Error remuxing MKV:', error)
+      this.config.onError?.(error as Error)
+      // Fallback to direct playback
+      this.playVideoDirectly()
+    }
+  }
+
+  /**
+   * Remux full MKV file to fMP4
+   */
+  private async remuxFullMKV(mkvData: Uint8Array): Promise<void> {
+    if (!this.ffmpeg) return
+
+    const timestamp = Date.now()
+    const inputFilename = `mkv_input_${timestamp}.mkv`
+    const outputFilename = `mp4_output_${timestamp}.mp4`
+
+    try {
+      // Write to FFmpeg FS
+      await this.ffmpeg.writeFile(inputFilename, mkvData)
+
+      // Build FFmpeg args for remuxing
+      const args = [
         '-i', inputFilename,
         '-c', 'copy', // Copy streams without re-encoding
-        '-movflags', 'frag_keyframe+empty_moov+default_base_moof', // fMP4 format
+        '-movflags', '+frag_keyframe+empty_moov+default_base_moof', // fMP4 format for streaming
         '-f', 'mp4',
+        '-y',
         outputFilename
-      ])
+      ]
 
-      // Read the remuxed file
-      const remuxedData = await this.ffmpeg.readFile(outputFilename)
-      const remuxedBuffer = remuxedData instanceof Uint8Array
-        ? remuxedData.buffer
-        : new Uint8Array(remuxedData as any).buffer
+      console.log('[HybridEngine] Starting FFmpeg remux...')
 
-      console.log('[HybridEngine] Remuxed to fMP4:', (remuxedBuffer.byteLength / 1024 / 1024).toFixed(2), 'MB')
+      // Execute FFmpeg
+      await this.ffmpeg.exec(args)
 
-      // Clean up FFmpeg files
-      try {
-        await this.ffmpeg.deleteFile(inputFilename)
-        await this.ffmpeg.deleteFile(outputFilename)
-      } catch (e) {
-        // Ignore cleanup errors
-      }
+      // Read output
+      const output = await this.ffmpeg.readFile(outputFilename)
+      const outputData = typeof output === 'string'
+        ? new TextEncoder().encode(output)
+        : new Uint8Array(output)
+
+      console.log(`[HybridEngine] Remuxed: ${(outputData.length / 1024 / 1024).toFixed(1)}MB`)
 
       // Append to MSE
-      this.appendVideoSegment(remuxedBuffer)
-      console.log('[HybridEngine] Remuxed video appended to MSE, waiting for MSE to process...')
+      this.appendVideoSegment(outputData.buffer as ArrayBuffer)
 
-      // Wait for MSE to process the data before attempting playback
+      // Cleanup
+      await this.ffmpeg.deleteFile(inputFilename)
+      await this.ffmpeg.deleteFile(outputFilename)
+
+      // Wait for MSE to process
       await new Promise<void>(resolve => {
         const checkProcessed = () => {
           if (!this.isVideoAppending && !this.videoSourceBuffer?.updating) {
@@ -737,28 +872,30 @@ export class HybridEngine extends EventTarget {
         checkProcessed()
       })
 
-      console.log('[HybridEngine] MSE processed data, attempting playback...')
-
-      // Try to play after MSE has processed the data
+      // Try to start playback
       if (this.videoElement && this.isPlaying) {
         try {
           await this.videoElement.play()
-          console.log('[HybridEngine] Remuxed video playing')
+          console.log('[HybridEngine] Video playback started')
         } catch (e) {
-          console.error('[HybridEngine] Remuxed video play error:', e)
+          console.warn('[HybridEngine] Video play error:', e)
         }
       }
+
     } catch (error) {
-      console.error('[HybridEngine] Error remuxing MKV:', error)
-      this.config.onError?.(error as Error)
-      // Fallback to direct playback
-      this.playVideoDirectly()
+      console.error('[HybridEngine] Remux error:', error)
+
+      // Cleanup on error
+      try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
+      try { await this.ffmpeg.deleteFile(outputFilename) } catch {}
+
+      throw error
     }
   }
 
   /**
    * Play video directly without MSE
-   * Fallback for unsupported containers
+   * Fallback for unsupported containers or large files
    */
   private playVideoDirectly(): void {
     console.log('[HybridEngine] Playing video directly (fallback)...')
@@ -768,14 +905,62 @@ export class HybridEngine extends EventTarget {
       return
     }
 
+    // Clean up MSE if it was set up (prevents conflict with direct playback)
+    if (this.mediaSource && this.mediaSource.readyState === 'open') {
+      try {
+        // Remove source buffers
+        if (this.videoSourceBuffer) {
+          this.mediaSource.removeSourceBuffer(this.videoSourceBuffer)
+          this.videoSourceBuffer = null
+        }
+        this.mediaSource.endOfStream()
+      } catch (e) {
+        console.warn('[HybridEngine] Error cleaning up MSE:', e)
+      }
+    }
+    this.mediaSource = null
+
     // Set source directly - browser will try to play it
     this.videoElement.src = this.sourceUrl
+    this.videoElement.load() // Force reload with new source
     
-    // Try to play
-    this.videoElement.play().catch(e => {
-      console.error('[HybridEngine] Direct playback error:', e)
-      this.config.onError?.(new Error('Direct playback failed'))
+    // Add event listeners for this video element
+    const onCanPlay = () => {
+      console.log('[HybridEngine] Direct video canplay - ready to play')
+      // Auto-play if we're supposed to be playing
+      if (this.isPlaying) {
+        this.videoElement?.play().catch(e => {
+          console.error('[HybridEngine] Direct video play error:', e)
+        })
+      }
+      this.videoElement?.removeEventListener('canplay', onCanPlay)
+    }
+    
+    this.videoElement.addEventListener('canplay', onCanPlay)
+    
+    this.videoElement.addEventListener('error', (e) => {
+      console.error('[HybridEngine] Direct video error:', e)
     })
+    
+    // Add timeupdate listener to sync time bar in direct playback mode
+    this.videoElement.addEventListener('timeupdate', () => {
+      if (this.videoElement) {
+        this.currentTime = this.videoElement.currentTime
+        this.dispatchEvent(new CustomEvent('timeupdate', { 
+          detail: { currentTime: this.currentTime } 
+        }))
+      }
+    })
+    
+    // Also get duration when metadata loads
+    this.videoElement.addEventListener('loadedmetadata', () => {
+      if (this.videoElement && this.videoElement.duration) {
+        this.duration = this.videoElement.duration
+        console.log('[HybridEngine] Direct video duration:', this.duration)
+      }
+    })
+    
+    console.log('[HybridEngine] Direct playback source set, loading...')
   }
 
   /**
@@ -842,7 +1027,12 @@ export class HybridEngine extends EventTarget {
     
     this.currentTime = time
 
-    // Flush video buffer for seeking
+    // Seek video element (direct playback mode) - video can seek anywhere
+    if (this.videoElement) {
+      this.videoElement.currentTime = time
+    }
+
+    // Flush video buffer for seeking (MSE mode)
     if (this.videoSourceBuffer && this.mediaSource?.readyState === 'open') {
       try {
         // Remove all buffered data
@@ -863,9 +1053,26 @@ export class HybridEngine extends EventTarget {
       }
     }
 
-    // Seek audio
+    // Seek audio - clamp to available buffer range
     if (this.audioElement) {
-      this.audioElement.currentTime = time
+      try {
+        const audioBuffered = this.audioElement.buffered
+        if (audioBuffered.length > 0) {
+          const audioEnd = audioBuffered.end(audioBuffered.length - 1)
+          // If seeking beyond available audio content, clamp to end of buffer
+          if (time > audioEnd) {
+            console.log(`[HybridEngine] Seek ${time}s beyond audio buffer (${audioEnd.toFixed(1)}s), clamping`)
+            this.audioElement.currentTime = Math.max(0, audioEnd - 0.5) // Stay slightly before end
+          } else {
+            this.audioElement.currentTime = time
+          }
+        } else {
+          // No buffer yet, try seeking anyway
+          this.audioElement.currentTime = time
+        }
+      } catch (e) {
+        console.warn('[HybridEngine] Audio seek error:', e)
+      }
     }
 
     // Restart streaming from new position
@@ -885,6 +1092,33 @@ export class HybridEngine extends EventTarget {
   pause(): void {
     this.isPlaying = false
     this.audioElement?.pause()
+    this.videoElement?.pause()
+  }
+
+  /**
+   * Resume playback after pause
+   */
+  async resume(): Promise<void> {
+    console.log('[HybridEngine] Resuming playback...')
+    this.isPlaying = true
+    
+    // Resume video
+    if (this.videoElement) {
+      try {
+        await this.videoElement.play()
+      } catch (e) {
+        console.error('[HybridEngine] Video resume error:', e)
+      }
+    }
+    
+    // Resume audio
+    if (this.audioElement && this.audioElement.readyState >= 2) {
+      try {
+        await this.audioElement.play()
+      } catch (e) {
+        console.error('[HybridEngine] Audio resume error:', e)
+      }
+    }
   }
 
   /**

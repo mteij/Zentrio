@@ -7,6 +7,7 @@ import { List, ListItem, ListShare, Profile } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 import { ShareListModal } from '../../components/features/ShareListModal'
+import { useLibraryData } from '../../hooks/useLibraryData'
 
 import { LibraryItemCard } from '../../components/library/LibraryItemCard'
 import { 
@@ -25,25 +26,39 @@ export const StreamingLibrary = () => {
   const { profileId, listId } = useParams<{ profileId: string, listId?: string }>()
   const navigate = useNavigate()
   
-  // Lists state
-  const [myLists, setMyLists] = useState<List[]>([])
-  const [accountSharedLists, setAccountSharedLists] = useState<SharedList[]>([])
-  const [profileSharedLists, setProfileSharedLists] = useState<ProfileSharedList[]>([])
-  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
-  const [availableFromOtherProfiles, setAvailableFromOtherProfiles] = useState<AvailableSharedList[]>([])
+  const { 
+    state: {
+      myLists,
+      accountSharedLists,
+      profileSharedLists,
+      pendingInvites,
+      availableFromOtherProfiles,
+      activeList,
+      items,
+      loading,
+      error
+    },
+    setters: {
+      setMyLists,
+      setAccountSharedLists,
+      setProfileSharedLists,
+      setPendingInvites,
+      setItems,
+      setActiveList
+    },
+    actions: {
+      refreshLibrary,
+      createList,
+      deleteList,
+      selectList
+    }
+  } = useLibraryData(profileId, listId)
   
-  // Current list state
-  const [activeList, setActiveList] = useState<List | SharedList | ProfileSharedList | null>(null)
-  const [items, setItems] = useState<ListItem[]>([])
-  
-  // UI state
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  // UI Only state
   const [showNewListInput, setShowNewListInput] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [creatingList, setCreatingList] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
-  const [profileShareModalOpen, setProfileShareModalOpen] = useState(false)
   const [shareListId, setShareListId] = useState<number | null>(null)
   
   // Sidebar section collapse state
@@ -59,193 +74,21 @@ export const StreamingLibrary = () => {
     setSectionsOpen(prev => ({ ...prev, [section]: !prev[section] }))
   }
 
-  useEffect(() => {
-    if (!profileId) {
-      navigate('/profiles')
-      return
-    }
-    
-    const controller = new AbortController()
-    loadLibrary(controller.signal)
-    
-    return () => {
-        controller.abort()
-    }
-  }, [profileId])
-
-  useEffect(() => {
-    // When listId changes in URL, or lists are loaded, update active list and items
-    let controller: AbortController | null = null
-
-    if (listId && !loading) {
-      const id = parseInt(listId)
-      const found = myLists.find(l => l.id === id) ||
-        accountSharedLists.find(l => l.id === id) ||
-        profileSharedLists.find(l => l.id === id)
-      
-      if (found) {
-        if (activeList?.id !== found.id) {
-            setActiveList(found)
-        }
-        
-        // Always load items for the current list ID when it changes or lists are ready
-        // We use a controller to cancel previous requests if rapid switching occurs
-        controller = new AbortController()
-        loadItems(id, controller.signal)
-      }
-    }
-
-    return () => {
-        controller?.abort()
-    }
-  }, [listId, myLists, accountSharedLists, profileSharedLists, loading])
-
-  const loadLibrary = async (signal?: AbortSignal) => {
-    setLoading(true)
-    try {
-      const [listsRes, sharedRes, profileSharedRes, pendingRes, availableRes] = await Promise.all([
-          apiFetch(`/api/lists?profileId=${profileId}`, { signal }),
-          apiFetch(`/api/lists/shared-for-profile/${profileId}`, { signal }),
-          apiFetch(`/api/lists/profile-shared/${profileId}`, { signal }),
-          apiFetch('/api/lists/pending-invites', { signal }),
-          apiFetch(`/api/lists/available-from-other-profiles/${profileId}`, { signal })
-      ])
-      
-      const [listsData, sharedData, profileSharedData, pendingData, availableData] = await Promise.all([
-          listsRes.json(),
-          sharedRes.json(),
-          profileSharedRes.json(),
-          pendingRes.json(),
-          availableRes.json()
-      ])
-      
-      if (signal?.aborted) return
-
-      let ownLists = listsData.lists || []
-      
-      if (ownLists.length === 0) {
-        // Create default list if none exist
-        const createRes = await apiFetch('/api/lists', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profileId, name: 'My Library' }),
-            signal
-        })
-        const createData = await createRes.json()
-        if (createData.list) {
-            ownLists = [createData.list]
-        }
-      }
-      
-      const newAccountSharedLists = (sharedData.lists || []).filter((l: SharedList) => l.isLinkedToThisProfile);
-      const newProfileSharedLists = profileSharedData.lists || [];
-      
-      setPendingInvites(pendingData.invites || [])
-      setAvailableFromOtherProfiles(availableData.lists || [])
-      setMyLists(ownLists)
-      setAccountSharedLists(newAccountSharedLists)
-      setProfileSharedLists(newProfileSharedLists)
-      
-      // Determine active list from URL or default
-      let currentList: List | SharedList | ProfileSharedList | null = null
-      
-      if (listId) {
-        const id = parseInt(listId)
-        currentList = ownLists.find((l: List) => l.id === id) ||
-          newAccountSharedLists.find((l: SharedList) => l.id === id) ||
-          newProfileSharedLists.find((l: ProfileSharedList) => l.id === id) ||
-          null
-      }
-      
-      if (!currentList && ownLists.length > 0) {
-        currentList = ownLists[0]
-      }
-      
-      if (currentList) {
-          setActiveList(currentList)
-          // Only load items here if we don't have a listId in URL (default list case)
-          // If we DO have listId, the useEffect will handle it when loading becomes false
-          if (!listId && currentList.id) {
-            loadItems(currentList.id, signal)
-          } else if (!currentList.id) {
-            setItems([])
-          }
-      }
-      
-    } catch (err: any) {
-      if (err.name !== 'AbortError' && err.message !== 'Request cancelled' && !signal?.aborted) {
-          console.error(err)
-          setError('Failed to load library')
-      }
-    } finally {
-      if (!signal?.aborted) {
-          setLoading(false)
-      }
-    }
-  }
-
-  const loadItems = async (lid: number, signal?: AbortSignal) => {
-    try {
-      const itemsRes = await apiFetch(`/api/lists/${lid}/items?profileId=${profileId}`, { signal })
-      const itemsData = await itemsRes.json()
-      if (!signal?.aborted) {
-        setItems(itemsData.items || [])
-      }
-    } catch (err: any) {
-      if (err.name !== 'AbortError' && err.message !== 'Request cancelled' && !signal?.aborted) {
-          console.error(err)
-          setItems([])
-      }
-    }
-  }
-
-  const handleListClick = (list: List | SharedList | ProfileSharedList) => {
-    // Just navigate, let useEffect handle state update and fetching
-    if (activeList?.id !== list.id) {
-        navigate(`/streaming/${profileId}/library/${list.id}`, { replace: true })
-    }
-  }
-
-  const handleCreateList = async () => {
+  const handleCreateListWrapper = async () => {
     if (!newListName.trim()) return
-    
     setCreatingList(true)
-    try {
-      const res = await apiFetch('/api/lists', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId, name: newListName.trim() })
-      })
-      const data = await res.json()
-      if (data.list) {
-        setMyLists([...myLists, data.list])
-        setNewListName('')
-        setShowNewListInput(false)
-        toast.success('List created!')
-      }
-    } catch (e) {
-      console.error(e)
-      toast.error('Failed to create list')
-    } finally {
-      setCreatingList(false)
+    const success = await createList(newListName.trim())
+    setCreatingList(false)
+    if (success) {
+      setNewListName('')
+      setShowNewListInput(false)
     }
   }
 
-  const handleDeleteList = async (list: List, e: React.MouseEvent) => {
+  const handleDeleteListWrapper = async (list: List, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm(`Delete "${list.name}"? This cannot be undone.`)) return
-    
-    try {
-      await apiFetch(`/api/lists/${list.id}`, { method: 'DELETE' })
-      setMyLists(myLists.filter(l => l.id !== list.id))
-      if (activeList?.id === list.id && myLists.length > 1) {
-        const nextList = myLists.find(l => l.id !== list.id)
-        if (nextList) handleListClick(nextList)
-      }
-      toast.success('List deleted')
-    } catch (e) {
-      toast.error('Failed to delete list')
-    }
+    await deleteList(list.id)
   }
 
   const handleOpenShareModal = (lid: number) => {
@@ -294,7 +137,7 @@ export const StreamingLibrary = () => {
       })
       if (res.ok) {
         toast.success(`Accepted invitation to "${invite.listName}"`)
-        loadLibrary()
+        refreshLibrary()
       } else {
         const data = await res.json()
         toast.error(data.error || 'Failed to accept invitation')
@@ -323,7 +166,7 @@ export const StreamingLibrary = () => {
       const res = await apiFetch(`/api/lists/shares/${share.share.id}/link/${profileId}`, { method: 'POST' })
       if (res.ok) {
         toast.success(`Added "${share.name}" to this profile`)
-        loadLibrary()
+        refreshLibrary()
       }
     } catch (e) {
       console.error(e)
@@ -465,7 +308,7 @@ export const StreamingLibrary = () => {
                 type="text"
                 value={newListName}
                 onChange={(e) => setNewListName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateList()}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateListWrapper()}
                 placeholder="List name..."
                 autoFocus
                 style={{
@@ -480,7 +323,7 @@ export const StreamingLibrary = () => {
               />
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={handleCreateList}
+                  onClick={handleCreateListWrapper}
                   disabled={creatingList || !newListName.trim()}
                   style={{
                     flex: 1,
@@ -552,9 +395,9 @@ export const StreamingLibrary = () => {
                 list={list}
                 isActive={activeList?.id === list.id}
                 sharingType="private"
-                onClick={() => handleListClick(list)}
+                onClick={() => selectList(list)}
                 onShare={() => handleOpenShareModal(list.id)}
-                onDelete={(e) => handleDeleteList(list, e)}
+                onDelete={(e) => handleDeleteListWrapper(list, e)}
                 showActions
               />
             ))}
@@ -627,7 +470,7 @@ export const StreamingLibrary = () => {
                       isActive={activeList?.id === list.id}
                       sharingType="profile-shared"
                       sharedBy={list.ownerName}
-                      onClick={() => handleListClick(list)}
+                      onClick={() => selectList(list)}
                       onLeave={() => handleLeaveProfileSharedList(list.profileShare.id)}
                     />
                   ))}
@@ -648,7 +491,7 @@ export const StreamingLibrary = () => {
                       isActive={activeList?.id === list.id}
                       sharingType="account-shared"
                       sharedBy={list.sharedByName}
-                      onClick={() => handleListClick(list)}
+                      onClick={() => selectList(list)}
                       onLeave={() => handleLeaveSharedList(list.share.id)}
                     />
                   ))}
@@ -727,7 +570,7 @@ export const StreamingLibrary = () => {
                           type="text"
                           value={newListName}
                           onChange={(e) => setNewListName(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { handleCreateList(); setMobileListOpen(false) } }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { handleCreateListWrapper(); setMobileListOpen(false) } }}
                           placeholder="List name..."
                           autoFocus
                           style={{
@@ -739,7 +582,7 @@ export const StreamingLibrary = () => {
                         />
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
-                            onClick={() => { handleCreateList(); setMobileListOpen(false) }}
+                            onClick={() => { handleCreateListWrapper(); setMobileListOpen(false) }}
                             disabled={creatingList || !newListName.trim()}
                             style={{
                               flex: 1, background: '#e50914', border: 'none', color: '#fff',
@@ -824,7 +667,7 @@ export const StreamingLibrary = () => {
                           }}
                         >
                           <button
-                            onClick={() => { handleListClick(list); setMobileListOpen(false) }}
+                            onClick={() => { selectList(list); setMobileListOpen(false) }}
                             style={{
                               flex: 1, textAlign: 'left', padding: '2px 0',
                               background: 'transparent', border: 'none', color: '#fff',
@@ -846,7 +689,7 @@ export const StreamingLibrary = () => {
                             </button>
                             {!list.is_default && (
                               <button
-                                onClick={(e) => { handleDeleteList(list, e); setMobileListOpen(false) }}
+                                onClick={(e) => { handleDeleteListWrapper(list, e); setMobileListOpen(false) }}
                                 style={{
                                   padding: '6px', background: 'rgba(239, 68, 68, 0.15)', border: 'none',
                                   borderRadius: '6px', cursor: 'pointer', color: '#f87171'
@@ -878,7 +721,7 @@ export const StreamingLibrary = () => {
                             }}
                           >
                             <button
-                              onClick={() => { handleListClick(list); setMobileListOpen(false) }}
+                              onClick={() => { selectList(list); setMobileListOpen(false) }}
                               style={{
                                 flex: 1, textAlign: 'left', padding: '2px 0',
                                 background: 'transparent', border: 'none', color: '#fff',
@@ -920,7 +763,7 @@ export const StreamingLibrary = () => {
                             }}
                           >
                             <button
-                              onClick={() => { handleListClick(list); setMobileListOpen(false) }}
+                              onClick={() => { selectList(list); setMobileListOpen(false) }}
                               style={{
                                 flex: 1, textAlign: 'left', padding: '2px 0',
                                 background: 'transparent', border: 'none', color: '#fff',

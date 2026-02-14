@@ -49,6 +49,9 @@ import { toast } from '../../utils/toast'
 const HybridEnginePromise = import('../../services/hybrid-media/HybridEngine').then(m => m.HybridEngine)
 const mightNeedHybridPlaybackPromise = import('../../services/hybrid-media').then(m => m.mightNeedHybridPlayback)
 
+// Tauri detection - hybrid playback is web-only
+const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__
+
 // Global cache to prevent re-probing on remounts
 // Maps URL -> 'native' | 'hybrid' | 'failed'
 const probeCache = new Map<string, { mode: 'native' | 'hybrid', duration?: number }>()
@@ -419,8 +422,8 @@ export function VidstackPlayer({
     
     // Playback mode: native (Vidstack), hybrid (custom engine), or probing
     const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(() => {
-        // Force native playback in Tauri
-        if (window.__TAURI__) {
+        // Force native playback in Tauri - hybrid is web-only
+        if (isTauri) {
             console.log('[VidstackPlayer] Tauri environment detected - forcing native playback')
             return 'native'
         }
@@ -430,7 +433,7 @@ export function VidstackPlayer({
         if (cached) {
             console.log(`[VidstackPlayer] Using cached probe result for ${src.slice(0, 50)}...: ${cached.mode}`)
             if (cached.mode === 'hybrid') {
-                 return 'probing' 
+                 return 'probing'
             }
             return cached.mode as PlaybackMode
         }
@@ -446,11 +449,15 @@ export function VidstackPlayer({
     const [hybridPlaying, setHybridPlaying] = useState(false)
     const [showControls, setShowControls] = useState(true)
     
+    // Store callbacks in refs to avoid re-triggering probe effect
+    const onMetadataLoadRef = useRef(onMetadataLoad)
+    onMetadataLoadRef.current = onMetadataLoad
+
     // Probe file to check if we need hybrid playback
     useEffect(() => {
-        // Skip probing in Tauri
-        if (window.__TAURI__) {
-            console.log('[VidstackPlayer] Skipping probe - running in Tauri environment')
+        // Skip probing in Tauri - hybrid playback is web-only
+        if (isTauri) {
+            console.log('[VidstackPlayer] Skipping probe - Tauri uses native playback')
             return
         }
         
@@ -461,7 +468,7 @@ export function VidstackPlayer({
              if (cached.mode === 'hybrid') {
                  setHybridDuration(cached.duration || 0)
                  setPlaybackMode('hybrid')
-                 if (cached.duration) onMetadataLoad?.(cached.duration)
+                 if (cached.duration) onMetadataLoadRef.current?.(cached.duration)
              } else {
                  setPlaybackMode('native')
              }
@@ -516,7 +523,7 @@ export function VidstackPlayer({
                 }
                 
                 if (cancelled) {
-                    console.log('[VidstackPlayer] Probe cancelled')
+                    console.log('[VidstackPlayer] Probe cancelled after completion, ignoring result')
                     return
                 }
 
@@ -545,7 +552,7 @@ export function VidstackPlayer({
                    
                     setHybridDuration(duration)
                     setPlaybackMode('hybrid')
-                    onMetadataLoad?.(duration)
+                    onMetadataLoadRef.current?.(duration)
                 } else {
                     console.log('[VidstackPlayer] File can use native playback (supported codecs)')
                     // Engine not needed, cleanup
@@ -571,7 +578,15 @@ export function VidstackPlayer({
         return () => {
             cancelled = true
         }
-    }, [src, onMetadataLoad])
+    }, [src]) // Only re-run when src changes, not when callbacks change
+
+    // Store callbacks in refs to avoid re-triggering effects
+    const onTimeUpdateRef = useRef(onTimeUpdate)
+    const onEndedRef = useRef(onEnded)
+    const onErrorRef = useRef(onError)
+    onTimeUpdateRef.current = onTimeUpdate
+    onEndedRef.current = onEnded
+    onErrorRef.current = onError
 
     // Initialize hybrid engine when in hybrid mode
     useEffect(() => {
@@ -622,11 +637,11 @@ export function VidstackPlayer({
                 engine.addEventListener('timeupdate', (e: any) => {
                     const { currentTime } = e.detail
                     setHybridCurrentTime(currentTime)
-                    onTimeUpdate?.(currentTime, duration)
+                    onTimeUpdateRef.current?.(currentTime, duration)
                 })
                  
                 engine.addEventListener('ended', () => {
-                    onEnded?.()
+                    onEndedRef.current?.()
                     setHybridPlaying(false)
                 })
                  
@@ -634,7 +649,7 @@ export function VidstackPlayer({
                     console.error('[VidstackPlayer] Hybrid engine error:', e.detail.error)
                     // Fall back to native playback
                     setPlaybackMode('native')
-                    onError?.(e.detail.error)
+                    onErrorRef.current?.(e.detail.error)
                 })
 
                 if (cancelled) return
@@ -668,7 +683,7 @@ export function VidstackPlayer({
                  
                 // Switch to native playback
                 setPlaybackMode('native')
-                onError?.(error instanceof Error ? error : new Error(String(error)))
+                onErrorRef.current?.(error instanceof Error ? error : new Error(String(error)))
             }
         }
 
@@ -677,7 +692,7 @@ export function VidstackPlayer({
         return () => {
             cancelled = true
         }
-    }, [playbackMode, autoPlay, startTime, onTimeUpdate, onError])
+    }, [playbackMode, autoPlay, startTime]) // Only re-run when these change, not callbacks
 
     // Ref to store cleanup timeout (for cancellation on Strict Mode remount)
     const cleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -694,7 +709,7 @@ export function VidstackPlayer({
     // Define keyboard handlers here before using them
     const handleHybridPlay = useCallback(async () => {
         if (engineRef.current) {
-            await engineRef.current.play()
+            await engineRef.current.resume()
             setHybridPlaying(true)
         }
     }, [])
@@ -873,7 +888,7 @@ export function VidstackPlayer({
         // Check if this might be an audio codec issue
         // If we haven't tried hybrid mode yet and URL might need it
         // AND we are not in Tauri (where we want native only)
-        if (playbackMode === 'native' && !window.__TAURI__) {
+        if (playbackMode === 'native' && !isTauri) {
             // Lazy load helper function
             const mightNeedHybridPlayback = await mightNeedHybridPlaybackPromise
             if (mightNeedHybridPlayback(src)) {
@@ -890,7 +905,7 @@ export function VidstackPlayer({
     // Loading state while probing
     if (playbackMode === 'probing') {
         return (
-            <div className="vidstack-player" style={{ 
+            <div className="vidstack-player" style={{
                 position: 'relative',
                 width: '100%',
                 height: '100%',
@@ -900,9 +915,9 @@ export function VidstackPlayer({
                 justifyContent: 'center'
             }}>
                 {poster && (
-                    <img 
-                        src={poster} 
-                        alt={title || ''} 
+                    <img
+                        src={poster}
+                        alt={title || ''}
                         style={{
                             position: 'absolute',
                             width: '100%',
@@ -912,8 +927,8 @@ export function VidstackPlayer({
                         }}
                     />
                 )}
-                <div style={{ 
-                    color: 'white', 
+                <div style={{
+                    color: 'white',
                     zIndex: 1,
                     display: 'flex',
                     flexDirection: 'column',
@@ -929,6 +944,9 @@ export function VidstackPlayer({
                         animation: 'spin 1s linear infinite'
                     }} />
                     <span>Analyzing media...</span>
+                    <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                        Checking codec compatibility
+                    </span>
                 </div>
                 <style>{`
                     @keyframes spin {
@@ -1009,6 +1027,9 @@ export function VidstackPlayer({
                             marginBottom: '1rem'
                         }} />
                         <span>Preparing audio transcoding...</span>
+                        <span style={{ fontSize: '12px', opacity: 0.7, marginTop: '8px' }}>
+                            Processing in chunks for instant playback
+                        </span>
                         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                     </div>
                 )}

@@ -1,6 +1,6 @@
 {
   "name": "zentrio",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "license": "MIT",
   "description": "Zentrio - Stream Your Way",
   "scripts": {
@@ -83,6 +83,7 @@
     "@typescript-eslint/parser": "^8.53.1",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.22",
+    "baseline-browser-mapping": "^2.9.19",
     "cpx": "^1.5.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^10.1.8",

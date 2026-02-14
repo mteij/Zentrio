@@ -48,6 +48,10 @@ export const userDb = {
     const fields: string[] = []
     const values: any[] = []
 
+    if (updates.email !== undefined) {
+        fields.push('email = ?')
+        values.push(updates.email)
+    }
     if (updates.username !== undefined) {
         fields.push('username = ?')
         values.push(updates.username)

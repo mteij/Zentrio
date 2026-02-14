@@ -34,7 +34,7 @@ export function normalizeMetaVideos(videos: any[]): any[] {
     const sanitized = videos.map((v: any, idx: number) => {
         const out: any = { ...(v || {}) }
 
-        // Remove stream-like text from title/name
+        // Remove stream-like text from title/name/overview/description
         if (looksLikeStreamText(out.title)) {
             out.title = `Episode ${getEpisode(v) || idx + 1}`
         }
@@ -44,31 +44,36 @@ export function normalizeMetaVideos(videos: any[]): any[] {
         if (looksLikeStreamText(out.overview)) {
             out.overview = undefined
         }
+        if (looksLikeStreamText(out.description)) {
+            out.description = undefined
+        }
 
         // Remove stream arrays that shouldn't be in meta videos
         if (Array.isArray(out.streams)) {
             delete out.streams
         }
 
+        out.__zentrioOrder = idx
         return out
     })
 
-    // Stable sort by (season, episode)
-    return sanitized.sort((a, b) => {
+    sanitized.sort((a, b) => {
         const sA = getSeason(a)
         const sB = getSeason(b)
         const eA = getEpisode(a)
         const eB = getEpisode(b)
 
-        // Push unknowns (season=0 or episode=0) to the end
         const aUnknown = sA === 0 && eA === 0
         const bUnknown = sB === 0 && eB === 0
-        
+
         if (aUnknown && !bUnknown) return 1
         if (!aUnknown && bUnknown) return -1
 
-        // Sort by season first, then episode
         if (sA !== sB) return sA - sB
-        return eA - eB
+        if (eA !== eB) return eA - eB
+
+        return Number(a.__zentrioOrder ?? 0) - Number(b.__zentrioOrder ?? 0)
     })
+
+    return sanitized.map(({ __zentrioOrder, ...rest }: any) => rest)
 }
