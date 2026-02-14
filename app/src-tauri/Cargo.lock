@@ -4305,6 +4305,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-safe-area-insets-css"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "561c23b4fcc4ba7afa0f88a4267fecf2e814f7575a7b1b1526f5c50830e293ce"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "tauri-plugin-shell"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5868,7 +5880,7 @@ dependencies = [
 
 [[package]]
 name = "zentrio"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "serde",
  "serde_json",
@@ -5882,6 +5894,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-os",
  "tauri-plugin-process",
+ "tauri-plugin-safe-area-insets-css",
  "tauri-plugin-shell",
  "tauri-plugin-single-instance",
  "tauri-plugin-store",

@@ -5,7 +5,7 @@ import { writeFile, BaseDirectory } from '@tauri-apps/plugin-fs';
 import { open } from '@tauri-apps/plugin-shell';
 import { tempDir } from '@tauri-apps/api/path';
 import { platform } from '@tauri-apps/plugin-os';
-import { Download, AlertCircle, Check, Loader2, Sparkles } from 'lucide-react';
+import { Download, AlertCircle, Check, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UpdateData {
@@ -23,9 +23,10 @@ interface UpdateModalProps {
   onClose: () => void;
   updateData: UpdateData | null;
   currentVersion: string;
+  isTauri?: boolean;
 }
 
-export function UpdateModal({ isOpen, onClose, updateData, currentVersion }: UpdateModalProps) {
+export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTauri = true }: UpdateModalProps) {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [downloadError, setDownloadError] = useState('');
@@ -43,6 +44,12 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion }: Upd
 
   const handleDownload = async () => {
     if (!updateData) return;
+
+    // Handle Web Update (Refresh)
+    if (!isTauri) {
+        window.location.reload();
+        return;
+    }
 
     try {
       setDownloading(true);
@@ -62,11 +69,16 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion }: Upd
         // Find .exe installer
         asset = updateData.assets.find(a => a.name.endsWith('.exe') && !a.name.includes('sig'));
       } else if (currentPlatform === 'linux') {
-          // Find .deb package (most common for Tauri updates on Linux usually)
-          // Or AppImage if available and preferred
+          // Find .deb package
           asset = updateData.assets.find(a => a.name.endsWith('.deb'));
           if (!asset) {
              asset = updateData.assets.find(a => a.name.endsWith('.AppImage'));
+          }
+      } else if (currentPlatform === 'macos') {
+          // Find .dmg (preferred) or .app.tar.gz
+          asset = updateData.assets.find(a => a.name.endsWith('.dmg'));
+          if (!asset) {
+              asset = updateData.assets.find(a => a.name.endsWith('.app.tar.gz'));
           }
       }
 
@@ -207,7 +219,12 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion }: Upd
             disabled={downloading}
             className="flex items-center gap-2"
           >
-            {downloading ? (
+            {!isTauri ? (
+                 <>
+                 <RefreshCw size={18} />
+                 Reload Application
+                 </>
+            ) : downloading ? (
                 <>Downloading...</>
             ) : (
                 <>

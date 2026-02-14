@@ -119,18 +119,17 @@ export const useAuthStore = create<AuthState>()(
           try {
             set({ isLoading: true, error: null })
             
-            // Use provided token or fall back to stored token
-            const effectiveToken = token || get().session?.token;
+            // DON'T send Authorization header when refreshing
+            // Let the server use the session cookie to generate a NEW token
+            // Sending the old token causes the server to return the same expired token
+            const session = await authClient.getSession()
             
-            const headers: Record<string, string> = effectiveToken 
-                ? { 'Authorization': `Bearer ${effectiveToken}` } 
-                : {};
-                
-            const session = await authClient.getSession({
-                fetchOptions: {
-                    headers
-                }
-            })
+            console.log('[AuthStore] Session refresh response:', {
+                hasUser: !!session?.data?.user,
+                hasToken: !!session?.data?.session?.token,
+                userEmail: session?.data?.user?.email,
+                newToken: session?.data?.session?.token ? `...${session?.data?.session?.token.slice(-6)}` : null
+            });
             
             if (session?.data?.user) {
               const user = session.data.user

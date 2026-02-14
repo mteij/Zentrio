@@ -43,24 +43,30 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   const navigate = useNavigate()
 
   useEffect(() => {
-    loadProfiles()
+    loadProfiles(0)
   }, [])
 
-  const loadProfiles = async () => {
+  const loadProfiles = async (retryCount = 0) => {
     try {
       const res = await apiFetch('/api/profiles');
       // Log full response for debugging
       console.log(`[ProfilesPage] API Response: ${res.status}`, { ok: res.ok, url: res.url });
 
       if (res.status === 401) {
-        // Session might be expired, try to refresh once
+        // Session might be expired, try to refresh once?
+        if (retryCount >= 2) {
+             console.log('[ProfilesPage] Session expired (401) and max retries reached, redirecting to login...');
+             navigate('/');
+             return;
+        }
+
         console.log('[ProfilesPage] Session expired (401), attempting refresh...');
         const refreshed = await useAuthStore.getState().refreshSession();
         console.log('[ProfilesPage] Refresh result:', refreshed);
         
         if (refreshed) {
              console.log('[ProfilesPage] Refresh success, retrying loadProfiles...');
-             return loadProfiles();
+             return loadProfiles(retryCount + 1);
         }
         
         // If refresh failed, then redirect

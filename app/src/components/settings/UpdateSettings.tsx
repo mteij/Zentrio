@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../index';
-import { RefreshCw, Download, CheckCircle, Smartphone } from 'lucide-react';
+import { RefreshCw, Download, CheckCircle, Smartphone, Globe } from 'lucide-react';
 import { fetch } from '@tauri-apps/plugin-http';
 import { getVersion } from '@tauri-apps/api/app';
 import { UpdateModal } from './modals/UpdateModal';
 import { toast } from 'sonner';
+
+declare const __APP_VERSION__: string;
 
 export function UpdateSettings() {
   const [loading, setLoading] = useState(false);
@@ -13,10 +15,26 @@ export function UpdateSettings() {
   const [updateData, setUpdateData] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [isTauri, setIsTauri] = useState(false);
 
   useEffect(() => {
-    // Get current app version
-    getVersion().then(v => setCurrentVersion(v)).catch(console.error);
+    // Check if running in Tauri
+    const checkTauri = async () => {
+        try {
+            // Simple check: try to get version from Tauri
+            // Or check window.__TAURI_INTERNALS__ if available, but calling API is safer detection
+            // Actually, getVersion() might throw if not in Tauri
+            const v = await getVersion();
+            setCurrentVersion(v);
+            setIsTauri(true);
+        } catch (e) {
+            // Fallback to web version defined in vite.config.ts
+            // We assume if getVersion fails, we are on web
+            setCurrentVersion(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'Web');
+            setIsTauri(false);
+        }
+    };
+    checkTauri();
   }, []);
 
   const checkForUpdates = async (silent = false) => {
@@ -85,20 +103,15 @@ export function UpdateSettings() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold text-white">System & Updates</h2>
-        <p className="text-zinc-400">Manage application updates and view system information.</p>
-      </div>
-
       {/* Version Card */}
       <div className="bg-zinc-900/50 border border-white/5 rounded-2xl overflow-hidden backdrop-blur-sm">
         <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             <div className={`p-3 rounded-xl ${updateAvailable ? 'bg-indigo-500/20 text-indigo-400' : 'bg-green-500/20 text-green-400'}`}>
-               <Smartphone size={28} />
+               {isTauri ? <Smartphone size={28} /> : <Globe size={28} />}
             </div>
             <div>
-              <h3 className="text-lg font-medium text-white">Zentrio for Android</h3>
+              <h3 className="text-lg font-medium text-white">{isTauri ? 'Zentrio App' : 'Zentrio Web'}</h3>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-zinc-400">Current Version:</span>
                 <span className="font-mono text-zinc-200 bg-white/5 px-2 py-0.5 rounded text-sm">{currentVersion}</span>
@@ -155,6 +168,7 @@ export function UpdateSettings() {
         onClose={() => setShowModal(false)}
         updateData={updateData}
         currentVersion={currentVersion}
+        isTauri={isTauri}
       />
     </div>
   );

@@ -22,6 +22,8 @@ import { StreamingHomeSkeleton, StreamingDetailsSkeleton } from './components/st
 import { appMode, AppMode } from './lib/app-mode'
 import { OnboardingWizard } from './components/onboarding'
 import { AppLifecycleProvider } from './lib/app-lifecycle'
+// Import safe area insets CSS plugin for mobile safe area support
+import '@saurl/tauri-plugin-safe-area-insets-css-api'
 
 // Lazy load all pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage as React.ComponentType<{version?: string}> })))

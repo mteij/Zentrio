@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { SimpleLayout, Button, Input } from '../components'
+import { motion } from 'framer-motion'
 import { ParticleBackground } from '../components/ui/ParticleBackground'
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight, Mail } from "lucide-react";
 import { authClient, getClientUrl } from '../lib/auth-client';
-import { apiFetch } from '../lib/apiFetch';
+import { apiFetch, apiFetchJson } from '../lib/apiFetch';
 import { getLoginBehaviorRedirectPath } from '../hooks/useLoginBehavior';
 
 // Brand icons as SVG components
@@ -36,34 +35,9 @@ interface LandingPageProps {
 
 export function LandingPage({ version }: LandingPageProps) {
   const navigate = useNavigate()
-  
-  const [view, setView] = useState<'intro' | 'login'>('intro')
-  const [email, setEmail] = useState('')
-  const [typewriterText, setTypewriterText] = useState('')
   const [isChecking, setIsChecking] = useState(false)
-  
-  const SLOGAN = "Stream Your Way"
-
-  // Note: Authenticated user redirect is now handled by PublicRoute wrapper
-
-
-
-
-  useEffect(() => {
-    // Typewriter effect
-    let i = 0
-    const speed = 100
-    const type = () => {
-      if (i < SLOGAN.length) {
-        setTypewriterText(SLOGAN.substring(0, i + 1))
-        i++
-        setTimeout(type, speed)
-      } else {
-        setTimeout(() => setView('login'), 800)
-      }
-    }
-    type()
-  }, [])
+  const [email, setEmail] = useState('')
+  const [showEmailInput, setShowEmailInput] = useState(false)
 
   const [providers, setProviders] = useState<{
     google: boolean;
@@ -72,24 +46,16 @@ export function LandingPage({ version }: LandingPageProps) {
     oidc: boolean;
     oidcName: string;
   }>({
-    google: false,
-    github: false,
-    discord: false,
-    oidc: false,
-    oidcName: 'OpenID'
+    google: false, github: false, discord: false, oidc: false, oidcName: 'OpenID'
   });
 
   useEffect(() => {
-    apiFetch('/api/auth/providers')
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`Server returned ${res.status}`);
-        }
-        return res.json();
-      })
+    apiFetchJson<any>('/api/auth/providers')
       .then(data => setProviders(data))
       .catch(err => console.error("Failed to fetch auth providers", err));
   }, []);
+
+  const hasSocialProviders = providers.google || providers.github || providers.discord;
 
   const handleSocialLogin = async (provider: "google" | "github" | "discord") => {
     try {
@@ -103,152 +69,166 @@ export function LandingPage({ version }: LandingPageProps) {
     }
   };
 
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email || isChecking) return;
+    
+    setIsChecking(true);
+    try {
+      const res = await apiFetch('/api/auth/identify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      
+      if (data.exists) {
+        navigate(`/signin?email=${encodeURIComponent(email)}`);
+      } else {
+        navigate(`/register?email=${encodeURIComponent(email)}`);
+      }
+    } catch (err) {
+      console.error("Check failed", err);
+      navigate(`/signin?email=${encodeURIComponent(email)}`);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
   return (
     <>
       <ParticleBackground />
       
       <main className="min-h-screen flex items-center justify-center relative z-10 p-4 w-full">
-        <div className="w-full max-w-lg mx-auto">
-          <div className="w-full flex flex-col items-center justify-center text-center relative z-10" data-tauri-drag-region>
+        <div className="w-full max-w-sm mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col items-center text-center"
+          >
+            {/* Logo */}
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4 }}
+              className="relative mb-6"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.4, 0.2] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute inset-0 bg-red-500 rounded-full blur-3xl"
+                style={{ margin: -15 }}
+              />
+              <img 
+                src="/static/logo/icon-192.png" 
+                alt="Zentrio" 
+                className="relative w-20 h-20 drop-shadow-[0_0_30px_rgba(220,38,38,0.3)]" 
+              />
+            </motion.div>
             
-            <AnimatePresence mode="wait">
-              {view === 'intro' ? (
-                <motion.div
-                  key="intro"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex flex-col items-center justify-center min-h-[60vh]"
+            {/* Branding */}
+            <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight mb-2">Zentrio</h1>
+            <p className="text-zinc-500 text-sm mb-10">Stream your way</p>
+            
+            {/* Social login buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="w-full space-y-3"
+            >
+              {providers.google && (
+                <button
+                  type="button"
+                  onClick={() => handleSocialLogin("google")}
+                  className="w-full flex items-center justify-center gap-3 bg-white text-black hover:bg-gray-100 py-3.5 rounded-xl transition-all font-medium text-[15px] shadow-lg shadow-white/5"
                 >
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.5 }}
-                    className="mb-8"
-                  >
-                    <img src="/static/logo/icon-512.png" alt="Zentrio Logo" className="w-24 h-24 drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]" />
-                  </motion.div>
-                  <h1 className="text-5xl md:text-6xl font-bold mb-4 text-white tracking-tight">Zentrio</h1>
-                  <div className="text-xl text-gray-400 font-mono tracking-wide">
-                    <span id="typewriter-text">{typewriterText}</span><span className="animate-pulse text-purple-500">|</span>
-                  </div>
-                  
-
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="login"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                  className="w-full flex flex-col items-center"
-                >
-
-
-                  <div className="w-full max-w-sm flex flex-col gap-4">
-                    <form 
-                      onSubmit={async (e) => {
-                        e.preventDefault()
-                        if (email && !isChecking) {
-                          setIsChecking(true);
-                          try {
-                              const res = await apiFetch('/api/auth/identify', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ email })
-                              });
-                              const data = await res.json();
-                              
-                              if (data.exists) {
-                                  navigate(`/signin?email=${encodeURIComponent(email)}`);
-                              } else {
-                                  navigate(`/register?email=${encodeURIComponent(email)}`);
-                              }
-                          } catch (err) {
-                              console.error("Check failed", err);
-                              // Fallback to signin if check fails
-                              navigate(`/signin?email=${encodeURIComponent(email)}`);
-                          } finally {
-                              setIsChecking(false);
-                          }
-                        }
-                      }}
-                      className="w-full"
-                    >
-                      <div className="relative">
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="name@example.com"
-                          className="w-full h-14 pl-4 pr-14 bg-white/5 border border-white/10 hover:border-white/20 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500/50 rounded-xl transition-all text-lg text-white placeholder:text-zinc-500 disabled:opacity-50"
-                          required
-                          autoFocus
-                          disabled={isChecking}
-                        />
-                        <button 
-                          type="submit"
-                          disabled={isChecking}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isChecking ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </form>
-
-                    <div className="flex items-center gap-4 py-2">
-                       <div className="h-px bg-white/10 flex-1"></div>
-                       <span className="text-gray-500 text-sm font-medium uppercase tracking-wider">or continue with</span>
-                       <div className="h-px bg-white/10 flex-1"></div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      {providers.google && (
-                        <button
-                          type="button"
-                          onClick={() => handleSocialLogin("google")}
-                          className="flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-100 py-3 rounded-xl transition-colors font-medium text-sm"
-                        >
-                          <GoogleIcon />
-                        </button>
-                      )}
-                      {providers.github && (
-                        <button
-                         type="button"
-                          onClick={() => handleSocialLogin("github")}
-                          className="flex items-center justify-center gap-2 bg-[#24292F] text-white hover:bg-[#2b3137] py-3 rounded-xl transition-colors font-medium text-sm"
-                        >
-                          <GitHubIcon />
-                        </button>
-                      )}
-                      {providers.discord && (
-                        <button
-                         type="button"
-                           onClick={() => handleSocialLogin("discord")}
-                           className="flex items-center justify-center gap-2 bg-[#5865F2] text-white hover:bg-[#4752C4] py-3 rounded-xl transition-colors font-medium text-sm"
-                        >
-                          <DiscordIcon />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
+                  <GoogleIcon />
+                  Continue with Google
+                </button>
               )}
-            </AnimatePresence>
-
-          </div>
+              {providers.github && (
+                <button
+                  type="button"
+                  onClick={() => handleSocialLogin("github")}
+                  className="w-full flex items-center justify-center gap-3 bg-[#24292F] text-white hover:bg-[#2b3137] py-3.5 rounded-xl transition-all font-medium text-[15px]"
+                >
+                  <GitHubIcon />
+                  Continue with GitHub
+                </button>
+              )}
+              {providers.discord && (
+                <button
+                  type="button"
+                  onClick={() => handleSocialLogin("discord")}
+                  className="w-full flex items-center justify-center gap-3 bg-[#5865F2] text-white hover:bg-[#4752C4] py-3.5 rounded-xl transition-all font-medium text-[15px]"
+                >
+                  <DiscordIcon />
+                  Continue with Discord
+                </button>
+              )}
+              
+              {/* Divider */}
+              {hasSocialProviders && (
+                <div className="relative flex items-center gap-4 py-1">
+                  <div className="h-px flex-1 bg-white/10" />
+                  <span className="text-xs text-zinc-600 uppercase tracking-wider">or</span>
+                  <div className="h-px flex-1 bg-white/10" />
+                </div>
+              )}
+              
+              {/* Email option */}
+              {!showEmailInput ? (
+                <button
+                  type="button"
+                  onClick={() => setShowEmailInput(true)}
+                  className="w-full flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-white hover:bg-white/10 py-3.5 rounded-xl transition-all font-medium text-[15px]"
+                >
+                  <Mail className="w-5 h-5 text-zinc-400" />
+                  Continue with Email
+                </button>
+              ) : (
+                <motion.form
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  onSubmit={handleEmailSubmit}
+                  className="w-full"
+                >
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500/50 rounded-xl pl-11 pr-14 py-3.5 text-[15px] text-white placeholder:text-zinc-600 transition-all"
+                      required
+                      autoFocus
+                      disabled={isChecking}
+                    />
+                    <button 
+                      type="submit"
+                      disabled={isChecking}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-red-600 hover:bg-red-500 text-white rounded-lg flex items-center justify-center transition-colors disabled:opacity-50"
+                    >
+                      {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </motion.form>
+              )}
+            </motion.div>
+          </motion.div>
         </div>
       </main>
 
-      <footer className="w-full py-6 text-center text-gray-500 text-sm relative z-10">
-        <div className="container mx-auto px-4">
-          <a href="https://github.com/mteij/Zentrio" target="_blank" className="hover:text-white transition-colors inline-flex items-center justify-center gap-2" rel="noreferrer">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-            </svg>
-            v{version}
-          </a>
-        </div>
+      <footer className="w-full py-6 text-center text-zinc-700 text-xs relative z-10">
+        <a href="https://github.com/mteij/Zentrio" target="_blank" className="hover:text-zinc-400 transition-colors inline-flex items-center gap-1.5" rel="noreferrer">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          v{version}
+        </a>
       </footer>
     </>
   )

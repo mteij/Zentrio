@@ -30,6 +30,20 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
     if (showOverlay && overlayInputRef.current) {
         setTimeout(() => overlayInputRef.current?.focus(), 50)
     }
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showOverlay) {
+        setShowOverlay(false)
+      }
+    }
+
+    if (showOverlay) {
+      document.addEventListener('keydown', handleEscape)
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [showOverlay])
 
   const handleSearchClick = (e: React.MouseEvent) => {
@@ -147,6 +161,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
           <motion.div 
             className={styles.searchOverlay} 
             id="searchOverlay"
+            onClick={() => setShowOverlay(false)}
             initial={{ opacity: 0 }}
             animate={{ opacity: isAnimatingOut ? 0 : 1 }}
             exit={{ opacity: 0 }}
@@ -154,6 +169,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
           >
             <motion.div 
                 className={styles.searchContainer}
+                onClick={(e) => e.stopPropagation()}
                 initial={{ scale: 0.95, opacity: 0, y: 20 }}
                 animate={{ 
                   scale: 1, 
