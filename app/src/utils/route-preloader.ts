@@ -33,8 +33,8 @@ const ROUTES_TO_PRELOAD: PreloadRoute[] = [
  * navigation speed for common user flows.
  */
 export function preloadCommonRoutes() {
-  // Delay preloading to allow initial render to complete
-  const PRELOAD_DELAY = 2000 // 2 seconds
+  // Delay preloading briefly to allow initial render to complete
+  const PRELOAD_DELAY = 500 // 500ms - load chunks quickly after mount
 
   const timer = setTimeout(() => {
     // Use requestIdleCallback if available to load during browser idle periods
@@ -85,7 +85,7 @@ function preloadRoutesWithIdleCallback() {
  */
 function preloadRoutesWithTimeout() {
   ROUTES_TO_PRELOAD.forEach((route, index) => {
-    const delay = index * 500 // Stagger by 500ms
+    const delay = index * 200 // Stagger by 200ms
     
     setTimeout(() => {
       route().catch(() => {

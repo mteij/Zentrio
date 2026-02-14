@@ -47,10 +47,18 @@ export function SettingsPage() {
     }
    }, [isGuestMode, activeTab])
 
+  const tabItems = [
+    { key: 'general', label: 'General', icon: SettingsIcon },
+    { key: 'appearance', label: 'Appearance', icon: Palette },
+    { key: 'addons', label: 'Addons', icon: Puzzle },
+    { key: 'streaming', label: 'Streaming', icon: Play },
+    ...(!isGuestMode ? [{ key: 'danger', label: 'Danger Zone', icon: AlertTriangle }] : [])
+  ]
+
   return (
     <SimpleLayout title="Settings">
       <AnimatedBackground />
-      <div className={styles.container} style={{ position: 'relative', zIndex: 1, paddingTop: '80px' }}>
+      <div className={`${styles.container} ${styles.settingsPageContent}`}>
         <button
           className={styles.backBtn}
           onClick={() => navigate('/profiles')}
@@ -58,6 +66,26 @@ export function SettingsPage() {
           <ArrowLeft size={18} />
           Back to Profiles
         </button>
+
+        <div className={styles.mobileHeader}>
+          <button
+            className={styles.mobileBackBtn}
+            onClick={() => navigate('/profiles')}
+            aria-label="Back to Profiles"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <select
+            className={styles.mobileHeaderSelect}
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value)}
+            aria-label="Select settings section"
+          >
+            {tabItems.map((tab) => (
+              <option key={tab.key} value={tab.key}>{tab.label}</option>
+            ))}
+          </select>
+        </div>
 
         {/* Tabs Navigation */}
         <div className={styles.settingsTabsWrapper}>
@@ -71,28 +99,19 @@ export function SettingsPage() {
              ref={tabsRef}
              onScroll={checkScroll}
            >
-              <button className={`${styles.tabBtn} ${activeTab === 'general' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('general')}>
-                <SettingsIcon size={16} />
-                General
-              </button>
-              <button className={`${styles.tabBtn} ${activeTab === 'appearance' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('appearance')}>
-                <Palette size={16} />
-                Appearance
-              </button>
-              <button className={`${styles.tabBtn} ${activeTab === 'addons' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('addons')}>
-                <Puzzle size={16} />
-                Addons
-              </button>
-              <button className={`${styles.tabBtn} ${activeTab === 'streaming' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('streaming')}>
-                <Play size={16} />
-                Streaming
-              </button>
-              {!isGuestMode && (
-              <button className={`${styles.tabBtn} ${activeTab === 'danger' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('danger')}>
-                <AlertTriangle size={16} />
-                Danger Zone
-              </button>
-              )}
+              {tabItems.map((tab) => {
+                const TabIcon = tab.icon
+                return (
+                  <button
+                    key={tab.key}
+                    className={`${styles.tabBtn} ${activeTab === tab.key ? styles.tabBtnActive : ''}`}
+                    onClick={() => setActiveTab(tab.key)}
+                  >
+                    <TabIcon size={16} />
+                    {tab.label}
+                  </button>
+                )
+              })}
            </div>
            {canScrollRight && (
              <div className={`${styles.scrollIndicator} ${styles.scrollIndicatorRight}`}>

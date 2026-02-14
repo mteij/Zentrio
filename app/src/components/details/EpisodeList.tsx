@@ -39,11 +39,11 @@ export function EpisodeList({
 
   return (
     <div className="series-episodes-container">
-      <div className="season-selector" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+      <div className="season-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <select 
           value={selectedSeason || ''} 
           onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
-          style={{ color: '#fff', background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '8px 16px', borderRadius: '8px', outline: 'none' }}
+          style={{ color: '#fff', background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '6px 12px', borderRadius: '8px', outline: 'none', fontSize: '0.85rem', lineHeight: 1.2 }}
         >
           {(() => {
             const seasons = Array.from(new Set(meta.videos.map((v: any) => v.season || 0))).sort((a: any, b: any) => a - b);
@@ -66,18 +66,19 @@ export function EpisodeList({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '8px 12px',
+                gap: '5px',
+                padding: '6px 10px',
                 background: allWatched ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.1)',
                 border: `1px solid ${allWatched ? 'rgba(34, 197, 94, 0.4)' : 'rgba(255, 255, 255, 0.2)'}`,
                 borderRadius: '8px',
                 color: allWatched ? '#22c55e' : '#fff',
                 cursor: 'pointer',
-                fontSize: '0.85rem'
+                fontSize: '0.8rem',
+                lineHeight: 1.2
               }}
               title={allWatched ? 'Mark season as unwatched' : 'Mark season as watched'}
             >
-              {allWatched ? <EyeOff size={16} /> : <Eye size={16} />}
+              {allWatched ? <EyeOff size={14} /> : <Eye size={14} />}
               {allWatched ? 'Unwatch Season' : 'Watch Season'}
             </button>
           )
@@ -174,7 +175,7 @@ export function EpisodeList({
                         }}
                         title="Quick play"
                     >
-                        <Play size={22} fill="currentColor" />
+                      <Play size={18} fill="currentColor" />
                     </button>
                   </div>
                   <div className={styles.episodeMeta}>

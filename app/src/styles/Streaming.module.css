@@ -67,7 +67,7 @@
   left: 0;
   width: 80px;
   height: 100vh;
-  background: rgba(10, 10, 10, 0.4); 
+  background: rgba(10, 10, 10, 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 1000;
@@ -143,17 +143,17 @@
   total step: 76px
 */
 .activeIndicator {
-    position: absolute;
-    top: 0;
-    left: 10px; /* Match padding of navLeft */
-    right: 10px;
-    height: 64px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    z-index: 0;
-    pointer-events: none;
-    transform: translateY(calc(var(--active-index, 0) * 76px));
-    transition: transform 0.3s cubic-bezier(0.2, 0.0, 0.2, 1);
+  position: absolute;
+  top: 0;
+  left: 10px; /* Match padding of navLeft */
+  right: 10px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  z-index: 0;
+  pointer-events: none;
+  transform: translateY(calc(var(--active-index, 0) * 76px));
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
 }
 
 .navRight {
@@ -376,7 +376,7 @@
     height: 36px; /* Match navLink height: padding 8px*2 + icon 20px = 36px */
     border-radius: 10px;
     transform: translateY(-50%) translateX(calc(var(--active-index, 0) * 48px)); /* 44px width + 4px gap */
-    transition: transform 0.3s cubic-bezier(0.2, 0.0, 0.2, 1);
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
   }
 }
 
@@ -393,7 +393,9 @@
 }
 
 .streamingLayoutNoHero {
-  padding-top: calc(100px + var(--titlebar-height, 0px)); /* Ensure content starts below header and titlebar */
+  padding-top: calc(
+    100px + var(--titlebar-height, 0px)
+  ); /* Ensure content starts below header and titlebar */
 }
 
 /* Page Ambient Background */
@@ -410,19 +412,16 @@
   filter: blur(80px) brightness(0.4) saturate(1.2);
   transform: scale(1.2);
   pointer-events: none;
-  transition: background-image 0.5s ease-in-out, opacity 0.5s ease;
+  transition:
+    background-image 0.5s ease-in-out,
+    opacity 0.5s ease;
 }
 
 .pageAmbientBackground::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.2) 0%,
-    rgba(0, 0, 0, 0.6) 50%,
-    #000 100%
-  );
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.6) 50%, #000 100%);
   z-index: 1;
 }
 
@@ -476,7 +475,7 @@
 }
 
 .heroBackdrop::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(
@@ -511,8 +510,12 @@
 }
 
 @keyframes ambientZoom {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.1); }
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.1);
+  }
 }
 
 .heroOverlay {
@@ -635,7 +638,7 @@
 .contentContainer {
   position: relative;
   z-index: 10;
-  margin-top: -100px; 
+  margin-top: -100px;
   padding-bottom: 60px;
 }
 
@@ -663,9 +666,8 @@
   padding-bottom: 4px; /* Safety for descenders */
 }
 
-
 .rowTitle::before {
-  content: "";
+  content: '';
   display: block;
   width: 4px;
   height: 24px;
@@ -895,7 +897,7 @@
   z-index: 20; /* In front of poster? Or behind? "Overlay" -> Front. But usually "Top 10" style has number slightly behind or flush. Let's try front but lower part. */
   font-family: 'Impact', sans-serif; /* Or closest sturdy font */
   pointer-events: none;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
   letter-spacing: -5px;
 }
 
@@ -986,7 +988,7 @@
   .rowWrapper {
     margin: 0 -20px;
   }
-  
+
   .rowScrollContainer {
     padding: 20px 20px 20px 20px;
     mask-image: linear-gradient(
@@ -1264,11 +1266,7 @@
 }
 
 .streamItem {
-  background: linear-gradient(
-    145deg,
-    rgba(30, 30, 30, 0.6) 0%,
-    rgba(20, 20, 20, 0.8) 100%
-  );
+  background: linear-gradient(145deg, rgba(30, 30, 30, 0.6) 0%, rgba(20, 20, 20, 0.8) 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 18px 20px;
   border-radius: 12px;
@@ -1284,7 +1282,7 @@
 }
 
 .streamItem::before {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   left: 0;
@@ -1296,22 +1294,14 @@
 }
 
 .streamItem:hover {
-  background: linear-gradient(
-    145deg,
-    rgba(50, 50, 50, 0.8) 0%,
-    rgba(30, 30, 30, 0.9) 100%
-  );
+  background: linear-gradient(145deg, rgba(50, 50, 50, 0.8) 0%, rgba(30, 30, 30, 0.9) 100%);
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px) translateX(2px);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
 .streamCached {
-  background: linear-gradient(
-    145deg,
-    rgba(16, 185, 129, 0.05) 0%,
-    rgba(16, 185, 129, 0.02) 100%
-  );
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%);
   border-color: rgba(16, 185, 129, 0.2);
 }
 
@@ -1321,11 +1311,7 @@
 }
 
 .streamCached:hover {
-  background: linear-gradient(
-    145deg,
-    rgba(16, 185, 129, 0.15) 0%,
-    rgba(16, 185, 129, 0.08) 100%
-  );
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%);
   border-color: rgba(16, 185, 129, 0.4);
 }
 
@@ -1603,17 +1589,44 @@
 /* Mobile skeleton adjustments */
 @media (max-width: 768px) {
   .skeletonCard {
-    width: 140px;
+    width: 120px;
   }
 
   .skeletonHeroTitle {
-    width: 80%;
-    height: 40px;
+    width: 70%;
+    height: 32px;
   }
 
   .skeletonDescription {
-    width: 100%;
-    height: 54px;
+    width: 90%;
+    height: 40px;
+    margin-bottom: 20px;
+  }
+
+  .skeletonChip {
+    width: 120px;
+    height: 26px;
+    margin-bottom: 10px;
+  }
+
+  .skeletonButton {
+    width: 120px;
+    height: 40px;
+  }
+
+  .skeletonTitle {
+    width: 150px;
+    height: 22px;
+  }
+
+  /* Reduce content overlap on mobile - hero is shorter so less overlap is needed */
+  .contentContainer {
+    margin-top: -40px !important;
+    padding-bottom: calc(var(--nav-height-mobile, 80px) + 40px);
+  }
+
+  .contentRow {
+    margin-bottom: 30px;
   }
 }
 
@@ -1624,16 +1637,16 @@
 .episodeList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .episodeItem {
   display: flex;
-  gap: 12px;
-  padding: 8px;
+  gap: 10px;
+  padding: 6px;
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -1648,9 +1661,9 @@
 .episodeThumbnail {
   position: relative;
   flex-shrink: 0;
-  width: 120px;
+  width: 104px;
   aspect-ratio: 16/9;
-  border-radius: 6px;
+  border-radius: 5px;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.3);
 }
@@ -1678,11 +1691,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    135deg,
-    rgba(40, 40, 40, 0.8) 0%,
-    rgba(20, 20, 20, 0.8) 100%
-  );
+  background: linear-gradient(135deg, rgba(40, 40, 40, 0.8) 0%, rgba(20, 20, 20, 0.8) 100%);
   color: rgba(255, 255, 255, 0.3);
 }
 
@@ -1693,9 +1702,9 @@
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 3px;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: #fff;
 }
@@ -1704,7 +1713,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   justify-content: center;
 }
@@ -1713,15 +1722,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .episodePlayBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
@@ -1739,7 +1748,7 @@
 
 .episodeTitle {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
@@ -1749,7 +1758,7 @@
 .episodeMeta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -1757,7 +1766,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: #f5c518;
 }
@@ -1766,7 +1775,7 @@
   background: rgba(255, 255, 255, 0.15);
   padding: 1px 5px;
   border-radius: 3px;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 600;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -1774,14 +1783,14 @@
 }
 
 .episodeRuntime {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.6);
 }
 
 .episodeDescription {
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   color: rgba(255, 255, 255, 0.5);
-  line-height: 1.4;
+  line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   line-clamp: 1;
@@ -1793,16 +1802,27 @@
 /* Mobile Episode List */
 @media (max-width: 768px) {
   .episodeItem {
-    flex-direction: column;
-    gap: 12px;
+    flex-direction: row;
+    gap: 8px;
+    padding: 4px;
   }
 
   .episodeThumbnail {
-    width: 100%;
+    width: 92px;
+    border-radius: 4px;
   }
 
   .episodeTitle {
-    white-space: normal;
+    white-space: nowrap;
+    font-size: 0.8rem;
+  }
+
+  .episodeMeta {
+    gap: 6px;
+  }
+
+  .episodeDescription {
+    display: none;
   }
 }
 
@@ -1857,7 +1877,6 @@
 .searchLayout {
   padding-top: 0;
 }
-
 
 /* Mobile Library Layout */
 @media (max-width: 1024px) {
@@ -2031,8 +2050,6 @@
 .exploreHeader > * {
   pointer-events: auto;
 }
-
-
 
 .exploreToggleGroup {
   display: flex;
@@ -2572,5 +2589,3 @@
     grid-template-columns: 1fr;
   }
 }
-
-

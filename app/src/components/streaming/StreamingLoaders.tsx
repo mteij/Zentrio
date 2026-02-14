@@ -14,8 +14,7 @@ export function StreamingHomeSkeleton() {
       <div className={styles.streamingLayout}>
         {/* Force hero skeleton to matching height/style */}
         <SkeletonHero />
-        <div className={styles.contentContainer} style={{ marginTop: '-100px' }}>
-          <SkeletonRow />
+        <div className={styles.contentContainer}>
           <SkeletonRow />
           <SkeletonRow />
         </div>

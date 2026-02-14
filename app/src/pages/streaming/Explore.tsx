@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ChevronDown } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { Layout, StreamingRow, SkeletonRow, Hero, SkeletonHero, LazyImage, RatingBadge, SkeletonCard } from '../../components'
 import { TraktRecommendationsRow } from '../../components/streaming/TraktRecommendationsRow'
@@ -87,11 +87,8 @@ export const StreamingExplore = () => {
 
   const isFilteredView = !!activeGenre || !!activeType
 
-  // Shuffle popular genres on mount to keep it fresh
-  const [shuffledGenres, setShuffledGenres] = useState<string[]>([])
-  useEffect(() => {
-    setShuffledGenres([...POPULAR_GENRES].sort(() => 0.5 - Math.random()))
-  }, [])
+  // Shuffle popular genres once on mount (useMemo avoids extra re-render vs useEffect+setState)
+  const shuffledGenres = useMemo(() => [...POPULAR_GENRES].sort(() => 0.5 - Math.random()), [])
 
   // Fetch Dashboard (for Trending/Top 10)
   const { data: dashboardData, isLoading: loadingDash } = useQuery({
@@ -102,7 +99,8 @@ export const StreamingExplore = () => {
     enabled: !isFilteredView,
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData
   })
 
   // Fetch Filters
@@ -113,7 +111,8 @@ export const StreamingExplore = () => {
     },
     staleTime: 1000 * 60 * 10, // 10 minutes - filters change rarely
     gcTime: 1000 * 60 * 30,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData
   })
 
   // ... (Filtered view logic remains same) ...
@@ -195,7 +194,7 @@ export const StreamingExplore = () => {
         <Layout title="Explore" showHeader={false} showFooter={false}>
             <div className={styles.streamingLayout}>
                 <SkeletonHero />
-                <div className={styles.contentContainer} style={{ marginTop: '-100px' }}>
+                <div className={styles.contentContainer}>
                     <SkeletonRow />
                     <SkeletonRow />
                 </div>

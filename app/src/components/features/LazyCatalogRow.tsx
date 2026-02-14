@@ -120,7 +120,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
                 key="skeleton"
                 initial={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.2 }}
                 style={{ display: 'flex', gap: '20px' }}
               >
                 {Array.from({ length: 7 }).map((_, i) => (
@@ -132,7 +132,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
                 key="items"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.2 }}
                 style={{ display: 'flex', gap: '20px' }}
               >
                 {items.map((item, index) => (
@@ -141,8 +141,8 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{
-                      duration: 0.4,
-                      delay: Math.min(index * 0.05, 0.3)
+                      duration: 0.25,
+                      delay: Math.min(index * 0.03, 0.15)
                     }}
                     className={styles.cardWrapper}
                   >

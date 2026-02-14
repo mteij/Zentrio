@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
 import { Layout, StreamingRow, LazyCatalogRow, SkeletonHero, SkeletonRow, Hero } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
@@ -51,7 +51,8 @@ export const StreamingHome = () => {
       if (error.message === 'Unauthorized') return false
       return failureCount < 2
     },
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData
   })
 
   useEffect(() => {
@@ -108,7 +109,7 @@ export const StreamingHome = () => {
       <Layout title="Streaming" showHeader={false} showFooter={false}>
         <div className={styles.streamingLayout}>
           <SkeletonHero />
-          <div className={styles.contentContainer} style={{ marginTop: '-100px' }}>
+          <div className={styles.contentContainer}>
             <SkeletonRow />
             <SkeletonRow />
             <SkeletonRow />

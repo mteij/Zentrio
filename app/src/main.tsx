@@ -17,7 +17,7 @@ import { preloadCommonRoutes } from './utils/route-preloader'
 // Initialize toast bridge for legacy window.addToast calls
 import './utils/toast'
 import { CastProvider } from './contexts/CastContext'
-import { StreamingHomeSkeleton, StreamingDetailsSkeleton } from './components/streaming/StreamingLoaders'
+import { StreamingHomeSkeleton } from './components/streaming/StreamingLoaders'
 
 import { appMode, AppMode } from './lib/app-mode'
 import { OnboardingWizard } from './components/onboarding'
@@ -236,41 +236,13 @@ function AppRoutes() {
           </ProtectedRoute>
         </Suspense>
       }>
-        <Route index element={
-          <Suspense fallback={<StreamingHomeSkeleton />}>
-            <StreamingHome />
-          </Suspense>
-        } />
-        <Route path="explore" element={
-          <Suspense fallback={<StreamingHomeSkeleton />}>
-            <StreamingExplore />
-          </Suspense>
-        } />
-        <Route path="library" element={
-          <Suspense fallback={<StreamingHomeSkeleton />}>
-            <StreamingLibrary />
-          </Suspense>
-        } />
-        <Route path="library/:listId" element={
-          <Suspense fallback={<StreamingHomeSkeleton />}>
-            <StreamingLibrary />
-          </Suspense>
-        } />
-        <Route path="search" element={
-          <Suspense fallback={<StreamingHomeSkeleton />}>
-            <StreamingSearch />
-          </Suspense>
-        } />
-        <Route path="catalog/:manifestUrl/:type/:id" element={
-          <Suspense fallback={<StreamingHomeSkeleton />}>
-            <StreamingCatalog />
-          </Suspense>
-        } />
-        <Route path=":type/:id" element={
-          <Suspense fallback={<StreamingDetailsSkeleton />}>
-            <StreamingDetails />
-          </Suspense>
-        } />
+        <Route index element={<StreamingHome />} />
+        <Route path="explore" element={<StreamingExplore />} />
+        <Route path="library" element={<StreamingLibrary />} />
+        <Route path="library/:listId" element={<StreamingLibrary />} />
+        <Route path="search" element={<StreamingSearch />} />
+        <Route path="catalog/:manifestUrl/:type/:id" element={<StreamingCatalog />} />
+        <Route path=":type/:id" element={<StreamingDetails />} />
         <Route path="player" element={
           <Suspense fallback={<div className="bg-black text-white w-full h-screen flex items-center justify-center">Loading Player...</div>}>
             <StreamingPlayer />

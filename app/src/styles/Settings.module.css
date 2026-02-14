@@ -26,9 +26,62 @@
 
 .settingsTabsWrapper {
   position: relative;
+  margin-top: 20px;
   margin-bottom: 32px;
   /* border-radius matches settingsTabs to clip indicators nicely if needed, 
      but settingsTabs has the border, so we place indicators inside */
+}
+
+.mobileHeader {
+  display: none;
+  margin-bottom: 16px;
+}
+
+.mobileBackBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text, white);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: 9999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.mobileBackBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mobileHeaderSelect {
+  flex: 1;
+  min-width: 0;
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  color: var(--text, white);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 12px);
+  padding: 12px 14px;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+}
+
+.mobileHeaderSelect:focus {
+  outline: none;
+  border-color: var(--accent, #e50914);
+  box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.2);
+}
+
+.settingsPageContent {
+  position: relative;
+  z-index: 1;
+  padding-top: 80px;
 }
 
 .scrollIndicator {
@@ -573,25 +626,48 @@
    Mobile Responsive
    ============================================ */
 @media (max-width: 768px) {
-  .settingsTabs {
+  .mobileHeader {
+    position: sticky;
+    top: calc(8px + var(--titlebar-height, 0px));
+    z-index: 110;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    background: var(--glass-bg, rgba(20, 20, 20, 0.72));
+    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
     border-radius: var(--radius-lg, 16px);
+    backdrop-filter: blur(var(--glass-blur, 24px));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  }
+
+  .settingsTabsWrapper {
+    display: none;
+  }
+
+  .settingsTabs {
     border-radius: var(--radius-lg, 16px);
     padding: 4px;
     gap: 4px;
-    justify-content: flex-start; /* Ensure start-aligned scrolling */
-    overflow-x: auto;
+    justify-content: stretch;
+    overflow-x: visible;
+    flex-wrap: wrap;
   }
 
   .tabBtn {
-    padding: 10px 16px;
+    padding: 10px 12px;
     font-size: 13px;
+    flex: 1 1 calc(50% - 2px);
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .scrollIndicator {
+    display: none;
   }
 
   .backBtn {
-    top: 16px;
-    left: 16px;
-    padding: 10px 16px;
-    font-size: 13px;
+    display: none;
   }
 
   .settingsCard {
@@ -621,6 +697,10 @@
 
   .container {
     padding: 0 16px;
+  }
+
+  .settingsPageContent {
+    padding-top: 8px;
   }
 
   /* Addon Item Mobile Styles */

@@ -33,10 +33,6 @@ export function SettingsProfileSelector({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadProfiles()
-  }, [])
-
   const loadProfiles = async () => {
     try {
       const res = await apiFetch('/api/user/settings-profiles')
@@ -50,6 +46,10 @@ export function SettingsProfileSelector({
       console.error('Failed to load profiles', e)
     }
   }
+
+  useEffect(() => {
+    loadProfiles()
+  }, [])
 
   const handleCreateProfile = async (name: string) => {
     try {

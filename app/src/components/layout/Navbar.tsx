@@ -3,7 +3,7 @@ import { Home, Compass, Library, Search, User, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createHoverPreloader } from '../../utils/route-preloader'
 import styles from '../../styles/Streaming.module.css'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo, startTransition, useCallback } from 'react'
 
 interface NavbarProps {
   profileId: number | string
@@ -19,12 +19,12 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
   const overlayInputRef = useRef<HTMLInputElement>(null)
   
-  // Create hover preloaders for each route
-  const homePreloader = createHoverPreloader('streaming-home')
-  const explorePreloader = createHoverPreloader('streaming-explore')
-  const libraryPreloader = createHoverPreloader('streaming-library')
-  const searchPreloader = createHoverPreloader('streaming-search')
-  const profilesPreloader = createHoverPreloader('/profiles')
+  // Create hover preloaders for each route (memoized to persist preloadTriggered flags)
+  const homePreloader = useMemo(() => createHoverPreloader('streaming-home'), [])
+  const explorePreloader = useMemo(() => createHoverPreloader('streaming-explore'), [])
+  const libraryPreloader = useMemo(() => createHoverPreloader('streaming-library'), [])
+  const searchPreloader = useMemo(() => createHoverPreloader('streaming-search'), [])
+  const profilesPreloader = useMemo(() => createHoverPreloader('/profiles'), [])
 
   useEffect(() => {
     if (showOverlay && overlayInputRef.current) {
@@ -114,21 +114,32 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
         >
             <div className={styles.activeIndicator} />
             {items.map(({ to, icon: Icon, label, path, exact, id, onMouseEnter, onFocus, onClick, ...linkProps }) => (
-                <Link 
+                <a 
                     key={to}
-                    to={to} 
+                    href={to}
                     className={`${styles.navLink} ${isActive(path, exact) ? styles.active : ''}`}
                     title={label}
                     id={id}
                     onMouseEnter={onMouseEnter}
                     onFocus={onFocus}
-                    onClick={onClick}
+                    onClick={(e) => {
+                      if (onClick) {
+                        onClick(e)
+                        return
+                      }
+                      e.preventDefault()
+                      // Use startTransition so React keeps the current page visible
+                      // while the new route's component loads — no skeleton flash
+                      startTransition(() => {
+                        navigate(to)
+                      })
+                    }}
                 >
                     <div className="relative z-10 flex flex-col items-center gap-1">
                         <Icon size={24} />
                         <span>{label}</span>
                     </div>
-                </Link>
+                </a>
             ))}
         </div>
 

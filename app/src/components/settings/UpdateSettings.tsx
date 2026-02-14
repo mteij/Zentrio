@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../index';
 import { RefreshCw, Download, CheckCircle, Smartphone, Globe } from 'lucide-react';
-import { fetch } from '@tauri-apps/plugin-http';
 import { getVersion } from '@tauri-apps/api/app';
 import { UpdateModal } from './modals/UpdateModal';
 import { toast } from 'sonner';
@@ -40,13 +39,24 @@ export function UpdateSettings() {
   const checkForUpdates = async (silent = false) => {
     setLoading(true);
     try {
+      let response: Response;
+
       // Fetch latest release from GitHub
-      // Note: Use a proxy if rate limiting is an issue, or client-side fetch is fine for low volume
-      const response = await fetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
-         headers: {
-             'User-Agent': 'Zentrio-App'
-         }
-      });
+      // Use native fetch on web to avoid Tauri invoke hook errors.
+      if (isTauri) {
+        const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+        response = await tauriFetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
+          headers: {
+            'User-Agent': 'Zentrio-App'
+          }
+        }) as unknown as Response;
+      } else {
+        response = await window.fetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
+          headers: {
+            'User-Agent': 'Zentrio-App'
+          }
+        });
+      }
       
       if (!response.ok) {
         throw new Error('Failed to fetch update info');
