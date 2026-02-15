@@ -162,9 +162,11 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       }
 
       if (isTauri()) {
+        // Clear app mode and server URL state for re-initialization
         localStorage.removeItem('zentrio_app_mode');
         localStorage.removeItem('zentrio_server_url');
-        window.location.reload(); 
+        // Navigate to profiles instead of reloading (reload can cause redirect issues)
+        window.location.href = '/profiles';
         return true;
       }
     }
@@ -287,7 +289,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
               </div>
 
               {/* Social login buttons — primary */}
-              {hasSocialProviders && (
+              {hasSocialProviders ? (
                 <div className="space-y-3 mb-6">
                   {providers.google && (
                     <button
@@ -334,6 +336,14 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                       Continue with Discord
                     </button>
                   )}
+                </div>
+              ) : (
+                // Loading skeleton while providers are being fetched
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center justify-center gap-3 bg-white/5 border border-white/10 !py-3 !rounded-xl !w-full animate-pulse">
+                    <div className="w-5 h-5 bg-white/20 rounded-full" />
+                    <div className="h-4 w-40 bg-white/20 rounded" />
+                  </div>
                 </div>
               )}
 

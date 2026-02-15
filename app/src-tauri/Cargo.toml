@@ -1,6 +1,6 @@
 [package]
 name = "zentrio"
-version = "0.4.0"
+version = "0.4.1"
 description = "Zentrio - Stream Your Way"
 authors = ["you"]
 edition = "2021"
@@ -34,3 +34,16 @@ serde_json = "1"
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+# Build optimization profiles
+[profile.dev]
+# Enable incremental compilation for faster dev builds
+incremental = true
+
+[profile.release]
+# Use 1 codegen unit for maximum optimization (slower build, faster runtime)
+codegen-units = 1
+# Link-time optimization for smaller binaries
+lto = true
+# Optimize for size (reduces APK size)
+opt-level = "z"

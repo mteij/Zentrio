@@ -286,24 +286,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               transition={{ duration: 0.4 }}
               className="w-full max-w-sm flex flex-col items-center"
             >
-              {/* Server indicator */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="mb-10"
-              >
-                <button
-                  onClick={() => setStep('server')}
-                  className="inline-flex items-center gap-1.5 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
-                >
-                  <Server className="w-3 h-3" />
-                  <span className="font-mono">{serverUrl.replace('https://', '')}</span>
-                  <span className="text-zinc-700">•</span>
-                  <span className="underline underline-offset-2">change</span>
-                </button>
-              </motion.div>
-              
               {/* Logo */}
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
@@ -479,6 +461,24 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               >
                 Continue without an account →
               </motion.button>
+              
+              {/* Server indicator - moved to bottom */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9 }}
+                className="mt-6"
+              >
+                <button
+                  onClick={() => setStep('server')}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/5 rounded-lg transition-all border border-white/5"
+                >
+                  <Server className="w-3.5 h-3.5" />
+                  <span className="font-mono">{serverUrl.replace('https://', '')}</span>
+                  <span className="text-zinc-700">•</span>
+                  <span className="underline underline-offset-2">change server</span>
+                </button>
+              </motion.div>
             </motion.div>
           )}
           

@@ -20,11 +20,6 @@ export function SignInPage() {
       <ParticleBackground />
       
       <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
-        {isTauri() && (
-           <div className="fixed top-0 left-0 z-50 px-4 pt-[max(24px,env(safe-area-inset-top,0px))]">
-                <BackButton onClick={handleChangeServer} label="Change Server" variant="static" />
-           </div>
-        )}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -32,6 +27,12 @@ export function SignInPage() {
           className="w-full max-w-lg relative"
         >
           <AuthForms mode="signin" />
+          
+          {isTauri() && (
+            <div className="mt-4 text-center">
+              <BackButton onClick={handleChangeServer} label="Change Server" variant="static" />
+            </div>
+          )}
         </motion.div>
       </div>
     </>

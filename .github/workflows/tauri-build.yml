@@ -166,6 +166,19 @@ jobs:
           echo "AR_aarch64_linux_android=$NDK_TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
           echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$NDK_TOOLCHAIN/aarch64-linux-android24-clang" >> $GITHUB_ENV
 
+      - name: Setup Gradle cache (Android only)
+        if: matrix.name == 'android'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            app/src-tauri/gen/android/.gradle
+            app/src-tauri/gen/android/build
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Install frontend dependencies
         working-directory: ./app
         run: bun install
