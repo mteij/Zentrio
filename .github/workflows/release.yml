@@ -102,15 +102,15 @@ jobs:
             echo "To regenerate notes, delete the existing release notes first."
           else
             # Generate release notes
-            node .github/scripts/generate-release-notes.mjs "$VERSION" > release-notes.md
+            node .github/scripts/generate-release-notes.mjs
             
             # Create or update release
             if gh release view "v$VERSION" >/dev/null 2>&1; then
               echo "Updating existing release v$VERSION with generated notes"
-              gh release edit "v$VERSION" --notes-file release-notes.md
+              gh release edit "v$VERSION" --notes-file RELEASE_NOTES.md
             else
               echo "Creating new release v$VERSION"
-              gh release create "v$VERSION" --title "Zentrio v$VERSION" --notes-file release-notes.md
+              gh release create "v$VERSION" --title "Zentrio v$VERSION" --notes-file RELEASE_NOTES.md
             fi
           fi
 
