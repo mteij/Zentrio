@@ -28,7 +28,7 @@ export function TwoFactorSetupModal({ onClose, onSuccess, hasPassword = true }: 
         if (session?.data?.user?.twoFactorEnabled) {
           setIsAlreadyEnabled(true);
         }
-      } catch (e) {
+      } catch {
         // Ignore - user might not be logged in
       }
     };
@@ -136,7 +136,7 @@ export function TwoFactorSetupModal({ onClose, onSuccess, hasPassword = true }: 
     setError(null);
 
     try {
-      const { data, error: disableError } = await authClient.twoFactor.disable({
+      const { error: disableError } = await authClient.twoFactor.disable({
         password,
       });
 

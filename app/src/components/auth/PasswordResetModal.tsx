@@ -11,7 +11,6 @@ interface PasswordResetModalProps {
 
 export function PasswordResetModal({
   onBack,
-  onSuccess,
   isLoading = false,
   error
 }: PasswordResetModalProps) {
@@ -59,11 +58,8 @@ export function PasswordResetModal({
       if (res.ok) {
         setIsSubmitted(true)
         setResendSeconds(60) // 1 minute cooldown
-      } else {
-        const data = await res.json()
-        // Error will be handled by parent component
       }
-    } catch (err) {
+    } catch {
       // Error will be handled by parent component
     }
   }
@@ -84,7 +80,7 @@ export function PasswordResetModal({
       if (res.ok) {
         setResendSeconds(60)
       }
-    } catch (err) {
+    } catch {
       // Error will be handled by parent component
     }
   }

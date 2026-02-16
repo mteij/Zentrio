@@ -1,4 +1,4 @@
-import { useRef, memo } from 'react'
+import { memo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -79,7 +79,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
   } = useScrollRow({ items })
 
   // Handle item click - prevent if dragging
-  const handleItemClick = (e: React.MouseEvent, item: ContentItem) => {
+  const handleItemClick = (e: React.MouseEvent, _item: ContentItem) => {
     if (isDragging()) {
       e.preventDefault()
       e.stopPropagation()

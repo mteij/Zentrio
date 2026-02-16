@@ -110,7 +110,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     setEmailMethod("password");
     setOtp("");
     setShowOtpInput(false);
-  }, [mode]);
+  }, [mode, hasEmailParam]);
 
   const hasSocialProviders = providers.google || providers.github || providers.discord || providers.oidc;
 
@@ -139,8 +139,8 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           callbackURL,
         });
       }
-    } catch (e: any) {
-      toast.error('Login Failed', { description: e.message || 'Failed to initiate social login' })
+    } catch (_e: any) {
+      toast.error('Login Failed', { description: _e.message || 'Failed to initiate social login' })
       setSocialLoading(null);
     }
   };
@@ -152,7 +152,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             email,
             type: "email-verification"
         });
-    } catch (e) {
+    } catch (_e) {
         // ignore
     }
   }
@@ -190,7 +190,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     try {
       if (mode === "signup") {
         const redirectPath = getLoginBehaviorRedirectPath();
-        const { data, error } = await authClient.signUp.email({
+        const { error } = await authClient.signUp.email({
           email,
           password,
           name,

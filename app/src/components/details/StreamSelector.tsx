@@ -7,7 +7,6 @@ import { CompactStreamItem } from '../../components/features/CompactStreamItem'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail, Stream } from '../../services/addons/types'
 import type { AddonLoadingState } from '../../hooks/useStreamLoader'
-import type { StreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
 
 // Helper to parse stream information
 const parseStreamInfo = (stream: Stream) => {
@@ -286,7 +285,7 @@ export function StreamSelector({
                 </div>
                 <h3 className="text-lg font-medium text-white mb-2">No streams found</h3>
                 <p className="text-sm text-gray-400 max-w-md">
-                    We couldn't find any streams for this content. Try adjusting your filters or checking your installed addons.
+                    We couldn&apos;t find any streams for this content. Try adjusting your filters or checking your installed addons.
                 </p>
             </div>
         ) : null}

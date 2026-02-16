@@ -82,7 +82,7 @@ export function EmailVerificationModal({
           onSuccess()
         }, 1500)
       }
-    } catch (err) {
+    } catch {
       setLocalError('An unexpected error occurred')
       toast.error('Error', 'An unexpected error occurred')
     } finally {

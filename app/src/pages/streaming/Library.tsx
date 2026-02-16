@@ -234,7 +234,7 @@ export const StreamingLibrary = () => {
 
   const handleRemoveItem = useCallback((metaId: string) => {
     setItems(current => current.filter(i => i.meta_id !== metaId))
-  }, [])
+  }, [setItems])
 
 
   if (loading) {

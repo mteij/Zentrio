@@ -111,18 +111,18 @@ export const LibraryItemCard = memo(function LibraryItemCard({
   }
   
   // Local state for optimistic updates
-  // @ts-ignore
+  // @ts-expect-error
   const [isWatched, setIsWatched] = useState(item.is_watched);
 
   useEffect(() => {
-    // @ts-ignore
+    // @ts-expect-error
     setIsWatched(item.is_watched);
   }, [item]); // simplified dependency
 
   const toggleWatched = async () => {
     const newWatchedState = !isWatched;
     setIsWatched(newWatchedState);
-    // @ts-ignore
+    // @ts-expect-error
     item.is_watched = newWatchedState;
 
     try {
@@ -146,9 +146,9 @@ export const LibraryItemCard = memo(function LibraryItemCard({
   }
   
   const markEpisodeWatched = async () => {
-         // @ts-ignore
+         // @ts-expect-error
          if (!item.episodeDisplay) return;
-         // @ts-ignore
+         // @ts-expect-error
          const match = item.episodeDisplay.match(/S(\d+):E(\d+)/);
          if (!match) return;
          
@@ -176,10 +176,10 @@ export const LibraryItemCard = memo(function LibraryItemCard({
 
   // Prepend Watch action
   // If it's a series and has an active episode, show "Mark Episode" option too
-  // @ts-ignore
+  // @ts-expect-error
   if (item.type === 'series' && item.episodeDisplay) {
     contextItems.unshift({
-        // @ts-ignore
+        // @ts-expect-error
         label: `Mark ${item.episodeDisplay} Watched`,
         icon: Check,
         onClick: markEpisodeWatched
@@ -243,7 +243,7 @@ export const LibraryItemCard = memo(function LibraryItemCard({
             )}
 
             {/* Progress Bar */}
-            {/* @ts-ignore */}
+            {/* @ts-expect-error */}
             {(item as any).progress_percent > 0 && (
                 <div style={{
                     position: 'absolute',

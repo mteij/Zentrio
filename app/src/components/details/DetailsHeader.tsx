@@ -78,7 +78,7 @@ export function DetailsHeader({
                 {meta.released && <span className={styles.metaBadge}>{String(meta.released).split('-')[0]}</span>}
                 {meta.runtime && <span className={styles.metaBadge}>{meta.runtime}</span>}
                 {showImdbRatings && meta.imdbRating && <span className={styles.metaBadge} style={{ background: '#f5c518', color: '#000' }}>IMDb {meta.imdbRating}</span>}
-                {/* @ts-ignore */}
+                {/* @ts-expect-error */}
                 {showAgeRatings && (meta.certification || meta.rating || meta.contentRating) && <span className={styles.metaBadge} style={{ border: '1px solid #fff' }}>{(meta.certification || meta.rating || meta.contentRating)}</span>}
               </div>
 

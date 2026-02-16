@@ -30,16 +30,16 @@ export function useContextMenu(options?: UseContextMenuOptions) {
     e.stopPropagation() // Stop bubbling
 
     let clientX, clientY
-    // @ts-ignore
+    // @ts-expect-error
     if (e.touches && e.touches.length > 0) {
-      // @ts-ignore
+      // @ts-expect-error
       clientX = e.touches[0].clientX
-      // @ts-ignore
+      // @ts-expect-error
       clientY = e.touches[0].clientY
     } else {
-      // @ts-ignore
+      // @ts-expect-error
       clientX = e.clientX
-      // @ts-ignore
+      // @ts-expect-error
       clientY = e.clientY
     }
 

@@ -1,4 +1,4 @@
-import { useRef, memo } from 'react'
+import { memo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { MetaPreview } from '../../services/addons/types'
@@ -40,7 +40,7 @@ export const SearchCatalogRow = memo(function SearchCatalogRow({
   } = useScrollRow({ items })
 
   // Handle item click - prevent if dragging
-  const handleItemClick = (e: React.MouseEvent, item: ContentItem) => {
+  const handleItemClick = (e: React.MouseEvent, _item: ContentItem) => {
     if (isDragging()) {
       e.preventDefault()
       e.stopPropagation()

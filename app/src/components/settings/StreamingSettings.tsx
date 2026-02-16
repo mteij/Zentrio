@@ -324,7 +324,7 @@ export function StreamingSettings() {
       const newSorting = settings.sorting.map(s => 
           s.id === id ? { ...s, direction: s.direction === 'asc' ? 'desc' : 'asc' } : s
       )
-      // @ts-ignore
+      // @ts-expect-error
       updateSetting('sorting', newSorting)
   }
 

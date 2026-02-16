@@ -1,6 +1,5 @@
 // Episode List Component
 // Extracted from Details.tsx
-import { useState } from 'react'
 import { Play, Eye, EyeOff, ChevronUp, Check } from 'lucide-react'
 import { LazyImage } from '../../components'
 import { ContextMenu } from '../../components/ui/ContextMenu'
