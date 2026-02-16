@@ -42,9 +42,64 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const navigate = useNavigate()
 
+  // Track auth store for token availability
+  const { session, isLoading: authLoading, isAuthenticated } = useAuthStore();
+  
+  // Determine if we're in Tauri environment
+  const isTauriEnv = typeof window !== 'undefined' &&
+    ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined);
+  
   useEffect(() => {
-    loadProfiles(0)
-  }, [])
+    // Wait for auth to be ready and session token to be available
+    // This prevents race conditions where we fetch before token is set
+    if (authLoading) {
+      console.log('[ProfilesPage] Waiting for auth to load...');
+      return;
+    }
+    
+    // For Tauri, we need a token; for web, cookies handle auth
+    if (isTauriEnv && isAuthenticated && !session?.token) {
+      console.log('[ProfilesPage] Authenticated but waiting for session token (Tauri mode)...');
+      
+      // Use Zustand subscribe to wait for token to become available
+      const unsubscribe = useAuthStore.subscribe(
+        (state) => state.session?.token,
+        (token) => {
+          if (token) {
+            console.log('[ProfilesPage] Token now available via subscription, loading profiles...');
+            loadProfiles(0);
+            unsubscribe();
+          }
+        }
+      );
+      
+      // Also set a fallback timeout in case subscription doesn't fire
+      const fallbackTimer = setTimeout(() => {
+        const freshToken = useAuthStore.getState().session?.token;
+        if (freshToken) {
+          console.log('[ProfilesPage] Token found via fallback timeout, loading profiles...');
+          loadProfiles(0);
+        } else {
+          console.log('[ProfilesPage] Still no token after timeout, loading anyway (may fail)...');
+          loadProfiles(0);
+        }
+        unsubscribe();
+      }, 500);
+      
+      return () => {
+        unsubscribe();
+        clearTimeout(fallbackTimer);
+      };
+    }
+    
+    console.log('[ProfilesPage] Auth ready, loading profiles...', {
+      authLoading,
+      isAuthenticated,
+      hasToken: !!session?.token,
+      isTauriEnv
+    });
+    loadProfiles(0);
+  }, [authLoading, session?.token, isAuthenticated, isTauriEnv])
 
   const loadProfiles = async (retryCount = 0) => {
     try {
@@ -65,7 +120,15 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
         console.log('[ProfilesPage] Refresh result:', refreshed);
         
         if (refreshed) {
-             console.log('[ProfilesPage] Refresh success, retrying loadProfiles...');
+             // Wait for state to propagate after refresh before retrying
+             console.log('[ProfilesPage] Refresh success, waiting for token propagation...');
+             await new Promise(resolve => setTimeout(resolve, 100));
+             
+             // Verify token is now available
+             const newToken = useAuthStore.getState().session?.token;
+             console.log('[ProfilesPage] New token available:', !!newToken);
+             
+             console.log('[ProfilesPage] Retrying loadProfiles...');
              return loadProfiles(retryCount + 1);
         }
         

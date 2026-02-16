@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 env:
   NODE_VERSION: 20
@@ -29,6 +28,8 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     permissions:
       contents: write
 
@@ -42,6 +43,11 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Get version
         id: version
@@ -114,16 +120,6 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
 
     steps:
-      - name: Trigger Mobile Build
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: mobile-build
-          client-payload: |
-            {
-              "version": "${{ needs.create-release.outputs.version }}"
-            }
-
       - name: Trigger Tauri Build
         uses: peter-evans/repository-dispatch@v2
         with:

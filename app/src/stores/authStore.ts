@@ -128,11 +128,16 @@ export const useAuthStore = create<AuthState>()(
             console.log('[AuthStore] Refreshing session...');
             const session = await authClient.getSession()
             
+            // Prefer fresh token from server, then passed token, then fallback to existing
+            const freshToken = session?.data?.session?.token;
+            const tokenToUse = freshToken || token || get().session?.token;
+            
             console.log('[AuthStore] Session refresh response:', {
                 hasUser: !!session?.data?.user,
-                hasToken: !!session?.data?.session?.token,
+                hasToken: !!freshToken,
                 userEmail: session?.data?.user?.email,
-                newToken: session?.data?.session?.token ? `...${session?.data?.session?.token.slice(-6)}` : null,
+                newToken: freshToken ? `...${freshToken.slice(-6)}` : null,
+                tokenToUse: tokenToUse ? `...${tokenToUse.slice(-6)}` : null,
                 error: session?.error
             });
             
@@ -141,9 +146,20 @@ export const useAuthStore = create<AuthState>()(
               const sessionData = {
                 user,
                 expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
-                token: token || session.data.session?.token || get().session?.token
+                token: tokenToUse
               }
-              get().login(user, sessionData)
+              
+              // Set state synchronously
+              set({
+                user,
+                session: sessionData,
+                isAuthenticated: true,
+                isLoading: false,
+                error: null,
+                lastActivity: Date.now(),
+              })
+              
+              console.log('[AuthStore] Session refreshed, token set:', tokenToUse ? `...${tokenToUse.slice(-6)}` : null);
               return true
             } else {
               // Session expired or invalid
@@ -161,19 +177,9 @@ export const useAuthStore = create<AuthState>()(
               
               // Otherwise, the session is truly dead.
               
-              // SECURITY CHECK:
-              // Before resetting, check if we are actually authenticated in the store.
-              // If we are authenticated AND we have a token, it means a login likely happened
-              // while this refresh was in flight, but the token didn't change (rare) or
-              // we just missed the update cadence.
-              const currentState = get();
-              if (currentState.isAuthenticated && currentState.session?.token) {
-                  console.log('[AuthStore] Refresh failed but store is authenticated. Assuming valid session (race condition protection).');
-                  set({ isLoading: false });
-                  return true;
-              }
-
-              console.log('[AuthStore] Refresh returned no user and no concurrent login detected. Resetting.');
+              // No valid server session and no concurrent login detected.
+              // Force local reset so route guards stop treating the user as authenticated.
+              console.log('[AuthStore] Refresh returned no user and no concurrent login detected. Resetting local auth state.');
               get().reset()
               return false
             }

@@ -44,6 +44,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   
+  // Guard to prevent double-completion (e.g., from both login handler AND auth effect)
+  const [completedRef] = useState({ current: false });
+  
   // Server state
   const [serverUrl, setServerUrl] = useState(() => {
     const saved = localStorage.getItem('zentrio_server_url');
@@ -105,13 +108,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     checkAuth();
   }, []);
   
-  // Auto-complete when authenticated
+  // Auto-complete when authenticated (e.g., from deep link or social login callback)
+  // Uses a guard to prevent double-completion if login handler also calls onComplete
   useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log('[Onboarding] Authenticated, completing flow');
+    if (isAuthenticated && user && !completedRef.current) {
+      console.log('[Onboarding] Authenticated via store update, completing flow');
+      completedRef.current = true;
       onComplete('connected', serverUrl);
     }
-  }, [isAuthenticated, user, onComplete, serverUrl]);
+  }, [isAuthenticated, user, onComplete, serverUrl, completedRef]);
   
   // Social login handler
   const handleSocialLogin = async (provider: 'google' | 'github' | 'discord' | 'oidc') => {
@@ -134,6 +139,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
   };
   
+  // Helper to ensure token is propagated before completing
+  const waitForTokenAndComplete = async (expectedToken?: string) => {
+    // Give Zustand a moment to propagate state
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Verify token is now readable
+    const token = useAuthStore.getState().session?.token;
+    console.log('[Onboarding] Token after login:', token ? `...${token.slice(-6)}` : 'none');
+    
+    if (!completedRef.current) {
+      completedRef.current = true;
+      onComplete('connected', serverUrl);
+    }
+  };
+  
   // Email sign in
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,7 +173,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             token: data.token
           } : undefined;
           useAuthStore.getState().login(data.user, sessionData);
-          onComplete('connected', serverUrl);
+          // Wait for token propagation before completing
+          await waitForTokenAndComplete(data.token);
         }
       } else if (emailMethod === 'magic-link') {
         const callbackURL = isTauri()
@@ -178,7 +199,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               token: data.token
             } : undefined;
             useAuthStore.getState().login(data.user, sessionData);
-            onComplete('connected', serverUrl);
+            await waitForTokenAndComplete(data.token);
           }
         }
       }
@@ -216,7 +237,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           token: signIn.data.token
         } : undefined;
         useAuthStore.getState().login(signIn.data.user, sessionData);
-        onComplete('connected', serverUrl);
+        await waitForTokenAndComplete(signIn.data.token);
       }
     } catch (e: any) {
       toast.error('Sign Up Failed', { description: e.message || 'Could not create account' });

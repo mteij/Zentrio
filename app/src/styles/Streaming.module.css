@@ -546,6 +546,8 @@
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
+  /* Ensure content doesn't overlap with titlebar area */
+  padding-top: var(--titlebar-height, 0px);
 }
 
 .heroTitle {
@@ -978,6 +980,8 @@
     font-size: 0.75rem;
     padding: 5px 10px;
     margin-bottom: 10px;
+    /* Ensure trending chip is visible below safe area on mobile */
+    margin-top: calc(env(safe-area-inset-top) + 8px);
   }
 
   .heroActions {

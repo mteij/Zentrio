@@ -1,9 +1,10 @@
-import { useEffect, useState, ReactNode } from 'react'
+import { useEffect, useState, ReactNode, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useLoginBehavior } from '../../hooks/useLoginBehavior'
 import { SplashScreen } from '../ui/SplashScreen'
 import { appMode } from '../../lib/app-mode'
+import { isTauri } from '../../lib/auth-client'
 
 interface RouteGuardProps {
   children: ReactNode
@@ -25,15 +26,34 @@ export function ProtectedRoute({ children }: RouteGuardProps) {
   const navigate = useNavigate()
   // Check if in guest mode - skip auth check entirely
   const isGuestMode = appMode.isGuest()
+  
+  // Track if we've already initiated a redirect to prevent multiple redirects
+  const [redirectInitiated, setRedirectInitiated] = useState(false)
 
   // Redirect if not authenticated (connected mode only)
   useEffect(() => {
     if (isGuestMode) return // Don't redirect in guest mode
+    if (redirectInitiated) return // Already handling redirect
 
     if (!isLoading && !isAuthenticated) {
-      navigate('/', { replace: true })
+      // For Tauri apps, clear the app mode so the OnboardingWizard shows
+      // This provides a native-feeling re-authentication experience
+      // instead of showing the web-oriented LandingPage
+      if (isTauri()) {
+        console.log('[ProtectedRoute] Session expired in Tauri, resetting mode for OnboardingWizard')
+        setRedirectInitiated(true)
+        appMode.clear()
+        // Clear server URL too so the OnboardingWizard condition triggers properly
+        localStorage.removeItem('zentrio_server_url')
+        // Use window.location for a full page reload to ensure App.tsx reinitializes
+        // This avoids race conditions with React state not updating from localStorage changes
+        window.location.href = '/'
+      } else {
+        setRedirectInitiated(true)
+        navigate('/', { replace: true })
+      }
     }
-  }, [isAuthenticated, isLoading, navigate, isGuestMode])
+  }, [isAuthenticated, isLoading, navigate, isGuestMode, redirectInitiated])
 
   // Show loading ONLY while checking session initially
   if (isLoading) {
@@ -42,7 +62,7 @@ export function ProtectedRoute({ children }: RouteGuardProps) {
 
   // Don't render children if not authenticated (connected mode only)
   if (!isGuestMode && !isAuthenticated) {
-    return null
+    return <SplashScreen /> // Show splash while redirect is processing
   }
 
   return <>{children}</>

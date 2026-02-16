@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from 'sonner'
-import { open } from "@tauri-apps/plugin-shell";
 import { authClient, getClientUrl, getServerUrl, isTauri } from "../../lib/auth-client";
 import { apiFetch, apiFetchJson } from "../../lib/apiFetch";
 import { 
@@ -126,12 +125,14 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       console.log('[AuthForms] Initiating social login', { provider, isTauri: isTauri() });
 
       if (isTauri()) {
+        // Use plugin-opener for consistency across all auth flows
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
         const serverUrl = getServerUrl();
         const handoffUrl = `${serverUrl}/api/auth/native-redirect`;
         const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
         
-        console.log('[AuthForms] Opening external URL via shell plugin:', url);
-        await open(url);
+        console.log('[AuthForms] Opening external URL via opener plugin:', url);
+        await openUrl(url);
       } else {
         console.log('[AuthForms] Using authClient redirection (Web mode)');
         await authClient.signIn.social({
@@ -172,11 +173,13 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       }
 
       if (isTauri()) {
-        // Clear app mode and server URL state for re-initialization
-        localStorage.removeItem('zentrio_app_mode');
-        localStorage.removeItem('zentrio_server_url');
-        // Navigate to profiles instead of reloading (reload can cause redirect issues)
-        window.location.href = '/profiles';
+        // For Tauri apps, ensure connected mode is set and navigate to profiles
+        // Don't clear state - preserve server URL that was set during onboarding
+        import('../../lib/app-mode').then(({ appMode }) => {
+          appMode.set('connected');
+          // Navigate to profiles
+          window.location.href = '/profiles';
+        });
         return true;
       }
     }

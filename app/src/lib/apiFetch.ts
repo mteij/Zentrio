@@ -34,7 +34,19 @@ export async function apiFetch(
   
   // Inject Bearer token if available (for Tauri cross-origin auth)
   if (isTauri()) {
-      const token = useAuthStore.getState().session?.token;
+      const state = useAuthStore.getState();
+      const token = state.session?.token;
+      
+      // Debug logging for auth issues
+      if (url.includes('/api/profiles') || url.includes('/api/auth')) {
+          console.log('[apiFetch] Request:', url, {
+              hasToken: !!token,
+              tokenSuffix: token ? `...${token.slice(-6)}` : null,
+              isAuthenticated: state.isAuthenticated,
+              isLoading: state.isLoading
+          });
+      }
+      
       if (token) {
           headers.set('Authorization', `Bearer ${token}`);
       }

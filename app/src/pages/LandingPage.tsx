@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import { ParticleBackground } from '../components/ui/ParticleBackground'
 import { toast } from 'sonner';
 import { Loader2, ArrowRight, Mail } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
 import { authClient, getClientUrl, getServerUrl, isTauri } from '../lib/auth-client';
 import { apiFetch, apiFetchJson } from '../lib/apiFetch';
 import { getLoginBehaviorRedirectPath } from '../hooks/useLoginBehavior';
@@ -70,7 +69,9 @@ export function LandingPage({ version }: LandingPageProps) {
       console.log('[LandingPage] Initiating social login', { provider, isTauri: isTauri() });
 
       if (isTauri()) {
-        const serverUrl = getServerUrl(); // Ensure this is imported or available
+        // Use plugin-opener like OnboardingWizard for consistency
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        const serverUrl = getServerUrl();
         console.log('[LandingPage] Target Server URL:', serverUrl);
         
         // Check if we are pointing to production but want local
@@ -83,8 +84,8 @@ export function LandingPage({ version }: LandingPageProps) {
         const handoffUrl = `${serverUrl}/api/auth/native-redirect`;
         const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
         
-        console.log('[LandingPage] Opening external URL via shell plugin:', url);
-        await open(url);
+        console.log('[LandingPage] Opening external URL via opener plugin:', url);
+        await openUrl(url);
       } else {
         await authClient.signIn.social({
           provider,

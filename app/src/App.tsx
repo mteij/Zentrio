@@ -158,9 +158,8 @@ function AppRoutes() {
         console.log('[App] Deep link received:', url)
         
         if (url.startsWith('zentrio://auth/magic-link') || url.includes('token=')) {
-          // ... magic link logic ...
+          // Handle magic link authentication
           try {
-             // ... existing magic link logic ...
              const urlObj = new URL(url)
              const token = urlObj.searchParams.get('token')
              if (token) {
@@ -169,13 +168,24 @@ function AppRoutes() {
                  toast.success('Signed in successfully')
                  const { data } = await authClient.getSession();
                  if (data?.user) {
-                     useAuthStore.getState().login(data.user);
+                     // Update auth store with session token
+                     useAuthStore.getState().login(data.user, {
+                       user: data.user,
+                       token: data.session?.token,
+                       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                     });
+                     
+                     // Wait for state propagation
+                     await new Promise(resolve => setTimeout(resolve, 100));
+                     console.log('[App] Magic link login complete, token:', data.session?.token ? `...${data.session.token.slice(-6)}` : 'none');
+                     
                      appMode.set('connected');
                      setMode('connected');
                      const currentServer = localStorage.getItem('zentrio_server_url') || 'https://app.zentrio.eu';
                      setServerUrl(currentServer);
+                     
+                     navigate('/profiles')
                  }
-                 navigate('/profiles')
              }
           } catch(e) {
             console.error('Failed to handle magic link', e)
@@ -211,17 +221,21 @@ function AppRoutes() {
                   toast.success(`Welcome back, ${data.user.name || 'User'}!`, { duration: 5000 });
                   console.log('[App] 🟢 Mobile login successful!', data.user.email);
                   
-                  // Force a small delay to ensure React state updates propagate before navigation
-                  // This is a heuristic to prevent race conditions during heavy mounting
-                  await new Promise(resolve => setTimeout(resolve, 100));
-                  
-                  // Update auth store
+                  // Update auth store FIRST
                   useAuthStore.getState().login(data.user, {
                     user: data.user,
                     token: data.token,
                     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
                   });
                   console.log('[App] Auth store updated with user:', data.user.email);
+                  
+                  // Wait for Zustand state to propagate AFTER login
+                  // This ensures the token is readable via getState() before navigation
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                  
+                  // Verify token propagation
+                  const verifiedToken = useAuthStore.getState().session?.token;
+                  console.log('[App] Token after propagation delay:', verifiedToken ? `...${verifiedToken.slice(-6)}` : 'MISSING');
                   
                   // Update app mode
                   appMode.set('connected');
@@ -290,9 +304,36 @@ function AppRoutes() {
   // Calculate if we should show onboarding (needs to be before hooks for consistent order)
   const isTauriApp = isTauri();
   const isGuestMode = appMode.isGuest();
-  const shouldShowOnboarding = isTauriApp && (mode === null || (mode === 'connected' && !serverUrl)) && location.pathname !== '/two-factor';
+  
+  // Track if we've completed the initial auth check to prevent race conditions
+  // This prevents showing OnboardingWizard before auth rehydration completes
+  const [initialAuthCheckDone, setInitialAuthCheckDone] = useState(false);
+  
+  useEffect(() => {
+    // Only mark initial check as done when loading transitions from true to false
+    if (!authLoading && !initialAuthCheckDone) {
+      // Add a small delay to ensure state has fully propagated
+      const timer = setTimeout(() => {
+        console.log('[AppRoutes] Initial auth check completed', { isAuthenticated, isGuestMode });
+        setInitialAuthCheckDone(true);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [authLoading, initialAuthCheckDone, isAuthenticated, isGuestMode]);
+  
+  // Show OnboardingWizard in Tauri when:
+  // 1. Mode has never been set (first launch)
+  // 2. Mode is connected but no server URL (incomplete setup)
+  // 3. Mode is connected, server URL is set, initial auth check done, but user is NOT authenticated (session expired)
+  //    This ensures Tauri users get the native OnboardingWizard instead of web LandingPage
+  // Exception: Don't show during 2FA flow
+  const shouldShowOnboarding = isTauriApp && (
+    mode === null ||
+    (mode === 'connected' && !serverUrl) ||
+    (mode === 'connected' && serverUrl && initialAuthCheckDone && !isAuthenticated && !isGuestMode)
+  ) && location.pathname !== '/two-factor';
 
-  // Tauri apps: Show splash screen while auth is loading
+  // Tauri apps: Show splash screen while auth is loading or waiting for initial check
   // This prevents the landing page from ever flashing
   // NOTE: Must be AFTER all hooks but BEFORE any conditional returns (except onboarding)
   useEffect(() => {
@@ -301,7 +342,7 @@ function AppRoutes() {
     
     // Auth redirect is now handled by the pages themselves (PublicRoute/ProtectedRoute)
     // The previous logic here caused a race condition with deep links
-    if (isTauriApp && mode && mode !== 'web' && location.pathname === '/') {
+    if (isTauriApp && mode && mode !== 'web' && location.pathname === '/' && initialAuthCheckDone) {
        // Only redirect to profiles if explicitly authenticated
        // Otherwise let the router handle it (LandingPage -> SignIn)
        if (isAuthenticated || isGuestMode) {
@@ -309,7 +350,7 @@ function AppRoutes() {
           navigate('/profiles', { replace: true });
        }
     }
-  }, [location.pathname, mode, navigate, shouldShowOnboarding, isAuthenticated, isGuestMode, isTauriApp]);
+  }, [location.pathname, mode, navigate, shouldShowOnboarding, isAuthenticated, isGuestMode, isTauriApp, initialAuthCheckDone]);
 
   // First launch in Tauri - show onboarding wizard
   // Skip if we are on the 2FA page (which happens during login flow)
@@ -319,8 +360,9 @@ function AppRoutes() {
 
   // Tauri loading gate: Wait for auth state before rendering routes
   // This prevents the web landing page from flashing on app reopen
-  if (isTauriApp && authLoading && location.pathname === '/') {
-    console.log('[AppRoutes] Tauri app waiting for auth state...');
+  // Wait for BOTH authLoading to complete AND initial check to be done
+  if (isTauriApp && (authLoading || !initialAuthCheckDone) && location.pathname === '/') {
+    console.log('[AppRoutes] Tauri app waiting for auth state...', { authLoading, initialAuthCheckDone });
     return <SplashScreen />;
   }
   
