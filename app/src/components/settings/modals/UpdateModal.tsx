@@ -16,6 +16,8 @@ interface UpdateData {
     browser_download_url: string;
     size: number;
   }>;
+  updateObj?: any; // The raw update object from @tauri-apps/plugin-updater
+  isCustom?: boolean;
 }
 
 interface UpdateModalProps {
@@ -24,9 +26,10 @@ interface UpdateModalProps {
   updateData: UpdateData | null;
   currentVersion: string;
   isTauri?: boolean;
+  platformName?: string;
 }
 
-export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTauri = true }: UpdateModalProps) {
+export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTauri = true, platformName }: UpdateModalProps) {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [downloadError, setDownloadError] = useState('');
@@ -45,7 +48,7 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
   const handleDownload = async () => {
     if (!updateData) return;
 
-    // Handle Web Update (Refresh)
+    // Handle Web
     if (!isTauri) {
         window.location.reload();
         return;
@@ -56,30 +59,62 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
       setStatus('downloading');
       setDownloadError('');
 
+      // ===========================================
+      // 1. DESKTOP OFFICIAL UPDATER FLOW
+      // ===========================================
+      if (updateData.updateObj) {
+          // This is the object from @tauri-apps/plugin-updater
+          const update = updateData.updateObj;
+          
+          // Re-attach download hook if possible, or just let it handle it.
+          // The official plugin doesn't expose easy progress hooks in v2 JS API same as v1?
+          // Actually it does: check(options) -> Update -> downloadAndInstall(cb)
+          
+          await update.downloadAndInstall((event: any) => {
+              if (event.event === 'Started') {
+                  setStatus('downloading');
+                  if (event.contentLength) {
+                      // rough estimate if needed
+                  }
+              } else if (event.event === 'Progress') {
+                 // event.chunkLength, event.contentLength
+                 // We might not get total length always
+              } else if (event.event === 'Finished') {
+                  setStatus('installing');
+              }
+          });
+
+          // Relaunch to complete
+          const { relaunch } = await import('@tauri-apps/plugin-process');
+          await relaunch();
+          return;
+      }
+
+      // ===========================================
+      // 2. ANDROID / CUSTOM FLOW
+      // ===========================================
+      // (This logic remains for Android where the plugin is not used/supported the same way yet,
+      // or if we forced custom flow)
+      
       const currentPlatform = await platform();
       let asset;
 
       if (currentPlatform === 'android') {
         // Find the correct asset (prefer arm64, fallback to universal)
-        asset = updateData.assets.find(a => a.name.includes('arm64') && a.name.endsWith('.apk'));
+        asset = updateData.assets?.find((a: any) => a.name.includes('arm64') && a.name.endsWith('.apk'));
         if (!asset) {
-            asset = updateData.assets.find(a => a.name.includes('universal') && a.name.endsWith('.apk'));
+            asset = updateData.assets?.find((a: any) => a.name.includes('universal') && a.name.endsWith('.apk'));
         }
-      } else if (currentPlatform === 'windows') {
-        // Find .exe installer
-        asset = updateData.assets.find(a => a.name.endsWith('.exe') && !a.name.includes('sig'));
+      } 
+      // Fallbacks for desktop if for some reason we are here (e.g. plugin failed check but we found assert manually?)
+      // ... existing desktop asset finder logic ...
+      else if (currentPlatform === 'windows') {
+         asset = updateData.assets?.find((a: any) => a.name.endsWith('.exe') && !a.name.includes('sig'));
       } else if (currentPlatform === 'linux') {
-          // Find .deb package
-          asset = updateData.assets.find(a => a.name.endsWith('.deb'));
-          if (!asset) {
-             asset = updateData.assets.find(a => a.name.endsWith('.AppImage'));
-          }
+          asset = updateData.assets?.find((a: any) => a.name.endsWith('.deb')) 
+                || updateData.assets?.find((a: any) => a.name.endsWith('.AppImage'));
       } else if (currentPlatform === 'macos') {
-          // Find .dmg (preferred) or .app.tar.gz
-          asset = updateData.assets.find(a => a.name.endsWith('.dmg'));
-          if (!asset) {
-              asset = updateData.assets.find(a => a.name.endsWith('.app.tar.gz'));
-          }
+          asset = updateData.assets?.find((a: any) => a.name.endsWith('.dmg'));
       }
 
       if (!asset) {

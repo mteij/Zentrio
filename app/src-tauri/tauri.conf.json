@@ -68,10 +68,26 @@
       "open": true
     },
     "deep-link": {
-      "customProtocol": true,
-      "schemes": [
-        "zentrio"
-      ]
+      "mobile": [
+        {
+          "scheme": [
+            "zentrio"
+          ],
+          "appLink": false
+        }
+      ],
+      "desktop": {
+        "schemes": [
+          "zentrio"
+        ]
+      }
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/mteij/Zentrio/releases/latest/download/latest.json"
+      ],
+      "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA5OUUyQTE4QkRBRkRBNjQKUldSazJxKzlHQ3FlQ1VMWFZTRWNPeVJWSXhGSlpZbEhtOVpCUmFiVmNGcG1icWxGU3JPQjRLelkK"
     }
   }
 }

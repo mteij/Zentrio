@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Filter, X } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { Layout, StreamingRow, SkeletonRow, Hero, SkeletonHero, LazyImage, RatingBadge, SkeletonCard } from '../../components'
@@ -79,6 +80,7 @@ export const StreamingExplore = () => {
 
   // State for view toggle
   const [viewMode, setViewMode] = useState<'all' | 'movie' | 'series'>('all')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
 
   // If a genre is selected via URL, we show the filtered grid view.
@@ -300,7 +302,79 @@ export const StreamingExplore = () => {
                  )}
             </div>
 
-            <div className={styles.contentContainer} style={{ marginTop: showHero ? '0' : '100px' }}>
+            {/* Mobile Floating Filter Button (Dashboard Only) */}
+            {!isFilteredView && (
+                <>
+                    <button 
+                        className={styles.mobileFilterBtn}
+                        onClick={() => setMobileMenuOpen(true)}
+                        aria-label="Filter Content"
+                    >
+                        <Filter size={18} fill="currentColor" />
+                        <span className={styles.mobileFilterLabel}>{viewMode === 'all' ? 'All' : viewMode === 'movie' ? 'Movies' : 'TV'}</span>
+                    </button>
+
+                    <AnimatePresence>
+                        {mobileMenuOpen && (
+                            <>
+                                <motion.div 
+                                    className={styles.mobileMenuBackdrop}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                />
+                                <motion.div 
+                                    className={styles.mobileMenuPanel}
+                                    initial={{ y: -50, opacity: 0, scale: 0.95 }}
+                                    animate={{ y: 0, opacity: 1, scale: 1 }}
+                                    exit={{ y: -20, opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <div className={styles.mobileMenuHeader}>
+                                        <span className={styles.mobileMenuTitle}>Browse</span>
+                                        <button className={styles.mobileMenuClose} onClick={() => setMobileMenuOpen(false)}>
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+
+                                    <div className={styles.mobileMenuSection}>
+                                        <label>Type</label>
+                                        <div className={styles.mobileToggleGroup}>
+                                            {(['all', 'movie', 'series'] as const).map(mode => (
+                                                <button
+                                                    key={mode}
+                                                    onClick={() => { setViewMode(mode); setMobileMenuOpen(false); }}
+                                                    className={`${styles.mobileToggleBtn} ${viewMode === mode ? styles.mobileToggleBtnActive : ''}`}
+                                                >
+                                                    {mode === 'all' ? 'All' : mode === 'movie' ? 'Movies' : 'TV Shows'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.mobileMenuSection}>
+                                        <label>Genre</label>
+                                        <div className={styles.mobileGenreGrid}>
+                                            {genres.map(g => (
+                                                <button 
+                                                    key={g} 
+                                                    className={styles.mobileGenreChip}
+                                                    onClick={() => { updateFilter('genre', g); setMobileMenuOpen(false); }}
+                                                >
+                                                    {g}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>
+                </>
+            )}
+
+            <div className={`${styles.contentContainer} ${!showHero ? styles.contentOffset : ''}`}>
 
                 {isFilteredView ? (
                     // GRID VIEW for Filtered Results

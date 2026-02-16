@@ -48,7 +48,7 @@
 
 @media (max-width: 768px) {
   .backBtn {
-    top: 20px;
+    top: calc(20px + env(safe-area-inset-top));
     left: 20px;
     padding: 10px 16px;
     font-size: 14px;
@@ -74,7 +74,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: calc(30px + var(--titlebar-height, 0px)) 0 20px 0;
+  padding: calc(30px + var(--titlebar-height, 0px) + env(safe-area-inset-top)) 0 20px 0;
   border-right: none;
   transition: all 0.3s ease;
   /* Prevent rubber banding/overscroll from affecting navbar */
@@ -386,15 +386,16 @@
   min-height: var(--app-height, 100vh);
   padding-left: 80px; /* Fixed width matching navbar */
   padding-bottom: 40px;
+  padding-top: env(safe-area-inset-top);
   transition: padding-left 0.3s ease;
   position: relative;
   z-index: 1;
-  overflow-x: hidden; /* Prevent horizontal scroll from negative margins */
+  /* overflow-x: hidden; - Removed to fix sticky header behavior. Body already handles overflow. */
 }
 
 .streamingLayoutNoHero {
   padding-top: calc(
-    100px + var(--titlebar-height, 0px)
+    100px + var(--titlebar-height, 0px) + env(safe-area-inset-top)
   ); /* Ensure content starts below header and titlebar */
 }
 
@@ -428,11 +429,11 @@
 /* Hero Section */
 .heroSection {
   position: relative;
-  height: 85vh;
+  height: 55vh;
   width: 100%;
   display: flex;
-  align-items: center;
-  padding-bottom: 80px;
+  align-items: flex-end;
+  padding-bottom: 60px;
   overflow: hidden;
   z-index: 1;
   transition: opacity 0.5s ease;
@@ -441,14 +442,14 @@
 /* Reduce hero height on larger screens */
 @media (min-width: 1024px) {
   .heroSection {
-    height: 70vh;
-    padding-bottom: 60px;
+    height: 50vh;
+    padding-bottom: 40px;
   }
 }
 
 @media (min-width: 1440px) {
   .heroSection {
-    height: 60vh;
+    height: 55vh;
     max-height: 700px;
     padding-bottom: 50px;
   }
@@ -456,7 +457,7 @@
 
 @media (min-width: 1920px) {
   .heroSection {
-    height: 55vh;
+    height: 50vh;
     max-height: 650px;
   }
 }
@@ -638,8 +639,20 @@
 .contentContainer {
   position: relative;
   z-index: 10;
-  margin-top: -100px;
+  margin-top: 0; /* Handled by layout flow now, or exploreHeader negative margin */
+  padding-top: 20px;
   padding-bottom: 60px;
+}
+
+/* Offset for content when no Hero is present (Desktop only) */
+.contentOffset {
+  margin-top: 100px;
+}
+
+@media (max-width: 768px) {
+  .contentOffset {
+    margin-top: 0;
+  }
 }
 
 /* Content Row */
@@ -935,12 +948,14 @@
   .streamingLayout {
     padding-left: 0;
     padding-bottom: calc(var(--nav-height-mobile) + 20px);
+    overflow-x: visible;
   }
 
   .heroSection {
-    height: 60vh;
-    min-height: 400px;
-    padding-bottom: 40px;
+    height: 45vh;
+    min-height: 300px;
+    padding-bottom: 20px;
+    align-items: flex-end;
   }
 
   .heroContent {
@@ -1621,7 +1636,7 @@
 
   /* Reduce content overlap on mobile - hero is shorter so less overlap is needed */
   .contentContainer {
-    margin-top: -40px !important;
+    margin-top: 0 !important;
     padding-bottom: calc(var(--nav-height-mobile, 80px) + 40px);
   }
 
@@ -2032,18 +2047,18 @@
 /* Explore Sticky Header   */
 /* ======================= */
 .exploreHeader {
-  position: fixed;
-  top: var(--titlebar-height, 0px);
-  left: 80px; /* Account for navbar */
-  right: 0;
+  position: sticky;
+  top: 0;
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 60px;
+  padding: calc(16px + var(--titlebar-height, 0px)) 60px 16px;
+  margin-bottom: -40px; /* Reduced negative margin to prevent overlap with content */
   /* Always transparent - controls have their own backgrounds */
   background: transparent;
   pointer-events: none; /* Allow clicking through empty space */
+  transition: all 0.3s ease;
 }
 
 /* Make the interactive elements clickable */
@@ -2177,15 +2192,25 @@
 
 @media (max-width: 768px) {
   .exploreHeader {
-    left: 0; /* No navbar on mobile, it's at bottom */
-    padding: 12px 20px;
-    flex-direction: column;
+    left: 0;
+    position: sticky;
+    top: 0;
+    margin-bottom: 0;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    flex-direction: column; /* Reset to column for filtered view logic or keeping existing */
+    /* We are hiding this on mobile dashboard anyway, so this mainly affects filtered view if we don't hide it */
     gap: 12px;
+    background: transparent; /* Remove background on mobile to let Filter button float? No, keep it for filtered view */
+    background: #141414;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    pointer-events: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    z-index: 50;
   }
 
   .exploreToggleGroup {
-    width: 100%;
-    justify-content: center;
+    flex: 1;
+    min-width: fit-content;
   }
 
   .exploreToggleBtn {
@@ -2201,6 +2226,145 @@
 
   .exploreFilteredTitle {
     font-size: 1.25rem;
+  }
+
+  /* Hide default explore header components on mobile unless it's filtered view */
+  .exploreHeader .exploreToggleGroup,
+  .exploreHeader .exploreGenreSelect {
+    display: none !important;
+  }
+  
+  /* Reset explore header for mobile dashboard to be user-select-none/pointer-events-none if empty */
+  .exploreHeader:not(:has(.exploreFilteredHeader)) {
+      display: none;
+      padding: 0;
+      margin: 0;
+  }
+
+  /* Mobile Filter FAB */
+  .mobileFilterBtn {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 16px);
+    right: 16px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(20, 20, 20, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 100px;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+  }
+
+  .mobileFilterBtn:active {
+    transform: scale(0.95);
+  }
+
+  /* Mobile Menu Styles */
+  .mobileMenuBackdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+  }
+
+  .mobileMenuPanel {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 60px); /* Below the FAB roughly */
+    right: 16px;
+    width: 280px;
+    max-height: 70vh;
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 16px;
+    z-index: 201;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .mobileMenuHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .mobileMenuTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .mobileMenuClose {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 4px;
+    cursor: pointer;
+  }
+
+  .mobileMenuSection label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 8px;
+  }
+
+  .mobileToggleGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .mobileToggleBtn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    text-align: left;
+    transition: all 0.2s;
+  }
+
+  .mobileToggleBtnActive {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .mobileGenreGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .mobileGenreChip {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 100px;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
   }
 }
 

@@ -132,7 +132,7 @@ function updateCargoToml(path: string, version: string) {
   }
 }
 
-function main() {
+async function main() {
   try {
     // Read source version from app/package.json
     const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, 'utf-8'));
@@ -157,6 +157,27 @@ function main() {
 
     // Update Cargo.toml with MSI version
     updateCargoToml(CARGO_TOML, msiVersion);
+
+    // Run cargo update -p zentrio to update Cargo.lock
+    console.log('📦 Updating Cargo.lock...')
+    try {
+      const { spawnSync } = await import('bun');
+      
+      // Run cargo update -p zentrio
+      const proc = spawnSync(['cargo', 'update', '-p', 'zentrio'], {
+        cwd: TAURI_DIR,
+        stdout: 'inherit',
+        stderr: 'inherit',
+      })
+      
+      if (proc.exitCode !== 0) {
+        console.error('❌ Failed to update Cargo.lock')
+      } else {
+        console.log('✅ Cargo.lock updated')
+      }
+    } catch (error) {
+      console.error('❌ Error running cargo update:', error)
+    }
 
     console.log('Version sync complete!');
     console.log(`Traditional version: ${traditionalVersion}`);

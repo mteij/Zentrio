@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ParticleBackground } from '../components/ui/ParticleBackground'
+import { toast } from 'sonner';
 import { Loader2, ArrowRight, Mail } from "lucide-react";
-import { authClient, getClientUrl } from '../lib/auth-client';
+import { open } from "@tauri-apps/plugin-shell";
+import { authClient, getClientUrl, getServerUrl, isTauri } from '../lib/auth-client';
 import { apiFetch, apiFetchJson } from '../lib/apiFetch';
 import { getLoginBehaviorRedirectPath } from '../hooks/useLoginBehavior';
 
@@ -59,13 +61,39 @@ export function LandingPage({ version }: LandingPageProps) {
 
   const handleSocialLogin = async (provider: "google" | "github" | "discord") => {
     try {
-      const redirectPath = getLoginBehaviorRedirectPath()
-      await authClient.signIn.social({
-        provider,
-        callbackURL: `${getClientUrl()}${redirectPath}`,
-      });
+      const redirectPath = getLoginBehaviorRedirectPath() 
+      
+      const callbackURL = isTauri() 
+         ? "zentrio://auth/callback" 
+         : `${getClientUrl()}${redirectPath}`; // Not strictly needed for Tauri shell open but good for consistency
+
+      console.log('[LandingPage] Initiating social login', { provider, isTauri: isTauri() });
+
+      if (isTauri()) {
+        const serverUrl = getServerUrl(); // Ensure this is imported or available
+        console.log('[LandingPage] Target Server URL:', serverUrl);
+        
+        // Check if we are pointing to production but want local
+        if (serverUrl.includes('zentrio.eu') && import.meta.env.DEV) {
+             toast.warning(`Using Production Server: ${serverUrl}. Deep links might fail if server is outdated.`);
+        } else {
+             toast.info(`Connecting to: ${serverUrl}`);
+        }
+
+        const handoffUrl = `${serverUrl}/api/auth/native-redirect`;
+        const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
+        
+        console.log('[LandingPage] Opening external URL via shell plugin:', url);
+        await open(url);
+      } else {
+        await authClient.signIn.social({
+          provider,
+          callbackURL,
+        });
+      }
     } catch (e) {
       console.error("Social login failed", e);
+      toast.error(`Login failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 

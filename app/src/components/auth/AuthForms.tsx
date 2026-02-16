@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from 'sonner'
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { open } from "@tauri-apps/plugin-shell";
 import { authClient, getClientUrl, getServerUrl, isTauri } from "../../lib/auth-client";
 import { apiFetch, apiFetchJson } from "../../lib/apiFetch";
 import { 
@@ -77,18 +77,23 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     discord: boolean;
     oidc: boolean;
     oidcName: string;
+    loaded: boolean;
   }>({
     google: false,
     github: false,
     discord: false,
     oidc: false,
-    oidcName: 'OpenID'
+    oidcName: 'OpenID',
+    loaded: false
   });
 
   useEffect(() => {
     apiFetchJson<any>('/api/auth/providers')
-      .then(data => setProviders(data))
-      .catch(err => console.error("Failed to fetch auth providers", err));
+      .then(data => setProviders({ ...data, loaded: true }))
+      .catch(err => {
+        console.error("Failed to fetch auth providers", err);
+        setProviders(p => ({ ...p, loaded: true }));
+      });
   }, []);
 
   useEffect(() => {
@@ -118,12 +123,17 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         ? "zentrio://auth/callback" 
         : `${getClientUrl()}${redirectPath}`;
 
+      console.log('[AuthForms] Initiating social login', { provider, isTauri: isTauri() });
+
       if (isTauri()) {
         const serverUrl = getServerUrl();
         const handoffUrl = `${serverUrl}/api/auth/native-redirect`;
         const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
-        await openUrl(url);
+        
+        console.log('[AuthForms] Opening external URL via shell plugin:', url);
+        await open(url);
       } else {
+        console.log('[AuthForms] Using authClient redirection (Web mode)');
         await authClient.signIn.social({
           provider,
           callbackURL,
@@ -265,8 +275,14 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         </div>
       ) : (
     <div className="w-full max-w-lg mx-auto relative">
-      <div className="bg-zinc-950/60 backdrop-blur-2xl border border-white/10 !rounded-3xl !p-8 md:!p-10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 relative">
-
+      <div className="bg-zinc-950/60 backdrop-blur-2xl border border-white/10 !rounded-3xl !p-8 md:!p-10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 relative min-h-[400px] flex flex-col justify-center">
+        
+        {!providers.loaded ? (
+            <div className="flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-700">
+                <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
+                <p className="text-zinc-400 text-sm font-medium animate-pulse">Connecting to secure server...</p>
+            </div>
+        ) : (
         <AnimatePresence mode="wait">
           {view === "main" ? (
             <motion.div
@@ -290,64 +306,56 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
 
               {/* Social login buttons — primary */}
               {hasSocialProviders ? (
-                <div className="space-y-3 mb-6">
-                  {providers.google && (
-                    <button
-                      type="button"
-                      onClick={() => handleSocialLogin("google")}
-                      disabled={!!socialLoading}
-                      className="flex items-center justify-center gap-3 bg-white text-black hover:bg-gray-100 !py-3 !rounded-xl transition-all font-medium text-[15px] !w-full disabled:opacity-50 shadow-lg shadow-white/5"
-                    >
-                      {socialLoading === 'google' ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
-                      ) : (
-                        <GoogleIcon />
-                      )}
-                      Continue with Google
-                    </button>
-                  )}
-                  {providers.github && (
-                    <button
-                      type="button"
-                      onClick={() => handleSocialLogin("github")}
-                      disabled={!!socialLoading}
-                      className="flex items-center justify-center gap-3 bg-[#24292F] text-white hover:bg-[#2b3137] !py-3 !rounded-xl transition-all font-medium text-[15px] !w-full disabled:opacity-50"
-                    >
-                      {socialLoading === 'github' ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <GitHubIcon />
-                      )}
-                      Continue with GitHub
-                    </button>
-                  )}
-                  {providers.discord && (
-                    <button
-                      type="button"
-                      onClick={() => handleSocialLogin("discord")}
-                      disabled={!!socialLoading}
-                      className="flex items-center justify-center gap-3 bg-[#5865F2] text-white hover:bg-[#4752C4] !py-3 !rounded-xl transition-all font-medium text-[15px] !w-full disabled:opacity-50"
-                    >
-                      {socialLoading === 'discord' ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <DiscordIcon />
-                      )}
-                      Continue with Discord
-                    </button>
-                  )}
-                </div>
-              ) : (
-                // Loading skeleton while providers are being fetched
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center justify-center gap-3 bg-white/5 border border-white/10 !py-3 !rounded-xl !w-full animate-pulse">
-                    <div className="w-5 h-5 bg-white/20 rounded-full" />
-                    <div className="h-4 w-40 bg-white/20 rounded" />
+                  <div className="space-y-3 mb-6">
+                    {providers.google && (
+                      <button
+                        type="button"
+                        onClick={() => handleSocialLogin("google")}
+                        disabled={!!socialLoading}
+                        className="flex items-center justify-center gap-3 bg-white text-black hover:bg-gray-100 !py-3 !rounded-xl transition-all font-medium text-[15px] !w-full disabled:opacity-50 shadow-lg shadow-white/5"
+                      >
+                        {socialLoading === 'google' ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
+                        ) : (
+                          <GoogleIcon />
+                        )}
+                        Continue with Google
+                      </button>
+                    )}
+                    {providers.github && (
+                      <button
+                        type="button"
+                        onClick={() => handleSocialLogin("github")}
+                        disabled={!!socialLoading}
+                        className="flex items-center justify-center gap-3 bg-[#24292F] text-white hover:bg-[#2b3137] !py-3 !rounded-xl transition-all font-medium text-[15px] !w-full disabled:opacity-50"
+                      >
+                        {socialLoading === 'github' ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <GitHubIcon />
+                        )}
+                        Continue with GitHub
+                      </button>
+                    )}
+                    {providers.discord && (
+                      <button
+                        type="button"
+                        onClick={() => handleSocialLogin("discord")}
+                        disabled={!!socialLoading}
+                        className="flex items-center justify-center gap-3 bg-[#5865F2] text-white hover:bg-[#4752C4] !py-3 !rounded-xl transition-all font-medium text-[15px] !w-full disabled:opacity-50"
+                      >
+                        {socialLoading === 'discord' ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <DiscordIcon />
+                        )}
+                        Continue with Discord
+                      </button>
+                    )}
                   </div>
-                </div>
-              )}
+              ) : null}
 
-              {/* Divider */}
+              {/* Divider - only show if social providers exist */}
               {hasSocialProviders && (
                 <div className="relative flex items-center gap-4 mb-6">
                   <div className="h-px flex-1 bg-white/10" />
@@ -623,8 +631,8 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                   <p>
                     Already have an account?{" "}
                     <button 
-                        onClick={() => navigate("/signin")}
-                        className="text-white hover:underline font-medium"
+                      onClick={() => navigate("/signin")}
+                      className="text-white hover:underline font-medium"
                     >
                       Sign in
                     </button>
@@ -634,6 +642,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </div>
     </div>
       )}

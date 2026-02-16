@@ -15,80 +15,96 @@ export function UpdateSettings() {
   const [showModal, setShowModal] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [isTauri, setIsTauri] = useState(false);
+  const [platformName, setPlatformName] = useState<string>('web');
 
   useEffect(() => {
-    // Check if running in Tauri
-    const checkTauri = async () => {
+    const init = async () => {
         try {
-            // Simple check: try to get version from Tauri
-            // Or check window.__TAURI_INTERNALS__ if available, but calling API is safer detection
-            // Actually, getVersion() might throw if not in Tauri
             const v = await getVersion();
             setCurrentVersion(v);
             setIsTauri(true);
+            
+            // Detect platform
+            try {
+                const { platform } = await import('@tauri-apps/plugin-os');
+                const osName = await platform();
+                setPlatformName(osName);
+            } catch (e) {
+                console.error("Failed to detect platform", e);
+            }
         } catch (e) {
-            // Fallback to web version defined in vite.config.ts
-            // We assume if getVersion fails, we are on web
             setCurrentVersion(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'Web');
             setIsTauri(false);
         }
     };
-    checkTauri();
+    init();
   }, []);
 
   const checkForUpdates = async (silent = false) => {
     setLoading(true);
     try {
-      let response: Response;
-
-      // Fetch latest release from GitHub
-      // Use native fetch on web to avoid Tauri invoke hook errors.
-      if (isTauri) {
-        const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-        response = await tauriFetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
-          headers: {
-            'User-Agent': 'Zentrio-App'
+      // DESKTOP: Use Official Tauri Updater
+      if (isTauri && (platformName === 'windows' || platformName === 'macos' || platformName === 'linux')) {
+          const { check } = await import('@tauri-apps/plugin-updater');
+          const update = await check();
+          
+          if (update) {
+              setUpdateAvailable(true);
+              setUpdateData({
+                  version: update.version,
+                  body: update.body,
+                  date: update.date,
+                  // We pass the update object itself for the modal to use (downloadAndInstall)
+                  updateObj: update 
+              });
+              if (!silent) setShowModal(true);
+          } else {
+              setUpdateAvailable(false);
+              if (!silent) toast.success('Up to date', { description: 'You are using the latest version.' });
           }
-        }) as unknown as Response;
-      } else {
-        response = await window.fetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
-          headers: {
-            'User-Agent': 'Zentrio-App'
+      } 
+      // ANDROID / WEB: Use Custom Logic (GitHub Fetch)
+      else {
+          let response: Response;
+          
+          // Use Tauri HTTP plugin if in Tauri (Android) to avoid CORS/Issues, or fallback to window.fetch
+          if (isTauri) {
+            const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+            response = await tauriFetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
+              headers: { 'User-Agent': 'Zentrio-App' }
+            }) as unknown as Response;
+          } else {
+            response = await window.fetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
+              headers: { 'User-Agent': 'Zentrio-App' }
+            });
           }
-        });
-      }
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch update info');
-      }
+          
+          if (!response.ok) throw new Error('Failed to fetch update info');
 
-      const data = await response.json();
-      const latestVersion = data.tag_name.replace(/^v/, ''); // Remove 'v' prefix if present
+          const data = await response.json();
+          const latestVersion = data.tag_name.replace(/^v/, '');
 
-      // Compare versions (semver-ish)
-      // We assume simple comparison or use a library if needed.
-      // For now, strict string inequality or simple check.
-      // Ideally usage of 'semver' package.
-      
-      const hasUpdate = compareVersions(currentVersion, latestVersion);
+          const hasUpdate = compareVersions(currentVersion, latestVersion);
 
-      if (hasUpdate) {
-        setUpdateAvailable(true);
-        setUpdateData({
-            version: latestVersion,
-            body: data.body,
-            assets: data.assets
-        });
-        if (!silent) setShowModal(true);
-      } else {
-        setUpdateAvailable(false);
-        if (!silent) toast.success('Up to date', { description: 'You are using the latest version.' });
+          if (hasUpdate) {
+            setUpdateAvailable(true);
+            setUpdateData({
+                version: latestVersion,
+                body: data.body,
+                assets: data.assets,
+                isCustom: true // Flag to tell modal to use custom logic
+            });
+            if (!silent) setShowModal(true);
+          } else {
+            setUpdateAvailable(false);
+            if (!silent) toast.success('Up to date', { description: 'You are using the latest version.' });
+          }
       }
       setLastChecked(new Date());
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      if (!silent) toast.error('Update Check Failed', { description: 'Could not connect to update server.' });
+      if (!silent) toast.error('Update Check Failed', { description: e.message || 'Could not check for updates.' });
     } finally {
       setLoading(false);
     }
@@ -96,17 +112,12 @@ export function UpdateSettings() {
 
   // Simple version comparison (returns true if v2 > v1)
   const compareVersions = (v1: string, v2: string) => {
-    // Handle "Unknown"
     if (v1 === 'Unknown') return false;
-    
     const parts1 = v1.split('.').map(Number);
     const parts2 = v2.split('.').map(Number);
-    
     for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-      const p1 = parts1[i] || 0;
-      const p2 = parts2[i] || 0;
-      if (p2 > p1) return true;
-      if (p2 < p1) return false;
+        if ((parts2[i] || 0) > (parts1[i] || 0)) return true;
+        if ((parts2[i] || 0) < (parts1[i] || 0)) return false;
     }
     return false;
   };
@@ -179,6 +190,7 @@ export function UpdateSettings() {
         updateData={updateData}
         currentVersion={currentVersion}
         isTauri={isTauri}
+        platformName={platformName}
       />
     </div>
   );

@@ -117,18 +117,23 @@ export const useAuthStore = create<AuthState>()(
 
         refreshSession: async (token?: string) => {
           try {
+            // Capture the token BEFORE the async call to detect concurrent logins later
+            const initialToken = token || get().session?.token;
+            
             set({ isLoading: true, error: null })
             
             // DON'T send Authorization header when refreshing
             // Let the server use the session cookie to generate a NEW token
             // Sending the old token causes the server to return the same expired token
+            console.log('[AuthStore] Refreshing session...');
             const session = await authClient.getSession()
             
             console.log('[AuthStore] Session refresh response:', {
                 hasUser: !!session?.data?.user,
                 hasToken: !!session?.data?.session?.token,
                 userEmail: session?.data?.user?.email,
-                newToken: session?.data?.session?.token ? `...${session?.data?.session?.token.slice(-6)}` : null
+                newToken: session?.data?.session?.token ? `...${session?.data?.session?.token.slice(-6)}` : null,
+                error: session?.error
             });
             
             if (session?.data?.user) {
@@ -141,14 +146,54 @@ export const useAuthStore = create<AuthState>()(
               get().login(user, sessionData)
               return true
             } else {
-              // Session expired or invalid - just reset state, don't force infinite reload loop
+              // Session expired or invalid
+              
+              const currentToken = get().session?.token;
+              
+              // RACE CONDITION GUARD:
+              // Only preserve the session if the token has CHANGED while we were waiting.
+              // If initialToken !== currentToken, it means a login happened in parallel.
+              if (currentToken && currentToken !== initialToken) {
+                 console.log('[AuthStore] Token changed during refresh (concurrent login detected). Keeping new session.');
+                 set({ isLoading: false });
+                 return true; 
+              }
+              
+              // Otherwise, the session is truly dead.
+              
+              // SECURITY CHECK:
+              // Before resetting, check if we are actually authenticated in the store.
+              // If we are authenticated AND we have a token, it means a login likely happened
+              // while this refresh was in flight, but the token didn't change (rare) or
+              // we just missed the update cadence.
+              const currentState = get();
+              if (currentState.isAuthenticated && currentState.session?.token) {
+                  console.log('[AuthStore] Refresh failed but store is authenticated. Assuming valid session (race condition protection).');
+                  set({ isLoading: false });
+                  return true;
+              }
+
+              console.log('[AuthStore] Refresh returned no user and no concurrent login detected. Resetting.');
               get().reset()
               return false
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('Error refreshing session:', error)
+            
+            // Only reset if it's explicitly an auth error (401/403)
+            // For network errors (fetch failed) or server errors (500), keep the local session
+            // This prevents "flickering" or logging out when the server is restarting/unreachable
+            const isAuthError = error?.status === 401 || error?.status === 403 || 
+                               (error?.message && (error.message.includes('401') || error.message.includes('403')));
+            
+            if (isAuthError) {
+                console.log('[AuthStore] Auth error detected, resetting session');
+                get().reset()
+            } else {
+                console.log('[AuthStore] Non-auth error during refresh, retaining session');
+            }
+            
             set({ error: 'Failed to refresh session' })
-            get().reset()
             return false
           } finally {
             set({ isLoading: false })

@@ -93,10 +93,13 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
                     const { useAuthStore } = await import('../stores/authStore');
                     const token = useAuthStore.getState().session?.token;
                     if (token) {
+                        console.log('[safeFetch] Injecting Bearer token from store', token.slice(-6));
                         headers.set('Authorization', `Bearer ${token}`);
+                    } else {
+                        console.log('[safeFetch] No token found in store');
                     }
                 } catch (e) {
-                    // Ignore - authStore might not be available yet
+                    console.error('[safeFetch] Failed to inject token:', e);
                 }
             }
             

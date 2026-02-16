@@ -293,7 +293,7 @@ export const StreamingLibrary = () => {
           height: 'calc(100vh - var(--titlebar-height, 0px) - 20px)',
           overflowY: 'auto',
           position: 'sticky',
-          top: 'calc(var(--titlebar-height, 0px) + 20px)'
+          top: 'calc(var(--titlebar-height, 0px) + 20px + env(safe-area-inset-top))'
         }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>

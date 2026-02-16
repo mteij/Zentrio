@@ -4,10 +4,22 @@ import { AuthForms } from "../../components/auth/AuthForms";
 import { ParticleBackground } from "../../components/ui/ParticleBackground";
 import { isTauri } from "../../lib/auth-client";
 import { BackButton } from "../../components/ui/BackButton";
+import { useAuthStore } from "../../stores/authStore";
+import { appMode } from "../../lib/app-mode";
+import { useNavigate } from "react-router-dom";
 
 export function SignInPage() {
   // Force reload removed to prevent infinite loop
   // Cross-origin isolation is handled by server headers
+
+  const { isAuthenticated, isLoading } = useAuthStore();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && (isAuthenticated || appMode.isGuest())) {
+      navigate('/profiles', { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
 
   const handleChangeServer = () => {
     localStorage.removeItem("zentrio_server_url");

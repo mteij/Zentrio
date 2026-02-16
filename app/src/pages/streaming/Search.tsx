@@ -233,7 +233,7 @@ export const StreamingSearch = () => {
           </div>
         </div>
 
-        <div className={styles.contentContainer} style={{ marginTop: '100px' }}>
+        <div className={`${styles.contentContainer} ${styles.contentOffset}`}>
           {query && catalogResults.length > 0 && (
             <h1 style={{ 
               padding: '0 60px', 

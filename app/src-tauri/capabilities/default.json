@@ -43,6 +43,7 @@
     "process:default",
     "opener:default",
     "deep-link:default",
-    "store:default"
+    "store:default",
+    "safe-area-insets-css:default"
   ]
 }

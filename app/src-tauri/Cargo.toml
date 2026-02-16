@@ -47,3 +47,6 @@ codegen-units = 1
 lto = true
 # Optimize for size (reduces APK size)
 opt-level = "z"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"

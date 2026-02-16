@@ -137,7 +137,7 @@ app.get('/assets/*', async (c) => {
 app.get('/static/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/static\//, '')
   // @ts-ignore
-  const filePath = join(import.meta.dir, 'static', reqPath)
+  const filePath = join(process.cwd(), 'public', 'static', reqPath)
   try {
     // @ts-ignore
     const file = Bun.file(filePath)
@@ -177,7 +177,7 @@ app.get('/static/*', async (c) => {
 app.get('/favicon.ico', async (c) => {
   try {
     // @ts-ignore
-    const filePath = join(import.meta.dir, 'static', 'logo', 'favicon', 'favicon.ico')
+    const filePath = join(process.cwd(), 'public', 'static', 'logo', 'favicon', 'favicon.ico')
     // @ts-ignore
     const file = Bun.file(filePath)
     return new Response(file, {
@@ -196,7 +196,7 @@ app.get('/favicon.ico', async (c) => {
 app.get('/sw.js', async () => {
   try {
     // @ts-ignore
-    const filePath = join(import.meta.dir, 'static', 'sw.js')
+    const filePath = join(process.cwd(), 'public', 'static', 'sw.js')
     // @ts-ignore
     const file = Bun.file(filePath)
 

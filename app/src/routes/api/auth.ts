@@ -263,7 +263,9 @@ app.post('/mobile-callback', async (c) => {
             
             // Token is valid - set the cookie
             const cfg = getConfig()
-            const isSecure = cfg.APP_URL?.startsWith('https') ?? true
+            // Only use Secure cookies if APP_URL is https AND we are not in development/test
+            // This prevents cookie rejection on Android localhost
+            const isSecure = (cfg.APP_URL?.startsWith('https') ?? true) && process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test'
             const cookieName = "better-auth.session_token"
             const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`
             
@@ -309,7 +311,7 @@ app.post('/mobile-callback', async (c) => {
             }
             
             const cfg = getConfig()
-            const isSecure = cfg.APP_URL?.startsWith('https') ?? true
+            const isSecure = (cfg.APP_URL?.startsWith('https') ?? true) && process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test'
             const cookieName = "better-auth.session_token"
             const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`
             
