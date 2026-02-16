@@ -173,8 +173,6 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            app/src-tauri/gen/android/.gradle
-            app/src-tauri/gen/android/build
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
@@ -188,8 +186,8 @@ jobs:
         run: bun run sync
 
       # Server Binary Builds
-      - name: Build Server Binary (Linux)
-        if: matrix.name == 'linux'
+      - name: Build Server Binary (Linux host)
+        if: matrix.platform == 'ubuntu-22.04'
         working-directory: ./app
         run: |
           bun build src/index.ts --compile --target bun-linux-x64 --outfile src-tauri/bin/zentrio-server-x86_64-unknown-linux-gnu
@@ -234,6 +232,7 @@ jobs:
           KEYSTORE_PATH="$(pwd)/keystore.jks"
 
           # Initialize Android project (creates fresh gen/android/ with default icons)
+          rm -rf src-tauri/gen/android
           bun tauri android init
 
           # Generate icons - MUST run after android init to overwrite default icons

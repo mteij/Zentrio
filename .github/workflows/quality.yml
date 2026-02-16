@@ -31,6 +31,9 @@ jobs:
       - name: Unit Tests
         run: cd app && bun run test
 
+      - name: Build Server Binary (Linux host)
+        run: cd app && bun build src/index.ts --compile --target bun-linux-x64 --outfile src-tauri/bin/zentrio-server-x86_64-unknown-linux-gnu
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
