@@ -1,6 +1,6 @@
 [package]
 name = "zentrio"
-version = "0.4.1"
+version = "0.4.2"
 description = "Zentrio - Stream Your Way"
 authors = ["you"]
 edition = "2021"
