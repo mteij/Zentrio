@@ -243,7 +243,6 @@ export const LibraryItemCard = memo(function LibraryItemCard({
             )}
 
             {/* Progress Bar */}
-            {/* @ts-expect-error */}
             {(item as any).progress_percent > 0 && (
                 <div style={{
                     position: 'absolute',

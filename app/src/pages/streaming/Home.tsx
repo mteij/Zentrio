@@ -154,7 +154,7 @@ export const StreamingHome = () => {
           />
         )}
 
-        <div className={styles.contentContainer} style={{ marginTop: shouldShowHero ? '-100px' : '40px' }}>
+        <div className={`${styles.contentContainer} ${!shouldShowHero ? styles.contentOffset : ''}`}>
           {history.length > 0 && (
             <StreamingRow
               title="Continue Watching"

@@ -161,7 +161,7 @@ function basicMarkdownNotes(version, prevTag, commitLog) {
 }
 
 async function generateWithNanoGPT(prompt, apiKey) {
-  // NanoGPT OpenAI-compatible API with GLM 4.7
+  // NanoGPT OpenAI-compatible API with GLM 5
   const endpoint = 'https://nano-gpt.com/api/v1/chat/completions';
   const body = {
     model: 'zai-org/glm-5:thinking',
@@ -271,7 +271,7 @@ async function main() {
   let usedAi = false;
 
   if (apiKey) {
-    console.log('[release-notes] Using NanoGPT with GLM 4.7');
+    console.log('[release-notes] Using NanoGPT with GLM 5');
     try {
       const ai = await generateWithNanoGPT(prompt, apiKey);
       if (ai && ai.length > 20) {
