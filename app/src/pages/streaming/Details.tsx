@@ -78,6 +78,13 @@ export const StreamingDetails = () => {
     }
     loadDetails()
     checkListStatus()
+    
+    const handleHistoryUpdate = () => {
+      loadDetails()
+    }
+    
+    window.addEventListener('history-updated', handleHistoryUpdate)
+    return () => window.removeEventListener('history-updated', handleHistoryUpdate)
   }, [profileId, type, id])
 
   const checkListStatus = async () => {
@@ -205,7 +212,7 @@ export const StreamingDetails = () => {
       toast.dismiss('autoplay-loading')
       // streams is now a flat sorted list (FlatStream[])
       // Pass true to replace history (skip details page on back)
-      handlePlay(streams[0].stream, true)
+      handlePlay(streams[0].stream)
       autoPlayRef.current = false
     } else if (autoPlayRef.current && streamsComplete && streams.length === 0) {
         // Fallback if no streams found
@@ -261,7 +268,7 @@ export const StreamingDetails = () => {
     })
   }
 
-  const handlePlay = (stream: Stream, replaceHistory = false) => {
+  const handlePlay = (stream: Stream) => {
     const meta = {
       id: data!.meta.id,
       type: data!.meta.type,
@@ -270,7 +277,7 @@ export const StreamingDetails = () => {
       season: selectedEpisode?.season,
       episode: selectedEpisode?.number
     }
-    navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`, { replace: replaceHistory })
+    navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`, { replace: false })
   }
 
   const handleEpisodeSelect = (season: number, number: number, title: string, autoPlay: boolean = false) => {

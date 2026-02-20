@@ -132,7 +132,13 @@ export const useAuthStore = create<AuthState>()(
             // Capture the token BEFORE the async call to detect concurrent logins later
             const initialToken = token || get().session?.token;
             
-            set({ isLoading: true, error: null })
+            // Do NOT unblock the UI if we are already authenticated. 
+            // This prevents video streams from destroying and recreating on window focus.
+            if (!get().isAuthenticated) {
+                set({ isLoading: true, error: null })
+            } else {
+                set({ error: null })
+            }
             
             // DON'T send Authorization header when refreshing
             // Let the server use the session cookie to generate a NEW token
@@ -142,40 +148,23 @@ export const useAuthStore = create<AuthState>()(
             console.log(`[AuthStore] Refreshing session... Token: ${initialToken ? `...${initialToken.slice(-6)}` : 'NONE'}`);
              
              let sessionResponse: any;
-             const client = getAuthClient() as any;
              
              try {
-                 // Robustly find the session method.
-                 // better-auth v1 sometimes has issues with the prototype or lazy loading.
-                 if (typeof client.getSession === 'function') {
-                     sessionResponse = await client.getSession();
-                 } else if (typeof client.session === 'function') {
-                     console.log('[AuthStore] Using client.session() fallback');
-                     sessionResponse = await client.session();
-                 } else if (typeof client.auth?.session === 'function') {
-                     sessionResponse = await client.auth.session();
-                 } else {
-                     // Last resort: force call on prototype or whatever is available
-                     console.warn('[AuthStore] No standard session method found, attempting forced call');
-                     sessionResponse = await (client as any).getSession();
-                 }
-             } catch (e: any) {
-                 // If "is not a function" happened, we catch it here.
-                 if (e.message?.includes('is not a function')) {
-                     console.warn('[AuthStore] getSession failed (not a function), trying direct fetch');
-                     try {
-                        const { apiFetch } = await import('../lib/apiFetch');
-                        sessionResponse = await apiFetch('/api/auth/get-session');
-                        if (sessionResponse instanceof Response) {
-                            sessionResponse = await sessionResponse.json();
-                        }
-                     } catch (fetchErr) {
-                         console.error('[AuthStore] Direct fetch fallback also failed:', fetchErr);
-                         throw e;
-                     }
-                 } else {
-                     throw e;
-                 }
+                // By-pass better-auth client entirely for session fetching
+                // better-auth has a bug where it completely ignores fetchOptions.customFetch for session probing
+                // This causes Tauri to send requests WITHOUT the Authorization header, returning 401s for valid tokens.
+                const { apiFetch } = await import('../lib/apiFetch');
+                const rawResponse = await apiFetch('/api/auth/get-session');
+                
+                if (rawResponse.ok) {
+                   sessionResponse = await rawResponse.json();
+                } else {
+                   console.warn(`[AuthStore] Direct fetch get-session returned ${rawResponse.status}`);
+                   sessionResponse = { error: { message: `HTTP ${rawResponse.status}`, status: rawResponse.status } };
+                }
+             } catch (fetchErr) {
+                 console.error('[AuthStore] Direct fetch fallback failed:', fetchErr);
+                 throw fetchErr;
              }
             
             // Handle both { data, error } and direct { user, session } response formats

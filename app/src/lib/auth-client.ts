@@ -151,6 +151,18 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
             
             if (isSessionRequest) {
                 console.log('[safeFetch] Using WebView fetch for session:', url);
+                
+                // --- DEBUG TRACING ---
+                console.log('[safeFetch] --- FETCH TRACE START ---');
+                console.log('[safeFetch] URL:', url);
+                console.log('[safeFetch] Has Auth Header:', headers.has('Authorization'));
+                if (headers.has('Authorization')) {
+                    const h = headers.get('Authorization');
+                    console.log('[safeFetch] Auth Header Suffix:', h ? `...${h.slice(-6)}` : 'null');
+                }
+                console.log('[safeFetch] --- FETCH TRACE END ---');
+                // ---------------------
+
                 return fetch(input, {
                     ...finalInit,
                     headers, // Pass the headers with injected token

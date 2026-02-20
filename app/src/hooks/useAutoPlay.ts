@@ -117,9 +117,9 @@ export function useAutoPlay(): UseAutoPlayResult {
     }
 
     // Navigate to player with stream in state (avoids URL encoding issues)
-    // Use replace: true so back button goes to previous page, not details
+    // Use replace: false so the back button goes to the previous page (details)
     navigate(`/streaming/${profileId}/player`, {
-      replace: true,
+      replace: false,
       state: {
         stream,
         meta: playerMeta

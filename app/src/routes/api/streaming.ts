@@ -671,6 +671,35 @@ streaming.get('/progress/:type/:id', async (c) => {
 })
 
 // Get series watch progress (all episodes)
+// Get single item progress (specifically for initializing the video player)
+streaming.get('/progress/:type/:id', async (c) => {
+  try {
+    const { type, id } = c.req.param()
+    const { profileId, season, episode } = c.req.query()
+    
+    if (!profileId) {
+      return c.json({ error: 'profileId required' }, 400)
+    }
+
+    const pId = parseInt(profileId)
+    const progress = watchHistoryDb.getProgress(
+      pId, 
+      id, 
+      season ? parseInt(season) : undefined, 
+      episode ? parseInt(episode) : undefined
+    )
+
+    return c.json({
+      position: progress?.position || 0,
+      duration: progress?.duration || 0,
+      isWatched: progress?.is_watched || false
+    })
+  } catch (e) {
+    console.error('Failed to get item progress', e)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 streaming.get('/series-progress/:id', async (c) => {
   try {
     const { id } = c.req.param()

@@ -77,6 +77,7 @@ export async function apiFetch(
         
         if (isSessionRequest) {
             console.log('[apiFetch] Using WebView fetch for session:', url);
+            
             // Must use window.fetch here to ensure it uses the browser's native fetch
             // interceptor, bypassing the Tauri Rust HTTP plugin entirely.
             return window.fetch(url, {

@@ -58,6 +58,7 @@ export const StreamingPlayer = () => {
     // Parsed data from URL
     const [stream, setStream] = useState<Stream | null>(null)
     const [meta, setMeta] = useState<MetaInfo | null>(null)
+    const [startTime, setStartTime] = useState<number>(0)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
 
@@ -225,6 +226,29 @@ export const StreamingPlayer = () => {
                 }
                 
                 setSubtitleTracks(tracks)
+
+                // Fetch existing progress
+                let watchStart = 0
+                try {
+                    const seasonParam = parsedMeta.season ? `&season=${parsedMeta.season}` : ''
+                    const episodeParam = parsedMeta.episode ? `&episode=${parsedMeta.episode}` : ''
+                    const progressUrl = `/api/streaming/progress/${parsedMeta.type}/${parsedMeta.id}?profileId=${profileId}${seasonParam}${episodeParam}`
+                    console.log('[Player] Fetching resume position:', progressUrl)
+                    const progRes = await apiFetch(progressUrl)
+                    if (progRes.ok) {
+                         const progData = await progRes.json()
+                         if (progData.position && !progData.isWatched) {
+                              watchStart = progData.position
+                              console.log('[Player] Found resume position:', watchStart)
+                         }
+                    }
+                } catch (e) {
+                    console.warn('[Player] Failed to load watch progress:', e)
+                }
+
+                setStartTime(watchStart)
+                lastSavedProgressRef.current = watchStart
+                
             } catch (e) {
                 console.error('Failed to initialize player', e)
                 setError('Invalid player parameters')
@@ -474,6 +498,9 @@ export const StreamingPlayer = () => {
                 })
                 navigator.sendBeacon('/api/trakt/scrobble/stop', new Blob([data], { type: 'application/json' }))
             }
+            
+            // Notify other components that history was updated
+            window.dispatchEvent(new CustomEvent('history-updated'))
         }
     }, [meta, profileId, duration])
 
@@ -520,6 +547,7 @@ export const StreamingPlayer = () => {
                     onMetadataLoad={handleMetadataLoad}
                     onEnded={handleVideoEnded}
                     onError={handleError}
+                    startTime={startTime}
                     autoPlay={true}
                     showCast={true}
                 />
