@@ -45,9 +45,8 @@ export function ProtectedRoute({ children }: RouteGuardProps) {
         appMode.clear()
         // Clear server URL too so the OnboardingWizard condition triggers properly
         localStorage.removeItem('zentrio_server_url')
-        // Use window.location for a full page reload to ensure App.tsx reinitializes
-        // This avoids race conditions with React state not updating from localStorage changes
-        window.location.href = '/'
+        // Use navigate to prevent full app reload which clears state
+        navigate('/', { replace: true })
       } else {
         setRedirectInitiated(true)
         navigate('/', { replace: true })

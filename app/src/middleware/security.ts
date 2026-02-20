@@ -39,8 +39,21 @@ export const corsMiddleware = (origins?: string[]) => {
     // Clean trailing slash from origin just in case
     const cleanOrigin = origin?.endsWith('/') ? origin.slice(0, -1) : origin;
     
-    if (origin && (allowedOrigins.includes(origin) || (cleanOrigin && allowedOrigins.includes(cleanOrigin)))) {
-      corsHeaders['Access-Control-Allow-Origin'] = origin
+    // Is it strictly in the allowed origins array?
+    const isExactMatch = origin && allowedOrigins.includes(origin);
+    const isCleanMatch = cleanOrigin && allowedOrigins.includes(cleanOrigin);
+    // Tauri often sends origin as tauri://localhost or http://tauri.localhost
+    const isTauriMatch = cleanOrigin && (cleanOrigin.startsWith('tauri://') || cleanOrigin.includes('tauri.localhost'));
+    // Android Emulator often sends requests from http://10.0.2.2 
+    const isAndroidMatch = cleanOrigin && cleanOrigin.startsWith('http://10.');
+
+    if (isExactMatch || isCleanMatch || isTauriMatch || isAndroidMatch) {
+      corsHeaders['Access-Control-Allow-Origin'] = origin as string;
+    } else if (process.env.NODE_ENV !== 'production' && origin) {
+      // In development, be more permissive with local origins to prevent dev blocking
+      if (origin.startsWith('http://localhost')) {
+         corsHeaders['Access-Control-Allow-Origin'] = origin;
+      }
     }
     
     // Handle preflight OPTIONS requests

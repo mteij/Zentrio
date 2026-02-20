@@ -126,7 +126,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       if (isTauri()) {
         const { openUrl } = await import('@tauri-apps/plugin-opener');
         const srvUrl = getServerUrl();
-        const handoffUrl = `${srvUrl}/api/auth/native-redirect`;
+        const handoffUrl = `${srvUrl}/api/auth/native-redirect?source=tauri`;
         const url = `${srvUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
         await openUrl(url);
       } else {

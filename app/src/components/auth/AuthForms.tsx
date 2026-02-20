@@ -128,7 +128,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         // Use plugin-opener for consistency across all auth flows
         const { openUrl } = await import('@tauri-apps/plugin-opener');
         const serverUrl = getServerUrl();
-        const handoffUrl = `${serverUrl}/api/auth/native-redirect`;
+        const handoffUrl = `${serverUrl}/api/auth/native-redirect?source=tauri`;
         const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
         
         console.log('[AuthForms] Opening external URL via opener plugin:', url);

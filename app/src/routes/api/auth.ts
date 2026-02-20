@@ -234,6 +234,47 @@ app.post('/identify', async (c) => {
 
 // [POST /mobile-callback] Handle mobile/desktop deep link callback
 // Exchanges authorization code for session token securely
+// Login Proxy for Native Apps
+// This endpoint initiates the social login flow and redirects to the provider
+app.get('/login-proxy', async (c) => {
+    const provider = c.req.query('provider')
+    const callbackURL = c.req.query('callbackURL')
+
+    if (!provider || !callbackURL) {
+        return c.text('Missing provider or callbackURL', 400)
+    }
+
+    // Construct the Better Auth social login URL
+    // We use the underlying API to generate the authorization URL
+    try {
+        const authResponse = await auth.api.signInSocial({
+            body: {
+                provider: provider as any,
+                callbackURL: callbackURL
+            },
+            asResponse: true // CRITICAL: Get full response to capture Set-Cookie headers for state
+        });
+
+        const authUrl = await authResponse.json();
+
+        if (authUrl && authUrl.url) {
+             // Forward set-cookie headers (state, etc.) to the client
+             const setCookie = authResponse.headers.get('set-cookie');
+             if (setCookie) {
+                 c.header('Set-Cookie', setCookie);
+             }
+             
+             // Forward any other relevant headers if needed, but Set-Cookie is the strict requirement
+             return c.redirect(authUrl.url.toString())
+        }
+        
+        return c.text('Failed to generate auth URL', 500)
+    } catch (e: any) {
+        console.error('Login proxy error:', e)
+        return c.text(`Login setup failed: ${e.message}`, 500)
+    }
+})
+
 app.post('/mobile-callback', async (c) => {
     const body = await c.req.json().catch(() => ({}))
     const { url, authCode } = body
@@ -263,12 +304,14 @@ app.post('/mobile-callback', async (c) => {
             
             // Token is valid - set the cookie
             const cfg = getConfig()
-            // Only use Secure cookies if APP_URL is https AND we are not in development/test
-            // This prevents cookie rejection on Android localhost
-            const isSecure = (cfg.APP_URL?.startsWith('https') ?? true) && process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test'
+            const isSecure = cfg.APP_URL?.startsWith('https') || false
             const cookieName = "better-auth.session_token"
-            const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`
+            // SameSite=None REQUIRES Secure=true. If not secure (local dev), use Lax.
+            const sameSite = isSecure ? 'None' : 'Lax'
+            const secureAttr = isSecure ? 'Secure' : ''
+            const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=${sameSite}${secureAttr ? '; ' + secureAttr : ''}`
             
+            console.log(`[AuthStore] Setting session cookie: ${cookieName}=...${sessionToken.slice(-6)} (Secure: ${isSecure})`)
             c.header('Set-Cookie', cookieValue)
             
             return c.json({ 
@@ -310,10 +353,10 @@ app.post('/mobile-callback', async (c) => {
                 return c.json({ error: 'Invalid session token' }, 401)
             }
             
-            const cfg = getConfig()
-            const isSecure = (cfg.APP_URL?.startsWith('https') ?? true) && process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test'
+            // Force Secure and SameSite=None for Android WebView cross-origin support
+            const isSecure = true 
             const cookieName = "better-auth.session_token"
-            const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`
+            const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=None; Secure`
             
             c.header('Set-Cookie', cookieValue)
             
@@ -550,10 +593,10 @@ app.get('/link-proxy', async (c) => {
                 
                 if (session && session.user) {
                     // Set the session cookie so the OAuth flow works
-                    const cfg = getConfig()
-                    const isSecure = cfg.APP_URL?.startsWith('https') ?? true
+                    // Force Secure and SameSite=None for Android WebView cross-origin support
+                    const isSecure = true
                     const cookieName = "better-auth.session_token"
-                    const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`
+                    const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=None; Secure`
                     c.header('Set-Cookie', cookieValue)
                 }
             } catch (e) {
@@ -690,7 +733,28 @@ app.get('/native-redirect', async (c) => {
         return c.text('Not authenticated', 401);
     }
 
-    // Generate a short-lived, single-use authorization code
+    // Check if this was initiated by a native app using the source=tauri query parameter
+    // We can no longer rely on user-agent because Tauri launching the system browser
+    // strips out the custom user-agent on the final redirect back to this endpoint.
+    const source = c.req.query('source')
+    const isBrowser = source !== 'tauri'
+    
+    // For browser mode, redirect to profiles with success
+    if (isBrowser) {
+        // Set cookie and redirect to profiles
+        const cfg = getConfig();
+        const isSecure = cfg.APP_URL?.startsWith('https') || false;
+        const cookieName = "better-auth.session_token";
+        const sameSite = isSecure ? 'None' : 'Lax';
+        const secureAttr = isSecure ? 'Secure' : '';
+        const cookieValue = `${cookieName}=${session.session.token}; Path=/; HttpOnly; SameSite=${sameSite}${secureAttr ? '; ' + secureAttr : ''}`;
+        c.header('Set-Cookie', cookieValue);
+        
+        // Redirect to profiles page
+        return c.redirect(`${cfg.CLIENT_URL || 'http://localhost:5173'}/profiles`);
+    }
+
+    // Generate a short-lived, single-use authorization code for native apps
     const authCode = generateAuthCode(session.session.token);
     
     // Show success page with auto-redirect to app
@@ -814,6 +878,16 @@ app.get('/native-redirect', async (c) => {
 // ============================================================================
 
 app.all("*", (c) => {
+    // Debug logging for session requests
+    if (c.req.path.includes('get-session') || c.req.path.includes('session')) {
+        const authHeader = c.req.header('Authorization');
+        console.log(`[Auth Passthrough] ${c.req.method} ${c.req.path}`, {
+            hasAuthHeader: !!authHeader,
+            authHeaderSuffix: authHeader ? `...${authHeader.slice(-6)}` : null,
+            cookie: c.req.header('Cookie') ? 'present' : 'missing'
+        });
+    }
+
     const cfg = getConfig();
     if (cfg.APP_URL) {
         try {
@@ -826,11 +900,12 @@ app.all("*", (c) => {
                 newUrl.host = appUrl.host;
                 newUrl.port = appUrl.port;
                 
+                // CRITICAL: Ensure headers (including Authorization) are cloned
                 const newReq = new Request(newUrl.toString(), c.req.raw);
                 return auth.handler(newReq);
             }
         } catch (e) {
-            // Fall back to original request
+            // Fall back
         }
     }
     return auth.handler(c.req.raw);

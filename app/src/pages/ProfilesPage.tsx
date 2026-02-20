@@ -357,6 +357,12 @@ function ProfileCard({ profile, onClick, onEdit }: {
                 src={profile.avatar.startsWith('http') || profile.avatar.startsWith('data:') ? profile.avatar : `/api/avatar/${encodeURIComponent(profile.avatar)}?style=${encodeURIComponent(profile.avatar_style || 'bottts-neutral')}`} 
                 alt={profile.name}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  console.error(`[ProfilesPage] Avatar load failed for ${profile.name} (URL: ${e.currentTarget.src})`);
+                  // Keep the broken image container but don't show the browser's broken icon if possible
+                  // Alternatively we could set a fallback initials avatar here
+                  e.currentTarget.style.opacity = '0';
+                }}
             />
             </div>
         </div>

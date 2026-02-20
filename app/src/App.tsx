@@ -150,11 +150,55 @@ function AppRoutes() {
     console.log('AppRoutes: Location changed to', location.pathname)
   }, [location.pathname])
 
-  // Handle Deep Links (Magic Link)
+  // Handle OAuth callback in browser mode
+  useEffect(() => {
+    // Only handle in browser (not Tauri)
+    if (isTauri()) return;
+    
+    // Check if we're on an OAuth callback URL
+    const handleOAuthCallback = async () => {
+      const path = window.location.pathname;
+      const search = window.location.search;
+      
+      // Check for OAuth callback (either direct callback or after redirect)
+      if (path.includes('/callback/') || search.includes('code=') || search.includes('state=')) {
+        console.log('[App] OAuth callback detected in browser, fetching session...');
+        
+        try {
+          // Use authClient to get session - this will use the cookie set by the server
+          const sessionRes = await authClient.getSession();
+          const sessionData = sessionRes?.data || sessionRes;
+          
+          if (sessionData?.user) {
+            console.log('[App] Browser OAuth: Session found, logging in user:', sessionData.user.email);
+            
+            // Update auth store
+            useAuthStore.getState().login(sessionData.user, {
+              user: sessionData.user,
+              token: sessionData.session?.token,
+              expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            });
+            
+            // Clean URL and redirect to profiles
+            window.history.replaceState({}, '', '/profiles');
+            return true;
+          } else {
+            console.log('[App] Browser OAuth: No session found after callback');
+          }
+        } catch (e) {
+          console.error('[App] Browser OAuth: Error fetching session:', e);
+        }
+      }
+      return false;
+    };
+    
+    handleOAuthCallback();
+  }, []);
+
+  // Handle Deep Links (Magic Link and OAuth) - Tauri only
   useEffect(() => {
     if (isTauri()) {
-      const unlistenPromise = listen('deep-link://new-url', async (event) => {
-        const url = event.payload as string
+      const handleDeepLinkUrl = async (url: string) => {
         console.log('[App] Deep link received:', url)
         
         if (url.startsWith('zentrio://auth/magic-link') || url.includes('token=')) {
@@ -166,18 +210,20 @@ function AppRoutes() {
                  toast.info('Verifying magic link...')
                  await apiFetch(`/api/auth/magic-link/verify?token=${token}&callbackURL=/profiles`)
                  toast.success('Signed in successfully')
-                 const { data } = await authClient.getSession();
-                 if (data?.user) {
-                     // Update auth store with session token
-                     useAuthStore.getState().login(data.user, {
-                       user: data.user,
-                       token: data.session?.token,
-                       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
-                     });
+                  const sessionRes = await authClient.getSession();
+                  const sessionData = sessionRes?.data || sessionRes;
+                  
+                  if (sessionData?.user) {
+                      // Update auth store with session token
+                      useAuthStore.getState().login(sessionData.user, {
+                        user: sessionData.user,
+                        token: sessionData.session?.token,
+                        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                      });
                      
                      // Wait for state propagation
                      await new Promise(resolve => setTimeout(resolve, 100));
-                     console.log('[App] Magic link login complete, token:', data.session?.token ? `...${data.session.token.slice(-6)}` : 'none');
+                     console.log('[App] Magic link login complete, token:', sessionData.session?.token ? `...${sessionData.session.token.slice(-6)}` : 'none');
                      
                      appMode.set('connected');
                      setMode('connected');
@@ -222,10 +268,17 @@ function AppRoutes() {
                   console.log('[App] 🟢 Mobile login successful!', data.user.email);
                   
                   // Update auth store FIRST
-                  useAuthStore.getState().login(data.user, {
-                    user: data.user,
-                    token: data.token,
-                    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                  useAuthStore.setState({ 
+                      user: data.user,
+                      session: {
+                          user: data.user,
+                          token: data.token,
+                          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                      },
+                      isAuthenticated: true,
+                      isLoading: false, // FORCE loading false to unblock UI
+                      isFreshLogin: true, // Prevent rehydration from triggering refresh
+                      lastActivity: Date.now()
                   });
                   console.log('[App] Auth store updated with user:', data.user.email);
                   
@@ -241,17 +294,28 @@ function AppRoutes() {
                   appMode.set('connected');
                   setMode('connected');
                   
-                  // Ensure server URL is set
-                  const currentServer = localStorage.getItem('zentrio_server_url') || 'https://app.zentrio.eu';
+                  // Ensure server URL is set correctly AND persisted
+                  let currentServer = localStorage.getItem('zentrio_server_url');
+                  
+                  // In dev mode on Tauri, default to localhost if not set
+                  if (!currentServer && import.meta.env.DEV && isTauri()) {
+                      currentServer = 'http://localhost:3000';
+                  }
+                  
+                  // Fallback to prod
+                  if (!currentServer) {
+                      currentServer = 'https://app.zentrio.eu';
+                  }
+                  
+                  // PERSIST IT so auth-client.ts picks it up on reload
+                  localStorage.setItem('zentrio_server_url', currentServer);
                   setServerUrl(currentServer);
-                  console.log('[App] ServerUrl set to:', currentServer);
+                  console.log('[App] ServerUrl persisted:', currentServer);
                   
-                  // Navigate to profiles
-                  console.log('[App] Navigating to /profiles');
-                  
-                  // Try explicit window location set if navigate fails significantly later
-                  // But for now, just navigate
-                  navigate('/profiles', { replace: true });
+                  // Force a hard reload to /profiles to ensure fresh state
+                  // This is safer than navigate() when changing auth state deeply
+                  console.log('[App] Hard redirecting to /profiles');
+                  window.location.href = '/profiles';
                 } else {
                    console.error('[App] No user data in callback response');
                    throw new Error('No user data returned');
@@ -268,13 +332,35 @@ function AppRoutes() {
             console.error('Failed to handle auth code deep link', e);
             toast.error('Sign in failed. Please try again.');
           }
-        } else {
-            console.log('[App] Unhandled deep link:', url);
         }
-      })
+      };
+
+      // 1. Listen to custom desktop events (Windows/Linux manual handling)
+      const unlistenPromise = listen('zentrio-deep-link', async (event) => {
+        let url = ''
+        if (Array.isArray(event.payload) && event.payload.length > 0) {
+          url = event.payload[0]
+        } else if (typeof event.payload === 'string') {
+          url = event.payload
+        }
+        await handleDeepLinkUrl(url);
+      });
+
+      // 2. Listen to official mobile deep links
+      let unlistenMobile: (() => void) | null = null;
+      import('@tauri-apps/plugin-deep-link').then(({ onOpenUrl }) => {
+          onOpenUrl((urls) => {
+              if (urls && urls.length > 0) {
+                  handleDeepLinkUrl(urls[0]);
+              }
+          }).then(unlisten => {
+              unlistenMobile = unlisten;
+          }).catch(err => console.error('[App] Failed to init mobile deep link', err));
+      }).catch(() => { /* plugin might not be installed, ignore */ });
       
       return () => {
         unlistenPromise.then(unlisten => unlisten())
+        if (unlistenMobile) unlistenMobile();
       }
     }
   }, [navigate])

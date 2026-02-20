@@ -65,62 +65,127 @@ export const getClientUrl = () => {
 // Safe fetch wrapper that uses Tauri HTTP plugin in Tauri context
 const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+    // INTERCEPT MALFORMED REQUESTS
+    // better-auth or a plugin sometimes tries to access properties of the fetch options as a URL
+    // e.g., 'to-upper-case' when checking method normalization
+    if (url.includes('fetch-options/method') || url.endsWith('to-upper-case')) {
+        console.warn('[safeFetch] Intercepted internal check request:', url);
+        return new Response(JSON.stringify({ success: true }), { 
+            status: 200, 
+            statusText: 'OK',
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    const headers = new Headers(init?.headers);
+    let overrideMethod: any = init ? init.method : undefined;
     
+    // WORKAROUND: better-auth sometimes passes a Promise as the method? 
+    // We detect this and resolve it if possible, or default to GET.
+    if (overrideMethod instanceof Promise) {
+        console.warn('[safeFetch] Found Promise in init.method, awaiting usage...');
+        try {
+            overrideMethod = await overrideMethod;
+            console.log('[safeFetch] Resolved method to:', overrideMethod);
+        } catch (e) {
+            console.error('[safeFetch] Failed to resolve method promise:', e);
+            overrideMethod = 'GET';
+        }
+    } 
+    
+    if (overrideMethod && typeof overrideMethod === 'object') {
+         console.warn('[safeFetch] Invalid method type:', typeof overrideMethod, overrideMethod);
+         // Better Fetch might pass an object proxy. Convert it to string so native fetch doesn't throw.
+         try {
+             const methodObj = overrideMethod;
+             overrideMethod = typeof methodObj.toString === 'function' && methodObj.toString() !== '[object Object]' 
+                ? methodObj.toString() 
+                : (init?.body ? 'POST' : 'GET');
+         } catch(e) {
+             overrideMethod = init?.body ? 'POST' : 'GET';
+         }
+    }
+    
+    if (overrideMethod === '[object Object]' || !overrideMethod) {
+         overrideMethod = init?.body ? 'POST' : 'GET';
+    }
+
+    const finalInit = init ? { ...init } : undefined;
+    if (finalInit && overrideMethod) {
+        finalInit.method = typeof overrideMethod === 'string' ? overrideMethod : 'GET';
+    }
+
+    if (!headers.has('Authorization')) {
+        try {
+            // Read directly from localStorage to avoid circular dependency and dynamic import lag
+            const storage = localStorage.getItem('zentrio-auth-storage');
+            if (storage) {
+                const parsed = JSON.parse(storage);
+                const token = parsed?.state?.session?.token;
+                if (token) {
+                    console.log(`[safeFetch] Injecting token: ...${token.slice(-6)} for ${url}`);
+                    headers.set('Authorization', `Bearer ${token}`);
+                }
+            }
+        } catch (e) {
+            console.error('[safeFetch] Failed to read token from storage:', e);
+        }
+    }
+
     if (isTauri()) {
         try {
+            // Bypass Tauri fetch for session endpoint to ensure cookies are sent from the Webview (if they exist)
+            // But now we ALSO send the Authorization header injected above as a fallback
+            // Note: In Tauri builds, we DON'T include /api/profiles because it breaks with cookies
+            // In browser builds, we DO include it for proper cookie handling
+            let isSessionRequest = url.includes('/auth/session') ||
+                                     url.includes('/auth/get-session') ||
+                                     url.includes('/auth/mobile-callback') ||
+                                     url.includes('/auth/providers');
+            
+            // Only add /api/profiles to session requests in browser (not Tauri)
+            if (!isTauri() && url.includes('/api/profiles')) {
+              isSessionRequest = true;
+            }
+            
+            if (isSessionRequest) {
+                console.log('[safeFetch] Using WebView fetch for session:', url);
+                return fetch(input, {
+                    ...finalInit,
+                    headers, // Pass the headers with injected token
+                    credentials: 'include'
+                });
+            }
+
             const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
             
-            // Ensure headers are properly passed
-            const headers = new Headers(init?.headers);
-            
-            // Set default Content-Type for JSON if body exists and not already set
-            if (init?.body && !headers.has('Content-Type')) {
-                if (typeof init.body === 'string') {
-                    try {
-                        JSON.parse(init.body);
-                        headers.set('Content-Type', 'application/json');
-                    } catch {
-                        // Not JSON, don't set
-                    }
-                }
-            }
-            
-            // Inject Bearer token if available (for Tauri cross-origin auth)
-            // This is critical for 2FA and other auth operations where cookies don't work
-            if (!headers.has('Authorization')) {
-                try {
-                    // Dynamic import to avoid circular dependency
-                    const { useAuthStore } = await import('../stores/authStore');
-                    const token = useAuthStore.getState().session?.token;
-                    if (token) {
-                        console.log('[safeFetch] Injecting Bearer token from store', token.slice(-6));
-                        headers.set('Authorization', `Bearer ${token}`);
-                    } else {
-                        console.log('[safeFetch] No token found in store');
-                    }
-                } catch (e) {
-                    console.error('[safeFetch] Failed to inject token:', e);
-                }
-            }
-            
-            const response = await tauriFetch(url, {
-                ...init,
+            return await tauriFetch(url, {
+                ...finalInit,
                 headers,
             });
-            return response;
         } catch (e: any) {
             console.error('[safeFetch] Tauri HTTP plugin error:', e);
-            console.error('[safeFetch] Error details:', e?.message || e?.toString?.() || JSON.stringify(e));
-            // Re-throw with more context instead of silent fallback
             throw new Error(`Network request failed: ${e?.message || 'Unknown error'} (URL: ${url})`);
         }
     }
-    return fetch(input, init);
+
+    // WEB FALLBACK: Also use the updated headers
+    return fetch(input, {
+        ...finalInit,
+        headers,
+        credentials: 'include'
+    });
 };
 
 // Create the auth client configuration
 const createClient = () => createAuthClient({
   baseURL: getServerUrl(),
+  fetchOptions: {
+    // Standard better-fetch option for custom fetch
+    customFetch: safeFetch
+  },
+  // Some versions of Better Auth expect it at the root as well
   fetch: safeFetch,
   plugins: [
     twoFactorClient({
@@ -131,7 +196,7 @@ const createClient = () => createAuthClient({
     magicLinkClient(),
     emailOTPClient(),
   ],
-});
+} as any);
 
 // Type for the auth client (includes plugin types)
 type AuthClientType = ReturnType<typeof createClient>;
@@ -158,11 +223,15 @@ export function resetAuthClient() {
   authClientInstance = null;
 }
 
-// Legacy export for backward compatibility
-// Uses a Proxy to dynamically forward all property access to the lazily-initialized client
-// This ensures the client is created with the correct server URL at first use
+/**
+ * Legacy export for backward compatibility
+ * Uses a Proxy to dynamically forward all property access to the lazily-initialized client.
+ * Because Better-Auth uses URL-building proxies internally, we MUST NOT attempt to
+ * use `.bind()` on its properties, as the proxy will intercept it as a URL path (e.g. `/bind`).
+ */
 export const authClient = new Proxy({} as AuthClientType, {
   get(_, prop) {
-    return (getAuthClient() as any)[prop];
+    const client = getAuthClient();
+    return (client as any)[prop];
   }
 });

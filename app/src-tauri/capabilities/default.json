@@ -4,6 +4,15 @@
   "windows": ["*"],
   "permissions": [
     "core:default",
+    "http:default",
+    "fs:default",
+    "shell:default",
+    "dialog:default",
+    "notification:default",
+    "os:default",
+    "process:default",
+    "deep-link:default",
+    "store:default",
     "core:event:default",
     "core:webview:allow-internal-toggle-devtools",
     "core:window:allow-close",
@@ -39,6 +48,7 @@
       ]
     },
     "notification:default",
+    "notification:allow-is-permission-granted",
     "os:default",
     "process:default",
     "opener:default",

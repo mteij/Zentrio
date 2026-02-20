@@ -1,7 +1,7 @@
 import React from 'react'
 import { create } from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
-import { authClient } from '../lib/auth-client'
+import { authClient, getAuthClient } from '../lib/auth-client'
 
 interface User {
   id: string
@@ -31,6 +31,7 @@ interface AuthState {
   isLoading: boolean
   error: string | null
   lastActivity: number
+  isFreshLogin: boolean  // NEW: Not persisted to storage, prevents refresh race condition
   login: (user: User, session?: Session) => void
   logout: () => Promise<void>
   updateUser: (updates: Partial<User>) => void
@@ -55,6 +56,7 @@ export const useAuthStore = create<AuthState>()(
         isLoading: true, // Default to true so we wait for session check
         error: null,
         lastActivity: Date.now(),
+        isFreshLogin: false,  // NEW: In-memory flag, not persisted
 
         login: (user, session) => {
           const now = Date.now()
@@ -65,12 +67,14 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
             lastActivity: now,
+            isFreshLogin: true,  // NEW: Mark as fresh login to prevent immediate refresh
           })
         },
 
         // Clean up state without forcing a reload/redirect loop
         // Used internally when session is invalid
         reset: () => {
+             console.trace('[AuthStore] reset() called!');
              set({
               user: null,
               session: null,
@@ -78,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
               error: null,
               lastActivity: Date.now(),
+              isFreshLogin: false,  // NEW: Reset flag on logout/reset
             })
         },
 
@@ -116,6 +121,13 @@ export const useAuthStore = create<AuthState>()(
         clearError: () => set({ error: null }),
 
         refreshSession: async (token?: string) => {
+          // Precise concurrency check: we only skip if we are already in the middle of the async call below
+          // (We use the isLoading state but only if we've already started the refresh)
+          if (get().isLoading && !token && get().isAuthenticated) {
+              console.log('[AuthStore] Refresh already in progress for authenticated user, skipping duplicate call');
+              return false;
+          }
+          
           try {
             // Capture the token BEFORE the async call to detect concurrent logins later
             const initialToken = token || get().session?.token;
@@ -125,24 +137,64 @@ export const useAuthStore = create<AuthState>()(
             // DON'T send Authorization header when refreshing
             // Let the server use the session cookie to generate a NEW token
             // Sending the old token causes the server to return the same expired token
-            console.log('[AuthStore] Refreshing session...');
-            const session = await authClient.getSession()
+            console.log(`[AuthStore] Refreshing session... Token: ${initialToken ? `...${initialToken.slice(-6)}` : 'NONE'}`);
+            
+            console.log(`[AuthStore] Refreshing session... Token: ${initialToken ? `...${initialToken.slice(-6)}` : 'NONE'}`);
+             
+             let sessionResponse: any;
+             const client = getAuthClient() as any;
+             
+             try {
+                 // Robustly find the session method.
+                 // better-auth v1 sometimes has issues with the prototype or lazy loading.
+                 if (typeof client.getSession === 'function') {
+                     sessionResponse = await client.getSession();
+                 } else if (typeof client.session === 'function') {
+                     console.log('[AuthStore] Using client.session() fallback');
+                     sessionResponse = await client.session();
+                 } else if (typeof client.auth?.session === 'function') {
+                     sessionResponse = await client.auth.session();
+                 } else {
+                     // Last resort: force call on prototype or whatever is available
+                     console.warn('[AuthStore] No standard session method found, attempting forced call');
+                     sessionResponse = await (client as any).getSession();
+                 }
+             } catch (e: any) {
+                 // If "is not a function" happened, we catch it here.
+                 if (e.message?.includes('is not a function')) {
+                     console.warn('[AuthStore] getSession failed (not a function), trying direct fetch');
+                     try {
+                        const { apiFetch } = await import('../lib/apiFetch');
+                        sessionResponse = await apiFetch('/api/auth/get-session');
+                        if (sessionResponse instanceof Response) {
+                            sessionResponse = await sessionResponse.json();
+                        }
+                     } catch (fetchErr) {
+                         console.error('[AuthStore] Direct fetch fallback also failed:', fetchErr);
+                         throw e;
+                     }
+                 } else {
+                     throw e;
+                 }
+             }
+            
+            // Handle both { data, error } and direct { user, session } response formats
+            const data = sessionResponse?.data || sessionResponse;
+            const error = sessionResponse?.error;
             
             // Prefer fresh token from server, then passed token, then fallback to existing
-            const freshToken = session?.data?.session?.token;
+            const freshToken = data?.session?.token;
             const tokenToUse = freshToken || token || get().session?.token;
             
             console.log('[AuthStore] Session refresh response:', {
-                hasUser: !!session?.data?.user,
+                hasUser: !!data?.user,
                 hasToken: !!freshToken,
-                userEmail: session?.data?.user?.email,
-                newToken: freshToken ? `...${freshToken.slice(-6)}` : null,
-                tokenToUse: tokenToUse ? `...${tokenToUse.slice(-6)}` : null,
-                error: session?.error
+                userEmail: data?.user?.email,
+                error: error
             });
             
-            if (session?.data?.user) {
-              const user = session.data.user
+            if (data?.user) {
+              const user = data.user
               const sessionData = {
                 user,
                 expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
@@ -175,11 +227,20 @@ export const useAuthStore = create<AuthState>()(
                  return true; 
               }
               
-              // Otherwise, the session is truly dead.
+              console.error('[AuthStore] Refresh failed: No user returned and no concurrent login.');
+
+              // Check if we have a local token - if so, DON'T reset
+              // The server might have rejected the cookie but the local session might still work
+              const localToken = get().session?.token;
+              if (localToken) {
+                console.log('[AuthStore] No user from server but local token exists - keeping user logged in');
+                set({ isLoading: false });
+                return true;
+              }
               
-              // No valid server session and no concurrent login detected.
+              // Otherwise, the session is truly dead.
               // Force local reset so route guards stop treating the user as authenticated.
-              console.log('[AuthStore] Refresh returned no user and no concurrent login detected. Resetting local auth state.');
+              console.log('[AuthStore] Refresh returned no user and no local token. Resetting local auth state.');
               get().reset()
               return false
             }
@@ -193,10 +254,20 @@ export const useAuthStore = create<AuthState>()(
                                (error?.message && (error.message.includes('401') || error.message.includes('403')));
             
             if (isAuthError) {
+                // Check if we have a local token - if so, don't reset
+                const localToken = get().session?.token;
+                if (localToken) {
+                    console.log('[AuthStore] Auth error but local token exists - not resetting');
+                    set({ isLoading: false, error: null });
+                    return true;
+                }
                 console.log('[AuthStore] Auth error detected, resetting session');
                 get().reset()
             } else {
                 console.log('[AuthStore] Non-auth error during refresh, retaining session');
+                // Keep the user logged in on non-auth errors
+                set({ isLoading: false });
+                return true;
             }
             
             set({ error: 'Failed to refresh session' })
@@ -207,27 +278,48 @@ export const useAuthStore = create<AuthState>()(
         },
 
         checkSession: async () => {
-          const { session } = get()
+          const { session, isAuthenticated } = get()
           
-          // Check if session exists and hasn't expired
-          if (!session) {
-            // Even if no local session, we might have a server cookie (SSO case)
-            // So we should try to refresh once if we are loading
-            return await get().refreshSession()
+          // If we're not authenticated and have no session, no point checking
+          if (!isAuthenticated && !session) {
+            return false;
+          }
+          
+          // If we have a stored session that's not expired, assume it's valid
+          // The background refresh on focus can fail silently - we don't want to log users out
+          // just because the refresh call had an issue
+          if (session) {
+            const now = Date.now()
+            const sessionExpiry = new Date(session.expiresAt).getTime()
+            
+            // If session is still fresh (not within 5 min of expiry), consider it valid
+            if (now < sessionExpiry - 5 * 60 * 1000) {
+              console.log('[AuthStore] Local session valid, skipping refresh');
+              set({ isLoading: false, lastActivity: now })
+              return true
+            }
+            
+            // Session is about to expire, try to refresh
+            // But don't fail hard - if refresh fails, keep the old session
+            console.log('[AuthStore] Session about to expire, attempting refresh...');
+            const refreshResult = await get().refreshSession().catch(e => {
+              console.error('[AuthStore] Refresh failed:', e);
+              return false;
+            });
+            
+            if (refreshResult) {
+              return true;
+            }
+            
+            // Refresh failed but we still have a local session - keep user logged in
+            console.log('[AuthStore] Refresh failed but local session exists, keeping user logged in');
+            set({ isLoading: false });
+            return true;
           }
 
-          const now = Date.now()
-          const sessionExpiry = new Date(session.expiresAt).getTime()
-          
-          // Check if session is still valid (with 5-minute buffer)
-          if (now > sessionExpiry - 5 * 60 * 1000) {
-            // Session expired or about to expire, try to refresh
-            return await get().refreshSession()
-          }
-
-          // Update last activity
-          set({ lastActivity: now })
-          return true
+          // No local session - try to get one from server
+          // This handles the SSO login case where cookie exists but no local storage
+          return await get().refreshSession()
         },
       }),
       {
@@ -237,17 +329,59 @@ export const useAuthStore = create<AuthState>()(
           session: state.session,
           isAuthenticated: state.isAuthenticated,
           lastActivity: state.lastActivity,
+          // NOTE: isFreshLogin is intentionally NOT persisted - always false on cold start
         }),
         onRehydrateStorage: () => (state) => {
-          console.log('[AuthStore] Rehydrated:', { 
-              isAuthenticated: state?.isAuthenticated, 
-              forceCheck: true
+          const hasSession = !!state?.session?.token;
+          
+          // Check if we just logged in (in-memory flag check)
+          // accessing get() inside here might be tricky, so we rely on the state passed in
+          const isJustLoggedIn = state?.isFreshLogin;
+
+          console.log('[AuthStore] Rehydrated state:', { 
+              isAuthenticated: state?.isAuthenticated,
+              isFreshLogin: isJustLoggedIn,
+              hasSession,
+              tokenSuffix: state?.session?.token ? `...${state.session.token.slice(-6)}` : null
           });
           
-          // ALWAYS check session on rehydration to handle SSO redirects
-          // This will verify with the server (cookies) even if localStorage is empty
+          if (state && typeof state.setLoading === 'function') {
+               // Unblock UI if we seem authenticated. On the web, hasSession might be false 
+               // (cookies only), so we trust isAuthenticated to unblock the initial loading screen.
+               if (state.isAuthenticated || hasSession) {
+                   state.setLoading(false);
+               }
+          }
+          
+          // If this is a fresh login, absolutely do NOT trigger a refresh
+          if (isJustLoggedIn) {
+              console.log('[AuthStore] Fresh login detected - suppressing auto-refresh and forcing loaded state');
+              if (state) {
+                  state.isFreshLogin = false; // consume flag
+                  state.setLoading(false); 
+              }
+              return;
+          }
+
           if (state) {
-              state.refreshSession().catch(console.error)
+              console.log('[AuthStore] Cold start detected - verifying session state...');
+              
+              setTimeout(async () => {
+                  console.log('[AuthStore] Executing rehydration check (background)');
+                  
+                  // If we don't have local auth state, we still need to check the server
+                  // because the user might have logged in via SSO or have an active cookie
+                  if (!state.isAuthenticated && !hasSession && typeof state.refreshSession === 'function') {
+                      await state.refreshSession();
+                  } else if (typeof state.checkSession === 'function') {
+                      await state.checkSession();
+                  }
+                  
+                  // Ensure loading state is false after check completes (e.g. for unauthenticated guests)
+                  if (typeof state.setLoading === 'function') {
+                      state.setLoading(false);
+                  }
+              }, 500);
           }
         },
       }

@@ -39,7 +39,7 @@ pub fn run() {
                     .expect("no main window")
                     .set_focus();
                 if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
-                    let _ = app.emit("deep-link://new-url", url);
+                    let _ = app.emit("zentrio-deep-link", url);
                 }
             },
         ));
@@ -66,7 +66,7 @@ pub fn run() {
                     tauri::async_runtime::spawn(async move {
                         // wait for frontend to load
                         std::thread::sleep(std::time::Duration::from_millis(1500));
-                        let _ = app_handle.emit("deep-link://new-url", url);
+                        let _ = app_handle.emit("zentrio-deep-link", url);
                     });
                 }
             }

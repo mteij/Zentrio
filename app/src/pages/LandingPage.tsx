@@ -81,7 +81,7 @@ export function LandingPage({ version }: LandingPageProps) {
              toast.info(`Connecting to: ${serverUrl}`);
         }
 
-        const handoffUrl = `${serverUrl}/api/auth/native-redirect`;
+        const handoffUrl = `${serverUrl}/api/auth/native-redirect?source=tauri`;
         const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
         
         console.log('[LandingPage] Opening external URL via opener plugin:', url);
