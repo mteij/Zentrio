@@ -36,35 +36,31 @@ export function ProtectedRoute({ children }: RouteGuardProps) {
     if (redirectInitiated) return // Already handling redirect
 
     if (!isLoading && !isAuthenticated) {
-      // For Tauri apps, clear the app mode so the OnboardingWizard shows
-      // This provides a native-feeling re-authentication experience
-      // instead of showing the web-oriented LandingPage
       if (isTauri()) {
-        console.log('[ProtectedRoute] Session expired in Tauri, resetting mode for OnboardingWizard')
-        setRedirectInitiated(true)
-        appMode.clear()
-        // Clear server URL too so the OnboardingWizard condition triggers properly
-        localStorage.removeItem('zentrio_server_url')
-        // Use navigate to prevent full app reload which clears state
-        navigate('/', { replace: true })
+        console.log('[ProtectedRoute] Session expired in Tauri, resetting mode for OnboardingWizard');
+        setRedirectInitiated(true);
+        // Clear app mode and server URL to force OnboardingWizard
+        appMode.clear();
+        localStorage.removeItem('zentrio_server_url');
       } else {
-        setRedirectInitiated(true)
-        navigate('/', { replace: true })
+        console.log('[ProtectedRoute] Session expired in browser, redirecting to LandingPage');
+        setRedirectInitiated(true);
       }
+      navigate('/', { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate, isGuestMode, redirectInitiated])
+  }, [isAuthenticated, isLoading, navigate, isGuestMode, redirectInitiated]);
 
   // Show loading ONLY while checking session initially
   if (isLoading) {
-    return <SplashScreen />
+    return <SplashScreen />;
   }
 
   // Don't render children if not authenticated (connected mode only)
   if (!isGuestMode && !isAuthenticated) {
-    return <SplashScreen /> // Show splash while redirect is processing
+    return <SplashScreen />; // Show splash while redirect is processing
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }
 
 /**
@@ -91,28 +87,20 @@ export function PublicRoute({ children }: RouteGuardProps) {
   }, [])
 
   useEffect(() => {
-    // Guest mode: redirect to profiles page
-    if (hasHydrated && isGuestMode) {
-      navigate('/profiles', { replace: true })
-      return
+    if (!hasHydrated) return;
+
+    if (isGuestMode) {
+      navigate('/profiles', { replace: true });
+      return;
     }
-    
-    const verifyAndRedirect = async () => {
-      if (hasHydrated && isAuthenticated && !isLoading) {
-        // Verify the session is actually valid with the server before redirecting
-        try {
-          const sessionValid = await useAuthStore.getState().refreshSession()
-          if (sessionValid) {
-            navigate(getRedirectPath(), { replace: true })
-          }
-          // If session is invalid, refreshSession() will have cleared the auth state
-        } catch (e) {
-          console.error('Session verification failed', e)
-        }
-      }
+
+    // Rely on authStore's onRehydrateStorage doing the actual verification
+    // PublicRoute only observes the state to decide whether to skip the login page
+    if (isAuthenticated && !isLoading) {
+       console.log('[PublicRoute] User is authenticated, redirecting to app...');
+       navigate(getRedirectPath(), { replace: true });
     }
-    verifyAndRedirect()
-  }, [hasHydrated, isAuthenticated, isLoading, navigate, getRedirectPath, isGuestMode])
+  }, [hasHydrated, isAuthenticated, isLoading, navigate, getRedirectPath, isGuestMode]);
 
   // Guest mode shouldn't see public/auth pages
   if (isGuestMode) {
