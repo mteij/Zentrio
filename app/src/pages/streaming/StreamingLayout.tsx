@@ -30,6 +30,7 @@ export const StreamingLayout = () => {
   const { profileId } = useParams<{ profileId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
 
   const { data: profile, error } = useQuery({
     queryKey: ['streaming-profile', profileId],
@@ -48,9 +49,35 @@ export const StreamingLayout = () => {
     }
   }, [error, navigate])
 
+  // React immediately when streaming settings changed (e.g. parental age limit)
+  useEffect(() => {
+    const invalidateStreamingQueries = () => {
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const [scope] = query.queryKey as [string, ...unknown[]]
+          return ['dashboard', 'filters', 'catalog-items', 'catalog', 'explore-genre'].includes(String(scope))
+        }
+      })
+    }
+
+    const handleSettingsUpdated = () => {
+      invalidateStreamingQueries()
+    }
+
+    window.addEventListener('streaming-settings-updated', handleSettingsUpdated)
+
+    // Catch updates made while user was on Settings page (outside streaming layout)
+    if (sessionStorage.getItem('streaming-settings-dirty') === '1') {
+      sessionStorage.removeItem('streaming-settings-dirty')
+      invalidateStreamingQueries()
+    }
+
+    return () => {
+      window.removeEventListener('streaming-settings-updated', handleSettingsUpdated)
+    }
+  }, [queryClient])
+
   // Preload all streaming route chunks AND prefetch data on mount for instant navigation
-  const queryClient = useQueryClient()
-  
   useEffect(() => {
     if (!profileId) return
     
@@ -89,14 +116,17 @@ export const StreamingLayout = () => {
   const firstSegment = pathParts[0]
   
   // Reserved main routes that SHOULD show navbar
-  const mainRoutes = ['explore', 'library', 'search', 'catalog']
+  const mainRoutes = ['explore', 'library', 'search']
+  const isCatalog = firstSegment === 'catalog'
+  const searchParams = new URLSearchParams(location.search)
+  const isExploreSeeAll = firstSegment === 'explore' && (searchParams.has('genre') || searchParams.has('type'))
   
   // If we have a first segment matching a type (e.g. 'movie', 'series') and it's not a reserved route,
   // then it's a details page.
   // Note: Home page has empty pathParts or firstSegment undefined
   const isDetails = firstSegment && !mainRoutes.includes(firstSegment) && !isPlayer
 
-  const shouldHideNavbar = isPlayer || isDetails
+  const shouldHideNavbar = isPlayer || isDetails || isCatalog || isExploreSeeAll
 
   return (
     <>

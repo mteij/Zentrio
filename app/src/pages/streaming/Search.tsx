@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Loader2 } from 'lucide-react'
+import { Search, Loader2, Filter } from 'lucide-react'
 import { Layout, AnimatedBackground } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { SearchCatalogRow } from '../../components/features/SearchCatalogRow'
@@ -20,29 +20,32 @@ export const StreamingSearch = () => {
   const [catalogResults, setCatalogResults] = useState<CatalogSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const hasAutoFocused = useRef(false)
   
   const query = searchParams.get('q') || ''
   const typeParam = searchParams.get('type') || 'all'
   const fromOverlay = searchParams.get('from') === 'overlay'
+  const startedFromOverlayRef = useRef(fromOverlay)
   
   // Local input state for controlled input
   const [inputValue, setInputValue] = useState(query)
   
-  // Track if we should maintain focus after URL changes
-  const shouldMaintainFocus = useRef(false)
+  // Track if we should maintain focus after URL changes.
+  // Only enabled when arriving from the global search overlay.
+  const shouldMaintainFocus = useRef(fromOverlay)
   
   // Immediately focus input with cursor at end when coming from overlay
   useLayoutEffect(() => {
-    if (inputRef.current && !hasAutoFocused.current) {
-      hasAutoFocused.current = true
-      shouldMaintainFocus.current = true
-      inputRef.current.focus()
-      // Move cursor to end of text
-      const len = inputRef.current.value.length
-      inputRef.current.setSelectionRange(len, len)
-    }
+    if (!startedFromOverlayRef.current || !inputRef.current || hasAutoFocused.current) return
+
+    hasAutoFocused.current = true
+    shouldMaintainFocus.current = true
+    inputRef.current.focus()
+    // Move cursor to end of text
+    const len = inputRef.current.value.length
+    inputRef.current.setSelectionRange(len, len)
   }, [])
   
   // Clean up the 'from' param separately to avoid focus issues
@@ -168,6 +171,11 @@ export const StreamingSearch = () => {
       setSearchParams(newParams)
   }
 
+  const handleTypeSelect = (value: 'all' | 'movie' | 'series') => {
+    handleFilterChange('type', value)
+    setMobileFilterOpen(false)
+  }
+
   // Determine background image from first result of first catalog
   const heroImage = catalogResults.length > 0 && catalogResults[0].items.length > 0 
     ? (catalogResults[0].items[0].background || catalogResults[0].items[0].poster) 
@@ -182,47 +190,36 @@ export const StreamingSearch = () => {
       />
       <div className={`${styles.streamingLayout} ${styles.searchLayout}`}>
         {/* Search Header - Matches Explore page styling */}
-        <div className={styles.exploreHeader}>
+        <div className={`${styles.exploreHeader} ${styles.searchTopBar}`}>
           {/* Search Input with glassmorphic styling */}
-          <div className={styles.exploreToggleGroup} style={{ padding: '6px', minWidth: '320px', maxWidth: '480px', flex: 1, display: 'flex', alignItems: 'center' }}>
+          <div className={styles.searchInputShell}>
             <Search 
               size={18} 
-              style={{
-                marginLeft: '12px',
-                color: 'rgba(255,255,255,0.5)',
-                flexShrink: 0
-              }} 
+              className={styles.searchInputIcon}
             />
-            <form onSubmit={handleSearch} id="searchForm" style={{ flex: 1 }}>
+            <form onSubmit={handleSearch} id="searchForm" className={styles.searchInputForm}>
               <input
                 ref={inputRef}
                 type="text"
                 name="q"
                 id="searchInput"
-                placeholder="Search..."
+                placeholder="Search movies & series..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 autoComplete="off"
-                style={{
-                  width: '100%',
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '8px 12px',
-                  fontSize: '0.95rem',
-                  color: '#fff',
-                  outline: 'none'
-                }}
+                className={styles.searchInputField}
               />
             </form>
           </div>
 
           {/* Right side: Type toggles */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className={styles.searchFilterWrap}>
             {/* Type Filter - Same as Explore toggles */}
             <div className={styles.exploreToggleGroup}>
               {(['all', 'movie', 'series'] as const).map(type => (
                 <button
                   key={type}
+                  type="button"
                   onClick={() => handleFilterChange('type', type)}
                   className={`${styles.exploreToggleBtn} ${typeParam === type ? styles.exploreToggleBtnActive : ''}`}
                 >
@@ -230,18 +227,42 @@ export const StreamingSearch = () => {
                 </button>
               ))}
             </div>
+
+            <button
+              type="button"
+              className={styles.searchMobileFilterBtn}
+              aria-label="Open type filter"
+              onClick={() => setMobileFilterOpen(v => !v)}
+            >
+              <Filter size={16} />
+            </button>
           </div>
         </div>
 
-        <div className={`${styles.contentContainer} ${styles.contentOffset}`}>
+        {mobileFilterOpen && (
+          <>
+            <div
+              className={styles.searchMobileFilterBackdrop}
+              onClick={() => setMobileFilterOpen(false)}
+            />
+            <div className={styles.searchMobileFilterMenu}>
+              {(['all', 'movie', 'series'] as const).map(type => (
+                <button
+                  key={`mobile-${type}`}
+                  type="button"
+                  onClick={() => handleTypeSelect(type)}
+                  className={`${styles.searchMobileFilterOption} ${typeParam === type ? styles.searchMobileFilterOptionActive : ''}`}
+                >
+                  {type === 'all' ? 'All' : type === 'movie' ? 'Movies' : 'Series'}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className={styles.contentContainer}>
           {query && catalogResults.length > 0 && (
-            <h1 style={{ 
-              padding: '0 60px', 
-              marginBottom: '30px', 
-              fontSize: '1.5rem', 
-              fontWeight: '600', 
-              color: '#fff'
-            }}>
+            <h1 className={styles.searchResultsHeading}>
               Results for "{query}"
             </h1>
           )}

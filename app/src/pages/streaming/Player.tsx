@@ -7,13 +7,14 @@
  * - Subtitle loading from addons
  * - Episode navigation
  * - Back button overlay
+ * - Mobile orientation handling
  * 
  * Video playback is handled by VidstackPlayer component.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, X, AlertTriangle, SkipForward } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, X, AlertTriangle, SkipForward, Smartphone } from 'lucide-react'
 import { Layout, SkeletonPlayer } from '../../components'
 import { VidstackPlayer } from '../../components/player/VidstackPlayer'
 import { Stream } from '../../services/addons/types'
@@ -28,6 +29,34 @@ import { resolveBeaconUrl } from '../../lib/url'
 const SHORT_VIDEO_THRESHOLD = 300 // 5 minutes in seconds
 // Time before end to show next episode popup
 const NEXT_EPISODE_COUNTDOWN_START = 30 // seconds before end
+
+// Orientation settings type
+type OrientationMode = 'auto' | 'landscape' | 'portrait'
+
+// Helper to detect mobile devices
+const isMobileDevice = (): boolean => {
+    if (typeof window === 'undefined') return false
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 768 && 'ontouchstart' in window)
+}
+
+// Helper to check if in portrait mode
+const isPortraitMode = (): boolean => {
+    if (typeof window === 'undefined') return false
+    return window.innerHeight > window.innerWidth
+}
+
+// Get saved orientation preference
+const getSavedOrientationPreference = (): OrientationMode => {
+    if (typeof window === 'undefined') return 'landscape'
+    const saved = localStorage.getItem('player-orientation-mode')
+    return (saved as OrientationMode) || 'landscape'
+}
+
+// Save orientation preference
+const saveOrientationPreference = (mode: OrientationMode): void => {
+    localStorage.setItem('player-orientation-mode', mode)
+}
 
 interface EpisodeInfo {
     season: number
@@ -93,14 +122,15 @@ export const StreamingPlayer = () => {
     const [error, setError] = useState('')
 
     // Subtitles from addons
-    const [subtitleTracks, setSubtitleTracks] = useState<Array<{
+  const [subtitleTracks, setSubtitleTracks] = useState<Array<{
         src: string
         label: string
         language: string
         type?: string
         addonName?: string
         default?: boolean
-    }>>([])
+  }>>([])
+  const subtitleRetryMapRef = useRef<Map<string, number>>(new Map())
 
     // Episode navigation
     const [prevEpisode, setPrevEpisode] = useState<EpisodeInfo | null>(null)
@@ -127,6 +157,14 @@ export const StreamingPlayer = () => {
     // Trakt scrobbling state
     const traktScrobbleStartedRef = useRef(false)
 
+    // Mobile orientation state
+    const [isMobile, setIsMobile] = useState(false)
+    const [isPortrait, setIsPortrait] = useState(false)
+    const [orientationMode, setOrientationMode] = useState<OrientationMode>('landscape')
+    const [showOrientationPrompt, setShowOrientationPrompt] = useState(false)
+    const [orientationPromptDismissed, setOrientationPromptDismissed] = useState(false)
+    const orientationLockAttemptedRef = useRef(false)
+
     // Force reload if not cross-origin isolated (needed for FFMPEG)
     useEffect(() => {
         // Skip for Tauri (uses native playback)
@@ -147,6 +185,95 @@ export const StreamingPlayer = () => {
             // We are isolated, clear the flag
             sessionStorage.removeItem('reloading_for_isolation')
         }
+    }, [])
+
+    // Mobile orientation handling
+    useEffect(() => {
+        // Initialize orientation settings
+        const mobile = isMobileDevice()
+        const portrait = isPortraitMode()
+        const savedMode = getSavedOrientationPreference()
+        
+        setIsMobile(mobile)
+        setIsPortrait(portrait)
+        setOrientationMode(savedMode)
+
+        // Show orientation prompt on mobile if in portrait and mode is landscape
+        if (mobile && portrait && savedMode === 'landscape') {
+            setShowOrientationPrompt(true)
+        }
+
+        // Listen for orientation changes
+        const handleOrientationChange = () => {
+            const newPortrait = isPortraitMode()
+            setIsPortrait(newPortrait)
+            
+            // Show/hide prompt based on orientation
+            if (isMobile && savedMode === 'landscape') {
+                if (newPortrait && !orientationPromptDismissed) {
+                    setShowOrientationPrompt(true)
+                } else {
+                    setShowOrientationPrompt(false)
+                }
+            }
+        }
+
+        // Listen for resize events (covers orientation change)
+        window.addEventListener('resize', handleOrientationChange)
+        
+        // Also listen for the orientationchange event for older browsers
+        window.addEventListener('orientationchange', handleOrientationChange)
+
+        return () => {
+            window.removeEventListener('resize', handleOrientationChange)
+            window.removeEventListener('orientationchange', handleOrientationChange)
+        }
+    }, [orientationPromptDismissed])
+
+    // Attempt to lock orientation on mobile when player loads
+    useEffect(() => {
+        if (!isMobile || orientationLockAttemptedRef.current) return
+        
+        orientationLockAttemptedRef.current = true
+        
+        // Try to lock to landscape if that's the preference
+        if (orientationMode === 'landscape' && 'screen' in window && 'orientation' in (window as any).screen) {
+            const screen = (window as any).screen
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch((e: Error) => {
+                    // Orientation lock not supported or denied - this is fine
+                    console.log('[Player] Orientation lock not available or denied:', e.message)
+                })
+            }
+        }
+    }, [isMobile, orientationMode])
+
+    // Handle orientation mode change
+    const handleOrientationModeChange = useCallback((mode: OrientationMode) => {
+        setOrientationMode(mode)
+        saveOrientationPreference(mode)
+        
+        // Try to apply orientation lock
+        if ('screen' in window && 'orientation' in (window as any).screen) {
+            const screen = (window as any).screen
+            if (screen.orientation && screen.orientation.lock && screen.orientation.unlock) {
+                if (mode === 'landscape') {
+                    screen.orientation.lock('landscape').catch(() => {})
+                } else if (mode === 'portrait') {
+                    screen.orientation.lock('portrait').catch(() => {})
+                } else {
+                    screen.orientation.unlock().catch(() => {})
+                }
+            }
+        }
+        
+        toast.success(`Orientation set to ${mode === 'auto' ? 'auto' : mode}`)
+    }, [])
+
+    // Dismiss orientation prompt
+    const dismissOrientationPrompt = useCallback(() => {
+        setShowOrientationPrompt(false)
+        setOrientationPromptDismissed(true)
     }, [])
 
     // Parse URL params or location state
@@ -443,10 +570,27 @@ export const StreamingPlayer = () => {
     }, [nextEpisode, meta, profileId, navigate])
 
     // Handle error
-    const handleError = useCallback((error: Error) => {
-        console.error('Playback error:', error)
-        toast.error('Playback error: ' + error.message)
-    }, [])
+  const handleError = useCallback((error: Error) => {
+    console.error('Playback error:', error)
+    toast.error('Playback error: ' + error.message)
+  }, [])
+
+  const handleSubtitleTrackError = useCallback((track: PlayerSubtitleTrack) => {
+    const key = track.src || track.label
+    const attempt = subtitleRetryMapRef.current.get(key) || 0
+
+    if (attempt === 0) {
+      subtitleRetryMapRef.current.set(key, 1)
+      setSubtitleTracks((prev) => {
+        const without = prev.filter((t) => t.src !== track.src)
+        return [...without, { ...track, src: `${track.src}${track.src.includes('?') ? '&' : '?'}retry=1` }]
+      })
+      toast.warning(`Subtitle failed (${track.label}). Retrying once...`)
+      return
+    }
+
+    toast.error(`Subtitle failed to load: ${track.label}`)
+  }, [])
 
     // Handle metadata loaded
     const handleMetadataLoad = useCallback((dur: number) => {
@@ -570,6 +714,7 @@ export const StreamingPlayer = () => {
                     onMetadataLoad={handleMetadataLoad}
                     onEnded={handleVideoEnded}
                     onError={handleError}
+                    onSubtitleTrackError={handleSubtitleTrackError}
                     startTime={startTime}
                     autoPlay={true}
                     showCast={true}
@@ -732,6 +877,39 @@ export const StreamingPlayer = () => {
                                 style={{ width: `${shortVideoProgress}%` }}
                             />
                         </div>
+                    </div>
+                )}
+
+                {/* Mobile Orientation Prompt - shown on mobile in portrait mode */}
+                {showOrientationPrompt && isMobile && isPortrait && (
+                    <div className={styles.orientationLockOverlay}>
+                        <div className={styles.orientationLockIcon}>
+                            <Smartphone size={40} />
+                        </div>
+                        <div className={styles.orientationLockText}>
+                            Rotate your device to landscape
+                        </div>
+                        <div className={styles.orientationLockSubtext}>
+                            For the best viewing experience, use landscape mode
+                        </div>
+                        <button 
+                            className={styles.orientationLockButton}
+                            onClick={() => {
+                                // Try to request fullscreen which often triggers landscape
+                                if (playerWrapperRef.current) {
+                                    playerWrapperRef.current.requestFullscreen?.().catch(() => {})
+                                }
+                                dismissOrientationPrompt()
+                            }}
+                        >
+                            Continue in Portrait
+                        </button>
+                        <button 
+                            className={styles.orientationLockDismiss}
+                            onClick={dismissOrientationPrompt}
+                        >
+                            Don't show again
+                        </button>
                     </div>
                 )}
             </div>

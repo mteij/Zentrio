@@ -30,7 +30,7 @@ import {
     useMediaState,
     useCaptionOptions,
 } from '@vidstack/react'
-import { Captions, Check, Music } from 'lucide-react'
+import { Captions, Check, Music, RotateCw, Smartphone, Settings } from 'lucide-react'
 
 // Import Vidstack styles
 import '@vidstack/react/player/styles/base.css'
@@ -87,12 +87,20 @@ export interface VidstackPlayerProps {
     streamUrl?: string
     /** Show Cast button */
     showCast?: boolean
+    /** Notify when subtitle tracks fail to load */
+    onSubtitleTrackError?: (track: SubtitleTrack) => void
 }
 
 function AudioTracksMenu() {
     const remote = useMediaRemote()
     const audioTracks = useMediaState('audioTracks')
     const currentAudioTrack = useMediaState('audioTrack')
+    const [audioReady, setAudioReady] = useState(false)
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setAudioReady(true), 1200)
+        return () => window.clearTimeout(timer)
+    }, [])
 
     // Get display name for language
     const getLangName = (code: string) => {
@@ -103,9 +111,32 @@ function AudioTracksMenu() {
         }
     }
 
-    // Always render the button, show info about available tracks
+    // Stremio-like behavior: always expose at least one stable option
     const hasAudioTracks = audioTracks && audioTracks.length > 0
     const hasMultipleAudioTracks = audioTracks && audioTracks.length > 1
+    const selectedTrackId = currentAudioTrack?.id?.toString() || 'auto'
+
+    const trackOptions = useMemo<Array<{
+        id: string
+        label: string
+        language?: string
+        isAuto: boolean
+        track?: any
+    }>>(() => {
+        if (!hasAudioTracks) {
+            return [{ id: 'auto', label: 'Auto', language: 'und', isAuto: true }]
+        }
+        return [
+            { id: 'auto', label: 'Auto', language: 'und', isAuto: true },
+            ...audioTracks.map((track) => ({
+                id: track.id?.toString?.() || 'unknown',
+                label: track.label,
+                language: track.language,
+                isAuto: false,
+                track
+            }))
+        ]
+    }, [audioTracks, hasAudioTracks])
 
     return (
         <Menu.Root>
@@ -115,38 +146,59 @@ function AudioTracksMenu() {
 
             <Menu.Content className="vds-menu-items" placement="top" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                 <div className="vds-menu-title">Audio</div>
-                
-                {!hasAudioTracks ? (
-                    <div style={{ padding: '12px', color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>
-                        No audio tracks detected
-                    </div>
-                ) : (
-                    <Menu.RadioGroup value={currentAudioTrack?.id?.toString() || ''}>
-                        {audioTracks.map((track) => (
+
+                <Menu.RadioGroup value={selectedTrackId}>
+                    {trackOptions.map((opt) => (
+                        opt.isAuto ? (
                             <Menu.Radio
-                                key={track.id}
-                                value={track.id.toString()}
+                                key="audio-auto"
+                                value="auto"
                                 className="vds-menu-item"
                                 onSelect={() => {
-                                    // Audio track IDs are typically numbers, but we need to ensure we're passing the right type
-                                    // The track.id is typically a number for audio tracks
-                                    (remote as any).changeAudioTrack(typeof track.id === 'number' ? track.id : parseInt(track.id.toString()))
+                                    if (hasAudioTracks && audioTracks[0]) {
+                                        const first = audioTracks[0]
+                                        ;(remote as any).changeAudioTrack(
+                                            typeof first.id === 'number' ? first.id : parseInt(first.id?.toString?.() || '0')
+                                        )
+                                    }
+                                    toast.success('Audio set to Auto')
+                                }}
+                            >
+                                <span className="vds-menu-item-label">Auto</span>
+                                <Check className="vds-radio-icon" size={14} />
+                            </Menu.Radio>
+                        ) : (
+                            <Menu.Radio
+                                key={opt.id}
+                                value={opt.id}
+                                className="vds-menu-item"
+                                onSelect={() => {
+                                    const rawId = opt.track?.id
+                                    ;(remote as any).changeAudioTrack(
+                                        typeof rawId === 'number' ? rawId : parseInt(rawId?.toString?.() || '0')
+                                    )
                                 }}
                             >
                             <span className="vds-menu-item-label">
-                                {track.label || getLangName(track.language || 'und')}
-                                {track.language && track.label && ` (${getLangName(track.language)})`}
+                                {opt.label || getLangName(opt.language || 'und')}
+                                {opt.language && opt.label && ` (${getLangName(opt.language)})`}
                             </span>
                             <Check className="vds-radio-icon" size={14} />
                         </Menu.Radio>
+                        )
                     ))}
-                    </Menu.RadioGroup>
-                )}
+                </Menu.RadioGroup>
                 
                 {/* Info about audio tracks */}
                 {hasAudioTracks && !hasMultipleAudioTracks && (
                     <div style={{ padding: '12px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '8px' }}>
                         Note: This video has a single audio track. Multiple audio tracks appear only if the video file contains multiple audio streams.
+                    </div>
+                )}
+
+                {!hasAudioTracks && audioReady && (
+                    <div style={{ padding: '12px', color: 'rgba(255,255,255,0.65)', fontSize: '12px', marginTop: '4px' }}>
+                        No explicit tracks reported. Using default audio.
                     </div>
                 )}
             </Menu.Content>
@@ -387,6 +439,98 @@ function SubtitlesMenu({ tracks: _tracks }: { tracks: SubtitleTrack[] }) {
     )
 }
 
+// Orientation type
+type OrientationMode = 'auto' | 'landscape' | 'portrait'
+
+// Helper to get saved orientation preference
+const getSavedOrientationPreference = (): OrientationMode => {
+    if (typeof window === 'undefined') return 'landscape'
+    const saved = localStorage.getItem('player-orientation-mode')
+    return (saved as OrientationMode) || 'landscape'
+}
+
+// Helper to check if mobile
+const isMobileDevice = (): boolean => {
+    if (typeof window === 'undefined') return false
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 768 && 'ontouchstart' in window)
+}
+
+function OrientationMenu() {
+    const [orientationMode, setOrientationMode] = useState<OrientationMode>('landscape')
+
+    useEffect(() => {
+        setOrientationMode(getSavedOrientationPreference())
+    }, [])
+
+    const handleOrientationChange = (mode: OrientationMode) => {
+        setOrientationMode(mode)
+        localStorage.setItem('player-orientation-mode', mode)
+        
+        // Try to apply orientation lock
+        if ('screen' in window && 'orientation' in (window as any).screen) {
+            const screen = (window as any).screen
+            if (screen.orientation && screen.orientation.lock && screen.orientation.unlock) {
+                if (mode === 'landscape') {
+                    screen.orientation.lock('landscape').catch(() => {})
+                } else if (mode === 'portrait') {
+                    screen.orientation.lock('portrait').catch(() => {})
+                } else {
+                    screen.orientation.unlock().catch(() => {})
+                }
+            }
+        }
+        
+        toast.success(`Orientation set to ${mode === 'auto' ? 'auto (unlocked)' : mode}`)
+    }
+
+    // Only show on mobile devices
+    if (!isMobileDevice()) return null
+
+    return (
+        <Menu.Root>
+            <Menu.Button className="vds-menu-button vds-button" aria-label="Orientation settings">
+                <Smartphone className="vds-icon" />
+            </Menu.Button>
+
+            <Menu.Content className="vds-menu-items" placement="top">
+                <div className="vds-menu-title">Orientation</div>
+
+                <Menu.RadioGroup value={orientationMode}>
+                    <Menu.Radio
+                        value="landscape"
+                        className="vds-menu-item"
+                        onSelect={() => handleOrientationChange('landscape')}
+                    >
+                        <span className="vds-menu-item-label">Landscape (Default)</span>
+                        {orientationMode === 'landscape' && <Check className="vds-radio-icon" size={14} />}
+                    </Menu.Radio>
+                    <Menu.Radio
+                        value="portrait"
+                        className="vds-menu-item"
+                        onSelect={() => handleOrientationChange('portrait')}
+                    >
+                        <span className="vds-menu-item-label">Portrait</span>
+                        {orientationMode === 'portrait' && <Check className="vds-radio-icon" size={14} />}
+                    </Menu.Radio>
+                    <Menu.Radio
+                        value="auto"
+                        className="vds-menu-item"
+                        onSelect={() => handleOrientationChange('auto')}
+                    >
+                        <span className="vds-menu-item-label">Auto (Unlocked)</span>
+                        {orientationMode === 'auto' && <Check className="vds-radio-icon" size={14} />}
+                    </Menu.Radio>
+                </Menu.RadioGroup>
+                
+                <div style={{ padding: '8px 12px', color: 'rgba(255,255,255,0.5)', fontSize: '11px', borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '8px' }}>
+                    Lock the screen orientation during playback
+                </div>
+            </Menu.Content>
+        </Menu.Root>
+    )
+}
+
 type PlaybackMode = 'native' | 'hybrid' | 'probing'
 
 export function VidstackPlayer({
@@ -397,6 +541,7 @@ export function VidstackPlayer({
     onTimeUpdate,
     onEnded,
     onError,
+    onSubtitleTrackError,
     onMetadataLoad,
     startTime = 0,
     autoPlay = true,
@@ -441,6 +586,34 @@ export function VidstackPlayer({
     const [hybridCurrentTime, setHybridCurrentTime] = useState(0)
     const [hybridPlaying, setHybridPlaying] = useState(false)
     const [showControls, setShowControls] = useState(true)
+
+    // Best-effort subtitle failure detection for native mode.
+    // If external subtitle tracks were provided but Vidstack doesn't expose text tracks after load,
+    // treat this as a loading failure and notify host page for retry UX.
+    useEffect(() => {
+        if (playbackMode !== 'native' || !onSubtitleTrackError || subtitles.length === 0) return
+
+        const timer = window.setTimeout(() => {
+            type PlayerTextTrack = { kind?: string }
+            const player = playerRef.current as unknown as {
+                state?: { textTracks?: PlayerTextTrack[] }
+            } | null
+
+            const textTracks = player?.state?.textTracks
+            const hasLoadedSubtitleTrack =
+                Array.isArray(textTracks) &&
+                textTracks.some(
+                    (track: PlayerTextTrack) =>
+                        track.kind === 'subtitles' || track.kind === 'captions'
+                )
+
+            if (!hasLoadedSubtitleTrack) {
+                onSubtitleTrackError(subtitles[0])
+            }
+        }, 6000)
+
+        return () => window.clearTimeout(timer)
+    }, [playbackMode, onSubtitleTrackError, subtitles])
     
     // Store callbacks in refs to avoid re-triggering probe effect
     const onMetadataLoadRef = useRef(onMetadataLoad)
@@ -969,16 +1142,17 @@ export function VidstackPlayer({
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 >
                     {/* Subtitle tracks must be children of video element */}
-                    {subtitles.map((track, index) => (
-                        <track
-                            key={track.src || `sub-${index}`}
-                            src={track.src}
-                            kind="subtitles"
-                            srcLang={track.language}
-                            label={track.label}
-                            default={track.default}
-                        />
-                    ))}
+                {subtitles.map((track, index) => (
+                    <track
+                        key={track.src || `sub-${index}`}
+                        src={track.src}
+                        kind="subtitles"
+                        srcLang={track.language}
+                        label={track.label}
+                        default={track.default}
+                        onError={() => onSubtitleTrackError?.(track)}
+                    />
+                ))}
                 </video>
                 
                 {/* Poster */}
@@ -1197,7 +1371,10 @@ export function VidstackPlayer({
                 slots={{
                     googleCastButton: showCast ? <CastButton /> : null,
                     captionButton: <SubtitlesMenu tracks={subtitles} />,
-                    beforeFullscreenButton: <AudioTracksMenu />
+                    beforeFullscreenButton: <>
+                        <AudioTracksMenu />
+                        <OrientationMenu />
+                    </>
                 }}
             >
             </DefaultVideoLayout>

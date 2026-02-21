@@ -4,6 +4,7 @@ import { streamDb, watchHistoryDb, profileDb, addonDb, listDb, userDb, type User
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { ok, err } from '../../utils/api'
 import { streamCache, StreamCache } from '../../services/addons/stream-cache'
+import { getParentalSettings, filterContent } from '../../services/addons/content-filter'
 
 const streaming = new Hono<{
   Variables: {
@@ -1231,7 +1232,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
       const MIN_PERCENT_THRESHOLD = 5
       const COMPLETED_PERCENT_THRESHOLD = 90
       
-      const filteredHistory = rawHistory.filter(h => {
+      const thresholdHistory = rawHistory.filter(h => {
         if (h.is_watched) return false
         const progressPercent = h.duration && h.duration > 0 && h.position 
           ? (h.position / h.duration) * 100 
@@ -1251,6 +1252,41 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
 
         return meetsMinSeconds || meetsMinPercent || isNextEpisode
       })
+
+      // Apply strict parental filtering to Continue Watching candidates.
+      // We map history entries to lightweight MetaPreview-shaped objects so the same filtering
+      // rules used across catalogs are applied here as well.
+      let filteredHistory = thresholdHistory
+      const parentalSettings = getParentalSettings(pId)
+      if (parentalSettings.enabled && thresholdHistory.length > 0) {
+        try {
+          const candidateItems = thresholdHistory.map((h) => {
+            const season = h.season !== undefined && h.season >= 0 ? h.season : null
+            const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
+            return {
+              id: h.meta_id,
+              type: h.meta_type,
+              name: h.title || 'Unknown',
+              poster: h.poster || undefined,
+              _historyKey: `${h.meta_id}:${h.meta_type}:${season ?? 'x'}:${episode ?? 'x'}`
+            }
+          }) as any[]
+
+          const allowed = await filterContent(candidateItems as any, parentalSettings, profile?.user_id)
+          const allowedKeys = new Set(allowed.map((item: any) => item._historyKey))
+
+          filteredHistory = thresholdHistory.filter((h) => {
+            const season = h.season !== undefined && h.season >= 0 ? h.season : null
+            const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
+            const key = `${h.meta_id}:${h.meta_type}:${season ?? 'x'}:${episode ?? 'x'}`
+            return allowedKeys.has(key)
+          })
+        } catch (e) {
+          console.warn('[Dashboard] Failed to apply parental filtering on history (guest mode)', e)
+          // Strict fallback: if filtering fails and parental controls are enabled, hide the list.
+          filteredHistory = []
+        }
+      }
       
       const deduplicatedHistory: typeof rawHistory = []
       const seenSeries = new Set<string>()
@@ -1378,9 +1414,9 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
     const COMPLETED_PERCENT_THRESHOLD = 90
     
     // Filter by thresholds, then deduplicate series
-    const filteredHistory = rawHistory.filter(h => {
-      // Skip if marked as fully watched
-      if (h.is_watched) return false
+      const thresholdHistory = rawHistory.filter(h => {
+        // Skip if marked as fully watched
+        if (h.is_watched) return false
       
       // Calculate progress percentage
       const progressPercent = h.duration && h.duration > 0 && h.position 
@@ -1404,6 +1440,39 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
 
       return meetsMinSeconds || meetsMinPercent || isNextEpisode
     })
+
+    // Apply strict parental filtering to Continue Watching candidates.
+    let filteredHistory = thresholdHistory
+    const parentalSettings = getParentalSettings(pId)
+    if (parentalSettings.enabled && thresholdHistory.length > 0) {
+      try {
+        const candidateItems = thresholdHistory.map((h) => {
+          const season = h.season !== undefined && h.season >= 0 ? h.season : null
+          const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
+          return {
+            id: h.meta_id,
+            type: h.meta_type,
+            name: h.title || 'Unknown',
+            poster: h.poster || undefined,
+            _historyKey: `${h.meta_id}:${h.meta_type}:${season ?? 'x'}:${episode ?? 'x'}`
+          }
+        }) as any[]
+
+        const allowed = await filterContent(candidateItems as any, parentalSettings, profile?.user_id)
+        const allowedKeys = new Set(allowed.map((item: any) => item._historyKey))
+
+        filteredHistory = thresholdHistory.filter((h) => {
+          const season = h.season !== undefined && h.season >= 0 ? h.season : null
+          const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
+          const key = `${h.meta_id}:${h.meta_type}:${season ?? 'x'}:${episode ?? 'x'}`
+          return allowedKeys.has(key)
+        })
+      } catch (e) {
+        console.warn('[Dashboard] Failed to apply parental filtering on history', e)
+        // Strict fallback: if filtering fails and parental controls are enabled, hide the list.
+        filteredHistory = []
+      }
+    }
     
       const deduplicatedHistory: typeof rawHistory = []
       const seenSeries = new Set<string>()

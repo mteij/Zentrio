@@ -1035,3 +1035,240 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* ==========================================================================
+   Vidstack Responsive Overrides - Prevent hiding/moving controls on small screens
+   ========================================================================== */
+
+/* 
+ * COMPLETELY DISABLE VIDSTACK'S RESPONSIVE BEHAVIOR
+ * Vidstack uses data-sm attribute for small screens which hides/moves controls.
+ * We override ALL of these behaviors to keep controls stable at all screen sizes.
+ */
+
+/* Override Vidstack's small screen behavior - keep all controls visible */
+:global(.vds-video-layout[data-sm]) :global(.vds-button),
+:global(.vds-video-layout[data-sm]) :global(.vds-slider:not(.vds-time-slider)),
+:global(.vds-video-layout[data-sm]) :global(.vds-time),
+:global(.vds-video-layout[data-sm]) :global(.vds-time-divider),
+:global(.vds-video-layout[data-sm]) :global(.vds-chapter-title) {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Keep controls groups visible on small screens */
+:global(.vds-video-layout[data-sm]) :global(.vds-controls-group) {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Prevent time slider from transforming on small screens */
+:global(.vds-video-layout[data-sm]) :global(.vds-time-slider) {
+  transform: none !important;
+}
+
+/* Keep all buttons visible even when not started on small screens */
+:global([data-media-player]:not([data-started]) .vds-video-layout[data-sm])
+  :global(.vds-button),
+:global([data-media-player]:not([data-started]) .vds-video-layout[data-sm])
+  :global(.vds-slider),
+:global([data-media-player]:not([data-started]) .vds-video-layout[data-sm])
+  :global(.vds-time-group) {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Keep all controls groups visible when not started */
+:global([data-media-player]:not([data-started]) .vds-video-layout[data-sm])
+  :global(.vds-controls-group:not(:nth-child(3))) {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Touch/pointer coarse overrides - keep controls visible during scrubbing */
+@media (pointer: coarse) {
+  :global([data-preview] .vds-video-layout:not([data-no-scrub-gesture]))
+    :global(.vds-button),
+  :global([data-preview] .vds-video-layout:not([data-no-scrub-gesture]))
+    :global(.vds-slider:not(.vds-time-slider)),
+  :global([data-preview] .vds-video-layout:not([data-no-scrub-gesture]))
+    :global(.vds-time),
+  :global([data-preview] .vds-video-layout:not([data-no-scrub-gesture]))
+    :global(.vds-chapter-title),
+  :global([data-preview] .vds-video-layout:not([data-no-scrub-gesture]))
+    :global(.vds-time-divider),
+  :global([data-preview] .vds-video-layout:not([data-no-scrub-gesture]))
+    :global(.vds-captions),
+  :global([data-preview] .vds-video-layout:not([data-no-scrub-gesture]))
+    :global(.vds-live-button) {
+    opacity: 1 !important;
+  }
+
+  :global([data-preview] .vds-video-layout:not([data-no-scrub-gesture]) .vds-time-slider) {
+    transform: none !important;
+  }
+}
+
+/* Ensure control buttons have consistent sizing on mobile */
+:global(.vds-video-layout[data-sm]) :global(.vds-button) {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+}
+
+/* Keep time display visible and properly sized */
+:global(.vds-video-layout[data-sm]) :global(.vds-time) {
+  font-size: 14px !important;
+}
+
+/* Ensure the controls spacing is consistent */
+:global(.vds-video-layout[data-sm]) :global(.vds-controls-group:nth-last-child(2)) {
+  pointer-events: auto !important;
+}
+
+/* Keep menu buttons always visible */
+:global(.vds-video-layout[data-sm]) :global(.vds-menu-button) {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* ==========================================================================
+   HIDE CHAPTER TITLE FROM BOTTOM BAR (already shown in header)
+   ========================================================================== */
+
+/* Hide the chapter title that appears in the bottom controls bar */
+:global(.vds-video-layout) :global(.vds-chapter-title) {
+  display: none !important;
+}
+
+/* Also hide the title container if it becomes empty */
+:global(.vds-video-layout) :global(.vds-title:empty),
+:global(.vds-video-layout) :global(.vds-title-text:empty) {
+  display: none !important;
+}
+
+/* ==========================================================================
+   PREVENT CONTROL REPOSITIONING ON SMALL SCREENS
+   ========================================================================== */
+
+/* Disable the play button transform on small screens */
+:global(.vds-video-layout[data-sm] .vds-controls .vds-play-button) {
+  transform: none !important;
+  --media-button-hover-transform: none !important;
+}
+
+/* Keep controls groups at normal positions */
+:global(.vds-video-layout[data-sm] .vds-controls-group:last-child) {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* Keep buffering indicator centered without transform */
+:global(.vds-video-layout[data-sm] .vds-buffering-indicator) {
+  transform: none !important;
+}
+
+/* Ensure time slider stays in place */
+:global(.vds-video-layout[data-sm] .vds-time-slider) {
+  --track-height: 4px !important;
+}
+
+/* Keep volume popup positioned correctly */
+:global(.vds-video-layout[data-sm] .vds-volume-popup) {
+  transform: translateX(-50%) !important;
+}
+
+/* Prevent controls from being hidden during preview on touch devices */
+@media (pointer: coarse) {
+  :global(.vds-video-layout:not([data-no-scrub-gesture])) :global(.vds-controls-group) {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
+
+/* ==========================================================================
+   Mobile Orientation Lock Styles
+   ========================================================================== */
+
+.orientationLockOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 100;
+  gap: 20px;
+  padding: 24px;
+  text-align: center;
+}
+
+.orientationLockIcon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  animation: rotatePhone 2s ease-in-out infinite;
+}
+
+@keyframes rotatePhone {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(90deg); }
+  50% { transform: rotate(90deg); }
+  75% { transform: rotate(0deg); }
+}
+
+.orientationLockText {
+  font-size: 1.1rem;
+  color: #fff;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+.orientationLockSubtext {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 8px;
+}
+
+.orientationLockButton {
+  padding: 12px 24px;
+  background: var(--accent, #7c3aed);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.orientationLockButton:hover {
+  background: var(--accent-hover, #6d28d9);
+  transform: scale(1.02);
+}
+
+.orientationLockDismiss {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.orientationLockDismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+

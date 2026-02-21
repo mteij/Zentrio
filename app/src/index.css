@@ -53,6 +53,9 @@ html {
   overscroll-behavior: none;
   height: 100%;
   width: 100%;
+  /* Disable zoom on desktop apps */
+  touch-action: manipulation;
+  -ms-touch-action: manipulation;
 }
 
 body {

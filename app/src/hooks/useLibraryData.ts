@@ -26,10 +26,12 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
   const [items, setItems] = useState<ListItem[]>([])
   
   // UI state
-  const [loading, setLoading] = useState(true)
+  const [listsLoading, setListsLoading] = useState(true)
+  const [itemsLoading, setItemsLoading] = useState(false)
   const [error, setError] = useState('')
 
   const loadItems = useCallback(async (lid: number, signal?: AbortSignal) => {
+    setItemsLoading(true)
     try {
       const itemsRes = await apiFetch(`/api/lists/${lid}/items?profileId=${profileId}`, { signal })
       const itemsData = await itemsRes.json()
@@ -41,12 +43,17 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
           console.error(err)
           setItems([])
       }
+    } finally {
+      if (!signal?.aborted) {
+        setItemsLoading(false)
+      }
     }
   }, [profileId])
 
   const loadLibrary = useCallback(async (signal?: AbortSignal) => {
     if (!profileId) return
-    setLoading(true)
+    setListsLoading(true)
+    setError('')
     try {
       const [listsRes, sharedRes, profileSharedRes, pendingRes, availableRes] = await Promise.all([
           apiFetch(`/api/lists?profileId=${profileId}`, { signal }),
@@ -124,7 +131,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
       }
     } finally {
       if (!signal?.aborted) {
-          setLoading(false)
+          setListsLoading(false)
       }
     }
   }, [profileId, listId, loadItems])
@@ -140,7 +147,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
   // Handle URL listId changes
   useEffect(() => {
     let controller: AbortController | null = null
-    if (listId && !loading) {
+    if (listId && !listsLoading) {
       const id = parseInt(listId)
       const found = myLists.find(l => l.id === id) ||
         accountSharedLists.find(l => l.id === id) ||
@@ -155,7 +162,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
       }
     }
     return () => controller?.abort()
-  }, [listId, myLists, accountSharedLists, profileSharedLists, loading, activeList, loadItems])
+  }, [listId, myLists, accountSharedLists, profileSharedLists, listsLoading, activeList, loadItems])
 
   // Actions
   const createList = async (name: string) => {
@@ -211,7 +218,9 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
       availableFromOtherProfiles,
       activeList,
       items,
-      loading,
+      loading: listsLoading,
+      listsLoading,
+      itemsLoading,
       error
     },
     setters: {

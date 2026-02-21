@@ -268,6 +268,8 @@ export function StreamingSettings() {
       
       if (res.ok) {
         setSettings(newSettings)
+        window.dispatchEvent(new CustomEvent('streaming-settings-updated'))
+        sessionStorage.setItem('streaming-settings-dirty', '1')
         toast.success('Settings Saved', { description: 'Streaming settings updated' })
       } else {
         toast.error('Save Failed', { description: 'Failed to save settings' })

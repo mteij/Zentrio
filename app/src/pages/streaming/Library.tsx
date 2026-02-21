@@ -35,7 +35,8 @@ export const StreamingLibrary = () => {
       availableFromOtherProfiles,
       activeList,
       items,
-      loading,
+      listsLoading,
+      itemsLoading,
       error
     },
     setters: {
@@ -237,27 +238,6 @@ export const StreamingLibrary = () => {
   }, [setItems])
 
 
-  if (loading) {
-    return (
-      <Layout title="Library" showHeader={false} showFooter={false}>
-        <div className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}>
-          <div className={styles.contentContainer} style={{ marginTop: 0 }}>
-            <div style={{ padding: '0 60px', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ width: '180px', height: '40px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }}>
-                <div className={styles.skeletonShimmer} />
-              </div>
-            </div>
-            <div className={styles.mediaGrid}>
-              {Array.from({ length: 12 }).map((_, i) => (
-                <SkeletonCard key={i} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </Layout>
-    )
-  }
-
   if (error) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#141414', color: 'white' }}>
@@ -382,6 +362,12 @@ export const StreamingLibrary = () => {
           )}
 
           {/* My Lists Section */}
+          {listsLoading && (
+            <div style={{ marginBottom: '18px', color: 'rgba(255,255,255,0.65)', fontSize: '0.85rem' }}>
+              Loading lists...
+            </div>
+          )}
+
           <SidebarSection
             title="My Lists"
             icon={<Lock size={16} />}
@@ -906,7 +892,18 @@ export const StreamingLibrary = () => {
           )}
 
           {/* List content */}
-          {items.length === 0 ? (
+          {activeList && itemsLoading ? (
+            <div className={styles.mediaGrid} style={{ padding: 0 }}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : !activeList && listsLoading ? (
+            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#666' }}>
+              <LibraryIcon size={56} style={{ marginBottom: '20px', opacity: 0.4 }} />
+              <p style={{ fontSize: '1.2rem', marginBottom: '8px', color: '#888' }}>Loading your library...</p>
+            </div>
+          ) : items.length === 0 ? (
             <div style={{ padding: '80px 20px', textAlign: 'center', color: '#666' }}>
               <LibraryIcon size={56} style={{ marginBottom: '20px', opacity: 0.4 }} />
               <p style={{ fontSize: '1.2rem', marginBottom: '8px', color: '#888' }}>This list is empty</p>

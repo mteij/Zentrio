@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Layout, RatingBadge, LazyImage, SkeletonCard } from '../../components'
+import { Layout, RatingBadge, LazyImage, SkeletonCard, AnimatedBackground } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
@@ -167,9 +167,15 @@ export const StreamingCatalog = () => {
   const firstPageTitle = data?.pages[0]?.title
   const title = firstPageTitle || `${type === 'movie' ? 'Movies' : 'Series'} - ${id}`
   const showImdbRatings = true
+  const ambientImage = allItems.length > 0 ? (allItems[0].background || allItems[0].poster) : undefined
 
   return (
     <Layout title={title} showHeader={false} showFooter={false}>
+      <AnimatedBackground
+        image={ambientImage}
+        fallbackColor="#000"
+        opacity={0.45}
+      />
       
       <button onClick={() => navigate(-1)} className={styles.backBtn}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
