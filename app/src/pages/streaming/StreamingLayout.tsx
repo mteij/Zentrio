@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navbar } from '../../components/layout/Navbar'
 import { useEffect } from 'react'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
-import { preloadCommonRoutes } from '../../utils/route-preloader'
+import { preloadCommonRoutes, shouldPreload } from '../../utils/route-preloader'
 
 const fetchProfile = async (profileId: string) => {
   // Use lightweight profile endpoint instead of heavy dashboard
@@ -55,7 +55,12 @@ export const StreamingLayout = () => {
     if (!profileId) return
     
     // Preload route chunks (code splitting)
-    preloadCommonRoutes()
+    const cleanupPreload = preloadCommonRoutes()
+
+    const canAggressivePrefetch = shouldPreload()
+    if (!canAggressivePrefetch) {
+      return cleanupPreload
+    }
     
     // Prefetch dashboard data (used by both Home and Explore)
     queryClient.prefetchQuery({
@@ -70,6 +75,8 @@ export const StreamingLayout = () => {
       queryFn: () => apiFetchJson(`/api/streaming/filters?profileId=${profileId}`),
       staleTime: 1000 * 60 * 10 // 10 minutes
     })
+
+    return cleanupPreload
   }, [profileId, queryClient])
 
   // Determine if we are on a page where the navbar should be hidden

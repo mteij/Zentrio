@@ -22,6 +22,7 @@ import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import styles from '../../styles/Player.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 import { isTauri } from '../../lib/auth-client'
+import { resolveBeaconUrl } from '../../lib/url'
 
 // Threshold for "short video" warning (videos under 5 minutes)
 const SHORT_VIDEO_THRESHOLD = 300 // 5 minutes in seconds
@@ -44,9 +45,38 @@ interface MetaInfo {
     videos?: { season: number; number: number; id: string; title?: string }[]
 }
 
+type PlayerSubtitleTrack = {
+    src: string
+    label: string
+    language: string
+    type?: string
+    addonName?: string
+    default?: boolean
+}
+
+function mergeSubtitleTracks(
+    baseTracks: PlayerSubtitleTrack[],
+    incomingTracks: PlayerSubtitleTrack[],
+): PlayerSubtitleTrack[] {
+    if (incomingTracks.length === 0) return baseTracks
+
+    const bySrc = new Map<string, PlayerSubtitleTrack>()
+    baseTracks.forEach((track) => {
+        if (track.src) bySrc.set(track.src, track)
+    })
+
+    incomingTracks.forEach((track) => {
+        if (!track.src) return
+        if (!bySrc.has(track.src)) bySrc.set(track.src, track)
+    })
+
+    return Array.from(bySrc.values())
+}
+
 export const StreamingPlayer = () => {
     const { profileId } = useParams<{ profileId: string }>()
     const [searchParams] = useSearchParams()
+    const searchParamsKey = searchParams.toString()
     const navigate = useNavigate()
     const location = useLocation()
     const playerWrapperRef = useRef<HTMLDivElement | null>(null)
@@ -96,7 +126,6 @@ export const StreamingPlayer = () => {
 
     // Trakt scrobbling state
     const traktScrobbleStartedRef = useRef(false)
-    const lastScrobbleProgressRef = useRef(0)
 
     // Force reload if not cross-origin isolated (needed for FFMPEG)
     useEffect(() => {
@@ -122,6 +151,60 @@ export const StreamingPlayer = () => {
 
     // Parse URL params or location state
     useEffect(() => {
+        let cancelled = false
+
+        const fetchResumeProgress = async (parsedMeta: MetaInfo): Promise<number> => {
+            try {
+                const seasonParam = parsedMeta.season ? `&season=${parsedMeta.season}` : ''
+                const episodeParam = parsedMeta.episode ? `&episode=${parsedMeta.episode}` : ''
+                const progressUrl = `/api/streaming/progress/${parsedMeta.type}/${parsedMeta.id}?profileId=${profileId}${seasonParam}${episodeParam}`
+                const progRes = await apiFetch(progressUrl)
+                if (!progRes.ok) return 0
+
+                const progData = await progRes.json()
+                return progData.position && !progData.isWatched ? progData.position : 0
+            } catch {
+                return 0
+            }
+        }
+
+        const fetchAddonSubtitles = async (
+            parsedMeta: MetaInfo,
+            parsedStream: Stream,
+            profileIdValue: string,
+        ): Promise<PlayerSubtitleTrack[]> => {
+            try {
+                const videoHash = parsedStream?.behaviorHints?.videoHash
+                const hashParam = videoHash ? `&videoHash=${videoHash}` : ''
+                const subtitleUrl = `/api/streaming/subtitles/${parsedMeta.type}/${parsedMeta.id}?profileId=${profileIdValue}${hashParam}`
+                const res = await apiFetch(subtitleUrl)
+                if (!res.ok) return []
+
+                const data = await res.json()
+                if (!data.subtitles || !Array.isArray(data.subtitles)) return []
+
+                return data.subtitles
+                    .filter((sub: { url?: string }) => !!sub?.url)
+                    .map(
+                        (sub: {
+                            url: string
+                            lang: string
+                            addonName?: string
+                            type?: string
+                            format?: string
+                        }) => ({
+                            src: sub.url,
+                            label: sub.addonName ? `${sub.lang} (${sub.addonName})` : sub.lang,
+                            language: sub.lang || 'und',
+                            type: sub.type || sub.format,
+                            addonName: sub.addonName,
+                        }),
+                    )
+            } catch {
+                return []
+            }
+        }
+
         const initPlayer = async () => {
             try {
                 let parsedStream: Stream | null = null
@@ -133,8 +216,9 @@ export const StreamingPlayer = () => {
                     parsedMeta = location.state.meta
                 } else {
                     // Fall back to URL params
-                    const streamParam = searchParams.get('stream')
-                    const metaParam = searchParams.get('meta')
+                    const params = new URLSearchParams(searchParamsKey)
+                    const streamParam = params.get('stream')
+                    const metaParam = params.get('meta')
 
                     if (!streamParam || !metaParam) {
                         navigate(`/streaming/${profileId}`)
@@ -153,15 +237,8 @@ export const StreamingPlayer = () => {
                 setMeta(parsedMeta)
 
                 // Load inline subtitles from stream
-                const tracks: typeof subtitleTracks = []
-                console.log('[Player] === Starting subtitle loading ===')
-                console.log('[Player] Content ID:', parsedMeta.id)
-                console.log('[Player] Content Type:', parsedMeta.type)
-                console.log('[Player] Profile ID:', profileId)
-                console.log('[Player] Stream subtitles:', parsedStream.subtitles)
-                
+                const tracks: PlayerSubtitleTrack[] = []
                 if (parsedStream.subtitles && Array.isArray(parsedStream.subtitles)) {
-                    console.log('[Player] Processing inline subtitles, count:', parsedStream.subtitles.length)
                     parsedStream.subtitles.forEach((sub: { url: string; lang: string }, i: number) => {
                         if (sub?.url) {
                             tracks.push({
@@ -172,93 +249,39 @@ export const StreamingPlayer = () => {
                             })
                         }
                     })
-                } else {
-                    console.log('[Player] No inline subtitles found')
-                }
-                console.log('[Player] Inline subtitles loaded:', tracks.length)
-
-                // Fetch subtitles from addon services
-                try {
-                    const contentId = parsedMeta.id
-                    const contentType = parsedMeta.type
-                    const videoHash = parsedStream?.behaviorHints?.videoHash
-                    const hashParam = videoHash ? `&videoHash=${videoHash}` : ''
-                    const subtitleUrl = `/api/streaming/subtitles/${contentType}/${contentId}?profileId=${profileId}${hashParam}`
-                    console.log('[Player] Fetching subtitles from:', subtitleUrl)
-                    const res = await apiFetch(subtitleUrl)
-                    console.log('[Player] Subtitle API response status:', res.status)
-                    if (res.ok) {
-                        const data = await res.json()
-                        console.log('[Player] Subtitle API response data:', data)
-                        if (data.subtitles && Array.isArray(data.subtitles)) {
-                            console.log('[Player] Adding', data.subtitles.length, 'subtitles from API')
-                            data.subtitles.forEach((sub: { url: string; lang: string; addonName?: string; type?: string; format?: string }) => {
-                                tracks.push({
-                                    src: sub.url,
-                                    label: sub.addonName ? `${sub.lang} (${sub.addonName})` : sub.lang,
-                                    language: sub.lang || 'und',
-                                    type: sub.type || sub.format, // Use type or format as type
-                                    addonName: sub.addonName
-                                })
-                            })
-                        } else {
-                            console.log('[Player] API response has no subtitles array')
-                        }
-                    } else {
-                        console.warn('[Player] Subtitle API returned non-OK status:', res.status)
-                    }
-                } catch (e) {
-                    console.warn('[Player] Failed to fetch addon subtitles', e)
                 }
 
-                console.log('[Player] Total subtitle tracks loaded:', tracks.length)
-                console.log('[Player] Final subtitle tracks:', tracks)
-                console.log('[Player] === Finished subtitle loading ===')
-                
-                if (tracks.length === 0) {
-                    console.warn('[Player] ⚠️ No subtitles available')
-                    console.warn('[Player] Reason: No addon provides subtitle resources for this content.')
-                    console.warn('[Player] Solution: Install a subtitle addon like OpenSubtitles:')
-                    console.warn('[Player]   1. Go to Settings > Addons')
-                    console.warn('[Player]   2. Add: https://github.com/openSubtitles/stremio-addon/manifest.json')
-                    console.warn('[Player]   3. Enable the subtitle addon')
-                    console.warn('[Player] Most torrent/debrid addons do NOT provide subtitles.')
-                }
-                
                 setSubtitleTracks(tracks)
 
-                // Fetch existing progress
-                let watchStart = 0
-                try {
-                    const seasonParam = parsedMeta.season ? `&season=${parsedMeta.season}` : ''
-                    const episodeParam = parsedMeta.episode ? `&episode=${parsedMeta.episode}` : ''
-                    const progressUrl = `/api/streaming/progress/${parsedMeta.type}/${parsedMeta.id}?profileId=${profileId}${seasonParam}${episodeParam}`
-                    console.log('[Player] Fetching resume position:', progressUrl)
-                    const progRes = await apiFetch(progressUrl)
-                    if (progRes.ok) {
-                         const progData = await progRes.json()
-                         if (progData.position && !progData.isWatched) {
-                              watchStart = progData.position
-                              console.log('[Player] Found resume position:', watchStart)
-                         }
-                    }
-                } catch (e) {
-                    console.warn('[Player] Failed to load watch progress:', e)
-                }
+                // Run progress fetch and subtitle addon fetch in parallel.
+                // We await progress for resume accuracy, while subtitles merge in background.
+                const subtitlePromise = fetchAddonSubtitles(parsedMeta, parsedStream, profileId!).then((addonTracks) => {
+                    if (cancelled || addonTracks.length === 0) return
+                    setSubtitleTracks((prev) => mergeSubtitleTracks(prev as PlayerSubtitleTrack[], addonTracks))
+                })
+
+                const watchStart = await fetchResumeProgress(parsedMeta)
+                if (cancelled) return
 
                 setStartTime(watchStart)
                 lastSavedProgressRef.current = watchStart
-                
+                setLoading(false)
+
+                void subtitlePromise
             } catch (e) {
                 console.error('Failed to initialize player', e)
+                if (cancelled) return
                 setError('Invalid player parameters')
-            } finally {
                 setLoading(false)
             }
         }
 
         initPlayer()
-    }, [searchParams.toString(), profileId, location.state])
+
+        return () => {
+            cancelled = true
+        }
+    }, [searchParamsKey, profileId, location.state, navigate])
 
     // Calculate episode navigation
     useEffect(() => {
@@ -413,11 +436,11 @@ export const StreamingPlayer = () => {
             traktScrobbleStartedRef.current = false
         }
         
-        if (nextEpisode) {
+        if (nextEpisode && meta) {
             // Auto-play next episode
-            goToEpisode(nextEpisode)
+            navigate(`/streaming/${profileId}/${meta.type}/${meta.id}/s${nextEpisode.season}e${nextEpisode.number}`)
         }
-    }, [nextEpisode, meta, profileId])
+    }, [nextEpisode, meta, profileId, navigate])
 
     // Handle error
     const handleError = useCallback((error: Error) => {
@@ -496,7 +519,7 @@ export const StreamingPlayer = () => {
                     episode: meta.episode,
                     progress: Math.round(progress)
                 })
-                navigator.sendBeacon('/api/trakt/scrobble/stop', new Blob([data], { type: 'application/json' }))
+                navigator.sendBeacon(resolveBeaconUrl('/api/trakt/scrobble/stop'), new Blob([data], { type: 'application/json' }))
             }
             
             // Notify other components that history was updated

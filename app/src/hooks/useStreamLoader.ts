@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Stream, Manifest } from '../services/addons/types'
+import { Stream } from '../services/addons/types'
 import { toast } from 'sonner'
+import { createApiEventSource } from '../lib/url'
 
 export type AddonStatus = 'idle' | 'loading' | 'done' | 'error'
 
@@ -65,6 +66,10 @@ export function useStreamLoader(): UseStreamLoaderResult {
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null)
   
   const eventSourceRef = useRef<EventSource | null>(null)
+  const pendingStreamsRef = useRef<FlatStream[] | null>(null)
+  const flushRafRef = useRef<number | null>(null)
+  const firstPlayableAppliedRef = useRef(false)
+  const loadIdRef = useRef(0)
   
   // Store last request params for refresh
   const lastRequestRef = useRef<{
@@ -84,11 +89,36 @@ export function useStreamLoader(): UseStreamLoaderResult {
   useEffect(() => {
     return () => {
       eventSourceRef.current?.close()
+      if (flushRafRef.current !== null) {
+        cancelAnimationFrame(flushRafRef.current)
+        flushRafRef.current = null
+      }
     }
   }, [])
 
+  const flushPendingStreams = useCallback(() => {
+    flushRafRef.current = null
+    const pending = pendingStreamsRef.current
+    if (!pending) return
+    pendingStreamsRef.current = null
+    setStreams(pending)
+    setTotalCount(pending.length)
+  }, [])
+
+  const scheduleStreamsUpdate = useCallback((nextStreams: FlatStream[]) => {
+    pendingStreamsRef.current = nextStreams
+    if (flushRafRef.current !== null) return
+    flushRafRef.current = requestAnimationFrame(flushPendingStreams)
+  }, [flushPendingStreams])
+
   const reset = useCallback(() => {
     eventSourceRef.current?.close()
+    if (flushRafRef.current !== null) {
+      cancelAnimationFrame(flushRafRef.current)
+      flushRafRef.current = null
+    }
+    pendingStreamsRef.current = null
+    firstPlayableAppliedRef.current = false
     setStreams([])
     setAddonStatuses(new Map())
     setSelectedAddon(null)
@@ -106,8 +136,16 @@ export function useStreamLoader(): UseStreamLoaderResult {
     episode?: number,
     forceRefresh: boolean = false
   ) => {
+    loadIdRef.current += 1
+
     // Close any existing connection
     eventSourceRef.current?.close()
+    if (flushRafRef.current !== null) {
+      cancelAnimationFrame(flushRafRef.current)
+      flushRafRef.current = null
+    }
+    pendingStreamsRef.current = null
+    firstPlayableAppliedRef.current = false
     
     // Store request params for potential refresh
     lastRequestRef.current = { type, id, profileId, season, episode }
@@ -131,7 +169,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     }
 
     // Create EventSource
-    const eventSource = new EventSource(url)
+    const eventSource = createApiEventSource(url)
     eventSourceRef.current = eventSource
 
     // Listen for cache-status event
@@ -175,9 +213,20 @@ export function useStreamLoader(): UseStreamLoaderResult {
 
       // Use the globally sorted allStreams from the server
       if (data.allStreams) {
-        setStreams(data.allStreams)
-        setTotalCount(data.allStreams.length)
+        firstPlayableAppliedRef.current = true
+        scheduleStreamsUpdate(data.allStreams)
       }
+    })
+
+    eventSource.addEventListener('first-playable', (e) => {
+      const data = JSON.parse(e.data)
+      if (firstPlayableAppliedRef.current) return
+      const first = data?.stream
+      if (!first?.stream) return
+
+      firstPlayableAppliedRef.current = true
+      setStreams([first])
+      setTotalCount(Math.max(1, data?.totalCount || 1))
     })
 
     eventSource.addEventListener('addon-error', (e) => {
@@ -205,6 +254,12 @@ export function useStreamLoader(): UseStreamLoaderResult {
     eventSource.addEventListener('complete', (e) => {
       const data = JSON.parse(e.data)
       if (data.allStreams) {
+        firstPlayableAppliedRef.current = true
+        if (flushRafRef.current !== null) {
+          cancelAnimationFrame(flushRafRef.current)
+          flushRafRef.current = null
+        }
+        pendingStreamsRef.current = null
         setStreams(data.allStreams)
         setTotalCount(data.totalCount || data.allStreams.length)
       }
@@ -222,7 +277,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
       setIsLoading(false)
       eventSource.close()
     })
-  }, [])
+  }, [scheduleStreamsUpdate])
 
   // Refresh function - reloads with cache bypass
   const refreshStreams = useCallback(() => {

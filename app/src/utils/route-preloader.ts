@@ -7,6 +7,11 @@
 
 type PreloadRoute = () => Promise<any>
 
+type NetworkInfo = {
+  effectiveType?: string
+  saveData?: boolean
+}
+
 /**
  * Routes to preload after the app mounts.
  * These are ordered by likelihood of being accessed.
@@ -20,12 +25,36 @@ const ROUTES_TO_PRELOAD: PreloadRoute[] = [
   
   // Secondary routes
   () => import('../pages/streaming/Details'),
-  () => import('../pages/SettingsPage'),
+  () => import('../pages/SettingsPage.tsx'),
   () => import('../pages/ProfilesPage'),
   
   // Less common routes
   () => import('../pages/ExploreAddonsPage'),
 ]
+
+function getNetworkInfo(): NetworkInfo | null {
+  try {
+    return (navigator as any).connection || null
+  } catch {
+    return null
+  }
+}
+
+function getAdaptivePreloadCount(): number {
+  const connection = getNetworkInfo()
+  if (!connection) return ROUTES_TO_PRELOAD.length
+
+  if (connection.saveData) return 0
+
+  const effectiveType = connection.effectiveType || '4g'
+  const deviceMemory = (navigator as any).deviceMemory as number | undefined
+
+  if (effectiveType === 'slow-2g' || effectiveType === '2g') return 0
+  if (effectiveType === '3g') return 3
+  if (typeof deviceMemory === 'number' && deviceMemory <= 2) return 4
+
+  return ROUTES_TO_PRELOAD.length
+}
 
 /**
  * Preloads common routes in the background after a small delay.
@@ -33,6 +62,12 @@ const ROUTES_TO_PRELOAD: PreloadRoute[] = [
  * navigation speed for common user flows.
  */
 export function preloadCommonRoutes() {
+  if (!shouldPreload()) return () => {}
+
+  const preloadCount = getAdaptivePreloadCount()
+  if (preloadCount <= 0) return () => {}
+  const routesToPreload = ROUTES_TO_PRELOAD.slice(0, preloadCount)
+
   // Delay preloading briefly to allow initial render to complete
   const PRELOAD_DELAY = 500 // 500ms - load chunks quickly after mount
 
@@ -40,11 +75,11 @@ export function preloadCommonRoutes() {
     // Use requestIdleCallback if available to load during browser idle periods
     if ('requestIdleCallback' in window) {
       requestIdleCallback(() => {
-        preloadRoutesWithIdleCallback()
+        preloadRoutesWithIdleCallback(routesToPreload)
       }, { timeout: 5000 })
     } else {
       // Fallback: preload after delay
-      preloadRoutesWithTimeout()
+      preloadRoutesWithTimeout(routesToPreload)
     }
   }, PRELOAD_DELAY)
 
@@ -54,13 +89,13 @@ export function preloadCommonRoutes() {
 /**
  * Preloads routes using requestIdleCallback for optimal performance
  */
-function preloadRoutesWithIdleCallback() {
+function preloadRoutesWithIdleCallback(routes: PreloadRoute[]) {
   let index = 0
 
   function preloadNext() {
-    if (index >= ROUTES_TO_PRELOAD.length) return
+    if (index >= routes.length) return
 
-    const route = ROUTES_TO_PRELOAD[index]
+    const route = routes[index]
     index++
 
     if ('requestIdleCallback' in window) {
@@ -83,8 +118,8 @@ function preloadRoutesWithIdleCallback() {
  * Preloads routes with a staggered timeout
  * Used as fallback when requestIdleCallback is not available
  */
-function preloadRoutesWithTimeout() {
-  ROUTES_TO_PRELOAD.forEach((route, index) => {
+function preloadRoutesWithTimeout(routes: PreloadRoute[]) {
+  routes.forEach((route, index) => {
     const delay = index * 200 // Stagger by 200ms
     
     setTimeout(() => {
@@ -130,6 +165,7 @@ export function createHoverPreloader(routeName: string) {
       'streaming-explore': () => import('../pages/streaming/Explore'),
       'streaming-library': () => import('../pages/streaming/Library'),
       'streaming-search': () => import('../pages/streaming/Search'),
+      '/settings': () => import('../pages/SettingsPage.tsx'),
       '/profiles': () => import('../pages/ProfilesPage'),
     }
 
@@ -155,6 +191,8 @@ export function createHoverPreloader(routeName: string) {
  */
 export function preloadPlayer() {
   // Higher priority preload - load immediately but non-blocking
+  if (!shouldPreload()) return
+
   requestAnimationFrame(() => {
     import('../pages/streaming/Player').catch(() => {})
   })

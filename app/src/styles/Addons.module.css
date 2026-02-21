@@ -10,7 +10,7 @@
   min-height: var(--app-height, 100vh);
   position: relative;
   z-index: 1;
-  padding-top: 100px;
+  padding-top: calc(100px + var(--app-content-top-offset, 0px));
   padding-bottom: 60px;
 }
 
@@ -713,7 +713,7 @@
 
 @media (max-width: 768px) {
   .addonsPage {
-    padding-top: 80px;
+    padding-top: calc(80px + var(--app-content-top-offset, 0px));
   }
   
   .addonsContainer {

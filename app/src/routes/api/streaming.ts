@@ -277,6 +277,7 @@ streaming.get('/streams-live/:type/:id', async (c) => {
       
       // Collect all raw results as they come in
       const rawResults: { addon: { id: string, name: string, logo?: string }, streams: any[] }[] = []
+      let firstPlayableSent = false
       
       // Meta for processing
       let meta: any = null
@@ -375,6 +376,15 @@ streaming.get('/streams-live/:type/:id', async (c) => {
                 // Send the full sorted stream list
                 allStreams: sortedStreams
               })
+
+              // Early playable hint for faster perceived readiness in UI
+              if (!firstPlayableSent && sortedStreams.length > 0) {
+                firstPlayableSent = true
+                sendEvent('first-playable', {
+                  stream: sortedStreams[0],
+                  totalCount: sortedStreams.length
+                })
+              }
             },
             onAddonError: (addon, error) => {
               sendEvent('addon-error', {

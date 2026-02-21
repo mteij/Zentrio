@@ -15,6 +15,7 @@ import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import { preloadPlayer } from '../../utils/route-preloader'
 
 interface StreamingDetailsData {
   meta: MetaDetail
@@ -277,6 +278,7 @@ export const StreamingDetails = () => {
       season: selectedEpisode?.season,
       episode: selectedEpisode?.number
     }
+    preloadPlayer()
     navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`, { replace: false })
   }
 

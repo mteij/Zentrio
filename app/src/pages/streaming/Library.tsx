@@ -290,10 +290,10 @@ export const StreamingLibrary = () => {
           flexShrink: 0,
           padding: '20px',
           borderRight: '1px solid rgba(255,255,255,0.06)',
-          height: 'calc(100vh - var(--titlebar-height, 0px) - 20px)',
+          height: 'calc(100vh - var(--app-content-top-offset, 0px) - 20px)',
           overflowY: 'auto',
           position: 'sticky',
-          top: 'calc(var(--titlebar-height, 0px) + 20px + env(safe-area-inset-top))'
+          top: 'calc(var(--app-content-top-offset, 0px) + 20px)'
         }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>

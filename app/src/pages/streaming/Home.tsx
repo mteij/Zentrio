@@ -189,6 +189,7 @@ export const StreamingHome = () => {
                 metadata={metadata}
                 profileId={profileId!}
                 showImdbRatings={showImdbRatings}
+                priority={idx < 2 ? 'eager' : 'lazy'}
               />
             ))
           )}

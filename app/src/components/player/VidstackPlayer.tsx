@@ -26,14 +26,11 @@ import {
 } from '@vidstack/react/player/layouts/default'
 import {
     Menu,
-    Tooltip,
     useMediaRemote,
-    useMediaStore,
     useMediaState,
     useCaptionOptions,
-    type TextTrack
 } from '@vidstack/react'
-import { ChevronRight, Captions, Check, Music, Volume2 } from 'lucide-react'
+import { Captions, Check, Music } from 'lucide-react'
 
 // Import Vidstack styles
 import '@vidstack/react/player/styles/base.css'
@@ -55,9 +52,6 @@ const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__
 // Global cache to prevent re-probing on remounts
 // Maps URL -> 'native' | 'hybrid' | 'failed'
 const probeCache = new Map<string, { mode: 'native' | 'hybrid', duration?: number }>()
-
-// Track in-flight probes to deduplicate requests
-const pendingProbes = new Map<string, Promise<{ mode: 'native' | 'hybrid', duration?: number }>>()
 
 export interface SubtitleTrack {
     src: string
@@ -160,7 +154,7 @@ function AudioTracksMenu() {
     )
 }
 
-function SubtitlesMenu({ tracks }: { tracks: SubtitleTrack[] }) {
+function SubtitlesMenu({ tracks: _tracks }: { tracks: SubtitleTrack[] }) {
     // We only need remote for turning off subtitles (setting track -1)
     const remote = useMediaRemote()
     const captionOptions = useCaptionOptions()
@@ -408,7 +402,6 @@ export function VidstackPlayer({
     autoPlay = true,
     showCast = true
 }: VidstackPlayerProps) {
-    // Debug: log subtitles when they change
     useEffect(() => {
         console.log('[VidstackPlayer] Subtitles prop updated:', subtitles)
     }, [subtitles])
@@ -628,7 +621,7 @@ export function VidstackPlayer({
                 console.log('[VidstackPlayer] Duration set:', duration)
 
                 // Listen to engine events
-                engine.addEventListener('audioready', (e: any) => {
+                engine.addEventListener('audioready', (_e: any) => {
                     console.log('[VidstackPlayer] Audio data ready for playback')
                     setHybridReady(true)
                     // Don't auto-play - wait for user interaction

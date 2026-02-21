@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ChevronDown, Filter, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -122,6 +122,8 @@ export const StreamingExplore = () => {
   const [loadingFiltered, setLoadingFiltered] = useState(false)
   const [skip, setSkip] = useState(0)
   const [hasMore, setHasMore] = useState(true)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const loadingMoreRef = useRef(false)
 
   useEffect(() => {
     if (isFilteredView && profileId) {
@@ -148,8 +150,9 @@ export const StreamingExplore = () => {
     }
   }, [isFilteredView, activeGenre, activeType, profileId])
 
-  const loadMore = async () => {
-    if (loadingFiltered || !hasMore || !isFilteredView) return
+  const loadMore = useCallback(async () => {
+    if (loadingFiltered || !hasMore || !isFilteredView || loadingMoreRef.current) return
+    loadingMoreRef.current = true
     const typeParam = activeType || ''
     const genreParam = activeGenre || ''
     try {
@@ -163,20 +166,37 @@ export const StreamingExplore = () => {
         }
     } catch (e) {
         console.error(e)
+    } finally {
+        loadingMoreRef.current = false
     }
-  }
+  }, [loadingFiltered, hasMore, isFilteredView, activeType, activeGenre, profileId, skip])
 
-  // Infinite scroll for filtered view
+  // Infinite scroll for filtered view (observer-based to reduce scroll handler overhead)
   useEffect(() => {
-      const handleScroll = () => {
-        // Infinite scroll
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
+      if (!isFilteredView || !hasMore) return
+
+      const target = loadMoreRef.current
+      if (!target) return
+
+      if (!('IntersectionObserver' in window)) {
+        const id = globalThis.setInterval(() => {
           loadMore()
-        }
+        }, 700)
+        return () => globalThis.clearInterval(id)
       }
-      window.addEventListener('scroll', handleScroll)
-      return () => window.removeEventListener('scroll', handleScroll)
-  }, [loadingFiltered, hasMore, skip, isFilteredView, activeGenre, activeType])
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting) {
+            loadMore()
+          }
+        },
+        { rootMargin: '700px 0px', threshold: 0.01 }
+      )
+
+      observer.observe(target)
+      return () => observer.disconnect()
+  }, [isFilteredView, hasMore, loadMore])
 
 
   const updateFilter = (key: string, value: string) => {
@@ -384,23 +404,26 @@ export const StreamingExplore = () => {
                                  {[...Array(10)].map((_, i) => <SkeletonCard key={i} />)}
                              </div>
                          ) : filteredItems.length > 0 ? (
-                             <div className={styles.mediaGrid}>
-                                {filteredItems.map((item, index) => (
-                                    <a key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
-                                        <div className={styles.posterContainer}>
-                                            <LazyImage src={item.poster || ''} alt={item.name} className={styles.posterImage} />
-                                             <div className={styles.badgesContainer}>
-                                                {showImdbRatings && item.imdbRating && (
-                                                    <RatingBadge rating={parseFloat(item.imdbRating)} />
-                                                )}
-                                             </div>
-                                            <div className={styles.cardOverlay}>
-                                                <div className={styles.cardTitle}>{item.name}</div>
-                                            </div>
-                                        </div>
-                                    </a>
-                                ))}
-                             </div>
+                             <>
+                               <div className={styles.mediaGrid}>
+                                  {filteredItems.map((item, index) => (
+                                      <a key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
+                                          <div className={styles.posterContainer}>
+                                              <LazyImage src={item.poster || ''} alt={item.name} className={styles.posterImage} />
+                                              <div className={styles.badgesContainer}>
+                                                  {showImdbRatings && item.imdbRating && (
+                                                      <RatingBadge rating={parseFloat(item.imdbRating)} />
+                                                  )}
+                                              </div>
+                                              <div className={styles.cardOverlay}>
+                                                  <div className={styles.cardTitle}>{item.name}</div>
+                                              </div>
+                                          </div>
+                                      </a>
+                                  ))}
+                               </div>
+                               {hasMore && <div ref={loadMoreRef} style={{ height: 1, width: '100%' }} />}
+                             </>
                          ) : (
                              <div className="text-center text-gray-500 py-20">No results found.</div>
                          )}

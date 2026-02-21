@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { User, Palette, Puzzle, Play, AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Settings as SettingsIcon } from 'lucide-react'
-import { toast } from 'sonner'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Settings as SettingsIcon } from 'lucide-react'
 import { SimpleLayout, AnimatedBackground } from '../components/index'
 import { appMode } from '../lib/app-mode'
 
@@ -14,38 +13,15 @@ import styles from '../styles/Settings.module.css'
 
 export function SettingsPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('general')
-  
+  const mobileTabsRef = useRef<HTMLDivElement>(null)
+  const [canScrollMobileLeft, setCanScrollMobileLeft] = useState(false)
+  const [canScrollMobileRight, setCanScrollMobileRight] = useState(false)
+
   // Check if in guest mode
   const isGuestMode = appMode.isGuest()
-  
-  // Scroll indicators state
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
-  const tabsRef = useRef<HTMLDivElement>(null)
 
-  const checkScroll = () => {
-    if (tabsRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current
-      setCanScrollLeft(scrollLeft > 0)
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1)
-    }
-  }
-
-  useEffect(() => {
-    checkScroll()
-    window.addEventListener('resize', checkScroll)
-    return () => window.removeEventListener('resize', checkScroll)
-  }, [])
-
-  useEffect(() => {
-    // In guest mode, default to appearance tab? Or still General?
-    // General has updates/system info which is useful in guest mode too.
-    if (!['general', 'appearance', 'addons', 'streaming', 'danger'].includes(activeTab)) {
-        setActiveTab('general');
-    }
-   }, [isGuestMode, activeTab])
+  const effectiveTab = isGuestMode && activeTab === 'danger' ? 'general' : activeTab
 
   const tabItems = [
     { key: 'general', label: 'General', icon: SettingsIcon },
@@ -54,6 +30,34 @@ export function SettingsPage() {
     { key: 'streaming', label: 'Streaming', icon: Play },
     ...(!isGuestMode ? [{ key: 'danger', label: 'Danger Zone', icon: AlertTriangle }] : [])
   ]
+
+  const updateMobileTabsOverflow = () => {
+    const el = mobileTabsRef.current
+    if (!el) return
+
+    const hasOverflow = el.scrollWidth > el.clientWidth + 1
+    setCanScrollMobileLeft(hasOverflow && el.scrollLeft > 4)
+    setCanScrollMobileRight(hasOverflow && el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
+  }
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(updateMobileTabsOverflow)
+    window.addEventListener('resize', updateMobileTabsOverflow)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', updateMobileTabsOverflow)
+    }
+  }, [effectiveTab, tabItems.length])
+
+  const renderActiveSection = () => {
+    if (effectiveTab === 'general') return <GeneralSettings />
+    if (effectiveTab === 'addons') return <AddonManager />
+    if (effectiveTab === 'appearance') return <AppearanceSettings />
+    if (effectiveTab === 'streaming') return <StreamingSettings />
+    if (effectiveTab === 'danger') return <DangerZoneSettings />
+    return <GeneralSettings />
+  }
 
   return (
     <SimpleLayout title="Settings">
@@ -68,68 +72,78 @@ export function SettingsPage() {
         </button>
 
         <div className={styles.mobileHeader}>
-          <button
-            className={styles.mobileBackBtn}
-            onClick={() => navigate('/profiles')}
-            aria-label="Back to Profiles"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <select
-            className={styles.mobileHeaderSelect}
-            value={activeTab}
-            onChange={(e) => setActiveTab(e.target.value)}
-            aria-label="Select settings section"
-          >
-            {tabItems.map((tab) => (
-              <option key={tab.key} value={tab.key}>{tab.label}</option>
-            ))}
-          </select>
-        </div>
+          <div className={styles.mobileHeaderTop}>
+            <button
+              className={styles.mobileBackBtn}
+              onClick={() => navigate('/profiles')}
+              aria-label="Back to Profiles"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <h1 className={styles.mobileHeaderTitle}>Settings</h1>
+          </div>
 
-        {/* Tabs Navigation */}
-        <div className={styles.settingsTabsWrapper}>
-           {canScrollLeft && (
-             <div className={`${styles.scrollIndicator} ${styles.scrollIndicatorLeft}`}>
-               <ChevronLeft size={16} className={styles.indicatorIcon} />
-             </div>
-           )}
-           <div 
-             className={styles.settingsTabs} 
-             ref={tabsRef}
-             onScroll={checkScroll}
-           >
+          <div className={styles.mobileSectionTabsWrap}>
+            {canScrollMobileLeft && <div className={`${styles.mobileTabsFade} ${styles.mobileTabsFadeLeft}`} aria-hidden="true" />}
+            <div
+              className={styles.mobileSectionTabs}
+              role="tablist"
+              aria-label="Settings sections"
+              ref={mobileTabsRef}
+              onScroll={updateMobileTabsOverflow}
+            >
               {tabItems.map((tab) => {
                 const TabIcon = tab.icon
+                const isActive = effectiveTab === tab.key
+
                 return (
                   <button
                     key={tab.key}
-                    className={`${styles.tabBtn} ${activeTab === tab.key ? styles.tabBtnActive : ''}`}
+                    role="tab"
+                    aria-selected={isActive}
+                    className={`${styles.mobileSectionTab} ${isActive ? styles.mobileSectionTabActive : ''}`}
                     onClick={() => setActiveTab(tab.key)}
                   >
-                    <TabIcon size={16} />
+                    <TabIcon size={14} />
                     {tab.label}
                   </button>
                 )
               })}
-           </div>
-           {canScrollRight && (
-             <div className={`${styles.scrollIndicator} ${styles.scrollIndicatorRight}`}>
-               <ChevronRight size={16} className={styles.indicatorIcon} />
-             </div>
-           )}
+            </div>
+            {canScrollMobileRight && (
+              <div className={`${styles.mobileTabsFade} ${styles.mobileTabsFadeRight}`} aria-hidden="true">
+                <span className={styles.mobileTabsCue}>›</span>
+              </div>
+            )}
+          </div>
+
         </div>
 
-        {/* General Tab */}
-        {activeTab === 'general' && <GeneralSettings />}
+        <div className={styles.settingsShell}>
+          <aside className={styles.settingsSidebar} aria-label="Settings sections">
+            <div className={styles.settingsSidebarTitle}>Settings</div>
+            <div className={styles.settingsSidebarNav}>
+              {tabItems.map((tab) => {
+                const TabIcon = tab.icon
+                const isActive = effectiveTab === tab.key
+                return (
+                  <button
+                    key={tab.key}
+                    className={`${styles.sidebarTabBtn} ${isActive ? styles.sidebarTabBtnActive : ''}`}
+                    onClick={() => setActiveTab(tab.key)}
+                  >
+                    <TabIcon size={16} />
+                    <span>{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </aside>
 
-        {/* Addons Tab */}
-        {activeTab === 'addons' && <AddonManager />}
-
-        {/* Other tabs placeholders */}
-        {activeTab === 'appearance' && <AppearanceSettings />}
-        {activeTab === 'streaming' && <StreamingSettings />}
-        {activeTab === 'danger' && <DangerZoneSettings />}
+          <section className={styles.settingsContent}>
+            {renderActiveSection()}
+          </section>
+        </div>
 
       </div>
     </SimpleLayout>

@@ -1,19 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Layout, Navbar, RatingBadge, LazyImage, SkeletonCard } from '../../components'
+import { Layout, RatingBadge, LazyImage, SkeletonCard } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
-
-interface CatalogResponse {
-  items: MetaPreview[]
-  hasMore: boolean
-}
+import { apiFetch } from '../../lib/apiFetch'
 
 const fetchCatalog = async ({ pageParam = 0, queryKey }: any) => {
-  const [_, profileId, manifestUrl, type, id] = queryKey
-  const res = await fetch(
+  const [, profileId, manifestUrl, type, id] = queryKey
+  const res = await apiFetch(
     `/api/streaming/catalog?profileId=${profileId}&manifestUrl=${encodeURIComponent(manifestUrl)}&type=${type}&id=${id}&skip=${pageParam}`
   )
   if (!res.ok) {
@@ -21,7 +17,9 @@ const fetchCatalog = async ({ pageParam = 0, queryKey }: any) => {
     try {
       const data = await res.json()
       if (data.error) msg = data.error
-    } catch {}
+    } catch {
+      // Ignore JSON parse failures and keep fallback error message
+    }
     throw new Error(msg)
   }
   const data = await res.json()
@@ -85,6 +83,43 @@ export const StreamingCatalog = () => {
     }
   }, [error])
 
+  const allItems = useMemo(() => {
+    // Dedup and sort items
+    const merged = data?.pages.reduce((acc: MetaPreview[], page) => {
+      // Use composite key (id-season-episode) for better deduplication of series episodes
+      const existingKeys = new Set(acc.map(i => {
+        const season = (i as any).season || 0
+        const episode = (i as any).episode || (i as any).number || 0
+        return `${i.id}-${season}-${episode}`
+      }))
+
+      const uniqueNew = page.items.filter((i: MetaPreview) => {
+        const season = (i as any).season || 0
+        const episode = (i as any).episode || (i as any).number || 0
+        const key = `${i.id}-${season}-${episode}`
+        return !existingKeys.has(key)
+      })
+
+      return [...acc, ...uniqueNew]
+    }, []) || []
+
+    // Sort episodes by season and episode number for series
+    if (merged.length > 0 && merged[0].type === 'series') {
+      merged.sort((a, b) => {
+        const seasonA = (a as any).season || 0
+        const seasonB = (b as any).season || 0
+        const episodeA = (a as any).episode || (a as any).number || 0
+        const episodeB = (b as any).episode || (b as any).number || 0
+
+        // Sort by season first, then episode
+        if (seasonA !== seasonB) return seasonA - seasonB
+        return episodeA - episodeB
+      })
+    }
+
+    return merged
+  }, [data?.pages])
+
   if (isLoading) {
     return (
       <Layout title="Loading..." showHeader={false} showFooter={false}>
@@ -126,39 +161,6 @@ export const StreamingCatalog = () => {
         </div>
       </div>
     )
-  }
-
-  // Dedup and sort items
-  const allItems = data?.pages.reduce((acc: MetaPreview[], page) => {
-    // Use composite key (id-season-episode) for better deduplication of series episodes
-    const existingKeys = new Set(acc.map(i => {
-      const season = (i as any).season || 0
-      const episode = (i as any).episode || (i as any).number || 0
-      return `${i.id}-${season}-${episode}`
-    }))
-    
-    const uniqueNew = page.items.filter((i: MetaPreview) => {
-      const season = (i as any).season || 0
-      const episode = (i as any).episode || (i as any).number || 0
-      const key = `${i.id}-${season}-${episode}`
-      return !existingKeys.has(key)
-    })
-    
-    return [...acc, ...uniqueNew]
-  }, []) || []
-
-  // Sort episodes by season and episode number for series
-  if (allItems.length > 0 && allItems[0].type === 'series') {
-    allItems.sort((a, b) => {
-      const seasonA = (a as any).season || 0
-      const seasonB = (b as any).season || 0
-      const episodeA = (a as any).episode || (a as any).number || 0
-      const episodeB = (b as any).episode || (b as any).number || 0
-      
-      // Sort by season first, then episode
-      if (seasonA !== seasonB) return seasonA - seasonB
-      return episodeA - episodeB
-    })
   }
 
   // Get title from first page if available, otherwise construct fallback

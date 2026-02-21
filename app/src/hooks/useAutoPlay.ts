@@ -19,6 +19,7 @@ import {
   AutoPlayConfig 
 } from '../services/addons/stream-service'
 import { FlatStream } from './useStreamLoader'
+import { createApiEventSource } from '../lib/url'
 
 export interface AutoPlayMeta {
   id: string
@@ -156,7 +157,7 @@ export function useAutoPlay(): UseAutoPlayResult {
     }
 
     // Create EventSource for progressive stream loading
-    const eventSource = new EventSource(url)
+    const eventSource = createApiEventSource(url)
     eventSourceRef.current = eventSource
 
     let allStreams: FlatStream[] = []

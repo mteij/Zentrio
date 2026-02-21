@@ -4,6 +4,7 @@ import { Settings, LogOut, Edit, X, Plus } from 'lucide-react'
 import { SimpleLayout, Button, ConfirmDialog, ProfileModal, AnimatedBackground, SkeletonProfile } from '../components'
 import { useAuthStore } from '../stores/authStore'
 import { apiFetch } from '../lib/apiFetch'
+import { buildAvatarUrl } from '../lib/url'
 import styles from './ProfilesPage.module.css'
 import { ContextMenu } from '../components/ui/ContextMenu'
 
@@ -354,7 +355,7 @@ function ProfileCard({ profile, onClick, onEdit }: {
         <div className={styles.profileAvatar}>
             <div id={`avatar-${profile.id}`}>
             <img 
-                src={profile.avatar.startsWith('http') || profile.avatar.startsWith('data:') ? profile.avatar : `/api/avatar/${encodeURIComponent(profile.avatar)}?style=${encodeURIComponent(profile.avatar_style || 'bottts-neutral')}`} 
+                src={buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral')} 
                 alt={profile.name}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={(e) => {

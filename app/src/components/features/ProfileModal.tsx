@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Pencil, Tv, ExternalLink, Loader2, Check, Unplug, RefreshCw } from 'lucide-react'
 import { Button, FormGroup, Input, Modal, ConfirmDialog } from '../index'
 import { apiFetch } from '../../lib/apiFetch'
+import { buildAvatarUrl } from '../../lib/url'
 import { toast } from 'sonner'
 
 // Avatar styles available in DiceBear
@@ -254,12 +255,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
   }
 
   const getAvatarUrl = (seed: string, style: string) => {
-    if (seed.startsWith('http') || seed.startsWith('data:')) {
-      return seed
-    }
-    // Fix: Prevent 404 errors by using a default seed if none provided
-    const seedToUse = seed || 'preview'
-    return `/api/avatar/${encodeURIComponent(seedToUse)}?style=${encodeURIComponent(style)}`
+    return buildAvatarUrl(seed, style, 'preview')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

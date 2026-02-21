@@ -4,8 +4,7 @@
 /* Back Button */
 .backBtn {
   position: fixed;
-  top: 40px;
-  top: calc(40px + var(--titlebar-height, 0px));
+  top: var(--app-fixed-top-xl, 40px);
   left: 40px;
   z-index: 100;
   display: flex;
@@ -48,7 +47,7 @@
 
 @media (max-width: 768px) {
   .backBtn {
-    top: calc(20px + env(safe-area-inset-top));
+    top: var(--app-fixed-top-md, 20px);
     left: 20px;
     padding: 10px 16px;
     font-size: 14px;
@@ -74,7 +73,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: calc(30px + var(--titlebar-height, 0px) + env(safe-area-inset-top)) 0 20px 0;
+  padding: calc(30px + var(--app-chrome-top, 0px)) 0 20px 0;
   border-right: none;
   transition: all 0.3s ease;
   /* Prevent rubber banding/overscroll from affecting navbar */
@@ -386,7 +385,7 @@
   min-height: var(--app-height, 100vh);
   padding-left: 80px; /* Fixed width matching navbar */
   padding-bottom: 40px;
-  padding-top: env(safe-area-inset-top);
+  padding-top: var(--app-content-top-offset, 0px);
   transition: padding-left 0.3s ease;
   position: relative;
   z-index: 1;
@@ -395,7 +394,7 @@
 
 .streamingLayoutNoHero {
   padding-top: calc(
-    100px + var(--titlebar-height, 0px) + env(safe-area-inset-top)
+    100px + var(--app-content-top-offset, 0px)
   ); /* Ensure content starts below header and titlebar */
 }
 
@@ -547,7 +546,7 @@
   align-items: flex-start;
   text-align: left;
   /* Ensure content doesn't overlap with titlebar area */
-  padding-top: var(--titlebar-height, 0px);
+  padding-top: var(--app-content-top-offset, 0px);
 }
 
 .heroTitle {
@@ -981,7 +980,7 @@
     padding: 5px 10px;
     margin-bottom: 10px;
     /* Ensure trending chip is visible below safe area on mobile */
-    margin-top: calc(env(safe-area-inset-top) + 8px);
+    margin-top: calc(var(--app-content-top-offset, 0px) + 8px);
   }
 
   .heroActions {
@@ -1064,7 +1063,7 @@
 .detailsContent {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 100px 40px 40px;
+  padding: calc(100px + var(--app-content-top-offset, 0px)) 40px 40px;
   display: flex;
   gap: 60px;
   align-items: flex-start;
@@ -1079,7 +1078,7 @@
   overflow: hidden;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   position: sticky;
-  top: 100px;
+  top: calc(100px + var(--app-content-top-offset, 0px));
   aspect-ratio: 2/3;
 }
 
@@ -1874,7 +1873,7 @@
 .libraryMain {
   overflow-x: hidden;
   padding: 20px 40px 40px;
-  min-height: calc(100vh - var(--titlebar-height, 0px) - 40px);
+  min-height: calc(100vh - var(--app-content-top-offset, 0px) - 40px);
 }
 
 /* Library Layout - Desktop flex, Mobile single column */
@@ -1913,9 +1912,9 @@
   .librarySidebar {
     position: fixed !important;
     left: 0;
-    top: var(--titlebar-height, 0px) !important;
+    top: var(--app-chrome-top, 0px) !important;
     width: 280px !important;
-    height: calc(100vh - var(--titlebar-height, 0px) - 80px) !important;
+    height: calc(100vh - var(--app-chrome-top, 0px) - 80px) !important;
     z-index: 100;
     background: rgba(10, 10, 10, 0.95);
     backdrop-filter: blur(20px);
@@ -2057,7 +2056,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(16px + var(--titlebar-height, 0px)) 60px 16px;
+  padding: calc(16px + var(--app-content-top-offset, 0px)) 60px 16px;
   margin-bottom: -40px; /* Reduced negative margin to prevent overlap with content */
   /* Always transparent - controls have their own backgrounds */
   background: transparent;
@@ -2200,7 +2199,7 @@
     position: sticky;
     top: 0;
     margin-bottom: 0;
-    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    padding: calc(12px + var(--app-content-top-offset, 0px)) 16px 12px;
     flex-direction: column; /* Reset to column for filtered view logic or keeping existing */
     /* We are hiding this on mobile dashboard anyway, so this mainly affects filtered view if we don't hide it */
     gap: 12px;
@@ -2248,7 +2247,7 @@
   /* Mobile Filter FAB */
   .mobileFilterBtn {
     position: fixed;
-    top: calc(env(safe-area-inset-top) + 16px);
+    top: var(--app-fixed-top-sm, 16px);
     right: 16px;
     z-index: 100;
     display: flex;
@@ -2285,7 +2284,7 @@
 
   .mobileMenuPanel {
     position: fixed;
-    top: calc(env(safe-area-inset-top) + 60px); /* Below the FAB roughly */
+    top: calc(var(--app-fixed-top-sm, 16px) + 44px); /* Below the FAB */
     right: 16px;
     width: 280px;
     max-height: 70vh;

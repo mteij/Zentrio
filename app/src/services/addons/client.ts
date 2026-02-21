@@ -20,6 +20,14 @@ const RETRY_PATTERNS = [
   /wait/i,
 ]
 
+const RESOURCE_TIMEOUTS = {
+  manifest: 5000,
+  catalog: 15000,
+  meta: 12000,
+  stream: 12000,
+  subtitles: 12000,
+} as const
+
 function checkForRetryableResponse(streams: Stream[]): boolean {
   if (!streams || streams.length === 0) return false
   
@@ -51,7 +59,7 @@ export class AddonClient {
   async init(): Promise<Manifest> {
     try {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 5000) // 5s timeout for manifest
+      const timeout = setTimeout(() => controller.abort(), RESOURCE_TIMEOUTS.manifest)
       
       const res = await fetch(`${this.baseUrl}/manifest.json`, { signal: controller.signal })
       clearTimeout(timeout)
@@ -65,7 +73,7 @@ export class AddonClient {
     }
   }
 
-  async getCatalog(type: string, id: string, extra: Record<string, string> = {}, config: Record<string, any> = {}): Promise<MetaPreview[]> {
+  async getCatalog(type: string, id: string, extra: Record<string, string> = {}, _config: Record<string, any> = {}): Promise<MetaPreview[]> {
     if (!this.manifest) await this.init()
     
     // Construct extra path components (e.g. genre=Action&skip=20 -> genre=Action/skip=20)
@@ -79,21 +87,21 @@ export class AddonClient {
     }
 
     const url = `${this.baseUrl}/catalog/${type}/${id}${extraPath}.json`
-    return this.fetchResource<MetaPreview[]>(url, 'metas')
+    return this.fetchResource<MetaPreview[]>(url, 'metas', RESOURCE_TIMEOUTS.catalog)
   }
 
-  async getMeta(type: string, id: string, config: Record<string, any> = {}): Promise<MetaDetail> {
+  async getMeta(type: string, id: string, _config: Record<string, any> = {}): Promise<MetaDetail> {
     if (!this.manifest) await this.init()
     const safeId = encodeURIComponent(id)
     const url = `${this.baseUrl}/meta/${type}/${safeId}.json`
-    return this.fetchResource<MetaDetail>(url, 'meta')
+    return this.fetchResource<MetaDetail>(url, 'meta', RESOURCE_TIMEOUTS.meta)
   }
 
   async getStreams(type: string, id: string): Promise<Stream[]> {
     if (!this.manifest) await this.init()
     const safeId = encodeURIComponent(id)
     const url = `${this.baseUrl}/stream/${type}/${safeId}.json`
-    const streams = await this.fetchResource<Stream[]>(url, 'streams')
+    const streams = await this.fetchResource<Stream[]>(url, 'streams', RESOURCE_TIMEOUTS.stream)
     
     // Check if the addon returned a "please wait" type response
     if (checkForRetryableResponse(streams)) {
@@ -115,7 +123,7 @@ export class AddonClient {
     console.log(`[AddonClient] ${addonName} fetching subtitles from: ${url}`)
     
     try {
-      const result = await this.fetchResource<Subtitle[]>(url, 'subtitles')
+      const result = await this.fetchResource<Subtitle[]>(url, 'subtitles', RESOURCE_TIMEOUTS.subtitles)
       console.log(`[AddonClient] ${addonName} returned ${Array.isArray(result) ? result.length : 0} subtitles`)
       return result
     } catch (e) {
@@ -124,9 +132,13 @@ export class AddonClient {
     }
   }
 
-  private async fetchResource<T>(url: string, extractKey: keyof AddonResponse<any>): Promise<T> {
+  private async fetchResource<T>(
+    url: string,
+    extractKey: keyof AddonResponse<any>,
+    timeoutMs: number = 30000,
+  ): Promise<T> {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 30000)
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
     try {
       const res = await fetch(url, { signal: controller.signal })
@@ -147,6 +159,9 @@ export class AddonClient {
       throw new Error(`Response missing key: ${String(extractKey)}`)
 
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeoutMs}ms`)
+      }
       // console.error(`[AddonClient] Error fetching ${url}`, e)
       throw e
     } finally {

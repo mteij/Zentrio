@@ -5,6 +5,7 @@ import { Layout, AnimatedBackground } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { SearchCatalogRow } from '../../components/features/SearchCatalogRow'
 import styles from '../../styles/Streaming.module.css'
+import { apiFetch } from '../../lib/apiFetch'
 
 interface CatalogSearchResult {
   addon: { id: string; name: string; logo?: string }
@@ -124,7 +125,7 @@ export const StreamingSearch = () => {
       let url = `/api/streaming/search-catalogs?profileId=${profileId}&q=${encodeURIComponent(q)}`
       if (type && type !== 'all') url += `&type=${type}`
       
-      const res = await fetch(url, { signal: controller.signal })
+      const res = await apiFetch(url, { signal: controller.signal })
       const data = await res.json()
       
       // Only update state if this request wasn't aborted
@@ -178,7 +179,6 @@ export const StreamingSearch = () => {
         image={heroImage} 
         fallbackColor="#000"
         opacity={0.4}
-        key={heroImage || 'no-hero'} 
       />
       <div className={`${styles.streamingLayout} ${styles.searchLayout}`}>
         {/* Search Header - Matches Explore page styling */}

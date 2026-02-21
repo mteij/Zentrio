@@ -34,6 +34,18 @@
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
   --safe-area-inset-right: env(safe-area-inset-right, 0px);
+
+  /* App chrome inset system */
+  --app-safe-top: var(--safe-area-inset-top, 0px);
+  --app-safe-bottom: var(--safe-area-inset-bottom, 0px);
+  --app-chrome-top: calc(var(--titlebar-height, 0px) + var(--app-safe-top));
+  --app-content-top-offset: var(--titlebar-height, 0px);
+  --app-content-top-spacing: calc(var(--app-content-top-offset) + 8px);
+  --app-fixed-top-xs: calc(var(--app-chrome-top) + 8px);
+  --app-fixed-top-sm: calc(var(--app-chrome-top) + 16px);
+  --app-fixed-top-md: calc(var(--app-chrome-top) + 20px);
+  --app-fixed-top-lg: calc(var(--app-chrome-top) + 32px);
+  --app-fixed-top-xl: calc(var(--app-chrome-top) + 40px);
 }
 
 html {
@@ -98,12 +110,14 @@ body.has-titlebar #root {
 
 body.is-mobile {
   /* Use safe area insets on mobile to avoid status bar overlap */
-  padding-top: var(--safe-area-inset-top);
-  padding-bottom: var(--safe-area-inset-bottom);
+  padding-top: var(--app-safe-top);
+  padding-bottom: var(--app-safe-bottom);
   padding-left: var(--safe-area-inset-left);
   padding-right: var(--safe-area-inset-right);
   /* No titlebar on mobile */
   --titlebar-height: 0px;
+  --app-content-top-offset: 0px;
+  --app-content-top-spacing: 8px;
   
   /* LOCK BODY SCROLL - Critical for preventing rubber banding */
   position: fixed;
@@ -115,7 +129,7 @@ body.is-mobile {
 
 body.is-mobile #root {
   /* Adjust height to account for safe area padding */
-  min-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
+  min-height: calc(100vh - var(--app-safe-top) - var(--app-safe-bottom));
   height: 100%;
   
   /* Enable scroll on root instead of body */
@@ -127,10 +141,10 @@ body.is-mobile #root {
 
 /* Ensure fixed elements respect safe areas on mobile */
 body.is-mobile .fixed-header {
-  top: var(--safe-area-inset-top);
+  top: var(--app-safe-top);
 }
 
 body.is-mobile .fixed-bottom {
-  bottom: var(--safe-area-inset-bottom);
+  bottom: var(--app-safe-bottom);
 }
 

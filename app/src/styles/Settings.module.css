@@ -78,10 +78,165 @@
   box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.2);
 }
 
+.mobileHeaderTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobileHeaderTitle {
+  margin: 0;
+  color: var(--text, #fff);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.mobileSectionTabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+.mobileSectionTabsWrap {
+  position: relative;
+}
+
+.mobileTabsFade {
+  position: absolute;
+  top: 0;
+  bottom: 2px;
+  width: 36px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  z-index: 2;
+}
+
+.mobileTabsFadeLeft {
+  left: 0;
+  justify-content: flex-start;
+  background: linear-gradient(90deg, rgba(10, 10, 10, 0.9) 0%, rgba(10, 10, 10, 0) 100%);
+}
+
+.mobileTabsFadeRight {
+  right: 0;
+  background: linear-gradient(-90deg, rgba(10, 10, 10, 0.95) 0%, rgba(10, 10, 10, 0) 100%);
+}
+
+.mobileTabsCue {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 18px;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.mobileTabsHint {
+  font-size: 11px;
+  color: var(--text-muted, #9ca3af);
+  text-align: right;
+  margin-top: -2px;
+}
+
+.mobileSectionTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.mobileSectionTab {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted, #b3b3b3);
+  border-radius: 10px;
+  padding: 8px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobileSectionTabActive {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text, #fff);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .settingsPageContent {
   position: relative;
   z-index: 1;
-  padding-top: 80px;
+  /* Keep content start aligned relative to floating back button top token */
+  padding-top: calc(var(--app-fixed-top-lg, 32px) + 48px);
+}
+
+.settingsShell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.settingsSidebar {
+  position: sticky;
+  top: calc(var(--app-fixed-top-lg, 32px) + 56px);
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 16px);
+  padding: 12px;
+}
+
+.settingsSidebarTitle {
+  color: var(--text-muted, #b3b3b3);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 4px 8px 10px;
+}
+
+.settingsSidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebarTabBtn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted, #b3b3b3);
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebarTabBtn:hover {
+  color: var(--text, #fff);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebarTabBtnActive {
+  color: var(--text, #fff);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.settingsContent {
+  min-width: 0;
 }
 
 .scrollIndicator {
@@ -386,8 +541,7 @@
    ============================================ */
 .backBtn {
   position: fixed;
-  top: 32px;
-  top: calc(32px + var(--titlebar-height, 0px));
+  top: var(--app-fixed-top-lg, 32px);
   left: 32px;
   z-index: 100;
   display: flex;
@@ -625,44 +779,42 @@
 /* ============================================
    Mobile Responsive
    ============================================ */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .mobileHeader {
     position: sticky;
-    top: calc(8px + var(--titlebar-height, 0px));
-    z-index: 110;
+    top: 0;
+    z-index: 25;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px;
-    background: var(--glass-bg, rgba(20, 20, 20, 0.72));
-    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
-    border-radius: var(--radius-lg, 16px);
-    backdrop-filter: blur(var(--glass-blur, 24px));
-    -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 16px 12px;
+    margin-left: -16px;
+    margin-right: -16px;
+    margin-top: -2px;
+    margin-bottom: 16px;
+    background: linear-gradient(to bottom, rgba(10, 10, 10, 0.92), rgba(10, 10, 10, 0.82));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
-  .settingsTabsWrapper {
+  .mobileBackBtn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .mobileHeaderSelect {
     display: none;
   }
 
-  .settingsTabs {
-    border-radius: var(--radius-lg, 16px);
-    padding: 4px;
-    gap: 4px;
-    justify-content: stretch;
-    overflow-x: visible;
-    flex-wrap: wrap;
+  .settingsShell {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
 
-  .tabBtn {
-    padding: 10px 12px;
-    font-size: 13px;
-    flex: 1 1 calc(50% - 2px);
-    justify-content: center;
-    min-width: 0;
-  }
-
-  .scrollIndicator {
+  .settingsSidebar {
     display: none;
   }
 
@@ -700,7 +852,7 @@
   }
 
   .settingsPageContent {
-    padding-top: 8px;
+    padding-top: var(--app-content-top-spacing, 8px);
   }
 
   /* Addon Item Mobile Styles */
@@ -846,7 +998,7 @@
    Container
    ============================================ */
 .container {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
 }

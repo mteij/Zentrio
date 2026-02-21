@@ -1,7 +1,7 @@
-import { memo } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { MetaPreview } from '../../services/addons/types'
 import { ContentCard, ContentItem } from './ContentCard'
 import { SkeletonCard } from '../ui/SkeletonCard'
@@ -22,6 +22,7 @@ interface LazyCatalogRowProps {
   profileId: string
   showImdbRatings?: boolean
   showAgeRatings?: boolean
+  priority?: 'eager' | 'lazy'
 }
 
 const fetchCatalogItems = async (
@@ -49,8 +50,41 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
   metadata, 
   profileId, 
   showImdbRatings = true, 
-  showAgeRatings = true 
+  showAgeRatings = true,
+  priority = 'lazy'
 }: LazyCatalogRowProps) {
+  const rowRef = useRef<HTMLDivElement | null>(null)
+  const isObserverSupported = typeof IntersectionObserver !== 'undefined'
+  const [isNearViewport, setIsNearViewport] = useState(priority === 'eager')
+
+  useEffect(() => {
+    if (priority === 'eager' || !isObserverSupported) return
+
+    const el = rowRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry?.isIntersecting) {
+          setIsNearViewport(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '600px 0px', threshold: 0.01 }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [priority, isObserverSupported])
+
+  const disableStagger = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const mobile = window.matchMedia('(max-width: 768px)').matches
+    return reducedMotion || mobile
+  }, [])
+
   // Fetch catalog items
   const { data: items = [], isLoading, error } = useQuery({
     queryKey: ['catalog-items', profileId, metadata.manifestUrl, metadata.catalog.type, metadata.catalog.id],
@@ -64,7 +98,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
     gcTime: 1000 * 60 * 30, // 30 minutes
     retry: 1,
     refetchOnWindowFocus: false,
-    enabled: !!metadata
+    enabled: !!metadata && (isNearViewport || !isObserverSupported)
   })
 
   // Use the shared scroll hook
@@ -87,13 +121,13 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
     }
   }
 
-  // Don't render if error or no items
-  if (error || (!isLoading && items.length === 0)) {
+  // Don't render if error or (after activation/loading) there are no items
+  if (error || (isNearViewport && !isLoading && items.length === 0)) {
     return null
   }
 
   return (
-    <div className={styles.contentRow}>
+    <div className={styles.contentRow} ref={rowRef}>
       <div className={styles.rowHeader}>
         <h2 className={styles.rowTitle}>{metadata.title}</h2>
         {metadata.seeAllUrl && (
@@ -114,51 +148,39 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
           {...handlers}
           style={{ cursor: isDown ? 'grabbing' : 'grab', userSelect: 'none' }}
         >
-          <AnimatePresence mode="wait">
-            {isLoading ? (
-              <motion.div
-                key="skeleton"
-                initial={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                style={{ display: 'flex', gap: '20px' }}
-              >
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <SkeletonCard key={i} />
-                ))}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="items"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2 }}
-                style={{ display: 'flex', gap: '20px' }}
-              >
-                {items.map((item, index) => (
-                  <motion.div
-                    key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.25,
-                      delay: Math.min(index * 0.03, 0.15)
-                    }}
-                    className={styles.cardWrapper}
-                  >
-                    <ContentCard 
-                      item={item as ContentItem}
-                      profileId={profileId}
-                      showImdbRatings={showImdbRatings}
-                      showAgeRatings={showAgeRatings}
-                      onDragStart={handlers.onDragStart}
-                      onClick={handleItemClick}
-                    />
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {isLoading || !isNearViewport ? (
+            <motion.div
+              initial={{ opacity: 1 }}
+              style={{ display: 'flex', gap: '20px' }}
+            >
+              {Array.from({ length: 7 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: disableStagger ? 1 : 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: disableStagger ? 0 : 0.2 }}
+              style={{ display: 'flex', gap: '20px' }}
+            >
+              {items.map((item, index) => (
+                <div
+                  key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
+                  className={styles.cardWrapper}
+                >
+                  <ContentCard 
+                    item={item as ContentItem}
+                    profileId={profileId}
+                    showImdbRatings={showImdbRatings}
+                    showAgeRatings={showAgeRatings}
+                    onDragStart={handlers.onDragStart}
+                    onClick={handleItemClick}
+                  />
+                </div>
+              ))}
+            </motion.div>
+          )}
         </div>
 
         <button 
@@ -176,6 +198,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
     prevProps.metadata === nextProps.metadata &&
     prevProps.profileId === nextProps.profileId &&
     prevProps.showImdbRatings === nextProps.showImdbRatings &&
-    prevProps.showAgeRatings === nextProps.showAgeRatings
+    prevProps.showAgeRatings === nextProps.showAgeRatings &&
+    prevProps.priority === nextProps.priority
   )
 })
