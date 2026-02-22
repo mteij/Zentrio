@@ -37,4 +37,4 @@ export { Hero } from './features/Hero'
 
 
 // Player Components
-export { VidstackPlayer } from './player/VidstackPlayer'
+export { ZentrioPlayer } from './player/ZentrioPlayer'

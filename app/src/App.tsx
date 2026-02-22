@@ -167,7 +167,7 @@ function AppRoutes() {
         try {
           // Use authClient to get session - this will use the cookie set by the server
           const sessionRes = await authClient.getSession();
-          const sessionData = sessionRes?.data || sessionRes;
+          const sessionData = (sessionRes as any)?.data ?? sessionRes;
           
           if (sessionData?.user) {
             console.log('[App] Browser OAuth: Session found, logging in user:', sessionData.user.email);
@@ -211,7 +211,7 @@ function AppRoutes() {
                  await apiFetch(`/api/auth/magic-link/verify?token=${token}&callbackURL=/profiles`)
                  toast.success('Signed in successfully')
                   const sessionRes = await authClient.getSession();
-                  const sessionData = sessionRes?.data || sessionRes;
+                  const sessionData = (sessionRes as any)?.data ?? sessionRes;
                   
                   if (sessionData?.user) {
                       // Update auth store with session token

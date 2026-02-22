@@ -93,12 +93,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const session = await authClient.getSession();
-        if (session.data?.user) {
-          useAuthStore.getState().login(session.data.user, {
-            user: session.data.user,
+        const sessionRes = await authClient.getSession();
+        // better-auth returns the session directly or wrapped — handle both shapes
+        const sessionData = (sessionRes as any)?.data ?? sessionRes;
+        if (sessionData?.user) {
+          useAuthStore.getState().login(sessionData.user, {
+            user: sessionData.user,
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-            token: session.data.session?.token
+            token: sessionData.session?.token
           });
         }
       } catch (e) {
@@ -160,11 +162,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     setLoading(true);
     try {
       if (emailMethod === 'password') {
-        const { data, error } = await authClient.signIn.email({
+        const result = await authClient.signIn.email({
           email,
           password,
           callbackURL: isTauri() ? undefined : `${getClientUrl()}/profiles`
         });
+        // better-auth may return { data, error } or the result directly — handle both
+        const res = result as any;
+        const data = res?.data ?? res;
+        const error = res?.error;
         if (error) throw error;
         if (data?.user) {
           const sessionData = data.token ? {
@@ -180,26 +186,31 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         const callbackURL = isTauri()
           ? 'zentrio://auth/magic-link'
           : `${getClientUrl()}/profiles`;
-        const { error } = await authClient.signIn.magicLink({ email, callbackURL });
-        if (error) throw error;
+        const mlResult = await (authClient as any).signIn.magicLink({ email, callbackURL });
+        const mlError = mlResult?.error;
+        if (mlError) throw mlError;
         toast.success('Email Sent', { description: 'Check your inbox for the magic link.' });
       } else if (emailMethod === 'otp') {
         if (!showOtpInput) {
-          const { error } = await authClient.emailOtp.sendVerificationOtp({ email, type: 'sign-in' });
-          if (error) throw error;
+          const otpResult = await (authClient as any).emailOtp.sendVerificationOtp({ email, type: 'sign-in' });
+          const otpError = otpResult?.error;
+          if (otpError) throw otpError;
           setShowOtpInput(true);
           toast.success('Code Sent', { description: 'Check your email for the 6-digit code.' });
         } else if (otp) {
-          const { data, error } = await authClient.signIn.emailOtp({ email, otp });
-          if (error) throw error;
-          if (data?.user) {
-            const sessionData = data.token ? {
-              user: data.user,
+          const otpSignIn = await (authClient as any).signIn.emailOtp({ email, otp });
+          const otpRes = otpSignIn as any;
+          const otpData = otpRes?.data ?? otpRes;
+          const otpError = otpRes?.error;
+          if (otpError) throw otpError;
+          if (otpData?.user) {
+            const sessionData = otpData.token ? {
+              user: otpData.user,
               expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-              token: data.token
+              token: otpData.token
             } : undefined;
-            useAuthStore.getState().login(data.user, sessionData);
-            await waitForTokenAndComplete(data.token);
+            useAuthStore.getState().login(otpData.user, sessionData);
+            await waitForTokenAndComplete(otpData.token);
           }
         }
       }
@@ -219,25 +230,29 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data, error } = await authClient.signUp.email({
+      const signUpResult = await authClient.signUp.email({
         email,
         password,
         name,
         username: name,
         callbackURL: isTauri() ? undefined : `${getClientUrl()}/profiles`
       } as any);
-      if (error) throw error;
+      const signUpRes = signUpResult as any;
+      const signUpError = signUpRes?.error;
+      if (signUpError) throw signUpError;
       
       // Auto sign in after registration
-      const signIn = await authClient.signIn.email({ email, password });
-      if (signIn.data?.user) {
-        const sessionData = signIn.data.token ? {
-          user: signIn.data.user,
+      const signInResult = await authClient.signIn.email({ email, password });
+      const signIn = signInResult as any;
+      const signInData = signIn?.data ?? signIn;
+      if (signInData?.user) {
+        const sessionData = signInData.token ? {
+          user: signInData.user,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          token: signIn.data.token
+          token: signInData.token
         } : undefined;
-        useAuthStore.getState().login(signIn.data.user, sessionData);
-        await waitForTokenAndComplete(signIn.data.token);
+        useAuthStore.getState().login(signInData.user, sessionData);
+        await waitForTokenAndComplete(signInData.token);
       }
     } catch (e: any) {
       toast.error('Sign Up Failed', { description: e.message || 'Could not create account' });

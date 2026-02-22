@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, LogOut, Edit, X, Plus } from 'lucide-react'
-import { SimpleLayout, Button, ConfirmDialog, ProfileModal, AnimatedBackground, SkeletonProfile } from '../components'
+import { Settings, LogOut, Edit, X, Plus, Check } from 'lucide-react'
+import { SimpleLayout, ConfirmDialog, ProfileModal, AnimatedBackground, SkeletonProfile } from '../components'
 import { useAuthStore } from '../stores/authStore'
 import { apiFetch } from '../lib/apiFetch'
 import { buildAvatarUrl } from '../lib/url'
@@ -259,52 +259,50 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
         </div>
       </main>
 
-      {/* Footer with buttons */}
+      {/* Footer Navbar - styled like mobile streaming navbar */}
       <footer className={styles.footer}>
-        <div className={styles.footerButtons} id="footerButtons">
-          {!editMode && (
-            <Button
-              id="settingsBtn"
-              variant="secondary"
-              size="small"
-              ariaLabel="Settings"
-              title="Settings"
-              onClick={() => navigate('/settings')}
-            >
-              <Settings className="w-5 h-5" />
-            </Button>
-          )}
-          
-          <Button
-            id="editModeBtn"
-            variant="secondary"
-            size="small"
-            ariaLabel={editMode ? "Exit edit mode" : "Toggle edit mode"}
-            title={editMode ? "Done" : "Edit Profiles"}
-            onClick={() => setEditMode(!editMode)}
-            className={editMode ? "active" : ""}
-            disabled={profiles.length === 0}
+        <nav className={styles.footerNav} id="footerButtons">
+          {/* Left group: main actions with animated active indicator */}
+          <div 
+            className={styles.navGroup}
+            style={{ '--active-index': editMode ? 1 : 0 } as React.CSSProperties}
           >
-            {editMode ? (
-              <X className="w-5 h-5" />
-            ) : (
-              <Edit className="w-5 h-5" />
-            )}
-          </Button>
-          
-          {!editMode && (
-            <Button
-              id="logoutBtn"
-              variant="danger"
-              size="small"
-              ariaLabel="Logout"
-              title="Logout"
-              onClick={() => setShowLogoutConfirm(true)}
+            <div className={styles.navIndicator} />
+            <button
+              id="settingsBtn"
+              className={`${styles.navItem} ${!editMode ? styles.navItemActive : ''}`}
+              aria-label="Settings"
+              title="Settings"
+              onClick={() => !editMode && navigate('/settings')}
             >
-              <LogOut className="w-5 h-5" />
-            </Button>
-          )}
-        </div>
+              <Settings size={20} />
+            </button>
+            <button
+              id="editModeBtn"
+              className={`${styles.navItem} ${editMode ? styles.navItemActive : ''}`}
+              aria-label={editMode ? 'Done editing' : 'Edit Profiles'}
+              title={editMode ? 'Done' : 'Edit Profiles'}
+              onClick={() => setEditMode(!editMode)}
+              disabled={profiles.length === 0 && !editMode}
+            >
+              {editMode ? <Check size={20} /> : <Edit size={20} />}
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className={styles.navDivider} />
+
+          {/* Right group: logout */}
+          <button
+            id="logoutBtn"
+            className={`${styles.navItem} ${styles.navItemDanger}`}
+            aria-label="Logout"
+            title="Logout"
+            onClick={() => setShowLogoutConfirm(true)}
+          >
+            <LogOut size={20} />
+          </button>
+        </nav>
       </footer>
 
       {/* Profile Modal */}

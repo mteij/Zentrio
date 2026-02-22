@@ -57,6 +57,10 @@ export class StreamingAudioTranscoder extends EventTarget {
   private downloadedBytes = 0
   private isComplete = false
   private audioReadyDispatched = false
+  private supportsRanges = true  // updated by probeFileSize()
+
+  // Cache probeFileSize() results across initialize() calls for the same URL
+  private static probeCache = new Map<string, { size: number; supportsRanges: boolean }>()
   
   // Container header for chunked transcoding (experimental)
   // MKV files need headers prepended to each chunk for FFmpeg to understand the format
@@ -135,15 +139,11 @@ export class StreamingAudioTranscoder extends EventTarget {
     // Load FFmpeg
     await this.loadFFmpeg()
 
-    // Get file size via HEAD request
-    const headResp = await fetch(url, { method: 'HEAD' })
-    this.totalSize = parseInt(headResp.headers.get('content-length') || '0')
+    const { size, supportsRanges } = await this.probeFileSize(url)
+    this.totalSize = size
+    this.supportsRanges = supportsRanges
 
-    if (this.totalSize === 0) {
-      throw new Error('Cannot determine file size')
-    }
-
-    console.log(`[StreamingAudioTranscoder] File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB`)
+    console.log(`[StreamingAudioTranscoder] File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB, ranges: ${supportsRanges}`)
 
     // Create MediaSource for audio output
     this.mediaSource = new MediaSource()
@@ -161,9 +161,10 @@ export class StreamingAudioTranscoder extends EventTarget {
       this.mediaSource!.addEventListener('sourceopen', () => resolve(), { once: true })
     })
 
-    // Create SourceBuffer for AAC audio in fMP4 container
+    // Create SourceBuffer for AAC audio in fMP4 container.
+    // Use 'segments' mode so we can control timestampOffset for seeking.
     this.sourceBuffer = this.mediaSource.addSourceBuffer('audio/mp4; codecs="mp4a.40.2"')
-    this.sourceBuffer.mode = 'sequence'
+    this.sourceBuffer.mode = 'segments'
 
     this.sourceBuffer.addEventListener('updateend', () => {
       this.isAppending = false
@@ -386,18 +387,28 @@ export class StreamingAudioTranscoder extends EventTarget {
         this.seekAttemptCount = 0
      }
      
-     // Clear buffer to ensure proper timestamp check
+     // Clear buffer and position SourceBuffer at the target time.
+     // CRITICAL: In 'segments' mode we must set timestampOffset to tell the browser
+     // where on the media timeline the incoming fMP4 data should be placed.
+     // Without this the audio will be placed right after the previous content.
      if (this.sourceBuffer && !this.sourceBuffer.updating) {
         try {
-           // Reset timestamp offset FIRST (while not updating)
-           this.sourceBuffer.timestampOffset = 0
-           
            if (this.sourceBuffer.buffered.length > 0) {
-              // This clears the timeline so we can see exactly where the new segment lands
               this.sourceBuffer.remove(0, Infinity)
+              // Wait for remove to complete before changing timestampOffset
+              await new Promise<void>(resolve => {
+                const onUpdateEnd = () => {
+                  this.sourceBuffer!.removeEventListener('updateend', onUpdateEnd)
+                  resolve()
+                }
+                this.sourceBuffer!.addEventListener('updateend', onUpdateEnd)
+              })
            }
+           // Set the timestamp offset so decoded audio lands at the right position
+           this.sourceBuffer.timestampOffset = timeOffset
+           console.log(`[StreamingAudioTranscoder] timestampOffset set to ${timeOffset.toFixed(2)}s`)
         } catch (e) {
-           console.warn('[StreamingAudioTranscoder] Failed to clear buffer:', e)
+           console.warn('[StreamingAudioTranscoder] Failed to reset buffer for seek:', e)
         }
      }
      
@@ -483,6 +494,119 @@ export class StreamingAudioTranscoder extends EventTarget {
          this.seekAttemptCount = 0
       }
   }
+  /**
+   * Probe the server to determine total file size and range support.
+   *
+   * Strategy (in order, stops at first success):
+   *  1. HEAD — zero bytes downloaded; check Content-Length + Accept-Ranges.
+   *     Skipped if the server is known to misreport via HEAD (detected from previous 416 on same URL).
+   *  2. GET bytes=0-0 — downloads exactly 1 byte; Content-Range tells us the real total.
+   *     This is the authoritative source for proxies (Stremthru, Debrid, etc.) that return
+   *     a wrong Content-Length via HEAD.
+   *  3. Full GET Content-Length fallback — for servers that don't support ranges at all.
+   *
+   * Results are cached per URL so calling initialize() multiple times doesn't re-probe.
+   */
+  private async probeFileSize(url: string): Promise<{ size: number; supportsRanges: boolean }> {
+    // Cache hit
+    const cached = StreamingAudioTranscoder.probeCache.get(url)
+    if (cached) {
+      console.log(`[StreamingAudioTranscoder] Probe cache hit: ${(cached.size / 1024 / 1024).toFixed(1)}MB, ranges: ${cached.supportsRanges}`)
+      return cached
+    }
+
+    const signal = this.abortController?.signal
+
+    // ── Strategy 1: HEAD ─────────────────────────────────────────────────────
+    try {
+      const head = await fetch(url, { method: 'HEAD', signal })
+      if (head.ok || head.status === 200) {
+        const cl = parseInt(head.headers.get('content-length') || '0')
+        const ar = head.headers.get('accept-ranges')
+        const ranges = ar === 'bytes'
+
+        if (cl > 0 && ranges) {
+          // HEAD is reliable: server both reports a size and supports range requests.
+          console.log(`[StreamingAudioTranscoder] Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, Accept-Ranges: bytes`)
+          const result = { size: cl, supportsRanges: true }
+          StreamingAudioTranscoder.probeCache.set(url, result)
+          return result
+        }
+
+        if (cl > 0 && !ranges) {
+          // Server gave us Content-Length but explicitly says no ranges (or omitted header).
+          // Return size but mark ranges unsupported — the download loop will use a single fetch.
+          console.log(`[StreamingAudioTranscoder] Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, no range support`)
+          const result = { size: cl, supportsRanges: false }
+          StreamingAudioTranscoder.probeCache.set(url, result)
+          return result
+        }
+
+        // cl === 0 (chunked/unknown length) — fall through to range probe
+        console.log('[StreamingAudioTranscoder] HEAD gave no Content-Length, trying range probe...')
+      }
+    } catch (e) {
+      // HEAD failed (network error, CORS) — proceed to range probe
+      console.log('[StreamingAudioTranscoder] HEAD failed, falling back to range probe:', (e as Error).message)
+    }
+
+    // ── Strategy 2: GET bytes=0-0 range probe ────────────────────────────────
+    // Downloads exactly one byte; the server MUST include Content-Range: bytes 0-0/TOTAL
+    // in a 206 response, giving us the authoritative total size.
+    try {
+      const probe = await fetch(url, {
+        method: 'GET',
+        headers: { 'Range': 'bytes=0-0' },
+        signal
+      })
+
+      if (probe.status === 206) {
+        const cr = probe.headers.get('content-range') // "bytes 0-0/12345678"
+        // Content-Range can be "bytes 0-0/TOTAL" or "bytes */TOTAL" (rare)
+        const match = cr?.match(/\/([0-9]+)$/)  // capture /TOTAL
+        const size = match ? parseInt(match[1]) : 0
+        await probe.body?.cancel()  // discard the 1-byte body
+
+        if (size > 0) {
+          console.log(`[StreamingAudioTranscoder] Probe via GET range: ${(size / 1024 / 1024).toFixed(1)}MB`)
+          const result = { size, supportsRanges: true }
+          StreamingAudioTranscoder.probeCache.set(url, result)
+          return result
+        }
+      } else if (probe.status === 200) {
+        // Server ignored the Range header and returned 200 — read Content-Length from it
+        const cl = parseInt(probe.headers.get('content-length') || '0')
+        await probe.body?.cancel()
+        if (cl > 0) {
+          console.log(`[StreamingAudioTranscoder] Probe via GET 200 (no range support): ${(cl / 1024 / 1024).toFixed(1)}MB`)
+          const result = { size: cl, supportsRanges: false }
+          StreamingAudioTranscoder.probeCache.set(url, result)
+          return result
+        }
+      }
+    } catch (e) {
+      console.log('[StreamingAudioTranscoder] Range probe failed:', (e as Error).message)
+    }
+
+    // ── Strategy 3: Full GET — read Content-Length from streaming response ───
+    // Last resort for servers that only speak plain HTTP/1.0-style.
+    try {
+      const resp = await fetch(url, { signal })
+      const cl = parseInt(resp.headers.get('content-length') || '0')
+      await resp.body?.cancel()
+      if (cl > 0) {
+        console.log(`[StreamingAudioTranscoder] Probe via full GET: ${(cl / 1024 / 1024).toFixed(1)}MB (no ranges)`)
+        const result = { size: cl, supportsRanges: false }
+        StreamingAudioTranscoder.probeCache.set(url, result)
+        return result
+      }
+    } catch (e) {
+      console.log('[StreamingAudioTranscoder] Full GET probe failed:', (e as Error).message)
+    }
+
+    throw new Error('Cannot determine file size: all probe strategies failed')
+  }
+
   private async downloadAndTranscodeFull(): Promise<void> {
     console.log('[StreamingAudioTranscoder] Downloading full file...')
 
@@ -679,8 +803,21 @@ export class StreamingAudioTranscoder extends EventTarget {
         console.log(`[StreamingAudioTranscoder] Segment complete, next offset: ${(currentOffset / 1024 / 1024).toFixed(0)}MB`)
 
       } catch (error) {
+        if ((error as any).isRangeExceeded) {
+          // 416 = the server has no more data at this offset. Treat as EOF.
+          const actualSize = (error as any).actualSize
+          if (typeof actualSize === 'number' && actualSize > 0 && actualSize < this.totalSize) {
+            console.log(`[StreamingAudioTranscoder] Server reports actual size ${(actualSize / 1024 / 1024).toFixed(1)}MB (was ${(this.totalSize / 1024 / 1024).toFixed(1)}MB). Stopping.`)
+            this.totalSize = actualSize  // update so future seeks also respect this
+          } else {
+            console.log('[StreamingAudioTranscoder] 416 received — reached end of ranged content, stopping.')
+          }
+          break  // Clean EOF — stop the loop
+        }
+
         console.error('[StreamingAudioTranscoder] Segment error:', error)
-        // Continue with next segment if we've made progress
+        // For non-range errors: if we already have some audio, skip this segment and continue.
+        // If this is the very first segment, re-throw so we fail loudly.
         if (currentOffset > 0) {
           currentOffset = segmentEnd + 1
         } else {
@@ -926,13 +1063,27 @@ export class StreamingAudioTranscoder extends EventTarget {
   }
 
   /**
-   * Download a byte range
+   * Download a byte range.
+   * Returns the data, or throws RangeExceededError if the server returns 416
+   * (meaning the requested start is past the actual rangeable end of the file).
    */
   private async downloadRange(start: number, end: number, signal?: AbortSignal): Promise<Uint8Array> {
     const response = await fetch(this.sourceUrl, {
       headers: { 'Range': `bytes=${start}-${end}` },
       signal: signal || this.abortController?.signal
     })
+
+    // 416 Range Not Satisfiable — the server has no data at this offset.
+    // Extract the actual rangeable size from Content-Range: bytes */ACTUAL_SIZE
+    if (response.status === 416) {
+      const cr = response.headers.get('content-range')
+      const match = cr?.match(/\/([0-9]+)$/)
+      const actualSize = match ? parseInt(match[1]) : start  // best guess: start is past EOF
+      const err = new Error(`416: Range Not Satisfiable (actual size: ${actualSize})`)
+      ;(err as any).isRangeExceeded = true
+      ;(err as any).actualSize = actualSize
+      throw err
+    }
 
     if (!response.ok && response.status !== 206) {
       throw new Error(`Download failed: ${response.status} ${response.statusText}`)

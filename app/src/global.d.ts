@@ -1,5 +1,12 @@
 // Global type declarations for Zentrio
 
+// Augment React to accept Firefox's non-standard orient attribute for range inputs
+declare namespace React {
+  interface InputHTMLAttributes<T> {
+    orient?: 'horizontal' | 'vertical'
+  }
+}
+
 declare global {
   interface Window {
     addToast?: (type: 'message' | 'warning' | 'error' | 'success' | 'info', title: string, message?: string) => void;

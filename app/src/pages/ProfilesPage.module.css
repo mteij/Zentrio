@@ -158,10 +158,11 @@
   font-weight: bold;
 }
 
-/* Footer - fixed at bottom */
+/* Footer - fixed at bottom, pill style matching mobile streaming navbar */
 .footer {
   position: fixed;
-  bottom: 40px;
+  bottom: 20px;
+  bottom: calc(20px + var(--safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   width: auto;
@@ -171,20 +172,92 @@
   max-width: 90vw;
 }
 
-.footerButtons {
+/* Outer pill container */
+.footerNav {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
-  background: rgba(20, 20, 20, 0.8);
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(20, 20, 20, 0.9);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 100px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  flex-wrap: nowrap;
-  white-space: nowrap;
+}
+
+/* Left icon group with animated active indicator */
+.navGroup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Animated pill indicator - slides between items */
+.navIndicator {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 40px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  transform: translateY(-50%) translateX(calc(var(--active-index, 0) * 44px));
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Individual nav button */
+.navItem {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: color 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.navItem:hover {
+  color: #fff;
+}
+
+.navItem:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Active nav item */
+.navItemActive {
+  color: #fff !important;
+}
+
+/* Danger variant (logout) */
+.navItemDanger {
+  color: rgba(239, 68, 68, 0.7);
+}
+
+.navItemDanger:hover {
+  color: #ef4444;
+}
+
+/* Vertical divider between groups */
+.navDivider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+  flex-shrink: 0;
 }
 
 /* Responsive: Tablet */
@@ -216,9 +289,9 @@
     bottom: 20px;
   }
 
-  .footerButtons {
-    gap: 8px;
-    padding: 10px 16px;
+  .footerNav {
+    gap: 2px;
+    padding: 6px 10px;
   }
 }
 
@@ -245,9 +318,9 @@
     margin-bottom: 8px;
   }
 
-  .footerButtons {
-    gap: 6px;
-    padding: 8px 12px;
+  .footerNav {
+    gap: 0;
+    padding: 6px 8px;
   }
 }
 
