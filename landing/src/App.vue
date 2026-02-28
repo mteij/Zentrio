@@ -91,17 +91,34 @@ import { ref, onMounted, onUnmounted, computed } from "vue";
 const isScrolled = ref(false);
 const currentYear = computed(() => new Date().getFullYear());
 
+// Use requestAnimationFrame to batch scroll updates and prevent forced reflow
+let rafId = null;
+let lastScrollY = 0;
+
+const updateScrollState = () => {
+  isScrolled.value = lastScrollY > 20;
+  rafId = null;
+};
+
 const handleScroll = () => {
-  isScrolled.value = window.scrollY > 20;
+  lastScrollY = window.scrollY;
+  if (rafId === null) {
+    rafId = requestAnimationFrame(updateScrollState);
+  }
 };
 
 onMounted(() => {
-  window.addEventListener("scroll", handleScroll);
-  handleScroll();
+  // Use passive listener for better scroll performance
+  window.addEventListener("scroll", handleScroll, { passive: true });
+  // Initial check without RAF for immediate state
+  isScrolled.value = window.scrollY > 20;
 });
 
 onUnmounted(() => {
   window.removeEventListener("scroll", handleScroll);
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+  }
 });
 </script>
 

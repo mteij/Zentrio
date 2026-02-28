@@ -74,7 +74,13 @@ const fetchStats = async () => {
 };
 
 onMounted(() => {
-  fetchStats();
+  // Defer non-critical stats API call to improve LCP
+  // Use requestIdleCallback if available, otherwise setTimeout
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => fetchStats(), { timeout: 1500 });
+  } else {
+    setTimeout(fetchStats, 50);
+  }
 });
 </script>
 

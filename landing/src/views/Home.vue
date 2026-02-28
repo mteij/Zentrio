@@ -253,7 +253,13 @@ const fetchLatestReleaseAndSetDownload = async () => {
 };
 
 onMounted(() => {
-  fetchLatestReleaseAndSetDownload();
+  // Defer non-critical API call to improve LCP
+  // Use requestIdleCallback if available, otherwise setTimeout
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => fetchLatestReleaseAndSetDownload(), { timeout: 2000 });
+  } else {
+    setTimeout(fetchLatestReleaseAndSetDownload, 100);
+  }
 });
 </script>
 
