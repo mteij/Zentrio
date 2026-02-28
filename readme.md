@@ -11,9 +11,9 @@
 <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black" alt="Tauri"></a>
 <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
 <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
-<a href="https://github.com/MichielEijpe/Zentrio/security"><img src="https://img.shields.io/github/code-scanning/analysis/MichielEijpe/Zentrio?style=for-the-badge" alt="CodeQL"></a>
 
-<a href="https://app.zentrio.eu"><strong>🌐 Public Instance</strong></a> •
+<a href="https://zentrio.eu"><strong>🌐 Zentrio.eu</strong></a> •
+<a href="https://app.zentrio.eu"><strong>▶️ Public Instance</strong></a> •
 <a href="https://docs.zentrio.eu"><strong>📚 Documentation</strong></a> •
 <a href="https://github.com/MichielEijpe/Zentrio/issues"><strong>🐛 Report Issues</strong></a>
 
@@ -28,10 +28,8 @@ Zentrio was built with substantial assistance from AI tooling, guided by an engi
 
 ## 🚀 Getting Started
 
-Zentrio is easiest to explore via the public instance and hosted documentation:
-
-- 🌐 Public instance: [**app.zentrio.eu**](https://app.zentrio.eu)
-- 📚 Documentation: [**docs.zentrio.eu**](https://docs.zentrio.eu)
+Zentrio is easiest to explore via the public instance, visit our website for more information:
+- 🌐 Zentrio.eu: [**zentrio.eu**](https://zentrio.eu)
 
 For deployment, self-hosting, and development setup instructions, refer to the documentation.
 
