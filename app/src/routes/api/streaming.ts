@@ -585,8 +585,19 @@ streaming.post('/progress', async (c) => {
       return c.json({ error: 'Missing required fields' }, 400)
     }
 
+    let pId: number
+    if (profileId === 'guest' || c.req.header('X-Guest-Mode') === 'true' || c.req.query('guestMode') === 'true') {
+      const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+      pId = guestDefaultProfile.id
+    } else {
+      pId = parseInt(profileId)
+      if (Number.isNaN(pId)) {
+        return c.json({ error: 'Invalid profileId' }, 400)
+      }
+    }
+
     watchHistoryDb.upsert({
-      profile_id: parseInt(profileId),
+      profile_id: pId,
       meta_id: metaId,
       meta_type: metaType,
       season: season !== undefined ? parseInt(season) : undefined,
@@ -602,7 +613,7 @@ streaming.post('/progress', async (c) => {
     // Auto-mark as watched if position >= 80% of duration (matches Trakt's threshold)
     if (duration && position && position >= duration * 0.8) {
       watchHistoryDb.autoMarkWatched(
-        parseInt(profileId),
+        pId,
         metaId,
         season !== undefined ? parseInt(season) : undefined,
         episode !== undefined ? parseInt(episode) : undefined
@@ -612,7 +623,7 @@ streaming.post('/progress', async (c) => {
       if (metaType === 'series' && season !== undefined && episode !== undefined) {
          // Run in background
          ensureNextEpisodeInContinueWatching(
-            parseInt(profileId),
+            pId,
             metaId,
             parseInt(season),
             parseInt(episode)
@@ -636,7 +647,16 @@ streaming.delete('/progress/:type/:id', async (c) => {
       return c.json({ error: 'Missing defined profileId' }, 400)
     }
 
-    const pId = parseInt(profileId)
+    let pId: number
+    if (profileId === 'guest' || c.req.header('X-Guest-Mode') === 'true' || c.req.query('guestMode') === 'true') {
+      const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+      pId = guestDefaultProfile.id
+    } else {
+      pId = parseInt(profileId)
+      if (Number.isNaN(pId)) {
+        return c.json({ error: 'Invalid profileId' }, 400)
+      }
+    }
 
     if (type === 'series' && season === undefined && episode === undefined) {
       // Delete ALL history for this series
@@ -657,30 +677,6 @@ streaming.delete('/progress/:type/:id', async (c) => {
   }
 })
 
-// Get watch progress for a specific item
-streaming.get('/progress/:type/:id', async (c) => {
-  try {
-    const { type, id } = c.req.param()
-    const { profileId, season, episode } = c.req.query()
-    
-    if (!profileId) {
-      return c.json({ error: 'profileId required' }, 400)
-    }
-
-    const progress = watchHistoryDb.getProgress(
-      parseInt(profileId),
-      id,
-      season ? parseInt(season) : undefined,
-      episode ? parseInt(episode) : undefined
-    )
-
-    return c.json({ progress: progress || null })
-  } catch (e) {
-    console.error('Failed to get progress', e)
-    return c.json({ error: 'Internal server error' }, 500)
-  }
-})
-
 // Get series watch progress (all episodes)
 // Get single item progress (specifically for initializing the video player)
 streaming.get('/progress/:type/:id', async (c) => {
@@ -692,7 +688,16 @@ streaming.get('/progress/:type/:id', async (c) => {
       return c.json({ error: 'profileId required' }, 400)
     }
 
-    const pId = parseInt(profileId)
+    let pId: number
+    if (profileId === 'guest' || c.req.header('X-Guest-Mode') === 'true' || c.req.query('guestMode') === 'true') {
+      const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+      pId = guestDefaultProfile.id
+    } else {
+      pId = parseInt(profileId)
+      if (Number.isNaN(pId)) {
+        return c.json({ error: 'Invalid profileId' }, 400)
+      }
+    }
     const progress = watchHistoryDb.getProgress(
       pId, 
       id, 
@@ -751,6 +756,7 @@ streaming.post('/mark-watched', async (c) => {
       metaId,
       metaType,
       watched,
+      season !== undefined ? parseInt(season) : undefined,
       episode !== undefined ? parseInt(episode) : undefined
     )
 

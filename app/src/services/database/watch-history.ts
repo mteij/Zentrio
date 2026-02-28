@@ -34,15 +34,16 @@ export const watchHistoryDb = {
         'poster = COALESCE(?, poster)',
         'episode_id = COALESCE(?, episode_id)',
         'updated_at = CURRENT_TIMESTAMP',
-        'dirty = TRUE'
+        'dirty = TRUE',
+        'deleted_at = NULL'
       ]
       
       const values = [
-        data.position || null,
-        data.duration || null,
-        data.title || null,
-        data.poster || null,
-        data.episode_id || null
+        data.position ?? null,
+        data.duration ?? null,
+        data.title ?? null,
+        data.poster ?? null,
+        data.episode_id ?? null
       ]
 
       if (lastStreamStr) {
@@ -60,19 +61,63 @@ export const watchHistoryDb = {
         INSERT INTO watch_history (profile_id, meta_id, meta_type, season, episode, episode_id, title, poster, duration, position, last_stream, updated_at, dirty)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, TRUE)
       `)
-      insertStmt.run(
-        data.profile_id,
-        data.meta_id,
-        data.meta_type,
-        seasonVal,
-        episodeVal,
-        data.episode_id || null,
-        data.title || null,
-        data.poster || null,
-        data.duration || null,
-        data.position || null,
-        lastStreamStr
-      )
+      try {
+        insertStmt.run(
+          data.profile_id,
+          data.meta_id,
+          data.meta_type,
+          seasonVal,
+          episodeVal,
+          data.episode_id ?? null,
+          data.title ?? null,
+          data.poster ?? null,
+          data.duration ?? null,
+          data.position ?? null,
+          lastStreamStr
+        )
+      } catch (e: any) {
+        // Backward compatibility for databases that still enforce UNIQUE(profile_id, meta_id)
+        if (e?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+          const fields = [
+            'season = ?',
+            'episode = ?',
+            'position = ?',
+            'duration = COALESCE(?, duration)',
+            'title = COALESCE(?, title)',
+            'poster = COALESCE(?, poster)',
+            'episode_id = COALESCE(?, episode_id)',
+            'updated_at = CURRENT_TIMESTAMP',
+            'dirty = TRUE',
+            'deleted_at = NULL'
+          ]
+
+          const values = [
+            seasonVal,
+            episodeVal,
+            data.position ?? null,
+            data.duration ?? null,
+            data.title ?? null,
+            data.poster ?? null,
+            data.episode_id ?? null
+          ]
+
+          if (lastStreamStr) {
+            fields.push('last_stream = ?')
+            values.push(lastStreamStr)
+          }
+
+          values.push(data.profile_id, data.meta_id)
+
+          const fallbackUpdateStmt = db.prepare(`
+            UPDATE watch_history
+            SET ${fields.join(', ')}
+            WHERE profile_id = ? AND meta_id = ?
+          `)
+          fallbackUpdateStmt.run(...values)
+        } else {
+          throw e
+        }
+      }
     }
   },
 

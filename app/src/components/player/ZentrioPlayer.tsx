@@ -136,13 +136,11 @@ export function ZentrioPlayer({
   const shortVideoTriggeredRef = useRef(false)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const durationRef = useRef(0)
-  const pipStateRef = useRef(false)
 
   /* UI state */
   const [controlsVisible, setControlsVisible] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [isFullscreen, setIsFullscreenState] = useState(false)
-  const [isPip, setIsPip] = useState(false)
 
   /* Menu state */
   const [openMenu, setOpenMenu] = useState<'settings' | 'subtitles' | 'external' | null>(null)
@@ -236,20 +234,6 @@ export function ZentrioPlayer({
     document.addEventListener('fullscreenchange', handler)
     return () => document.removeEventListener('fullscreenchange', handler)
   }, [])
-
-  /* ── PiP events ── */
-  useEffect(() => {
-    const vid = videoRef.current
-    if (!vid) return
-    const onEnterPip = () => { setIsPip(true); pipStateRef.current = true }
-    const onLeavePip = () => { setIsPip(false); pipStateRef.current = false }
-    vid.addEventListener('enterpictureinpicture', onEnterPip)
-    vid.addEventListener('leavepictureinpicture', onLeavePip)
-    return () => {
-      vid.removeEventListener('enterpictureinpicture', onEnterPip)
-      vid.removeEventListener('leavepictureinpicture', onLeavePip)
-    }
-  }, [videoRef])
 
   /* ── Next episode progress logic ── */
   const handlePlaybackProgress = useCallback((t: number, d: number) => {
@@ -773,13 +757,6 @@ export function ZentrioPlayer({
 
             {/* Right group */}
             <div className={styles.controlGroup}>
-              {/* PiP (desktop quick access) */}
-              {!isMobile && document.pictureInPictureEnabled && (
-                <button className={`${styles.ctrlBtn} ${isPip ? styles.active : ''}`} onClick={togglePip} aria-label="Picture in Picture">
-                  <PictureInPicture2 size={20} />
-                </button>
-              )}
-
               {/* Subtitles */}
               {subtitleTracks.length > 0 && (
                 <div className={styles.menuWrap}>
