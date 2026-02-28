@@ -4,6 +4,7 @@ import { Navbar } from '../../components/layout/Navbar'
 import { useEffect } from 'react'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { shouldPreload } from '../../utils/route-preloader'
+import { useAuthStore } from '../../stores/authStore'
 
 const fetchProfile = async (profileId: string) => {
   // Use lightweight profile endpoint instead of heavy dashboard
@@ -45,6 +46,8 @@ export const StreamingLayout = () => {
 
   useEffect(() => {
     if (error?.message === 'Unauthorized') {
+      console.log('[StreamingLayout] 401 Unauthorized received, logging out locally...');
+      useAuthStore.getState().logout();
       navigate('/')
     }
   }, [error, navigate])

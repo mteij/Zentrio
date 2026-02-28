@@ -29,11 +29,10 @@ export const getServerUrl = () => {
 
   // In development mode...
   if (import.meta.env.DEV) {
-    // In Tauri (desktop or Android), use localhost:3000 directly
-    // On Android, this works with ADB reverse port forwarding
-    // On desktop, this also works as the server runs locally
+    // In Tauri (desktop or Android), try to use the selected server first
     if (isTauri()) {
-      return "http://localhost:3000";
+      const stored = localStorage.getItem("zentrio_server_url");
+      return stored || "http://localhost:3000";
     }
     // In web browser dev mode, use same origin (Vite proxy handles /api)
     return window.location.origin;

@@ -14,6 +14,38 @@
   -webkit-user-select: none;
 }
 
+/* Tauri Mobile Immersive Mode - Full screen player without scroll */
+.playerWrapperImmersive {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh; /* Use dynamic viewport height for mobile */
+  background: #000;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 9999;
+}
+
+/* When body has is-mobile class, adjust the player to fill entire screen */
+body.is-mobile .playerWrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
 .errorPage {
   display: flex;
   align-items: center;

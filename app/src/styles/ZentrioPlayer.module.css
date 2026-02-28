@@ -14,6 +14,27 @@
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
+  /* Prevent any scroll within the player */
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile/Tauri specific - ensure player fills entire screen without scroll */
+body.is-mobile .playerContainer,
+body.is-mobile .playerContainer * {
+  /* Lock all touch actions to prevent scrolling */
+  touch-action: none !important;
+  overscroll-behavior: none !important;
+}
+
+/* Ensure video element fills container on mobile without scroll */
+body.is-mobile .videoElement {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .videoElement {
@@ -772,9 +793,122 @@
   font-size: 13px;
 }
 
-/* Settings panel extras */
+/* Settings & Subtitles panel extras */
 .settingsPanel {
   min-width: 220px;
+}
+
+.subtitlesPanel {
+  display: flex;
+  flex-direction: row;
+  width: 480px;
+  height: 350px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 120px);
+  padding: 0;
+  overflow: hidden; /* Hide main overflow, let columns scroll individually */
+}
+
+/* Two columns */
+.subtitlesLeftCol {
+  flex: 0 0 160px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 10, 0.95);
+}
+
+@media (max-width: 600px) {
+  .subtitlesPanel {
+    width: calc(100vw - 32px);
+  }
+  .subtitlesLeftCol {
+    flex: 0 0 120px;
+  }
+}
+
+.subtitlesRightCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* allows text truncation */
+  background: rgba(14, 14, 14, 0.97);
+}
+
+.subtitlesLangList,
+.subtitlesTrackList {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+/* Custom scrollbar for columns */
+.subtitlesLangList::-webkit-scrollbar,
+.subtitlesTrackList::-webkit-scrollbar {
+  width: 6px;
+}
+.subtitlesLangList::-webkit-scrollbar-track,
+.subtitlesTrackList::-webkit-scrollbar-track {
+  background: transparent;
+}
+.subtitlesLangList::-webkit-scrollbar-thumb,
+.subtitlesTrackList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+.subtitlesLangList::-webkit-scrollbar-thumb:hover,
+.subtitlesTrackList::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.subtitlesOffBtn {
+  margin-bottom: 4px;
+}
+
+.subtitlesLangBtn {
+  justify-content: space-between;
+  padding-right: 12px;
+}
+
+.subtitlesLangBtn.activeLang {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.langChevron {
+  opacity: 0.4;
+}
+
+.subtitlesLangBtn.activeLang .langChevron {
+  opacity: 1;
+  color: var(--accent, #e50914);
+}
+
+.subtitleGroupTitle {
+  position: sticky;
+  top: 0;
+  background: rgba(14, 14, 14, 0.98);
+  backdrop-filter: blur(20px);
+  padding: 10px 16px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  z-index: 2;
+}
+
+.subtitleGroupItem {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.subtitleLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .settingsRow {
@@ -1148,4 +1282,34 @@
 .playerContainer:-webkit-full-screen {
   width: 100vw;
   height: 100vh;
+}
+
+/* Custom skip icons (+10/-10) */
+.skipIconWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+.skipIconText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -45%); /* Slight vertical nudge to center within the arrow visual center */
+  font-size: 8px;
+  font-weight: 700;
+  color: inherit;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Adjust sizes for the larger ripple version */
+.seekRipple .skipIconWrap {
+  width: 32px;
+  height: 32px;
+}
+.seekRipple .skipIconText {
+  font-size: 11px;
 }

@@ -10,7 +10,7 @@ import { useRef, useEffect, useCallback, useState } from 'react'
 import {
   Play, Pause, Volume2, VolumeX, Volume1,
   Maximize, Minimize, Settings, Subtitles,
-  SkipBack, SkipForward, ArrowLeft,
+  RotateCcw, RotateCw, ArrowLeft,
   ChevronLeft, ChevronRight,
   ExternalLink,
   PictureInPicture2, Cast,
@@ -81,6 +81,13 @@ const isMobileDevice = () =>
   typeof window !== 'undefined' &&
   (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth <= 1024))
 
+/** Check if running in Tauri mobile context */
+const isTauriMobile = () => {
+  if (typeof window === 'undefined') return false
+  // @ts-expect-error - Tauri-specific property
+  return !!(window.__TAURI__ || window.__TAURI_INTERNALS__)
+}
+
 /* ─────────────────────── Countdown Ring ─────────────────────── */
 
 function CountdownRing({ total, current }: { total: number; current: number }) {
@@ -145,6 +152,7 @@ export function ZentrioPlayer({
   /* Menu state */
   const [openMenu, setOpenMenu] = useState<'settings' | 'subtitles' | 'external' | null>(null)
   const [settingsPage, setSettingsPage] = useState<'main' | 'speed' | 'quality' | 'audio' | 'orientation'>('main')
+  const [selectedSubtitleLang, setSelectedSubtitleLang] = useState<string | null>(null)
 
   /* Seek / volume feedback */
   const [seekFeedback, setSeekFeedback] = useState<{ dir: 'left' | 'right'; secs: number } | null>(null)
@@ -152,7 +160,15 @@ export function ZentrioPlayer({
   const volumeOSDTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /* Orientation */
-  const [orientationMode, setOrientationMode] = useState<OrientationMode>('landscape')
+  const [orientationMode, setOrientationMode] = useState<OrientationMode>(() => {
+    try {
+      const saved = localStorage.getItem('zentrio_orientation')
+      if (saved === 'auto' || saved === 'landscape' || saved === 'portrait') {
+        return saved as OrientationMode
+      }
+    } catch (e) {}
+    return 'landscape'
+  })
 
   /* Progress hover */
   const [hoverTime, setHoverTime] = useState<{ time: number; pct: number } | null>(null)
@@ -227,6 +243,49 @@ export function ZentrioPlayer({
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+
+  /* ── Orientation Lock ── */
+  useEffect(() => {
+    if (!isMobile) return
+
+    // Skip web orientation API in Tauri mobile - native code handles it
+    if (isTauriMobile()) return
+
+    const applyOrientation = async () => {
+      try {
+        const so = screen.orientation as any // ts workaround
+        if (orientationMode === 'landscape') {
+          await so?.lock?.('landscape')
+        } else if (orientationMode === 'portrait') {
+          await so?.lock?.('portrait')
+        } else {
+          so?.unlock?.()
+        }
+      } catch (e) {
+        // Silently ignore - lock() requires fullscreen and user gesture
+        // This is expected to fail in most mobile web contexts
+      }
+    }
+
+    applyOrientation()
+
+    // Unlock on unmount
+    return () => {
+      try {
+        const so = screen.orientation as any
+        so?.unlock?.()
+      } catch (e) {
+        // Silently ignore
+      }
+    }
+  }, [isMobile, orientationMode])
+
+  const handleOrientationChange = (mode: OrientationMode) => {
+    setOrientationMode(mode)
+    try {
+      localStorage.setItem('zentrio_orientation', mode)
+    } catch (e) {}
+  }
 
   /* ── Fullscreen sync ── */
   useEffect(() => {
@@ -522,7 +581,17 @@ export function ZentrioPlayer({
       {/* Seek feedback ripples */}
       {seekFeedback && (
         <div className={`${styles.seekRipple} ${styles[seekFeedback.dir]}`}>
-          {seekFeedback.dir === 'left' ? <SkipBack size={32} /> : <SkipForward size={32} />}
+          {seekFeedback.dir === 'left' ? (
+             <span className={styles.skipIconWrap}>
+               <RotateCcw size={32} />
+               <span className={styles.skipIconText} style={{ fontSize: '11px' }}>10</span>
+             </span>
+          ) : (
+             <span className={styles.skipIconWrap}>
+               <RotateCw size={32} />
+               <span className={styles.skipIconText} style={{ fontSize: '11px' }}>10</span>
+             </span>
+          )}
           <span>{seekFeedback.dir === 'left' ? '-' : '+'}{seekFeedback.secs}s</span>
         </div>
       )}
@@ -708,23 +777,34 @@ export function ZentrioPlayer({
               <button className={styles.ctrlBtn} onClick={togglePlayPause} aria-label={state.paused ? 'Play' : 'Pause'}>
                 {state.paused ? <Play size={22} /> : <Pause size={22} />}
               </button>
-              <button className={styles.ctrlBtn} onClick={() => seek(Math.max(0, state.currentTime - 10))} aria-label="Skip back 10s">
-                <SkipBack size={20} />
-              </button>
-              <button className={styles.ctrlBtn} onClick={() => seek(Math.min(state.duration, state.currentTime + 10))} aria-label="Skip forward 10s">
-                <SkipForward size={20} />
-              </button>
+              {/* Hide skip buttons on mobile */}
+              {!isMobile && (
+                <>
+                  <button className={styles.ctrlBtn} onClick={() => seek(Math.max(0, state.currentTime - 10))} aria-label="Skip back 10s">
+                    <span className={styles.skipIconWrap}>
+                      <RotateCcw size={20} />
+                      <span className={styles.skipIconText}>10</span>
+                    </span>
+                  </button>
+                  <button className={styles.ctrlBtn} onClick={() => seek(Math.min(state.duration, state.currentTime + 10))} aria-label="Skip forward 10s">
+                    <span className={styles.skipIconWrap}>
+                      <RotateCw size={20} />
+                      <span className={styles.skipIconText}>10</span>
+                    </span>
+                  </button>
+                </>
+              )}
 
-              {/* Volume — horizontal inline slider on desktop, mute-only on mobile */}
-              <div className={styles.volumeWrap}>
-                <button
-                  className={styles.ctrlBtn}
-                  onClick={() => setMuted(!state.muted)}
-                  aria-label={state.muted ? 'Unmute' : 'Mute'}
-                >
-                  <VolumeIcon size={20} />
-                </button>
-                {!isMobile && (
+              {/* Volume — horizontal inline slider on desktop (hidden entirely on mobile) */}
+              {!isMobile && (
+                <div className={styles.volumeWrap}>
+                  <button
+                    className={styles.ctrlBtn}
+                    onClick={() => setMuted(!state.muted)}
+                    aria-label={state.muted ? 'Unmute' : 'Mute'}
+                  >
+                    <VolumeIcon size={20} />
+                  </button>
                   <div
                     className={styles.volumeSliderInline}
                     style={{ '--vol': Math.round((state.muted ? 0 : state.volume) * 100) } as React.CSSProperties}
@@ -744,8 +824,8 @@ export function ZentrioPlayer({
                       onClick={e => e.stopPropagation()}
                     />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Time */}
               <div className={styles.timeDisplay}>
@@ -762,30 +842,85 @@ export function ZentrioPlayer({
                 <div className={styles.menuWrap}>
                   <button
                     className={`${styles.ctrlBtn} ${openMenu === 'subtitles' ? styles.active : ''}`}
-                    onClick={() => setOpenMenu(openMenu === 'subtitles' ? null : 'subtitles')}
+                    onClick={() => {
+                      if (openMenu !== 'subtitles') {
+                        // Initialize selected language when opening
+                        const tracksWithLang = subtitleTracks.filter(t => t.language)
+                        const activeTrack = subtitleTracks.find(t => t.enabled)
+                        if (activeTrack && activeTrack.language) {
+                          setSelectedSubtitleLang(activeTrack.language)
+                        } else if (tracksWithLang.length > 0) {
+                          setSelectedSubtitleLang(tracksWithLang[0].language)
+                        } else {
+                          setSelectedSubtitleLang('Unknown')
+                        }
+                        setOpenMenu('subtitles')
+                      } else {
+                        setOpenMenu(null)
+                      }
+                    }}
                     aria-label="Subtitles"
                   >
                     <Subtitles size={20} />
                   </button>
                   {openMenu === 'subtitles' && (
-                    <div className={`${styles.dropdownPanel} ${styles.dropdownUp}`}>
-                      <div className={styles.dropdownTitle}>Subtitles</div>
-                      <button
-                        className={`${styles.dropdownItem} ${subtitleTracks.every(t => !t.enabled) ? styles.selected : ''}`}
-                        onClick={() => { setSubtitleTrack(null); setOpenMenu(null) }}
-                      >
-                        Off
-                      </button>
-                      {subtitleTracks.map(t => (
+                    <div className={`${styles.dropdownPanel} ${styles.dropdownUp} ${styles.subtitlesPanel}`}>
+                      
+                      {/* Left Column: Languages */}
+                      <div className={styles.subtitlesLeftCol}>
+                        <div className={styles.dropdownTitle}>Subtitles</div>
                         <button
-                          key={t.id}
-                          className={`${styles.dropdownItem} ${t.enabled ? styles.selected : ''}`}
-                          onClick={() => { setSubtitleTrack(t.id); setOpenMenu(null) }}
+                          className={`${styles.dropdownItem} ${styles.subtitlesOffBtn} ${subtitleTracks.every(t => !t.enabled) ? styles.selected : ''}`}
+                          onClick={() => { setSubtitleTrack(null); setOpenMenu(null) }}
                         >
-                          {t.label}
-                          {t.enabled && <span className={styles.check}>✓</span>}
+                          Off
                         </button>
-                      ))}
+                        
+                        <div className={styles.subtitlesLangList}>
+                          {Object.keys(
+                            subtitleTracks.reduce((acc, t) => {
+                              const lang = t.language || 'Unknown'
+                              if (!acc[lang]) acc[lang] = []
+                              acc[lang].push(t)
+                              return acc
+                            }, {} as Record<string, SubtitleTrack[]>)
+                          )
+                          .sort((a, b) => a.localeCompare(b))
+                          .map(lang => (
+                            <button
+                              key={lang}
+                              className={`${styles.dropdownItem} ${styles.subtitlesLangBtn} ${selectedSubtitleLang === lang ? styles.activeLang : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedSubtitleLang(lang)
+                              }}
+                            >
+                              {lang}
+                              <ChevronRight size={14} className={styles.langChevron} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Right Column: Tracks for selected language */}
+                      <div className={styles.subtitlesRightCol}>
+                        <div className={styles.subtitleGroupTitle}>{selectedSubtitleLang || 'Tracks'}</div>
+                        <div className={styles.subtitlesTrackList}>
+                          {subtitleTracks
+                            .filter(t => (t.language || 'Unknown') === selectedSubtitleLang)
+                            .map(t => (
+                              <button
+                                key={t.id}
+                                className={`${styles.dropdownItem} ${styles.subtitleGroupItem} ${t.enabled ? styles.selected : ''}`}
+                                onClick={() => { setSubtitleTrack(t.id); setOpenMenu(null) }}
+                              >
+                                <span className={styles.subtitleLabel} title={t.label}>{t.label}</span>
+                                {t.enabled && <span className={styles.check}>✓</span>}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+
                     </div>
                   )}
                 </div>
@@ -819,6 +954,14 @@ export function ZentrioPlayer({
                           <button className={styles.settingsRow} onClick={() => setSettingsPage('audio')}>
                             <span>Audio</span>
                             <span className={styles.settingsValue}>{audioTracks.find(a => a.enabled)?.label || 'Default'} ›</span>
+                          </button>
+                        )}
+                        {isMobile && (
+                          <button className={styles.settingsRow} onClick={() => setSettingsPage('orientation')}>
+                            <span>Orientation</span>
+                            <span className={styles.settingsValue}>
+                              {orientationMode === 'auto' ? 'Auto' : orientationMode === 'landscape' ? 'Landscape' : 'Portrait'} ›
+                            </span>
                           </button>
                         )}
                       </>
@@ -868,14 +1011,31 @@ export function ZentrioPlayer({
                         ))}
                       </>
                     )}
+                    {settingsPage === 'orientation' && isMobile && (
+                      <>
+                        <button className={styles.backRow} onClick={() => setSettingsPage('main')}>‹ Orientation</button>
+                        {(['auto', 'landscape', 'portrait'] as OrientationMode[]).map(mode => (
+                          <button
+                            key={mode}
+                            className={`${styles.dropdownItem} ${orientationMode === mode ? styles.selected : ''}`}
+                            onClick={() => { handleOrientationChange(mode); setSettingsPage('main') }}
+                          >
+                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                            {orientationMode === mode && <span className={styles.check}>✓</span>}
+                          </button>
+                        ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Fullscreen */}
-              <button className={styles.ctrlBtn} onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
-                {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-              </button>
+              {/* Fullscreen (hidden on mobile) */}
+              {!isMobile && (
+                <button className={styles.ctrlBtn} onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+                  {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+                </button>
+              )}
             </div>
           </div>
         </div>

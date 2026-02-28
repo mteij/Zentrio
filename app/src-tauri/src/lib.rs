@@ -7,6 +7,8 @@ use tauri_plugin_deep_link::DeepLinkExt;
 #[cfg(all(desktop, not(debug_assertions)))]
 use tauri_plugin_shell::ShellExt;
 
+mod plugins;
+
 struct ServerPort(Mutex<u16>);
 
 #[tauri::command]
@@ -32,17 +34,19 @@ pub fn run() {
 
     #[cfg(not(mobile))]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(
-            |app, args: Vec<String>, _cwd| {
-                let _ = app
-                    .get_webview_window("main")
-                    .expect("no main window")
-                    .set_focus();
-                if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
-                    let _ = app.emit("zentrio-deep-link", url);
-                }
-            },
-        ));
+        builder = builder
+            .plugin(tauri_plugin_single_instance::init(
+                |app, args: Vec<String>, _cwd| {
+                    let _ = app
+                        .get_webview_window("main")
+                        .expect("no main window")
+                        .set_focus();
+                    if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
+                        let _ = app.emit("zentrio-deep-link", url);
+                    }
+                },
+            ))
+            .plugin(tauri_plugin_updater::Builder::new().build());
     }
 
     builder
@@ -87,7 +91,10 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_server_port])
+        .invoke_handler(tauri::generate_handler![
+            get_server_port,
+            plugins::immersive_mode::set_immersive_mode
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

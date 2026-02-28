@@ -88,6 +88,9 @@ gateway.all('/*', async (c) => {
   reqHeaders.delete('origin')
   reqHeaders.set('x-zentrio-gateway', '1')
 
+  console.log(`[Gateway] Forwarding ${c.req.method} ${targetUrl.toString()}`);
+  console.log(`[Gateway] Has Authorization:`, reqHeaders.has('authorization') || reqHeaders.has('Authorization'));
+  
   const init: RequestInit = {
     method: c.req.method,
     headers: reqHeaders,

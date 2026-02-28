@@ -81,9 +81,9 @@ export function Layout({
 
 
   return (
-    <div className={className}>
+    <div className={`${className} ${showHeader === false && showFooter === false ? 'layout-player' : ''}`}>
       {showHeader && <PageHeader />}
-      <main>
+      <main className={showHeader === false && showFooter === false ? 'main-player' : ''}>
         {children}
       </main>
       {showFooter && <PageFooter />}

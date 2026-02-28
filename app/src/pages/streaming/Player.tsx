@@ -19,6 +19,17 @@ import { apiFetch } from '../../lib/apiFetch'
 import { resolveBeaconUrl, createApiEventSource } from '../../lib/url'
 import type { FlatStream } from '../../hooks/useStreamLoader'
 
+/* ─── Immersive mode (Android only) ─── */
+const setImmersiveMode = async (enabled: boolean) => {
+  if (!(window as any).__TAURI_INTERNALS__) return
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('plugin:immersive-mode|setImmersiveMode', { enabled })
+  } catch {
+    // Not on Android or plugin unavailable — silently ignore
+  }
+}
+
 /* ─── Constants ─── */
 const SHORT_VIDEO_THRESHOLD = 120   // seconds — show "find new stream"
 const NEXT_EP_COUNTDOWN    = 30    // seconds before end — show next-ep popup
@@ -413,6 +424,17 @@ export const StreamingPlayer = () => {
     return result
   }, [openExternal, stream, meta])
 
+  /* ─── Immersive mode: enable on mount, restore on unmount ─── */
+  useEffect(() => {
+    setImmersiveMode(true)
+    // Add player-active class to body for CSS targeting (fallback for browsers without :has() support)
+    document.body.classList.add('player-active')
+    return () => { 
+      setImmersiveMode(false) 
+      document.body.classList.remove('player-active')
+    }
+  }, [])
+
   /* ─── Trakt stop on unmount ─── */
   useEffect(() => {
     return () => {
@@ -455,9 +477,14 @@ export const StreamingPlayer = () => {
       }`
     : undefined
 
+  // Detect if we're on mobile (for immersive mode styling)
+  const isMobilePlatform = typeof window !== 'undefined' && 
+    (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || 
+     ('ontouchstart' in window && window.innerWidth <= 1024))
+
   return (
     <Layout title={`Playing: ${meta.name}`} showHeader={false} showFooter={false}>
-      <div className={styles.playerWrapper}>
+      <div className={`${styles.playerWrapper} ${isMobilePlatform ? styles.playerWrapperImmersive : ''}`}>
         <ZentrioPlayer
           src={stream.url!}
           poster={meta.poster}

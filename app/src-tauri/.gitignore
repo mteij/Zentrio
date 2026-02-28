@@ -1,7 +1,8 @@
 target
 bin/
 gen/
-# Preserve MainActivity.kt for Android WebView customizations
+# Preserve hand-written Android files
 !gen/android/app/src/main/java/**/MainActivity.kt
+!gen/android/app/src/main/java/**/ImmersiveModePlugin.kt
 data/
 node_modules/

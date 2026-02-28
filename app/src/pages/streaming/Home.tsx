@@ -6,6 +6,7 @@ import { MetaPreview } from '../../services/addons/types'
 import { WatchHistoryItem } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import { useAuthStore } from '../../stores/authStore'
 
 interface CatalogMetadata {
   addon: { id: string; name: string; logo?: string }
@@ -96,6 +97,8 @@ export const StreamingHome = () => {
   // Handle unauthorized redirect
   useEffect(() => {
     if (error?.message === 'Unauthorized') {
+      console.log('[Home] 401 Unauthorized received, logging out locally...');
+      useAuthStore.getState().logout();
       navigate('/')
     }
   }, [error, navigate])

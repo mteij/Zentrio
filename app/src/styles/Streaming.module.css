@@ -389,7 +389,14 @@
   transition: padding-left 0.3s ease;
   position: relative;
   z-index: 1;
-  /* overflow-x: hidden; - Removed to fix sticky header behavior. Body already handles overflow. */
+  max-width: 100%; /* Ensure layout never overflows the viewport width */
+  overflow-x: hidden; /* Prevent horizontal scroll within the page container */
+}
+
+@media (max-width: 768px) {
+  .streamingLayout {
+    padding-left: 0; /* No sidebar on mobile — navbar is a floating bottom bar */
+  }
 }
 
 .streamingLayoutNoHero {
@@ -1905,6 +1912,16 @@
 .searchInputShell {
   min-width: 320px;
   max-width: 560px;
+}
+
+@media (max-width: 480px) {
+  .searchInputShell {
+    min-width: 0; /* Let it shrink on very small screens to avoid horizontal overflow */
+    width: 100%;
+  }
+}
+
+.searchInputShell {
   flex: 1;
   display: flex;
   align-items: center;

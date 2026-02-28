@@ -53,6 +53,8 @@ html {
   overscroll-behavior: none;
   height: 100%;
   width: 100%;
+  max-width: 100%; /* Prevent horizontal overflow at the root level */
+  overflow-x: hidden; /* Never allow horizontal scroll on html */
   /* Disable zoom on desktop apps */
   touch-action: manipulation;
   -ms-touch-action: manipulation;
@@ -60,10 +62,11 @@ html {
 
 body {
   margin: 0;
-  min-width: 320px;
+  /* Note: min-width intentionally removed — it caused horizontal panning on mobile */
   min-height: 100vh;
   min-height: var(--app-height);
   width: 100%;
+  max-width: 100%; /* Clamp to viewport width on all platforms */
   overscroll-behavior: none;
   overflow-x: hidden;
   background-color: #000000;
@@ -134,12 +137,45 @@ body.is-mobile #root {
   /* Adjust height to account for safe area padding */
   min-height: calc(100vh - var(--app-safe-top) - var(--app-safe-bottom));
   height: 100%;
+  max-width: 100%; /* Prevent any child from widening the scroll container */
   
   /* Enable scroll on root instead of body */
   overflow-y: auto;
   overflow-x: hidden;
-  overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none; /* Prevent rubber-banding in both axes */
+  -webkit-overflow-scrolling: touch; /* Smooth momentum scrolling on iOS/Android */
+}
+
+/* When player is active on mobile, disable scrolling on #root to prevent conflicts */
+body.is-mobile:has(.playerWrapperImmersive) #root,
+body.is-mobile:has(.playerWrapper) #root {
+  overflow: hidden !important;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Alternative for browsers that don't support :has() */
+@supports not selector(:has(*)) {
+  body.is-mobile.player-active #root {
+    overflow: hidden !important;
+    height: 100vh;
+    height: 100dvh;
+  }
+}
+
+/* Layout player mode - when header/footer are hidden (player page) */
+body.is-mobile .layout-player {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body.is-mobile .layout-player .main-player {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
 }
 
 /* Ensure fixed elements respect safe areas on mobile */

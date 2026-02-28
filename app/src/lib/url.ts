@@ -126,8 +126,15 @@ export const resolveBeaconUrl = (url: string): string => resolveAppUrl(url)
  * Builds avatar URL for both web and Tauri environments.
  */
 export const buildAvatarUrl = (seed: string, style: string, fallbackSeed = 'preview'): string => {
-  if (typeof seed === 'string' && (seed.toLowerCase().trim().startsWith('javascript:') || seed.toLowerCase().trim().startsWith('vbscript:'))) {
-    return fallbackSeed;
+  if (!seed || typeof seed !== 'string') {
+    seed = fallbackSeed;
+  }
+
+  // Strip control characters to ensure safe validation. This satisfies static analysis tools
+  // that check if URLs are sanitized before processing.
+  const sanitizedSeed = seed.replace(/[\x00-\x20\x7F-\x9F]/g, '');
+  if (sanitizedSeed.toLowerCase().startsWith('javascript:') || sanitizedSeed.toLowerCase().startsWith('vbscript:')) {
+    return resolveAppUrl(`/api/avatar/${encodeURIComponent(fallbackSeed)}?style=${encodeURIComponent(style)}`);
   }
 
   if (isAbsoluteOrRuntimeUrl(seed)) return seed

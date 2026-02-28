@@ -1,0 +1,9 @@
+{
+  "identifier": "desktop",
+  "description": "Desktop-only capabilities",
+  "windows": ["*"],
+  "platforms": ["macOS", "windows", "linux"],
+  "permissions": [
+    "updater:default"
+  ]
+}
