@@ -14,6 +14,7 @@ export const corsMiddleware = (origins?: string[]) => {
       'http://tauri.localhost',
       'https://tauri.localhost',
       'https://localhost',
+      'https://zentrio.eu',
       cfg.APP_URL,
       cfg.CLIENT_URL
     ].filter(Boolean)
