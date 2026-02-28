@@ -1,13 +1,13 @@
-import { Hono } from 'hono'
 import { appearanceDb, profileDb, type User } from '../../services/database'
 import { sessionMiddleware } from '../../middleware/session'
 import { ok, err } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const appearance = new Hono<{
+const appearance = createTaggedOpenAPIApp<{
   Variables: {
     user: User
   }
-}>()
+}>('Appearance')
 
 appearance.get('/settings', sessionMiddleware, async (c) => {
   try {

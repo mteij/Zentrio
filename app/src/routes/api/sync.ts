@@ -1,9 +1,24 @@
-import { Hono } from 'hono'
 import { syncService } from '../../services/sync'
 import { auth } from '../../services/auth'
-import { db, profileDb, settingsProfileDb, addonDb, streamDb, appearanceDb, watchHistoryDb, listDb } from '../../services/database'
+import { db } from '../../services/database'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const app = new Hono()
+const app = createTaggedOpenAPIApp('Sync')
+
+const SYNC_ENTITY_TABLES = new Set([
+  'profiles',
+  'settings_profiles',
+  'profile_addons',
+  'stream_settings',
+  'appearance_settings',
+  'watch_history',
+  'lists',
+  'list_items'
+])
+
+const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+const isSafeSqlIdentifier = (value: string) => SAFE_SQL_IDENTIFIER.test(value)
 
 app.get('/status', async (c) => {
   try {
@@ -82,16 +97,6 @@ app.post('/disconnect', async (c) => {
 });
 
 app.post('/sync', async (c) => {
-  try {
-    await syncService.sync();
-    return c.json({ success: true });
-  } catch (e: any) {
-    return c.json({ success: false, error: e.message }, 500);
-  }
-});
-
-// Legacy endpoint for backward compatibility
-app.post('/trigger', async (c) => {
   try {
     await syncService.sync();
     return c.json({ success: true });
@@ -242,52 +247,61 @@ app.get('/pull', async (c) => {
 })
 
 // Helper function to process sync payload from Tauri client
-async function processSyncPayload(payload: any, userId: string) {
+async function processSyncPayload(payload: any, _userId: string) {
   const mappings: any = {}
   
   // Process each entity type
   for (const [entityType, records] of Object.entries(payload)) {
+    if (!SYNC_ENTITY_TABLES.has(entityType)) continue
     if (!Array.isArray(records) || records.length === 0) continue
     
     mappings[entityType] = []
-    
-    for (const record of records) {
-      try {
-        // Check if record already exists (by remote_id)
-        const existing = db.prepare(`SELECT * FROM ${entityType} WHERE remote_id = ?`).get(record.remote_id)
-        
-        if (existing) {
-          // Update existing record if remote is newer
-          const remoteDate = new Date(record.updated_at).getTime()
-          const localDate = new Date((existing as any).updated_at).getTime()
-          
-          if (remoteDate > localDate) {
-            const fields = Object.keys(record).filter(k => k !== 'id' && k !== 'remote_id')
-            const sets = fields.map(k => `${k} = ?`).join(', ')
-            const values = fields.map(k => record[k])
-            values.push(record.remote_id)
-            
-            db.prepare(`UPDATE ${entityType} SET ${sets} WHERE remote_id = ?`).run(...values)
+
+    db.transaction(() => {
+      for (const record of records) {
+        if (!record || typeof record !== 'object' || Array.isArray(record)) continue
+
+        try {
+          // Check if record already exists (by remote_id)
+          const existing = db.prepare(`SELECT * FROM ${entityType} WHERE remote_id = ?`).get((record as any).remote_id)
+
+          if (existing) {
+            // Update existing record if remote is newer
+            const remoteDate = new Date((record as any).updated_at).getTime()
+            const localDate = new Date((existing as any).updated_at).getTime()
+
+            if (remoteDate > localDate) {
+              const fields = Object.keys(record).filter(k => k !== 'id' && k !== 'remote_id' && isSafeSqlIdentifier(k))
+              if (fields.length === 0) continue
+
+              const sets = fields.map(k => `${k} = ?`).join(', ')
+              const values = fields.map(k => (record as any)[k])
+              values.push((record as any).remote_id)
+
+              db.prepare(`UPDATE ${entityType} SET ${sets} WHERE remote_id = ?`).run(...values)
+            }
+          } else {
+            // Insert new record
+            const fields = Object.keys(record).filter(k => k !== 'id' && isSafeSqlIdentifier(k))
+            if (fields.length === 0) continue
+
+            const cols = fields.join(', ')
+            const placeholders = fields.map(() => '?').join(', ')
+            const values = fields.map(k => (record as any)[k])
+
+            const result = db.prepare(`INSERT INTO ${entityType} (${cols}) VALUES (${placeholders})`).run(...values)
+
+            // Map local ID to remote ID for response
+            mappings[entityType].push({
+              id: (record as any).id, // This is the client's local ID
+              remote_id: result.lastInsertRowid.toString() // This is the server's ID
+            })
           }
-        } else {
-          // Insert new record
-          const fields = Object.keys(record).filter(k => k !== 'id')
-          const cols = fields.join(', ')
-          const placeholders = fields.map(() => '?').join(', ')
-          const values = fields.map(k => record[k])
-          
-          const result = db.prepare(`INSERT INTO ${entityType} (${cols}) VALUES (${placeholders})`).run(...values)
-          
-          // Map local ID to remote ID for response
-          mappings[entityType].push({
-            id: record.id, // This is the client's local ID
-            remote_id: result.lastInsertRowid.toString() // This is the server's ID
-          })
+        } catch (error) {
+          console.error(`Error processing ${entityType} record:`, error)
         }
-      } catch (error) {
-        console.error(`Error processing ${entityType} record:`, error)
       }
-    }
+    })()
   }
   
   return mappings
@@ -300,11 +314,7 @@ async function getChangesSince(since: string | undefined, userId: string) {
   // Get all changes for the user since the specified date
   const changes: any = {}
   
-  const entities = [
-    'profiles', 'settings_profiles', 'profile_addons',
-    'stream_settings', 'appearance_settings',
-    'watch_history', 'lists', 'list_items'
-  ]
+  const entities = Array.from(SYNC_ENTITY_TABLES)
   
   for (const entity of entities) {
     try {

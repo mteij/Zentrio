@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import authApiRoutes from './auth'
 import profileApiRoutes from './profiles'
 import userApiRoutes from './user'
@@ -11,10 +11,16 @@ import syncApiRoutes from './sync'
 import traktApiRoutes from './trakt'
 import gatewayApiRoutes from './gateway'
 import { getConfig } from '../../services/envParser'
-
 import { db } from '../../services/database'
+import {
+  generateOpenAPISpec,
+  setupScalarUI,
+  ErrorSchema,
+  HealthResponseSchema,
+  ApiInfoSchema,
+} from './openapi'
 
-const app = new Hono()
+const app = new OpenAPIHono()
 
 // Mount sub-routers under /api/*
 app.route('/auth', authApiRoutes)
@@ -29,41 +35,45 @@ app.route('/sync', syncApiRoutes)
 app.route('/trakt', traktApiRoutes)
 app.route('/gateway', gatewayApiRoutes)
 
-// Environment Configuration now read via getConfig() within handlers
+// Health check with OpenAPI documentation
+interface HealthStats {
+  users?: number
+  profiles?: number
+  addons?: number
+  active_sessions?: number
+  watched_items?: number
+  error?: string
+}
 
-// Streaming support
-app.get('/stream', (c) => {
-  return new Response(
-    new ReadableStream({
-      start(controller) {
-        let i = 0
-        const interval = setInterval(() => {
-          if (i < 10) {
-            controller.enqueue(`data: ${i}\n\n`)
-            i++
-          } else {
-            controller.close()
-            clearInterval(interval)
-          }
-        }, 1000)
+app.openapi({
+  method: 'get',
+  path: '/health',
+  tags: ['System'],
+  summary: 'Health Check',
+  description: 'Returns the health status of the API including database connectivity, environment configuration, and usage statistics.',
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: HealthResponseSchema,
+        },
       },
-    }),
-    {
-      headers: {
-        'Content-Type': 'text/plain',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
+      description: 'API is healthy',
     },
-  )
-})
-
-// Health check
-app.get('/health', (c) => {
+    500: {
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+      description: 'Internal server error',
+    },
+  },
+}, (c) => {
   const { DATABASE_URL, AUTH_SECRET } = getConfig()
-  
+
   // Gather stats
-  let stats = {}
+  let stats: HealthStats = {}
   try {
     const userCount = (db.prepare('SELECT COUNT(*) as count FROM user').get() as { count: number }).count
     const profileCount = (db.prepare('SELECT COUNT(*) as count FROM profiles').get() as { count: number }).count
@@ -103,17 +113,35 @@ app.get('/health', (c) => {
       database: DATABASE_URL ? 'configured' : 'not configured',
       auth: AUTH_SECRET ? 'configured' : 'not configured',
     },
-    stats
-  })
+    stats: stats as { users: number; profiles: number; addons: number; active_sessions: number; watched_items: number }
+  }, 200)
 })
 
-// API info
-app.get('/', (c) => {
+// API info with OpenAPI documentation
+app.openapi({
+  method: 'get',
+  path: '/',
+  tags: ['System'],
+  summary: 'API Information',
+  description: 'Returns general information about the Zentrio API including available endpoints and documentation. Visit /api/docs for interactive documentation.',
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: ApiInfoSchema,
+        },
+      },
+      description: 'API information retrieved successfully',
+    },
+  },
+}, (c) => {
   return c.json({
     message: 'Zentrio API',
     version: '1.0.0',
     endpoints: {
       health: '/health',
+      docs: '/docs',
+      openapi: '/openapi.json',
       auth: {
         identify: 'POST /api/auth/identify',
         identifyInfo: {
@@ -160,9 +188,16 @@ app.get('/', (c) => {
     },
     notes: {
       security: 'Identify returns only a boolean to avoid data leakage; emails are trimmed and lowercased.',
-      rateLimiting: 'Global rate limiting may apply via middleware; an endpoint-specific limiter can be added if needed.'
+      rateLimiting: 'Global rate limiting may apply via middleware; an endpoint-specific limiter can be added if needed.',
+      documentation: 'Interactive API documentation is available at /api/docs'
     }
-  })
+  }, 200)
 })
+
+// Generate OpenAPI specification endpoint at /api/openapi.json
+generateOpenAPISpec(app, '')
+
+// Setup Scalar API Reference UI at /api/docs
+setupScalarUI(app, '')
 
 export default app

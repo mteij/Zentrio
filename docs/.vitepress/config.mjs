@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 
-export default defineConfig({
+export default withMermaid(defineConfig({
   title: 'Zentrio Documentation',
   description: 'Profile management for Stremio Web',
   lang: 'en-US',
@@ -9,7 +10,8 @@ export default defineConfig({
   themeConfig: {
     logo: '/icon-512.png',
     nav: [
-      { text: 'Launch Zentrio', link: 'https://app.zentrio.eu' }
+      { text: 'Launch Zentrio', link: 'https://app.zentrio.eu' },
+      { text: 'API Docs', link: 'https://app.zentrio.eu/api/docs' }
     ],
  
     sidebar: [
@@ -51,4 +53,4 @@ export default defineConfig({
   },
 
   ignoreDeadLinks: true
-})
+}))

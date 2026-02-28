@@ -1,7 +1,7 @@
-import { Hono } from 'hono'
 import { getConfig } from '../../services/envParser'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const gateway = new Hono()
+const gateway = createTaggedOpenAPIApp('Gateway')
 
 const REQUEST_TIMEOUT_MS = 30000
 
@@ -57,7 +57,7 @@ const resolveRemoteBase = (requestOverride?: string | null) => {
   return appUrl || 'http://localhost:3000'
 }
 
-gateway.all('/*', async (c) => {
+const gatewayProxyHandler = async (c: any) => {
   // Critical production hardening: do not expose this as a public/open proxy.
   // This route is only intended for local sidecar usage.
   if (!isLocalGatewayHost(c.req.header('host'))) {
@@ -92,13 +92,9 @@ gateway.all('/*', async (c) => {
   console.log(`[Gateway] Has Authorization:`, reqHeaders.has('authorization') || reqHeaders.has('Authorization'));
   
   const init: RequestInit = {
-    method: c.req.method,
+    method: 'GET',
     headers: reqHeaders,
     redirect: 'follow'
-  }
-
-  if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
-    init.body = await c.req.raw.arrayBuffer()
   }
 
   const controller = new AbortController()
@@ -126,7 +122,13 @@ gateway.all('/*', async (c) => {
   } finally {
     clearTimeout(timeout)
   }
-})
+}
+
+// Register explicit OpenAPI-documented routes.
+// Read-only proxy: keep this GET-only to match the allowed read prefix policy.
+// `:path{.+}` allows forwarding nested paths like /api/streaming/dashboard.
+gateway.get('/', gatewayProxyHandler)
+gateway.get('/:path{.+}', gatewayProxyHandler)
 
 export default gateway
 

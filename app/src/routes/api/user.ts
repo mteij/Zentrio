@@ -1,4 +1,3 @@
-import { Hono } from 'hono'
 import { z } from 'zod'
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { userDb, verifyPassword, profileProxySettingsDb, profileDb, streamDb, settingsProfileDb, type User } from '../../services/database'
@@ -8,14 +7,15 @@ import { getConfig } from '../../services/envParser'
 import { createHash, randomBytes } from 'crypto'
 import { encrypt, decrypt } from '../../services/encryption'
 import { ok, err, validate, schemas } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const app = new Hono<{
+const app = createTaggedOpenAPIApp<{
   Variables: {
     user: User | null
     guestMode: boolean
     session: any
   }
-}>()
+}>('User')
 
 // [GET /ping] Test route
 app.get('/ping', (c) => ok(c, { pong: true }))

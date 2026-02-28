@@ -1,8 +1,8 @@
-import { Hono } from 'hono'
 import { addonDb } from '../../services/database'
 import { AddonClient } from '../../services/addons/client'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const app = new Hono()
+const app = createTaggedOpenAPIApp('Addons')
 
 // List all installed addons
 app.get('/', (c) => {

@@ -2,142 +2,223 @@
   <div class="releases-view">
     <div class="container">
       <header class="page-header">
-        <h1 class="page-title">Releases</h1>
-        <p class="page-subtitle">Download the latest version of Zentrio for your device.</p>
+        <h1 class="page-title">Downloads & Releases</h1>
+        <p class="page-subtitle">
+          Get Zentrio for your platform to enjoy the native experience.
+        </p>
       </header>
 
-      <div v-if="loading" class="loading-state">
-        <div class="spinner"></div>
-        <p>Loading releases...</p>
-      </div>
+      <!-- Top Section: Primary Downloads -->
+      <section class="primary-downloads">
+        <div v-if="loadingLatest" class="loading-latest">
+          <div class="spinner"></div>
+        </div>
 
-      <div v-else-if="error" class="error-state">
-        <p>{{ error }}</p>
-        <button @click="fetchReleases" class="btn btn-secondary">Try Again</button>
-      </div>
-
-      <div v-else class="releases-list">
-        <div v-for="(release, index) in releases" :key="release.id" class="release-card" :class="{ latest: index === 0 }">
-          <div class="release-header">
-            <div class="version-info">
-              <span v-if="index === 0" class="latest-badge">Latest</span>
-              <h2>{{ release.tag_name }}</h2>
-              <span class="release-date">{{ formatDate(release.published_at) }}</span>
-            </div>
-            <a :href="release.html_url" target="_blank" class="github-link">
-              View on GitHub ↗
+        <div v-else-if="latestRelease" class="downloads-grid">
+          <div class="platform-card">
+            <Monitor class="platform-icon-svg" />
+            <h3>Windows</h3>
+            <p>Windows 10/11 (64-bit)</p>
+            <a
+              v-if="getAsset(latestRelease, 'windows')"
+              :href="getAsset(latestRelease, 'windows').browser_download_url"
+              class="btn btn-primary w-full mt-4"
+            >
+              Download .exe
             </a>
+            <span v-else class="btn btn-secondary disabled w-full mt-4"
+              >Not Available Yet</span
+            >
           </div>
 
-          <div class="release-notes" v-html="renderMarkdown(release.body)"></div>
+          <div class="platform-card">
+            <Apple class="platform-icon-svg" />
+            <h3>macOS</h3>
+            <p>macOS 11.0 or later</p>
+            <a
+              v-if="getAsset(latestRelease, 'mac')"
+              :href="getAsset(latestRelease, 'mac').browser_download_url"
+              class="btn btn-primary w-full mt-4"
+            >
+              Download .dmg
+            </a>
+            <span v-else class="btn btn-secondary disabled w-full mt-4"
+              >Not Available Yet</span
+            >
+          </div>
 
-          <div class="downloads-grid">
-            <div class="platform-group">
-              <h4>Mobile</h4>
-              <div class="btn-group">
-                <a v-if="getAsset(release, 'android')" :href="getAsset(release, 'android').browser_download_url" class="btn btn-secondary btn-sm">
-                  <span class="icon">🤖</span> Android (APK)
-                </a>
-                <span v-else class="btn btn-secondary btn-sm disabled">
-                  <span class="icon">🤖</span> Android (Not available)
-                </span>
-                
-                <a v-if="getAsset(release, 'ios')" :href="getAsset(release, 'ios').browser_download_url" class="btn btn-secondary btn-sm">
-                  <span class="icon">🍎</span> iOS (IPA)
-                </a>
-                <span v-else class="btn btn-secondary btn-sm disabled">
-                  <span class="icon">🍎</span> iOS (Not available)
-                </span>
-              </div>
-            </div>
+          <div class="platform-card">
+            <Smartphone class="platform-icon-svg" />
+            <h3>Android</h3>
+            <p>Android 8.0 or later</p>
+            <a
+              v-if="getAsset(latestRelease, 'android')"
+              :href="getAsset(latestRelease, 'android').browser_download_url"
+              class="btn btn-primary w-full mt-4"
+            >
+              Download .apk
+            </a>
+            <span v-else class="btn btn-secondary disabled w-full mt-4"
+              >Not Available Yet</span
+            >
+          </div>
 
-            <div class="platform-group">
-              <h4>Desktop</h4>
-              <div class="btn-group">
-                <a v-if="getAsset(release, 'windows')" :href="getAsset(release, 'windows').browser_download_url" class="btn btn-secondary btn-sm">
-                  <span class="icon">🪟</span> Windows (.exe)
-                </a>
-                <span v-else class="btn btn-secondary btn-sm disabled">
-                  <span class="icon">🪟</span> Windows (Not available)
-                </span>
-
-                <a v-if="getAsset(release, 'mac')" :href="getAsset(release, 'mac').browser_download_url" class="btn btn-secondary btn-sm">
-                  <span class="icon">🍎</span> macOS (.dmg)
-                </a>
-                <span v-else class="btn btn-secondary btn-sm disabled">
-                  <span class="icon">🍎</span> macOS (Not available)
-                </span>
-
-                <a v-if="getAsset(release, 'linux')" :href="getAsset(release, 'linux').browser_download_url" class="btn btn-secondary btn-sm">
-                  <span class="icon">🐧</span> Linux (.AppImage)
-                </a>
-                <span v-else class="btn btn-secondary btn-sm disabled">
-                  <span class="icon">🐧</span> Linux (Not available)
-                </span>
-              </div>
+          <div class="platform-card">
+            <Terminal class="platform-icon-svg" />
+            <h3>Linux</h3>
+            <p>.deb / AppImage</p>
+            <a
+              v-if="getAsset(latestRelease, 'linux')"
+              :href="getAsset(latestRelease, 'linux').browser_download_url"
+              class="btn btn-primary w-full mt-4"
+            >
+              Download direct
+            </a>
+            <span v-else class="btn btn-secondary disabled w-full mt-4"
+              >Not Available Yet</span
+            >
+            <div class="install-script-container">
+              <span class="install-script-label"
+                >Or use the install script:</span
+              >
+              <code class="install-script-code"
+                >curl -sL zentrio.eu/install.sh | bash</code
+              >
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <section class="web-app-banner">
+        <div class="banner-content">
+          <h3>No installation required!</h3>
+          <p>
+            You can also access the fully featured Zentrio web application
+            directly in your browser.
+          </p>
+        </div>
+        <a href="https://app.zentrio.eu" class="btn btn-secondary"
+          >Launch Zentrio Web</a
+        >
+      </section>
+
+      <!-- Bottom Section: Changelog -->
+      <section class="changelog-section">
+        <h2 class="section-title">Changelog</h2>
+        <p class="section-subtitle">See what's new in recent updates.</p>
+
+        <div v-if="loading" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading releases history...</p>
+        </div>
+
+        <div v-else-if="error" class="error-state">
+          <p>{{ error }}</p>
+          <button @click="fetchReleases" class="btn btn-secondary mt-4">
+            Try Again
+          </button>
+        </div>
+
+        <div v-else class="releases-list">
+          <div
+            v-for="(release, index) in releases"
+            :key="release.id"
+            class="release-entry"
+          >
+            <div class="release-sidebar">
+              <div class="version-tag" :class="{ 'latest-tag': index === 0 }">
+                {{ release.tag_name }}
+              </div>
+              <div class="release-date">
+                {{ formatDate(release.published_at) }}
+              </div>
+            </div>
+            <div class="release-content">
+              <div class="release-header-flex">
+                <h3>{{ release.name || release.tag_name }}</h3>
+                <a :href="release.html_url" target="_blank" class="github-link"
+                  >View on GitHub ↗</a
+                >
+              </div>
+              <div
+                class="markdown-body"
+                v-html="renderMarkdown(release.body)"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
-<script>
-import { marked } from 'marked'
+<script setup>
+import { ref, computed, onMounted } from "vue";
+import { marked } from "marked";
+import { Monitor, Apple, Smartphone, Terminal } from "lucide-vue-next";
 
-export default {
-  name: 'Releases',
-  data() {
-    return {
-      releases: [],
-      loading: true,
-      error: null
-    }
-  },
-  async created() {
-    await this.fetchReleases()
-  },
-  methods: {
-    async fetchReleases() {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await fetch('https://api.github.com/repos/mteij/Zentrio/releases')
-        if (!response.ok) throw new Error('Failed to fetch releases')
-        this.releases = await response.json()
-      } catch (err) {
-        this.error = 'Unable to load releases. Please check your connection.'
-        console.error(err)
-      } finally {
-        this.loading = false
-      }
-    },
-    formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })
-    },
-    renderMarkdown(text) {
-      return marked(text || '')
-    },
-    getAsset(release, platform) {
-      if (!release.assets) return null
-      
-      const patterns = {
-        android: /\.apk$/i,
-        ios: /\.ipa$/i,
-        windows: /\.exe$/i,
-        mac: /\.dmg$/i,
-        linux: /\.AppImage$/i
-      }
-      
-      return release.assets.find(asset => patterns[platform].test(asset.name))
-    }
+const releases = ref([]);
+const loading = ref(true);
+const error = ref(null);
+
+const latestRelease = computed(() => {
+  return releases.value.length > 0 ? releases.value[0] : null;
+});
+const loadingLatest = computed(() => loading.value);
+
+const fetchReleases = async () => {
+  loading.value = true;
+  error.value = null;
+
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/mteij/Zentrio/releases",
+    );
+    if (!response.ok) throw new Error("Failed to fetch releases");
+    const data = await response.json();
+    releases.value = data;
+  } catch (err) {
+    error.value = "Unable to load releases. Please check your connection.";
+    console.error(err);
+  } finally {
+    loading.value = false;
   }
-}
+};
+
+const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const renderMarkdown = (text) => {
+  if (!text) return "";
+  const filteredText = text
+    .split("## Links:")[0]
+    .split("Links:")[0]
+    .split("### Links:")[0];
+  return marked(filteredText.trim());
+};
+
+const getAsset = (release, platform) => {
+  if (!release || !release.assets) return null;
+
+  const patterns = {
+    android: /\.apk$/i,
+    ios: /\.ipa$/i,
+    windows: /\.exe$/i,
+    mac: /\.dmg$/i,
+    linux: /\.(AppImage|deb)$/i,
+  };
+
+  return release.assets.find((asset) => patterns[platform].test(asset.name));
+};
+
+onMounted(() => {
+  fetchReleases();
+});
 </script>
 
 <style scoped>
@@ -153,13 +234,10 @@ export default {
 }
 
 .page-title {
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-weight: 800;
   margin-bottom: 16px;
-  background: linear-gradient(135deg, #ffffff 0%, #e50914 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  letter-spacing: -0.03em;
 }
 
 .page-subtitle {
@@ -167,82 +245,183 @@ export default {
   font-size: 1.2rem;
 }
 
-.loading-state, .error-state {
+/* Primary Downloads Section */
+.primary-downloads {
+  margin-bottom: 40px;
+}
+
+.downloads-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.platform-card {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 24px;
   text-align: center;
-  padding: 60px;
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.platform-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-hover);
+}
+
+.platform-icon-svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.platform-card h3 {
+  font-size: 1.25rem;
+  margin-bottom: 4px;
+}
+
+.platform-card p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.mt-4 {
+  margin-top: 16px;
+}
+
+.install-script-container {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.install-script-label {
+  font-size: 0.8rem;
   color: var(--text-muted);
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  border-top-color: var(--accent);
-  animation: spin 1s ease-in-out infinite;
-  margin: 0 auto 20px;
+.install-script-code {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #a0a0a5;
+  border: 1px solid var(--border);
+  user-select: all;
+  word-break: break-all;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.btn.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
-.release-card {
-  background: var(--card-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--card-border);
-  border-radius: 24px;
-  padding: 40px;
-  margin-bottom: 40px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.release-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-}
-
-.release-card.latest {
-  border-color: rgba(229, 9, 20, 0.3);
-  background: linear-gradient(180deg, rgba(229, 9, 20, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
-}
-
-.release-header {
+/* Web App Banner */
+.web-app-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(229, 9, 20, 0.1) 0%,
+    rgba(20, 20, 23, 0.4) 100%
+  );
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  padding: 32px 40px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 30px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 20px;
-}
-
-.version-info {
-  display: flex;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+  margin-bottom: 80px;
 }
 
-.version-info h2 {
-  font-size: 2rem;
-  font-weight: 700;
+.banner-content h3 {
+  font-size: 1.4rem;
+  margin-bottom: 8px;
 }
 
-.latest-badge {
-  background: var(--accent);
-  color: white;
-  padding: 4px 12px;
+.banner-content p {
+  color: var(--text-muted);
+}
+
+/* Changelog Section */
+.changelog-section {
+  border-top: 1px solid var(--border);
+  padding-top: 80px;
+}
+
+.section-title {
+  font-size: 2.2rem;
+  margin-bottom: 8px;
+}
+
+.section-subtitle {
+  color: var(--text-muted);
+  margin-bottom: 40px;
+}
+
+.release-entry {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 60px;
+}
+
+.release-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.version-tag {
+  display: inline-block;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
   border-radius: 100px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.latest-tag {
+  background: rgba(229, 9, 20, 0.15);
+  border-color: rgba(229, 9, 20, 0.3);
+  color: white;
 }
 
 .release-date {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: 0.9rem;
+  padding-left: 8px;
+}
+
+.release-content {
+  flex: 1;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px;
+}
+
+.release-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 20px;
+}
+
+.release-header-flex h3 {
+  font-size: 1.5rem;
 }
 
 .github-link {
@@ -256,92 +435,115 @@ export default {
   color: white;
 }
 
-.release-notes {
-  margin-bottom: 40px;
+/* Markdown Rendering Styles */
+.markdown-body {
   color: var(--text-muted);
-  line-height: 1.6;
+  font-size: 0.95rem;
 }
 
-.release-notes :deep(h1),
-.release-notes :deep(h2),
-.release-notes :deep(h3) {
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3) {
   color: var(--text);
   margin-top: 24px;
   margin-bottom: 16px;
+  font-weight: 600;
 }
 
-.release-notes :deep(ul),
-.release-notes :deep(ol) {
-  padding-left: 24px;
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  padding-left: 20px;
   margin-bottom: 16px;
 }
 
-.release-notes :deep(li) {
-  margin-bottom: 8px;
+.markdown-body :deep(li) {
+  margin-bottom: 6px;
 }
 
-.release-notes :deep(a) {
+.markdown-body :deep(a) {
   color: var(--accent);
   text-decoration: none;
 }
 
-.release-notes :deep(a:hover) {
+.markdown-body :deep(a:hover) {
   text-decoration: underline;
 }
 
-.downloads-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 40px;
+.markdown-body :deep(strong) {
+  color: var(--text);
 }
 
-.platform-group h4 {
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 80px 0;
   color: var(--text-muted);
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 16px;
 }
 
-.btn-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
 }
 
-.btn-sm {
-  padding: 10px 20px;
-  font-size: 0.95rem;
-  justify-content: flex-start;
-  width: 100%;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.btn-sm.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.icon {
-  margin-right: 12px;
-  font-size: 1.2em;
+@media (max-width: 1024px) {
+  .downloads-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
-  .release-header {
+  .page-title {
+    font-size: 2.8rem;
+  }
+
+  .web-app-banner {
     flex-direction: column;
+    text-align: center;
+    gap: 20px;
+    padding: 32px 24px;
+  }
+
+  .release-entry {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .release-sidebar {
+    width: 100%;
+    display: flex;
+    align-items: center;
     gap: 16px;
   }
-  
-  .version-info {
+
+  .release-date {
+    padding-left: 0;
+    margin-bottom: 8px;
+  }
+
+  .release-content {
+    padding: 24px;
+  }
+
+  .release-header-flex {
     flex-direction: column;
-    align-items: flex-start;
     gap: 8px;
   }
-  
+}
+
+@media (max-width: 480px) {
   .downloads-grid {
     grid-template-columns: 1fr;
-    gap: 30px;
   }
 }
 </style>

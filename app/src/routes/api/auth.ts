@@ -1,12 +1,12 @@
-import { Hono } from 'hono'
 import { z } from 'zod'
 import { auth } from '../../services/auth'
 import { userDb } from '../../services/database'
 import { validate, schemas } from '../../utils/api'
 import { getConfig } from '../../services/envParser'
 import { randomBytes } from 'crypto'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const app = new Hono()
+const app = createTaggedOpenAPIApp('Authentication')
 
 // ============================================================================
 // Secure Authorization Code Store
@@ -402,129 +402,6 @@ app.post('/mobile-callback', async (c) => {
     }
 })
 
-// [GET /login-proxy] Initiate social login flow for native apps
-app.get('/login-proxy', async (c) => {
-    const provider = c.req.query('provider')
-    const callbackURL = c.req.query('callbackURL')
-    
-    if (!provider || !callbackURL) {
-        return c.text('Missing provider or callbackURL', 400)
-    }
-    
-    return c.html(`
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>Connecting... - Zentrio</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    * { box-sizing: border-box; margin: 0; padding: 0; }
-                    body {
-                        background: linear-gradient(135deg, #0a0a0a 0%, #1a0a0a 50%, #0a0a0a 100%);
-                        color: #fff;
-                        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        min-height: 100vh;
-                        padding: 24px;
-                    }
-                    .container {
-                        position: relative;
-                        z-index: 10;
-                        text-align: center;
-                    }
-                    .loader {
-                        border: 3px solid rgba(255,255,255,0.1);
-                        border-top: 3px solid #e50914;
-                        border-radius: 50%;
-                        width: 40px;
-                        height: 40px;
-                        animation: spin 1s linear infinite;
-                        margin: 0 auto 20px;
-                    }
-                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                    p {
-                        color: rgba(255, 255, 255, 0.8);
-                        font-size: 18px;
-                    }
-                    .error {
-                        background: rgba(255, 255, 255, 0.05);
-                        backdrop-filter: blur(20px);
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                        border-radius: 16px;
-                        padding: 32px;
-                        max-width: 400px;
-                    }
-                    .error h3 {
-                        color: #ef4444;
-                        margin-bottom: 12px;
-                    }
-                    .error p {
-                        color: rgba(255, 255, 255, 0.7);
-                        margin-bottom: 16px;
-                    }
-                    .retry-btn {
-                        background: linear-gradient(135deg, #e50914, #b91c1c);
-                        color: white;
-                        border: none;
-                        padding: 12px 24px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-weight: 600;
-                        transition: all 0.2s;
-                    }
-                    .retry-btn:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 10px 30px -5px rgba(229, 9, 20, 0.4);
-                    }
-                </style>
-            </head>
-            <body>
-                ${getParticleBackgroundHtml()}
-                <div class="container">
-                    <div class="loader"></div>
-                    <p>Connecting to ${provider}...</p>
-                </div>
-                <script>
-                    fetch('/api/auth/sign-in/social', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            provider: '${provider}',
-                            callbackURL: '${callbackURL}'
-                        })
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.url) {
-                            window.location.href = data.url;
-                        } else {
-                            document.querySelector('.container').innerHTML = \`
-                                <div class="error">
-                                    <h3>Authentication Error</h3>
-                                    <p>\${data.message || data.error || 'Unknown error occurred'}</p>
-                                    <button class="retry-btn" onclick="window.history.back()">Go Back</button>
-                                </div>
-                            \`;
-                        }
-                    })
-                    .catch(err => {
-                        document.querySelector('.container').innerHTML = \`
-                            <div class="error">
-                                <h3>Connection Error</h3>
-                                <p>Failed to connect to authentication service</p>
-                                <button class="retry-btn" onclick="window.location.reload()">Try Again</button>
-                            </div>
-                        \`;
-                    });
-                </script>
-            </body>
-        </html>
-    `)
-})
-
 // [POST /link-code] Generate a link code for Tauri apps to use when linking accounts
 // This allows the browser to establish a session from the app's authentication
 app.post('/link-code', async (c) => {
@@ -878,19 +755,19 @@ app.get('/native-redirect', async (c) => {
 // ============================================================================
 
 app.all("*", (c) => {
-    // Debug logging for session requests
-    if (c.req.path.includes('get-session') || c.req.path.includes('session')) {
-        const authHeader = c.req.header('Authorization');
-        console.log(`[Auth Passthrough] ${c.req.method} ${c.req.path}`, {
-            hasAuthHeader: !!authHeader,
-            authHeaderSuffix: authHeader ? `...${authHeader.slice(-6)}` : null,
-            cookie: c.req.header('Cookie') ? 'present' : 'missing'
-        });
-    }
+  // Debug logging for session requests
+  const cfg = getConfig();
+  if (cfg.PROXY_LOGS && (c.req.path.includes('get-session') || c.req.path.includes('session'))) {
+      const authHeader = c.req.header('Authorization');
+      console.log(`[Auth Passthrough] ${c.req.method} ${c.req.path}`, {
+          hasAuthHeader: !!authHeader,
+          authHeaderSuffix: authHeader ? `...${authHeader.slice(-6)}` : null,
+          cookie: c.req.header('Cookie') ? 'present' : 'missing'
+      });
+  }
 
-    const cfg = getConfig();
-    if (cfg.APP_URL) {
-        try {
+  if (cfg.APP_URL) {
+      try {
             const reqUrl = new URL(c.req.raw.url);
             const appUrl = new URL(cfg.APP_URL);
             

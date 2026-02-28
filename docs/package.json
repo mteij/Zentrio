@@ -16,7 +16,9 @@
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@types/prismjs": "^1.26.5",
+    "mermaid": "^11.12.3",
     "prismjs": "^1.30.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }

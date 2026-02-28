@@ -1,126 +1,26 @@
-# Usage
+# Welcome to Zentrio
 
-Getting started with Zentrio is simple. This guide covers the core features and how to use them.
+[Public Instance](https://app.zentrio.eu)
 
-## Getting Started
+Zentrio is designed to be your all-in-one streaming hub, offering a personalized and highly customizable experience across all your devices. Whether you are managing multiple users under one roof or tuning your streaming setup to perfection, Zentrio provides the tools you need in a modern, clean interface.
 
-### Creating Your Account
+## Core Features
 
-1. Navigate to your Zentrio instance (or [app.zentrio.eu](https://app.zentrio.eu))
-2. Click **Sign Up** on the landing page
-3. Choose your sign-up method:
-   - **Email/Password**: Enter your details and verify your email
-   - **Social Login**: Sign in with Google, GitHub, or Discord (if enabled)
-4. Complete the onboarding wizard
+### Profiles
 
-### Logging In
-
-Use the same credentials you registered with. If you signed up with a social provider, click the corresponding button on the login page.
-
----
-
-## Profiles
-
-Profiles let you manage separate content libraries, watch histories, and preferences under one account.
-
-### Create a Profile
-
-1. Go to the **Profiles** page from the sidebar
-2. Click **New Profile**
-3. Enter a name and optional avatar
-4. Click **Save**
-
-### Switch Profiles
-
-Use the profile switcher in the navigation bar to toggle between your profiles. Each profile maintains its own:
-
-- Watch history
-- Continue watching list
-- Appearance settings
-- Streaming preferences
-
-### Edit or Delete Profiles
-
-From the **Profiles** page, click on a profile to edit its name, avatar, or delete it entirely.
-
----
-
-## Content Discovery
-
-### Browse & Search
-
-The home page displays personalized content based on your profile's history. Use the search bar to find specific movies or TV shows.
+Keep everyone's watch history and preferences strictly separated. Just like major streaming services, you can create multiple profiles under a single account. Each profile maintains its own "Continue Watching" list, visual preferences (like showing IMDb or age ratings), and streaming settings.
 
 ### Addons
 
-Zentrio supports community addons to extend your content sources.
+Zentrio's content library is powered by the community. You can easily install addons to extend your streaming sources and discover new media. Simply drop an addon manifest URL into your settings, and Zentrio handles the rest, allowing you to reorder sources to prioritize your preferred streams.
 
-#### Installing Addons
+### Settings & Customization
 
-1. Go to **Settings** → **Addons**
-2. Enter the addon manifest URL
-3. Click **Install**
+Take full control over your experience. You can tweak everything from your default streaming quality and subtitle preferences to proxy settings and debrid service integrations. Zentrio also supports secure account management, including Two-Factor Authentication (2FA) and social logins (SSO) via Google, GitHub, or Discord.
 
-#### Managing Addons
+### Multi-Platform Access
 
-- View installed addons in the Addons tab
-- Reorder addons to set priority for stream sources
-- Remove addons you no longer need
+Zentrio is built to go wherever you go:
 
----
-
-## Settings
-
-### Account
-
-Manage your account settings:
-
-- **Username**: Change your display name
-- **Email**: Update your email address (requires verification)
-- **Password**: Change or set up a password
-- **Linked Accounts**: Connect/disconnect social logins
-- **Two-Factor Authentication**: Enable 2FA for added security
-
-### Appearance
-
-Per-profile display options:
-
-- **Show IMDb Ratings**: Toggle IMDb rating badges on media cards
-- **Show Age Ratings**: Toggle age rating badges (PG-13, R, etc.)
-
-### Streaming
-
-Configure playback behavior:
-
-- Preferred quality
-- Subtitle preferences
-- Debrid service integration
-- Proxy settings
-
-### Danger Zone
-
-- Delete your account and all associated data
-
----
-
-## Mobile & PWA
-
-Zentrio works seamlessly across devices.
-
-### Android
-
-Download the dedicated APK from the [Releases](https://github.com/mteij/Zentrio/releases) page.
-
-### iOS / Desktop
-
-Native apps are available for download from the [Releases](https://github.com/mteij/Zentrio/releases) page.
-
-### Progressive Web App (PWA)
-
-For any browser:
-
-1. Navigate to your Zentrio instance in Safari (iOS) or Chrome (other devices)
-2. Tap **Share** (iOS) or the menu button
-3. Select **Add to Home Screen**
-
-The PWA provides an app-like experience without requiring a store download.
+- **Web & PWA**: Access your library from any browser, or install the Progressive Web App (PWA) on iOS/Android for a native app-like experience without needing an app store.
+- **Native Apps**: Dedicated applications are available for both Desktop and Android, which you can find on our [Releases page](https://zentrio.eu/releases).

@@ -1,64 +1,19 @@
 # Self-Hosting
 
-The recommended way to run Zentrio is via Docker.
-
-## Quick Start
-
-Run the following command to start a complete instance:
+## Docker
 
 ```bash
 docker run -d --name zentrio \
   -e AUTH_SECRET=$(openssl rand -base64 32) \
   -e ENCRYPTION_KEY=$(openssl rand -hex 32) \
+  -e TMDB_API_KEY="your-tmdb-api-key" \
   -e DATABASE_URL="file:/app/data/zentrio.db" \
   -p 3000:3000 \
   -v ./data:/app/data \
   ghcr.io/michieleijpe/zentrio:latest
 ```
 
-Your instance will be available at `http://localhost:3000`.
-
-## Configuration
-
-Configure Zentrio using environment variables.
-
-### Core Variables
-
-| Variable         | Description                          | Required | Default                 |
-| :--------------- | :----------------------------------- | :------- | :---------------------- |
-| `AUTH_SECRET`    | Secret for JWT signing.              | Yes      | -                       |
-| `ENCRYPTION_KEY` | 32-byte hex key for data encryption. | Yes      | -                       |
-| `DATABASE_URL`   | SQLite connection string.            | Yes      | `./data/zentrio.db`     |
-| `APP_URL`        | Public URL of your instance.         | No       | `http://localhost:3000` |
-
-### Email (SMTP)
-
-Required for password resets and invitations.
-
-| Variable     | Description                                   |
-| :----------- | :-------------------------------------------- |
-| `SMTP_HOST`  | Hostname of your SMTP provider.               |
-| `SMTP_PORT`  | Port (e.g., 587 or 465).                      |
-| `SMTP_USER`  | SMTP username.                                |
-| `SMTP_PASS`  | SMTP password.                                |
-| `EMAIL_FROM` | Sender address (e.g., `noreply@example.com`). |
-
-### Social Login (SSO)
-
-Zentrio supports OIDC for social login.
-
-See the specific guides for setting up each provider:
-
-- [Google](./self-hosting/sso/google.md)
-- [Discord](./self-hosting/sso/discord.md)
-- [GitHub](./self-hosting/sso/github.md)
-- [OpenID Connect](./self-hosting/sso/openid.md)
-
-Supported providers: `GOOGLE`, `GITHUB`, `DISCORD`, `OPENID`. Prefix variables with `AUTH_{PROVIDER}_`.
-
 ## Docker Compose
-
-For production, use `docker-compose.yml`:
 
 ```yaml
 services:
@@ -71,14 +26,49 @@ services:
     environment:
       - AUTH_SECRET=change_me
       - ENCRYPTION_KEY=change_me
+      - TMDB_API_KEY=your-tmdb-api-key
       - DATABASE_URL=file:/app/data/zentrio.db
     volumes:
       - ./data:/app/data
 ```
 
-## Reverse Proxy
+## Environment Variables
 
-If running behind Nginx, ensure you pass the correct headers:
+### Required
+
+- `AUTH_SECRET`: Secret for JWT signing (Required).
+- `ENCRYPTION_KEY`: 32-byte hex key for data encryption (Required).
+- `TMDB_API_KEY`: API key for TMDB (Required).
+
+### Server (Optional)
+
+- `PORT`: Server port. Default: `3000`
+- `APP_URL`: Public URL. Default: `http://localhost:3000`
+- `CLIENT_URL`: Client URL. Default: `http://localhost:5173`
+- `DATABASE_URL`: SQLite connection string. Default: `./data/zentrio.db`
+
+### Email (Optional)
+
+**SMTP**:
+
+- `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM`
+
+**Resend**:
+
+- `RESEND_API_KEY`
+
+### Social Login / SSO (Optional)
+
+- **Google**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` ([Docs](./self-hosting/sso/google.md))
+- **GitHub**: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` ([Docs](./self-hosting/sso/github.md))
+- **Discord**: `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` ([Docs](./self-hosting/sso/discord.md))
+- **OIDC**: `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ISSUER`, `OIDC_DISPLAY_NAME` ([Docs](./self-hosting/sso/openid.md))
+
+### Integrations (Optional)
+
+- **Trakt**: `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`
+
+## Reverse Proxy (Nginx)
 
 ```nginx
 location / {

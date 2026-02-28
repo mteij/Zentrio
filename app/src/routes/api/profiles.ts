@@ -1,14 +1,14 @@
-import { Hono } from 'hono'
 import { db, profileDb, profileProxySettingsDb, userDb, User, Profile } from '../../services/database'
 import { optionalSessionMiddleware } from '../../middleware/session'
+import { createTaggedOpenAPIApp } from './openapi-route'
  
-const app = new Hono<{
+const app = createTaggedOpenAPIApp<{
   Variables: {
     user: User | null
     guestMode: boolean
     session: any
   }
-}>()
+}>('Profiles')
  
 app.use('/*', optionalSessionMiddleware)
  

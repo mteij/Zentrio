@@ -1,14 +1,14 @@
-import { Hono } from 'hono'
 import { listDb, userDb, profileDb, watchHistoryDb, type User, type ListShare } from '../../services/database'
 import { sessionMiddleware } from '../../middleware/session'
 import { emailService } from '../../services/email'
 import { getConfig } from '../../services/envParser'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const lists = new Hono<{
+const lists = createTaggedOpenAPIApp<{
   Variables: {
     user: User
   }
-}>()
+}>('Lists')
 
 // Get all lists for a profile
 lists.get('/', async (c) => {

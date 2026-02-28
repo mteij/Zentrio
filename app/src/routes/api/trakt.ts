@@ -1,7 +1,6 @@
 // Trakt API Routes
 // Handles authentication flows, sync operations, and recommendations
 
-import { Hono } from 'hono'
 import { randomBytes } from 'crypto'
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { traktAccountDb, traktSyncStateDb, profileDb, profileProxySettingsDb, type User } from '../../services/database'
@@ -10,14 +9,15 @@ import { addonManager } from '../../services/addons/addon-manager'
 import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../../services/tmdb/age-ratings'
 import { getConfig } from '../../services/envParser'
 import { ok, err } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const trakt = new Hono<{
+const trakt = createTaggedOpenAPIApp<{
   Variables: {
     user: User | null
     guestMode: boolean
     session: any
   }
-}>()
+}>('Trakt')
 
 // Store pending device codes in memory (with expiry)
 const pendingDeviceCodes = new Map<string, {

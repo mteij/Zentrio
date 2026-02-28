@@ -1,18 +1,18 @@
-import { Hono } from 'hono'
 import { addonManager } from '../../services/addons/addon-manager'
 import { streamDb, watchHistoryDb, profileDb, addonDb, listDb, userDb, type User } from '../../services/database'
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { ok, err } from '../../utils/api'
 import { streamCache, StreamCache } from '../../services/addons/stream-cache'
 import { getParentalSettings, filterContent } from '../../services/addons/content-filter'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const streaming = new Hono<{
+const streaming = createTaggedOpenAPIApp<{
   Variables: {
     user: User | null
     guestMode: boolean
     session: any
   }
-}>()
+}>('Streaming')
 
 // Helper to find and add next episode to continue watching
 async function ensureNextEpisodeInContinueWatching(

@@ -1,7 +1,7 @@
-import { Hono } from 'hono'
 import { generateAvatar, generateRandomAvatar, isValidAvatarStyle, DEFAULT_AVATAR_STYLE, AVATAR_STYLES, AVATAR_STYLE_NAMES, type AvatarStyle } from '../../services/avatar'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
-const app = new Hono()
+const app = createTaggedOpenAPIApp('Avatar')
 
 // Get available avatar styles
 app.get('/styles', (c) => {
