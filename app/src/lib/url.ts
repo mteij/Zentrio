@@ -122,34 +122,66 @@ export const createApiEventSource = (url: string, init?: EventSourceInit): Event
 export const resolveBeaconUrl = (url: string): string => resolveAppUrl(url)
 
 /**
- * Builds avatar URL for both web and Tauri environments.
+ * Dangerous URL schemes that could lead to XSS when used in img src attributes.
+ * These are checked in a case-insensitive manner.
  */
-export const buildAvatarUrl = (seed: string, style: string, fallbackSeed = 'preview'): string => {
-  if (!seed || typeof seed !== 'string') {
-    seed = fallbackSeed;
+const DANGEROUS_URL_SCHEMES = ['javascript:', 'vbscript:', 'data:', 'file:'] as const;
+
+/**
+ * Validates if a URL is safe to use in an img src attribute.
+ * Returns null if the URL is potentially dangerous.
+ */
+const validateSafeUrl = (url: string): string | null => {
+  if (!url || typeof url !== 'string') {
+    return null;
   }
 
-  // Strip control characters to ensure safe validation. This satisfies static analysis tools
-  // that check if URLs are sanitized before processing.
-  const sanitizedSeed = seed.replace(/[\x00-\x20\x7F-\x9F]/g, '');
-  
+  // Aggressively strip all whitespace and control characters
+  const cleaned = url.replace(/[\s\x00-\x20\x7F-\x9F]/g, '');
+
+  // Check for dangerous schemes (case-insensitive)
+  const lowerCleaned = cleaned.toLowerCase();
+  for (const scheme of DANGEROUS_URL_SCHEMES) {
+    if (lowerCleaned.startsWith(scheme)) {
+      return null;
+    }
+  }
+
+  // Additional URL parsing validation for edge cases
   try {
-    const parsed = new URL(sanitizedSeed);
-    if (['javascript:', 'vbscript:', 'data:'].includes(parsed.protocol)) {
-      return resolveAppUrl(`/api/avatar/${encodeURIComponent(fallbackSeed)}?style=${encodeURIComponent(style)}`);
+    const parsed = new URL(cleaned);
+    if (DANGEROUS_URL_SCHEMES.some(scheme => parsed.protocol.toLowerCase() === scheme)) {
+      return null;
     }
   } catch {
-    // Fails to parse if it's a relative URL, which is safe
-  }
-  
-  const lowerSeed = sanitizedSeed.toLowerCase();
-  if (lowerSeed.startsWith('javascript:') || lowerSeed.startsWith('vbscript:') || lowerSeed.startsWith('data:')) {
-    return resolveAppUrl(`/api/avatar/${encodeURIComponent(fallbackSeed)}?style=${encodeURIComponent(style)}`);
+    // If URL parsing fails, it's likely a relative path which is safe
   }
 
-  if (isAbsoluteOrRuntimeUrl(sanitizedSeed)) return sanitizedSeed
+  return cleaned;
+};
 
-  const seedToUse = sanitizedSeed || fallbackSeed
-  return resolveAppUrl(`/api/avatar/${encodeURIComponent(seedToUse)}?style=${encodeURIComponent(style)}`)
+/**
+ * Builds avatar URL for both web and Tauri environments.
+ * This function ensures the output is always safe for use in img src attributes.
+ */
+export const buildAvatarUrl = (seed: string, style: string, fallbackSeed = 'preview'): string => {
+  // Validate and sanitize the seed input
+  const safeSeed = validateSafeUrl(seed);
+  const safeStyle = validateSafeUrl(style);
+
+  // Use fallback if seed is unsafe or empty
+  const seedToUse = safeSeed || fallbackSeed;
+  const styleToUse = safeStyle || 'bottts-neutral';
+
+  // If the seed is an absolute URL (http/https), return it directly after validation
+  if (isAbsoluteOrRuntimeUrl(seedToUse)) {
+    return seedToUse;
+  }
+
+  // Build the safe URL using encodeURIComponent for all dynamic parts
+  const encodedSeed = encodeURIComponent(seedToUse);
+  const encodedStyle = encodeURIComponent(styleToUse);
+
+  return resolveAppUrl(`/api/avatar/${encodedSeed}?style=${encodedStyle}`);
 }
 
