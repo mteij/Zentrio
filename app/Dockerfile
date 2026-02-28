@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y git npm && rm -rf /var/lib/apt/lists/*
 
 FROM base AS builder
 WORKDIR /app
-COPY package.json bun.lock tsconfig.json index.html vite.config.ts tailwind.config.js postcss.config.js ./
+COPY package.json bun.lock tsconfig.json tsconfig.node.json index.html vite.config.ts tailwind.config.js postcss.config.js ./
 # Enforce frozen lockfile: use the committed bun.lock exactly
 RUN bun install --no-save
 
