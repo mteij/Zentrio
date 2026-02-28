@@ -84,7 +84,6 @@ const isMobileDevice = () =>
 /** Check if running in Tauri mobile context */
 const isTauriMobile = () => {
   if (typeof window === 'undefined') return false
-  // @ts-expect-error - Tauri-specific property
   return !!(window.__TAURI__ || window.__TAURI_INTERNALS__)
 }
 
