@@ -30,7 +30,7 @@ Zentrio was built with substantial assistance from AI tooling, guided by an engi
 ## 🚀 Getting Started
 
 Zentrio is easiest to explore via the public instance, visit our website for more information:
-- 🌐 Zentrio.eu: [**app.zentrio.eu**](https://zentrio.eu)
+- 🌐 Zentrio.eu: [**zentrio.eu**](https://zentrio.eu)
 
 For deployment, self-hosting, and development setup instructions, refer to the documentation.
 
