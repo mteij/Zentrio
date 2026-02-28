@@ -72,50 +72,11 @@
               <div class="url-bar">app.zentrio.eu</div>
             </div>
             <div class="browser-content">
-              <div class="app-mockup">
-                <div class="app-sidebar">
-                  <div class="app-logo-mock"></div>
-                  <div class="app-nav-item active"></div>
-                  <div class="app-nav-item"></div>
-                  <div class="app-nav-item"></div>
-                  <div class="app-nav-item"></div>
-                </div>
-                <div class="app-main">
-                  <div class="app-hero-mock">
-                    <div class="app-hero-content-mock">
-                      <div class="app-hero-title-mock"></div>
-                      <div class="app-hero-desc-mock"></div>
-                      <div class="app-hero-desc-mock short"></div>
-                      <div class="app-hero-buttons-mock">
-                        <div class="app-btn-play-mock"></div>
-                        <div class="app-btn-more-mock"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="app-rows-mock">
-                    <div class="app-row-mock">
-                      <div class="app-row-title-mock"></div>
-                      <div class="app-row-cards-mock">
-                        <div
-                          class="app-card-mock"
-                          v-for="n in 6"
-                          :key="'r1' + n"
-                        ></div>
-                      </div>
-                    </div>
-                    <div class="app-row-mock">
-                      <div class="app-row-title-mock"></div>
-                      <div class="app-row-cards-mock">
-                        <div
-                          class="app-card-mock"
-                          v-for="n in 6"
-                          :key="'r2' + n"
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <img
+                src="/app-screenshot.png"
+                alt="Zentrio Web App Screenshot"
+                class="app-screenshot-img"
+              />
             </div>
           </div>
         </div>
@@ -135,32 +96,48 @@
       </div>
     </main>
 
-    <section class="features">
+    <section class="community">
       <div class="container">
-        <div class="features-grid">
-          <div class="feature-card">
-            <div class="feature-icon">⚡</div>
-            <h3>Modern Tech Stack</h3>
-            <p>
-              Engineered with modern technologies like Bun, Hono, and Tauri for
-              a buttery smooth, native-like experience on all devices.
+        <div class="community-grid">
+          <div class="community-content fade-in-up">
+            <h2 class="section-title" style="text-align: left">
+              Open Source & Community
+            </h2>
+            <p
+              class="section-subtitle"
+              style="text-align: left; margin-bottom: 24px; font-size: 1.1rem"
+            >
+              Zentrio is completely open-source. We welcome contributions from
+              everyone, whether it's fixing bugs, adding features, or improving
+              documentation. Feel free to explore the repository!
             </p>
+            <div class="community-actions">
+              <a
+                href="https://github.com/mteij/Zentrio"
+                target="_blank"
+                class="btn btn-secondary action-btn"
+              >
+                <Github class="btn-icon-svg" />
+                Contribute on GitHub
+              </a>
+              <a
+                href="https://buymeacoffee.com/michieleijpe"
+                target="_blank"
+                class="btn btn-primary action-btn shine-effect"
+              >
+                <Coffee class="btn-icon-svg" />
+                Buy Me a Coffee
+              </a>
+            </div>
           </div>
-          <div class="feature-card">
-            <div class="feature-icon">🧩</div>
-            <h3>Addon System</h3>
-            <p>
-              Extend the platform instantly with community-built,
-              Stremio-compatible addons to scrape and stream media.
-            </p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🤖</div>
-            <h3>Built with AI</h3>
-            <p>
-              Zentrio is an experimental project built with substantial
-              assistance from AI tooling. Fast iteration, unique codebase.
-            </p>
+          <div class="community-visual fade-in-up delay-1">
+            <div class="star-history-container">
+              <img
+                src="https://api.star-history.com/svg?repos=mteij/Zentrio&type=Date&theme=dark"
+                alt="Zentrio GitHub Star History"
+                class="star-history-img"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -178,6 +155,8 @@ import {
   Apple,
   Smartphone,
   Terminal,
+  Github,
+  Coffee,
 } from "lucide-vue-next";
 
 const primaryDownload = ref({
@@ -476,160 +455,15 @@ onMounted(() => {
 }
 
 .browser-content {
-  height: 600px;
   background: var(--bg);
   position: relative;
   overflow: hidden;
 }
 
-/* App Mockup UI */
-.app-mockup {
-  display: flex;
-  height: 100%;
-  background: #09090b; /* Deep dark native background */
+.app-screenshot-img {
   width: 100%;
-}
-
-.app-sidebar {
-  width: 72px;
-  background: rgba(255, 255, 255, 0.02);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px 0;
-  gap: 28px;
-  flex-shrink: 0;
-}
-
-.app-logo-mock {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--accent);
-  margin-bottom: 24px;
-}
-
-.app-nav-item {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.app-nav-item.active {
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.app-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.app-hero-mock {
-  height: 40%;
-  background:
-    linear-gradient(to right, rgba(9, 9, 11, 1) 5%, rgba(9, 9, 11, 0) 70%),
-    linear-gradient(45deg, rgba(229, 9, 20, 0.15), transparent);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: flex-end;
-  padding: 40px 48px;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.app-hero-content-mock {
-  width: 70%;
-}
-
-.app-hero-title-mock {
-  width: 60%;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 6px;
-  margin-bottom: 16px;
-}
-
-.app-hero-desc-mock {
-  width: 85%;
-  height: 12px;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 4px;
-  margin-bottom: 10px;
-}
-
-.app-hero-desc-mock.short {
-  width: 50%;
-  margin-bottom: 24px;
-}
-
-.app-hero-buttons-mock {
-  display: flex;
-  gap: 16px;
-}
-
-.app-btn-play-mock {
-  width: 120px;
-  height: 40px;
-  border-radius: 8px;
-  background: var(--text);
-}
-
-.app-btn-more-mock {
-  width: 140px;
-  height: 40px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.app-rows-mock {
-  flex: 1;
-  padding: 32px 48px;
-  display: flex;
-  flex-direction: column;
-  gap: 40px;
-}
-
-.app-row-mock {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.app-row-title-mock {
-  width: 160px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 4px;
-}
-
-.app-row-cards-mock {
-  display: flex;
-  gap: 20px;
-  overflow: hidden;
-}
-
-.app-card-mock {
-  min-width: 140px;
-  height: 210px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  position: relative;
-  overflow: hidden;
-}
-
-.app-card-mock::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.6) 100%);
+  height: auto;
+  display: block;
 }
 
 /* Stats Section */
@@ -660,47 +494,62 @@ onMounted(() => {
   font-size: 1.15rem;
 }
 
-/* Features Section */
-.features {
+/* Community Section */
+.community {
   padding: 60px 0 120px;
+  position: relative;
+  z-index: 1;
 }
 
-.features-grid {
+.community-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 30px;
-}
-
-.feature-card {
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
   background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 40px 32px;
+  padding: 40px;
   transition:
-    transform 0.3s ease,
-    border-color 0.3s ease;
+    border-color 0.3s ease,
+    transform 0.3s ease;
 }
 
-.feature-card:hover {
-  transform: translateY(-5px);
+.community-grid:hover {
   border-color: var(--border-hover);
+  transform: translateY(-5px);
 }
 
-.feature-icon {
-  font-size: 2.5rem;
-  margin-bottom: 24px;
+.community-content {
+  display: flex;
+  flex-direction: column;
 }
 
-.feature-card h3 {
-  font-size: 1.3rem;
-  margin-bottom: 12px;
-  color: var(--text);
+.community-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  flex-wrap: wrap;
 }
 
-.feature-card p {
-  color: var(--text-muted);
-  font-size: 1rem;
-  line-height: 1.6;
+.community-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.star-history-container {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.star-history-img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 /* Animations */
@@ -734,9 +583,6 @@ onMounted(() => {
   .hero-title {
     font-size: 3.5rem;
   }
-  .features-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 @media (max-width: 768px) {
@@ -755,36 +601,20 @@ onMounted(() => {
     width: 100%;
   }
 
-  .features-grid {
+  .community-grid {
     grid-template-columns: 1fr;
+    padding: 24px;
+    gap: 32px;
   }
+
   .browser-mockup {
     transform: none;
     border-radius: 8px 8px 0 0;
     border-bottom: none;
   }
   .browser-content {
-    height: 400px;
+    height: auto;
     padding: 0;
-  }
-
-  .app-sidebar {
-    display: none;
-  }
-
-  .app-hero-mock {
-    height: 180px;
-    padding: 24px;
-  }
-
-  .app-rows-mock {
-    padding: 24px;
-    gap: 24px;
-  }
-
-  .app-card-mock {
-    min-width: 110px;
-    height: 165px;
   }
 }
 </style>

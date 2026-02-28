@@ -72,6 +72,9 @@
             <a href="https://github.com/mteij/Zentrio" class="footer-link"
               >GitHub</a
             >
+            <router-link to="/tos" class="footer-link"
+              >Terms of Service</router-link
+            >
           </div>
           <p class="copyright">
             &copy; {{ currentYear }} Zentrio. Open Source Software.

@@ -136,8 +136,18 @@ app.get('/assets/*', async (c) => {
 // Static file serving (explicit, to avoid path mismatches)
 app.get('/static/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/static\//, '')
+  // Try dist/static first (production/Docker), then public/static (development)
   // @ts-ignore
-  const filePath = join(process.cwd(), 'public', 'static', reqPath)
+  const distPath = join(process.cwd(), 'dist', 'static', reqPath)
+  // @ts-ignore
+  const publicPath = join(process.cwd(), 'public', 'static', reqPath)
+
+  let filePath = distPath
+  // @ts-ignore
+  if (!(await Bun.file(distPath).exists())) {
+    filePath = publicPath
+  }
+
   try {
     // @ts-ignore
     const file = Bun.file(filePath)
@@ -176,8 +186,18 @@ app.get('/static/*', async (c) => {
 // Favicon at root for browser defaults
 app.get('/favicon.ico', async (c) => {
   try {
+    // Try dist/static first (production/Docker), then public/static (development)
     // @ts-ignore
-    const filePath = join(process.cwd(), 'public', 'static', 'logo', 'favicon', 'favicon.ico')
+    const distPath = join(process.cwd(), 'dist', 'static', 'logo', 'favicon', 'favicon.ico')
+    // @ts-ignore
+    const publicPath = join(process.cwd(), 'public', 'static', 'logo', 'favicon', 'favicon.ico')
+
+    let filePath = distPath
+    // @ts-ignore
+    if (!(await Bun.file(distPath).exists())) {
+      filePath = publicPath
+    }
+
     // @ts-ignore
     const file = Bun.file(filePath)
     return new Response(file, {
@@ -195,8 +215,18 @@ app.get('/favicon.ico', async (c) => {
 // Serve the unregistering SW from /static/sw.js and disable caching to speed up removal/updates.
 app.get('/sw.js', async () => {
   try {
+    // Try dist/static first (production/Docker), then public/static (development)
     // @ts-ignore
-    const filePath = join(process.cwd(), 'public', 'static', 'sw.js')
+    const distPath = join(process.cwd(), 'dist', 'static', 'sw.js')
+    // @ts-ignore
+    const publicPath = join(process.cwd(), 'public', 'static', 'sw.js')
+
+    let filePath = distPath
+    // @ts-ignore
+    if (!(await Bun.file(distPath).exists())) {
+      filePath = publicPath
+    }
+
     // @ts-ignore
     const file = Bun.file(filePath)
 
