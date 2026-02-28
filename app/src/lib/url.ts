@@ -85,8 +85,8 @@ export const toDirectRemoteUrl = (resolvedOrRelativeUrl: string): string => {
  * Returns true when URL is already absolute or handled by browser/runtime directly.
  */
 export const isAbsoluteOrRuntimeUrl = (url: string): boolean => {
-  return /^(?:[a-z][a-z\d+\-.]*:)?\/\//i.test(url) ||
-    url.startsWith('data:') ||
+  return /^(?:https?|ftp):\/\//i.test(url) ||
+    url.startsWith('data:image/') ||
     url.startsWith('blob:')
 }
 
@@ -126,6 +126,10 @@ export const resolveBeaconUrl = (url: string): string => resolveAppUrl(url)
  * Builds avatar URL for both web and Tauri environments.
  */
 export const buildAvatarUrl = (seed: string, style: string, fallbackSeed = 'preview'): string => {
+  if (typeof seed === 'string' && (seed.toLowerCase().trim().startsWith('javascript:') || seed.toLowerCase().trim().startsWith('vbscript:'))) {
+    return fallbackSeed;
+  }
+
   if (isAbsoluteOrRuntimeUrl(seed)) return seed
 
   const seedToUse = seed || fallbackSeed

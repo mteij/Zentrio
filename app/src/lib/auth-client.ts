@@ -195,10 +195,10 @@ const createClient = () => createAuthClient({
   baseURL: getServerUrl(),
   fetchOptions: {
     // Standard better-fetch option for custom fetch
-    customFetch: safeFetch
-  },
+    customFetch: safeFetch as any
+  } as any,
   // Some versions of Better Auth expect it at the root as well
-  fetch: safeFetch,
+  fetch: safeFetch as any,
   plugins: [
     twoFactorClient({
       onTwoFactorRedirect: () => {
@@ -208,7 +208,7 @@ const createClient = () => createAuthClient({
     magicLinkClient(),
     emailOTPClient(),
   ],
-} as any);
+});
 
 // Type for the auth client (includes plugin types)
 type AuthClientType = ReturnType<typeof createClient>;
@@ -241,7 +241,7 @@ export function resetAuthClient() {
  * Because Better-Auth uses URL-building proxies internally, we MUST NOT attempt to
  * use `.bind()` on its properties, as the proxy will intercept it as a URL path (e.g. `/bind`).
  */
-export const authClient = new Proxy({} as AuthClientType, {
+export const authClient: any = new Proxy({} as AuthClientType, {
   get(_, prop) {
     const client = getAuthClient();
     return (client as any)[prop];
