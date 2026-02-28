@@ -5,6 +5,13 @@
 [dev]
   command = "bun run dev"
 
+# Allow static files (sitemap, robots, etc.) to be served directly
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/sitemap.xml"
+  status = 200
+
+# SPA fallback - all other routes go to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
