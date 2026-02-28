@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
-import { ErrorBoundary, TitleBar } from './components'
+import { ErrorBoundary, TitleBar, ScrollToTop } from './components'
 import { SplashScreen } from './components'
 import { ProtectedRoute, PublicRoute } from './components/auth/AuthGuards'
 import { isTauri, resetAuthClient, authClient } from './lib/auth-client'
@@ -137,6 +137,23 @@ function AppRoutes() {
     const stored = localStorage.getItem("zentrio_server_url");
     return stored;
   });
+
+  // Keep local sidecar gateway target synchronized with selected connected server.
+  // This preserves auth behavior while enabling local-first read routing.
+  useEffect(() => {
+    if (!isTauri()) return
+
+    const isConnected = mode === 'connected'
+    if (!isConnected || !serverUrl || serverUrl === 'guest') {
+      localStorage.removeItem('zentrio_local_gateway_url')
+      localStorage.removeItem('zentrio_local_gateway_remote_url')
+      return
+    }
+
+    localStorage.setItem('zentrio_local_gateway_enabled', '1')
+    localStorage.setItem('zentrio_local_gateway_url', 'http://localhost:3000')
+    localStorage.setItem('zentrio_local_gateway_remote_url', serverUrl)
+  }, [mode, serverUrl])
 
   // Preload common routes after mount
   useEffect(() => {
@@ -520,6 +537,7 @@ export default function App() {
           <AppLifecycleProvider>
              <AppInitializer>
                 <BrowserRouter>
+                  <ScrollToTop />
                   <TitleBar />
                   <AppRoutes />
                   <Toaster 

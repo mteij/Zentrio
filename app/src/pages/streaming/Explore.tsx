@@ -21,6 +21,32 @@ interface GenreRowProps {
 }
 
 const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: GenreRowProps) => {
+  const rowRef = useRef<HTMLDivElement | null>(null)
+  const [isNearViewport, setIsNearViewport] = useState(false)
+
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return
+
+    if (!('IntersectionObserver' in window)) {
+      setIsNearViewport(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsNearViewport(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '220px 0px', threshold: 0.01 }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   const { data, isLoading } = useQuery({
     queryKey: ['explore-genre', profileId, genre, type],
     queryFn: async () => {
@@ -31,15 +57,16 @@ const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: G
     },
     staleTime: 1000 * 60 * 60, // 1 hour - genre data rarely changes
     gcTime: 1000 * 60 * 30,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    enabled: isNearViewport
   })
 
-  if (isLoading) {
-    return <SkeletonRow />
+  if (!isNearViewport || isLoading) {
+    return <div ref={rowRef}><SkeletonRow /></div>
   }
 
   if (!data?.items || data.items.length === 0) {
-    return null
+    return <div ref={rowRef} />
   }
 
   // Update seeAllUrl to include type if specified
@@ -47,14 +74,16 @@ const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: G
   const seeAllUrl = type && type !== 'all' ? `${seeAllBase}&type=${type}` : seeAllBase
 
   return (
-    <StreamingRow
-      title={genre}
-      items={data.items}
-      profileId={profileId}
-      showImdbRatings={showImdbRatings}
-      showAgeRatings={showAgeRatings}
-      seeAllUrl={seeAllUrl}
-    />
+    <div ref={rowRef}>
+      <StreamingRow
+        title={genre}
+        items={data.items}
+        profileId={profileId}
+        showImdbRatings={showImdbRatings}
+        showAgeRatings={showAgeRatings}
+        seeAllUrl={seeAllUrl}
+      />
+    </div>
   )
 }
 
@@ -257,7 +286,7 @@ export const StreamingExplore = () => {
     ? shuffledGenres.filter(g => genres.includes(g)).concat(genres.filter(g => !shuffledGenres.includes(g)))
     : shuffledGenres
   
-  const rowGenres = displayGenres.slice(0, 15)
+  const rowGenres = displayGenres.slice(0, 8)
 
   const showHero = !isFilteredView && trending.length > 0
   

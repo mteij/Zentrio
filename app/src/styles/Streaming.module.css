@@ -599,6 +599,8 @@
   font-weight: 600;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Ensure trending chip is visible below titlebar/safe area on desktop */
+  margin-top: calc(var(--app-content-top-offset, 0px) + 8px);
 }
 
 .btnHero {
@@ -979,8 +981,8 @@
     font-size: 0.75rem;
     padding: 5px 10px;
     margin-bottom: 10px;
-    /* Ensure trending chip is visible below safe area on mobile */
-    margin-top: calc(var(--app-content-top-offset, 0px) + 8px);
+    /* On mobile, hero content is aligned to bottom so no top margin needed */
+    margin-top: 0;
   }
 
   .heroActions {

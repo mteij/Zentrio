@@ -188,6 +188,7 @@ streaming.get('/streams/:type/:id', async (c) => {
  * - complete: { allStreams: [...], totalCount } - All addons finished
  */
 streaming.get('/streams-live/:type/:id', async (c) => {
+  const startedAt = Date.now()
   const { type, id } = c.req.param()
   const { profileId, season, episode, refresh } = c.req.query()
   const userAgent = c.req.header('user-agent') || ''
@@ -248,6 +249,10 @@ streaming.get('/streams-live/:type/:id', async (c) => {
       const cached = streamCache.get(cacheKey)
       if (cached && cached.isComplete) {
         const cacheAge = streamCache.getAge(cacheKey) || 0
+        sendEvent('server-timing', {
+          phase: 'cache-hit',
+          durationMs: Date.now() - startedAt
+        })
         sendEvent('cache-status', { fromCache: true, cacheAgeMs: cacheAge })
 
         // When serving from cache, also emit per-addon events so the UI can show provider chips
@@ -381,6 +386,10 @@ streaming.get('/streams-live/:type/:id', async (c) => {
               // Early playable hint for faster perceived readiness in UI
               if (!firstPlayableSent && sortedStreams.length > 0) {
                 firstPlayableSent = true
+                sendEvent('server-timing', {
+                  phase: 'first-playable',
+                  durationMs: Date.now() - startedAt
+                })
                 sendEvent('first-playable', {
                   stream: sortedStreams[0],
                   totalCount: sortedStreams.length
@@ -411,6 +420,11 @@ streaming.get('/streams-live/:type/:id', async (c) => {
           allStreams: finalStreams,
           totalCount: finalStreams.length,
           fromCache: false
+        })
+        sendEvent('server-timing', {
+          phase: 'complete',
+          durationMs: Date.now() - startedAt,
+          totalCount: finalStreams.length
         })
         closeController()
       } catch (e) {

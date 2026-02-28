@@ -71,7 +71,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
           observer.disconnect()
         }
       },
-      { rootMargin: '600px 0px', threshold: 0.01 }
+      { rootMargin: '250px 0px', threshold: 0.01 }
     )
 
     observer.observe(el)

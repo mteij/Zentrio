@@ -1,6 +1,8 @@
-import { getServerUrl, isTauri } from './auth-client';
+import { isTauri } from './auth-client';
 import { appMode } from './app-mode';
 import { useAuthStore } from '../stores/authStore';
+import { recordPerfEvent } from '../utils/performance';
+import { resolveAppUrl, isGatewayResolvedUrl, toDirectRemoteUrl } from './url';
 
 /**
  * Fetch wrapper that prepends the server URL for Tauri apps.
@@ -18,12 +20,13 @@ export async function apiFetch(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> {
+  const method = (init?.method || 'GET').toUpperCase()
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
   let url = typeof input === 'string' ? input : input.toString();
   
-  // If it's a relative path and we're in Tauri, prepend server URL
-  if (url.startsWith('/') && isTauri()) {
-    const serverUrl = getServerUrl();
-    url = `${serverUrl}${url}`;
+  // Resolve relative app routes (supports local gateway routing in Tauri when enabled)
+  if (url.startsWith('/')) {
+    url = resolveAppUrl(url)
   }
   
   // Add X-Guest-Mode header when in guest mode
@@ -80,31 +83,81 @@ export async function apiFetch(
             
             // Must use window.fetch here to ensure it uses the browser's native fetch
             // interceptor, bypassing the Tauri Rust HTTP plugin entirely.
-            return window.fetch(url, {
+            const res = await window.fetch(url, {
                 ...init,
                 headers,
                 credentials: 'include',
             });
+            recordPerfEvent('api_request', {
+              url,
+              method: init?.method || 'GET',
+              status: res.status,
+              durationMs: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
+              transport: 'webview-fetch',
+              isTauri: true
+            })
+            return res
         }
 
         const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
         
-        return tauriFetch(url, {
+        const res = await tauriFetch(url, {
           ...init,
           headers,
         });
+        if (res.status >= 500 && isGatewayResolvedUrl(url) && method === 'GET') {
+          const fallbackUrl = toDirectRemoteUrl(url)
+          const fallbackRes = await tauriFetch(fallbackUrl, {
+            ...init,
+            headers,
+          })
+          recordPerfEvent('api_request', {
+            url: fallbackUrl,
+            method,
+            status: fallbackRes.status,
+            durationMs: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
+            transport: 'tauri-http-plugin-gateway-fallback',
+            isTauri: true
+          })
+          return fallbackRes
+        }
+        recordPerfEvent('api_request', {
+          url,
+          method,
+          status: res.status,
+          durationMs: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
+          transport: 'tauri-http-plugin',
+          isTauri: true
+        })
+        return res
       } catch (e) {
+        recordPerfEvent('api_request_error', {
+          url,
+          method: init?.method || 'GET',
+          durationMs: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
+          isTauri: true,
+          message: e instanceof Error ? e.message : String(e)
+        })
         // Fallback to browser fetch if Tauri HTTP plugin fails
       }
   }
   
 
 
-  return fetch(url, {
+  const res = await fetch(url, {
     ...init,
     headers,
     credentials: 'include', // Ensure cookies are sent for auth
   });
+  recordPerfEvent('api_request', {
+    url,
+    method: init?.method || 'GET',
+    status: res.status,
+    durationMs: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
+    transport: 'fetch',
+    isTauri: isTauri()
+  })
+  return res
 }
 
 /**

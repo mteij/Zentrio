@@ -1,5 +1,86 @@
 import { getServerUrl, isTauri } from './auth-client'
 
+type GatewayRoute =
+  | '/api/streaming/dashboard'
+  | '/api/streaming/filters'
+  | '/api/streaming/details'
+  | '/api/streaming/catalog'
+  | '/api/streaming/catalog-items'
+  | '/api/streaming/streams-live'
+
+const GATEWAY_READ_ROUTES: GatewayRoute[] = [
+  '/api/streaming/dashboard',
+  '/api/streaming/filters',
+  '/api/streaming/details',
+  '/api/streaming/catalog',
+  '/api/streaming/catalog-items',
+  '/api/streaming/streams-live'
+]
+
+const getLocalGatewayBase = (): string => {
+  if (typeof window === 'undefined') return 'http://localhost:3000'
+  return localStorage.getItem('zentrio_local_gateway_url') || 'http://localhost:3000'
+}
+
+const getGatewayRemoteBase = (): string => {
+  if (typeof window !== 'undefined') {
+    const storedRemote = localStorage.getItem('zentrio_local_gateway_remote_url')
+    if (storedRemote) return storedRemote.replace(/\/$/, '')
+  }
+
+  const remote = getServerUrl()
+  return remote.replace(/\/$/, '')
+}
+
+const getAppMode = (): 'guest' | 'connected' | null => {
+  if (typeof window === 'undefined') return null
+  const mode = localStorage.getItem('zentrio_app_mode')
+  return mode === 'guest' || mode === 'connected' ? mode : null
+}
+
+export const shouldUseLocalGatewayForRead = (url: string): boolean => {
+  if (!isTauri()) return false
+  if (getAppMode() === 'guest') return false
+
+  // Emergency kill-switch (client-side) if local gateway must be bypassed.
+  if (typeof window !== 'undefined' && localStorage.getItem('zentrio_local_gateway_disabled') === '1') {
+    return false
+  }
+
+  return GATEWAY_READ_ROUTES.some((route) => url.startsWith(route))
+}
+
+const withGatewayRemote = (gatewayUrl: string): string => {
+  const remote = getGatewayRemoteBase()
+  const sep = gatewayUrl.includes('?') ? '&' : '?'
+  return `${gatewayUrl}${sep}__remote=${encodeURIComponent(remote)}`
+}
+
+export const isGatewayResolvedUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url, 'http://localhost')
+    return parsed.pathname.startsWith('/api/gateway/')
+  } catch {
+    return url.includes('/api/gateway/')
+  }
+}
+
+export const toDirectRemoteUrl = (resolvedOrRelativeUrl: string): string => {
+  const parsed = new URL(resolvedOrRelativeUrl, 'http://localhost')
+
+  const isGatewayPath = parsed.pathname.startsWith('/api/gateway/')
+  const cleanPath = isGatewayPath
+    ? parsed.pathname.replace(/^\/api\/gateway/, '')
+    : (resolvedOrRelativeUrl.startsWith('/') ? resolvedOrRelativeUrl : parsed.pathname)
+
+  const params = new URLSearchParams(parsed.search)
+  params.delete('__remote')
+
+  const query = params.toString()
+  const pathWithQuery = query ? `${cleanPath}?${query}` : cleanPath
+  return `${getGatewayRemoteBase()}${pathWithQuery}`
+}
+
 /**
  * Returns true when URL is already absolute or handled by browser/runtime directly.
  */
@@ -16,6 +97,11 @@ export const isAbsoluteOrRuntimeUrl = (url: string): boolean => {
  */
 export const resolveAppUrl = (url: string): string => {
   if (!url || isAbsoluteOrRuntimeUrl(url)) return url
+
+  if (url.startsWith('/') && shouldUseLocalGatewayForRead(url)) {
+    const gatewayUrl = `${getLocalGatewayBase()}/api/gateway${url}`
+    return withGatewayRemote(gatewayUrl)
+  }
 
   if (url.startsWith('/') && isTauri()) {
     return `${getServerUrl()}${url}`

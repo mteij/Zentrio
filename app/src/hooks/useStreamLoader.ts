@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { Stream } from '../services/addons/types'
 import { toast } from 'sonner'
 import { createApiEventSource } from '../lib/url'
+import { recordPerfEvent } from '../utils/performance'
 
 export type AddonStatus = 'idle' | 'loading' | 'done' | 'error'
 
@@ -137,6 +138,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     forceRefresh: boolean = false
   ) => {
     loadIdRef.current += 1
+    const requestStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
 
     // Close any existing connection
     eventSourceRef.current?.close()
@@ -227,6 +229,14 @@ export function useStreamLoader(): UseStreamLoaderResult {
       firstPlayableAppliedRef.current = true
       setStreams([first])
       setTotalCount(Math.max(1, data?.totalCount || 1))
+
+      recordPerfEvent('streams_first_playable', {
+        type,
+        id,
+        profileId,
+        fromCache: cacheStatus?.fromCache ?? null,
+        durationMs: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - requestStartedAt)
+      })
     })
 
     eventSource.addEventListener('addon-error', (e) => {
@@ -269,6 +279,14 @@ export function useStreamLoader(): UseStreamLoaderResult {
       }
       setIsLoading(false)
       setIsComplete(true)
+      recordPerfEvent('streams_complete', {
+        type,
+        id,
+        profileId,
+        totalCount: data.totalCount || data.allStreams?.length || 0,
+        fromCache: data.fromCache,
+        durationMs: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - requestStartedAt)
+      })
       eventSource.close()
     })
 

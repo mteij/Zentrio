@@ -38,3 +38,6 @@ export { Hero } from './features/Hero'
 
 // Player Components
 export { ZentrioPlayer } from './player/ZentrioPlayer'
+
+// Utility Components
+export { ScrollToTop } from './ScrollToTop'

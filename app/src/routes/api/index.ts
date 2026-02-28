@@ -9,6 +9,7 @@ import listsApiRoutes from './lists'
 import appearanceApiRoutes from './appearance'
 import syncApiRoutes from './sync'
 import traktApiRoutes from './trakt'
+import gatewayApiRoutes from './gateway'
 import { getConfig } from '../../services/envParser'
 
 import { db } from '../../services/database'
@@ -26,6 +27,7 @@ app.route('/lists', listsApiRoutes)
 app.route('/appearance', appearanceApiRoutes)
 app.route('/sync', syncApiRoutes)
 app.route('/trakt', traktApiRoutes)
+app.route('/gateway', gatewayApiRoutes)
 
 // Environment Configuration now read via getConfig() within handlers
 

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navbar } from '../../components/layout/Navbar'
 import { useEffect } from 'react'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
-import { preloadCommonRoutes, shouldPreload } from '../../utils/route-preloader'
+import { shouldPreload } from '../../utils/route-preloader'
 
 const fetchProfile = async (profileId: string) => {
   // Use lightweight profile endpoint instead of heavy dashboard
@@ -77,34 +77,42 @@ export const StreamingLayout = () => {
     }
   }, [queryClient])
 
-  // Preload all streaming route chunks AND prefetch data on mount for instant navigation
+  // Defer data prefetching to reduce mount-time network/CPU bursts (stutter prevention)
   useEffect(() => {
     if (!profileId) return
-    
-    // Preload route chunks (code splitting)
-    const cleanupPreload = preloadCommonRoutes()
 
     const canAggressivePrefetch = shouldPreload()
     if (!canAggressivePrefetch) {
-      return cleanupPreload
+      return
     }
-    
-    // Prefetch dashboard data (used by both Home and Explore)
-    queryClient.prefetchQuery({
-      queryKey: ['dashboard', profileId],
-      queryFn: () => apiFetchJson(`/api/streaming/dashboard?profileId=${profileId}`),
-      staleTime: 1000 * 60 * 5 // 5 minutes
-    })
-    
-    // Prefetch filters data (used by Explore)
-    queryClient.prefetchQuery({
-      queryKey: ['filters', profileId],
-      queryFn: () => apiFetchJson(`/api/streaming/filters?profileId=${profileId}`),
-      staleTime: 1000 * 60 * 10 // 10 minutes
-    })
 
-    return cleanupPreload
-  }, [profileId, queryClient])
+    const isExplore = location.pathname.startsWith(`/streaming/${profileId}/explore`)
+    const isHome =
+      location.pathname === `/streaming/${profileId}` ||
+      location.pathname === `/streaming/${profileId}/`
+
+    const timer = setTimeout(() => {
+      // If we're on Home, avoid immediate duplicate dashboard pressure.
+      if (!isHome) {
+        queryClient.prefetchQuery({
+          queryKey: ['dashboard', profileId],
+          queryFn: () => apiFetchJson(`/api/streaming/dashboard?profileId=${profileId}`),
+          staleTime: 1000 * 60 * 5
+        })
+      }
+
+      // If we're on Explore, avoid immediate duplicate filters pressure.
+      if (!isExplore) {
+        queryClient.prefetchQuery({
+          queryKey: ['filters', profileId],
+          queryFn: () => apiFetchJson(`/api/streaming/filters?profileId=${profileId}`),
+          staleTime: 1000 * 60 * 10
+        })
+      }
+    }, 1200)
+
+    return () => clearTimeout(timer)
+  }, [profileId, queryClient, location.pathname])
 
   // Determine if we are on a page where the navbar should be hidden
   // Player page: ends with /player

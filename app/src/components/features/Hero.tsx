@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { AnimatePresence, motion } from 'framer-motion'
@@ -42,6 +42,15 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
     }
     return randomIdx
   })
+  const rotateTriggerRef = useRef(false)
+  const lastRenderedKeyRef = useRef<string | null>(null)
+  const [animateSwap, setAnimateSwap] = useState(false)
+
+  // Keep index persisted so transient remounts don't jump/animate unexpectedly.
+  useEffect(() => {
+    if (!storageKey) return
+    sessionStorage.setItem(storageKey, String(featuredIndex))
+  }, [featuredIndex, storageKey])
 
   // Cycle through items randomly every minute
   useEffect(() => {
@@ -56,6 +65,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
     }
 
     const interval = setInterval(() => {
+      rotateTriggerRef.current = true
       setFeaturedIndex(prev => getRandomIndex(prev, items.length))
     }, 60000) // 1 minute
 
@@ -82,7 +92,24 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
   // Key animations off the actual item, not the index.
   // Continue Watching often stays at index 0 but changes (episode/progress),
   // which can look like "weird" animation if keys don't change.
-  const featuredKey = `${itemType}-${itemId}-${itemSeason ?? ''}-${itemEpisode ?? ''}`
+  // Keep key stable to the content item itself.
+  // Avoid including episodic progress fields, which can cause noisy re-animations.
+  const featuredKey = `${itemType}-${itemId}`
+
+  // Only animate when the hero actually rotates to another featured item.
+  // Data refreshes or transient rerenders with the same key should remain visually stable.
+  useEffect(() => {
+    if (lastRenderedKeyRef.current === null) {
+      lastRenderedKeyRef.current = featuredKey
+      setAnimateSwap(false)
+      return
+    }
+
+    const changed = lastRenderedKeyRef.current !== featuredKey
+    setAnimateSwap(changed && rotateTriggerRef.current)
+    lastRenderedKeyRef.current = featuredKey
+    rotateTriggerRef.current = false
+  }, [featuredKey])
   
   // Dynamic Button Logic
   let playButtonText = "Play Now"
@@ -133,7 +160,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
 
   return (
     <>
-      <AnimatePresence mode="sync">
+      <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={`ambient-${featuredKey}`}
           className={styles.pageAmbientBackground}
@@ -147,20 +174,20 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: animateSwap ? 0.8 : 0, ease: "easeOut" }}
         />
       </AnimatePresence>
       
       <div className={styles.heroSection} id="heroSection">
         <div className={styles.heroBackdrop} id="heroBackdrop">
-          <AnimatePresence mode="sync">
+          <AnimatePresence mode="sync" initial={false}>
             {itemBg ? (
               <motion.div
                 key={`hero-bg-${featuredKey}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
+                transition={{ duration: animateSwap ? 0.6 : 0, ease: "easeOut" }}
                 style={{
                   position: 'absolute',
                   width: '100%',
@@ -187,7 +214,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
+                transition={{ duration: animateSwap ? 0.6 : 0, ease: "easeOut" }}
                 style={{
                   position: 'absolute',
                   width: '100%',
@@ -216,22 +243,22 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
+                transition={{ duration: animateSwap ? 0.6 : 0, ease: "easeOut" }}
               />
             )}
           </AnimatePresence>
         </div>
         <div className={styles.heroOverlay}></div>
         <div className={styles.heroContent}>
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={`hero-info-${featuredKey}`}
               className={styles.heroInfo}
               id="heroInfo"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: animateSwap ? 0 : 1, y: animateSwap ? 20 : 0 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
+              exit={{ opacity: animateSwap ? 0 : 1, y: animateSwap ? -20 : 0 }}
+              transition={{ duration: animateSwap ? 0.6 : 0, ease: "easeOut" }}
             >
               {showTrending && (
                 <div className={styles.trendingChip} id="trendingChip">
