@@ -197,7 +197,23 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
           <h5 className="text-sm font-medium text-zinc-300">What's New</h5>
           <div className="bg-zinc-950/50 rounded-lg border border-white/5 p-4 max-h-60 overflow-y-auto custom-scrollbar">
             <pre className="whitespace-pre-wrap text-sm text-zinc-400 font-sans">
-              {updateData?.body || 'No release notes available.'}
+              {(() => {
+                let body = updateData?.body || 'No release notes available.';
+                if (body === 'No release notes available.') return body;
+
+                body = body
+                  .split("**Links:**")[0]
+                  .split("## Links:")[0]
+                  .split("### Links:")[0]
+                  .split("Links:")[0];
+
+                body = body.trim();
+                if (body.endsWith("---")) {
+                  body = body.slice(0, -3).trim();
+                }
+
+                return body;
+              })()}
             </pre>
           </div>
         </div>

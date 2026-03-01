@@ -12,9 +12,7 @@ pub struct SetImmersiveModeArgs {
 /// Set immersive mode on Android (hides/shows system bars)
 /// This command is handled by the Kotlin plugin (ImmersiveModePlugin.kt)
 #[tauri::command]
-pub async fn set_immersive_mode(
-    _args: SetImmersiveModeArgs,
-) -> Result<(), String> {
+pub async fn set_immersive_mode(_args: SetImmersiveModeArgs) -> Result<(), String> {
     // The actual implementation is in the Kotlin plugin
     // This Rust command acts as a bridge to the mobile plugin
     Ok(())

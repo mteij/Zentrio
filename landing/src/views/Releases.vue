@@ -133,8 +133,26 @@
 
       <!-- Bottom Section: Changelog -->
       <section class="changelog-section">
-        <h2 class="section-title">Changelog</h2>
-        <p class="section-subtitle">See what's new in recent updates.</p>
+        <div class="changelog-header-flex">
+          <div>
+            <h2 class="section-title">Changelog</h2>
+            <p class="section-subtitle">See what's new in recent updates.</p>
+          </div>
+
+          <div
+            v-if="!loading && !error && releases.length > 0"
+            class="pagination-controls"
+          >
+            <span class="text-sm text-muted">Show:</span>
+            <select v-model="itemsPerPage" class="items-select">
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+            </select>
+            <span class="text-sm text-muted ml-2">per page</span>
+          </div>
+        </div>
 
         <div v-if="loading" class="loading-state">
           <div class="spinner"></div>
@@ -150,7 +168,7 @@
 
         <div v-else class="releases-list">
           <div
-            v-for="(release, index) in releases"
+            v-for="(release, index) in paginatedReleases"
             :key="release.id"
             class="release-entry"
           >
@@ -175,6 +193,27 @@
               ></div>
             </div>
           </div>
+
+          <!-- Pagination Buttons -->
+          <div v-if="totalPages > 1" class="pagination-footer">
+            <button
+              @click="currentPage--"
+              :disabled="currentPage === 1"
+              class="btn btn-secondary btn-sm"
+            >
+              Previous
+            </button>
+            <span class="page-info"
+              >Page {{ currentPage }} of {{ totalPages }}</span
+            >
+            <button
+              @click="currentPage++"
+              :disabled="currentPage >= totalPages"
+              class="btn btn-secondary btn-sm"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -190,10 +229,30 @@ const releases = ref([]);
 const loading = ref(true);
 const error = ref(null);
 
+// Pagination
+const currentPage = ref(1);
+const itemsPerPage = ref(10);
+
 const latestRelease = computed(() => {
   return releases.value.length > 0 ? releases.value[0] : null;
 });
 const loadingLatest = computed(() => loading.value);
+
+const totalPages = computed(() =>
+  Math.ceil(releases.value.length / itemsPerPage.value),
+);
+
+const paginatedReleases = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
+  return releases.value.slice(start, end);
+});
+
+// Reset to page 1 if user changes the items per page
+import { watch } from "vue";
+watch(itemsPerPage, () => {
+  currentPage.value = 1;
+});
 
 const fetchReleases = async () => {
   loading.value = true;
@@ -224,11 +283,20 @@ const formatDate = (dateString) => {
 
 const renderMarkdown = (text) => {
   if (!text) return "";
-  const filteredText = text
+
+  let filteredText = text
+    .split("**Links:**")[0]
     .split("## Links:")[0]
-    .split("Links:")[0]
-    .split("### Links:")[0];
-  return marked(filteredText.trim());
+    .split("### Links:")[0]
+    .split("Links:")[0];
+
+  filteredText = filteredText.trim();
+
+  if (filteredText.endsWith("---")) {
+    filteredText = filteredText.slice(0, -3).trim();
+  }
+
+  return marked(filteredText);
 };
 
 const getAsset = (release, platform) => {
@@ -357,6 +425,11 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   width: 100%;
+  gap: 8px; /* Added gap to prevent buttons from colliding */
+}
+
+.linux-downloads .btn {
+  margin-top: 0 !important; /* Override the inline mt-4 and mt-2 */
 }
 
 .btn-sm {
@@ -394,10 +467,18 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-/* Changelog Section */
 .changelog-section {
   border-top: 1px solid var(--border);
   padding-top: 80px;
+}
+
+.changelog-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
 .section-title {
@@ -407,7 +488,56 @@ onMounted(() => {
 
 .section-subtitle {
   color: var(--text-muted);
-  margin-bottom: 40px;
+  margin-bottom: 0px; /* Moved margin to the flex container */
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-alt);
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.items-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 6px;
+  outline: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.items-select:focus {
+  border-color: var(--accent);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.ml-2 {
+  margin-left: 8px;
+}
+
+.pagination-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 40px;
+  padding-top: 40px;
+  border-top: 1px solid var(--border);
+}
+
+.page-info {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
 
 .release-entry {
