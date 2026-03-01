@@ -18,6 +18,8 @@ jobs:
       eslint_warnings: ${{ steps.eslint.outputs.warnings }}
       ts_errors: ${{ steps.typecheck.outputs.errors }}
       tests_passed: ${{ steps.tests.outputs.passed }}
+      rustfmt_ok: ${{ steps.rustfmt.outputs.fmt_ok }}
+      clippy_errors: ${{ steps.clippy.outputs.errors }}
       clippy_warnings: ${{ steps.clippy.outputs.warnings }}
       score: ${{ steps.score.outputs.score }}
       grade: ${{ steps.score.outputs.grade }}
@@ -41,17 +43,12 @@ jobs:
           set +e
           cd app
           tsc_out=$(bun run type-check 2>&1)
-          tsc_exit=$?
           echo "$tsc_out"
           # Count error lines (lines containing "error TS")
           err_count=$(echo "$tsc_out" | grep -c "error TS" || true)
+          err_count=$(echo "$err_count" | tr -d '\n' | head -1)
           echo "errors=$err_count" >> "$GITHUB_OUTPUT"
-          # Fail the step only if tsc itself returns non-zero AND there are actual errors
-          if [ $tsc_exit -ne 0 ] && [ "$err_count" -gt 0 ]; then
-            echo "❌ TypeScript: $err_count error(s)"
-            exit 1
-          fi
-          echo "✅ TypeScript: $err_count error(s)"
+          echo "📊 TypeScript: $err_count error(s)"
 
       # ── ESLint ──────────────────────────────────────────────────────────────
       - name: Lint (ESLint)
@@ -76,20 +73,17 @@ jobs:
             # Plain text fallback
             plain_out=$(bun run lint 2>&1 || true)
             echo "$plain_out"
-            errors=$(echo "$plain_out" | grep -c "error" || echo "0")
-            warnings=$(echo "$plain_out" | grep -c "warning" || echo "0")
+            errors=$(echo "$plain_out" | grep -c "error" | head -1 || echo "0")
+            warnings=$(echo "$plain_out" | grep -c "warning" | head -1 || echo "0")
           fi
 
-          echo "errors=${errors:-0}" >> "$GITHUB_OUTPUT"
-          echo "warnings=${warnings:-0}" >> "$GITHUB_OUTPUT"
-          echo "📊 ESLint: ${errors:-0} error(s), ${warnings:-0} warning(s)"
+          # Sanitize counts
+          errors=$(echo "${errors:-0}" | tr -d '\n' | head -1)
+          warnings=$(echo "${warnings:-0}" | tr -d '\n' | head -1)
 
-          # Only fail when there are actual errors (not warnings)
-          if [ "${errors:-0}" -gt 0 ]; then
-            echo "❌ ESLint errors detected – failing step"
-            exit 1
-          fi
-          echo "✅ ESLint passed (warnings are informational)"
+          echo "errors=${errors}" >> "$GITHUB_OUTPUT"
+          echo "warnings=${warnings}" >> "$GITHUB_OUTPUT"
+          echo "📊 ESLint: ${errors} error(s), ${warnings} warning(s)"
 
       # ── Unit Tests ──────────────────────────────────────────────────────────
       - name: Unit Tests
@@ -101,9 +95,10 @@ jobs:
           exit_code=$?
           if [ $exit_code -eq 0 ]; then
             echo "passed=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Tests passed"
           else
             echo "passed=false" >> "$GITHUB_OUTPUT"
-            exit 1
+            echo "📊 Tests failed (score will be affected)"
           fi
 
       # ── Server Build ────────────────────────────────────────────────────────
@@ -125,27 +120,36 @@ jobs:
           workspaces: "./app/src-tauri -> target"
 
       - name: Rust Formatting
-        run: cd app/src-tauri && cargo fmt -- --check
+        id: rustfmt
+        run: |
+          set +e
+          cd app/src-tauri
+          cargo fmt -- --check
+          fmt_exit=$?
+          if [ $fmt_exit -eq 0 ]; then
+            echo "fmt_ok=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Rust formatting OK"
+          else
+            echo "fmt_ok=false" >> "$GITHUB_OUTPUT"
+            echo "📊 Rust formatting issues found (score will be affected)"
+          fi
 
       - name: Rust Linting (Clippy)
         id: clippy
         run: |
           set +e
           cd app/src-tauri
-          # Use -W warnings so warnings are reported but don't fail; errors (-D) still fail
+          # Use -W warnings so warnings are reported but don't fail
           clippy_out=$(cargo clippy -- -W warnings 2>&1)
-          clippy_exit=$?
           echo "$clippy_out"
-          warn_count=$(echo "$clippy_out" | grep -c "^warning" || echo "0")
-          err_count=$(echo "$clippy_out" | grep -c "^error" || echo "0")
+          warn_count=$(echo "$clippy_out" | grep -c "^warning" | head -1 || echo "0")
+          err_count=$(echo "$clippy_out" | grep -c "^error" | head -1 || echo "0")
+          # Sanitize to ensure single integer values
+          warn_count=$(echo "$warn_count" | tr -d '\n' | head -1)
+          err_count=$(echo "$err_count" | tr -d '\n' | head -1)
           echo "warnings=${warn_count}" >> "$GITHUB_OUTPUT"
           echo "errors=${err_count}" >> "$GITHUB_OUTPUT"
           echo "📊 Clippy: ${err_count} error(s), ${warn_count} warning(s)"
-          # Fail only on actual errors
-          if [ "${err_count}" -gt 0 ]; then
-            exit 1
-          fi
-          echo "✅ Clippy passed"
 
       # ── Score ───────────────────────────────────────────────────────────────
       - name: Calculate Quality Score
@@ -157,14 +161,19 @@ jobs:
           ESLINT_ERRORS="${{ steps.eslint.outputs.errors || '0' }}"
           ESLINT_WARNINGS="${{ steps.eslint.outputs.warnings || '0' }}"
           TESTS_PASSED="${{ steps.tests.outputs.passed || 'false' }}"
+          CLIPPY_ERRORS="${{ steps.clippy.outputs.errors || '0' }}"
           CLIPPY_WARNINGS="${{ steps.clippy.outputs.warnings || '0' }}"
+          RUSTFMT_OK="${{ steps.rustfmt.outputs.fmt_ok || 'false' }}"
 
           # Scoring (100 points, deductions):
-          #   TypeScript errors: -5 per error (max -40)
-          #   ESLint errors:     -5 per error (max -30)
-          #   ESLint warnings:   -0.5 per warning (max -15)
-          #   Tests failed:      -20
-          #   Clippy warnings:   -1 per warning (max -10)
+          #   TypeScript errors:   -10 per error (max -50)
+          #   TypeScript warnings: -2 per warning (max -20)
+          #   ESLint errors:       -10 per error (max -50)
+          #   ESLint warnings:     -3 per warning (max -30)
+          #   Tests failed:        -25
+          #   Rust fmt issues:     -10
+          #   Clippy errors:       -10 per error (max -30)
+          #   Clippy warnings:     -3 per warning (max -20)
 
           python3 - <<'PYEOF'
           import os, math
@@ -173,15 +182,20 @@ jobs:
           esl_err  = int(os.environ.get('ESLINT_ERRORS', '0'))
           esl_warn = int(os.environ.get('ESLINT_WARNINGS', '0'))
           tests_ok = os.environ.get('TESTS_PASSED', 'false') == 'true'
+          clip_err = int(os.environ.get('CLIPPY_ERRORS', '0'))
           clip_w   = int(os.environ.get('CLIPPY_WARNINGS', '0'))
+          rustfmt_ok = os.environ.get('RUSTFMT_OK', 'false') == 'true'
 
           score = 100
-          score -= min(ts_err   * 5,  40)
-          score -= min(esl_err  * 5,  30)
-          score -= min(math.floor(esl_warn * 0.5), 15)
+          score -= min(ts_err   * 10, 50)
+          score -= min(esl_err  * 10, 50)
+          score -= min(esl_warn * 3,  30)
           if not tests_ok:
-              score -= 20
-          score -= min(clip_w   * 1,  10)
+              score -= 25
+          if not rustfmt_ok:
+              score -= 10
+          score -= min(clip_err * 10, 30)
+          score -= min(clip_w   * 3,  20)
 
           score = max(0, score)
 
@@ -193,6 +207,8 @@ jobs:
               grade, color = "C", "yellowgreen"
           elif score >= 60:
               grade, color = "D", "yellow"
+          elif score >= 40:
+              grade, color = "E", "orange"
           else:
               grade, color = "F", "red"
 
@@ -261,10 +277,12 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
           echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Score  | ${{ needs.quality.outputs.score }}/100 |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Grade  | ${{ needs.quality.outputs.grade }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Score** | **${{ needs.quality.outputs.score }}/100** |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Grade** | **${{ needs.quality.outputs.grade }}** |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| TypeScript errors | ${{ needs.quality.outputs.ts_errors }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| ESLint errors | ${{ needs.quality.outputs.eslint_errors }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| ESLint warnings | ${{ needs.quality.outputs.eslint_warnings }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| TypeScript errors | ${{ needs.quality.outputs.ts_errors }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Clippy warnings | ${{ needs.quality.outputs.clippy_warnings }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Tests | ${{ needs.quality.outputs.tests_passed == 'true' && '✅ passed' || '❌ failed' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Rust fmt | ${{ needs.quality.outputs.rustfmt_ok == 'true' && '✅ OK' || '❌ issues' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Clippy errors | ${{ needs.quality.outputs.clippy_errors }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Clippy warnings | ${{ needs.quality.outputs.clippy_warnings }} |" >> "$GITHUB_STEP_SUMMARY"

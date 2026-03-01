@@ -67,15 +67,17 @@ jobs:
             exit 1
           fi
 
-      - name: Set pre-release flag for 0.x.x versions
+      - name: Ensure latest flag and pre-release flag for 0.x.x versions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           MAJOR=$(echo "$VERSION" | cut -d. -f1)
           if [ "$MAJOR" = "0" ]; then
-            echo "📦 Version $VERSION is 0.x.x — ensuring release is marked as pre-release"
-            gh release edit "v$VERSION" --prerelease
+            echo "📦 Version $VERSION is 0.x.x — ensuring release is marked as pre-release and latest"
+            gh release edit "v$VERSION" --prerelease --latest
+          else
+            gh release edit "v$VERSION" --latest
           fi
 
       - name: Get Release ID

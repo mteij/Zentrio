@@ -108,9 +108,11 @@ jobs:
           if [ "$IS_PLACEHOLDER" = "false" ] && [ -n "$EXISTING_NOTES" ]; then
             echo "✅ Release v$VERSION already has custom release notes. Skipping overwrite."
             echo "To regenerate notes, delete the existing release notes first."
-            # Still ensure pre-release flag is set correctly
+            # Still ensure pre-release flag and latest flag are set correctly
             if [ -n "$PRERELEASE_FLAG" ]; then
-              gh release edit "v$VERSION" --prerelease
+              gh release edit "v$VERSION" --prerelease --latest
+            else
+              gh release edit "v$VERSION" --latest
             fi
           else
             # Generate release notes
@@ -119,10 +121,10 @@ jobs:
             # Create or update release
             if gh release view "v$VERSION" >/dev/null 2>&1; then
               echo "Updating existing release v$VERSION with generated notes"
-              gh release edit "v$VERSION" --notes-file RELEASE_NOTES.md $PRERELEASE_FLAG
+              gh release edit "v$VERSION" --notes-file RELEASE_NOTES.md $PRERELEASE_FLAG --latest
             else
               echo "Creating new release v$VERSION"
-              gh release create "v$VERSION" --title "Zentrio v$VERSION" --notes-file RELEASE_NOTES.md $PRERELEASE_FLAG
+              gh release create "v$VERSION" --title "Zentrio v$VERSION" --notes-file RELEASE_NOTES.md $PRERELEASE_FLAG --latest
             fi
           fi
 
