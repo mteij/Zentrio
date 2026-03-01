@@ -152,7 +152,11 @@ export function LandingPage({ version }: LandingPageProps) {
               <img 
                 src="/static/logo/icon-192.png" 
                 alt="Zentrio" 
-                className="relative w-20 h-20 drop-shadow-[0_0_30px_rgba(220,38,38,0.3)]" 
+                className="relative w-20 h-20 drop-shadow-[0_0_30px_rgba(220,38,38,0.3)]"
+                fetchPriority="high"
+                loading="eager"
+                width={80}
+                height={80}
               />
             </motion.div>
             

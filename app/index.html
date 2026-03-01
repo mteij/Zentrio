@@ -1,40 +1,39 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover"
+    />
     <title>Zentrio</title>
+    <meta
+      name="description"
+      content="Zentrio — Stream your way. A modern, open-source streaming platform for movies, series, and more."
+    />
 
-    <!-- Styles -->
+    <!-- Preload LCP image so the browser fetches it before React renders -->
+    <link rel="preload" as="image" href="/static/logo/icon-192.png" fetchpriority="high" />
+
     <!-- styles.css removed - migrated to CSS Modules and Tailwind -->
-    <link rel="stylesheet" href="/static/css/toast.css" />
+    <!-- toast.css moved to JS bundle import for faster initial render -->
     <!-- profiles.css removed - using ProfilesPage.module.css instead -->
     <!-- streaming.css removed - using Streaming.module.css instead -->
 
     <!-- Favicons -->
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="/static/logo/favicon/apple-touch-icon.png"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="/static/logo/favicon/favicon-32x32.png"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="16x16"
-      href="/static/logo/favicon/favicon-16x16.png"
-    />
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/logo/favicon/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon/favicon-16x16.png" />
 
     <link rel="icon" href="/static/logo/favicon/favicon.ico" />
     <meta name="theme-color" content="#141414" />
 
     <!-- Scripts -->
-    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+    <!-- Cast SDK loaded async — only needed when Chromecast is used -->
+    <script
+      async
+      src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"
+    ></script>
   </head>
   <body>
     <div id="root"></div>

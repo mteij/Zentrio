@@ -122,39 +122,58 @@ export const createApiEventSource = (url: string, init?: EventSourceInit): Event
 export const resolveBeaconUrl = (url: string): string => resolveAppUrl(url)
 
 /**
- * Dangerous URL schemes that could lead to XSS when used in img src attributes.
- * These are checked in a case-insensitive manner.
+ * Allowed URL protocols for image src attributes.
+ * Only these protocols are permitted — everything else is rejected.
  */
-const DANGEROUS_URL_SCHEMES = ['javascript:', 'vbscript:', 'data:', 'file:'] as const;
+const ALLOWED_IMG_PROTOCOLS = ['http:', 'https:', 'blob:'] as const;
 
 /**
- * Validates if a URL is safe to use in an img src attribute.
- * Returns null if the URL is potentially dangerous.
+ * Sanitizes a URL for safe use in an `<img src>` attribute.
+ * Returns an empty string if the URL is potentially dangerous.
+ *
+ * This is the **single point of sanitization** that CodeQL can trace.
+ * Every dynamically-built image URL MUST pass through this function
+ * before being assigned to a DOM src attribute.
  */
-const validateSafeUrl = (url: string): string | null => {
-  if (!url || typeof url !== 'string') {
-    return null;
-  }
+export const sanitizeImgSrc = (url: string): string => {
+  if (!url || typeof url !== 'string') return '';
 
-  // Aggressively strip all whitespace and control characters
-  const cleaned = url.replace(/[\s\x00-\x20\x7F-\x9F]/g, '');
+  // Strip all ASCII control characters and whitespace that could hide a scheme
+  const cleaned = url.replace(/[\s\x00-\x1F\x7F-\x9F]/g, '');
+  if (!cleaned) return '';
 
-  // Check for dangerous schemes (case-insensitive)
-  const lowerCleaned = cleaned.toLowerCase();
-  for (const scheme of DANGEROUS_URL_SCHEMES) {
-    if (lowerCleaned.startsWith(scheme)) {
-      return null;
-    }
-  }
+  // Relative paths (starting with /) are always safe in same-origin contexts
+  if (cleaned.startsWith('/')) return cleaned;
 
-  // Additional URL parsing validation for edge cases
+  // For absolute URLs, only allow explicitly safe protocols
   try {
     const parsed = new URL(cleaned);
-    if (DANGEROUS_URL_SCHEMES.some(scheme => parsed.protocol.toLowerCase() === scheme)) {
-      return null;
+    const proto = parsed.protocol.toLowerCase();
+    if ((ALLOWED_IMG_PROTOCOLS as readonly string[]).includes(proto)) {
+      return cleaned;
     }
+    // Protocol not in allow-list → reject
+    return '';
   } catch {
-    // If URL parsing fails, it's likely a relative path which is safe
+    // Not a valid absolute URL and doesn't start with / — reject to be safe
+    return '';
+  }
+};
+
+/**
+ * Validates if a URL fragment (seed / style) is safe to embed in a constructed URL.
+ * Returns null if the input contains a dangerous scheme.
+ */
+const validateSafeUrlFragment = (value: string): string | null => {
+  if (!value || typeof value !== 'string') return null;
+
+  const cleaned = value.replace(/[\s\x00-\x1F\x7F-\x9F]/g, '');
+  if (!cleaned) return null;
+
+  // Reject anything that looks like a dangerous scheme
+  const lower = cleaned.toLowerCase();
+  for (const scheme of ['javascript:', 'vbscript:', 'data:', 'file:']) {
+    if (lower.startsWith(scheme)) return null;
   }
 
   return cleaned;
@@ -162,26 +181,25 @@ const validateSafeUrl = (url: string): string | null => {
 
 /**
  * Builds avatar URL for both web and Tauri environments.
- * This function ensures the output is always safe for use in img src attributes.
+ * The returned URL is guaranteed safe for use in `<img src>` attributes
+ * because it always passes through `sanitizeImgSrc` before being returned.
  */
 export const buildAvatarUrl = (seed: string, style: string, fallbackSeed = 'preview'): string => {
-  // Validate and sanitize the seed input
-  const safeSeed = validateSafeUrl(seed);
-  const safeStyle = validateSafeUrl(style);
+  const safeSeed = validateSafeUrlFragment(seed);
+  const safeStyle = validateSafeUrlFragment(style);
 
-  // Use fallback if seed is unsafe or empty
   const seedToUse = safeSeed || fallbackSeed;
   const styleToUse = safeStyle || 'bottts-neutral';
 
-  // If the seed is an absolute URL (http/https), return it directly after validation
+  // If the seed is already an absolute URL (http/https), sanitize and return
   if (isAbsoluteOrRuntimeUrl(seedToUse)) {
-    return seedToUse;
+    return sanitizeImgSrc(seedToUse);
   }
 
-  // Build the safe URL using encodeURIComponent for all dynamic parts
+  // Build the URL with encoded dynamic parts, then sanitize the final result
   const encodedSeed = encodeURIComponent(seedToUse);
   const encodedStyle = encodeURIComponent(styleToUse);
 
-  return resolveAppUrl(`/api/avatar/${encodedSeed}?style=${encodedStyle}`);
+  return sanitizeImgSrc(resolveAppUrl(`/api/avatar/${encodedSeed}?style=${encodedStyle}`));
 }
 

@@ -225,7 +225,7 @@ function AppRoutes() {
              const token = urlObj.searchParams.get('token')
              if (token) {
                  toast.info('Verifying magic link...')
-                 await apiFetch(`/api/auth/magic-link/verify?token=${token}&callbackURL=/profiles`)
+                 await apiFetch(`/api/auth/magic-link/verify?token=${encodeURIComponent(token)}&callbackURL=/profiles`)
                  toast.success('Signed in successfully')
                   const sessionRes = await authClient.getSession();
                   const sessionData = (sessionRes as any)?.data ?? sessionRes;
@@ -240,7 +240,7 @@ function AppRoutes() {
                      
                      // Wait for state propagation
                      await new Promise(resolve => setTimeout(resolve, 100));
-                     console.log('[App] Magic link login complete, token:', sessionData.session?.token ? `...${sessionData.session.token.slice(-6)}` : 'none');
+                     console.log('[App] Magic link login complete, token present:', !!sessionData.session?.token);
                      
                      appMode.set('connected');
                      setMode('connected');
@@ -305,7 +305,7 @@ function AppRoutes() {
                   
                   // Verify token propagation
                   const verifiedToken = useAuthStore.getState().session?.token;
-                  console.log('[App] Token after propagation delay:', verifiedToken ? `...${verifiedToken.slice(-6)}` : 'MISSING');
+                  console.log('[App] Auth state propagation delay complete, token present:', !!verifiedToken);
                   
                   // Update app mode
                   appMode.set('connected');

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Pencil, Tv, ExternalLink, Loader2, Check, Unplug, RefreshCw } from 'lucide-react'
 import { Button, FormGroup, Input, Modal, ConfirmDialog } from '../index'
 import { apiFetch } from '../../lib/apiFetch'
-import { buildAvatarUrl } from '../../lib/url'
+import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 import { toast } from 'sonner'
 
 // Avatar styles available in DiceBear
@@ -344,7 +344,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
               <div className="flex flex-col items-center gap-3 mb-2">
                   <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-zinc-700 group">
                       <img 
-                          src={getAvatarUrl(avatar, avatarStyle)} 
+                          src={sanitizeImgSrc(getAvatarUrl(avatar, avatarStyle))} 
                           alt="Avatar Preview"
                           className="w-full h-full object-cover"
                       />
@@ -548,7 +548,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
                   >
                       <div className="w-14 h-14 rounded-full overflow-hidden bg-zinc-900 shadow-lg">
                           <img 
-                              src={getAvatarUrl(avatar || 'preview', style.id)}
+                              src={sanitizeImgSrc(getAvatarUrl(avatar || 'preview', style.id))}
                               alt={style.name}
                               className="w-full h-full object-cover"
                           />

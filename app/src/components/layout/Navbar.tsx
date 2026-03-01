@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createHoverPreloader } from '../../utils/route-preloader'
 import styles from '../../styles/Streaming.module.css'
 import { useState, useRef, useEffect, useMemo, startTransition, useCallback } from 'react'
-import { buildAvatarUrl } from '../../lib/url'
+import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 
 interface NavbarProps {
   profileId: number | string
@@ -155,7 +155,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
             <div className={styles.navAvatar} key={profile?.avatar ? 'avatar-img' : 'avatar-icon'}>
               {profile?.avatar ? (
                 <img 
-                  src={buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral')} 
+                  src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))} 
                   alt={profile.name} 
                 />
               ) : (
