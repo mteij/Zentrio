@@ -124,6 +124,29 @@ export async function apiFetch(
         })
         return res
       } catch (e) {
+        if (isGatewayResolvedUrl(url) && method === 'GET') {
+          const fallbackUrl = toDirectRemoteUrl(url)
+          try {
+            const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http')
+            const fallbackRes = await tauriFetch(fallbackUrl, {
+              ...init,
+              headers,
+            })
+            recordPerfEvent('api_request', {
+              url: fallbackUrl,
+              method,
+              status: fallbackRes.status,
+              durationMs: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
+              transport: 'tauri-http-plugin-gateway-catch-fallback',
+              isTauri: true
+            })
+            return fallbackRes
+          } catch {
+            // Last-resort: fall through to browser fetch using direct remote URL.
+            url = fallbackUrl
+          }
+        }
+
         recordPerfEvent('api_request_error', {
           url,
           method: init?.method || 'GET',

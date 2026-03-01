@@ -38,9 +38,24 @@ const getAppMode = (): 'guest' | 'connected' | null => {
   return mode === 'guest' || mode === 'connected' ? mode : null
 }
 
+const isLikelyMobileRuntime = (): boolean => {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
+}
+
 export const shouldUseLocalGatewayForRead = (url: string): boolean => {
   if (!isTauri()) return false
   if (getAppMode() === 'guest') return false
+
+  // Mobile Tauri builds (Android/iOS) do not run the local sidecar server,
+  // so localhost gateway routing would fail with "Failed to fetch".
+  if (isLikelyMobileRuntime()) return false
+
+  // Require explicit enablement so accidental stale localStorage does not
+  // force local gateway usage unexpectedly.
+  if (typeof window !== 'undefined' && localStorage.getItem('zentrio_local_gateway_enabled') !== '1') {
+    return false
+  }
 
   // Emergency kill-switch (client-side) if local gateway must be bypassed.
   if (typeof window !== 'undefined' && localStorage.getItem('zentrio_local_gateway_disabled') === '1') {
