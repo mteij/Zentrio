@@ -213,12 +213,6 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
     <SimpleLayout title="Profiles">
       <AnimatedBackground />
 
-      <header className="header" style={{ background: 'transparent', boxShadow: 'none' }}>
-        <nav className="nav">
-          {/* Header is now empty, buttons moved to footer */}
-        </nav>
-      </header>
-
       <main className={styles.profilesPage} style={{ position: 'relative', zIndex: 1 }}>
         <h1 className="sr-only">Profiles</h1>
         <div className={styles.profilesMain}>

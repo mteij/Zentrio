@@ -396,6 +396,11 @@
 @media (max-width: 768px) {
   .streamingLayout {
     padding-left: 0; /* No sidebar on mobile — navbar is a floating bottom bar */
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y pinch-zoom;
   }
 }
 

@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 
 declare const __APP_VERSION__: string;
 
+type PlatformType = 'windows' | 'macos' | 'linux' | 'android' | 'ios' | 'web';
+
 export function UpdateSettings() {
   const [loading, setLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('Unknown');
@@ -15,7 +17,7 @@ export function UpdateSettings() {
   const [showModal, setShowModal] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [isTauri, setIsTauri] = useState(false);
-  const [platformName, setPlatformName] = useState<string>('web');
+  const [platformName, setPlatformName] = useState<PlatformType>('web');
 
   useEffect(() => {
     const init = async () => {
@@ -24,11 +26,10 @@ export function UpdateSettings() {
             setCurrentVersion(v);
             setIsTauri(true);
             
-            // Detect platform
             try {
                 const { platform } = await import('@tauri-apps/plugin-os');
                 const osName = await platform();
-                setPlatformName(osName);
+                setPlatformName(osName as PlatformType);
             } catch (e) {
                 console.error("Failed to detect platform", e);
             }
@@ -40,11 +41,15 @@ export function UpdateSettings() {
     init();
   }, []);
 
+  const isDesktopPlatform = (p: PlatformType) => p === 'windows' || p === 'macos' || p === 'linux';
+
   const checkForUpdates = async (silent = false) => {
     setLoading(true);
     try {
-      // DESKTOP: Use Official Tauri Updater
-      if (isTauri && (platformName === 'windows' || platformName === 'macos' || platformName === 'linux')) {
+      // ─────────────────────────────────────────────
+      // DESKTOP: Use Official Tauri Updater Plugin
+      // ─────────────────────────────────────────────
+      if (isTauri && isDesktopPlatform(platformName)) {
           const { check } = await import('@tauri-apps/plugin-updater');
           const update = await check();
           
@@ -54,7 +59,6 @@ export function UpdateSettings() {
                   version: update.version,
                   body: update.body,
                   date: update.date,
-                  // We pass the update object itself for the modal to use (downloadAndInstall)
                   updateObj: update 
               });
               if (!silent) setShowModal(true);
@@ -63,27 +67,35 @@ export function UpdateSettings() {
               if (!silent) toast.success('Up to date', { description: 'You are using the latest version.' });
           }
       } 
-      // ANDROID / WEB: Use Custom Logic (GitHub Fetch)
-      else {
-          let response: Response;
-          
-          // Use Tauri HTTP plugin if in Tauri (Android) to avoid CORS/Issues, or fallback to window.fetch
-          if (isTauri) {
-            const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-            response = await tauriFetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
-              headers: { 'User-Agent': 'Zentrio-App' }
-            }) as unknown as Response;
-          } else {
-            response = await window.fetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
-              headers: { 'User-Agent': 'Zentrio-App' }
-            });
-          }
-          
-          if (!response.ok) throw new Error('Failed to fetch update info');
-
-          const data = await response.json();
+      // ─────────────────────────────────────────────
+      // iOS: Cannot self-update — direct to App Store
+      // ─────────────────────────────────────────────
+      else if (isTauri && platformName === 'ios') {
+          // On iOS, apps can only be updated through the App Store.
+          // We still check GitHub releases to know IF there's a newer version.
+          const data = await fetchLatestRelease(isTauri);
           const latestVersion = data.tag_name.replace(/^v/, '');
+          const hasUpdate = compareVersions(currentVersion, latestVersion);
 
+          if (hasUpdate) {
+            setUpdateAvailable(true);
+            setUpdateData({
+                version: latestVersion,
+                body: data.body,
+                isIOS: true
+            });
+            if (!silent) setShowModal(true);
+          } else {
+            setUpdateAvailable(false);
+            if (!silent) toast.success('Up to date', { description: 'You are using the latest version.' });
+          }
+      }
+      // ─────────────────────────────────────────────
+      // ANDROID / WEB: Custom GitHub Release Check
+      // ─────────────────────────────────────────────
+      else {
+          const data = await fetchLatestRelease(isTauri);
+          const latestVersion = data.tag_name.replace(/^v/, '');
           const hasUpdate = compareVersions(currentVersion, latestVersion);
 
           if (hasUpdate) {
@@ -92,7 +104,7 @@ export function UpdateSettings() {
                 version: latestVersion,
                 body: data.body,
                 assets: data.assets,
-                isCustom: true // Flag to tell modal to use custom logic
+                isCustom: true
             });
             if (!silent) setShowModal(true);
           } else {
@@ -108,18 +120,6 @@ export function UpdateSettings() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Simple version comparison (returns true if v2 > v1)
-  const compareVersions = (v1: string, v2: string) => {
-    if (v1 === 'Unknown') return false;
-    const parts1 = v1.split('.').map(Number);
-    const parts2 = v2.split('.').map(Number);
-    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-        if ((parts2[i] || 0) > (parts1[i] || 0)) return true;
-        if ((parts2[i] || 0) < (parts1[i] || 0)) return false;
-    }
-    return false;
   };
 
   return (
@@ -194,6 +194,39 @@ export function UpdateSettings() {
       />
     </div>
   );
+}
+
+// ── Helpers ──────────────────────────────────────
+
+/** Fetch latest release info from GitHub API */
+async function fetchLatestRelease(isTauri: boolean) {
+  let response: Response;
+  
+  if (isTauri) {
+    const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+    response = await tauriFetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
+      headers: { 'User-Agent': 'Zentrio-App' }
+    }) as unknown as Response;
+  } else {
+    response = await window.fetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
+      headers: { 'User-Agent': 'Zentrio-App' }
+    });
+  }
+  
+  if (!response.ok) throw new Error('Failed to fetch update info from GitHub');
+  return response.json();
+}
+
+/** Simple semver comparison — returns true if v2 > v1 */
+function compareVersions(v1: string, v2: string) {
+  if (v1 === 'Unknown') return false;
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      if ((parts2[i] || 0) > (parts1[i] || 0)) return true;
+      if ((parts2[i] || 0) < (parts1[i] || 0)) return false;
+  }
+  return false;
 }
 
 function SparklesIcon() {

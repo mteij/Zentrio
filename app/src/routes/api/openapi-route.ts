@@ -271,8 +271,10 @@ export const createTaggedOpenAPIRouter = <T extends Env>(app: OpenAPIHono<T>, ta
   }
 
   const register = (method: Method, path: string, handlers: AnyHandler[]) => {
-    if (path.includes('*')) {
-      // Catch-all routes are usually framework passthroughs and not suitable for OpenAPI docs.
+    if (path.includes('*') || /\{[^}]*[.+*]/.test(path)) {
+      // Catch-all routes (wildcards and regex path params like {.+}) are framework
+      // passthroughs and not suitable for OpenAPI docs.  Registering them via
+      // createRoute strips the regex, breaking multi-segment matching.
       return native[method](path, ...handlers)
     }
 

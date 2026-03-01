@@ -125,10 +125,10 @@ export function LandingPage({ version }: LandingPageProps) {
   };
 
   return (
-    <>
+    <div className="h-dvh flex flex-col overflow-hidden">
       <ParticleBackground />
       
-      <main className="min-h-screen flex items-center justify-center relative z-10 p-4 w-full">
+      <main className="flex-1 flex items-center justify-center relative z-10 p-4 w-full">
         <div className="w-full max-w-sm mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -263,6 +263,6 @@ export function LandingPage({ version }: LandingPageProps) {
           v{version}
         </a>
       </footer>
-    </>
+    </div>
   )
 }

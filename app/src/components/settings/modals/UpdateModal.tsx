@@ -1,23 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Button, Modal } from '../../index';
-import { fetch } from '@tauri-apps/plugin-http';
-import { writeFile, BaseDirectory } from '@tauri-apps/plugin-fs';
-import { open } from '@tauri-apps/plugin-shell';
-import { tempDir } from '@tauri-apps/api/path';
-import { platform } from '@tauri-apps/plugin-os';
-import { Download, AlertCircle, Check, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+
+type UpdateStatus = 'idle' | 'downloading' | 'installing' | 'done' | 'error';
+import { Download, AlertCircle, Loader2, Sparkles, RefreshCw, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UpdateData {
   version: string;
   body: string;
-  assets: Array<{
+  assets?: Array<{
     name: string;
     browser_download_url: string;
     size: number;
   }>;
-  updateObj?: any; // The raw update object from @tauri-apps/plugin-updater
+  updateObj?: any; // The raw update object from @tauri-apps/plugin-updater (desktop only)
   isCustom?: boolean;
+  isIOS?: boolean;
 }
 
 interface UpdateModalProps {
@@ -33,11 +31,10 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [downloadError, setDownloadError] = useState('');
-  const [status, setStatus] = useState<'idle' | 'downloading' | 'installing' | 'error'>('idle');
+  const [status, setStatus] = useState<UpdateStatus>('idle');
 
   useEffect(() => {
     if (isOpen) {
-      // Reset state on open
       setDownloading(false);
       setProgress(0);
       setDownloadError('');
@@ -48,10 +45,23 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
   const handleDownload = async () => {
     if (!updateData) return;
 
-    // Handle Web
+    // ─── Web: Just reload ────────────────────────
     if (!isTauri) {
-        window.location.reload();
-        return;
+      window.location.reload();
+      return;
+    }
+
+    // ─── iOS: Open GitHub releases page ──────────
+    if (updateData.isIOS) {
+      try {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        await openUrl('https://github.com/mteij/Zentrio/releases/latest');
+      } catch {
+        // Fallback
+        window.open('https://github.com/mteij/Zentrio/releases/latest', '_blank');
+      }
+      onClose();
+      return;
     }
 
     try {
@@ -59,115 +69,53 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
       setStatus('downloading');
       setDownloadError('');
 
-      // ===========================================
-      // 1. DESKTOP OFFICIAL UPDATER FLOW
-      // ===========================================
+      // ═════════════════════════════════════════════
+      // 1. DESKTOP — Official Tauri Updater Plugin
+      // ═════════════════════════════════════════════
       if (updateData.updateObj) {
-          // This is the object from @tauri-apps/plugin-updater
-          const update = updateData.updateObj;
-          
-          // Re-attach download hook if possible, or just let it handle it.
-          // The official plugin doesn't expose easy progress hooks in v2 JS API same as v1?
-          // Actually it does: check(options) -> Update -> downloadAndInstall(cb)
-          
-          await update.downloadAndInstall((event: any) => {
-              if (event.event === 'Started') {
-                  setStatus('downloading');
-                  if (event.contentLength) {
-                      // rough estimate if needed
-                  }
-              } else if (event.event === 'Progress') {
-                 // event.chunkLength, event.contentLength
-                 // We might not get total length always
-              } else if (event.event === 'Finished') {
-                  setStatus('installing');
-              }
-          });
+        const update = updateData.updateObj;
+        let downloaded = 0;
+        let contentLength = 0;
 
-          // Relaunch to complete
-          const { relaunch } = await import('@tauri-apps/plugin-process');
-          await relaunch();
-          return;
+        await update.downloadAndInstall((event: any) => {
+          if (event.event === 'Started') {
+            contentLength = event.data?.contentLength ?? 0;
+            setStatus('downloading');
+          } else if (event.event === 'Progress') {
+            downloaded += event.data?.chunkLength ?? 0;
+            if (contentLength > 0) {
+              setProgress(Math.round((downloaded / contentLength) * 100));
+            }
+          } else if (event.event === 'Finished') {
+            setProgress(100);
+            setStatus('installing');
+          }
+        });
+
+        // Relaunch to complete installation
+        const { relaunch } = await import('@tauri-apps/plugin-process');
+        await relaunch();
+        return;
       }
 
-      // ===========================================
-      // 2. ANDROID / CUSTOM FLOW
-      // ===========================================
-      // (This logic remains for Android where the plugin is not used/supported the same way yet,
-      // or if we forced custom flow)
-      
-      const currentPlatform = await platform();
-      let asset;
-
-      if (currentPlatform === 'android') {
-        // Find the correct asset (prefer arm64, fallback to universal)
-        asset = updateData.assets?.find((a: any) => a.name.includes('arm64') && a.name.endsWith('.apk'));
-        if (!asset) {
-            asset = updateData.assets?.find((a: any) => a.name.includes('universal') && a.name.endsWith('.apk'));
-        }
-      } 
-      // Fallbacks for desktop if for some reason we are here (e.g. plugin failed check but we found assert manually?)
-      // ... existing desktop asset finder logic ...
-      else if (currentPlatform === 'windows') {
-         asset = updateData.assets?.find((a: any) => a.name.endsWith('.exe') && !a.name.includes('sig'));
-      } else if (currentPlatform === 'linux') {
-          asset = updateData.assets?.find((a: any) => a.name.endsWith('.deb')) 
-                || updateData.assets?.find((a: any) => a.name.endsWith('.AppImage'));
-      } else if (currentPlatform === 'macos') {
-          asset = updateData.assets?.find((a: any) => a.name.endsWith('.dmg'));
+      // ═════════════════════════════════════════════
+      // 2. ANDROID — Download APK + Open with Installer
+      // ═════════════════════════════════════════════
+      if (platformName === 'android') {
+        await handleAndroidUpdate(updateData, setProgress, setStatus);
+        setStatus('done');
+        toast.success('APK ready', { description: 'The installer should open automatically. If not, check your Downloads folder.' });
+        onClose();
+        return;
       }
 
-      if (!asset) {
-        throw new Error(`No compatible update file found for ${currentPlatform}.`);
-      }
-
-      // Start Download
-      const response = await fetch(asset.browser_download_url);
-      if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
-      if (!response.body) throw new Error('Download failed: No response body');
-
-      const contentLength = asset.size;
-      const reader = response.body.getReader();
-
-      let receivedLength = 0;
-      const chunks: Uint8Array[] = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) break;
-
-        chunks.push(value);
-        receivedLength += value.length;
-
-        // Update progress
-        const percent = Math.round((receivedLength / contentLength) * 100);
-        setProgress(percent);
-      }
-
-      // Combine chunks
-      const blob = new Uint8Array(receivedLength);
-      let position = 0;
-      for (const chunk of chunks) {
-        blob.set(chunk, position);
-        position += chunk.length;
-      }
-
-      // Write to temp file
-      setStatus('installing');
-      const fileName = asset.name;
-      
-      await writeFile(fileName, blob, { baseDir: BaseDirectory.Temp });
-      
-      // Get temp path to open
-      const tempPath = await tempDir();
-      const filePath = `${tempPath}${fileName}`; 
-      
-      await open(filePath);
-      
-      setStatus('idle');
+      // ═════════════════════════════════════════════
+      // 3. FALLBACK — Download asset for current platform
+      // ═════════════════════════════════════════════
+      await handleGenericDownload(updateData, platformName, setProgress, setStatus);
+      setStatus('done');
       onClose();
-      
+
     } catch (e: any) {
       console.error('Update failed:', e);
       setDownloadError(e.message || 'Failed to download update');
@@ -176,7 +124,19 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
     }
   };
 
-  const isUpdateAvailable = updateData && updateData.version !== currentVersion;
+  // ─── Determine button label & icon ─────────────
+  const getButtonContent = () => {
+    if (!isTauri) {
+      return <><RefreshCw size={18} /> Reload Application</>;
+    }
+    if (updateData?.isIOS) {
+      return <><ExternalLink size={18} /> View on GitHub</>;
+    }
+    if (downloading) {
+      return <>Downloading...</>;
+    }
+    return <><Download size={18} /> Download &amp; Install</>;
+  };
 
   return (
     <Modal
@@ -194,7 +154,10 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
           <div>
             <h4 className="text-lg font-semibold text-white">New Version {updateData?.version}</h4>
             <p className="text-sm text-zinc-400 mt-1">
-              A new version of Zentrio is available. Upgrade now for the latest features and fixes.
+              {updateData?.isIOS 
+                ? 'A new version is available. iOS updates are distributed through the App Store or GitHub.'
+                : 'A new version of Zentrio is available. Upgrade now for the latest features and fixes.'
+              }
             </p>
           </div>
         </div>
@@ -254,22 +217,130 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
             disabled={downloading}
             className="flex items-center gap-2"
           >
-            {!isTauri ? (
-                 <>
-                 <RefreshCw size={18} />
-                 Reload Application
-                 </>
-            ) : downloading ? (
-                <>Downloading...</>
-            ) : (
-                <>
-                <Download size={18} />
-                Download & Install
-                </>
-            )}
+            {getButtonContent()}
           </Button>
         </div>
       </div>
     </Modal>
   );
+}
+
+// ══════════════════════════════════════════════════
+// Platform-specific update handlers
+// ══════════════════════════════════════════════════
+
+/** Android: Download APK and trigger installation via opener */
+async function handleAndroidUpdate(
+  updateData: UpdateData,
+  setProgress: (p: number) => void,
+  setStatus: (s: UpdateStatus) => void,
+) {
+  // Find the correct APK asset (prefer arm64, fallback to universal, then any APK)
+  let asset = updateData.assets?.find(a => a.name.includes('arm64') && a.name.endsWith('.apk'));
+  if (!asset) {
+    asset = updateData.assets?.find(a => a.name.includes('universal') && a.name.endsWith('.apk'));
+  }
+  if (!asset) {
+    asset = updateData.assets?.find(a => a.name.endsWith('.apk'));
+  }
+
+  if (!asset) {
+    throw new Error('No APK found in the latest release. Please download manually from GitHub.');
+  }
+
+  // Download the APK
+  const fileData = await downloadAsset(asset, setProgress);
+
+  // Write to temp directory
+  setStatus('installing');
+  const { writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+  const fileName = asset.name;
+  await writeFile(fileName, fileData, { baseDir: BaseDirectory.Temp });
+
+  // Get the full temp path and open with Android's installer
+  const { tempDir } = await import('@tauri-apps/api/path');
+  const tempPath = await tempDir();
+  const filePath = `${tempPath}${fileName}`;
+
+  // Use opener plugin to trigger APK installation on Android
+  const { openPath } = await import('@tauri-apps/plugin-opener');
+  await openPath(filePath);
+}
+
+/** Generic fallback: Download platform-appropriate asset and open it */
+async function handleGenericDownload(
+  updateData: UpdateData,
+  platformName: string | undefined,
+  setProgress: (p: number) => void,
+  setStatus: (s: UpdateStatus) => void,
+) {
+  let asset;
+
+  if (platformName === 'windows') {
+    asset = updateData.assets?.find(a => a.name.endsWith('.exe') && !a.name.includes('sig'));
+  } else if (platformName === 'linux') {
+    asset = updateData.assets?.find(a => a.name.endsWith('.deb'))
+         || updateData.assets?.find(a => a.name.endsWith('.AppImage'));
+  } else if (platformName === 'macos') {
+    asset = updateData.assets?.find(a => a.name.endsWith('.dmg'));
+  }
+
+  if (!asset) {
+    throw new Error(`No compatible update file found for ${platformName || 'this platform'}.`);
+  }
+
+  const fileData = await downloadAsset(asset, setProgress);
+
+  setStatus('installing');
+  const { writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+  const fileName = asset.name;
+  await writeFile(fileName, fileData, { baseDir: BaseDirectory.Temp });
+
+  const { tempDir } = await import('@tauri-apps/api/path');
+  const tempPath = await tempDir();
+  const filePath = `${tempPath}${fileName}`;
+
+  const { openPath } = await import('@tauri-apps/plugin-opener');
+  await openPath(filePath);
+}
+
+/** Download an asset with progress tracking, returns Uint8Array */
+async function downloadAsset(
+  asset: { browser_download_url: string; size: number; name: string },
+  setProgress: (p: number) => void,
+): Promise<Uint8Array> {
+  const { fetch } = await import('@tauri-apps/plugin-http');
+  const response = await fetch(asset.browser_download_url);
+
+  if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
+  if (!response.body) throw new Error('Download failed: No response body');
+
+  const contentLength = asset.size;
+  const reader = response.body.getReader();
+
+  let receivedLength = 0;
+  const chunks: Uint8Array[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    chunks.push(value);
+    receivedLength += value.length;
+
+    if (contentLength > 0) {
+      setProgress(Math.min(99, Math.round((receivedLength / contentLength) * 100)));
+    }
+  }
+
+  // Combine all chunks into a single Uint8Array
+  const result = new Uint8Array(receivedLength);
+  let position = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, position);
+    position += chunk.length;
+  }
+
+  setProgress(100);
+  return result;
 }

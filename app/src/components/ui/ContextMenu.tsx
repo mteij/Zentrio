@@ -123,7 +123,6 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
     startPosition.current = { x: touch.clientX, y: touch.clientY }
     
     longPressTimer.current = setTimeout(() => {
-      e.preventDefault()
       // Vibrate on supported devices
       if (navigator.vibrate) navigator.vibrate(50)
       openMenu(touch.clientX, touch.clientY)
@@ -160,7 +159,12 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        style={{ display: 'contents' }}
+        style={{ 
+          display: 'contents',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none'
+        }}
       >
         {children}
       </div>
