@@ -5,6 +5,16 @@ import { optionalSessionMiddleware, sessionMiddleware } from '../../middleware/s
 type Method = 'get' | 'post' | 'put' | 'delete' | 'patch'
 type AnyHandler = (c: any, next: () => Promise<void>) => any
 
+const isResponseLike = (value: unknown): value is Response => {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as any
+  return (
+    typeof candidate.status === 'number' &&
+    candidate.headers instanceof Headers &&
+    typeof candidate.arrayBuffer === 'function'
+  )
+}
+
 const ACTION_VERBS: Record<Method, string> = {
   get: 'Get',
   post: 'Create',
@@ -214,7 +224,7 @@ const inferRouteSecurity = (tag: string, path: string, handlers: AnyHandler[]) =
 }
 
 const composeHandlers = (handlers: AnyHandler[]): AnyHandler => {
-  return async (c, next) => {
+  return async (c, _next) => {
     let index = -1
 
     const dispatch = async (i: number): Promise<any> => {
@@ -224,7 +234,9 @@ const composeHandlers = (handlers: AnyHandler[]): AnyHandler => {
       index = i
 
       const handler = handlers[i]
-      if (!handler) return next()
+      if (!handler) {
+        return undefined
+      }
 
       const result = await handler(c, () => dispatch(i + 1))
 
@@ -232,16 +244,19 @@ const composeHandlers = (handlers: AnyHandler[]): AnyHandler => {
       // many Hono middlewares call `await next()` and return `void`.
       // When that happens, we still need to return the finalized response
       // created by downstream handlers.
-      if (result !== undefined) return result
+      if (isResponseLike(result)) {
+        c.res = result
+        return c.res
+      }
       if ((c as any).finalized) return c.res
 
-      return result
+      return undefined
     }
 
     const result = await dispatch(0)
-    if (result !== undefined) return result
+    if (isResponseLike(result)) return result
     if ((c as any).finalized) return c.res
-    return result
+    return undefined
   }
 }
 

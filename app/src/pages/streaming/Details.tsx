@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { Layout, SkeletonDetails } from '../../components'
+import { Layout, SkeletonDetails, LoadErrorState } from '../../components'
 import { InfoModal } from '../../components/features/InfoModal'
 import { ListSelectionModal } from '../../components/features/ListSelectionModal'
 
@@ -544,9 +544,25 @@ export const StreamingDetails = () => {
 
   if (error || !data) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#141414', color: 'white' }}>
-        {error || 'Content not found'}
-      </div>
+      <LoadErrorState
+        message={error || 'Content not found'}
+        onRetry={() => {
+          setError('')
+          setLoading(true)
+          void loadDetails()
+        }}
+        onBack={() => {
+          if (window.history.length > 1) {
+            navigate(-1)
+            return
+          }
+          if (profileId) {
+            navigate(`/streaming/${profileId}`)
+            return
+          }
+          navigate('/profiles')
+        }}
+      />
     )
   }
 

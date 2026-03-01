@@ -19,6 +19,7 @@ export { SkeletonPlayer } from './ui/SkeletonPlayer'
 export { SkeletonStreamList } from './ui/SkeletonStreamList'
 export { SkeletonProfile } from './ui/SkeletonProfile'
 export { SkeletonAddonCard } from './ui/SkeletonAddonCard'
+export { LoadErrorState } from './ui/LoadErrorState'
 
 // Layout Components
 export { Layout, PageHeader, PageFooter, SimpleLayout } from './layout/Layout'

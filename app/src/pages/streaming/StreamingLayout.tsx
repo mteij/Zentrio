@@ -1,5 +1,6 @@
 import { Outlet, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { LoadErrorState } from '../../components'
 import { Navbar } from '../../components/layout/Navbar'
 import { useEffect } from 'react'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
@@ -33,7 +34,7 @@ export const StreamingLayout = () => {
   const location = useLocation()
   const queryClient = useQueryClient()
 
-  const { data: profile, error } = useQuery({
+  const { data: profile, error, isFetching, refetch } = useQuery({
     queryKey: ['streaming-profile', profileId],
     queryFn: () => fetchProfile(profileId!),
     enabled: !!profileId,
@@ -51,6 +52,33 @@ export const StreamingLayout = () => {
       navigate('/')
     }
   }, [error, navigate])
+
+  if (error?.message === 'Unauthorized') {
+    return null
+  }
+
+  if (error) {
+    const errorMessage = error.message && error.message !== 'Failed to load profile'
+      ? error.message
+      : 'Failed to load, try again.'
+
+    return (
+      <LoadErrorState
+        message={errorMessage}
+        onRetry={() => {
+          void refetch()
+        }}
+        isRetrying={isFetching}
+        onBack={() => {
+          if (window.history.length > 1) {
+            navigate(-1)
+            return
+          }
+          navigate('/profiles')
+        }}
+      />
+    )
+  }
 
   // React immediately when streaming settings changed (e.g. parental age limit)
   useEffect(() => {

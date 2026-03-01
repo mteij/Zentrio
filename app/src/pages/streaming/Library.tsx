@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Plus, Share2, Users, LogOut, Library as LibraryIcon, Trash2, Mail, Check, X as XIcon, UserPlus, ChevronDown, ChevronRight, Lock, Globe, User, MoreVertical } from 'lucide-react'
-import { Layout, RatingBadge, LazyImage, SkeletonCard } from '../../components'
+import { Layout, RatingBadge, LazyImage, SkeletonCard, LoadErrorState } from '../../components'
 import { List, ListItem, ListShare, Profile } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
@@ -239,10 +239,28 @@ export const StreamingLibrary = () => {
 
 
   if (error) {
+    const handleGoBack = () => {
+      if (window.history.length > 1) {
+        navigate(-1)
+        return
+      }
+
+      if (profileId) {
+        navigate(`/streaming/${profileId}`)
+        return
+      }
+
+      navigate('/profiles')
+    }
+
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#141414', color: 'white' }}>
-        {error}
-      </div>
+      <LoadErrorState
+        message={error}
+        onRetry={() => {
+          void refreshLibrary()
+        }}
+        onBack={handleGoBack}
+      />
     )
   }
 

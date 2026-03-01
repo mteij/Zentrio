@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
-import { Layout, StreamingRow, LazyCatalogRow, SkeletonHero, SkeletonRow, Hero } from '../../components'
+import { Layout, StreamingRow, LazyCatalogRow, SkeletonHero, SkeletonRow, Hero, LoadErrorState } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { WatchHistoryItem } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
@@ -42,7 +42,7 @@ export const StreamingHome = () => {
   const { profileId } = useParams<{ profileId: string }>()
   const navigate = useNavigate()
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['dashboard', profileId],
     queryFn: () => fetchDashboard(profileId!),
     enabled: !!profileId,
@@ -123,19 +123,27 @@ export const StreamingHome = () => {
   }
 
   if (error || !data) {
+    const errorMessage = error?.message && error.message !== 'Failed to load dashboard'
+      ? error.message
+      : 'Failed to load, try again.'
+
+    const handleGoBack = () => {
+      if (window.history.length > 1) {
+        navigate(-1)
+        return
+      }
+      navigate('/profiles')
+    }
+
     return (
-      <div className="min-h-screen bg-[#141414] flex items-center justify-center text-white">
-        <div className="text-center">
-          <h2 className="text-xl font-bold mb-2">Something went wrong</h2>
-          <p className="text-gray-400">{error?.message || 'Failed to load content'}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 px-4 py-2 bg-purple-600 rounded hover:bg-purple-700 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
+      <LoadErrorState
+        message={errorMessage}
+        onRetry={() => {
+          void refetch()
+        }}
+        isRetrying={isFetching}
+        onBack={handleGoBack}
+      />
     )
   }
 

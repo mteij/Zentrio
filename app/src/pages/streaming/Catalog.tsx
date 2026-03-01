@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Layout, RatingBadge, LazyImage, SkeletonCard, AnimatedBackground } from '../../components'
+import { Layout, RatingBadge, LazyImage, SkeletonCard, AnimatedBackground, LoadErrorState } from '../../components'
 import { MetaPreview } from '../../services/addons/types'
 import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
@@ -40,8 +40,10 @@ export const StreamingCatalog = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isRefetching,
     isLoading,
-    error
+    error,
+    refetch
   } = useInfiniteQuery({
     queryKey: ['catalog', profileId, manifestUrl, type, id],
     queryFn: fetchCatalog,
@@ -148,18 +150,27 @@ export const StreamingCatalog = () => {
   }
 
   if (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to load catalog'
+
     return (
-      <div className="min-h-screen bg-[#141414] flex items-center justify-center text-white">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">Failed to load catalog</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-purple-600 rounded hover:bg-purple-700"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
+      <LoadErrorState
+        message={errorMessage}
+        onRetry={() => {
+          void refetch()
+        }}
+        isRetrying={isRefetching}
+        onBack={() => {
+          if (window.history.length > 1) {
+            navigate(-1)
+            return
+          }
+          if (profileId) {
+            navigate(`/streaming/${profileId}`)
+            return
+          }
+          navigate('/profiles')
+        }}
+      />
     )
   }
 
