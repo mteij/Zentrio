@@ -227,65 +227,53 @@ jobs:
     runs-on: ubuntu-latest
     needs: quality
     # Only update on push to main (not on PRs, not on develop)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
-      contents: read
+      contents: write
 
     steps:
-      - name: Push badge JSON to Gist
-        env:
-          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-          GIST_ID: ${{ secrets.QUALITY_BADGE_GIST_ID }}
-          SCORE: ${{ needs.quality.outputs.score }}
-          GRADE: ${{ needs.quality.outputs.grade }}
-          COLOR: ${{ needs.quality.outputs.color }}
-        run: |
-          # Debug: Show which secrets are set (safely)
-          if [ -z "$GIST_TOKEN" ]; then
-            echo "❌ GIST_TOKEN is not set"
-          else
-            echo "✅ GIST_TOKEN is set (length: ${#GIST_TOKEN})"
-          fi
-          
-          if [ -z "$GIST_ID" ]; then
-            echo "❌ QUALITY_BADGE_GIST_ID is not set"
-          else
-            echo "✅ QUALITY_BADGE_GIST_ID is set: $GIST_ID"
-          fi
-          
-          if [ -z "$GIST_TOKEN" ] || [ -z "$GIST_ID" ]; then
-            echo "⚠️  GIST_TOKEN or QUALITY_BADGE_GIST_ID secret not set – skipping badge update"
-            echo ""
-            echo "To fix this, add these secrets to your repository:"
-            echo "  - GIST_TOKEN: A GitHub Personal Access Token with 'gist' scope"
-            echo "  - QUALITY_BADGE_GIST_ID: The ID of the gist to store the badge JSON"
-            exit 0
-          fi
+      - uses: actions/checkout@v4
 
-          PAYLOAD=$(python3 -c "
+      - name: Write badge JSON to repository
+        env:
+          SCORE: ${{ needs.quality.outputs.score || '0' }}
+          GRADE: ${{ needs.quality.outputs.grade || '?' }}
+          COLOR: ${{ needs.quality.outputs.color || 'lightgrey' }}
+        run: |
+          mkdir -p .github/badges
+          python3 - <<'PYEOF'
           import json, os
+          from pathlib import Path
+
           score = os.environ.get('SCORE', '?')
           grade = os.environ.get('GRADE', '?')
           color = os.environ.get('COLOR', 'lightgrey')
+
           data = {
             'schemaVersion': 1,
             'label': 'code quality',
             'message': f'{score}/100 ({grade})',
             'color': color,
-            'cacheSeconds': 60
+            'cacheSeconds': 60,
           }
-          print(json.dumps(data))
-          ")
 
-          # Escape the payload for the GitHub API
-          ESCAPED=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$PAYLOAD")
+          out = Path('.github/badges/quality.json')
+          out.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+          print(f'✅ Wrote {out}')
+          PYEOF
 
-          curl -s -X PATCH \
-            -H "Authorization: token $GIST_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/gists/$GIST_ID" \
-            -d "{\"files\":{\"quality.json\":{\"content\":$ESCAPED}}}" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print('✅ Gist updated:', d.get('html_url','?'))"
+      - name: Commit updated badge
+        run: |
+          if git diff --quiet -- .github/badges/quality.json; then
+            echo "No badge changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/badges/quality.json
+          git commit -m "chore: update quality badge [skip ci]"
+          git push
 
       - name: Print score summary
         if: always()

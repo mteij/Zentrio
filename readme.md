@@ -11,7 +11,7 @@
 <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black" alt="Tauri"></a>
 <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
 <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
-<a href="https://github.com/MichielEijpe/Zentrio/actions/workflows/quality.yml"><img src="https://img.shields.io/github/actions/workflow/status/MichielEijpe/Zentrio/quality.yml?branch=main&style=for-the-badge&label=quality" alt="Code Quality"></a>
+<a href="https://github.com/MichielEijpe/Zentrio/actions/workflows/quality.yml"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/MichielEijpe/Zentrio/main/.github/badges/quality.json&style=for-the-badge" alt="Code Quality"></a>
 
 <a href="https://zentrio.eu"><strong>🌐 Zentrio.eu</strong></a> •
 <a href="https://app.zentrio.eu"><strong>▶️ Public Instance</strong></a> •
