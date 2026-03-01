@@ -56,6 +56,14 @@ trakt.use('*', optionalSessionMiddleware)
 // [GET /status] Get Trakt connection status for a profile
 trakt.get('/status', async (c) => {
   try {
+    const isGuestMode = c.get('guestMode')
+    if (isGuestMode) {
+      return ok(c, {
+        connected: false,
+        available: false
+      })
+    }
+
     const { profileId } = c.req.query()
     if (!profileId) {
       return err(c, 400, 'INVALID_INPUT', 'profileId required')
@@ -64,17 +72,18 @@ trakt.get('/status', async (c) => {
     const pId = parseInt(profileId)
     const account = traktAccountDb.getByProfileId(pId)
     const syncState = traktSyncStateDb.getByProfileId(pId)
+    const configured = traktClient.isConfigured()
 
-    if (!account) {
+    if (!account || !configured) {
       return ok(c, {
         connected: false,
-        available: traktClient.isConfigured()
+        available: configured
       })
     }
 
     return ok(c, {
       connected: true,
-      available: true,
+      available: configured,
       username: account.trakt_username,
       userId: account.trakt_user_id,
       syncEnabled: syncState?.sync_enabled ?? true,
@@ -95,6 +104,10 @@ trakt.get('/status', async (c) => {
 // [GET /auth-url] Get OAuth authorization URL
 trakt.get('/auth-url', async (c) => {
   try {
+    if (c.get('guestMode')) {
+      return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
+    }
+
     if (!traktClient.isConfigured()) {
       return err(c, 400, 'NOT_CONFIGURED', 'Trakt integration is not configured')
     }
@@ -185,6 +198,10 @@ trakt.get('/callback', async (c) => {
 // [POST /exchange-code] Exchange auth code for tokens (SPA flow)
 trakt.post('/exchange-code', async (c) => {
   try {
+    if (c.get('guestMode')) {
+      return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
+    }
+
     const body = await c.req.json()
     const { code, profileId, redirectUri } = body
 
@@ -236,6 +253,10 @@ trakt.post('/exchange-code', async (c) => {
 // [POST /device-code] Generate device code for user to enter at trakt.tv/activate
 trakt.post('/device-code', async (c) => {
   try {
+    if (c.get('guestMode')) {
+      return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
+    }
+
     if (!traktClient.isConfigured()) {
       return err(c, 400, 'NOT_CONFIGURED', 'Trakt integration is not configured')
     }
@@ -276,6 +297,10 @@ trakt.post('/device-code', async (c) => {
 // [GET /poll-token] Poll for device authorization
 trakt.get('/poll-token', async (c) => {
   try {
+    if (c.get('guestMode')) {
+      return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
+    }
+
     const { pollToken } = c.req.query()
 
     if (!pollToken) {
@@ -352,6 +377,10 @@ trakt.get('/poll-token', async (c) => {
 // [POST /disconnect] Disconnect Trakt from profile
 trakt.post('/disconnect', async (c) => {
   try {
+    if (c.get('guestMode')) {
+      return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
+    }
+
     const body = await c.req.json()
     const { profileId } = body
 
@@ -388,6 +417,10 @@ trakt.post('/disconnect', async (c) => {
 // [POST /sync] Trigger manual sync
 trakt.post('/sync', async (c) => {
   try {
+    if (c.get('guestMode')) {
+      return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
+    }
+
     const body = await c.req.json()
     const { profileId } = body
 
@@ -414,6 +447,10 @@ trakt.post('/sync', async (c) => {
 // [PUT /sync-settings] Update sync settings
 trakt.put('/sync-settings', async (c) => {
   try {
+    if (c.get('guestMode')) {
+      return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
+    }
+
     const body = await c.req.json()
     const { profileId, syncEnabled, pushToTrakt } = body
 
@@ -440,7 +477,15 @@ trakt.put('/sync-settings', async (c) => {
 // [GET /recommendations] Get personalized recommendations
 trakt.get('/recommendations', async (c) => {
   try {
+    if (c.get('guestMode')) {
+      return ok(c, { items: [], connected: false, available: false })
+    }
+
     const { profileId, type = 'movies', limit = '20' } = c.req.query()
+
+    if (!traktClient.isConfigured()) {
+      return ok(c, { items: [], connected: false, available: false })
+    }
 
     if (!profileId) {
       return err(c, 400, 'INVALID_INPUT', 'profileId required')

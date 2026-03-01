@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { ChevronDown, Monitor, Disc } from 'lucide-react'
-import { Button, Toggle, SettingsProfileSelector } from '../index'
+import { Button, Toggle } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 
@@ -65,9 +65,13 @@ const AVAILABLE_LANGUAGES = [
     'Croatian', 'Serbian', 'Slovak', 'Lithuanian', 'Latvian', 'Estonian', 'Slovenian', 'Icelandic', 'Albanian'
 ].sort()
 
-export function StreamingSettings() {
+interface StreamingSettingsProps {
+  currentProfileId: string
+  onProfileChange: (id: string) => void
+}
+
+export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) {
   const [loading, setLoading] = useState(false)
-  const [currentProfileId, setCurrentProfileId] = useState<string>('')
   const [settings, setSettings] = useState<StreamingSettingsData>(DEFAULT_SETTINGS)
   const [showSortingContent, setShowSortingContent] = useState(false)
   const [languageToAdd, setLanguageToAdd] = useState('')
@@ -279,22 +283,11 @@ export function StreamingSettings() {
     }
   }
 
-  const handleProfileChange = (newProfileId: string) => {
-    if (!newProfileId) return
-    setCurrentProfileId(newProfileId)
-    localStorage.setItem('lastSelectedStreamingProfile', newProfileId)
-    loadSettings(newProfileId)
-  }
-
-  const handleProfilesLoaded = (profilesList: any[]) => {
-      // Logic to auto-select profile if not selected
-      const lastSelected = localStorage.getItem('lastSelectedStreamingProfile')
-      if (lastSelected && profilesList.some(p => String(p.id) === lastSelected)) {
-          handleProfileChange(lastSelected)
-      } else if (profilesList.length > 0) {
-          handleProfileChange(String(profilesList[0].id))
-      }
-  }
+  useEffect(() => {
+    if (currentProfileId) {
+      loadSettings(currentProfileId)
+    }
+  }, [currentProfileId])
 
   const updateSetting = (key: keyof StreamingSettingsData, value: any) => {
       const newSettings = { ...settings, [key]: value }
@@ -346,19 +339,6 @@ export function StreamingSettings() {
     <div className={styles.tabContent}>
       <div className={styles.settingsCard}>
         <h2 className={styles.sectionTitle}>Streaming Preferences <span className={styles.infoIcon} title="Configure your streaming preferences">?</span></h2>
-
-        {/* Profile Selector */}
-        <div className={styles.settingItem} style={{ alignItems: 'flex-start' }}>
-            <div className="w-full">
-                 <SettingsProfileSelector
-                    currentProfileId={currentProfileId}
-                    onProfileChange={handleProfileChange}
-                    onProfilesLoaded={handleProfilesLoaded}
-                />
-            </div>
-        </div>
-
-
 
         {/* Sorting & Filtering */}
         <div className={`${styles.settingItem} !flex-col !items-start`}>

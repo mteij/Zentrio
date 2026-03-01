@@ -138,6 +138,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     forceRefresh: boolean = false
   ) => {
     loadIdRef.current += 1
+    const currentLoadId = loadIdRef.current
     const requestStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
 
     // Close any existing connection
@@ -174,8 +175,12 @@ export function useStreamLoader(): UseStreamLoaderResult {
     const eventSource = createApiEventSource(url)
     eventSourceRef.current = eventSource
 
+    // Guard: ignore events from a stale connection (when loadStreams was called again before this one finished)
+    const isStale = () => loadIdRef.current !== currentLoadId
+
     // Listen for cache-status event
     eventSource.addEventListener('cache-status', (e) => {
+      if (isStale()) return
       const data = JSON.parse(e.data)
       setCacheStatus({
         fromCache: data.fromCache,
@@ -184,6 +189,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     })
 
     eventSource.addEventListener('addon-start', (e) => {
+      if (isStale()) return
       const data = JSON.parse(e.data)
       setAddonStatuses(prev => {
         const next = new Map(prev)
@@ -198,6 +204,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     })
 
     eventSource.addEventListener('addon-result', (e) => {
+      if (isStale()) return
       const data = JSON.parse(e.data)
       
       // Update addon status
@@ -221,6 +228,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     })
 
     eventSource.addEventListener('first-playable', (e) => {
+      if (isStale()) return
       const data = JSON.parse(e.data)
       if (firstPlayableAppliedRef.current) return
       const first = data?.stream
@@ -240,6 +248,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     })
 
     eventSource.addEventListener('addon-error', (e) => {
+      if (isStale()) return
       const data = JSON.parse(e.data)
 
       const errorMsg = data.error || 'Unknown error'
@@ -262,6 +271,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     })
 
     eventSource.addEventListener('complete', (e) => {
+      if (isStale()) { eventSource.close(); return }
       const data = JSON.parse(e.data)
       if (data.allStreams) {
         firstPlayableAppliedRef.current = true
@@ -291,10 +301,12 @@ export function useStreamLoader(): UseStreamLoaderResult {
     })
 
     eventSource.addEventListener('error', (e) => {
+      if (isStale()) { eventSource.close(); return }
       console.error('SSE error:', e)
       setIsLoading(false)
       eventSource.close()
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleStreamsUpdate])
 
   // Refresh function - reloads with cache bypass

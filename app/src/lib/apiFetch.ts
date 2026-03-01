@@ -40,14 +40,6 @@ export async function apiFetch(
       const state = useAuthStore.getState();
       const token = state.session?.token;
       
-      // Enhanced logging for debugging resource loading and auth issues
-      console.log('[apiFetch] Request:', url, {
-          hasToken: !!token,
-          tokenSuffix: token ? `...${token.slice(-6)}` : null,
-          isAuthenticated: state.isAuthenticated,
-          isLoading: state.isLoading
-      });
-      
       // Check if init already has a token (e.g. during refresh)
       const authHeader = headers.get('Authorization') || headers.get('authorization');
       const existingAuth = (authHeader || '').replace('Bearer ', '');
@@ -57,7 +49,8 @@ export async function apiFetch(
           if (!existingAuth) {
              headers.set('Authorization', `Bearer ${tokenToUse}`);
           }
-      } else {
+      } else if (!appMode.isGuest()) {
+          // Only warn when not in guest mode — guest mode has no token by design
           console.warn('[apiFetch] No token available for Tauri request:', url);
       }
       

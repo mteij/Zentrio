@@ -1,19 +1,25 @@
-import { appearanceDb, profileDb, type User } from '../../services/database'
-import { sessionMiddleware } from '../../middleware/session'
+import { appearanceDb, profileDb, userDb, type User } from '../../services/database'
+import { optionalSessionMiddleware } from '../../middleware/session'
 import { ok, err } from '../../utils/api'
 import { createTaggedOpenAPIApp } from './openapi-route'
 
 const appearance = createTaggedOpenAPIApp<{
   Variables: {
-    user: User
+    user: User | null
+    guestMode: boolean
+    session: any
   }
 }>('Appearance')
 
-appearance.get('/settings', sessionMiddleware, async (c) => {
+appearance.get('/settings', optionalSessionMiddleware, async (c) => {
   try {
     const { profileId, settingsProfileId: querySettingsProfileId } = c.req.query()
     const user = c.get('user')
-    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    const isGuestMode = c.get('guestMode') as boolean
+
+    // Resolve effective user for guest mode
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
     let settingsProfileId: number;
 
@@ -21,13 +27,16 @@ appearance.get('/settings', sessionMiddleware, async (c) => {
         settingsProfileId = parseInt(querySettingsProfileId);
     } else {
         let pId: number;
-        if (profileId) {
+        if (profileId && profileId !== 'guest') {
             pId = parseInt(profileId)
+        } else if (isGuestMode || profileId === 'guest') {
+            const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+            pId = guestDefaultProfile.id
         } else {
             // Fallback to default profile
-            let profile = profileDb.getDefault(user.id)
+            let profile = profileDb.getDefault(effectiveUser.id)
             if (!profile) {
-                const profiles = profileDb.findByUserId(user.id)
+                const profiles = profileDb.findByUserId(effectiveUser.id)
                 if (profiles && profiles.length > 0) {
                     profile = profiles[0]
                 }
@@ -49,11 +58,15 @@ appearance.get('/settings', sessionMiddleware, async (c) => {
   }
 })
 
-appearance.put('/settings', sessionMiddleware, async (c) => {
+appearance.put('/settings', optionalSessionMiddleware, async (c) => {
   try {
     const { profileId, settingsProfileId: querySettingsProfileId } = c.req.query()
     const user = c.get('user')
-    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    const isGuestMode = c.get('guestMode') as boolean
+
+    // Resolve effective user for guest mode
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
     let settingsProfileId: number;
 
@@ -64,13 +77,16 @@ appearance.put('/settings', sessionMiddleware, async (c) => {
         }
     } else {
         let pId: number;
-        if (profileId) {
+        if (profileId && profileId !== 'guest') {
             pId = parseInt(profileId)
+        } else if (isGuestMode || profileId === 'guest') {
+            const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+            pId = guestDefaultProfile.id
         } else {
             // Fallback to default profile
-            let profile = profileDb.getDefault(user.id)
+            let profile = profileDb.getDefault(effectiveUser.id)
             if (!profile) {
-                const profiles = profileDb.findByUserId(user.id)
+                const profiles = profileDb.findByUserId(effectiveUser.id)
                 if (profiles && profiles.length > 0) {
                     profile = profiles[0]
                 }

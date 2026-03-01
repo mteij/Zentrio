@@ -77,28 +77,16 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
   const featuredItem = items.length > 0 ? items[currentIndex] : null
   const shouldShowHero = featuredItem && ((featuredItem as any).background || featuredItem.poster)
 
-  if (!shouldShowHero || !featuredItem) return null
-
-  // Ensure we have properties even if type definitions are loose
-  const itemTitle = (featuredItem as any).title || (featuredItem as any).name
-  const itemDesc = (featuredItem as any).description || 'Start watching now on Zentrio.'
-  const itemBg = (featuredItem as any).background
-  const itemPoster = featuredItem.poster
-  const itemType = (featuredItem as any).meta_type || (featuredItem as any).type
-  const itemId = (featuredItem as any).meta_id || (featuredItem as any).id
-  const itemSeason = (featuredItem as any).season
-  const itemEpisode = (featuredItem as any).episode
-
   // Key animations off the actual item, not the index.
-  // Continue Watching often stays at index 0 but changes (episode/progress),
-  // which can look like "weird" animation if keys don't change.
-  // Keep key stable to the content item itself.
-  // Avoid including episodic progress fields, which can cause noisy re-animations.
+  // These must be computed before any early return so the useEffect below is not conditional.
+  const itemType = featuredItem ? ((featuredItem as any).meta_type || (featuredItem as any).type) : ''
+  const itemId = featuredItem ? ((featuredItem as any).meta_id || (featuredItem as any).id) : ''
   const featuredKey = `${itemType}-${itemId}`
 
   // Only animate when the hero actually rotates to another featured item.
   // Data refreshes or transient rerenders with the same key should remain visually stable.
   useEffect(() => {
+    if (!featuredKey || featuredKey === '-') return
     if (lastRenderedKeyRef.current === null) {
       lastRenderedKeyRef.current = featuredKey
       setAnimateSwap(false)
@@ -110,6 +98,14 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
     lastRenderedKeyRef.current = featuredKey
     rotateTriggerRef.current = false
   }, [featuredKey])
+
+  if (!shouldShowHero || !featuredItem) return null
+
+  // Ensure we have properties even if type definitions are loose
+  const itemTitle = (featuredItem as any).title || (featuredItem as any).name
+  const itemDesc = (featuredItem as any).description || 'Start watching now on Zentrio.'
+  const itemBg = (featuredItem as any).background
+  const itemPoster = featuredItem.poster
   
   // Dynamic Button Logic
   let playButtonText = "Play Now"

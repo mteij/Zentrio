@@ -84,6 +84,13 @@
   gap: 12px;
 }
 
+/* Compact profile pill in the mobile header */
+.mobileProfilePill {
+  margin-left: auto;
+  flex-shrink: 0;
+  max-width: 220px;
+}
+
 .mobileHeaderTitle {
   margin: 0;
   color: var(--text, #fff);
@@ -171,26 +178,42 @@
 .settingsPageContent {
   position: relative;
   z-index: 1;
-  /* Keep content start aligned relative to floating back button top token */
-  padding-top: calc(var(--app-fixed-top-lg, 32px) + 48px);
+}
+
+/* Sidebar width token — used in both sidebar and content-area margin */
+:root {
+  --settings-sidebar-w: 220px;
+  --settings-sidebar-left: 32px;
+  --settings-content-top: 100px;
 }
 
 .settingsShell {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
+  display: block;
+  /* Left margin = sidebar width + gap + sidebar left offset so content doesn't underlay sidebar */
+  margin-left: calc(var(--settings-sidebar-w, 220px) + var(--settings-sidebar-left, 32px) + 20px);
+  margin-top: var(--settings-content-top, 100px);
+  margin-bottom: 48px;
 }
 
 .settingsSidebar {
-  position: sticky;
-  top: calc(var(--app-fixed-top-lg, 32px) + 56px);
+  position: fixed;
+  top: var(--settings-content-top, 100px);
+  left: var(--settings-sidebar-left, 32px);
+  width: var(--settings-sidebar-w, 220px);
+  /* Fill from top offset down to bottom with some padding */
+  max-height: calc(100vh - var(--settings-content-top, 100px) - 24px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  z-index: 50;
   background: var(--glass-bg, rgba(20, 20, 20, 0.65));
   backdrop-filter: blur(var(--glass-blur, 24px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
   border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
   border-radius: var(--radius-lg, 16px);
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .settingsSidebarTitle {
@@ -205,6 +228,24 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+}
+
+/* Profile area pinned at the top of the sidebar, below the title */
+.sidebarProfileArea {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sidebarProfileLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #888);
+  margin-bottom: 8px;
+  padding: 0 4px;
 }
 
 .sidebarTabBtn {
@@ -812,9 +853,16 @@
   .settingsShell {
     grid-template-columns: 1fr;
     gap: 0;
+    margin-left: 0;
+    margin-top: 0;
+    margin-bottom: 24px;
   }
 
   .settingsSidebar {
+    display: none;
+  }
+
+  .sidebarProfileArea {
     display: none;
   }
 
@@ -857,38 +905,39 @@
 
   /* Addon Item Mobile Styles */
   .addonItem {
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 12px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 10px 12px;
+    align-items: center;
   }
 
   .addonInfo {
-    flex: 1 1 100%;
-    gap: 10px;
-    order: 1;
+    flex: 1 1 0%;
+    min-width: 0;
+    gap: 8px;
   }
 
   .addonReorderControls {
-    order: 0;
     align-self: center;
+    flex-shrink: 0;
   }
 
   .addonReorderControls button {
-    padding: 6px !important;
+    padding: 4px !important;
   }
 
   .addonActions {
-    flex: 1 1 100%;
-    order: 2;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    flex-shrink: 0;
+    gap: 6px;
+    flex-wrap: nowrap;
+    align-items: center;
   }
 
   .addonLogo,
   .addonLogoPlaceholder {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
   }
 
   .addonDetails {

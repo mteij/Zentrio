@@ -278,9 +278,16 @@ async function handleGenericDownload(
 
   if (platformName === 'windows') {
     asset = updateData.assets?.find(a => a.name.endsWith('.exe') && !a.name.includes('sig'));
-  } else if (platformName === 'linux') {
-    asset = updateData.assets?.find(a => a.name.endsWith('.deb'))
-         || updateData.assets?.find(a => a.name.endsWith('.AppImage'));
+  } else if (platformName?.startsWith('linux')) {
+    if (platformName === 'linux-deb') {
+      asset = updateData.assets?.find(a => a.name.endsWith('.deb'));
+    } else if (platformName === 'linux-rpm') {
+      asset = updateData.assets?.find(a => a.name.endsWith('.rpm'));
+    } else {
+      asset = updateData.assets?.find(a => a.name.endsWith('.deb'))
+           || updateData.assets?.find(a => a.name.endsWith('.rpm'))
+           || updateData.assets?.find(a => a.name.endsWith('.AppImage'));
+    }
   } else if (platformName === 'macos') {
     asset = updateData.assets?.find(a => a.name.endsWith('.dmg'));
   }

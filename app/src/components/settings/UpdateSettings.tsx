@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 declare const __APP_VERSION__: string;
 
-type PlatformType = 'windows' | 'macos' | 'linux' | 'android' | 'ios' | 'web';
+type PlatformType = 'windows' | 'macos' | 'linux' | 'linux-deb' | 'linux-rpm' | 'android' | 'ios' | 'web';
 
 export function UpdateSettings() {
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,14 @@ export function UpdateSettings() {
             
             try {
                 const { platform } = await import('@tauri-apps/plugin-os');
-                const osName = await platform();
+                let osName: string = await platform();
+                
+                if (osName === 'linux') {
+                   const agent = window.navigator.userAgent;
+                   if (/Ubuntu|Debian/i.test(agent)) osName = 'linux-deb';
+                   else if (/Fedora|Red Hat|CentOS|SUSE/i.test(agent)) osName = 'linux-rpm';
+                }
+
                 setPlatformName(osName as PlatformType);
             } catch (e) {
                 console.error("Failed to detect platform", e);
@@ -41,32 +48,63 @@ export function UpdateSettings() {
     init();
   }, []);
 
-  const isDesktopPlatform = (p: PlatformType) => p === 'windows' || p === 'macos' || p === 'linux';
+  const isTauriUpdaterSupported = (p: PlatformType) => p === 'windows' || p === 'macos';
 
   const checkForUpdates = async (silent = false) => {
     setLoading(true);
     try {
       // ─────────────────────────────────────────────
-      // DESKTOP: Use Official Tauri Updater Plugin
+      // MAC/WIN: Use Official Tauri Updater Plugin
+      // Falls back to GitHub API if updater returns null
+      // (e.g. all releases are pre-releases, which are
+      // excluded from the /releases/latest redirect)
       // ─────────────────────────────────────────────
-      if (isTauri && isDesktopPlatform(platformName)) {
-          const { check } = await import('@tauri-apps/plugin-updater');
-          const update = await check();
-          
-          if (update) {
-              setUpdateAvailable(true);
-              setUpdateData({
-                  version: update.version,
-                  body: update.body,
-                  date: update.date,
-                  updateObj: update 
-              });
-              if (!silent) setShowModal(true);
-          } else {
-              setUpdateAvailable(false);
-              if (!silent) toast.success('Up to date', { description: 'You are using the latest version.' });
+      if (isTauri && isTauriUpdaterSupported(platformName)) {
+          let tauriUpdateFound = false;
+          try {
+              const { check } = await import('@tauri-apps/plugin-updater');
+              const update = await check();
+              
+              if (update) {
+                  tauriUpdateFound = true;
+                  setUpdateAvailable(true);
+                  setUpdateData({
+                      version: update.version,
+                      body: update.body,
+                      date: update.date,
+                      updateObj: update
+                  });
+                  if (!silent) setShowModal(true);
+              }
+              // If update is null, the updater endpoint returned no update
+              // (could be all releases are pre-releases). Fall through to GitHub API.
+          } catch (updaterErr) {
+              // Tauri updater failed (e.g. network error, 404 on latest.json).
+              // Fall through to the GitHub API fallback below.
+              console.warn('Tauri updater failed, falling back to GitHub API:', updaterErr);
           }
-      } 
+
+          if (!tauriUpdateFound) {
+              // Fallback: query GitHub API directly (supports pre-releases)
+              const data = await fetchLatestRelease(isTauri);
+              const latestVersion = data.tag_name.replace(/^v/, '');
+              const hasUpdate = compareVersions(currentVersion, latestVersion);
+
+              if (hasUpdate) {
+                  setUpdateAvailable(true);
+                  setUpdateData({
+                      version: latestVersion,
+                      body: data.body,
+                      assets: data.assets,
+                      isCustom: true
+                  });
+                  if (!silent) setShowModal(true);
+              } else {
+                  setUpdateAvailable(false);
+                  if (!silent) toast.success('Up to date', { description: 'You are using the latest version.' });
+              }
+          }
+      }
       // ─────────────────────────────────────────────
       // iOS: Cannot self-update — direct to App Store
       // ─────────────────────────────────────────────
@@ -198,23 +236,27 @@ export function UpdateSettings() {
 
 // ── Helpers ──────────────────────────────────────
 
-/** Fetch latest release info from GitHub API */
+/** Fetch latest release info from GitHub API.
+ *  Uses /releases?per_page=1 instead of /releases/latest so that
+ *  pre-releases (0.x.x) are also returned — GitHub's /releases/latest
+ *  endpoint deliberately excludes pre-releases and drafts.
+ */
 async function fetchLatestRelease(isTauri: boolean) {
+  const url = 'https://api.github.com/repos/mteij/Zentrio/releases?per_page=1';
+  const headers = { 'User-Agent': 'Zentrio-App' };
   let response: Response;
   
   if (isTauri) {
     const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-    response = await tauriFetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
-      headers: { 'User-Agent': 'Zentrio-App' }
-    }) as unknown as Response;
+    response = await tauriFetch(url, { headers }) as unknown as Response;
   } else {
-    response = await window.fetch('https://api.github.com/repos/mteij/Zentrio/releases/latest', {
-      headers: { 'User-Agent': 'Zentrio-App' }
-    });
+    response = await window.fetch(url, { headers });
   }
   
   if (!response.ok) throw new Error('Failed to fetch update info from GitHub');
-  return response.json();
+  const releases: any[] = await response.json();
+  if (!releases || releases.length === 0) throw new Error('No releases found on GitHub');
+  return releases[0];
 }
 
 /** Simple semver comparison — returns true if v2 > v1 */

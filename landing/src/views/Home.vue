@@ -180,7 +180,11 @@ const detectOS = () => {
   if (iosPlatforms.indexOf(platform) !== -1 || userAgent.includes("iPhone"))
     return "ios";
   if (/Android/.test(userAgent)) return "android";
-  if (/Linux/.test(platform)) return "linux";
+  if (/Linux/.test(platform) || /Linux/.test(userAgent)) {
+    if (/Ubuntu|Debian/i.test(userAgent)) return "linux-deb";
+    if (/Fedora|Red Hat|CentOS|SUSE/i.test(userAgent)) return "linux-rpm";
+    return "linux-appimage";
+  }
   return null;
 };
 
@@ -204,9 +208,12 @@ const fetchLatestReleaseAndSetDownload = async () => {
       label = "Android";
       icon = Smartphone;
     }
-    if (os === "linux") {
+    if (os.startsWith("linux")) {
       label = "Linux";
       icon = Terminal;
+      if (os === "linux-deb") label = "Linux (.deb)";
+      if (os === "linux-rpm") label = "Linux (.rpm)";
+      if (os === "linux-appimage") label = "Linux (.AppImage)";
     }
     if (os === "ios") {
       label = "iOS";
@@ -220,20 +227,25 @@ const fetchLatestReleaseAndSetDownload = async () => {
       isExternal: false,
     };
 
+    // Use /releases?per_page=1 instead of /releases/latest because
+    // GitHub's /releases/latest endpoint excludes pre-releases (0.x.x).
     const response = await fetch(
-      "https://api.github.com/repos/mteij/Zentrio/releases/latest",
+      "https://api.github.com/repos/mteij/Zentrio/releases?per_page=1",
     );
     if (!response.ok) return;
 
-    const release = await response.json();
-    if (!release.assets) return;
+    const data = await response.json();
+    const release = Array.isArray(data) ? data[0] : data;
+    if (!release || !release.assets) return;
 
     const patterns = {
       android: /\.apk$/i,
       ios: /\.ipa$/i,
       windows: /\.exe$/i,
       mac: /\.dmg$/i,
-      linux: /\.(AppImage|deb)$/i,
+      "linux-appimage": /\.AppImage$/i,
+      "linux-deb": /\.deb$/i,
+      "linux-rpm": /\.rpm$/i,
     };
 
     if (patterns[os]) {
@@ -255,8 +267,10 @@ const fetchLatestReleaseAndSetDownload = async () => {
 onMounted(() => {
   // Defer non-critical API call to improve LCP
   // Use requestIdleCallback if available, otherwise setTimeout
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => fetchLatestReleaseAndSetDownload(), { timeout: 2000 });
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(() => fetchLatestReleaseAndSetDownload(), {
+      timeout: 2000,
+    });
   } else {
     setTimeout(fetchLatestReleaseAndSetDownload, 100);
   }

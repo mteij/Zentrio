@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { User, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../index'
 import { authClient, getClientUrl } from '../../lib/auth-client'
@@ -346,14 +346,7 @@ export function GeneralSettings() {
             </div>
             </div>
             </>
-            ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center border-b border-white/5">
-                <User size={32} className="text-zinc-500 mb-3" />
-                <p className="text-sm text-zinc-400 max-w-md">
-                Account settings (username, email, password, 2FA) require signing in. Other settings are available below.
-                </p>
-            </div>
-            )}
+            ) : null}
 
             {/* Login Behavior Setting - visible in both modes */}
             <LoginBehaviorSettings />

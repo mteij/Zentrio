@@ -329,8 +329,13 @@ async function csrfLikeGuard(c: any, next: any) {
       const cand = new URL(candidate)
       const exp = new URL(expectedOrigin)
       
+      // Allow Tauri WebView origins (tauri://localhost, https://tauri.localhost)
+      if (cand.hostname === 'localhost' && (cand.protocol === 'tauri:' || cand.protocol === 'https:')) {
+        return true
+      }
+
       // Allow localhost/127.0.0.1 port mismatch for development (Vite proxy vs Hono server)
-      if ((cand.hostname === 'localhost' || cand.hostname === '127.0.0.1') && 
+      if ((cand.hostname === 'localhost' || cand.hostname === '127.0.0.1') &&
           (exp.hostname === 'localhost' || exp.hostname === '127.0.0.1')) {
           return true
       }

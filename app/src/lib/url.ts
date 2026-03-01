@@ -139,6 +139,7 @@ export const sanitizeImgSrc = (url: string): string => {
   if (!url || typeof url !== 'string') return '';
 
   // Strip all ASCII control characters and whitespace that could hide a scheme
+  // eslint-disable-next-line no-control-regex
   const cleaned = url.replace(/[\s\x00-\x1F\x7F-\x9F]/g, '');
   if (!cleaned) return '';
 
@@ -167,6 +168,7 @@ export const sanitizeImgSrc = (url: string): string => {
 const validateSafeUrlFragment = (value: string): string | null => {
   if (!value || typeof value !== 'string') return null;
 
+  // eslint-disable-next-line no-control-regex
   const cleaned = value.replace(/[\s\x00-\x1F\x7F-\x9F]/g, '');
   if (!cleaned) return null;
 

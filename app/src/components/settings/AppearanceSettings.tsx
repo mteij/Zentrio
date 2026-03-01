@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Button, Toggle, SettingsProfileSelector } from '../index'
+import { Toggle } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 
@@ -9,14 +9,24 @@ interface AppearanceSettingsData {
   show_age_ratings: boolean
 }
 
-export function AppearanceSettings() {
+interface AppearanceSettingsProps {
+  currentProfileId: string
+  onProfileChange: (id: string) => void
+}
+
+export function AppearanceSettings({ currentProfileId }: AppearanceSettingsProps) {
   const [loading, setLoading] = useState(false)
-  const [currentProfileId, setCurrentProfileId] = useState<string>('')
   const [settings, setSettings] = useState<AppearanceSettingsData>({
     show_imdb_ratings: true,
     show_age_ratings: true
   })
   
+  useEffect(() => {
+    if (currentProfileId) {
+      loadSettings(currentProfileId)
+    }
+  }, [currentProfileId])
+
   const loadSettings = async (profileId: string) => {
     if (!profileId) return
     try {
@@ -66,38 +76,12 @@ export function AppearanceSettings() {
     }
   }
 
-  const handleProfileChange = (newProfileId: string) => {
-    if (!newProfileId) return
-    setCurrentProfileId(newProfileId)
-    localStorage.setItem('lastSelectedAppearanceProfile', newProfileId)
-    loadSettings(newProfileId)
-  }
-
-  const handleProfilesLoaded = (profilesList: any[]) => {
-      const lastSelected = localStorage.getItem('lastSelectedAppearanceProfile')
-      if (lastSelected && profilesList.some(p => String(p.id) === lastSelected)) {
-          handleProfileChange(lastSelected)
-      } else if (profilesList.length > 0) {
-          handleProfileChange(String(profilesList[0].id))
-      }
-  }
-
   if (loading && !settings) return <div className={styles.settingsCard}>Loading appearance settings...</div>
 
   return (
     <div className={styles.tabContent}>
       <div className={styles.settingsCard}>
         <h2 className={styles.sectionTitle}>Appearance</h2>
-
-        {/* Profile Selector */}
-        <div className="flex flex-col py-5 border-b border-white/5 last:border-0">
-            <SettingsProfileSelector
-                currentProfileId={currentProfileId}
-                onProfileChange={handleProfileChange}
-                onProfilesLoaded={handleProfilesLoaded}
-                label="Profile"
-            />
-        </div>
 
         {/* IMDb Ratings */}
         <div className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 border-b border-white/5 last:border-0">

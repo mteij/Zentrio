@@ -32,15 +32,20 @@ const parseStreamInfo = (stream: Stream) => {
   }
   
   // Cached status
-  const cachedIndicators = ['cached', '⚡', '+', '✓', 'instant', 'your media', '[tb+]']
-  const uncachedIndicators = ['⬇️', '⬇', '⏳', 'uncached', 'download']
-  
-  const isExplicitlyUncached = uncachedIndicators.some(indicator => 
+  // Use the same conservative heuristics as stream-processor: bracket patterns like [RD+], [TB+], etc.
+  const uncachedIndicators = ['⬇️', '⬇', '⏳', 'uncached']
+  const isExplicitlyUncached = uncachedIndicators.some(indicator =>
     combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
   )
-  
-  const isCached = !isExplicitlyUncached && cachedIndicators.some(indicator => 
-    combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
+  const bracketCachedPattern = /\[[a-z]{1,4}\+\]/i
+  const isCached = !isExplicitlyUncached && (
+    combined.includes('cached') ||
+    combined.includes('⚡') ||
+    combined.includes('✓') ||
+    combined.includes('instant') ||
+    combined.includes('your media') ||
+    bracketCachedPattern.test(name) ||
+    bracketCachedPattern.test(title)
   )
   
   // HDR/DV
@@ -284,9 +289,16 @@ export function StreamSelector({
                     <Wifi size={32} className="text-gray-400 opacity-50" />
                 </div>
                 <h3 className="text-lg font-medium text-white mb-2">No streams found</h3>
-                <p className="text-sm text-gray-400 max-w-md">
+                <p className="text-sm text-gray-400 max-w-md mb-5">
                     We couldn&apos;t find any streams for this content. Try adjusting your filters or checking your installed addons.
                 </p>
+                <button
+                    onClick={onRefresh}
+                    className={`${styles.actionBtn} ${styles.btnSecondaryGlass}`}
+                    style={{ padding: '8px 20px' }}
+                >
+                    Try Again
+                </button>
             </div>
         ) : null}
     </div>

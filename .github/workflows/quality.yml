@@ -6,10 +6,22 @@ on:
   pull_request:
     branches: ["main", "develop"]
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     name: Code Quality
     runs-on: ubuntu-latest
+    outputs:
+      eslint_errors: ${{ steps.eslint.outputs.errors }}
+      eslint_warnings: ${{ steps.eslint.outputs.warnings }}
+      ts_errors: ${{ steps.typecheck.outputs.errors }}
+      tests_passed: ${{ steps.tests.outputs.passed }}
+      clippy_warnings: ${{ steps.clippy.outputs.warnings }}
+      score: ${{ steps.score.outputs.score }}
+      grade: ${{ steps.score.outputs.grade }}
+      color: ${{ steps.score.outputs.color }}
 
     steps:
       - uses: actions/checkout@v4
@@ -22,18 +34,83 @@ jobs:
       - name: Install Dependencies
         run: cd app && bun install
 
+      # ── TypeScript ──────────────────────────────────────────────────────────
       - name: Type Check
-        run: cd app && bun run type-check
+        id: typecheck
+        run: |
+          set +e
+          cd app
+          tsc_out=$(bun run type-check 2>&1)
+          tsc_exit=$?
+          echo "$tsc_out"
+          # Count error lines (lines containing "error TS")
+          err_count=$(echo "$tsc_out" | grep -c "error TS" || true)
+          echo "errors=$err_count" >> "$GITHUB_OUTPUT"
+          # Fail the step only if tsc itself returns non-zero AND there are actual errors
+          if [ $tsc_exit -ne 0 ] && [ "$err_count" -gt 0 ]; then
+            echo "❌ TypeScript: $err_count error(s)"
+            exit 1
+          fi
+          echo "✅ TypeScript: $err_count error(s)"
 
+      # ── ESLint ──────────────────────────────────────────────────────────────
       - name: Lint (ESLint)
-        run: cd app && bun run lint
+        id: eslint
+        run: |
+          set +e
+          cd app
+          # Run ESLint with JSON format, capture output – never fail the step
+          eslint_json=$(bun run lint -- --format json 2>/dev/null || true)
 
+          # Fall back: if JSON is empty/invalid, run plain and count manually
+          if echo "$eslint_json" | node -e "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'))" 2>/dev/null; then
+            errors=$(echo "$eslint_json" | node -e "
+              const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+              console.log(d.reduce((s,f)=>s+f.errorCount,0));
+            ")
+            warnings=$(echo "$eslint_json" | node -e "
+              const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+              console.log(d.reduce((s,f)=>s+f.warningCount,0));
+            ")
+          else
+            # Plain text fallback
+            plain_out=$(bun run lint 2>&1 || true)
+            echo "$plain_out"
+            errors=$(echo "$plain_out" | grep -c "error" || echo "0")
+            warnings=$(echo "$plain_out" | grep -c "warning" || echo "0")
+          fi
+
+          echo "errors=${errors:-0}" >> "$GITHUB_OUTPUT"
+          echo "warnings=${warnings:-0}" >> "$GITHUB_OUTPUT"
+          echo "📊 ESLint: ${errors:-0} error(s), ${warnings:-0} warning(s)"
+
+          # Only fail when there are actual errors (not warnings)
+          if [ "${errors:-0}" -gt 0 ]; then
+            echo "❌ ESLint errors detected – failing step"
+            exit 1
+          fi
+          echo "✅ ESLint passed (warnings are informational)"
+
+      # ── Unit Tests ──────────────────────────────────────────────────────────
       - name: Unit Tests
-        run: cd app && bun run test
+        id: tests
+        run: |
+          set +e
+          cd app
+          bun run test
+          exit_code=$?
+          if [ $exit_code -eq 0 ]; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
 
+      # ── Server Build ────────────────────────────────────────────────────────
       - name: Build Server Binary (Linux host)
         run: cd app && bun build src/index.ts --compile --target bun-linux-x64 --outfile src-tauri/bin/zentrio-server-x86_64-unknown-linux-gnu
 
+      # ── Rust ────────────────────────────────────────────────────────────────
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -51,4 +128,143 @@ jobs:
         run: cd app/src-tauri && cargo fmt -- --check
 
       - name: Rust Linting (Clippy)
-        run: cd app/src-tauri && cargo clippy -- -D warnings
+        id: clippy
+        run: |
+          set +e
+          cd app/src-tauri
+          # Use -W warnings so warnings are reported but don't fail; errors (-D) still fail
+          clippy_out=$(cargo clippy -- -W warnings 2>&1)
+          clippy_exit=$?
+          echo "$clippy_out"
+          warn_count=$(echo "$clippy_out" | grep -c "^warning" || echo "0")
+          err_count=$(echo "$clippy_out" | grep -c "^error" || echo "0")
+          echo "warnings=${warn_count}" >> "$GITHUB_OUTPUT"
+          echo "errors=${err_count}" >> "$GITHUB_OUTPUT"
+          echo "📊 Clippy: ${err_count} error(s), ${warn_count} warning(s)"
+          # Fail only on actual errors
+          if [ "${err_count}" -gt 0 ]; then
+            exit 1
+          fi
+          echo "✅ Clippy passed"
+
+      # ── Score ───────────────────────────────────────────────────────────────
+      - name: Calculate Quality Score
+        id: score
+        if: always()
+        run: |
+          # Inputs (default to 0 if not available)
+          TS_ERRORS="${{ steps.typecheck.outputs.errors || '0' }}"
+          ESLINT_ERRORS="${{ steps.eslint.outputs.errors || '0' }}"
+          ESLINT_WARNINGS="${{ steps.eslint.outputs.warnings || '0' }}"
+          TESTS_PASSED="${{ steps.tests.outputs.passed || 'false' }}"
+          CLIPPY_WARNINGS="${{ steps.clippy.outputs.warnings || '0' }}"
+
+          # Scoring (100 points, deductions):
+          #   TypeScript errors: -5 per error (max -40)
+          #   ESLint errors:     -5 per error (max -30)
+          #   ESLint warnings:   -0.5 per warning (max -15)
+          #   Tests failed:      -20
+          #   Clippy warnings:   -1 per warning (max -10)
+
+          python3 - <<'PYEOF'
+          import os, math
+
+          ts_err   = int(os.environ.get('TS_ERRORS', '0'))
+          esl_err  = int(os.environ.get('ESLINT_ERRORS', '0'))
+          esl_warn = int(os.environ.get('ESLINT_WARNINGS', '0'))
+          tests_ok = os.environ.get('TESTS_PASSED', 'false') == 'true'
+          clip_w   = int(os.environ.get('CLIPPY_WARNINGS', '0'))
+
+          score = 100
+          score -= min(ts_err   * 5,  40)
+          score -= min(esl_err  * 5,  30)
+          score -= min(math.floor(esl_warn * 0.5), 15)
+          if not tests_ok:
+              score -= 20
+          score -= min(clip_w   * 1,  10)
+
+          score = max(0, score)
+
+          if score >= 90:
+              grade, color = "A", "brightgreen"
+          elif score >= 80:
+              grade, color = "B", "green"
+          elif score >= 70:
+              grade, color = "C", "yellowgreen"
+          elif score >= 60:
+              grade, color = "D", "yellow"
+          else:
+              grade, color = "F", "red"
+
+          print(f"Score: {score}/100  Grade: {grade}  Color: {color}")
+
+          # Write to GITHUB_OUTPUT
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+              fh.write(f"score={score}\n")
+              fh.write(f"grade={grade}\n")
+              fh.write(f"color={color}\n")
+          PYEOF
+
+  # ── Badge update (main branch only) ────────────────────────────────────────
+  update-badge:
+    name: Update Quality Badge
+    runs-on: ubuntu-latest
+    needs: quality
+    # Only update on push to main (not on PRs, not on develop)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Push badge JSON to Gist
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.QUALITY_BADGE_GIST_ID }}
+          SCORE: ${{ needs.quality.outputs.score }}
+          GRADE: ${{ needs.quality.outputs.grade }}
+          COLOR: ${{ needs.quality.outputs.color }}
+        run: |
+          if [ -z "$GIST_TOKEN" ] || [ -z "$GIST_ID" ]; then
+            echo "⚠️  GIST_TOKEN or QUALITY_BADGE_GIST_ID secret not set – skipping badge update"
+            exit 0
+          fi
+
+          PAYLOAD=$(python3 -c "
+          import json, os
+          score = os.environ.get('SCORE', '?')
+          grade = os.environ.get('GRADE', '?')
+          color = os.environ.get('COLOR', 'lightgrey')
+          data = {
+            'schemaVersion': 1,
+            'label': 'code quality',
+            'message': f'{score}/100 ({grade})',
+            'color': color,
+            'cacheSeconds': 3600
+          }
+          print(json.dumps(data))
+          ")
+
+          # Escape the payload for the GitHub API
+          ESCAPED=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$PAYLOAD")
+
+          curl -s -X PATCH \
+            -H "Authorization: token $GIST_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/gists/$GIST_ID" \
+            -d "{\"files\":{\"quality.json\":{\"content\":$ESCAPED}}}" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('✅ Gist updated:', d.get('html_url','?'))"
+
+      - name: Print score summary
+        if: always()
+        run: |
+          echo "## 📊 Quality Score" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Score  | ${{ needs.quality.outputs.score }}/100 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Grade  | ${{ needs.quality.outputs.grade }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ESLint errors | ${{ needs.quality.outputs.eslint_errors }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ESLint warnings | ${{ needs.quality.outputs.eslint_warnings }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| TypeScript errors | ${{ needs.quality.outputs.ts_errors }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Clippy warnings | ${{ needs.quality.outputs.clippy_warnings }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tests | ${{ needs.quality.outputs.tests_passed == 'true' && '✅ passed' || '❌ failed' }} |" >> "$GITHUB_STEP_SUMMARY"

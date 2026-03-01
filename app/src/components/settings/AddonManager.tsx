@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Puzzle, Settings, Trash2, X, Share2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Input, Toggle, SettingsProfileSelector } from '../index'
+import { Button, Input, Toggle } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import { isTauri } from '../../lib/auth-client'
 
 interface Addon {
   id: string
@@ -20,16 +21,20 @@ interface Addon {
 }
 
 // Config/Install Modal Component
-const AddonConfigModal = ({ 
-    isOpen, 
-    onClose, 
-    profileId, 
-    onSuccess 
-}: { 
+const AddonConfigModal = ({
+    isOpen,
+    onClose,
+    profileId,
+    replaceAddonId,
+    replacePosition,
+    onSuccess
+}: {
     isOpen: boolean
     onClose: () => void
     profileId: string
-    onSuccess: () => void 
+    replaceAddonId?: string | null
+    replacePosition?: number | null
+    onSuccess: (newAddonId?: string) => void
 }) => {
     const [url, setUrl] = useState('')
     const [installing, setInstalling] = useState(false)
@@ -40,18 +45,24 @@ const AddonConfigModal = ({
         if (!url || !profileId) return
         setInstalling(true)
         try {
+            // If updating an existing addon, delete it first so we don't get duplicates
+            if (replaceAddonId) {
+                await apiFetch(`/api/addons/${replaceAddonId}`, { method: 'DELETE' })
+            }
+
             const res = await apiFetch('/api/addons', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     manifestUrl: url,
-                    settingsProfileId: profileId 
+                    settingsProfileId: profileId
                 })
             })
             if (res.ok) {
-                toast.success('Success', { description: 'Addon installed successfully!' })
+                const newAddon = await res.json()
+                toast.success('Success', { description: replaceAddonId ? 'Addon updated successfully!' : 'Addon installed successfully!' })
                 setUrl('')
-                onSuccess()
+                onSuccess(newAddon?.id ? String(newAddon.id) : undefined)
                 onClose()
             } else {
                 const err = await res.json()
@@ -66,7 +77,7 @@ const AddonConfigModal = ({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 w-full max-w-lg shadow-2xl">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-white">Addon Configuration</h3>
@@ -102,11 +113,16 @@ const AddonConfigModal = ({
     )
 }
 
-export function AddonManager() {
+interface AddonManagerProps {
+  currentProfileId: string
+  onProfileChange: (id: string) => void
+}
+
+export function AddonManager({ currentProfileId }: AddonManagerProps) {
   const [loading, setLoading] = useState(false)
-  const [currentProfileId, setCurrentProfileId] = useState<string>('')
   const [addons, setAddons] = useState<Addon[]>([])
-  const [selectedAddon, setSelectedAddon] = useState<Addon | null>(null)
+  const [configAddon, setConfigAddon] = useState<Addon | null>(null)
+  const [configAddonPosition, setConfigAddonPosition] = useState<number>(-1)
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [manifestUrl, setManifestUrl] = useState('')
   const [installing, setInstalling] = useState(false)
@@ -132,21 +148,11 @@ export function AddonManager() {
     }
   }
 
-  const handleProfileChange = (newProfileId: string) => {
-    if (!newProfileId) return
-    setCurrentProfileId(newProfileId)
-    localStorage.setItem('lastSelectedAddonProfile', newProfileId)
-    loadAddons(newProfileId)
-  }
-
-  const handleProfilesLoaded = (profilesList: any[]) => {
-      const lastSelected = localStorage.getItem('lastSelectedAddonProfile')
-      if (lastSelected && profilesList.some(p => String(p.id) === lastSelected)) {
-          handleProfileChange(lastSelected)
-      } else if (profilesList.length > 0) {
-          handleProfileChange(String(profilesList[0].id))
-      }
-  }
+  useEffect(() => {
+    if (currentProfileId) {
+      loadAddons(currentProfileId)
+    }
+  }, [currentProfileId])
 
   const handleInstallAddon = async () => {
     if (!manifestUrl) return
@@ -214,15 +220,27 @@ export function AddonManager() {
     }
   }
 
-  const handleConfigureAddon = (addon: Addon) => {
-    setSelectedAddon(addon)
+  const handleConfigureAddon = useCallback(async (addon: Addon) => {
+    setConfigAddon(addon)
+    setConfigAddonPosition(addons.findIndex(a => a.id === addon.id))
     let configUrl = addon.manifest_url.replace('/manifest.json', '')
     if (configUrl.endsWith('/')) configUrl = configUrl.slice(0, -1)
     configUrl += '/configure'
-    
-    window.open(configUrl, '_blank')
+
+    if (isTauri()) {
+      try {
+        const { openUrl } = await import('@tauri-apps/plugin-opener')
+        await openUrl(configUrl)
+      } catch (e) {
+        console.error('Failed to open URL via Tauri opener', e)
+        window.open(configUrl, '_blank', 'noopener,noreferrer')
+      }
+    } else {
+      window.open(configUrl, '_blank', 'noopener,noreferrer')
+    }
+
     setIsConfigModalOpen(true)
-  }
+  }, [addons])
 
   const handleShareAddon = async (addon: Addon) => {
     try {
@@ -315,15 +333,6 @@ export function AddonManager() {
     <div className={styles.tabContent}>
       <div className={styles.settingsCard}>
         <h2 className={styles.sectionTitle}>Addons</h2>
-
-        {/* Profile Selector */}
-        <div className={styles.settingItem} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-            <SettingsProfileSelector
-                currentProfileId={currentProfileId}
-                onProfileChange={handleProfileChange}
-                onProfilesLoaded={handleProfilesLoaded}
-            />
-        </div>
 
         {/* Install Addon */}
         <div className={styles.settingItem} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -475,11 +484,38 @@ export function AddonManager() {
 
       </div>
 
-      <AddonConfigModal 
+      <AddonConfigModal
         isOpen={isConfigModalOpen}
-        onClose={() => setIsConfigModalOpen(false)}
+        onClose={() => { setIsConfigModalOpen(false); setConfigAddon(null); setConfigAddonPosition(-1) }}
         profileId={currentProfileId}
-        onSuccess={() => loadAddons(currentProfileId)}
+        replaceAddonId={configAddon?.id ?? null}
+        replacePosition={configAddonPosition}
+        onSuccess={async (newAddonId) => {
+          // Reload the list first so we have fresh data with the new addon's ID
+          const res = await apiFetch(`/api/addons/settings-profile/${currentProfileId}/manage`)
+          if (!res.ok) { loadAddons(currentProfileId); return }
+          const freshAddons: Addon[] = await res.json()
+          setAddons(freshAddons)
+
+          // If we replaced an existing addon, move the new one back to the original position
+          if (newAddonId && configAddonPosition >= 0 && freshAddons.length > 1) {
+            const newIdx = freshAddons.findIndex(a => String(a.id) === String(newAddonId))
+            if (newIdx >= 0 && newIdx !== configAddonPosition) {
+              const reordered = [...freshAddons]
+              const [moved] = reordered.splice(newIdx, 1)
+              // Clamp position to valid range
+              const targetPos = Math.min(configAddonPosition, reordered.length)
+              reordered.splice(targetPos, 0, moved)
+              setAddons(reordered)
+              // Persist the new order
+              await apiFetch(`/api/addons/settings-profile/${currentProfileId}/reorder`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ addonIds: reordered.map(a => parseInt(a.id)) })
+              })
+            }
+          }
+        }}
       />
     </div>
   )

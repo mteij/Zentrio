@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Settings as SettingsIcon } from 'lucide-react'
 import { SimpleLayout, AnimatedBackground } from '../components/index'
+import { SettingsProfileSelector } from '../components/features/SettingsProfileSelector'
 import { appMode } from '../lib/app-mode'
 
 import { AppearanceSettings } from '../components/settings/AppearanceSettings'
@@ -17,6 +18,9 @@ export function SettingsPage() {
   const mobileTabsRef = useRef<HTMLDivElement>(null)
   const [canScrollMobileLeft, setCanScrollMobileLeft] = useState(false)
   const [canScrollMobileRight, setCanScrollMobileRight] = useState(false)
+
+  // Shared settings profile state — lifted up from individual tab components
+  const [currentProfileId, setCurrentProfileId] = useState<string>('')
 
   // Check if in guest mode
   const isGuestMode = appMode.isGuest()
@@ -50,11 +54,30 @@ export function SettingsPage() {
     }
   }, [effectiveTab, tabItems.length])
 
+  const handleProfileChange = (id: string) => {
+    setCurrentProfileId(id)
+  }
+
+  const handleProfilesLoaded = (profiles: any[]) => {
+    if (currentProfileId) return // already have one
+    const lastSelected = localStorage.getItem('lastSelectedSettingsProfile')
+    if (lastSelected && profiles.some((p: any) => String(p.id) === lastSelected)) {
+      setCurrentProfileId(lastSelected)
+    } else if (profiles.length > 0) {
+      setCurrentProfileId(String(profiles[0].id))
+    }
+  }
+
+  const wrappedProfileChange = (id: string) => {
+    handleProfileChange(id)
+    localStorage.setItem('lastSelectedSettingsProfile', id)
+  }
+
   const renderActiveSection = () => {
     if (effectiveTab === 'general') return <GeneralSettings />
-    if (effectiveTab === 'addons') return <AddonManager />
-    if (effectiveTab === 'appearance') return <AppearanceSettings />
-    if (effectiveTab === 'streaming') return <StreamingSettings />
+    if (effectiveTab === 'addons') return <AddonManager currentProfileId={currentProfileId} onProfileChange={wrappedProfileChange} />
+    if (effectiveTab === 'appearance') return <AppearanceSettings currentProfileId={currentProfileId} onProfileChange={wrappedProfileChange} />
+    if (effectiveTab === 'streaming') return <StreamingSettings currentProfileId={currentProfileId} onProfileChange={wrappedProfileChange} />
     if (effectiveTab === 'danger') return <DangerZoneSettings />
     return <GeneralSettings />
   }
@@ -71,6 +94,7 @@ export function SettingsPage() {
           Back to Profiles
         </button>
 
+        {/* ── Mobile sticky header ── */}
         <div className={styles.mobileHeader}>
           <div className={styles.mobileHeaderTop}>
             <button
@@ -81,6 +105,17 @@ export function SettingsPage() {
               <ArrowLeft size={16} />
             </button>
             <h1 className={styles.mobileHeaderTitle}>Settings</h1>
+
+            {/* Compact profile pill — always visible so switching works on any tab */}
+            <div className={styles.mobileProfilePill}>
+              <SettingsProfileSelector
+                currentProfileId={currentProfileId}
+                onProfileChange={wrappedProfileChange}
+                onProfilesLoaded={handleProfilesLoaded}
+                label={null}
+                compact
+              />
+            </div>
           </div>
 
           <div className={styles.mobileSectionTabsWrap}>
@@ -116,12 +151,25 @@ export function SettingsPage() {
               </div>
             )}
           </div>
-
         </div>
 
+        {/* ── Desktop shell: sidebar + content ── */}
         <div className={styles.settingsShell}>
           <aside className={styles.settingsSidebar} aria-label="Settings sections">
             <div className={styles.settingsSidebarTitle}>Settings</div>
+
+            {/* Profile selector always pinned at top of sidebar, below the title */}
+            <div className={styles.sidebarProfileArea}>
+              <SettingsProfileSelector
+                currentProfileId={currentProfileId}
+                onProfileChange={wrappedProfileChange}
+                onProfilesLoaded={handleProfilesLoaded}
+                label={null}
+                layout="column"
+                compact
+              />
+            </div>
+
             <div className={styles.settingsSidebarNav}>
               {tabItems.map((tab) => {
                 const TabIcon = tab.icon
@@ -138,6 +186,7 @@ export function SettingsPage() {
                 )
               })}
             </div>
+
           </aside>
 
           <section className={styles.settingsContent}>

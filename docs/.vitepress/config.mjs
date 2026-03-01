@@ -2,8 +2,8 @@ import { defineConfig } from 'vitepress'
 import { withMermaid } from 'vitepress-plugin-mermaid'
 
 export default withMermaid(defineConfig({
-  title: 'Zentrio Documentation',
-  description: 'Profile management for Stremio Web',
+  title: 'Documentation',
+  description: 'Zentrio Documentation',
   lang: 'en-US',
   base: '/',
   

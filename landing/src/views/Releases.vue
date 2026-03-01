@@ -66,17 +66,46 @@
           <div class="platform-card">
             <Terminal class="platform-icon-svg" />
             <h3>Linux</h3>
-            <p>.deb / AppImage</p>
-            <a
-              v-if="getAsset(latestRelease, 'linux')"
-              :href="getAsset(latestRelease, 'linux').browser_download_url"
-              class="btn btn-primary w-full mt-4"
-            >
-              Download direct
-            </a>
-            <span v-else class="btn btn-secondary disabled w-full mt-4"
+            <p>.deb / .rpm / AppImage</p>
+            <div class="linux-downloads">
+              <a
+                v-if="getAsset(latestRelease, 'linux-deb')"
+                :href="
+                  getAsset(latestRelease, 'linux-deb').browser_download_url
+                "
+                class="btn btn-primary btn-sm mt-4 w-full"
+              >
+                Download .deb
+              </a>
+              <a
+                v-if="getAsset(latestRelease, 'linux-rpm')"
+                :href="
+                  getAsset(latestRelease, 'linux-rpm').browser_download_url
+                "
+                class="btn btn-primary btn-sm mt-2 w-full"
+              >
+                Download .rpm
+              </a>
+              <a
+                v-if="getAsset(latestRelease, 'linux-appimage')"
+                :href="
+                  getAsset(latestRelease, 'linux-appimage').browser_download_url
+                "
+                class="btn btn-primary btn-sm mt-2 w-full"
+              >
+                Download AppImage
+              </a>
+            </div>
+            <span
+              v-if="
+                !getAsset(latestRelease, 'linux-deb') &&
+                !getAsset(latestRelease, 'linux-rpm') &&
+                !getAsset(latestRelease, 'linux-appimage')
+              "
+              class="btn btn-secondary disabled w-full mt-4"
               >Not Available Yet</span
             >
+
             <div class="install-script-container">
               <span class="install-script-label"
                 >Or use the install script:</span
@@ -210,7 +239,9 @@ const getAsset = (release, platform) => {
     ios: /\.ipa$/i,
     windows: /\.exe$/i,
     mac: /\.dmg$/i,
-    linux: /\.(AppImage|deb)$/i,
+    "linux-deb": /\.deb$/i,
+    "linux-rpm": /\.rpm$/i,
+    "linux-appimage": /\.AppImage$/i,
   };
 
   return release.assets.find((asset) => patterns[platform].test(asset.name));
@@ -320,6 +351,17 @@ onMounted(() => {
   border: 1px solid var(--border);
   user-select: all;
   word-break: break-all;
+}
+
+.linux-downloads {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.9rem;
 }
 
 .btn.disabled {

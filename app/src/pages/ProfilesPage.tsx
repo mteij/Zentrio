@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, LogOut, Edit, X, Plus, Check } from 'lucide-react'
+import { Settings, LogOut, Edit, X, Plus, Check, LogIn } from 'lucide-react'
 import { SimpleLayout, ConfirmDialog, ProfileModal, AnimatedBackground, SkeletonProfile } from '../components'
 import { useAuthStore } from '../stores/authStore'
 import { apiFetch } from '../lib/apiFetch'
 import { buildAvatarUrl, sanitizeImgSrc } from '../lib/url'
 import styles from './ProfilesPage.module.css'
 import { ContextMenu } from '../components/ui/ContextMenu'
+import { appMode } from '../lib/app-mode'
 
 interface Profile {
   id: number
@@ -43,6 +44,9 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const navigate = useNavigate()
 
+  // Check if in guest mode
+  const isGuestMode = appMode.isGuest()
+
   // Track auth store for token availability
   const { session, isLoading: authLoading, isAuthenticated } = useAuthStore();
   
@@ -51,6 +55,13 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
     ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined);
   
   useEffect(() => {
+    // In guest mode, load profiles immediately without waiting for auth
+    if (isGuestMode) {
+      console.log('[ProfilesPage] Guest mode, loading profiles directly...');
+      loadProfiles(0);
+      return;
+    }
+
     // Wait for auth to be ready and session token to be available
     // This prevents race conditions where we fetch before token is set
     if (authLoading) {
@@ -100,7 +111,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
       isTauriEnv
     });
     loadProfiles(0);
-  }, [authLoading, session?.token, isAuthenticated, isTauriEnv])
+  }, [authLoading, session?.token, isAuthenticated, isTauriEnv, isGuestMode])
 
   const loadProfiles = async (retryCount = 0) => {
     try {
@@ -190,6 +201,13 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   }
 
   const handleLogout = async () => {
+    if (isGuestMode) {
+      // In guest mode, "logout" means exiting local mode and returning to onboarding
+      appMode.clear()
+      localStorage.removeItem('zentrio_server_url')
+      window.location.href = '/'
+      return
+    }
     try {
       await useAuthStore.getState().logout()
       navigate('/')
@@ -257,7 +275,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
       <footer className={styles.footer}>
         <nav className={styles.footerNav} id="footerButtons">
           {/* Left group: main actions with animated active indicator */}
-          <div 
+          <div
             className={styles.navGroup}
             style={{ '--active-index': editMode ? 1 : 0 } as React.CSSProperties}
           >
@@ -286,15 +304,15 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
           {/* Divider */}
           <div className={styles.navDivider} />
 
-          {/* Right group: logout */}
+          {/* Right group: logout / exit local mode */}
           <button
             id="logoutBtn"
             className={`${styles.navItem} ${styles.navItemDanger}`}
-            aria-label="Logout"
-            title="Logout"
+            aria-label={isGuestMode ? 'Exit Local Mode' : 'Logout'}
+            title={isGuestMode ? 'Exit Local Mode' : 'Logout'}
             onClick={() => setShowLogoutConfirm(true)}
           >
-            <LogOut size={20} />
+            {isGuestMode ? <LogIn size={20} /> : <LogOut size={20} />}
           </button>
         </nav>
       </footer>
@@ -309,14 +327,16 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
         />
       )}
 
-      {/* Logout Confirmation */}
+      {/* Logout / Exit Local Mode Confirmation */}
       <ConfirmDialog
         isOpen={showLogoutConfirm}
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={handleLogout}
-        title="Logout"
-        message="Are you sure you want to logout?"
-        confirmText="Logout"
+        title={isGuestMode ? 'Exit Local Mode' : 'Logout'}
+        message={isGuestMode
+          ? 'Exit local mode and return to the server selection screen? Your local data will be preserved.'
+          : 'Are you sure you want to logout?'}
+        confirmText={isGuestMode ? 'Exit' : 'Logout'}
         cancelText="Cancel"
         variant="danger"
       />

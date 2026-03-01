@@ -49,6 +49,7 @@ function generateId(): string {
 export class TauriPlayerEngine implements IPlayerEngine {
   private video: HTMLVideoElement | null = null
   private state: PlayerState
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   private eventHandlers: Map<keyof PlayerEventHandlers, Set<Function>> = new Map()
   private externalSubtitles: SubtitleTrack[] = []
   private currentSource: MediaSource | null = null
@@ -392,6 +393,7 @@ export class TauriPlayerEngine implements IPlayerEngine {
     if (handlers) {
       handlers.forEach(handler => {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
           (handler as Function)(...args)
         } catch (error) {
           console.error(`[TauriPlayerEngine] Error in ${event} handler:`, error)

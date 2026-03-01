@@ -295,40 +295,47 @@ export class StreamProcessor {
     // Stream Type & Cache Status
     // This is heuristic. Addons usually indicate cached status in title or description.
     // Common patterns:
-    // - "[RD+]", "[AD+]", "[PM+]" = cached on debrid service
+    // - "[RD+]", "[AD+]", "[PM+]", "[TB+]" = cached on debrid service (bracket + pattern)
     // - "⚡" (lightning bolt emoji) = cached/instant (Comet, Torrentio)
-    // - "+" symbol in title = cached
+    // - "✓" checkmark = cached
     // - "cached" keyword
+    // - "your media" = Torbox cached
     // - "⬇️" (download arrow) = NOT cached (needs download)
-    const cachedIndicators = [
+    // NOTE: bare "+" is intentionally NOT an indicator - it's far too common in filenames.
+    // NOTE: "download" as uncached indicator only matches whole-word to avoid false positives
+    //   on stream names containing "download" as part of a phrase (TorBox uses "Downloading..." etc.)
+    const cachedIndicatorPatterns: Array<string | RegExp> = [
       'cached',
       '⚡',           // Lightning bolt = instant/cached
-      '+',            // Plus sign in brackets like [RD+]
+      /\[[a-z]{1,4}\+\]/i,  // Bracket patterns: [RD+], [AD+], [PM+], [TB+], [DL+], etc.
       '✓',            // Checkmark sometimes used
       'instant',
       'your media',    // Torbox specific
-      '[tb+]',         // Torbox specific
     ]
     const uncachedIndicators = [
       '⬇️',           // Download arrow = needs download
       '⬇',            // Alternative down arrow
       '⏳',           // Hourglass = download required
       'uncached',
-      'download',
     ]
-    
+
     // Check for explicit uncached indicators first
-    const isExplicitlyUncached = uncachedIndicators.some(indicator => 
+    const isExplicitlyUncached = uncachedIndicators.some(indicator =>
       combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
     )
-    
+
     if (isExplicitlyUncached) {
       parsed.isCached = false
     } else {
-      // Check for cached indicators
-      parsed.isCached = cachedIndicators.some(indicator => 
-        combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
-      )
+      // Check for cached indicators (supports string and RegExp patterns)
+      const originalCombinedForCache = `${name} ${title} ${description}`
+      parsed.isCached = cachedIndicatorPatterns.some(indicator => {
+        if (typeof indicator === 'string') {
+          return combined.includes(indicator.toLowerCase()) || name.includes(indicator) || title.includes(indicator)
+        }
+        // RegExp: test against the original (non-lowercased) combined string since flags handle case
+        return indicator.test(originalCombinedForCache)
+      })
     }
 
     // Determine stream type based on addon or content
@@ -364,7 +371,8 @@ export class StreamProcessor {
 
     return streams.filter(s => {
       // Cache Filter
-      if (filters.cache) {
+      // Guard: if both cached and uncached are disabled, skip filter entirely to avoid hiding all streams.
+      if (filters.cache && (filters.cache.cached || filters.cache.uncached)) {
         if (s.parsed.isCached && !filters.cache.cached) return false
         if (!s.parsed.isCached && !filters.cache.uncached) return false
       }
@@ -402,12 +410,12 @@ export class StreamProcessor {
       // Seeders Filter
       if (filters.seeders && s.parsed.seeders !== undefined) {
         // Check if seeders filter applies to this stream type
-        if (!filters.seeders.applyTo || (s.parsed.streamType && filters.seeders.applyTo.includes(s.parsed.streamType))) {
-            if (filters.seeders.required) {
+        if (!filters.seeders.applyTo || (filters.seeders.applyTo.length === 0) || (s.parsed.streamType && filters.seeders.applyTo.includes(s.parsed.streamType))) {
+            if (filters.seeders.required && filters.seeders.required.length > 0) {
                 const inRange = filters.seeders.required.some(([min, max]) => s.parsed.seeders! >= min && s.parsed.seeders! <= max)
                 if (!inRange) return false
             }
-            if (filters.seeders.excluded) {
+            if (filters.seeders.excluded && filters.seeders.excluded.length > 0) {
                 const inRange = filters.seeders.excluded.some(([min, max]) => s.parsed.seeders! >= min && s.parsed.seeders! <= max)
                 if (inRange) return false
             }
@@ -417,8 +425,8 @@ export class StreamProcessor {
       // Keyword Filter
       if (filters.keyword) {
           const title = s.parsed.title?.toLowerCase() || ''
-          if (filters.keyword.required && !filters.keyword.required.some(k => title.includes(k.toLowerCase()))) return false
-          if (filters.keyword.excluded && filters.keyword.excluded.some(k => title.includes(k.toLowerCase()))) return false
+          if (filters.keyword.required && filters.keyword.required.length > 0 && !filters.keyword.required.some(k => title.includes(k.toLowerCase()))) return false
+          if (filters.keyword.excluded && filters.keyword.excluded.length > 0 && filters.keyword.excluded.some(k => title.includes(k.toLowerCase()))) return false
       }
 
       return true

@@ -57,13 +57,18 @@ export function useAppLifecycle() {
   useEffect(() => {
     if (!isTauri()) return;
 
+    // Minimum time the window must have been away before we bother refreshing (5 minutes).
+    // Short focus round-trips (e.g. opening a popup, switching tabs briefly) must not
+    // destroy/remount any open settings dialogs.
+    const MIN_BACKGROUND_MS = 5 * 60 * 1000;
+
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
         const timeSinceLastChange = Date.now() - lastVisibilityChange.current;
         
-        // Only revalidate if the app was in background for more than 1 second
-        // We check regardless of isAuthenticated to catch SSO logins that happened in browser
-        if (timeSinceLastChange > 1000) {
+        // Only revalidate after the window has been hidden long enough that the session
+        // genuinely might have changed (e.g. SSO login in external browser).
+        if (timeSinceLastChange > MIN_BACKGROUND_MS) {
           console.log('[AppLifecycle] App resumed after', Math.round(timeSinceLastChange / 1000), 'seconds, checking session...');
           try {
             const valid = await refreshSession();
@@ -73,6 +78,8 @@ export function useAppLifecycle() {
           } catch (e) {
             console.error('[AppLifecycle] Failed to revalidate session:', e);
           }
+        } else {
+          console.log('[AppLifecycle] Short focus gap (' + Math.round(timeSinceLastChange / 1000) + 's), skipping session refresh');
         }
       }
       lastVisibilityChange.current = Date.now();
@@ -89,8 +96,8 @@ export function useAppLifecycle() {
         const { listen } = await import('@tauri-apps/api/event');
         const unlisten = await listen('tauri://focus', async () => {
           const timeSinceLastChange = Date.now() - lastVisibilityChange.current;
-          if (timeSinceLastChange > 1000) {
-            console.log('[AppLifecycle] Window focused, checking session...');
+          if (timeSinceLastChange > MIN_BACKGROUND_MS) {
+            console.log('[AppLifecycle] Window focused after long gap, checking session...');
             await refreshSession();
           }
           lastVisibilityChange.current = Date.now();

@@ -53,33 +53,6 @@ export const StreamingLayout = () => {
     }
   }, [error, navigate])
 
-  if (error?.message === 'Unauthorized') {
-    return null
-  }
-
-  if (error) {
-    const errorMessage = error.message && error.message !== 'Failed to load profile'
-      ? error.message
-      : 'Failed to load, try again.'
-
-    return (
-      <LoadErrorState
-        message={errorMessage}
-        onRetry={() => {
-          void refetch()
-        }}
-        isRetrying={isFetching}
-        onBack={() => {
-          if (window.history.length > 1) {
-            navigate(-1)
-            return
-          }
-          navigate('/profiles')
-        }}
-      />
-    )
-  }
-
   // React immediately when streaming settings changed (e.g. parental age limit)
   useEffect(() => {
     const invalidateStreamingQueries = () => {
@@ -144,6 +117,33 @@ export const StreamingLayout = () => {
 
     return () => clearTimeout(timer)
   }, [profileId, queryClient, location.pathname])
+
+  if (error?.message === 'Unauthorized') {
+    return null
+  }
+
+  if (error) {
+    const errorMessage = error.message && error.message !== 'Failed to load profile'
+      ? error.message
+      : 'Failed to load, try again.'
+
+    return (
+      <LoadErrorState
+        message={errorMessage}
+        onRetry={() => {
+          void refetch()
+        }}
+        isRetrying={isFetching}
+        onBack={() => {
+          if (window.history.length > 1) {
+            navigate(-1)
+            return
+          }
+          navigate('/profiles')
+        }}
+      />
+    )
+  }
 
   // Determine if we are on a page where the navbar should be hidden
   // Player page: ends with /player

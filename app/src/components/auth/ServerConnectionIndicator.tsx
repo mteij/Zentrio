@@ -23,6 +23,8 @@ export function ServerConnectionIndicator({ variant = 'inline' }: ServerConnecti
   const handleChangeServer = () => {
     localStorage.removeItem("zentrio_server_url");
     localStorage.removeItem("zentrio_app_mode");
+    // Clear persisted auth state so the new server gets a clean session
+    localStorage.removeItem("zentrio-auth-storage");
     // Navigate to root to trigger server selector
     window.location.href = '/';
   };

@@ -121,6 +121,12 @@ export const useAuthStore = create<AuthState>()(
         clearError: () => set({ error: null }),
 
         refreshSession: async (token?: string) => {
+          // In guest mode there is no auth server – skip entirely
+          const { appMode } = await import('../lib/app-mode');
+          if (appMode.isGuest()) {
+              return false;
+          }
+
           // Precise concurrency check: we only skip if we are already in the middle of the async call below
           // (We use the isLoading state but only if we've already started the refresh)
           if (get().isLoading && !token && get().isAuthenticated) {
@@ -143,8 +149,6 @@ export const useAuthStore = create<AuthState>()(
             // DON'T send Authorization header when refreshing
             // Let the server use the session cookie to generate a NEW token
             // Sending the old token causes the server to return the same expired token
-            console.log(`[AuthStore] Refreshing session... Token: ${initialToken ? `...${initialToken.slice(-6)}` : 'NONE'}`);
-            
             console.log(`[AuthStore] Refreshing session... Token: ${initialToken ? `...${initialToken.slice(-6)}` : 'NONE'}`);
              
              let sessionResponse: any;
@@ -216,7 +220,7 @@ export const useAuthStore = create<AuthState>()(
                  return true; 
               }
               
-              console.error('[AuthStore] Refresh failed: No user returned and no concurrent login.');
+              console.warn('[AuthStore] Refresh failed: No user returned and no concurrent login.');
 
               // Check if we have a local token - if so, DON'T reset
               // The server might have rejected the cookie but the local session might still work
@@ -393,15 +397,32 @@ export const useSessionRefresh = () => {
     return () => clearInterval(interval)
   }, [isAuthenticated, checkSession])
 
-  // Check session on window focus
+  // Check session on window focus, but only after a meaningful gap (5 minutes).
+  // Short focus round-trips (e.g. opening a file dialog, alt-tabbing briefly) must NOT
+  // trigger a session check – that causes the settings page and any open modals to
+  // re-render / remount.
   React.useEffect(() => {
     if (!isAuthenticated) return
 
-    const handleFocus = () => {
-      checkSession().catch(console.error)
+    let lastFocusTime = Date.now()
+    const MIN_FOCUS_GAP_MS = 5 * 60 * 1000
+
+    const handleBlur = () => {
+      lastFocusTime = Date.now()
     }
 
+    const handleFocus = () => {
+      const gap = Date.now() - lastFocusTime
+      if (gap > MIN_FOCUS_GAP_MS) {
+        checkSession().catch(console.error)
+      }
+    }
+
+    window.addEventListener('blur', handleBlur)
     window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [isAuthenticated, checkSession])
 }

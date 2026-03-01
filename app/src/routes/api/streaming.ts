@@ -84,11 +84,15 @@ async function ensureNextEpisodeInContinueWatching(
   }
 }
 
-streaming.get('/settings', sessionMiddleware, async (c) => {
+streaming.get('/settings', optionalSessionMiddleware, async (c) => {
   try {
     const { profileId, settingsProfileId: querySettingsProfileId } = c.req.query()
     const user = c.get('user')
-    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    const isGuestMode = c.get('guestMode') as boolean
+
+    // Resolve effective user for guest mode
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
     let settingsProfileId: number;
 
@@ -96,13 +100,16 @@ streaming.get('/settings', sessionMiddleware, async (c) => {
         settingsProfileId = parseInt(querySettingsProfileId);
     } else {
         let pId: number;
-        if (profileId) {
+        if (profileId && profileId !== 'guest') {
             pId = parseInt(profileId)
+        } else if (isGuestMode || profileId === 'guest') {
+            const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+            pId = guestDefaultProfile.id
         } else {
             // Fallback to default profile
-            let profile = profileDb.getDefault(user.id)
+            let profile = profileDb.getDefault(effectiveUser.id)
             if (!profile) {
-                const profiles = profileDb.findByUserId(user.id)
+                const profiles = profileDb.findByUserId(effectiveUser.id)
                 if (profiles && profiles.length > 0) {
                     profile = profiles[0]
                 }
@@ -124,11 +131,15 @@ streaming.get('/settings', sessionMiddleware, async (c) => {
   }
 })
 
-streaming.put('/settings', sessionMiddleware, async (c) => {
+streaming.put('/settings', optionalSessionMiddleware, async (c) => {
   try {
     const { profileId, settingsProfileId: querySettingsProfileId } = c.req.query()
     const user = c.get('user')
-    if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    const isGuestMode = c.get('guestMode') as boolean
+
+    // Resolve effective user for guest mode
+    const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
+    if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
     let settingsProfileId: number;
 
@@ -136,13 +147,16 @@ streaming.put('/settings', sessionMiddleware, async (c) => {
         settingsProfileId = parseInt(querySettingsProfileId);
     } else {
         let pId: number;
-        if (profileId) {
+        if (profileId && profileId !== 'guest') {
             pId = parseInt(profileId)
+        } else if (isGuestMode || profileId === 'guest') {
+            const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+            pId = guestDefaultProfile.id
         } else {
             // Fallback to default profile
-            let profile = profileDb.getDefault(user.id)
+            let profile = profileDb.getDefault(effectiveUser.id)
             if (!profile) {
-                const profiles = profileDb.findByUserId(user.id)
+                const profiles = profileDb.findByUserId(effectiveUser.id)
                 if (profiles && profiles.length > 0) {
                     profile = profiles[0]
                 }
@@ -201,16 +215,25 @@ streaming.get('/streams-live/:type/:id', async (c) => {
   c.header('Connection', 'keep-alive')
   c.header('X-Accel-Buffering', 'no') // Disable nginx buffering
 
+  // Resolve guest profileId → real numeric ID (mirrors /details, /filters, etc.)
+  let pId: number
+  if (profileId === 'guest') {
+    const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+    pId = guestDefaultProfile.id
+  } else {
+    pId = parseInt(profileId)
+  }
+
   // Get stream processor settings for this profile
-  const settingsProfileId = profileDb.getSettingsProfileId(parseInt(profileId))
+  const settingsProfileId = profileDb.getSettingsProfileId(pId)
   const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined
   
   // Build cache key
   const cacheKey = StreamCache.buildKey(
-    type, 
-    id, 
-    parseInt(profileId), 
-    season ? parseInt(season) : undefined, 
+    type,
+    id,
+    pId,
+    season ? parseInt(season) : undefined,
     episode ? parseInt(episode) : undefined
   )
   
@@ -255,8 +278,9 @@ streaming.get('/streams-live/:type/:id', async (c) => {
         })
         sendEvent('cache-status', { fromCache: true, cacheAgeMs: cacheAge })
 
-        // When serving from cache, also emit per-addon events so the UI can show provider chips
-        // (otherwise it only shows "N sources" without addon/provider context).
+        // When serving from cache, emit per-addon events so the UI can show provider chips.
+        // Also include allStreams in the final addon-result so the frontend can render streams
+        // progressively rather than waiting for the 'complete' event.
         const addonCounts = new Map<string, { addon: { id: string; name: string; logo?: string }, count: number }>()
         for (const item of cached.streams || []) {
           const addon = item?.addon
@@ -266,10 +290,16 @@ streaming.get('/streams-live/:type/:id', async (c) => {
           else addonCounts.set(addon.id, { addon, count: 1 })
         }
 
-        for (const { addon, count } of addonCounts.values()) {
+        const addonEntries = Array.from(addonCounts.values())
+        for (let i = 0; i < addonEntries.length; i++) {
+          const { addon, count } = addonEntries[i]
           sendEvent('addon-start', { addon })
-          // No need to include allStreams here; "complete" will send the full list once
-          sendEvent('addon-result', { addon, count })
+          // On the last addon-result, include allStreams so the UI updates immediately
+          sendEvent('addon-result', {
+            addon,
+            count,
+            allStreams: i === addonEntries.length - 1 ? cached.streams : undefined
+          })
         }
 
         sendEvent('complete', {
@@ -288,7 +318,7 @@ streaming.get('/streams-live/:type/:id', async (c) => {
       // Meta for processing
       let meta: any = null
       try {
-        meta = await addonManager.getMeta(type, id, parseInt(profileId))
+        meta = await addonManager.getMeta(type, id, pId)
       } catch (e) {
         // Fallback minimal meta
         meta = { id, type, name: 'Unknown' }
@@ -356,7 +386,7 @@ streaming.get('/streams-live/:type/:id', async (c) => {
         await addonManager.getStreamsProgressive(
           type,
           id,
-          parseInt(profileId),
+          pId,
           season ? parseInt(season) : undefined,
           episode ? parseInt(episode) : undefined,
           platform,
@@ -1128,10 +1158,18 @@ streaming.post('/mark-episodes-before', async (c) => {
 })
 
 
-streaming.get('/details/:type/:id', sessionMiddleware, async (c) => {
+streaming.get('/details/:type/:id', optionalSessionMiddleware, async (c) => {
   const { type, id } = c.req.param()
   const { profileId, metaFallback } = c.req.query()
-  const pId = parseInt(profileId)
+  const isGuestMode = c.get('guestMode') as boolean
+  
+  let pId: number
+  if (isGuestMode || profileId === 'guest') {
+    const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+    pId = guestDefaultProfile.id
+  } else {
+    pId = parseInt(profileId)
+  }
   
   try {
     let meta = await addonManager.getMeta(type, id, pId)
@@ -1217,9 +1255,17 @@ streaming.get('/details/:type/:id', sessionMiddleware, async (c) => {
   }
 })
 
-streaming.get('/filters', sessionMiddleware, async (c) => {
+streaming.get('/filters', optionalSessionMiddleware, async (c) => {
   const { profileId } = c.req.query()
-  const pId = parseInt(profileId)
+  const isGuestMode = c.get('guestMode') as boolean
+
+  let pId: number
+  if (isGuestMode || profileId === 'guest') {
+    const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+    pId = guestDefaultProfile.id
+  } else {
+    pId = parseInt(profileId)
+  }
   
   try {
     const filters = await addonManager.getAvailableFilters(pId)

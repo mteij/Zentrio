@@ -15,17 +15,20 @@ interface SettingsProfileSelectorProps {
   onProfileChange: (id: string) => void
   onProfilesLoaded?: (profiles: SettingsProfile[]) => void
   disabled?: boolean
-  label?: string
+  label?: string | null
   layout?: 'row' | 'column'
+  /** Compact mode: hides label text, smaller controls */
+  compact?: boolean
 }
 
-export function SettingsProfileSelector({ 
-    currentProfileId, 
-    onProfileChange, 
-    onProfilesLoaded, 
+export function SettingsProfileSelector({
+    currentProfileId,
+    onProfileChange,
+    onProfilesLoaded,
     disabled = false,
     label = "Profile",
-    layout = 'row'
+    layout = 'row',
+    compact = false
 }: SettingsProfileSelectorProps) {
   const [profiles, setProfiles] = useState<SettingsProfile[]>([])
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -147,56 +150,64 @@ export function SettingsProfileSelector({
 
   return (
     <div className={`flex ${layout === 'column' ? 'flex-col items-start gap-2' : 'items-center gap-4'} w-full`}>
-       {label && (
+       {label != null && (
          <div className="flex flex-col">
             <h3 className="text-lg font-medium text-white mb-1">{label}</h3>
             <p className="text-sm text-zinc-400">Select profile to configure.</p>
          </div>
        )}
        
-       <div className="flex items-center gap-2 ml-auto">
-            {error && <div className="text-red-400 text-sm mr-2">{error}</div>}
-            
-            <select 
-                value={currentProfileId} 
+       <div className={`flex items-center gap-2 ${label != null ? 'ml-auto' : 'w-full'} flex-wrap`}>
+            {error && <div className="text-red-400 text-sm w-full">{error}</div>}
+
+            <select
+                value={currentProfileId}
                 onChange={(e) => onProfileChange(e.target.value)}
                 disabled={disabled}
-                className="bg-zinc-800 text-white border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 transition-colors min-w-[150px]"
+                className={`bg-zinc-800 text-white border border-zinc-700 rounded-lg focus:outline-none focus:border-red-500 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm min-w-[150px]'} flex-1 min-w-0`}
             >
                 {profiles.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
             </select>
-            
-            <Button 
-                variant="secondary" 
-                onClick={() => setShowCreateDialog(true)} 
-                title="Create new profile"
-                disabled={disabled}
-            >
-                <Plus size={16} />
-            </Button>
-            
-            {!isDefaultProfile && currentProfileId && (
-                <>
-                <Button 
-                    variant="secondary" 
-                    onClick={() => setShowRenameDialog(true)} 
-                    title="Rename profile"
-                    disabled={disabled}
-                >
-                    <Edit2 size={16} />
-                </Button>
-                <Button 
-                    variant="danger" 
-                    onClick={() => setShowDeleteDialog(true)} 
-                    title="Delete profile"
-                    disabled={disabled}
-                >
-                    <Trash2 size={16} />
-                </Button>
-                </>
-            )}
+
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => setShowCreateDialog(true)}
+                  title="Create new profile"
+                  disabled={disabled}
+                  className="!px-2"
+              >
+                  <Plus size={13} />
+              </Button>
+
+              {!isDefaultProfile && currentProfileId && (
+                  <>
+                  <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={() => setShowRenameDialog(true)}
+                      title="Rename profile"
+                      disabled={disabled}
+                      className="!px-2"
+                  >
+                      <Edit2 size={13} />
+                  </Button>
+                  <Button
+                      variant="danger"
+                      size="small"
+                      onClick={() => setShowDeleteDialog(true)}
+                      title="Delete profile"
+                      disabled={disabled}
+                      className="!px-2"
+                  >
+                      <Trash2 size={13} />
+                  </Button>
+                  </>
+              )}
+            </div>
        </div>
 
       <InputDialog
