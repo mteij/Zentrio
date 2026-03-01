@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "label": "code quality",
-  "message": "pending",
-  "color": "lightgrey",
+  "message": "65/100 (D)",
+  "color": "yellow",
   "cacheSeconds": 60
 }
