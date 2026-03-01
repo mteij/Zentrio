@@ -272,7 +272,7 @@ jobs:
             'label': 'code quality',
             'message': f'{score}/100 ({grade})',
             'color': color,
-            'cacheSeconds': 3600
+            'cacheSeconds': 60
           }
           print(json.dumps(data))
           ")
