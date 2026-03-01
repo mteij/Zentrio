@@ -221,59 +221,35 @@ jobs:
               fh.write(f"color={color}\n")
           PYEOF
 
-  # ── Badge update (main branch only) ────────────────────────────────────────
-  update-badge:
-    name: Update Quality Badge
-    runs-on: ubuntu-latest
-    needs: quality
-    # Only update on push to main (not on PRs, not on develop)
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Write badge JSON to repository
-        env:
-          SCORE: ${{ needs.quality.outputs.score || '0' }}
-          GRADE: ${{ needs.quality.outputs.grade || '?' }}
-          COLOR: ${{ needs.quality.outputs.color || 'lightgrey' }}
+      - name: Save quality metrics
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mkdir -p .github/badges
-          python3 - <<'PYEOF'
-          import json, os
-          from pathlib import Path
-
-          score = os.environ.get('SCORE', '?')
-          grade = os.environ.get('GRADE', '?')
-          color = os.environ.get('COLOR', 'lightgrey')
-
-          data = {
-            'schemaVersion': 1,
-            'label': 'code quality',
-            'message': f'{score}/100 ({grade})',
-            'color': color,
-            'cacheSeconds': 60,
+          cat > .github/badges/quality-metrics.json << 'EOF'
+          {
+            "score": "${{ steps.score.outputs.score }}",
+            "grade": "${{ steps.score.outputs.grade }}",
+            "color": "${{ steps.score.outputs.color }}",
+            "ts_errors": "${{ steps.typecheck.outputs.errors }}",
+            "eslint_errors": "${{ steps.eslint.outputs.errors }}",
+            "eslint_warnings": "${{ steps.eslint.outputs.warnings }}",
+            "tests_passed": "${{ steps.tests.outputs.passed }}",
+            "rustfmt_ok": "${{ steps.rustfmt.outputs.fmt_ok }}",
+            "clippy_errors": "${{ steps.clippy.outputs.errors }}",
+            "clippy_warnings": "${{ steps.clippy.outputs.warnings }}",
+            "run_id": "${{ github.run_id }}"
           }
+          EOF
+          cat .github/badges/quality-metrics.json
 
-          out = Path('.github/badges/quality.json')
-          out.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
-          print(f'✅ Wrote {out}')
-          PYEOF
-
-      - name: Commit updated badge
-        run: |
-          if git diff --quiet -- .github/badges/quality.json; then
-            echo "No badge changes to commit"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/badges/quality.json
-          git commit -m "chore: update quality badge [skip ci]"
-          git push
+      - name: Upload quality metrics artifact
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-metrics
+          path: .github/badges/quality-metrics.json
+          retention-days: 1
+          overwrite: true
 
       - name: Print score summary
         if: always()
@@ -282,12 +258,12 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
           echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| **Score** | **${{ needs.quality.outputs.score }}/100** |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| **Grade** | **${{ needs.quality.outputs.grade }}** |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| TypeScript errors | ${{ needs.quality.outputs.ts_errors }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| ESLint errors | ${{ needs.quality.outputs.eslint_errors }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| ESLint warnings | ${{ needs.quality.outputs.eslint_warnings }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Tests | ${{ needs.quality.outputs.tests_passed == 'true' && '✅ passed' || '❌ failed' }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Rust fmt | ${{ needs.quality.outputs.rustfmt_ok == 'true' && '✅ OK' || '❌ issues' }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Clippy errors | ${{ needs.quality.outputs.clippy_errors }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Clippy warnings | ${{ needs.quality.outputs.clippy_warnings }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Score** | **${{ steps.score.outputs.score }}/100** |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Grade** | **${{ steps.score.outputs.grade }}** |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| TypeScript errors | ${{ steps.typecheck.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ESLint errors | ${{ steps.eslint.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ESLint warnings | ${{ steps.eslint.outputs.warnings }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tests | ${{ steps.tests.outputs.passed == 'true' && '✅ passed' || '❌ failed' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Rust fmt | ${{ steps.rustfmt.outputs.fmt_ok == 'true' && '✅ OK' || '❌ issues' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Clippy errors | ${{ steps.clippy.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Clippy warnings | ${{ steps.clippy.outputs.warnings }} |" >> "$GITHUB_STEP_SUMMARY"

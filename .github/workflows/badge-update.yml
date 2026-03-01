@@ -1,0 +1,120 @@
+name: Update Quality Badge
+
+on:
+  workflow_run:
+    workflows: ["Quality Check"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-badge:
+    name: Update Badge
+    runs-on: ubuntu-latest
+    # Only run if the quality workflow succeeded
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch full history for proper git operations
+          fetch-depth: 0
+
+      - name: Download quality metrics artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quality-metrics
+          path: ./metrics
+          # Download from the triggering workflow run
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Read metrics and generate badge
+        id: generate
+        run: |
+          mkdir -p .github/badges
+
+          # Default values
+          SCORE="0"
+          GRADE="?"
+          COLOR="lightgrey"
+
+          # If we have the metrics file, use it
+          if [ -f ./metrics/quality-metrics.json ]; then
+            echo "Found metrics file, reading values..."
+            METRICS=$(cat ./metrics/quality-metrics.json)
+            echo "$METRICS"
+            SCORE=$(echo "$METRICS" | jq -r '.score // 0')
+            GRADE=$(echo "$METRICS" | jq -r '.grade // "?"')
+            COLOR=$(echo "$METRICS" | jq -r '.color // "lightgrey"')
+          else
+            echo "No metrics file found, using defaults"
+          fi
+
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
+          echo "color=$COLOR" >> "$GITHUB_OUTPUT"
+
+          python3 - <<'PYEOF'
+          import json, os
+          from pathlib import Path
+
+          score = os.environ.get('SCORE', '?')
+          grade = os.environ.get('GRADE', '?')
+          color = os.environ.get('COLOR', 'lightgrey')
+
+          data = {
+            'schemaVersion': 1,
+            'label': 'code quality',
+            'message': f'{score}/100 ({grade})',
+            'color': color,
+            'cacheSeconds': 60,
+          }
+
+          out = Path('.github/badges/quality.json')
+          out.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+          print(f'✅ Wrote {out}')
+          print(json.dumps(data, indent=2))
+          PYEOF
+        env:
+          SCORE: ${{ steps.generate.outputs.score }}
+          GRADE: ${{ steps.generate.outputs.grade }}
+          COLOR: ${{ steps.generate.outputs.color }}
+
+      - name: Check if badge changed
+        id: check
+        run: |
+          if git diff --quiet -- .github/badges/quality.json 2>/dev/null; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No badge changes detected"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Badge changes detected"
+          fi
+
+      - name: Create Pull Request
+        if: steps.check.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update quality badge [skip ci]"
+          title: "chore: update quality badge"
+          body: |
+            ## 📊 Quality Score Update
+
+            This PR updates the code quality badge based on the latest analysis.
+
+            **Score:** ${{ steps.generate.outputs.score }}/100 (**${{ steps.generate.outputs.grade }}**)
+
+            Changes are automated and reflect the current code quality metrics.
+          branch: update-quality-badge
+          delete-branch: true
+          base: main
+          add-paths: |
+            .github/badges/quality.json
