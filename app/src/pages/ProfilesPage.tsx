@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, LogOut, Edit, X, Plus, Check, LogIn } from 'lucide-react'
+import { Settings, LogOut, Edit, X, Plus, Check, LogIn, Shield } from 'lucide-react'
 import { SimpleLayout, ConfirmDialog, ProfileModal, AnimatedBackground, SkeletonProfile } from '../components'
 import { useAuthStore } from '../stores/authStore'
 import { apiFetch } from '../lib/apiFetch'
@@ -42,13 +42,19 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   const [showModal, setShowModal] = useState(false)
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const navigate = useNavigate()
 
   // Check if in guest mode
   const isGuestMode = appMode.isGuest()
 
   // Track auth store for token availability
-  const { session, isLoading: authLoading, isAuthenticated } = useAuthStore();
+  const { session, isLoading: authLoading, isAuthenticated, user: authUser } = useAuthStore();
+
+  // Check if user is admin
+  useEffect(() => {
+    setIsAdmin(isAuthenticated && authUser?.role === 'admin')
+  }, [isAuthenticated, authUser])
   
   // Determine if we're in Tauri environment
   const isTauriEnv = typeof window !== 'undefined' &&
@@ -303,6 +309,19 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
 
           {/* Divider */}
           <div className={styles.navDivider} />
+
+          {/* Admin button - only shown for admins */}
+          {isAdmin && (
+            <button
+              id="adminBtn"
+              className={styles.navItem}
+              aria-label="Admin Panel"
+              title="Admin Panel"
+              onClick={() => navigate('/admin')}
+            >
+              <Shield size={20} />
+            </button>
+          )}
 
           {/* Right group: logout / exit local mode */}
           <button

@@ -1,4 +1,4 @@
-import { useEffect, useState, ReactNode, useRef } from 'react'
+import { useEffect, useState, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useLoginBehavior } from '../../hooks/useLoginBehavior'
@@ -108,5 +108,29 @@ export function PublicRoute({ children }: RouteGuardProps) {
   }
 
   // Always render children for public routes (they handle their own UI)
+  return <>{children}</>
+}
+
+/**
+ * AdminGuard - Wrapper for routes that require admin privileges.
+ * Checks the admin role directly from the server-validated session stored in the auth store.
+ */
+export function AdminGuard({ children }: RouteGuardProps) {
+  const { isAuthenticated, isLoading, user } = useAuthStore()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        navigate('/signin', { replace: true })
+      } else if (user?.role !== 'admin') {
+        navigate('/profiles', { replace: true })
+      }
+    }
+  }, [isLoading, isAuthenticated, user, navigate])
+
+  if (isLoading) return <SplashScreen />
+  if (!isAuthenticated || user?.role !== 'admin') return null
+
   return <>{children}</>
 }

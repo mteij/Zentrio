@@ -8,6 +8,9 @@ if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
 }
 
 const algorithm = 'aes-256-gcm'
+// KDF: scrypt with a fixed salt to stretch/normalise the ENCRYPTION_KEY to exactly 32 bytes.
+// The static salt is a known trade-off — changing it invalidates all existing encrypted records.
+// Real-world security depends on ENCRYPTION_KEY having high entropy (use `openssl rand -hex 32`).
 const key = scryptSync(ENCRYPTION_KEY, 'salt', 32)
 
 export function encrypt(text: string): string {

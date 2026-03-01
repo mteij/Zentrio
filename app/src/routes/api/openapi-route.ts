@@ -209,6 +209,10 @@ const inferRouteSecurity = (tag: string, path: string, handlers: AnyHandler[]) =
     return OPTIONAL_AUTH_SECURITY
   }
 
+  if (tag === 'Admin') {
+    return AUTH_SECURITY
+  }
+
   if (tag === 'Authentication') {
     if (path === '/link-code') return AUTH_SECURITY
     return undefined

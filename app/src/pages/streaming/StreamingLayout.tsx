@@ -2,6 +2,9 @@ import { Outlet, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { LoadErrorState } from '../../components'
 import { Navbar } from '../../components/layout/Navbar'
+import { OfflineBanner } from '../../components/downloads/OfflineBanner'
+import { useOfflineMode } from '../../hooks/useOfflineMode'
+import { useDownloads } from '../../hooks/useDownloads'
 import { useEffect } from 'react'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { shouldPreload } from '../../utils/route-preloader'
@@ -33,6 +36,10 @@ export const StreamingLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
+
+  // Initialize download store + event listeners for this profile
+  useDownloads(profileId)
+  const { isOnline } = useOfflineMode(profileId)
 
   const { data: profile, error, isFetching, refetch } = useQuery({
     queryKey: ['streaming-profile', profileId],
@@ -155,7 +162,7 @@ export const StreamingLayout = () => {
   const firstSegment = pathParts[0]
   
   // Reserved main routes that SHOULD show navbar
-  const mainRoutes = ['explore', 'library', 'search']
+  const mainRoutes = ['explore', 'library', 'search', 'downloads']
   const isCatalog = firstSegment === 'catalog'
   const searchParams = new URLSearchParams(location.search)
   const isExploreSeeAll = firstSegment === 'explore' && (searchParams.has('genre') || searchParams.has('type'))
@@ -169,6 +176,7 @@ export const StreamingLayout = () => {
 
   return (
     <>
+      <OfflineBanner visible={!isOnline && !shouldHideNavbar} />
       {!shouldHideNavbar && <Navbar profileId={profileId === 'guest' ? 'guest' : parseInt(profileId!)} profile={profile} />}
       <Outlet />
     </>

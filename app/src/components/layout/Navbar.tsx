@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Compass, Library, Search, User, X } from 'lucide-react'
+import { Home, Compass, Library, Search, User, X, Download } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createHoverPreloader } from '../../utils/route-preloader'
 import styles from '../../styles/Streaming.module.css'
@@ -24,6 +24,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
   const homePreloader = useMemo(() => createHoverPreloader('streaming-home'), [])
   const explorePreloader = useMemo(() => createHoverPreloader('streaming-explore'), [])
   const libraryPreloader = useMemo(() => createHoverPreloader('streaming-library'), [])
+  const downloadsPreloader = useMemo(() => createHoverPreloader('streaming-downloads'), [])
   const searchPreloader = useMemo(() => createHoverPreloader('streaming-search'), [])
   const profilesPreloader = useMemo(() => createHoverPreloader('/profiles'), [])
 
@@ -100,6 +101,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
       { to: `/streaming/${profileId}`, icon: Home, label: 'Home', path: '', exact: true, ...homePreloader },
       { to: `/streaming/${profileId}/explore`, icon: Compass, label: 'Explore', path: '/explore', ...explorePreloader },
       { to: `/streaming/${profileId}/library`, icon: Library, label: 'Library', path: '/library', ...libraryPreloader },
+      { to: `/streaming/${profileId}/downloads`, icon: Download, label: 'Downloads', path: '/downloads', ...downloadsPreloader },
       { to: `/streaming/${profileId}/search`, icon: Search, label: 'Search', path: '/search', id: 'navSearchBtn', onClick: handleSearchClick, ...searchPreloader }
   ]
 

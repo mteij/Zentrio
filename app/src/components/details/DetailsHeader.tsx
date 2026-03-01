@@ -1,8 +1,13 @@
 // Details Header Component
 // Extracted from Details.tsx
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Youtube, Check, List, Info, Eye, EyeOff } from 'lucide-react'
+import { Play, Youtube, Check, List, Info, Eye, EyeOff, Download, CheckCircle, Loader } from 'lucide-react'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
+import { QualityPicker } from '../downloads/QualityPicker'
+import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
+import { useDownloadForMedia } from '../../hooks/useDownloads'
+import dlStyles from '../downloads/Downloads.module.css'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
 
@@ -38,6 +43,39 @@ export function DetailsHeader({
   children
 }: DetailsHeaderProps) {
   const navigate = useNavigate()
+  const [showQualityPicker, setShowQualityPicker] = useState(false)
+  const existingDownload = useDownloadForMedia(meta.id)
+
+  const handleDownload = async (quality: DownloadQuality) => {
+    setShowQualityPicker(false)
+    if (!meta || !profileId) return
+
+    // Pull the top stream URL from the page's loaded streams (stored in sessionStorage by StreamSelector)
+    const streamJson = sessionStorage.getItem(`top_stream_${meta.id}`)
+    if (!streamJson) {
+      // Stream not resolved yet; user needs to open the stream selector first
+      import('sonner').then(({ toast }) => toast.info('Open a stream first, then download it.'))
+      return
+    }
+
+    try {
+      const stream = JSON.parse(streamJson)
+      await downloadService.start({
+        profileId: profileId.toString(),
+        mediaType: meta.type as 'movie' | 'series',
+        mediaId: meta.id,
+        title: meta.name,
+        posterPath: meta.poster || '',
+        streamUrl: stream.url || '',
+        addonId: stream.addonId || '',
+        quality,
+      })
+      import('sonner').then(({ toast }) => toast.success(`Downloading: ${meta.name}`))
+    } catch (e) {
+      console.error('[DetailsHeader] download start failed', e)
+      import('sonner').then(({ toast }) => toast.error('Failed to start download'))
+    }
+  }
 
   return (
     <>
@@ -90,6 +128,37 @@ export function DetailsHeader({
                       Play
                     </button>
                 )}
+
+                {/* Download button — movies only in Phase 1 */}
+                {meta.type === 'movie' && (() => {
+                  const dlStatus = existingDownload?.status
+                  if (dlStatus === 'completed') {
+                    return (
+                      <button className={`${dlStyles.downloadBtn} ${dlStyles.downloadBtnDownloaded}`} disabled>
+                        <CheckCircle size={16} />
+                        Downloaded
+                      </button>
+                    )
+                  }
+                  if (dlStatus === 'downloading' || dlStatus === 'queued') {
+                    return (
+                      <button className={`${dlStyles.downloadBtn} ${dlStyles.downloadBtnActive}`} disabled>
+                        <Loader size={16} className="animate-spin" />
+                        Downloading…
+                      </button>
+                    )
+                  }
+                  return (
+                    <button
+                      className={dlStyles.downloadBtn}
+                      onClick={() => setShowQualityPicker(true)}
+                      title="Download for offline viewing"
+                    >
+                      <Download size={16} />
+                      Download
+                    </button>
+                  )
+                })()}
                 
                 {/* Icon buttons for secondary actions */}
                 {meta.trailerStreams && meta.trailerStreams.length > 0 && (
@@ -169,6 +238,15 @@ export function DetailsHeader({
           {children}
         </div>
       </div>
+
+      {/* Quality picker modal */}
+      {showQualityPicker && (
+        <QualityPicker
+          title={meta.name}
+          onConfirm={handleDownload}
+          onClose={() => setShowQualityPicker(false)}
+        />
+      )}
     </>
   )
 }

@@ -62,6 +62,14 @@ export function getConfig() {
     return !(s === 'false' || s === '0' || s === 'no' || s === 'off' || s === '')
   }
 
+  const parseCsv = (value: string | undefined): string[] => {
+    if (!value) return []
+    return value
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  }
+
   const PORT = Number(process.env.PORT ?? 3000)
   const DATABASE_URL = process.env.DATABASE_URL ?? './data/zentrio.db'
   const isProduction = process.env.NODE_ENV === 'production'
@@ -104,6 +112,10 @@ export function getConfig() {
   const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET
   const OIDC_ISSUER = process.env.OIDC_ISSUER
   const OIDC_DISPLAY_NAME = process.env.OIDC_DISPLAY_NAME || 'OpenID'
+
+  // Admin security / bootstrap
+  const ADMIN_BOOTSTRAP_ALLOWED_EMAILS = parseCsv(process.env.ADMIN_BOOTSTRAP_ALLOWED_EMAILS)
+  const ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL = (process.env.ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL || '').trim().toLowerCase()
  
   return {
     PORT,
@@ -126,6 +138,8 @@ export function getConfig() {
     OIDC_CLIENT_SECRET,
     OIDC_ISSUER,
     OIDC_DISPLAY_NAME,
+    ADMIN_BOOTSTRAP_ALLOWED_EMAILS,
+    ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL,
     TMDB_API_KEY: process.env.TMDB_API_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     // Trakt Integration

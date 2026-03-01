@@ -7,6 +7,12 @@ export interface User {
   name: string
   emailVerified: boolean
   image?: string
+  role?: 'user' | 'admin' | string
+  banned?: boolean
+  banReason?: string | null
+  banExpires?: Date | string | null
+  phoneNumber?: string | null
+  phoneNumberVerified?: boolean
   createdAt: Date
   updatedAt: Date
   username?: string
@@ -214,4 +220,62 @@ export interface AppearanceSettings extends SyncableEntity {
   show_imdb_ratings: boolean
   show_age_ratings: boolean
   background_style: string
+}
+
+export interface AdminAuditLog {
+  id: number
+  actor_id: string
+  action: string
+  target_type?: string | null
+  target_id?: string | null
+  reason?: string | null
+  before_json?: string | null
+  after_json?: string | null
+  ip_address?: string | null
+  user_agent?: string | null
+  hash_prev: string
+  hash_curr: string
+  created_at: string
+}
+
+export interface AdminStepUpChallenge {
+  id: string
+  admin_identity_id: string
+  challenge_type: 'email_otp'
+  otp_code: string
+  expires_at: string
+  used_at?: string | null
+  failed_attempts: number
+  created_at: string
+}
+
+// RBAC Types
+export interface AdminRole {
+  id: string
+  name: string
+  description?: string | null
+  is_system: boolean
+  created_at: string
+}
+
+export interface AdminPermission {
+  id: string
+  key: string
+  description?: string | null
+  category: string
+  created_at: string
+}
+
+export interface AdminRolePermission {
+  id: number
+  role_id: string
+  permission_id: string
+  created_at: string
+}
+
+export interface AdminUserRole {
+  id: number
+  user_id: string
+  role_id: string
+  created_at: string
 }

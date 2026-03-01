@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { ErrorBoundary, TitleBar, ScrollToTop } from './components'
 import { SplashScreen } from './components'
-import { ProtectedRoute, PublicRoute } from './components/auth/AuthGuards'
+import { ProtectedRoute, PublicRoute, AdminGuard } from './components/auth/AuthGuards'
 import { isTauri, resetAuthClient, authClient } from './lib/auth-client'
 import { listen } from '@tauri-apps/api/event'
 import { toast } from 'sonner'
@@ -39,9 +39,16 @@ const StreamingExplore = lazy(() => import('./pages/streaming/Explore').then(m =
 const StreamingLibrary = lazy(() => import('./pages/streaming/Library').then(m => ({ default: m.StreamingLibrary })))
 const StreamingSearch = lazy(() => import('./pages/streaming/Search').then(m => ({ default: m.StreamingSearch })))
 const StreamingCatalog = lazy(() => import('./pages/streaming/Catalog').then(m => ({ default: m.StreamingCatalog })))
+const StreamingDownloads = lazy(() => import('./pages/streaming/Downloads').then(m => ({ default: m.StreamingDownloads })))
 
 // Share invite page
 const ShareInvitePage = lazy(() => import('./pages/ShareInvitePage').then(m => ({ default: m.ShareInvitePage })))
+
+// Admin pages
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout').then(m => ({ default: m.AdminLayout })))
+const DashboardPage = lazy(() => import('./pages/admin/DashboardPage').then(m => ({ default: m.DashboardPage })))
+const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
+const AuditPage = lazy(() => import('./pages/admin/AuditPage').then(m => ({ default: m.AuditPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -485,6 +492,19 @@ function AppRoutes() {
       <Route path="/settings" element={<Suspense fallback={<SplashScreen />}><ProtectedRoute><SettingsPage /></ProtectedRoute></Suspense>} />
       <Route path="/settings/explore-addons" element={<Suspense fallback={<SplashScreen />}><ProtectedRoute><ExploreAddonsPage /></ProtectedRoute></Suspense>} />
       
+      {/* Admin routes - requires admin privileges */}
+      <Route path="/admin" element={
+        <Suspense fallback={<SplashScreen />}>
+          <AdminGuard>
+            <AdminLayout />
+          </AdminGuard>
+        </Suspense>
+      }>
+        <Route index element={<DashboardPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="audit" element={<AuditPage />} />
+      </Route>
+      
       {/* Streaming Routes with Nested Layout */}
       <Route path="/streaming/:profileId" element={
         <Suspense fallback={<StreamingHomeSkeleton />}>
@@ -498,6 +518,7 @@ function AppRoutes() {
         <Route path="library" element={<StreamingLibrary />} />
         <Route path="library/:listId" element={<StreamingLibrary />} />
         <Route path="search" element={<StreamingSearch />} />
+        <Route path="downloads" element={<StreamingDownloads />} />
         <Route path="catalog/:manifestUrl/:type/:id" element={<StreamingCatalog />} />
         <Route path=":type/:id" element={<StreamingDetails />} />
         <Route path="player" element={

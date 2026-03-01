@@ -30,6 +30,12 @@ db.exec(`
      name TEXT NOT NULL,
      emailVerified BOOLEAN NOT NULL,
      image TEXT,
+     role TEXT DEFAULT 'user',
+     banned BOOLEAN DEFAULT FALSE,
+     banReason TEXT,
+     banExpires DATETIME,
+     phoneNumber TEXT UNIQUE,
+     phoneNumberVerified BOOLEAN DEFAULT FALSE,
      createdAt DATETIME NOT NULL,
      updatedAt DATETIME NOT NULL,
      username TEXT,
@@ -398,4 +404,146 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_trakt_accounts_profile ON trakt_accounts(profile_id);
   CREATE INDEX IF NOT EXISTS idx_trakt_sync_state_profile ON trakt_sync_state(profile_id);
+
+  -- Admin Audit Log with hash chaining for tamper evidence
+  CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id TEXT,
+    reason TEXT,
+    before_json TEXT,
+    after_json TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    hash_prev TEXT NOT NULL,
+    hash_curr TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (actor_id) REFERENCES user (id) ON DELETE CASCADE
+  );
+
+  -- Indexes for audit log queries
+  CREATE INDEX IF NOT EXISTS idx_admin_audit_actor ON admin_audit_log(actor_id);
+  CREATE INDEX IF NOT EXISTS idx_admin_audit_action ON admin_audit_log(action);
+  CREATE INDEX IF NOT EXISTS idx_admin_audit_target ON admin_audit_log(target_type, target_id);
+  CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at);
+
+  -- Admin Step-up Challenges for sensitive operations
+  CREATE TABLE IF NOT EXISTS admin_stepup_challenges (
+    id TEXT PRIMARY KEY,
+    admin_identity_id TEXT NOT NULL,
+    challenge_type TEXT NOT NULL DEFAULT 'email_otp',
+    otp_code TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_identity_id) REFERENCES user (id) ON DELETE CASCADE
+  );
+
+  -- Indexes for step-up challenges
+  CREATE INDEX IF NOT EXISTS idx_admin_stepup_identity ON admin_stepup_challenges(admin_identity_id);
+  CREATE INDEX IF NOT EXISTS idx_admin_stepup_expires ON admin_stepup_challenges(expires_at);
+  CREATE INDEX IF NOT EXISTS idx_admin_stepup_used ON admin_stepup_challenges(used_at);
+
+  -- RBAC: Admin roles
+  CREATE TABLE IF NOT EXISTS admin_roles (
+    id TEXT PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    description TEXT,
+    is_system BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- RBAC: Admin permissions catalog
+  CREATE TABLE IF NOT EXISTS admin_permissions (
+    id TEXT PRIMARY KEY,
+    key TEXT UNIQUE NOT NULL,
+    description TEXT,
+    category TEXT DEFAULT 'general',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- RBAC: Role-Permission mappings
+  CREATE TABLE IF NOT EXISTS admin_role_permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_id TEXT NOT NULL,
+    permission_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES admin_permissions(id) ON DELETE CASCADE,
+    UNIQUE(role_id, permission_id)
+  );
+
+  -- RBAC: User-Role mappings (additional to the role field on user table)
+  CREATE TABLE IF NOT EXISTS admin_user_roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+    UNIQUE(user_id, role_id)
+  );
+
+  -- Indexes for RBAC
+  CREATE INDEX IF NOT EXISTS idx_admin_role_permissions_role ON admin_role_permissions(role_id);
+  CREATE INDEX IF NOT EXISTS idx_admin_role_permissions_perm ON admin_role_permissions(permission_id);
+  CREATE INDEX IF NOT EXISTS idx_admin_user_roles_user ON admin_user_roles(user_id);
+  CREATE INDEX IF NOT EXISTS idx_admin_user_roles_role ON admin_user_roles(role_id);
+
+  -- Seed default admin role if not exists
+  INSERT OR IGNORE INTO admin_roles (id, name, description, is_system) VALUES 
+    ('role_superadmin', 'superadmin', 'Full system access', TRUE),
+    ('role_admin', 'admin', 'Standard admin access', TRUE),
+    ('role_moderator', 'moderator', 'Limited moderation access', TRUE),
+    ('role_readonly', 'readonly', 'Read-only access', TRUE);
+
+  -- Seed permission catalog
+  INSERT OR IGNORE INTO admin_permissions (id, key, description, category) VALUES
+    -- Stats & Monitoring
+    ('perm_stats_read', 'admin.stats.read', 'View system statistics', 'monitoring'),
+    ('perm_activity_read', 'admin.activity.read', 'View live activity feeds', 'monitoring'),
+    ('perm_audit_read', 'admin.audit.read', 'View audit logs', 'monitoring'),
+    
+    -- User Management
+    ('perm_users_read', 'admin.users.read', 'View user list and details', 'users'),
+    ('perm_users_write_role', 'admin.users.write.role', 'Change user roles', 'users'),
+    ('perm_users_write_ban', 'admin.users.write.ban', 'Ban/unban users', 'users'),
+    ('perm_users_write_email', 'admin.users.write.email', 'Change user email', 'users'),
+    ('perm_users_write_password', 'admin.users.write.password', 'Reset user password', 'users'),
+    ('perm_users_write_accounts', 'admin.users.write.accounts', 'Manage linked accounts', 'users'),
+    ('perm_users_write_sessions', 'admin.users.write.sessions', 'Revoke user sessions', 'users'),
+    
+    -- System Configuration
+    ('perm_system_bootstrap', 'admin.system.bootstrap', 'Access bootstrap claim', 'system'),
+    ('perm_system_settings', 'admin.system.settings', 'Modify system settings', 'system'),
+    ('perm_system_maintenance', 'admin.system.maintenance', 'Enable maintenance mode', 'system');
+
+  -- Assign all permissions to superadmin
+  INSERT OR IGNORE INTO admin_role_permissions (role_id, permission_id)
+  SELECT 'role_superadmin', id FROM admin_permissions;
+
+  -- Assign standard permissions to admin role
+  INSERT OR IGNORE INTO admin_role_permissions (role_id, permission_id) VALUES
+    ('role_admin', 'perm_stats_read'),
+    ('role_admin', 'perm_activity_read'),
+    ('role_admin', 'perm_audit_read'),
+    ('role_admin', 'perm_users_read'),
+    ('role_admin', 'perm_users_write_ban'),
+    ('role_admin', 'perm_users_write_sessions');
+
+  -- Assign read-only permissions to moderator
+  INSERT OR IGNORE INTO admin_role_permissions (role_id, permission_id) VALUES
+    ('role_moderator', 'perm_stats_read'),
+    ('role_moderator', 'perm_activity_read'),
+    ('role_moderator', 'perm_users_read'),
+    ('role_moderator', 'perm_users_write_ban');
+
+  -- Assign read-only permissions
+  INSERT OR IGNORE INTO admin_role_permissions (role_id, permission_id) VALUES
+    ('role_readonly', 'perm_stats_read'),
+    ('role_readonly', 'perm_activity_read'),
+    ('role_readonly', 'perm_users_read');
  `)

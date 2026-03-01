@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { Database } from "bun:sqlite";
-import { twoFactor, magicLink, emailOTP, openAPI, oidcProvider, bearer } from "better-auth/plugins";
+import { twoFactor, magicLink, emailOTP, openAPI, oidcProvider, bearer, phoneNumber } from "better-auth/plugins";
 import { getConfig } from "./envParser";
 import { join, isAbsolute, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
@@ -24,36 +24,20 @@ export const auth = betterAuth({
     secret: cfg.AUTH_SECRET,
     baseURL: cfg.APP_URL,
     basePath: "/api/auth",
-    // Avoid production breakage when APP_URL/CLIENT_URL are misconfigured or when behind a reverse proxy.
-    // Better Auth allows a dynamic trustedOrigins callback; include request origin + request.url origin.
-    trustedOrigins: async (request) => {
-        const base = [
-            "tauri://localhost",
-            "zentrio://",
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "http://tauri.localhost",
-            "https://tauri.localhost",
-            cfg.APP_URL,
-            cfg.CLIENT_URL
-        ].filter(Boolean) as string[]
-
-        // request is undefined during initialization and auth.api calls
-        if (!request) return base
-
-        const out = new Set<string>(base)
-
-        const origin = request.headers.get("origin")
-        if (origin) out.add(origin)
-
-        try {
-            out.add(new URL(request.url).origin)
-        } catch {
-            // ignore
-        }
-
-        return Array.from(out)
-    },
+    // Trusted origins for CSRF protection.
+    // Only explicitly known origins are trusted — never echo back the request Origin header,
+    // as that would allow any website to bypass CSRF checks.
+    // Add APP_URL / CLIENT_URL to cover reverse-proxy / custom domain deployments.
+    trustedOrigins: [
+        "tauri://localhost",
+        "zentrio://",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+        cfg.APP_URL,
+        cfg.CLIENT_URL
+    ].filter(Boolean) as string[],
     database: db,
     advanced: {
         defaultCookieAttributes: {
@@ -136,6 +120,27 @@ export const auth = betterAuth({
                 await emailService.sendOTP(email, otp);
             },
         }),
+        phoneNumber({
+            async sendOTP({ phoneNumber, code }, _ctx) {
+                const cfg = getConfig()
+
+                // Production should wire this to a proper SMS provider.
+                // As a secure fallback path, we route OTP to a configured admin email inbox.
+                if (cfg.ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL) {
+                    await emailService.sendOTP(cfg.ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL, `${code} (phone: ${phoneNumber})`)
+                    return
+                }
+
+                // Never silently succeed in production without a delivery channel.
+                if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
+                    throw new Error('Phone OTP provider not configured')
+                }
+
+                // Development-only fallback for local testing.
+                console.warn(`[PhoneOTP] ${phoneNumber} -> ${code}`)
+            },
+            requireVerification: false
+        }),
         openAPI(),
         oidcProvider({
             loginPage: "/login",
@@ -150,6 +155,24 @@ export const auth = betterAuth({
             enabled: true,
         },
         additionalFields: {
+            role: {
+                type: "string",
+                required: false,
+                defaultValue: "user",
+            },
+            banned: {
+                type: "boolean",
+                required: false,
+                defaultValue: false,
+            },
+            banReason: {
+                type: "string",
+                required: false,
+            },
+            banExpires: {
+                type: "date",
+                required: false,
+            },
             username: {
                 type: "string",
                 required: false,
@@ -188,12 +211,32 @@ export const auth = betterAuth({
         },
     },
     databaseHooks: {
+        session: {
+            create: {
+                before: async (session) => {
+                    if (!cfg.ADMIN_BOOTSTRAP_ALLOWED_EMAILS.length) return { data: session }
+
+                    const user = db.prepare('SELECT id, email, role FROM user WHERE id = ?').get((session as any).userId) as any
+                    if (!user || user.role === 'admin') return { data: session }
+
+                    const email = String(user.email || '').toLowerCase()
+                    if (cfg.ADMIN_BOOTSTRAP_ALLOWED_EMAILS.includes(email)) {
+                        db.prepare("UPDATE user SET role = 'admin', updatedAt = ? WHERE id = ?")
+                            .run(new Date().toISOString(), user.id)
+                        console.log(`[Bootstrap] Auto-elevated ${email} to admin on login`)
+                    }
+
+                    return { data: session }
+                }
+            }
+        },
         user: {
             create: {
                 before: async (user) => {
                     if (user.email) {
                         user.email = user.email.toLowerCase();
                     }
+
                     if (!user.username && user.name) {
                         // Use name as username if not explicitly provided
                         user.username = user.name;

@@ -157,7 +157,5 @@ jspm_packages/
 
 # Temporary files
 temp/
-
-old_app/
-plans/streaming-ux-stability-plan.md
-docs/admin-security-architecture-plan.md
+CLAUDE.md
+.claude

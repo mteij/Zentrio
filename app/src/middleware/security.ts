@@ -45,8 +45,8 @@ export const corsMiddleware = (origins?: string[]) => {
     const isCleanMatch = cleanOrigin && allowedOrigins.includes(cleanOrigin);
     // Tauri often sends origin as tauri://localhost or http://tauri.localhost
     const isTauriMatch = cleanOrigin && (cleanOrigin.startsWith('tauri://') || cleanOrigin.includes('tauri.localhost'));
-    // Android Emulator often sends requests from http://10.0.2.2 
-    const isAndroidMatch = cleanOrigin && cleanOrigin.startsWith('http://10.');
+    // Android Emulator sends requests from http://10.0.2.2 — dev only, never allow in production
+    const isAndroidMatch = process.env.NODE_ENV !== 'production' && cleanOrigin && cleanOrigin.startsWith('http://10.');
 
     if (isExactMatch || isCleanMatch || isTauriMatch || isAndroidMatch) {
       corsHeaders['Access-Control-Allow-Origin'] = origin as string;

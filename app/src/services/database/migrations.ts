@@ -14,7 +14,89 @@ const columnMigrations = [
   // List sharing support
   "ALTER TABLE lists ADD COLUMN is_default BOOLEAN DEFAULT FALSE",
   // Addons: logo_url support
-  "ALTER TABLE addons ADD COLUMN logo_url TEXT"
+  "ALTER TABLE addons ADD COLUMN logo_url TEXT",
+  // Better Auth admin plugin fields
+  "ALTER TABLE user ADD COLUMN role TEXT DEFAULT 'user'",
+  "ALTER TABLE user ADD COLUMN banned BOOLEAN DEFAULT FALSE",
+  "ALTER TABLE user ADD COLUMN banReason TEXT",
+  "ALTER TABLE user ADD COLUMN banExpires DATETIME",
+  // Better Auth phone-number plugin fields
+  "ALTER TABLE user ADD COLUMN phoneNumber TEXT",
+  "ALTER TABLE user ADD COLUMN phoneNumberVerified BOOLEAN DEFAULT FALSE",
+  // Admin audit log table (for existing databases)
+  `CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id TEXT,
+    reason TEXT,
+    before_json TEXT,
+    after_json TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    hash_prev TEXT NOT NULL,
+    hash_curr TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (actor_id) REFERENCES user (id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_audit_actor ON admin_audit_log(actor_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_audit_action ON admin_audit_log(action)`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_audit_target ON admin_audit_log(target_type, target_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at)`,
+  // Admin step-up challenges table (for existing databases)
+  `CREATE TABLE IF NOT EXISTS admin_stepup_challenges (
+    id TEXT PRIMARY KEY,
+    admin_identity_id TEXT NOT NULL,
+    challenge_type TEXT NOT NULL DEFAULT 'email_otp',
+    otp_code TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_identity_id) REFERENCES user (id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_stepup_identity ON admin_stepup_challenges(admin_identity_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_stepup_expires ON admin_stepup_challenges(expires_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_stepup_used ON admin_stepup_challenges(used_at)`,
+  // RBAC tables (for existing databases)
+  `CREATE TABLE IF NOT EXISTS admin_roles (
+    id TEXT PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    description TEXT,
+    is_system BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS admin_permissions (
+    id TEXT PRIMARY KEY,
+    key TEXT UNIQUE NOT NULL,
+    description TEXT,
+    category TEXT DEFAULT 'general',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS admin_role_permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_id TEXT NOT NULL,
+    permission_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES admin_permissions(id) ON DELETE CASCADE,
+    UNIQUE(role_id, permission_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS admin_user_roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE,
+    UNIQUE(user_id, role_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_role_permissions_role ON admin_role_permissions(role_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_role_permissions_perm ON admin_role_permissions(permission_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_user_roles_user ON admin_user_roles(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_admin_user_roles_role ON admin_user_roles(role_id)`,
+  // OTP brute-force protection: track failed verification attempts
+  "ALTER TABLE admin_stepup_challenges ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0"
 ]
 
 for (const sql of columnMigrations) {
@@ -23,6 +105,13 @@ for (const sql of columnMigrations) {
   } catch (e) {
     // Column already exists, ignore
   }
+}
+
+// Unique index for phone number plugin (safe/idempotent)
+try {
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_user_phone_number ON user(phoneNumber)')
+} catch (e) {
+  // Ignore for legacy databases with inconsistent states
 }
 
 // Backfill season/episode defaults for pre-migration rows

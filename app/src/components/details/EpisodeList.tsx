@@ -1,8 +1,11 @@
 // Episode List Component
 // Extracted from Details.tsx
-import { Play, Eye, EyeOff, ChevronUp, Check } from 'lucide-react'
+import { useState } from 'react'
+import { Play, Eye, EyeOff, ChevronUp, Check, Download } from 'lucide-react'
 import { LazyImage } from '../../components'
 import { ContextMenu } from '../../components/ui/ContextMenu'
+import { QualityPicker } from '../downloads/QualityPicker'
+import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
 
@@ -18,6 +21,7 @@ interface EpisodeListProps {
   onSelect: (season: number, episode: number, title: string, autoPlay: boolean) => void
   showImdbRatings: boolean
   showAgeRatings: boolean
+  profileId: string
 }
 
 export function EpisodeList({
@@ -31,12 +35,55 @@ export function EpisodeList({
   onPlay,
   onSelect,
   showImdbRatings,
-  showAgeRatings
+  showAgeRatings,
+  profileId
 }: EpisodeListProps) {
+  const [pickerEpisode, setPickerEpisode] = useState<{ season: number; episode: number; title: string; episodeId: string } | null>(null)
+
+  const handleDownloadEpisode = async (quality: DownloadQuality) => {
+    if (!pickerEpisode) return
+    setPickerEpisode(null)
+
+    const key = `top_stream_${meta.id}_${pickerEpisode.season}_${pickerEpisode.episode}`
+    const fallbackKey = `top_stream_${meta.id}`
+    const streamJson = sessionStorage.getItem(key) || sessionStorage.getItem(fallbackKey)
+
+    if (!streamJson) {
+      import('sonner').then(({ toast }) =>
+        toast.info('Select a stream for this episode first, then download.')
+      )
+      return
+    }
+
+    try {
+      const stream = JSON.parse(streamJson)
+      await downloadService.start({
+        profileId,
+        mediaType: 'series',
+        mediaId: meta.id,
+        episodeId: pickerEpisode.episodeId,
+        title: meta.name,
+        episodeTitle: pickerEpisode.title,
+        season: pickerEpisode.season,
+        episode: pickerEpisode.episode,
+        posterPath: meta.poster || '',
+        streamUrl: stream.url || '',
+        addonId: stream.addonId || '',
+        quality,
+      })
+      import('sonner').then(({ toast }) =>
+        toast.success(`Downloading: ${pickerEpisode.title}`)
+      )
+    } catch (e) {
+      console.error('[EpisodeList] episode download error', e)
+      import('sonner').then(({ toast }) => toast.error('Failed to start download'))
+    }
+  }
   
   if (!meta.videos) return null
 
   return (
+    <>
     <div className="series-episodes-container">
       <div className="season-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <select 
@@ -98,6 +145,16 @@ export function EpisodeList({
                   label: 'Play',
                   icon: Play,
                   onClick: () => onPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
+                },
+                {
+                  label: 'Download episode',
+                  icon: Download,
+                  onClick: () => setPickerEpisode({
+                    season: ep.season,
+                    episode: epNum,
+                    title: ep.title || ep.name || `Episode ${epNum}`,
+                    episodeId: ep.id || `${ep.season}:${epNum}`,
+                  })
                 },
                 { type: 'separator' },
                 {
@@ -202,5 +259,15 @@ export function EpisodeList({
         })}
       </div>
     </div>
+
+    {/* Quality picker for episode downloads */}
+    {pickerEpisode && (
+      <QualityPicker
+        title={`${meta.name} — ${pickerEpisode.title}`}
+        onConfirm={handleDownloadEpisode}
+        onClose={() => setPickerEpisode(null)}
+      />
+    )}
+    </>
   )
 }

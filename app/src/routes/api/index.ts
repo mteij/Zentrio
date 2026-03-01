@@ -10,6 +10,7 @@ import appearanceApiRoutes from './appearance'
 import syncApiRoutes from './sync'
 import traktApiRoutes from './trakt'
 import gatewayApiRoutes from './gateway'
+import adminApiRoutes from './admin'
 import { getConfig } from '../../services/envParser'
 import { db } from '../../services/database'
 import {
@@ -34,6 +35,7 @@ app.route('/appearance', appearanceApiRoutes)
 app.route('/sync', syncApiRoutes)
 app.route('/trakt', traktApiRoutes)
 app.route('/gateway', gatewayApiRoutes)
+app.route('/admin', adminApiRoutes)
 
 // Health check with OpenAPI documentation
 interface HealthStats {
@@ -177,6 +179,16 @@ app.openapi({
         profile: 'GET /api/user/profile',
         tmdbApiKey: 'GET /api/user/tmdb-api-key',
         updateTmdbApiKey: 'PUT /api/user/tmdb-api-key',
+      },
+      admin: {
+        me: 'GET /api/admin/me',
+        stats: 'GET /api/admin/stats',
+        liveActivity: 'GET /api/admin/activity/live',
+        users: 'GET /api/admin/users',
+        bootstrapClaim: 'POST /api/admin/bootstrap/claim',
+        setRole: 'POST /api/admin/users/:id/role',
+        banUser: 'POST /api/admin/users/:id/ban',
+        unbanUser: 'POST /api/admin/users/:id/unban'
       },
       pages: {
         landing: '/',

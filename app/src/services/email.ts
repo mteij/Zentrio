@@ -137,6 +137,20 @@ class DevFallbackProvider implements EmailProvider {
 // Email Service
 // =============================================================================
 
+// Per-recipient rate limiter: max 5 emails per 10-minute window per address.
+// Prevents inbox flooding and abuse of transactional email endpoints.
+const EMAIL_RATE_LIMIT_MAX = 5
+const EMAIL_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
+const emailRateMap = new Map<string, { count: number; resetAt: number }>()
+
+// Periodic cleanup of expired rate-limit entries
+setInterval(() => {
+  const now = Date.now()
+  for (const [addr, entry] of emailRateMap) {
+    if (now >= entry.resetAt) emailRateMap.delete(addr)
+  }
+}, 5 * 60 * 1000)
+
 class EmailService {
   private providers?: EmailProvider[]
   private providerLastFailure = new Map<string, number>()
@@ -234,7 +248,21 @@ class EmailService {
     return this.providers
   }
 
+  private checkRateLimit(to: string): void {
+    const now = Date.now()
+    const entry = emailRateMap.get(to)
+    if (!entry || now >= entry.resetAt) {
+      emailRateMap.set(to, { count: 1, resetAt: now + EMAIL_RATE_LIMIT_WINDOW_MS })
+      return
+    }
+    if (entry.count >= EMAIL_RATE_LIMIT_MAX) {
+      throw new Error(`Email rate limit exceeded for ${to}. Try again later.`)
+    }
+    entry.count++
+  }
+
   private async sendViaProviders(options: SendMailOptions): Promise<void> {
+    this.checkRateLimit(options.to)
     let lastErr: unknown = null
 
     for (const provider of this.getProviders()) {

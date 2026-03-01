@@ -88,6 +88,30 @@ export const userDb = {
         fields.push('tmdbApiKey = ?')
         values.push(updates.tmdbApiKey)
     }
+    if (updates.role !== undefined) {
+        fields.push('role = ?')
+        values.push(updates.role)
+    }
+    if (updates.banned !== undefined) {
+        fields.push('banned = ?')
+        values.push(updates.banned)
+    }
+    if (updates.banReason !== undefined) {
+        fields.push('banReason = ?')
+        values.push(updates.banReason)
+    }
+    if (updates.banExpires !== undefined) {
+        fields.push('banExpires = ?')
+        values.push(updates.banExpires)
+    }
+    if (updates.phoneNumber !== undefined) {
+        fields.push('phoneNumber = ?')
+        values.push(updates.phoneNumber)
+    }
+    if (updates.phoneNumberVerified !== undefined) {
+        fields.push('phoneNumberVerified = ?')
+        values.push(updates.phoneNumberVerified)
+    }
     
     if (fields.length === 0) return userDb.findById(id)
 

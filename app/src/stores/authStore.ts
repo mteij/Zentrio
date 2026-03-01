@@ -7,6 +7,12 @@ interface User {
   id: string
   email: string
   name?: string
+  role?: string
+  banned?: boolean
+  banReason?: string | null
+  banExpires?: Date | string | null
+  phoneNumber?: string | null
+  phoneNumberVerified?: boolean
   username?: string
   firstName?: string
   lastName?: string
