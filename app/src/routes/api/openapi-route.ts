@@ -226,10 +226,22 @@ const composeHandlers = (handlers: AnyHandler[]): AnyHandler => {
       const handler = handlers[i]
       if (!handler) return next()
 
-      return handler(c, () => dispatch(i + 1))
+      const result = await handler(c, () => dispatch(i + 1))
+
+      // Important for middleware compatibility:
+      // many Hono middlewares call `await next()` and return `void`.
+      // When that happens, we still need to return the finalized response
+      // created by downstream handlers.
+      if (result !== undefined) return result
+      if ((c as any).finalized) return c.res
+
+      return result
     }
 
-    return dispatch(0)
+    const result = await dispatch(0)
+    if (result !== undefined) return result
+    if ((c as any).finalized) return c.res
+    return result
   }
 }
 
