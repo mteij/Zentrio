@@ -240,8 +240,25 @@ jobs:
           GRADE: ${{ needs.quality.outputs.grade }}
           COLOR: ${{ needs.quality.outputs.color }}
         run: |
+          # Debug: Show which secrets are set (safely)
+          if [ -z "$GIST_TOKEN" ]; then
+            echo "❌ GIST_TOKEN is not set"
+          else
+            echo "✅ GIST_TOKEN is set (length: ${#GIST_TOKEN})"
+          fi
+          
+          if [ -z "$GIST_ID" ]; then
+            echo "❌ QUALITY_BADGE_GIST_ID is not set"
+          else
+            echo "✅ QUALITY_BADGE_GIST_ID is set: $GIST_ID"
+          fi
+          
           if [ -z "$GIST_TOKEN" ] || [ -z "$GIST_ID" ]; then
             echo "⚠️  GIST_TOKEN or QUALITY_BADGE_GIST_ID secret not set – skipping badge update"
+            echo ""
+            echo "To fix this, add these secrets to your repository:"
+            echo "  - GIST_TOKEN: A GitHub Personal Access Token with 'gist' scope"
+            echo "  - QUALITY_BADGE_GIST_ID: The ID of the gist to store the badge JSON"
             exit 0
           fi
 
