@@ -28,6 +28,17 @@ async function optimizeImages() {
     .png({ quality: 100, compressionLevel: 9 })
     .toFile(path.join(PUBLIC_DIR, 'app-screenshot-1000.png'));
 
+  // Create ~600 WebP for mobile screens
+  await screenshotBase.clone()
+    .resize(600)
+    .webp({ quality: 80, effort: 6 })
+    .toFile(path.join(PUBLIC_DIR, 'app-screenshot-600.webp'));
+  
+  // Create ~600 PNG fallback
+  await screenshotBase.clone()
+    .resize(600)
+    .png({ quality: 100, compressionLevel: 9 })
+    .toFile(path.join(PUBLIC_DIR, 'app-screenshot-600.png'));
 
   // Icon
   const iconPath = path.join(PUBLIC_DIR, 'icon-512.png');

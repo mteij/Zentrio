@@ -468,7 +468,7 @@ h6 {
 
 .copyright {
   font-size: 0.9rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 /* Page Transitions */
