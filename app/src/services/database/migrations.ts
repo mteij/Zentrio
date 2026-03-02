@@ -190,6 +190,12 @@ try {
 
 // Helper block to backfill/init data (idempotent checks)
 try {
+   // Ensure admin role includes role-management permission for existing DBs.
+   db.exec(`
+     INSERT OR IGNORE INTO admin_role_permissions (role_id, permission_id)
+     VALUES ('role_admin', 'perm_users_write_role')
+   `)
+
    // Ensure Zentrio addon is enabled for all settings profiles if no addon settings exist
    // This is strictly for initialization on a fresh DB if we want to pre-seed, 
    // but better to leave it to application logic or hooks.

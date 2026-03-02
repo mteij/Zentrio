@@ -113,9 +113,8 @@ export function getConfig() {
   const OIDC_ISSUER = process.env.OIDC_ISSUER
   const OIDC_DISPLAY_NAME = process.env.OIDC_DISPLAY_NAME || 'OpenID'
 
-  // Admin security / bootstrap
+  // Admin security
   const ADMIN_BOOTSTRAP_ALLOWED_EMAILS = parseCsv(process.env.ADMIN_BOOTSTRAP_ALLOWED_EMAILS)
-  const ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL = (process.env.ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL || '').trim().toLowerCase()
  
   return {
     PORT,
@@ -139,7 +138,6 @@ export function getConfig() {
     OIDC_ISSUER,
     OIDC_DISPLAY_NAME,
     ADMIN_BOOTSTRAP_ALLOWED_EMAILS,
-    ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL,
     TMDB_API_KEY: process.env.TMDB_API_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     // Trakt Integration

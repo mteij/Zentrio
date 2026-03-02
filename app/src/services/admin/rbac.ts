@@ -21,7 +21,6 @@ export const Permissions = {
   USERS_WRITE_SESSIONS: 'admin.users.write.sessions',
 
   // System
-  SYSTEM_BOOTSTRAP: 'admin.system.bootstrap',
   SYSTEM_SETTINGS: 'admin.system.settings',
   SYSTEM_MAINTENANCE: 'admin.system.maintenance',
 } as const
@@ -101,6 +100,7 @@ function getLegacyRolePermissions(role: string): string[] {
         Permissions.ACTIVITY_READ,
         Permissions.AUDIT_READ,
         Permissions.USERS_READ,
+        Permissions.USERS_WRITE_ROLE,
         Permissions.USERS_WRITE_BAN,
         Permissions.USERS_WRITE_SESSIONS,
       ]

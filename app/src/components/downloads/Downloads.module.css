@@ -2,7 +2,9 @@
 
 /* ── Downloads Page Layout ── */
 .downloadsPage {
-  padding: 16px 16px 100px;
+  padding-top: 16px;
+  padding-right: 16px;
+  padding-bottom: 100px;
   min-height: 100vh;
   color: #fff;
 }

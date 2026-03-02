@@ -72,11 +72,29 @@
               <div class="url-bar">app.zentrio.eu</div>
             </div>
             <div class="browser-content">
-              <img
-                src="/app-screenshot.png"
-                alt="Zentrio Web App Screenshot"
-                class="app-screenshot-img"
-              />
+              <picture>
+                <source
+                  srcset="
+                    /app-screenshot-1000.webp 1000w,
+                    /app-screenshot.webp      1920w
+                  "
+                  sizes="(max-width: 1000px) 100vw, 1000px"
+                  type="image/webp"
+                />
+                <img
+                  src="/app-screenshot-1000.png"
+                  srcset="
+                    /app-screenshot-1000.png 1000w,
+                    /app-screenshot.png      1920w
+                  "
+                  sizes="(max-width: 1000px) 100vw, 1000px"
+                  alt="Zentrio Web App Screenshot"
+                  class="app-screenshot-img"
+                  width="1920"
+                  height="1032"
+                  loading="lazy"
+                />
+              </picture>
             </div>
           </div>
         </div>

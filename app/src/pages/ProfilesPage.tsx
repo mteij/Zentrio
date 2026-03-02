@@ -53,8 +53,12 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
 
   // Check if user is admin
   useEffect(() => {
-    setIsAdmin(isAuthenticated && authUser?.role === 'admin')
-  }, [isAuthenticated, authUser])
+    // Promote/demote role changes can lag in local auth state.
+    // Use both session user and store user to reduce UI stale state.
+    const sessionUser = useAuthStore.getState().session?.user as any
+    const effectiveRole = (authUser as any)?.role || sessionUser?.role
+    setIsAdmin(isAuthenticated && effectiveRole === 'admin')
+  }, [isAuthenticated, authUser, session?.user])
   
   // Determine if we're in Tauri environment
   const isTauriEnv = typeof window !== 'undefined' &&

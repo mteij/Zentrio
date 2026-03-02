@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { ErrorBoundary, TitleBar, ScrollToTop } from './components'
@@ -518,7 +518,7 @@ function AppRoutes() {
         <Route path="library" element={<StreamingLibrary />} />
         <Route path="library/:listId" element={<StreamingLibrary />} />
         <Route path="search" element={<StreamingSearch />} />
-        <Route path="downloads" element={<StreamingDownloads />} />
+        <Route path="downloads" element={isTauri() ? <StreamingDownloads /> : <Navigate to=".." replace />} />
         <Route path="catalog/:manifestUrl/:type/:id" element={<StreamingCatalog />} />
         <Route path=":type/:id" element={<StreamingDetails />} />
         <Route path="player" element={

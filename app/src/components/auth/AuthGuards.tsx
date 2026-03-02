@@ -113,24 +113,25 @@ export function PublicRoute({ children }: RouteGuardProps) {
 
 /**
  * AdminGuard - Wrapper for routes that require admin privileges.
- * Checks the admin role directly from the server-validated session stored in the auth store.
+ * Requires authentication before rendering admin routes.
+ * Fine-grained admin authorization is enforced server-side by /api/admin/* endpoints.
  */
 export function AdminGuard({ children }: RouteGuardProps) {
-  const { isAuthenticated, isLoading, user } = useAuthStore()
+  const { isAuthenticated, isLoading } = useAuthStore()
   const navigate = useNavigate()
 
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
         navigate('/signin', { replace: true })
-      } else if (user?.role !== 'admin') {
-        navigate('/profiles', { replace: true })
       }
     }
-  }, [isLoading, isAuthenticated, user, navigate])
+  }, [isLoading, isAuthenticated, navigate])
 
+  // Role and permissions are validated server-side via /api/admin/* endpoints.
+  // This avoids stale local role state blocking newly promoted admins.
   if (isLoading) return <SplashScreen />
-  if (!isAuthenticated || user?.role !== 'admin') return null
+  if (!isAuthenticated) return null
 
   return <>{children}</>
 }

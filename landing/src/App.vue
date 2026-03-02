@@ -5,7 +5,16 @@
     <nav class="navbar" :class="{ scrolled: isScrolled }">
       <div class="container nav-content">
         <router-link to="/" class="logo-area">
-          <img src="/icon-512.png" alt="Zentrio" class="nav-logo" />
+          <picture>
+            <source srcset="/icon-72.webp" type="image/webp" />
+            <img
+              src="/icon-72.png"
+              alt="Zentrio"
+              class="nav-logo"
+              width="36"
+              height="36"
+            />
+          </picture>
           <span class="nav-title">Zentrio</span>
         </router-link>
 
@@ -53,7 +62,16 @@
       <div class="container footer-container">
         <div class="footer-left">
           <div class="footer-brand">
-            <img src="/icon-512.png" alt="Zentrio Logo" class="footer-logo" />
+            <picture>
+              <source srcset="/icon-72.webp" type="image/webp" />
+              <img
+                src="/icon-72.png"
+                alt="Zentrio Logo"
+                class="footer-logo"
+                width="32"
+                height="32"
+              />
+            </picture>
             <span>Zentrio</span>
           </div>
           <p class="footer-description">

@@ -390,18 +390,20 @@ export const useAuthStore = create<AuthState>()(
 
 // Auto-session refresh hook
 export const useSessionRefresh = () => {
-  const { checkSession, isAuthenticated } = useAuthStore()
+  const { checkSession, refreshSession, isAuthenticated } = useAuthStore()
 
   // Check session every 5 minutes
   React.useEffect(() => {
     if (!isAuthenticated) return
 
     const interval = setInterval(() => {
-      checkSession().catch(console.error)
+      // Force periodic server sync so role/ban changes (e.g. admin promotion)
+      // propagate even when the local session is far from expiry.
+      refreshSession().catch(console.error)
     }, 5 * 60 * 1000) // 5 minutes
 
     return () => clearInterval(interval)
-  }, [isAuthenticated, checkSession])
+  }, [isAuthenticated, refreshSession])
 
   // Check session on window focus, but only after a meaningful gap (5 minutes).
   // Short focus round-trips (e.g. opening a file dialog, alt-tabbing briefly) must NOT

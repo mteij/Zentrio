@@ -185,7 +185,6 @@ app.openapi({
         stats: 'GET /api/admin/stats',
         liveActivity: 'GET /api/admin/activity/live',
         users: 'GET /api/admin/users',
-        bootstrapClaim: 'POST /api/admin/bootstrap/claim',
         setRole: 'POST /api/admin/users/:id/role',
         banUser: 'POST /api/admin/users/:id/ban',
         unbanUser: 'POST /api/admin/users/:id/unban'

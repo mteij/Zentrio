@@ -4,7 +4,6 @@
 import { randomBytes, createHash } from 'crypto'
 import { db } from '../database/connection'
 import type { AdminStepUpChallenge } from '../database/types'
-import { getConfig } from '../envParser'
 
 // Challenge TTL: 10 minutes
 const CHALLENGE_TTL_MS = 10 * 60 * 1000
@@ -273,14 +272,6 @@ export function getChallengeStatus(userId: string): ChallengeStatus {
   }
 }
 
-/**
- * Resolve OTP delivery email — in non-production, routes to a configured
- * redirect inbox if ADMIN_OTP_DEV_REDIRECT_EMAIL is set.
- */
 export function getOtpDestinationEmail(userEmail: string): string {
-  const cfg = getConfig()
-  if (cfg.ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL && process.env.NODE_ENV !== 'production') {
-    return cfg.ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL
-  }
   return userEmail
 }

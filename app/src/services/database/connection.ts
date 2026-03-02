@@ -517,7 +517,6 @@ db.exec(`
     ('perm_users_write_sessions', 'admin.users.write.sessions', 'Revoke user sessions', 'users'),
     
     -- System Configuration
-    ('perm_system_bootstrap', 'admin.system.bootstrap', 'Access bootstrap claim', 'system'),
     ('perm_system_settings', 'admin.system.settings', 'Modify system settings', 'system'),
     ('perm_system_maintenance', 'admin.system.maintenance', 'Enable maintenance mode', 'system');
 
@@ -531,6 +530,7 @@ db.exec(`
     ('role_admin', 'perm_activity_read'),
     ('role_admin', 'perm_audit_read'),
     ('role_admin', 'perm_users_read'),
+    ('role_admin', 'perm_users_write_role'),
     ('role_admin', 'perm_users_write_ban'),
     ('role_admin', 'perm_users_write_sessions');
 

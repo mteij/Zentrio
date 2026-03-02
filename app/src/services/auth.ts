@@ -52,8 +52,10 @@ export const auth = betterAuth({
     },
     session: {
         cookieCache: {
-            enabled: true,
-            maxAge: 5 * 60
+            // Keep role/ban/session changes visible immediately across requests.
+            // A cached session can otherwise make admin promotions feel delayed/unreliable.
+            enabled: false,
+            maxAge: 0
         }
     },
     emailAndPassword: {
@@ -122,15 +124,6 @@ export const auth = betterAuth({
         }),
         phoneNumber({
             async sendOTP({ phoneNumber, code }, _ctx) {
-                const cfg = getConfig()
-
-                // Production should wire this to a proper SMS provider.
-                // As a secure fallback path, we route OTP to a configured admin email inbox.
-                if (cfg.ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL) {
-                    await emailService.sendOTP(cfg.ADMIN_PHONE_OTP_DEV_FALLBACK_EMAIL, `${code} (phone: ${phoneNumber})`)
-                    return
-                }
-
                 // Never silently succeed in production without a delivery channel.
                 if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
                     throw new Error('Phone OTP provider not configured')

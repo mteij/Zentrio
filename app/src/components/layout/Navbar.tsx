@@ -5,6 +5,7 @@ import { createHoverPreloader } from '../../utils/route-preloader'
 import styles from '../../styles/Streaming.module.css'
 import { useState, useRef, useEffect, useMemo, startTransition, useCallback } from 'react'
 import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
+import { isTauri } from '../../lib/auth-client'
 
 interface NavbarProps {
   profileId: number | string
@@ -101,7 +102,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
       { to: `/streaming/${profileId}`, icon: Home, label: 'Home', path: '', exact: true, ...homePreloader },
       { to: `/streaming/${profileId}/explore`, icon: Compass, label: 'Explore', path: '/explore', ...explorePreloader },
       { to: `/streaming/${profileId}/library`, icon: Library, label: 'Library', path: '/library', ...libraryPreloader },
-      { to: `/streaming/${profileId}/downloads`, icon: Download, label: 'Downloads', path: '/downloads', ...downloadsPreloader },
+      ...(isTauri() ? [{ to: `/streaming/${profileId}/downloads`, icon: Download, label: 'Downloads', path: '/downloads', ...downloadsPreloader }] : []),
       { to: `/streaming/${profileId}/search`, icon: Search, label: 'Search', path: '/search', id: 'navSearchBtn', onClick: handleSearchClick, ...searchPreloader }
   ]
 
