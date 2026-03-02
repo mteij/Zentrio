@@ -154,6 +154,9 @@
                 src="https://api.star-history.com/svg?repos=mteij/Zentrio&type=Date&theme=dark"
                 alt="Zentrio GitHub Star History"
                 class="star-history-img"
+                loading="lazy"
+                width="800"
+                height="400"
               />
             </div>
           </div>
@@ -402,7 +405,7 @@ onMounted(() => {
   content: "";
   position: absolute;
   top: 0;
-  left: -100%;
+  left: 0;
   width: 50%;
   height: 100%;
   background: linear-gradient(
@@ -411,19 +414,19 @@ onMounted(() => {
     rgba(255, 255, 255, 0.2) 50%,
     rgba(255, 255, 255, 0) 100%
   );
-  transform: skewX(-25deg);
+  transform: translateX(-200%) skewX(-25deg);
   animation: shine 6s infinite;
 }
 
 @keyframes shine {
   0% {
-    left: -100%;
+    transform: translateX(-200%) skewX(-25deg);
   }
   20% {
-    left: 200%;
+    transform: translateX(400%) skewX(-25deg);
   }
   100% {
-    left: 200%;
+    transform: translateX(400%) skewX(-25deg);
   }
 }
 

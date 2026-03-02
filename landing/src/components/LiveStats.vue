@@ -1,5 +1,5 @@
 <template>
-  <div class="live-stats-wrapper">
+  <div class="live-stats-wrapper" ref="target">
     <div v-if="loading" class="stats-loading">
       <div class="spinner"></div>
       <span>Loading platform stats...</span>
@@ -31,8 +31,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
+import { useIntersectionObserver } from "@vueuse/core";
 
+const target = ref(null);
 const loading = ref(true);
 const error = ref(null);
 const stats = ref({
@@ -41,12 +43,16 @@ const stats = ref({
   addons: 0,
   profiles: 0,
 });
+const hasFetched = ref(false);
 
 const formatNumber = (num) => {
   return new Intl.NumberFormat("en-US").format(num);
 };
 
 const fetchStats = async () => {
+  if (hasFetched.value) return;
+  hasFetched.value = true;
+
   loading.value = true;
   error.value = null;
 
@@ -73,15 +79,15 @@ const fetchStats = async () => {
   }
 };
 
-onMounted(() => {
-  // Defer non-critical stats API call to improve LCP
-  // Use requestIdleCallback if available, otherwise setTimeout
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => fetchStats(), { timeout: 1500 });
-  } else {
-    setTimeout(fetchStats, 50);
-  }
-});
+useIntersectionObserver(
+  target,
+  ([{ isIntersecting }]) => {
+    if (isIntersecting) {
+      fetchStats();
+    }
+  },
+  { rootMargin: "200px" },
+);
 </script>
 
 <style scoped>
