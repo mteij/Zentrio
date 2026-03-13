@@ -10,7 +10,9 @@ use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 use super::db::{DownloadDb, DownloadQuality, DownloadRecord, DownloadStatus};
-use super::events::{emit_progress, emit_status, ProgressPayload, StatusPayload};
+use super::events::{
+    emit_progress, emit_smart_next, emit_status, ProgressPayload, SmartNextPayload, StatusPayload,
+};
 use super::file_store;
 use super::hls;
 use super::notifier;
@@ -53,8 +55,8 @@ struct QueueItem {
 pub struct DownloadManager {
     db: Arc<Mutex<DownloadDb>>,
     queue: Arc<Mutex<VecDeque<QueueItem>>>,
-    active: Arc<Mutex<Vec<String>>>,     // IDs of currently running downloads
-    paused: Arc<Mutex<Vec<String>>>,     // IDs that have been paused
+    active: Arc<Mutex<Vec<String>>>,
+    paused: Arc<Mutex<Vec<String>>>,
     max_concurrent: usize,
 }
 
@@ -83,10 +85,25 @@ impl DownloadManager {
             .to_string_lossy()
             .to_string();
 
+        let db = self.db.lock().map_err(|_| "DB lock poisoned".to_string())?;
+
+        // Enforce storage quota before inserting
+        let quota = db.get_quota(&payload.profile_id).map_err(|e| e.to_string())?;
+        if quota > 0 {
+            let (used, _) = db
+                .get_storage_stats(&payload.profile_id)
+                .map_err(|e| e.to_string())?;
+            if used >= quota {
+                return Err(format!(
+                    "Storage quota exceeded: using {} of {} bytes",
+                    used, quota
+                ));
+            }
+        }
+
         // Resolve smart download and auto-delete flags: explicit override > profile default > false
-        let (profile_smart, profile_auto_delete) = self.db.lock().unwrap()
-            .get_smart_defaults(&payload.profile_id)
-            .unwrap_or((false, false));
+        let (profile_smart, profile_auto_delete) =
+            db.get_smart_defaults(&payload.profile_id).unwrap_or((false, false));
         let smart_download = payload.smart_download.unwrap_or(profile_smart);
         let auto_delete = payload.auto_delete.unwrap_or(profile_auto_delete);
 
@@ -118,7 +135,8 @@ impl DownloadManager {
             auto_delete,
         };
 
-        self.db.lock().unwrap().insert(&record).map_err(|e| e.to_string())?;
+        db.insert(&record).map_err(|e| e.to_string())?;
+        drop(db); // Release before touching queue/active
 
         let item = QueueItem {
             id: id.clone(),
@@ -130,122 +148,65 @@ impl DownloadManager {
             auto_delete,
         };
 
-        self.queue.lock().unwrap().push_back(item);
-        self.try_start_next(app);
+        self.queue
+            .lock()
+            .map_err(|_| "Queue lock poisoned".to_string())?
+            .push_back(item);
 
+        self.try_start_next(app);
         Ok(id)
     }
 
-    /// Tries to start the next queued download if below max_concurrent.
     fn try_start_next(&self, app: AppHandle) {
-        let active_count = self.active.lock().unwrap().len();
-        if active_count >= self.max_concurrent {
-            return;
-        }
-
-        let item = {
-            let mut q = self.queue.lock().unwrap();
-            q.pop_front()
-        };
-
-        if let Some(item) = item {
-            // Mark as active
-            self.active.lock().unwrap().push(item.id.clone());
-
-            let db = Arc::clone(&self.db);
-            let active = Arc::clone(&self.active);
-            let queue = Arc::clone(&self.queue);
-            let paused = Arc::clone(&self.paused);
-            let app_clone = app.clone();
-            let id = item.id.clone();
-            let title = item.title.clone();
-            let profile_id = item.profile_id.clone();
-            let stream_url = item.stream_url.clone();
-            let quality = item.quality.clone();
-            let smart_download = item.smart_download;
-            let auto_delete_on_done = item.auto_delete;
-            let max_concurrent = self.max_concurrent;
-
-            tauri::async_runtime::spawn(async move {
-                let result = run_download(
-                    app_clone.clone(),
-                    db.clone(),
-                    paused.clone(),
-                    &id,
-                    &profile_id,
-                    &title,
-                    &stream_url,
-                    &quality,
-                )
-                .await;
-
-                // Remove from active when done
-                active.lock().unwrap().retain(|a| a != &id);
-
-                if result.is_ok() && smart_download {
-                    smart_download_hook(
-                        app_clone.clone(),
-                        db.clone(),
-                        paused.clone(),
-                        &id,
-                        auto_delete_on_done,
-                    ).await;
-                }
-
-                // Try to start the next one
-                let next_active = active.lock().unwrap().len();
-                if next_active < max_concurrent {
-                    let next_item = queue.lock().unwrap().pop_front();
-                    if let Some(next) = next_item {
-                        active.lock().unwrap().push(next.id.clone());
-                        let db2 = Arc::clone(&db);
-                        let active2 = Arc::clone(&active);
-                        let paused2 = Arc::clone(&paused);
-                        let app2 = app_clone.clone();
-                        let next_quality = next.quality.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let _ = run_download(
-                                app2.clone(),
-                                db2,
-                                paused2,
-                                &next.id,
-                                &next.profile_id,
-                                &next.title,
-                                &next.stream_url,
-                                &next_quality,
-                            ).await;
-                            active2.lock().unwrap().retain(|a| a != &next.id);
-                        });
-                    }
-                }
-            });
-        }
+        dispatch_pending(
+            app,
+            Arc::clone(&self.db),
+            Arc::clone(&self.queue),
+            Arc::clone(&self.active),
+            Arc::clone(&self.paused),
+            self.max_concurrent,
+        );
     }
 
     pub fn pause(&self, app: AppHandle, id: &str) -> Result<(), String> {
-        self.paused.lock().unwrap().push(id.to_string());
-        self.db.lock().unwrap()
+        self.paused
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?
+            .push(id.to_string());
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
             .update_status(id, &DownloadStatus::Paused)
             .map_err(|e| e.to_string())?;
-        emit_status(&app, StatusPayload {
-            id: id.to_string(),
-            status: "paused".into(),
-            file_path: None,
-            error: None,
-        });
+        emit_status(
+            &app,
+            StatusPayload {
+                id: id.to_string(),
+                status: "paused".into(),
+                file_path: None,
+                error: None,
+            },
+        );
         Ok(())
     }
 
     pub fn resume(&self, app: AppHandle, id: &str) -> Result<(), String> {
-        // Remove from paused list, re-queue
-        self.paused.lock().unwrap().retain(|p| p != id);
-        
-        let rec = self.db.lock().unwrap()
+        self.paused
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?
+            .retain(|p| p != id);
+
+        let rec = self
+            .db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
             .get_by_id(id)
             .map_err(|e| e.to_string())?
             .ok_or("Download not found")?;
 
-        self.db.lock().unwrap()
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
             .update_status(id, &DownloadStatus::Queued)
             .map_err(|e| e.to_string())?;
 
@@ -258,71 +219,133 @@ impl DownloadManager {
             smart_download: rec.smart_download,
             auto_delete: rec.auto_delete,
         };
-        self.queue.lock().unwrap().push_front(item);
+        self.queue
+            .lock()
+            .map_err(|_| "Queue lock poisoned".to_string())?
+            .push_front(item);
         self.try_start_next(app);
         Ok(())
     }
 
     pub fn cancel(&self, app: AppHandle, id: &str) -> Result<(), String> {
-        self.paused.lock().unwrap().push(id.to_string()); // treat as paused so worker exits
-        self.queue.lock().unwrap().retain(|q| q.id != id);
-        self.db.lock().unwrap()
+        self.paused
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?
+            .push(id.to_string()); // treat as paused so worker exits
+        self.queue
+            .lock()
+            .map_err(|_| "Queue lock poisoned".to_string())?
+            .retain(|q| q.id != id);
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
             .update_status(id, &DownloadStatus::Cancelled)
             .map_err(|e| e.to_string())?;
-        emit_status(&app, StatusPayload {
-            id: id.to_string(),
-            status: "cancelled".into(),
-            file_path: None,
-            error: None,
-        });
+        emit_status(
+            &app,
+            StatusPayload {
+                id: id.to_string(),
+                status: "cancelled".into(),
+                file_path: None,
+                error: None,
+            },
+        );
         Ok(())
     }
 
     pub fn delete(&self, app: AppHandle, id: &str) -> Result<(), String> {
-        let rec = self.db.lock().unwrap()
+        let rec = self
+            .db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
             .get_by_id(id)
             .map_err(|e| e.to_string())?;
 
         if let Some(rec) = rec {
             file_store::delete_files(&app, &rec.profile_id, id);
         }
-        self.queue.lock().unwrap().retain(|q| q.id != id);
-        self.paused.lock().unwrap().retain(|p| p != id);
-        self.active.lock().unwrap().retain(|a| a != id);
-        self.db.lock().unwrap().delete(id).map_err(|e| e.to_string())?;
+        self.queue
+            .lock()
+            .map_err(|_| "Queue lock poisoned".to_string())?
+            .retain(|q| q.id != id);
+        self.paused
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?
+            .retain(|p| p != id);
+        self.active
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?
+            .retain(|a| a != id);
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
+            .delete(id)
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub fn get_downloads(&self, profile_id: &str) -> Result<Vec<DownloadRecord>, String> {
-        self.db.lock().unwrap()
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
             .get_all(profile_id)
             .map_err(|e| e.to_string())
     }
 
     pub fn get_storage_stats(&self, profile_id: &str) -> Result<(i64, i64), String> {
-        self.db.lock().unwrap()
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
             .get_storage_stats(profile_id)
             .map_err(|e| e.to_string())
     }
 
     pub fn get_quota(&self, profile_id: &str) -> Result<i64, String> {
-        self.db.lock().unwrap().get_quota(profile_id).map_err(|e| e.to_string())
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
+            .get_quota(profile_id)
+            .map_err(|e| e.to_string())
     }
 
     pub fn set_quota(&self, profile_id: &str, quota_bytes: i64) -> Result<(), String> {
-        self.db.lock().unwrap().set_quota(profile_id, quota_bytes).map_err(|e| e.to_string())
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
+            .set_quota(profile_id, quota_bytes)
+            .map_err(|e| e.to_string())
     }
 
     pub fn get_smart_defaults(&self, profile_id: &str) -> Result<(bool, bool), String> {
-        self.db.lock().unwrap().get_smart_defaults(profile_id).map_err(|e| e.to_string())
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
+            .get_smart_defaults(profile_id)
+            .map_err(|e| e.to_string())
     }
 
-    pub fn set_smart_defaults(&self, profile_id: &str, smart: bool, auto_delete: bool) -> Result<(), String> {
-        self.db.lock().unwrap().set_smart_defaults(profile_id, smart, auto_delete).map_err(|e| e.to_string())
+    pub fn set_smart_defaults(
+        &self,
+        profile_id: &str,
+        smart: bool,
+        auto_delete: bool,
+    ) -> Result<(), String> {
+        self.db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
+            .set_smart_defaults(profile_id, smart, auto_delete)
+            .map_err(|e| e.to_string())
     }
 
-    pub fn delete_all_for_profile(&self, app: AppHandle, profile_id: &str) -> Result<(), String> {
-        let ids = self.db.lock().unwrap()
+    pub fn delete_all_for_profile(
+        &self,
+        app: AppHandle,
+        profile_id: &str,
+    ) -> Result<(), String> {
+        let ids = self
+            .db
+            .lock()
+            .map_err(|_| "DB lock poisoned".to_string())?
             .delete_all_for_profile(profile_id)
             .map_err(|e| e.to_string())?;
         for id in ids {
@@ -332,90 +355,168 @@ impl DownloadManager {
     }
 }
 
+// ─── Queue dispatcher ─────────────────────────────────────────────────────────
+
+/// Starts queued downloads up to `max_concurrent`.
+/// Safe to call from within async tasks — spawns new tasks and returns immediately.
+fn dispatch_pending(
+    app: AppHandle,
+    db: Arc<Mutex<DownloadDb>>,
+    queue: Arc<Mutex<VecDeque<QueueItem>>>,
+    active: Arc<Mutex<Vec<String>>>,
+    paused: Arc<Mutex<Vec<String>>>,
+    max_concurrent: usize,
+) {
+    loop {
+        let active_count = match active.lock() {
+            Ok(a) => a.len(),
+            Err(_) => return,
+        };
+        if active_count >= max_concurrent {
+            return;
+        }
+
+        let item = match queue.lock() {
+            Ok(mut q) => q.pop_front(),
+            Err(_) => return,
+        };
+        let item = match item {
+            Some(i) => i,
+            None => return,
+        };
+
+        match active.lock() {
+            Ok(mut a) => a.push(item.id.clone()),
+            Err(_) => return,
+        };
+
+        let db2 = Arc::clone(&db);
+        let queue2 = Arc::clone(&queue);
+        let active2 = Arc::clone(&active);
+        let paused2 = Arc::clone(&paused);
+        let app2 = app.clone();
+        let id = item.id.clone();
+        let smart = item.smart_download;
+        let auto_del = item.auto_delete;
+
+        tauri::async_runtime::spawn(async move {
+            let result = run_download(
+                app2.clone(),
+                db2.clone(),
+                paused2.clone(),
+                &item.id,
+                &item.profile_id,
+                &item.title,
+                &item.stream_url,
+                &item.quality,
+            )
+            .await;
+
+            if let Ok(mut a) = active2.lock() {
+                a.retain(|a| a != &id);
+            }
+
+            if result.is_ok() && smart {
+                smart_download_hook(app2.clone(), db2.clone(), &id, auto_del).await;
+            }
+
+            // Continue draining the queue
+            dispatch_pending(app2, db2, queue2, active2, paused2, max_concurrent);
+        });
+    }
+}
+
+// ─── Smart Downloads hook ─────────────────────────────────────────────────────
+
 /// Post-completion hook for Smart Downloads.
-/// Looks up the next episode and enqueues it; optionally deletes the current file.
+/// Emits `download:queue_next` so the frontend can resolve the stream URL and
+/// call download_start. The frontend is the only place that can resolve a
+/// per-episode stream URL via the addon system.
 async fn smart_download_hook(
     app: AppHandle,
     db: Arc<Mutex<DownloadDb>>,
-    paused: Arc<Mutex<Vec<String>>>,
     completed_id: &str,
     auto_delete: bool,
 ) {
-    // Try to find the next episode
-    let next = db.lock().unwrap().get_next_episode(completed_id);
-    let next_ep = match next {
-        Ok(Some(ep)) => ep,
-        _ => return, // No next episode or error — done
-    };
+    let next_ep =
+        match db.lock().ok().and_then(|d| d.get_next_episode(completed_id).ok().flatten()) {
+            Some(ep) => ep,
+            None => return,
+        };
 
-    let title = next_ep.episode_title.clone().unwrap_or_else(|| next_ep.title.clone());
-    eprintln!("[SmartDownloads] Queuing next episode: {}", title);
-
-    // Assign a real ID, file path, and enqueue
-    let new_id = uuid::Uuid::new_v4().to_string();
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64;
-
-    let file_path = file_store::download_file_path(&app, &next_ep.profile_id, &new_id)
-        .to_string_lossy()
-        .to_string();
-    file_store::ensure_dir(&app, &next_ep.profile_id).ok();
-
-    let record = super::db::DownloadRecord {
-        id: new_id.clone(),
-        profile_id: next_ep.profile_id.clone(),
-        media_type: next_ep.media_type.clone(),
-        media_id: next_ep.media_id.clone(),
-        episode_id: next_ep.episode_id.clone(),
-        title: next_ep.title.clone(),
-        episode_title: next_ep.episode_title.clone(),
-        season: next_ep.season,
-        episode: next_ep.episode,
-        poster_path: next_ep.poster_path.clone(),
-        status: super::db::DownloadStatus::Queued,
-        progress: 0.0,
-        quality: next_ep.quality.clone(),
-        file_path,
-        file_size: 0,
-        downloaded_bytes: 0,
-        added_at: now,
-        completed_at: None,
-        last_watched_at: None,
-        watched_percent: 0.0,
-        stream_url: next_ep.stream_url.clone(),
-        addon_id: next_ep.addon_id.clone(),
-        error_message: None,
-        smart_download: true,
-        auto_delete: next_ep.auto_delete,
-    };
-
-    if db.lock().unwrap().insert(&record).is_err() {
-        return;
-    }
-
-    // Optionally delete the now-completed file to free up space
+    // Optionally delete the completed file to free space before the next download
     if auto_delete {
-        file_store::delete_files(&app, &next_ep.profile_id, completed_id);
-        db.lock().unwrap().delete(completed_id).ok();
+        let profile_id = match db
+            .lock()
+            .ok()
+            .and_then(|d| d.get_by_id(completed_id).ok().flatten())
+        {
+            Some(rec) => rec.profile_id,
+            None => return,
+        };
+        file_store::delete_files(&app, &profile_id, completed_id);
+        if let Ok(d) = db.lock() {
+            d.delete(completed_id).ok();
+        }
     }
 
-    // Kick off the new download
-    let _ = run_download(
-        app,
-        db,
-        paused,
-        &new_id,
-        &next_ep.profile_id,
-        &title,
-        &next_ep.stream_url,
-        next_ep.quality.as_str(),
-    ).await;
+    log::info!(
+        "[SmartDownloads] Signalling next episode: {} S{}E{}",
+        next_ep.title,
+        next_ep.season.unwrap_or(0),
+        next_ep.episode.unwrap_or(0),
+    );
+
+    emit_smart_next(
+        &app,
+        SmartNextPayload {
+            profile_id: next_ep.profile_id,
+            media_id: next_ep.media_id,
+            media_type: next_ep.media_type,
+            title: next_ep.title,
+            poster_path: next_ep.poster_path,
+            addon_id: next_ep.addon_id,
+            quality: next_ep.quality.as_str().to_string(),
+            season: next_ep.season.unwrap_or(0),
+            episode: next_ep.episode.unwrap_or(0),
+            smart_download: true,
+            auto_delete: next_ep.auto_delete,
+        },
+    );
 }
 
+// ─── HLS detection ────────────────────────────────────────────────────────────
+
+/// Returns true if the URL or its Content-Type indicates an HLS stream.
+async fn is_hls_stream(client: &Client, url: &str) -> bool {
+    let lower = url.to_lowercase();
+    if lower.contains(".m3u8") || lower.contains("playlist.m3u") {
+        return true;
+    }
+    // HEAD request fallback for HLS streams without .m3u8 in the URL
+    match client
+        .head(url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            let ct = resp
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_lowercase();
+            ct.contains("mpegurl")
+        }
+        Err(_) => false,
+    }
+}
+
+// ─── Download worker ──────────────────────────────────────────────────────────
+
 /// The async task that actually downloads a file.
-/// Detects stream format by URL and routes to the appropriate engine.
+/// Detects stream format and routes to the appropriate engine.
 async fn run_download(
     app: AppHandle,
     db: Arc<Mutex<DownloadDb>>,
@@ -426,23 +527,21 @@ async fn run_download(
     stream_url: &str,
     quality: &str,
 ) -> Result<(), String> {
-    // Route HLS streams to the dedicated engine
-    let url_lower = stream_url.to_lowercase();
-    if url_lower.contains(".m3u8") || url_lower.contains("m3u8") {
-        return hls::download_hls(
-            app, db, paused, id, profile_id, title, stream_url, quality,
-        ).await;
-    }
     let client = Client::builder()
         .user_agent("Zentrio/1.0")
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
 
+    if is_hls_stream(&client, stream_url).await {
+        return hls::download_hls(app, db, paused, id, profile_id, title, stream_url, quality)
+            .await;
+    }
+
     let part_path = file_store::part_file_path(&app, profile_id, id);
     let final_path = file_store::download_file_path(&app, profile_id, id);
 
-    // Check how much we already have (resume support)
+    // Resume support: continue from where we left off
     let start_byte = if part_path.exists() {
         file_store::file_size(&part_path)
     } else {
@@ -455,10 +554,21 @@ async fn run_download(
     }
 
     let response = req.send().await.map_err(|e| {
-        db.lock().unwrap().update_error(id, &e.to_string()).ok();
-        emit_status(&app, StatusPayload { id: id.to_string(), status: "failed".into(), file_path: None, error: Some(e.to_string()) });
+        let msg = e.to_string();
+        if let Ok(d) = db.lock() {
+            d.update_error(id, &msg).ok();
+        }
+        emit_status(
+            &app,
+            StatusPayload {
+                id: id.to_string(),
+                status: "failed".into(),
+                file_path: None,
+                error: Some(msg.clone()),
+            },
+        );
         notifier::notify_failed(&app, title);
-        e.to_string()
+        msg
     })?;
 
     let total_size = response
@@ -469,7 +579,6 @@ async fn run_download(
         .map(|s| s + start_byte)
         .unwrap_or(0);
 
-    // Open part file in append mode
     let mut file = tokio::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -487,17 +596,32 @@ async fn run_download(
     let mut stream = response.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
-        // Check if paused/cancelled
-        if paused.lock().unwrap().contains(&id.to_string()) {
+        // Pause / cancel check
+        if paused
+            .lock()
+            .map(|p| p.contains(&id.to_string()))
+            .unwrap_or(false)
+        {
             file.flush().await.ok();
             return Ok(());
         }
 
         let chunk = chunk.map_err(|e| {
-            db.lock().unwrap().update_error(id, &e.to_string()).ok();
-            emit_status(&app, StatusPayload { id: id.to_string(), status: "failed".into(), file_path: None, error: Some(e.to_string()) });
+            let msg = e.to_string();
+            if let Ok(d) = db.lock() {
+                d.update_error(id, &msg).ok();
+            }
+            emit_status(
+                &app,
+                StatusPayload {
+                    id: id.to_string(),
+                    status: "failed".into(),
+                    file_path: None,
+                    error: Some(msg.clone()),
+                },
+            );
             notifier::notify_failed(&app, title);
-            e.to_string()
+            msg
         })?;
 
         file.write_all(&chunk).await.map_err(|e| e.to_string())?;
@@ -510,26 +634,30 @@ async fn run_download(
             0.0
         };
 
-        // Emit progress event only every ~1% change or 1s
+        // Emit progress ~every 1% to avoid flooding the UI
         if (progress - last_progress) >= 1.0 {
             last_progress = progress;
-            db.lock().unwrap().update_progress(id, progress, downloaded).ok();
+            if let Ok(d) = db.lock() {
+                d.update_progress(id, progress, downloaded).ok();
+            }
 
             let elapsed_secs = speed_window.elapsed().as_secs_f64().max(0.001);
             let speed = bytes_since_window as f64 / elapsed_secs;
 
-            emit_progress(&app, ProgressPayload {
-                id: id.to_string(),
-                progress,
-                downloaded_bytes: downloaded,
-                speed,
-            });
+            emit_progress(
+                &app,
+                ProgressPayload {
+                    id: id.to_string(),
+                    progress,
+                    downloaded_bytes: downloaded,
+                    speed,
+                },
+            );
 
             // OS notification every 10% or every 30 seconds
             let progress_u8 = progress as u8;
             let should_notify = progress_u8 / 10 > last_notif_progress / 10
                 || last_notif_time.elapsed().as_secs() >= 30;
-
             if should_notify {
                 last_notif_progress = progress_u8;
                 last_notif_time = Instant::now();
@@ -541,22 +669,24 @@ async fn run_download(
     file.flush().await.map_err(|e| e.to_string())?;
     drop(file);
 
-    // Rename part file to final
     tokio::fs::rename(&part_path, &final_path)
         .await
         .map_err(|e| e.to_string())?;
 
     let size = file_store::file_size(&final_path);
-    db.lock().unwrap()
-        .update_complete(id, &final_path.to_string_lossy(), size)
-        .ok();
+    if let Ok(d) = db.lock() {
+        d.update_complete(id, &final_path.to_string_lossy(), size).ok();
+    }
 
-    emit_status(&app, StatusPayload {
-        id: id.to_string(),
-        status: "completed".into(),
-        file_path: Some(final_path.to_string_lossy().to_string()),
-        error: None,
-    });
+    emit_status(
+        &app,
+        StatusPayload {
+            id: id.to_string(),
+            status: "completed".into(),
+            file_path: Some(final_path.to_string_lossy().to_string()),
+            error: None,
+        },
+    );
 
     notifier::notify_complete(&app, title);
 

@@ -29,6 +29,13 @@
             <span v-else class="btn btn-secondary disabled w-full mt-4"
               >Not Available Yet</span
             >
+
+            <div class="install-script-container">
+              <span class="install-script-label">Or use PowerShell:</span>
+              <code class="install-script-code"
+                >irm https://zentrio.eu/install.ps1 | iex</code
+              >
+            </div>
           </div>
 
           <div class="platform-card">
@@ -45,6 +52,13 @@
             <span v-else class="btn btn-secondary disabled w-full mt-4"
               >Not Available Yet</span
             >
+
+            <div class="install-script-container">
+              <span class="install-script-label">Or use install script:</span>
+              <code class="install-script-code"
+                >curl -fsSL zentrio.eu/install-macos.sh | bash</code
+              >
+            </div>
           </div>
 
           <div class="platform-card">
@@ -111,7 +125,7 @@
                 >Or use the install script:</span
               >
               <code class="install-script-code"
-                >curl -sL zentrio.eu/install.sh | bash</code
+                >curl -fsSL zentrio.eu/install.sh | bash</code
               >
             </div>
           </div>

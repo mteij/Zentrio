@@ -1,7 +1,7 @@
 // Admin Step-up Challenge Service
 // Provides email OTP verification for sensitive admin operations
 
-import { randomBytes, createHash } from 'crypto'
+import { randomBytes, createHash, randomInt } from 'crypto'
 import { db } from '../database/connection'
 import type { AdminStepUpChallenge } from '../database/types'
 
@@ -30,11 +30,8 @@ export interface VerifyResult {
  * Generate a cryptographically secure 6-digit OTP
  */
 function generateOTP(): string {
-  // Use randomBytes for cryptographically secure randomness
-  const bytes = randomBytes(4)
-  const num = bytes.readUInt32BE(0)
-  // Generate 6-digit number (000000-999999)
-  return String(num % 1000000).padStart(6, '0')
+  // Generate cryptographically secure 6-digit number (000000-999999)
+  return String(randomInt(0, 1000000)).padStart(6, '0')
 }
 
 /**

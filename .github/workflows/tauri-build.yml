@@ -249,9 +249,9 @@ jobs:
           bun tauri android init
 
           # Generate icons - MUST run after android init to overwrite default icons
-          # The tauri icon command generates icons for all platforms including Android mipmap
-          echo "📱 Generating app icons from src-tauri/icons/icon.png..."
-          bun tauri icon src-tauri/icons/icon.png
+          # Use android-icon.png (has black background) instead of icon.png (transparent, desktop-only)
+          echo "📱 Generating app icons from src-tauri/icons/android-icon.png..."
+          bun tauri icon src-tauri/icons/android-icon.png
 
           # Set dark background color for adaptive icon (instead of default white)
           echo "🎨 Setting dark icon background color..."

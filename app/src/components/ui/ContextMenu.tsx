@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { vibrate } from '@tauri-apps/plugin-haptics'
 
 export interface ContextMenuItem {
   label: string
@@ -32,6 +33,7 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startPosition = useRef<{ x: number; y: number } | null>(null)
   const targetPosition = useRef<{ x: number; y: number } | null>(null)
+  const isLongPressActive = useRef(false)
 
   const close = useCallback(() => {
     setIsOpen(false)
@@ -121,10 +123,18 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0]
     startPosition.current = { x: touch.clientX, y: touch.clientY }
+    isLongPressActive.current = false
     
     longPressTimer.current = setTimeout(() => {
       // Vibrate on supported devices
-      if (navigator.vibrate) navigator.vibrate(50)
+      try {
+        vibrate(50).catch(() => {
+          if (navigator.vibrate) navigator.vibrate(50)
+        })
+      } catch (err) {
+        if (navigator.vibrate) navigator.vibrate(50)
+      }
+      isLongPressActive.current = true
       openMenu(touch.clientX, touch.clientY)
     }, 500)
   }
@@ -142,11 +152,16 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
     }
   }
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
+
+    if (isLongPressActive.current) {
+      if (e.cancelable) e.preventDefault()
+    }
+
     startPosition.current = null
   }
 

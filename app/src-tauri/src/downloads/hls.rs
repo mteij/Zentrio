@@ -78,18 +78,13 @@ pub async fn download_hls(
     let mut bytes_total: i64 = 0;
 
     for url in &segment_urls {
-        // Pause / cancel check
-        if paused.lock().unwrap().contains(&id.to_string()) {
+        // Pause / cancel check — manager.pause() already updated DB and emitted event
+        if paused
+            .lock()
+            .map(|p| p.contains(&id.to_string()))
+            .unwrap_or(false)
+        {
             output.flush().await.ok();
-            db.lock().unwrap()
-                .update_status(id, &super::db::DownloadStatus::Paused)
-                .ok();
-            emit_status(&app, StatusPayload {
-                id: id.to_string(),
-                status: "paused".into(),
-                file_path: None,
-                error: None,
-            });
             return Ok(());
         }
 
@@ -260,7 +255,7 @@ async fn download_segment(client: &Client, url: &str) -> Result<Vec<u8>, String>
             Err(e) if attempts < 3 => {
                 attempts += 1;
                 tokio::time::sleep(std::time::Duration::from_millis(500 * attempts as u64)).await;
-                eprintln!("[HLS] Retrying segment ({attempts}/3): {url} — {e}");
+                log::warn!("[HLS] Retrying segment ({attempts}/3): {url} — {e}");
             }
             Err(e) => return Err(e.to_string()),
         }

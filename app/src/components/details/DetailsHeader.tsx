@@ -7,6 +7,7 @@ import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { QualityPicker } from '../downloads/QualityPicker'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadForMedia } from '../../hooks/useDownloads'
+import { useDownloadStore } from '../../stores/downloadStore'
 import dlStyles from '../downloads/Downloads.module.css'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
@@ -48,6 +49,7 @@ export function DetailsHeader({
   const navigate = useNavigate()
   const [showQualityPicker, setShowQualityPicker] = useState(false)
   const existingDownload = useDownloadForMedia(meta.id)
+  const addDownload = useDownloadStore((s) => s.addDownload)
 
   const handleDownload = async (quality: DownloadQuality) => {
     setShowQualityPicker(false)
@@ -63,7 +65,7 @@ export function DetailsHeader({
 
     try {
       const stream = JSON.parse(streamJson)
-      await downloadService.start({
+      const id = await downloadService.start({
         profileId: profileId.toString(),
         mediaType: meta.type as 'movie' | 'series',
         mediaId: meta.id,
@@ -72,6 +74,27 @@ export function DetailsHeader({
         streamUrl: stream.url || '',
         addonId: stream.addonId || '',
         quality,
+      })
+      // Optimistically add to store so queued state is visible immediately
+      addDownload({
+        id,
+        profileId: profileId.toString(),
+        mediaType: meta.type as 'movie' | 'series',
+        mediaId: meta.id,
+        title: meta.name,
+        posterPath: meta.poster || '',
+        status: 'queued',
+        progress: 0,
+        quality,
+        filePath: '',
+        fileSize: 0,
+        downloadedBytes: 0,
+        addedAt: Date.now(),
+        watchedPercent: 0,
+        streamUrl: stream.url || '',
+        addonId: stream.addonId || '',
+        smartDownload: false,
+        autoDelete: false,
       })
       import('sonner').then(({ toast }) => toast.success(`Downloading: ${meta.name}`))
     } catch (e) {

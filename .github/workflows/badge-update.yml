@@ -12,6 +12,9 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   update-badge:
     name: Update Badge
@@ -57,6 +60,10 @@ jobs:
             echo "No metrics file found, using defaults"
           fi
 
+          export SCORE
+          export GRADE
+          export COLOR
+
           echo "score=$SCORE" >> "$GITHUB_OUTPUT"
           echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
           echo "color=$COLOR" >> "$GITHUB_OUTPUT"
@@ -82,10 +89,6 @@ jobs:
           print(f'✅ Wrote {out}')
           print(json.dumps(data, indent=2))
           PYEOF
-        env:
-          SCORE: ${{ steps.generate.outputs.score }}
-          GRADE: ${{ steps.generate.outputs.grade }}
-          COLOR: ${{ steps.generate.outputs.color }}
 
       - name: Check if badge changed
         id: check
@@ -98,23 +101,9 @@ jobs:
             echo "Badge changes detected"
           fi
 
-      - name: Create Pull Request
+      - name: Commit and push changes
         if: steps.check.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update quality badge [skip ci]"
-          title: "chore: update quality badge"
-          body: |
-            ## 📊 Quality Score Update
-
-            This PR updates the code quality badge based on the latest analysis.
-
-            **Score:** ${{ steps.generate.outputs.score }}/100 (**${{ steps.generate.outputs.grade }}**)
-
-            Changes are automated and reflect the current code quality metrics.
-          branch: update-quality-badge
-          delete-branch: true
-          base: main
-          add-paths: |
-            .github/badges/quality.json
+          commit_message: "chore: update quality badge [skip ci]"
+          file_pattern: .github/badges/quality.json

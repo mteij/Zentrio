@@ -6,6 +6,7 @@ import { LazyImage } from '../../components'
 import { ContextMenu } from '../../components/ui/ContextMenu'
 import { QualityPicker } from '../downloads/QualityPicker'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
+import { useDownloadStore } from '../../stores/downloadStore'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
 import { createLogger } from '../../utils/client-logger'
@@ -42,6 +43,7 @@ export function EpisodeList({
   profileId
 }: EpisodeListProps) {
   const [pickerEpisode, setPickerEpisode] = useState<{ season: number; episode: number; title: string; episodeId: string } | null>(null)
+  const addDownload = useDownloadStore((s) => s.addDownload)
 
   const handleDownloadEpisode = async (quality: DownloadQuality) => {
     if (!pickerEpisode) return
@@ -60,7 +62,7 @@ export function EpisodeList({
 
     try {
       const stream = JSON.parse(streamJson)
-      await downloadService.start({
+      const id = await downloadService.start({
         profileId,
         mediaType: 'series',
         mediaId: meta.id,
@@ -73,6 +75,31 @@ export function EpisodeList({
         streamUrl: stream.url || '',
         addonId: stream.addonId || '',
         quality,
+      })
+      // Optimistically add to store so queued state is visible immediately
+      addDownload({
+        id,
+        profileId,
+        mediaType: 'series',
+        mediaId: meta.id,
+        episodeId: pickerEpisode.episodeId,
+        title: meta.name,
+        episodeTitle: pickerEpisode.title,
+        season: pickerEpisode.season,
+        episode: pickerEpisode.episode,
+        posterPath: meta.poster || '',
+        status: 'queued',
+        progress: 0,
+        quality,
+        filePath: '',
+        fileSize: 0,
+        downloadedBytes: 0,
+        addedAt: Date.now(),
+        watchedPercent: 0,
+        streamUrl: stream.url || '',
+        addonId: stream.addonId || '',
+        smartDownload: false,
+        autoDelete: false,
       })
       import('sonner').then(({ toast }) =>
         toast.success(`Downloading: ${pickerEpisode.title}`)

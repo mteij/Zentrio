@@ -4510,6 +4510,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-haptics"
+version = "2.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01b167d598ada05c599f4460595108c8d1aa636030a97d19796c1bcda97d881d"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "tauri-plugin-http"
 version = "2.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6238,9 +6252,10 @@ dependencies = [
 
 [[package]]
 name = "zentrio"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "futures-util",
+ "log",
  "m3u8-rs",
  "reqwest",
  "rusqlite",
@@ -6251,6 +6266,7 @@ dependencies = [
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
+ "tauri-plugin-haptics",
  "tauri-plugin-http",
  "tauri-plugin-notification",
  "tauri-plugin-opener",
