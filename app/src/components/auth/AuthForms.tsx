@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmailVerificationModal } from "./EmailVerificationModal";
+import { appMode } from '../../lib/app-mode'
 
 import { useLoginBehavior, getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
 import { useSessionDuration } from "../../hooks/useSessionDuration";
@@ -178,11 +179,9 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       if (isTauri()) {
         // For Tauri apps, ensure connected mode is set and navigate to profiles
         // Don't clear state - preserve server URL that was set during onboarding
-        import('../../lib/app-mode').then(({ appMode }) => {
-          appMode.set('connected');
-          // Navigate to profiles
-          window.location.href = '/profiles';
-        });
+        appMode.set('connected');
+        // Navigate to profiles
+        window.location.href = '/profiles';
         return true;
       }
     }

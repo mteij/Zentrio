@@ -1,4 +1,5 @@
 import { Play, Trash2, CheckCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { DownloadRecord, downloadService } from '../../services/downloads/download-service'
 import styles from './Downloads.module.css'
 import { useNavigate } from 'react-router-dom'
@@ -64,7 +65,7 @@ export function DownloadCard({ record, profileId, onDelete }: Props) {
       navigate(`/streaming/${profileId}/player`, { state: { stream, meta } })
     } catch (e) {
       log.error('play download error', e)
-      import('sonner').then(({ toast }) => toast.error('Failed to open downloaded file'))
+      toast.error('Failed to open downloaded file')
     }
   }
 

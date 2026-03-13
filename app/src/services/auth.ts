@@ -128,7 +128,7 @@ export const auth = betterAuth({
         phoneNumber({
             async sendOTP({ phoneNumber, code }, _ctx) {
                 // Never silently succeed in production without a delivery channel.
-                if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
+                if ((process.env.NODE_ENV || '').trim().toLowerCase() === 'production') {
                     throw new Error('Phone OTP provider not configured')
                 }
 

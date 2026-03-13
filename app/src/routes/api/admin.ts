@@ -665,7 +665,7 @@ app.post('/stepup/request', adminSessionMiddleware, async (c) => {
     } catch (emailErr) {
       // In non-production: log OTP to console as a dev fallback so step-up can be tested
       // without valid email credentials (mirrors phone OTP dev fallback in auth.ts)
-      if (process.env.NODE_ENV !== 'production') {
+      if ((process.env.NODE_ENV || '').trim().toLowerCase() !== 'production') {
         log.warn(`Email delivery failed — dev fallback OTP for ${emailDest}: ${otp}`)
       } else {
         log.error('Failed to send step-up OTP email:', emailErr)

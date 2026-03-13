@@ -27,7 +27,6 @@ export {
 // Engine implementations
 export { WebPlayerEngine } from './WebPlayerEngine'
 export { TauriPlayerEngine } from './TauriPlayerEngine'
-export { HybridPlayerEngine } from './HybridPlayerEngine'
 
 // Factory functions
 export {

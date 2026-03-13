@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play, Youtube, Check, List, Info, Eye, EyeOff, Download, CheckCircle, Loader } from 'lucide-react'
+import { toast } from 'sonner'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { QualityPicker } from '../downloads/QualityPicker'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
@@ -78,9 +79,7 @@ export function DetailsHeader({
         mediaId: meta.id,
       })
       if (!stream) {
-        import('sonner').then(({ toast }) =>
-          toast.error('Could not resolve a stream yet. Please try again in a moment.')
-        )
+        toast.error('Could not resolve a stream yet. Please try again in a moment.')
         return
       }
 
@@ -115,10 +114,10 @@ export function DetailsHeader({
         smartDownload: false,
         autoDelete: false,
       })
-      import('sonner').then(({ toast }) => toast.success(`Downloading: ${meta.name}`))
+      toast.success(`Downloading: ${meta.name}`)
     } catch (e) {
       log.error('download start failed', e)
-      import('sonner').then(({ toast }) => toast.error('Failed to start download'))
+      toast.error('Failed to start download')
     } finally {
       setResolvingDownloadStream(false)
     }

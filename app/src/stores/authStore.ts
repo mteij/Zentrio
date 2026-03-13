@@ -2,6 +2,8 @@ import React from 'react'
 import { create } from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
 import { authClient, getAuthClient } from '../lib/auth-client'
+import { appMode } from '../lib/app-mode'
+import { apiFetch } from '../lib/apiFetch'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('AuthStore')
@@ -106,10 +108,7 @@ export const useAuthStore = create<AuthState>()(
             get().reset()
             
             // Clear app mode and server URL to show onboarding wizard
-            // Import dynamically to avoid circular dependency
-            import('../lib/app-mode').then(({ appMode }) => {
-              appMode.clear()
-            })
+            appMode.clear()
             localStorage.removeItem('zentrio_server_url')
             
             // Reload to show onboarding wizard
@@ -131,7 +130,6 @@ export const useAuthStore = create<AuthState>()(
 
         refreshSession: async (token?: string) => {
           // In guest mode there is no auth server – skip entirely
-          const { appMode } = await import('../lib/app-mode');
           if (appMode.isGuest()) {
               return false;
           }
@@ -166,7 +164,6 @@ export const useAuthStore = create<AuthState>()(
                 // By-pass better-auth client entirely for session fetching
                 // better-auth has a bug where it completely ignores fetchOptions.customFetch for session probing
                 // This causes Tauri to send requests WITHOUT the Authorization header, returning 401s for valid tokens.
-                const { apiFetch } = await import('../lib/apiFetch');
                 const rawResponse = await apiFetch('/api/auth/get-session');
                 
                 if (rawResponse.ok) {

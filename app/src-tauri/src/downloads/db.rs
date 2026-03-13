@@ -425,6 +425,7 @@ impl DownloadDb {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn update_smart_flags(&self, id: &str, smart: bool, auto_delete: bool) -> Result<()> {
         self.conn.execute(
             "UPDATE downloads SET smart_download=?1, auto_delete=?2 WHERE id=?3",

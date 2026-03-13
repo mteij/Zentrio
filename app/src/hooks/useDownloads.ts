@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
+import { toast } from 'sonner'
 import { downloadService, DownloadRecord, DownloadQuality } from '../services/downloads/download-service'
 import { useDownloadStore } from '../stores/downloadStore'
 import { getTopStream } from '../lib/topStreamCache'
@@ -93,9 +94,7 @@ export function useDownloads(profileId: string | undefined) {
       })
 
       if (!stream) {
-        import('sonner').then(({ toast }) =>
-          toast.info('Smart Download: could not resolve the next episode source yet', { duration: 6000 })
-        )
+        toast.info('Smart Download: could not resolve the next episode source yet', { duration: 6000 })
         return
       }
 

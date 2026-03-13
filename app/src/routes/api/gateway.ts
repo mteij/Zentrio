@@ -25,6 +25,8 @@ const FORWARDABLE_READ_PREFIXES = [
   '/api/streaming/streams-live'
 ]
 
+const isProductionEnv = () => (process.env.NODE_ENV || '').trim().toLowerCase() === 'production'
+
 const normalizeOrigin = (value?: string | null): string | null => {
   const raw = value?.trim()
   if (!raw) return null
@@ -41,7 +43,7 @@ const normalizeOrigin = (value?: string | null): string | null => {
 
 const isLocalGatewayHost = (hostHeader?: string | null): boolean => {
   const host = (hostHeader || '').trim().toLowerCase()
-  if (!host) return process.env.NODE_ENV !== 'production'
+  if (!host) return !isProductionEnv()
 
   // Strip port for host checks
   const hostWithoutPort = host.startsWith('[')

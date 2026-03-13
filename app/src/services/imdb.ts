@@ -206,6 +206,8 @@ export function initImdbService() {
     logger.info('IMDb database is empty, starting initial download...')
     // Run in background to not block startup
     setTimeout(() => downloadAndProcessRatings(), 5000)
+  } else {
+    logger.info(`IMDb database already loaded (${count.count} ratings). Refreshing in ${updateIntervalHours}h`)
   }
 
   // Schedule periodic updates

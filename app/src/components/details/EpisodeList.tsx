@@ -2,6 +2,7 @@
 // Extracted from Details.tsx
 import { useEffect, useState } from 'react'
 import { Play, Eye, EyeOff, ChevronUp, Check, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import { LazyImage } from '../../components'
 import { ContextMenu } from '../../components/ui/ContextMenu'
 import { QualityPicker } from '../downloads/QualityPicker'
@@ -95,7 +96,7 @@ export function EpisodeList({
     setPickerEpisode(null)
 
     if (!profileId) {
-      import('sonner').then(({ toast }) => toast.error('Missing profile context for download'))
+      toast.error('Missing profile context for download')
       return
     }
 
@@ -108,9 +109,7 @@ export function EpisodeList({
         episode: selected.episode,
       })
       if (!stream) {
-        import('sonner').then(({ toast }) =>
-          toast.error('Could not resolve a stream for this episode. Please try again.')
-        )
+        toast.error('Could not resolve a stream for this episode. Please try again.')
         return
       }
 
@@ -153,12 +152,10 @@ export function EpisodeList({
         smartDownload: false,
         autoDelete: false,
       })
-      import('sonner').then(({ toast }) =>
-        toast.success(`Downloading: ${selected.title}`)
-      )
+      toast.success(`Downloading: ${selected.title}`)
     } catch (e) {
       log.error('episode download error', e)
-      import('sonner').then(({ toast }) => toast.error('Failed to start download'))
+      toast.error('Failed to start download')
     }
   }
   

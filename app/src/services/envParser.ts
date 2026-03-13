@@ -64,7 +64,8 @@ export function getConfig() {
 
   const PORT = Number(process.env.PORT ?? 3000)
   const DATABASE_URL = process.env.DATABASE_URL ?? './data/zentrio.db'
-  const isProduction = process.env.NODE_ENV === 'production'
+  const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase()
+  const isProduction = nodeEnv === 'production'
   const getSecret = (key: string, fallback: string) => {
     const val = process.env[key]
     if (val) return val

@@ -36,7 +36,8 @@ try {
 
 // ─── Startup Display ──────────────────────────────────────────────────
 const c = logger.colors
-const isDev = process.env.NODE_ENV !== 'production'
+const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase()
+const isDev = nodeEnv !== 'production'
 const mode = isDev ? `${c.yellow}development${c.reset}` : `${c.green}production${c.reset}`
 
 // Gather status checks

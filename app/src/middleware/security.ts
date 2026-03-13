@@ -3,6 +3,7 @@ import { getConfig } from '../services/envParser'
 import { logger } from '../services/logger'
 
 const log = logger.scope('Security')
+const isProductionEnv = () => (process.env.NODE_ENV || '').trim().toLowerCase() === 'production'
 
 // Rate limiting storage
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -26,7 +27,7 @@ export const corsMiddleware = (origins?: string[]) => {
     const origin = c.req.header('origin')
     
     // Debug CORS in development
-    if (process.env.NODE_ENV !== 'production' && origin && !allowedOrigins.includes(origin)) {
+    if (!isProductionEnv() && origin && !allowedOrigins.includes(origin)) {
         log.debug(`Blocking origin: ${origin}. Allowed:`, allowedOrigins)
     }
 
@@ -49,11 +50,11 @@ export const corsMiddleware = (origins?: string[]) => {
     // Tauri often sends origin as tauri://localhost or http://tauri.localhost
     const isTauriMatch = cleanOrigin && (cleanOrigin.startsWith('tauri://') || cleanOrigin.includes('tauri.localhost'));
     // Android Emulator sends requests from http://10.0.2.2 — dev only, never allow in production
-    const isAndroidMatch = process.env.NODE_ENV !== 'production' && cleanOrigin && cleanOrigin.startsWith('http://10.');
+    const isAndroidMatch = !isProductionEnv() && cleanOrigin && cleanOrigin.startsWith('http://10.');
 
     if (isExactMatch || isCleanMatch || isTauriMatch || isAndroidMatch) {
       corsHeaders['Access-Control-Allow-Origin'] = origin as string;
-    } else if (process.env.NODE_ENV !== 'production' && origin) {
+    } else if (!isProductionEnv() && origin) {
       // In development, be more permissive with local origins to prevent dev blocking
       if (origin.startsWith('http://localhost')) {
          corsHeaders['Access-Control-Allow-Origin'] = origin;

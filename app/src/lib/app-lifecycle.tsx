@@ -6,6 +6,8 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { listen } from '@tauri-apps/api/event';
+import { toast } from 'sonner';
 import { isTauri } from './auth-client';
 import { useAuthStore } from '../stores/authStore';
 import { createLogger } from '../utils/client-logger'
@@ -44,7 +46,6 @@ export function useAppLifecycle() {
         const { type } = await import('@tauri-apps/plugin-os');
         const osType = await type();
         if (osType === 'android') {
-          const { toast } = await import('sonner');
           toast.error('Cannot connect to dev server', {
             description: 'Run: bun run android:ports',
             duration: 10000,
@@ -96,7 +97,6 @@ export function useAppLifecycle() {
     
     const setupTauriListener = async () => {
       try {
-        const { listen } = await import('@tauri-apps/api/event');
         const unlisten = await listen('tauri://focus', async () => {
           const timeSinceLastChange = Date.now() - lastVisibilityChange.current;
           if (timeSinceLastChange > MIN_BACKGROUND_MS) {
