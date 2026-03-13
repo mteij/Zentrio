@@ -23,6 +23,9 @@ import type {
   AudioTrack,
   QualityLevel
 } from './types'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('HybridPlayerEngine')
 
 // Lazy load hybrid media dependencies
 const HybridEnginePromise = import('../../../services/hybrid-media/HybridEngine').then(m => m.HybridEngine)
@@ -98,7 +101,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     }
 
     if (this.video) {
-      console.warn('[HybridPlayerEngine] Already initialized, destroying previous instance')
+      log.warn('Already initialized, destroying previous instance')
       await this.destroy()
     }
 
@@ -113,7 +116,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     }
 
     this.isInitialized = true
-    console.log('[HybridPlayerEngine] Initialized')
+    log.debug('Initialized')
   }
 
   async loadSource(source: MediaSource): Promise<void> {
@@ -127,7 +130,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     this.currentSource = source
     const { src } = source
 
-    console.log('[HybridPlayerEngine] Loading source:', src.substring(0, 80))
+    log.debug('Loading source:', src.substring(0, 80))
 
     // Reset state
     this.state = {
@@ -144,7 +147,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     // Check cache first
     const cached = probeCache.get(src)
     if (cached) {
-      console.log('[HybridPlayerEngine] Using cached probe result:', cached.mode)
+      log.debug('Using cached probe result:', cached.mode)
       if (cached.mode === 'hybrid') {
         this.state.duration = cached.duration || 0
         await this.startHybridPlayback(src)
@@ -162,18 +165,18 @@ export class HybridPlayerEngine implements IPlayerEngine {
       ])
 
       if (!mightNeedHybrid(src)) {
-        console.log('[HybridPlayerEngine] Source likely plays natively')
+        log.debug('Source likely plays natively')
         probeCache.set(src, { mode: 'native' })
         await this.startNativePlayback(src)
         return
       }
 
       // Probe for metadata
-      console.log('[HybridPlayerEngine] Probing source for codec info...')
+      log.debug('Probing source for codec info...')
       const metadata = await TranscoderService.probe(src)
       
       if (!metadata) {
-        console.log('[HybridPlayerEngine] No metadata, trying native playback')
+        log.debug('No metadata, trying native playback')
         probeCache.set(src, { mode: 'native' })
         await this.startNativePlayback(src)
         return
@@ -184,7 +187,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
       const engine = new HybridEngine(src, metadata)
 
       if (engine.requiresHybridPlayback) {
-        console.log('[HybridPlayerEngine] Hybrid playback required')
+        log.debug('Hybrid playback required')
         this.hybridEngine = engine
         this.needsTranscoding = true
         
@@ -194,12 +197,12 @@ export class HybridPlayerEngine implements IPlayerEngine {
         
         await this.startHybridPlayback(src)
       } else {
-        console.log('[HybridPlayerEngine] Native playback sufficient')
+        log.debug('Native playback sufficient')
         probeCache.set(src, { mode: 'native' })
         await this.startNativePlayback(src)
       }
     } catch (error) {
-      console.error('[HybridPlayerEngine] Probe failed, falling back to native:', error)
+      log.error('Probe failed, falling back to native:', error)
       probeCache.set(src, { mode: 'native' })
       await this.startNativePlayback(src)
     }
@@ -220,7 +223,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     if (!this.video || !this.hybridEngine) return
 
     this.isHybridMode = true
-    console.log('[HybridPlayerEngine] Starting hybrid playback...')
+    log.debug('Starting hybrid playback...')
 
     try {
       // Initialize the hybrid engine with our video element
@@ -241,12 +244,12 @@ export class HybridPlayerEngine implements IPlayerEngine {
       })
 
       this.hybridEngine.addEventListener('error', (e: any) => {
-        console.error('[HybridPlayerEngine] Hybrid engine error:', e.detail.error)
+        log.error('Hybrid engine error:', e.detail.error)
         this.emit('error', e.detail.error)
       })
 
       this.hybridEngine.addEventListener('audioready', () => {
-        console.log('[HybridPlayerEngine] Audio ready')
+        log.debug('Audio ready')
         this.state.ready = true
         this.state.buffering = false
         this.emit('canplay')
@@ -262,7 +265,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
       this.emit('statechange', { paused: false })
 
     } catch (error) {
-      console.error('[HybridPlayerEngine] Hybrid playback failed:', error)
+      log.error('Hybrid playback failed:', error)
       // Fall back to native
       this.isHybridMode = false
       await this.startNativePlayback(src)
@@ -357,7 +360,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
   }
 
   async destroy(): Promise<void> {
-    console.log('[HybridPlayerEngine] Destroying...')
+    log.debug('Destroying...')
 
     await this.cleanupSource()
     
@@ -366,7 +369,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     this.currentSource = null
     this.isInitialized = false
 
-    console.log('[HybridPlayerEngine] Destroyed')
+    log.debug('Destroyed')
   }
 
   // ============================================
@@ -600,7 +603,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
           (handler as Function)(...args)
         } catch (error) {
-          console.error(`[HybridPlayerEngine] Error in ${event} handler:`, error)
+          log.error(`Error in ${event} handler:`, error)
         }
       })
     }

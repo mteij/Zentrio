@@ -3,6 +3,9 @@ import { sessionMiddleware } from '../../middleware/session'
 import { emailService } from '../../services/email'
 import { getConfig } from '../../services/envParser'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Lists')
 
 const lists = createTaggedOpenAPIApp<{
   Variables: {
@@ -263,12 +266,12 @@ lists.post('/:id/share', sessionMiddleware, async (c) => {
         acceptUrl
       )
     } catch (e) {
-      console.error('Failed to send share email:', e)
+      log.error('Failed to send share email:', e)
     }
 
     return c.json({ share, emailSent })
   } catch (e) {
-    console.error('Failed to create share:', e)
+    log.error('Failed to create share:', e)
     return c.json({ error: 'Failed to create share' }, 500)
   }
 })
@@ -491,7 +494,7 @@ lists.post('/:id/share-with-profile', sessionMiddleware, async (c) => {
     if (e.message?.includes('UNIQUE constraint')) {
       return c.json({ error: 'Already shared with this profile' }, 400)
     }
-    console.error('Failed to create profile share:', e)
+    log.error('Failed to create profile share:', e)
     return c.json({ error: 'Failed to share list' }, 500)
   }
 })

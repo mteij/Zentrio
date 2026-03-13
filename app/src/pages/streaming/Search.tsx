@@ -6,6 +6,9 @@ import { MetaPreview } from '../../services/addons/types'
 import { SearchCatalogRow } from '../../components/features/SearchCatalogRow'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('SearchPage')
 
 interface CatalogSearchResult {
   addon: { id: string; name: string; logo?: string }
@@ -140,7 +143,7 @@ export const StreamingSearch = () => {
       if (err instanceof Error && err.name === 'AbortError') {
         return
       }
-      console.error(err)
+      log.error(err)
       setError('Failed to search')
     } finally {
       // Only set loading false if this request wasn't aborted

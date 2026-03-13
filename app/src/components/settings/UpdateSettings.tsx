@@ -4,6 +4,9 @@ import { RefreshCw, Download, CheckCircle, Smartphone, Globe } from 'lucide-reac
 import { getVersion } from '@tauri-apps/api/app';
 import { UpdateModal } from './modals/UpdateModal';
 import { toast } from 'sonner';
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('UpdateSettings')
 
 declare const __APP_VERSION__: string;
 
@@ -38,7 +41,7 @@ export function UpdateSettings() {
 
                 setPlatformName(osName as PlatformType);
             } catch (e) {
-                console.error("Failed to detect platform", e);
+                log.error("Failed to detect platform", e);
             }
         } catch (e) {
             setCurrentVersion(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'Web');
@@ -81,7 +84,7 @@ export function UpdateSettings() {
           } catch (updaterErr) {
               // Tauri updater failed (e.g. network error, 404 on latest.json).
               // Fall through to the GitHub API fallback below.
-              console.warn('Tauri updater failed, falling back to GitHub API:', updaterErr);
+              log.warn('Tauri updater failed, falling back to GitHub API:', updaterErr);
           }
 
           if (!tauriUpdateFound) {
@@ -153,7 +156,7 @@ export function UpdateSettings() {
       setLastChecked(new Date());
 
     } catch (e: any) {
-      console.error(e);
+      log.error(e);
       if (!silent) toast.error('Update Check Failed', { description: e.message || 'Could not check for updates.' });
     } finally {
       setLoading(false);

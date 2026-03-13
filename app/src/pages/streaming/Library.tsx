@@ -21,6 +21,9 @@ import {
   type SharingType 
 } from '../../components/library/LibrarySidebar'
 import { toast } from 'sonner'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('LibraryPage')
 
 export const StreamingLibrary = () => {
   const { profileId, listId } = useParams<{ profileId: string, listId?: string }>()
@@ -108,7 +111,7 @@ export const StreamingLibrary = () => {
         }
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Failed to leave list')
     }
   }
@@ -124,7 +127,7 @@ export const StreamingLibrary = () => {
         }
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Failed to leave list')
     }
   }
@@ -144,7 +147,7 @@ export const StreamingLibrary = () => {
         toast.error(data.error || 'Failed to accept invitation')
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Failed to accept invitation')
     }
   }
@@ -157,7 +160,7 @@ export const StreamingLibrary = () => {
         toast.success('Invitation declined')
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Failed to decline invitation')
     }
   }
@@ -170,7 +173,7 @@ export const StreamingLibrary = () => {
         refreshLibrary()
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Failed to add list to profile')
     }
   }

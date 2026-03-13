@@ -10,6 +10,10 @@
  * a simpler approach that works reliably.
  */
 
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('Demuxer')
+
 export interface DemuxerConfig {
   /** Segment duration in seconds (default: 2s) */
   segmentDuration?: number
@@ -45,8 +49,8 @@ export class Demuxer extends EventTarget {
   async initialize(fileSize: number): Promise<void> {
     this.fileSize = fileSize
     
-    console.log('[Demuxer] Initialized with file size:', (fileSize / 1024 / 1024).toFixed(2), 'MB')
-    console.log('[Demuxer] Note: Using simplified approach for reliable streaming')
+    log.debug('Initialized with file size:', (fileSize / 1024 / 1024).toFixed(2), 'MB')
+    log.debug('Note: Using simplified approach for reliable streaming')
     
     this.isInitialized = true
   }
@@ -71,7 +75,7 @@ export class Demuxer extends EventTarget {
       // Track progress
       const percent = Math.round((this.processedSize / this.fileSize) * 100)
       if (percent % 10 === 0) {
-        console.log(`[Demuxer] Progress: ${percent}% (${(this.processedSize / 1024 / 1024).toFixed(1)}MB)`)
+        log.debug(`Progress: ${percent}% (${(this.processedSize / 1024 / 1024).toFixed(1)}MB)`)
       }
     } finally {
       this.isProcessing = false
@@ -82,7 +86,7 @@ export class Demuxer extends EventTarget {
    * Stop demuxing
    */
   stop(): void {
-    console.log('[Demuxer] Stopping...')
+    log.debug('Stopping...')
     this.shouldStop = true
   }
 
@@ -92,7 +96,7 @@ export class Demuxer extends EventTarget {
   destroy(): void {
     this.isInitialized = false
     this.isProcessing = false
-    console.log('[Demuxer] Destroyed')
+    log.debug('Destroyed')
   }
 
   // Getters

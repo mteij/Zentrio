@@ -18,6 +18,9 @@ import styles from '../../styles/Player.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 import { resolveBeaconUrl, createApiEventSource } from '../../lib/url'
 import type { FlatStream } from '../../hooks/useStreamLoader'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('PlayerPage')
 
 /* ─── Immersive mode (Android only) ─── */
 const setImmersiveMode = async (enabled: boolean) => {
@@ -285,7 +288,7 @@ export const StreamingPlayer = () => {
 
         void subPromise
       } catch (e) {
-        console.error('Failed to init player', e)
+        log.error('Failed to init player', e)
         if (cancelled) return
         setPageError('Invalid player parameters')
         setLoading(false)
@@ -327,7 +330,7 @@ export const StreamingPlayer = () => {
             position: t, duration: d,
             title: meta.name, poster: meta.poster
           })
-        }).catch(console.error)
+        }).catch((e: any) => log.error('Error:', e))
       }
     }
 
@@ -374,7 +377,7 @@ export const StreamingPlayer = () => {
   }, [])
 
   const handleError = useCallback((err: Error) => {
-    console.error('Playback error:', err)
+    log.error('Playback error:', err)
     toast.error('Playback error: ' + err.message)
   }, [])
 

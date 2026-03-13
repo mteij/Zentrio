@@ -4,6 +4,9 @@ import { Button, InputDialog, ConfirmDialog } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { useAuthStore } from '../../stores/authStore'
 import { apiFetch } from '../../lib/apiFetch'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('DangerZone')
 
 export function DangerZoneSettings() {
   const [showTypeDelete, setShowTypeDelete] = useState(false)
@@ -40,7 +43,7 @@ export function DangerZoneSettings() {
         toast.error('Deletion Failed', { description: 'Failed to delete account' })
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Network Error', { description: 'Network error' })
     }
   }

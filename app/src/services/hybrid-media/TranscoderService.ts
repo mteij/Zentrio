@@ -17,6 +17,9 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 import type { MediaMetadata, MediaStream, MediaFormat } from './types'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('Transcoder')
 
 /**
  * Check if running in Tauri environment
@@ -118,7 +121,7 @@ class TranscoderServiceClass {
 
         // Set up logging
         this.ffmpeg.on('log', ({ message }) => {
-          console.log('[FFmpeg]', message)
+          log.debug('', message)
         })
 
         // Load from CDN with proper CORS headers
@@ -130,9 +133,9 @@ class TranscoderServiceClass {
         })
 
         this.isLoaded = true
-        console.log('[TranscoderService] FFmpeg WASM loaded successfully')
+        log.debug('FFmpeg WASM loaded successfully')
       } catch (error) {
-        console.error('[TranscoderService] Failed to load FFmpeg:', error)
+        log.error('Failed to load FFmpeg:', error)
         throw error
       } finally {
         this.isLoading = false
@@ -162,7 +165,7 @@ class TranscoderServiceClass {
     }
 
     const codecName = this.getCodecName(codecId)
-    console.log(`[TranscoderService] Transcoding ${codecName} audio to AAC...`)
+    log.debug(`Transcoding ${codecName} audio to AAC...`)
 
     // Generate unique filenames to avoid conflicts with concurrent operations
     const transcodeId = `transcode_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
@@ -177,7 +180,7 @@ class TranscoderServiceClass {
       })
 
       // Fetch the source file
-      console.log('[TranscoderService] Fetching source file...')
+      log.debug('Fetching source file...')
       const sourceData = await fetchFile(sourceUrl)
       
       // Write input file to virtual filesystem
@@ -198,7 +201,7 @@ class TranscoderServiceClass {
         outputFilename
       ]
 
-      console.log('[TranscoderService] Running FFmpeg:', ffmpegArgs.join(' '))
+      log.debug('Running FFmpeg:', ffmpegArgs.join(' '))
       await this.ffmpeg.exec(ffmpegArgs)
 
       // Read output file
@@ -223,15 +226,15 @@ class TranscoderServiceClass {
       try {
         await this.ffmpeg.deleteFile(inputFilename)
       } catch (err) {
-        console.warn('[TranscoderService] Failed to delete input file:', err)
+        log.warn('Failed to delete input file:', err)
       }
       try {
         await this.ffmpeg.deleteFile(outputFilename)
       } catch (err) {
-        console.warn('[TranscoderService] Failed to delete output file:', err)
+        log.warn('Failed to delete output file:', err)
       }
 
-      console.log(`[TranscoderService] Transcoding complete: ${audioUrl}`)
+      log.debug(`Transcoding complete: ${audioUrl}`)
 
       return {
         audioUrl,
@@ -241,7 +244,7 @@ class TranscoderServiceClass {
         }
       }
     } catch (error) {
-      console.error('[TranscoderService] Transcoding failed:', error)
+      log.error('Transcoding failed:', error)
       
       // Cleanup files on error
       try {
@@ -302,7 +305,7 @@ class TranscoderServiceClass {
       try {
         await this.ffmpeg.deleteFile(inputFilename)
       } catch (err) {
-        console.warn('[TranscoderService] Failed to delete probe input file:', err)
+        log.warn('Failed to delete probe input file:', err)
       }
 
       if (audioMatch) {
@@ -325,7 +328,7 @@ class TranscoderServiceClass {
 
       return null
     } catch (error) {
-      console.warn('[TranscoderService] Probe failed:', error)
+      log.warn('Probe failed:', error)
       
       // Cleanup input file on error - use try/catch to handle case where file might not exist
       try {
@@ -345,12 +348,12 @@ class TranscoderServiceClass {
    * Uses Range requests to only download the first few MB (where metadata lives)
    */
   async probe(sourceUrl: string): Promise<MediaMetadata | null> {
-    console.log('[TranscoderService] Starting lightweight probe for:', sourceUrl)
+    log.debug('Starting lightweight probe for:', sourceUrl)
     
     await this.load()
     
     if (!this.ffmpeg) {
-      console.error('[TranscoderService] FFmpeg not initialized')
+      log.error('FFmpeg not initialized')
       return null
     }
 
@@ -360,7 +363,7 @@ class TranscoderServiceClass {
 
     try {
       // Use Range request to fetch only first 5MB (metadata is at the beginning)
-      console.log('[TranscoderService] Fetching first 5MB for probing...')
+      log.debug('Fetching first 5MB for probing...')
       
       // Add timeout using AbortController
       const controller = new AbortController()
@@ -372,7 +375,7 @@ class TranscoderServiceClass {
       }).finally(() => clearTimeout(timeoutId))
       
       if (!response.ok && response.status !== 206 && response.status !== 200) {
-        console.error('[TranscoderService] HTTP error:', response.status, response.statusText)
+        log.error('HTTP error:', response.status, response.statusText)
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
@@ -380,17 +383,17 @@ class TranscoderServiceClass {
       if (response.status === 200 && response.headers.get('content-length')) {
         const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
         if (contentLength > 6 * 1024 * 1024) { // If > 6MB, server sent full file
-          console.warn('[TranscoderService] Server returned full file instead of range, aborting')
+          log.warn('Server returned full file instead of range, aborting')
           throw new Error('Server does not support Range requests')
         }
       }
       
       const sourceData = await response.arrayBuffer()
-      console.log('[TranscoderService] Source data fetched, size:', sourceData.byteLength)
+      log.debug('Source data fetched, size:', sourceData.byteLength)
       
       // Validate we got enough data
       if (sourceData.byteLength < 1000) {
-        console.warn('[TranscoderService] Received insufficient data, may not be valid media')
+        log.warn('Received insufficient data, may not be valid media')
         return null
       }
       
@@ -403,7 +406,7 @@ class TranscoderServiceClass {
       }
       this.ffmpeg.on('log', logHandler)
 
-      console.log('[TranscoderService] Running FFmpeg probe...')
+      log.debug('Running FFmpeg probe...')
       // Run FFprobe with JSON output
       await this.ffmpeg.exec([
         '-hide_banner',
@@ -412,11 +415,11 @@ class TranscoderServiceClass {
         '-'
       ]).catch((err) => {
         // FFmpeg returns error code when -f null but we have the probe output
-        console.log('[TranscoderService] FFmpeg probe completed (expected error for -f null):', err)
+        log.debug('FFmpeg probe completed (expected error for -f null):', err)
       })
 
-      console.log('[TranscoderService] Probe output length:', probeOutput.length)
-      console.log('[TranscoderService] Probe output preview:', probeOutput.substring(0, 500))
+      log.debug('Probe output length:', probeOutput.length)
+      log.debug('Probe output preview:', probeOutput.substring(0, 500))
 
       // Parse streams from output - improved regex to handle more formats
       const streams: MediaStream[] = []
@@ -436,7 +439,7 @@ class TranscoderServiceClass {
         })
       }
 
-      console.log('[TranscoderService] Parsed streams:', streams)
+      log.debug('Parsed streams:', streams)
 
       // Parse format name from output (e.g., "Input #0, matroska,webm, from '...'")
       const formatMatch = probeOutput.match(/Input\s+#\d+,\s+([^,]+)/)
@@ -458,7 +461,7 @@ class TranscoderServiceClass {
       try {
         await this.ffmpeg.deleteFile(inputFilename)
       } catch (err) {
-        console.warn('[TranscoderService] Failed to delete probe input file:', err)
+        log.warn('Failed to delete probe input file:', err)
       }
 
       const format: MediaFormat = {
@@ -468,10 +471,10 @@ class TranscoderServiceClass {
         format_long_name: formatName.charAt(0).toUpperCase() + formatName.slice(1)
       }
 
-      console.log('[TranscoderService] Probe result:', { streams, format })
+      log.debug('Probe result:', { streams, format })
 
       if (streams.length === 0) {
-        console.warn('[TranscoderService] No streams found in probe output')
+        log.warn('No streams found in probe output')
         return null
       }
 
@@ -480,7 +483,7 @@ class TranscoderServiceClass {
         format
       }
     } catch (error) {
-      console.error('[TranscoderService] Probe failed with error:', error)
+      log.error('Probe failed with error:', error)
       
       // Cleanup input file on error - use try/catch to handle case where file might not exist
       try {

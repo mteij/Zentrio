@@ -1,6 +1,9 @@
 import { addonDb } from '../../services/database'
 import { AddonClient } from '../../services/addons/client'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Addons')
 
 const app = createTaggedOpenAPIApp('Addons')
 
@@ -49,7 +52,7 @@ app.post('/', async (c) => {
     
     return c.json(addon)
   } catch (e) {
-    console.error('Failed to install addon', e)
+    log.error('Failed to install addon', e)
     return c.json({ error: 'Internal server error during installation' }, 500)
   }
 })
@@ -119,10 +122,10 @@ app.delete('/settings-profile/:settingsProfileId/:addonId', (c) => {
   const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
   const addonId = parseInt(c.req.param('addonId'))
   
-  console.log(`[API] DELETE /settings-profile/${settingsProfileId}/${addonId}`);
+  log.debug(`DELETE /settings-profile/${settingsProfileId}/${addonId}`);
   
   if (isNaN(settingsProfileId) || isNaN(addonId)) {
-    console.error('[API] Invalid parameters for remove addon');
+    log.error('Invalid parameters for remove addon');
     return c.json({ error: 'Invalid parameters' }, 400);
   }
 

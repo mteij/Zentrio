@@ -5,6 +5,9 @@ import { useLoginBehavior } from '../../hooks/useLoginBehavior'
 import { SplashScreen } from '../ui/SplashScreen'
 import { appMode } from '../../lib/app-mode'
 import { isTauri } from '../../lib/auth-client'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('AuthGuards')
 
 interface RouteGuardProps {
   children: ReactNode
@@ -37,13 +40,13 @@ export function ProtectedRoute({ children }: RouteGuardProps) {
 
     if (!isLoading && !isAuthenticated) {
       if (isTauri()) {
-        console.log('[ProtectedRoute] Session expired in Tauri, resetting mode for OnboardingWizard');
+        log.debug('Session expired in Tauri, resetting mode for OnboardingWizard');
         setRedirectInitiated(true);
         // Clear app mode and server URL to force OnboardingWizard
         appMode.clear();
         localStorage.removeItem('zentrio_server_url');
       } else {
-        console.log('[ProtectedRoute] Session expired in browser, redirecting to LandingPage');
+        log.debug('Session expired in browser, redirecting to LandingPage');
         setRedirectInitiated(true);
       }
       navigate('/', { replace: true });
@@ -97,7 +100,7 @@ export function PublicRoute({ children }: RouteGuardProps) {
     // Rely on authStore's onRehydrateStorage doing the actual verification
     // PublicRoute only observes the state to decide whether to skip the login page
     if (isAuthenticated && !isLoading) {
-       console.log('[PublicRoute] User is authenticated, redirecting to app...');
+       log.debug('User is authenticated, redirecting to app...');
        navigate(getRedirectPath(), { replace: true });
     }
   }, [hasHydrated, isAuthenticated, isLoading, navigate, getRedirectPath, isGuestMode]);

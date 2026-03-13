@@ -19,8 +19,8 @@ try {
 
 export const db = new Database(dbPath)
 
-// Enable foreign keys
-db.exec('PRAGMA foreign_keys = ON')
+// Enable foreign keys, WAL mode for concurrency, and a busy timeout to prevent SQLITE_BUSY
+db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;')
 
 // Create tables with full schema
 db.exec(`

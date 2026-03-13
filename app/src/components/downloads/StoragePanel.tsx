@@ -3,6 +3,9 @@ import { X, Settings, HardDrive, Trash2, FolderOpen, CheckCircle, Zap, RotateCcw
 import { open } from '@tauri-apps/plugin-dialog'
 import { downloadService, StorageStats, SmartDefaults } from '../../services/downloads/download-service'
 import styles from './Downloads.module.css'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('StoragePanel')
 
 interface Props {
   profileId: string
@@ -38,10 +41,10 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    downloadService.storageStats(profileId).then(setStats).catch(console.error)
-    downloadService.getDirectory().then(setDir).catch(console.error)
-    downloadService.getQuota(profileId).then(setQuota).catch(console.error)
-    downloadService.getSmartDefaults(profileId).then(setSmart).catch(console.error)
+    downloadService.storageStats(profileId).then(setStats).catch((e: any) => log.error('Error:', e))
+    downloadService.getDirectory().then(setDir).catch((e: any) => log.error('Error:', e))
+    downloadService.getQuota(profileId).then(setQuota).catch((e: any) => log.error('Error:', e))
+    downloadService.getSmartDefaults(profileId).then(setSmart).catch((e: any) => log.error('Error:', e))
   }, [profileId])
 
   const handleChangeDir = async () => {
@@ -52,7 +55,7 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
         setDir(selected)
       }
     } catch (e) {
-      console.error('[StoragePanel] folder picker error', e)
+      log.error('folder picker error', e)
     }
   }
 
@@ -63,7 +66,7 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
       setStats({ totalBytes: 0, count: 0 })
       onClear()
     } catch (e) {
-      console.error('[StoragePanel] clear error', e)
+      log.error('clear error', e)
     } finally { setConfirmed(false) }
   }
 
@@ -75,7 +78,7 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
         downloadService.setSmartDefaults(profileId, smart.smartDownload, smart.autoDelete),
       ])
     } catch (e) {
-      console.error('[StoragePanel] save error', e)
+      log.error('save error', e)
     } finally { setSaving(false) }
   }
 

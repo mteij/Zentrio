@@ -15,6 +15,9 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('ChunkedAudio')
 
 function isTauriEnvironment(): boolean {
   return typeof window !== 'undefined' &&
@@ -90,7 +93,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
     this.ffmpeg.on('log', ({ message }) => {
       if (message.includes('Error') || message.includes('failed') ||
           message.includes('Stream mapping') || message.includes('Output #0')) {
-        console.log('[ChunkedAudioTranscoder]', message)
+        log.debug('', message)
       }
     })
 
@@ -102,7 +105,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
     })
 
     this.ffmpegLoaded = true
-    console.log('[ChunkedAudioTranscoder] FFmpeg WASM loaded')
+    log.debug('FFmpeg WASM loaded')
   }
 
   /**
@@ -130,7 +133,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
     }
 
     this.totalChunks = Math.ceil(this.totalSize / this.config.chunkSize)
-    console.log(`[ChunkedAudioTranscoder] File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB, ${this.totalChunks} chunks`)
+    log.debug(`File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB, ${this.totalChunks} chunks`)
 
     // Create MediaSource for audio output
     this.mediaSource = new MediaSource()
@@ -194,11 +197,11 @@ export class ChunkedAudioTranscoder extends EventTarget {
       }
 
       this.dispatchEvent(new CustomEvent('complete'))
-      console.log('[ChunkedAudioTranscoder] All chunks processed')
+      log.debug('All chunks processed')
 
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('[ChunkedAudioTranscoder] Error:', error)
+        log.error('Error:', error)
         this.dispatchEvent(new CustomEvent('error', { detail: { error } }))
       }
     } finally {
@@ -213,7 +216,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
     const start = chunkIndex * this.config.chunkSize
     const end = Math.min(start + this.config.chunkSize - 1, this.totalSize - 1)
 
-    console.log(`[ChunkedAudioTranscoder] Processing chunk ${chunkIndex + 1}/${this.totalChunks} (bytes ${start}-${end})`)
+    log.debug(`Processing chunk ${chunkIndex + 1}/${this.totalChunks} (bytes ${start}-${end})`)
 
     // Download chunk
     const response = await fetch(this.sourceUrl, {
@@ -226,7 +229,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
     }
 
     const chunkData = new Uint8Array(await response.arrayBuffer())
-    console.log(`[ChunkedAudioTranscoder] Downloaded chunk ${chunkIndex}: ${(chunkData.length / 1024).toFixed(0)}KB`)
+    log.debug(`Downloaded chunk ${chunkIndex}: ${(chunkData.length / 1024).toFixed(0)}KB`)
 
     // Transcode this chunk
     const transcodedData = await this.transcodeChunk(chunkData, chunkIndex, start === 0)
@@ -284,7 +287,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
 
       args.push(outputFilename)
 
-      console.log(`[ChunkedAudioTranscoder] Transcoding chunk ${chunkIndex}...`)
+      log.debug(`Transcoding chunk ${chunkIndex}...`)
 
       // Execute FFmpeg
       await this.ffmpeg.exec(args)
@@ -295,7 +298,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
         ? new TextEncoder().encode(output)
         : new Uint8Array(output)
 
-      console.log(`[ChunkedAudioTranscoder] Chunk ${chunkIndex} transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
+      log.debug(`Chunk ${chunkIndex} transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
 
       // Cleanup
       await this.ffmpeg.deleteFile(inputFilename)
@@ -304,7 +307,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
       return outputData
 
     } catch (error) {
-      console.error(`[ChunkedAudioTranscoder] Failed to transcode chunk ${chunkIndex}:`, error)
+      log.error(`Failed to transcode chunk ${chunkIndex}:`, error)
 
       // Cleanup on error
       try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
@@ -361,7 +364,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
         segment.byteOffset + segment.byteLength
       ) as ArrayBuffer)
     } catch (error) {
-      console.error('[ChunkedAudioTranscoder] Append error:', error)
+      log.error('Append error:', error)
       this.isAppending = false
 
       // If QuotaExceededError, remove some buffered data and retry
@@ -391,7 +394,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
         }
       }
     } catch (e) {
-      console.error('[ChunkedAudioTranscoder] Error handling quota exceeded:', e)
+      log.error('Error handling quota exceeded:', e)
     }
   }
 
@@ -425,7 +428,7 @@ export class ChunkedAudioTranscoder extends EventTarget {
 
   play(): void {
     this.audioElement?.play().catch(e =>
-      console.warn('[ChunkedAudioTranscoder] Play failed:', e)
+      log.warn('Play failed:', e)
     )
   }
 
@@ -467,6 +470,6 @@ export class ChunkedAudioTranscoder extends EventTarget {
       this.ffmpegLoaded = false
     }
 
-    console.log('[ChunkedAudioTranscoder] Destroyed')
+    log.debug('Destroyed')
   }
 }

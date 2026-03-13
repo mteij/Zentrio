@@ -10,6 +10,9 @@
 import type { IPlayerEngine, MediaSource, EngineConfig, EngineType } from './types'
 import { WebPlayerEngine } from './WebPlayerEngine'
 import { TauriPlayerEngine } from './TauriPlayerEngine'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('PlayerFactory')
 
 // Lazy import for hybrid engine to reduce initial bundle size
 let HybridPlayerEngine: typeof import('./HybridPlayerEngine').HybridPlayerEngine | null = null
@@ -89,7 +92,7 @@ export async function detectEngineType(
         }
       }
     } catch (error) {
-      console.warn('[EngineFactory] Hybrid engine not available:', error)
+      log.warn('Hybrid engine not available:', error)
     }
   }
 
@@ -125,13 +128,13 @@ export async function createEngineByType(type: EngineType): Promise<IPlayerEngin
   switch (type) {
     case 'tauri':
       if (!isTauriEnvironment()) {
-        console.warn('[EngineFactory] Creating TauriPlayerEngine outside of Tauri environment')
+        log.warn('Creating TauriPlayerEngine outside of Tauri environment')
       }
       return new TauriPlayerEngine()
 
     case 'hybrid':
       if (isTauriEnvironment()) {
-        console.warn('[EngineFactory] Hybrid engine not supported in Tauri, using native engine')
+        log.warn('Hybrid engine not supported in Tauri, using native engine')
         return new TauriPlayerEngine()
       }
       
@@ -146,7 +149,7 @@ export async function createEngineByType(type: EngineType): Promise<IPlayerEngin
     default:
       if (isTauriEnvironment()) {
         // In Tauri, prefer native engine
-        console.log('[EngineFactory] Using TauriPlayerEngine for Tauri environment')
+        log.debug('Using TauriPlayerEngine for Tauri environment')
         return new TauriPlayerEngine()
       }
       return new WebPlayerEngine()

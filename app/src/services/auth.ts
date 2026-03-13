@@ -5,6 +5,9 @@ import { getConfig } from "./envParser";
 import { join, isAbsolute, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
 import { emailService } from "./email";
+import { logger } from './logger'
+
+const log = logger.scope('Auth')
 
 const cfg = getConfig();
 let dbPath = cfg.DATABASE_URL || './data/zentrio.db';
@@ -130,7 +133,7 @@ export const auth = betterAuth({
                 }
 
                 // Development-only fallback for local testing.
-                console.warn(`[PhoneOTP] ${phoneNumber} -> ${code}`)
+                log.warn(`[PhoneOTP] ${phoneNumber} -> ${code}`)
             },
             requireVerification: false
         }),
@@ -204,25 +207,6 @@ export const auth = betterAuth({
         },
     },
     databaseHooks: {
-        session: {
-            create: {
-                before: async (session) => {
-                    if (!cfg.ADMIN_BOOTSTRAP_ALLOWED_EMAILS.length) return { data: session }
-
-                    const user = db.prepare('SELECT id, email, role FROM user WHERE id = ?').get((session as any).userId) as any
-                    if (!user || user.role === 'admin') return { data: session }
-
-                    const email = String(user.email || '').toLowerCase()
-                    if (cfg.ADMIN_BOOTSTRAP_ALLOWED_EMAILS.includes(email)) {
-                        db.prepare("UPDATE user SET role = 'admin', updatedAt = ? WHERE id = ?")
-                            .run(new Date().toISOString(), user.id)
-                        console.log(`[Bootstrap] Auto-elevated ${email} to admin on login`)
-                    }
-
-                    return { data: session }
-                }
-            }
-        },
         user: {
             create: {
                 before: async (user) => {
@@ -277,9 +261,9 @@ export const auth = betterAuth({
                         // Note: Zentrio addon is auto-enabled by settingsProfileDb.create
                         
                     } catch (e) {
-                        console.error("Failed to auto-create profile for new user", e);
+                        log.error("Failed to auto-create profile for new user", e);
                     }
-                    console.log("Auto-create profile hook finished for user", user.id);
+                    log.info("Auto-create profile hook finished for user", user.id);
                 }
             }
         }

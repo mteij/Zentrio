@@ -1,5 +1,8 @@
 import type { Context, Next } from 'hono'
 import { getConfig } from '../services/envParser'
+import { logger } from '../services/logger'
+
+const log = logger.scope('Security')
 
 // Rate limiting storage
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -24,7 +27,7 @@ export const corsMiddleware = (origins?: string[]) => {
     
     // Debug CORS in development
     if (process.env.NODE_ENV !== 'production' && origin && !allowedOrigins.includes(origin)) {
-        console.log(`[CORS] Blocking origin: ${origin}. Allowed:`, allowedOrigins)
+        log.debug(`Blocking origin: ${origin}. Allowed:`, allowedOrigins)
     }
 
     // Handle CORS headers

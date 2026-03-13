@@ -1,6 +1,9 @@
 // Settings Profile database operations
 import { db } from './connection'
 import type { SettingsProfile } from './types'
+import { logger } from '../logger'
+
+const log = logger.scope('DB:Settings')
 
 // Forward declaration for addonDb to avoid circular imports
 let addonDb: any
@@ -19,7 +22,7 @@ export const settingsProfileDb = {
                 addonDb.enableForProfile(id, zentrioAddon.id);
             }
         } catch (e) {
-            console.error("Failed to auto-enable Zentrio addon for new profile", e);
+            log.error("Failed to auto-enable Zentrio addon for new profile", e);
         }
 
         return settingsProfileDb.findById(id)!;

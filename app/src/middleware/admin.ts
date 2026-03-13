@@ -3,12 +3,15 @@ import { auth } from '../services/auth'
 import { err } from '../utils/api'
 import { hasValidStepUp } from '../services/admin/stepup'
 import { hasPermission, type PermissionKey } from '../services/admin/rbac'
+import { getConfig } from '../services/envParser'
+
+const ADMIN_ROLES = new Set(['superadmin', 'admin', 'moderator', 'readonly'])
 
 const hasAdminRole = (role: unknown): boolean => {
   if (Array.isArray(role)) {
-    return role.some((r) => String(r).toLowerCase() === 'admin')
+    return role.some((r) => ADMIN_ROLES.has(String(r).toLowerCase()))
   }
-  return String(role || '').toLowerCase() === 'admin'
+  return ADMIN_ROLES.has(String(role || '').toLowerCase())
 }
 
 /**
@@ -23,6 +26,10 @@ const isNotBanned = (user: any): boolean => {
  * Validates admin authentication and role
  */
 export const adminSessionMiddleware = createMiddleware(async (c, next) => {
+  if (!getConfig().ADMIN_ENABLED) {
+    return err(c, 404, 'NOT_FOUND', 'Admin console is not enabled on this instance')
+  }
+
   const session = await auth.api.getSession({
     headers: c.req.raw.headers,
   })

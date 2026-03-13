@@ -9,6 +9,9 @@ import { getLogo, getTvLogo } from './logo'
 import { getEpisodes } from './episodes'
 import { getRating } from '../imdb'
 import { toStandardAgeRating } from './age-ratings'
+import { logger } from '../logger'
+
+const log = logger.scope('TMDB:Meta')
 
 const CACHE_TTL = 1000 * 60 * 60 // 1 hour
 const blacklistLogoUrls = ["https://assets.fanart.tv/fanart/tv/0/hdtvlogo/-60a02798b7eea.png"]
@@ -173,7 +176,7 @@ async function getMovieAgeRating(tmdbClient: TMDBClient, tmdbId: string, languag
 
     return ageRating || null
   } catch (error: any) {
-    console.error(`Error fetching age rating for movie ${tmdbId}:`, error.message)
+    log.error(`Error fetching age rating for movie ${tmdbId}:`, error.message)
     return null
   }
 }
@@ -203,7 +206,7 @@ async function getTvAgeRating(tmdbClient: TMDBClient, tmdbId: string, language: 
 
     return ageRating || null
   } catch (error: any) {
-    console.error(`Error fetching age rating for TV show ${tmdbId}:`, error.message)
+    log.error(`Error fetching age rating for TV show ${tmdbId}:`, error.message)
     return null
   }
 }
@@ -226,7 +229,7 @@ export async function getAgeRating(tmdbClient: TMDBClient, tmdbId: string, type:
     ageRatingCache.set(cacheKey, { rating, timestamp: Date.now() })
     return rating
   } catch (err: any) {
-    console.error(`Error fetching age rating for ${type} ${tmdbId}:`, err.message)
+    log.error(`Error fetching age rating for ${type} ${tmdbId}:`, err.message)
     return null
   }
 }
@@ -244,7 +247,7 @@ const buildMovieResponse = async (tmdbClient: TMDBClient, res: any, type: string
   const logoFetcher = getLogo(tmdbClient, tmdbId, language, res.original_language)
 
   const logo = await logoFetcher.catch(e => {
-    console.warn(`Error fetching logo for movie ${tmdbId}:`, e.message)
+    log.warn(`Error fetching logo for movie ${tmdbId}:`, e.message)
     return null
   })
 
@@ -252,7 +255,7 @@ const buildMovieResponse = async (tmdbClient: TMDBClient, res: any, type: string
     Utils.parseMediaImage(type, tmdbId, res.poster_path, language),
     (res.belongs_to_collection && res.belongs_to_collection.id)
       ? fetchCollectionData(tmdbClient, res.belongs_to_collection.id, language, tmdbId).catch((e) => {
-        console.warn(`Error fetching collection data for movie ${tmdbId} and collection ${res.belongs_to_collection.id}:`, e.message)
+        log.warn(`Error fetching collection data for movie ${tmdbId} and collection ${res.belongs_to_collection.id}:`, e.message)
         return null
       })
       : null
@@ -337,7 +340,7 @@ const buildTvResponse = async (tmdbClient: TMDBClient, res: any, type: string, l
   const logoFetcher = getTvLogo(tmdbClient, res.external_ids?.tvdb_id, res.id, language, res.original_language)
 
   const logo = await logoFetcher.catch(e => {
-    console.warn(`Error fetching logo for series ${tmdbId}:`, e.message)
+    log.warn(`Error fetching logo for series ${tmdbId}:`, e.message)
     return null
   })
 
@@ -346,12 +349,12 @@ const buildTvResponse = async (tmdbClient: TMDBClient, res: any, type: string, l
     getEpisodes(tmdbClient, language, tmdbId, res.external_ids?.imdb_id, res.seasons, {
       hideEpisodeThumbnails
     }).catch(e => {
-      console.warn(`Error fetching episodes for series ${tmdbId}:`, e.message)
+      log.warn(`Error fetching episodes for series ${tmdbId}:`, e.message)
       return []
     }),
     (res.belongs_to_collection && res.belongs_to_collection.id)
       ? fetchCollectionData(tmdbClient, res.belongs_to_collection.id, language, tmdbId).catch((e) => {
-        console.warn(`Error fetching collection data for movie ${tmdbId} and collection ${res.belongs_to_collection.id}:`, e.message)
+        log.warn(`Error fetching collection data for movie ${tmdbId} and collection ${res.belongs_to_collection.id}:`, e.message)
         return null
       })
       : null
@@ -441,7 +444,7 @@ export async function getMeta(tmdbClient: TMDBClient, type: string, language: st
     cache.set(cacheKey, { data: meta, timestamp: Date.now() })
     return Promise.resolve({ meta })
   } catch (error: any) {
-    console.error(`Error in getMeta: ${error.message}`)
+    log.error(`Error in getMeta: ${error.message}`)
     throw error
   }
 }

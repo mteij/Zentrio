@@ -10,6 +10,9 @@ import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { getPackId } from '../../services/addons/stream-service'
 import { apiFetch } from '../../lib/apiFetch'
 import styles from '../../styles/Streaming.module.css'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('ContentCard')
 
 /**
  * Extended MetaPreview with watch history properties
@@ -144,7 +147,7 @@ export const ContentCard = memo(function ContentCard({
       })
       window.dispatchEvent(new CustomEvent('history-updated'))
     } catch (e) {
-      console.error('Failed to mark as watched', e)
+      log.error('Failed to mark as watched', e)
       setIsWatched(!newWatchedState)
     }
   }, [isWatched, profileId, item.id, item.type])
@@ -173,7 +176,7 @@ export const ContentCard = memo(function ContentCard({
       })
       window.dispatchEvent(new CustomEvent('history-updated'))
     } catch (e) {
-      console.error('Failed to mark episode watched', e)
+      log.error('Failed to mark episode watched', e)
     }
   }, [item.episodeDisplay, profileId, item.id, item.type])
 

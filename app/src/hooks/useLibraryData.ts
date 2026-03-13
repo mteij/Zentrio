@@ -10,6 +10,9 @@ import {
   type AvailableSharedList, 
   type ProfileSharedList, 
 } from '../components/library/LibrarySidebar'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('useLibraryData')
 
 export function useLibraryData(profileId: string | undefined, listId: string | undefined) {
   const navigate = useNavigate()
@@ -40,7 +43,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
       }
     } catch (err: any) {
       if (err.name !== 'AbortError' && err.message !== 'Request cancelled' && !signal?.aborted) {
-          console.error(err)
+          log.error(err)
           setItems([])
       }
     } finally {
@@ -126,7 +129,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
       
     } catch (err: any) {
       if (err.name !== 'AbortError' && err.message !== 'Request cancelled' && !signal?.aborted) {
-          console.error(err)
+          log.error(err)
           setError('Failed to load library')
       }
     } finally {
@@ -180,7 +183,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
       }
       return false
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Failed to create list')
       return false
     }

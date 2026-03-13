@@ -1,6 +1,8 @@
 import { db, profileDb, profileProxySettingsDb, userDb, User, Profile } from '../../services/database'
 import { optionalSessionMiddleware } from '../../middleware/session'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { writeAuditEvent } from '../../services/admin/audit'
+import { getRequestMeta } from '../../utils/api'
  
 const app = createTaggedOpenAPIApp<{
   Variables: {
@@ -96,6 +98,17 @@ app.get('/:id', async (c) => {
     }
   }
 
+  const { ipAddress, userAgent } = getRequestMeta(c)
+  writeAuditEvent({
+    actorId: effectiveUser.id.toString(),
+    action: 'user.create_profile',
+    targetType: 'profile',
+    targetId: profile.id.toString(),
+    reason: `Created profile: ${name}`,
+    ipAddress,
+    userAgent
+  })
+
   // Don't return password
   return c.json(profile)
 })
@@ -149,6 +162,17 @@ app.get('/:id', async (c) => {
     // unless we update the frontend to send it.
   })
 
+  const { ipAddress, userAgent } = getRequestMeta(c)
+  writeAuditEvent({
+    actorId: effectiveUser.id.toString(),
+    action: 'user.update_profile',
+    targetType: 'profile',
+    targetId: profileId.toString(),
+    reason: `Updated profile details for: ${name || 'Unknown'}`,
+    ipAddress,
+    userAgent
+  })
+
   // Don't return password
   return c.json(updatedProfile)
 })
@@ -190,6 +214,17 @@ app.get('/:id', async (c) => {
      return c.json({ error: 'Profile not found' }, 404)
    }
  
+   const { ipAddress, userAgent } = getRequestMeta(c)
+   writeAuditEvent({
+     actorId: effectiveUser.id.toString(),
+     action: 'user.delete_profile',
+     targetType: 'profile',
+     targetId: profileId.toString(),
+     reason: `Deleted profile id: ${profileId}`,
+     ipAddress,
+     userAgent
+   })
+
    return c.json({ message: 'Profile deleted successfully' })
  })
 
@@ -248,6 +283,18 @@ app.put('/:id/settings', async (c) => {
     if (!updated) {
       return c.json({ error: 'Failed to save settings' }, 500)
     }
+
+    const { ipAddress, userAgent } = getRequestMeta(c)
+    writeAuditEvent({
+      actorId: effectiveUser.id.toString(),
+      action: 'user.update_profile_settings',
+      targetType: 'profile_settings',
+      targetId: profileId.toString(),
+      reason: `Updated proxy settings for profile id: ${profileId}`,
+      ipAddress,
+      userAgent
+    })
+
     return c.json({ message: 'Settings saved successfully' })
   } catch (_e) {
     return c.json({ error: 'Failed to save settings' }, 500)

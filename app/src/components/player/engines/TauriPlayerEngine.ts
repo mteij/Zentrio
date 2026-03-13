@@ -16,6 +16,9 @@ import type {
   AudioTrack,
   QualityLevel
 } from './types'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('TauriEngine')
 
 /**
  * Check if running in Tauri environment
@@ -78,11 +81,11 @@ export class TauriPlayerEngine implements IPlayerEngine {
 
   async initialize(videoElement: HTMLVideoElement): Promise<void> {
     if (!isTauriEnvironment()) {
-      console.warn('[TauriPlayerEngine] Not in Tauri environment - this engine may not work correctly')
+      log.warn('Not in Tauri environment - this engine may not work correctly')
     }
 
     if (this.video) {
-      console.warn('[TauriPlayerEngine] Already initialized, destroying previous instance')
+      log.warn('Already initialized, destroying previous instance')
       await this.destroy()
     }
 
@@ -97,7 +100,7 @@ export class TauriPlayerEngine implements IPlayerEngine {
       paused: videoElement.paused
     }
 
-    console.log('[TauriPlayerEngine] Initialized')
+    log.debug('Initialized')
   }
 
   async loadSource(source: MediaSource): Promise<void> {
@@ -111,7 +114,7 @@ export class TauriPlayerEngine implements IPlayerEngine {
     this.currentSource = source
     const { src, type } = source
 
-    console.log('[TauriPlayerEngine] Loading source:', src.substring(0, 80), 'type:', type)
+    log.debug('Loading source:', src.substring(0, 80), 'type:', type)
 
     // Reset state
     this.state = {
@@ -142,7 +145,7 @@ export class TauriPlayerEngine implements IPlayerEngine {
   }
 
   async destroy(): Promise<void> {
-    console.log('[TauriPlayerEngine] Destroying...')
+    log.debug('Destroying...')
 
     await this.cleanupSource()
 
@@ -154,7 +157,7 @@ export class TauriPlayerEngine implements IPlayerEngine {
     this.video = null
     this.currentSource = null
 
-    console.log('[TauriPlayerEngine] Destroyed')
+    log.debug('Destroyed')
   }
 
   // ============================================
@@ -171,7 +174,7 @@ export class TauriPlayerEngine implements IPlayerEngine {
       this.state.paused = false
       this.emit('statechange', { paused: false })
     } catch (error) {
-      console.error('[TauriPlayerEngine] Play error:', error)
+      log.error('Play error:', error)
       throw error
     }
   }
@@ -396,7 +399,7 @@ export class TauriPlayerEngine implements IPlayerEngine {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
           (handler as Function)(...args)
         } catch (error) {
-          console.error(`[TauriPlayerEngine] Error in ${event} handler:`, error)
+          log.error(`Error in ${event} handler:`, error)
         }
       })
     }

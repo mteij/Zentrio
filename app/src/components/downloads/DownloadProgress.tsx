@@ -1,6 +1,9 @@
 import { Pause, Play, X, AlertCircle, RefreshCw } from 'lucide-react'
 import { DownloadRecord, downloadService } from '../../services/downloads/download-service'
 import styles from './Downloads.module.css'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('DownloadProgress')
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
@@ -27,7 +30,7 @@ export function DownloadProgress({ record, onDelete }: Props) {
         await downloadService.resume(record.id)
       }
     } catch (e) {
-      console.error('[DownloadProgress] pause/resume error', e)
+      log.error('pause/resume error', e)
     }
   }
 
@@ -36,7 +39,7 @@ export function DownloadProgress({ record, onDelete }: Props) {
       await downloadService.cancel(record.id)
       onDelete(record.id)
     } catch (e) {
-      console.error('[DownloadProgress] cancel error', e)
+      log.error('cancel error', e)
     }
   }
 
@@ -44,7 +47,7 @@ export function DownloadProgress({ record, onDelete }: Props) {
     try {
       await downloadService.resume(record.id)
     } catch (e) {
-      console.error('[DownloadProgress] retry error', e)
+      log.error('retry error', e)
     }
   }
 

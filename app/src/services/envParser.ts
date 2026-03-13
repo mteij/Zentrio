@@ -62,14 +62,6 @@ export function getConfig() {
     return !(s === 'false' || s === '0' || s === 'no' || s === 'off' || s === '')
   }
 
-  const parseCsv = (value: string | undefined): string[] => {
-    if (!value) return []
-    return value
-      .split(',')
-      .map((item) => item.trim().toLowerCase())
-      .filter(Boolean)
-  }
-
   const PORT = Number(process.env.PORT ?? 3000)
   const DATABASE_URL = process.env.DATABASE_URL ?? './data/zentrio.db'
   const isProduction = process.env.NODE_ENV === 'production'
@@ -114,7 +106,7 @@ export function getConfig() {
   const OIDC_DISPLAY_NAME = process.env.OIDC_DISPLAY_NAME || 'OpenID'
 
   // Admin security
-  const ADMIN_BOOTSTRAP_ALLOWED_EMAILS = parseCsv(process.env.ADMIN_BOOTSTRAP_ALLOWED_EMAILS)
+  const ADMIN_ENABLED = process.env.ADMIN_ENABLED === 'true'
  
   return {
     PORT,
@@ -137,10 +129,9 @@ export function getConfig() {
     OIDC_CLIENT_SECRET,
     OIDC_ISSUER,
     OIDC_DISPLAY_NAME,
-    ADMIN_BOOTSTRAP_ALLOWED_EMAILS,
+    ADMIN_ENABLED,
     TMDB_API_KEY: process.env.TMDB_API_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
-    // Trakt Integration
     // Trakt Integration
     TRAKT_CLIENT_ID: process.env.TRAKT_CLIENT_ID,
     TRAKT_CLIENT_SECRET: process.env.TRAKT_CLIENT_SECRET,

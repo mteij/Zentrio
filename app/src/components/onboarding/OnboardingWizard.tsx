@@ -9,6 +9,9 @@ import { resetAuthClient, isTauri, authClient, getServerUrl, getClientUrl } from
 import { apiFetchJson } from '../../lib/apiFetch';
 import { ParticleBackground } from '../ui/ParticleBackground';
 import { useAuthStore } from '../../stores/authStore';
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('Onboarding')
 
 
 // Brand icons as SVG components
@@ -86,7 +89,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   useEffect(() => {
     apiFetchJson<any>('/api/auth/providers')
       .then(data => setProviders(data))
-      .catch(err => console.error('[Onboarding] Failed to fetch providers', err));
+      .catch(err => log.error('Failed to fetch providers', err));
   }, []);
   
   // Check if already authenticated
@@ -114,7 +117,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // Uses a guard to prevent double-completion if login handler also calls onComplete
   useEffect(() => {
     if (isAuthenticated && user && !completedRef.current) {
-      console.log('[Onboarding] Authenticated via store update, completing flow');
+      log.debug('Authenticated via store update, completing flow');
       completedRef.current = true;
       onComplete('connected', serverUrl);
     }
@@ -148,7 +151,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     
     // Verify token is now readable
     const token = useAuthStore.getState().session?.token;
-    console.log('[Onboarding] Token after login:', token ? `...${token.slice(-6)}` : 'none');
+    log.debug('Token after login:', token ? `...${token.slice(-6)}` : 'none');
     
     if (!completedRef.current) {
       completedRef.current = true;

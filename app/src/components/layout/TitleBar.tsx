@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/apiFetch';
 import { getServerUrl } from '../../lib/auth-client';
 import { useAuthStore } from '../../stores/authStore';
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('TitleBar')
 
 // Helper to check if we're running in Tauri
 const isTauri = () => {
@@ -45,7 +48,7 @@ export function TitleBar() {
         }
       } catch (e) {
         // Plugin not available or not in Tauri - ignore
-        console.log('[TitleBar] OS detection failed:', e);
+        log.debug('OS detection failed:', e);
       }
     };
     
@@ -72,18 +75,18 @@ export function TitleBar() {
         // Get Tauri APIs
         const tauriGlobal = (window as any).__TAURI__;
         if (!tauriGlobal) {
-          console.log('[TitleBar] __TAURI__ not available yet');
+          log.debug('__TAURI__ not available yet');
           return;
         }
 
         // Get the current window
         const appWindow = tauriGlobal.window?.getCurrentWindow?.();
         if (!appWindow) {
-          console.log('[TitleBar] Could not get current window');
+          log.debug('Could not get current window');
           return;
         }
 
-        console.log('[TitleBar] Window controls initialized');
+        log.debug('Window controls initialized');
         
         // Track maximized state
         const updateMaximizedState = async () => {
@@ -115,7 +118,7 @@ export function TitleBar() {
               setIsMaximized(true);
             }
           } catch (err) {
-            console.error('[TitleBar] Maximize toggle failed', err);
+            log.error('Maximize toggle failed', err);
           }
         };
         
@@ -131,7 +134,7 @@ export function TitleBar() {
 
 
       } catch (err) {
-        console.error('[TitleBar] Failed to initialize titlebar controls', err);
+        log.error('Failed to initialize titlebar controls', err);
       }
     };
 

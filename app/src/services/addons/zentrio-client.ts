@@ -2,6 +2,9 @@ import { AddonClient } from './client'
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
 import { tmdbService } from '../tmdb/index'
 import { userDb } from '../database'
+import { logger } from '../logger'
+
+const log = logger.scope('Zentrio')
 
 export class ZentrioAddonClient extends AddonClient {
   private userId: string | null = null
@@ -26,7 +29,7 @@ export class ZentrioAddonClient extends AddonClient {
         movieGenres = mGenres || []
         seriesGenres = sGenres || []
       } catch (e) {
-        console.warn('Failed to load genres for manifest', e)
+        log.warn('Failed to load genres for manifest', e)
       }
     }
 
@@ -187,11 +190,11 @@ export class ZentrioAddonClient extends AddonClient {
                     this.idCache.set(tmdbId, resolvedId)
                     tmdbId = resolvedId
                 } else {
-                    console.warn(`Could not resolve IMDb ID ${tmdbId} to TMDB ID`)
+                    log.warn(`Could not resolve IMDb ID ${tmdbId} to TMDB ID`)
                     throw new Error(`Could not resolve IMDb ID ${tmdbId} to TMDB ID`)
                 }
             } catch (e) {
-                console.error(`Error resolving IMDb ID ${tmdbId}:`, e)
+                log.error(`Error resolving IMDb ID ${tmdbId}:`, e)
                 throw e
             }
         }

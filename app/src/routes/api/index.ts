@@ -20,6 +20,9 @@ import {
   HealthResponseSchema,
   ApiInfoSchema,
 } from './openapi'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API')
 
 const app = new OpenAPIHono()
 
@@ -91,7 +94,7 @@ app.openapi({
       watched_items: watchedItems
     }
   } catch (e) {
-    console.error('Failed to fetch health stats', e)
+    log.error('Failed to fetch health stats', e)
     stats = { error: 'Failed to fetch stats' }
   }
 

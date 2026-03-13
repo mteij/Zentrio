@@ -7,6 +7,9 @@ import { userDb } from '../database'
 import { decrypt } from '../encryption'
 import { tmdbCache, type CacheType } from './cache'
 import { getConfig } from '../envParser'
+import { logger } from '../logger'
+
+const log = logger.scope('TMDB')
 
 const TMDB_API_BASE = 'https://api.themoviedb.org/3'
 
@@ -241,7 +244,7 @@ export const getClient = async (userId?: string): Promise<TMDBClient> => {
           return new TMDBClient(apiKey)
         }
       } catch (error) {
-        console.warn('Failed to decrypt user TMDB API key, falling back to global:', error)
+        log.warn('Failed to decrypt user TMDB API key, falling back to global:', error)
       }
     }
   }
@@ -306,7 +309,7 @@ export async function validateTmdbApiKey(apiKey: string): Promise<boolean> {
     // TMDB returns 401 for invalid keys
     return response.ok
   } catch (error) {
-    console.error('Failed to validate TMDB API key:', error)
+    log.error('Failed to validate TMDB API key:', error)
     return false
   }
 }

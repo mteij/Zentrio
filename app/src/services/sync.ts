@@ -1,5 +1,8 @@
 import { db, profileDb, settingsProfileDb, addonDb, streamDb, appearanceDb, watchHistoryDb, listDb } from './database';
 import { getConfig } from './envParser';
+import { logger } from './logger'
+
+const log = logger.scope('Sync')
 
 interface SyncState {
   id: number;
@@ -98,7 +101,7 @@ export class SyncService {
 
       await this.setSyncState({ last_sync_at: new Date().toISOString(), is_syncing: false });
     } catch (error) {
-      console.error('Sync failed:', error);
+      log.error('Sync failed:', error);
       await this.setSyncState({ is_syncing: false });
     }
   }

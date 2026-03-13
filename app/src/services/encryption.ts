@@ -1,6 +1,8 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto'
 import { getConfig } from './envParser'
+import { logger } from './logger'
 
+const log = logger.scope('Encryption')
 const { ENCRYPTION_KEY } = getConfig()
 
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
@@ -35,7 +37,7 @@ export function decrypt(encryptedText: string): string {
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
     return decrypted.toString('utf8')
   } catch (error) {
-    console.error('Decryption failed:', error)
+    log.error('Decryption failed:', error)
     return ''
   }
 }

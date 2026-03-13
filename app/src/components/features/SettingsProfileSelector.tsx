@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { Button, InputDialog, ConfirmDialog } from '../index'
 import { apiFetch } from '../../lib/apiFetch'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('ProfileSelector')
 
 interface SettingsProfile {
   id: string
@@ -46,7 +49,7 @@ export function SettingsProfileSelector({
         onProfilesLoaded?.(profilesList)
       }
     } catch (e) {
-      console.error('Failed to load profiles', e)
+      log.error('Failed to load profiles', e)
     }
   }
 
@@ -75,7 +78,7 @@ export function SettingsProfileSelector({
         setError(err.error?.message || "Failed to create profile")
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       setError("Network error")
     }
   }
@@ -113,7 +116,7 @@ export function SettingsProfileSelector({
         setError(err.error?.message || "Failed to delete profile")
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       setError("Network error")
     }
   }
@@ -139,7 +142,7 @@ export function SettingsProfileSelector({
         setError(err.error?.message || "Failed to rename profile")
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       setError("Network error")
     }
   }

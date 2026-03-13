@@ -20,6 +20,9 @@ import { OnboardingWizard } from './components/onboarding'
 import { AppLifecycleProvider } from './lib/app-lifecycle'
 // Import safe area insets CSS plugin for mobile safe area support
 import '@saurl/tauri-plugin-safe-area-insets-css-api'
+import { createLogger } from './utils/client-logger'
+
+const log = createLogger('App')
 
 // Lazy load all pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage as React.ComponentType<{version?: string}> })))
@@ -47,6 +50,7 @@ const ShareInvitePage = lazy(() => import('./pages/ShareInvitePage').then(m => (
 // Admin pages
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout').then(m => ({ default: m.AdminLayout })))
 const DashboardPage = lazy(() => import('./pages/admin/DashboardPage').then(m => ({ default: m.DashboardPage })))
+const SystemPage = lazy(() => import('./pages/admin/SystemPage').then(m => ({ default: m.SystemPage })))
 const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
 const AuditPage = lazy(() => import('./pages/admin/AuditPage').then(m => ({ default: m.AuditPage })))
 
@@ -86,7 +90,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
           (window as any).__TAURI_IPC__ !== undefined;
 
         if (isTauriRequest) {
-          console.log('[AppInitializer] Tauri detected!');
+          log.debug('Tauri detected!');
           setReady(true);
           return;
         }
@@ -98,7 +102,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
           attempts++;
           setTimeout(checkTauri, 50);
         } else {
-          console.log('[AppInitializer] Tauri not detected, assuming Web Mode.');
+          log.debug('Tauri not detected, assuming Web Mode.');
           setReady(true);
         }
       };
@@ -126,7 +130,7 @@ function AppRoutes() {
     const tauriDetected = isTauri();
     const storedMode = appMode.get();
     
-    console.log('[AppRoutes] Initializing mode:', { 
+    log.debug('Initializing mode:', { 
       isTauri: tauriDetected, 
       storedMode
     });
@@ -164,14 +168,14 @@ function AppRoutes() {
 
   // Preload common routes after mount
   useEffect(() => {
-    console.log('AppRoutes: MOUNTED')
+    log.debug('AppRoutes: MOUNTED')
     preloadCommonRoutes()
-    return () => console.log('AppRoutes: UNMOUNTED')
+    return () => log.debug('AppRoutes: UNMOUNTED')
   }, [])
 
   // Log location changes
   useEffect(() => {
-    console.log('AppRoutes: Location changed to', location.pathname)
+    log.debug('AppRoutes: Location changed to', location.pathname)
   }, [location.pathname])
 
   // Handle OAuth callback in browser mode
@@ -186,7 +190,7 @@ function AppRoutes() {
       
       // Check for OAuth callback (either direct callback or after redirect)
       if (path.includes('/callback/') || search.includes('code=') || search.includes('state=')) {
-        console.log('[App] OAuth callback detected in browser, fetching session...');
+        log.debug('OAuth callback detected in browser, fetching session...');
         
         try {
           // Use authClient to get session - this will use the cookie set by the server
@@ -194,7 +198,7 @@ function AppRoutes() {
           const sessionData = (sessionRes as any)?.data ?? sessionRes;
           
           if (sessionData?.user) {
-            console.log('[App] Browser OAuth: Session found, logging in user:', sessionData.user.email);
+            log.debug('Browser OAuth: Session found, logging in user:', sessionData.user.email);
             
             // Update auth store
             useAuthStore.getState().login(sessionData.user, {
@@ -207,10 +211,10 @@ function AppRoutes() {
             window.history.replaceState({}, '', '/profiles');
             return true;
           } else {
-            console.log('[App] Browser OAuth: No session found after callback');
+            log.debug('Browser OAuth: No session found after callback');
           }
         } catch (e) {
-          console.error('[App] Browser OAuth: Error fetching session:', e);
+          log.error('Browser OAuth: Error fetching session:', e);
         }
       }
       return false;
@@ -223,7 +227,7 @@ function AppRoutes() {
   useEffect(() => {
     if (isTauri()) {
       const handleDeepLinkUrl = async (url: string) => {
-        console.log('[App] Deep link received:', url)
+        log.debug('Deep link received:', url)
         
         if (url.startsWith('zentrio://auth/magic-link') || url.includes('token=')) {
           // Handle magic link authentication
@@ -247,7 +251,7 @@ function AppRoutes() {
                      
                      // Wait for state propagation
                      await new Promise(resolve => setTimeout(resolve, 100));
-                     console.log('[App] Magic link login complete, token present:', !!sessionData.session?.token);
+                     log.debug('Magic link login complete, token present:', !!sessionData.session?.token);
                      
                      appMode.set('connected');
                      setMode('connected');
@@ -258,38 +262,38 @@ function AppRoutes() {
                  }
              }
           } catch(e) {
-            console.error('Failed to handle magic link', e)
+            log.error('Failed to handle magic link', e)
             toast.error('Failed to sign in with magic link')
           }
         } else if (url.includes('auth_code') || url.includes('code=')) {
           // Handle social login callback with auth code
           try {
-            console.log('[App] Processing auth code from deep link');
+            log.debug('Processing auth code from deep link');
             const urlObj = new URL(url);
             const authCode = urlObj.searchParams.get('auth_code') || urlObj.searchParams.get('code');
             
-            console.log('[App] Extracted auth code:', authCode ? 'FOUND' : 'MISSING');
+            log.debug('Extracted auth code:', authCode ? 'FOUND' : 'MISSING');
 
             if (authCode) {
               toast.info('Finalizing sign in...');
               
               // Exchange the auth code for a session
-              console.log('[App] Exchanging auth code...');
+              log.debug('Exchanging auth code...');
               const response = await apiFetch('/api/auth/mobile-callback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ authCode })
               });
               
-              console.log('[App] Mobile callback response status:', response.status);
+              log.debug('Mobile callback response status:', response.status);
               
               if (response.ok) {
                 const data = await response.json();
-                console.log('[App] Mobile callback data:', data);
+                log.debug('Mobile callback data:', data);
                 
                 if (data.user) {
                   toast.success(`Welcome back, ${data.user.name || 'User'}!`, { duration: 5000 });
-                  console.log('[App] 🟢 Mobile login successful!', data.user.email);
+                  log.debug('🟢 Mobile login successful!', data.user.email);
                   
                   // Update auth store FIRST
                   useAuthStore.setState({ 
@@ -304,7 +308,7 @@ function AppRoutes() {
                       isFreshLogin: true, // Prevent rehydration from triggering refresh
                       lastActivity: Date.now()
                   });
-                  console.log('[App] Auth store updated with user:', data.user.email);
+                  log.debug('Auth store updated with user:', data.user.email);
                   
                   // Wait for Zustand state to propagate AFTER login
                   // This ensures the token is readable via getState() before navigation
@@ -312,7 +316,7 @@ function AppRoutes() {
                   
                   // Verify token propagation
                   const verifiedToken = useAuthStore.getState().session?.token;
-                  console.log('[App] Auth state propagation delay complete, token present:', !!verifiedToken);
+                  log.debug('Auth state propagation delay complete, token present:', !!verifiedToken);
                   
                   // Update app mode
                   appMode.set('connected');
@@ -334,26 +338,26 @@ function AppRoutes() {
                   // PERSIST IT so auth-client.ts picks it up on reload
                   localStorage.setItem('zentrio_server_url', currentServer);
                   setServerUrl(currentServer);
-                  console.log('[App] ServerUrl persisted:', currentServer);
+                  log.debug('ServerUrl persisted:', currentServer);
                   
                   // Force a hard reload to /profiles to ensure fresh state
                   // This is safer than navigate() when changing auth state deeply
-                  console.log('[App] Hard redirecting to /profiles');
+                  log.debug('Hard redirecting to /profiles');
                   window.location.href = '/profiles';
                 } else {
-                   console.error('[App] No user data in callback response');
+                   log.error('No user data in callback response');
                    throw new Error('No user data returned');
                 }
               } else {
                  const errorText = await response.text();
-                 console.error('[App] Callback response not OK:', errorText);
+                 log.error('Callback response not OK:', errorText);
                  throw new Error('Failed to exchange auth code');
               }
             } else {
-                console.warn('[App] No auth code found in deep link');
+                log.warn('No auth code found in deep link');
             }
           } catch (e) {
-            console.error('Failed to handle auth code deep link', e);
+            log.error('Failed to handle auth code deep link', e);
             toast.error('Sign in failed. Please try again.');
           }
         }
@@ -379,7 +383,7 @@ function AppRoutes() {
               }
           }).then(unlisten => {
               unlistenMobile = unlisten;
-          }).catch(err => console.error('[App] Failed to init mobile deep link', err));
+          }).catch(err => log.error('Failed to init mobile deep link', err));
       }).catch(() => { /* plugin might not be installed, ignore */ });
       
       return () => {
@@ -391,7 +395,7 @@ function AppRoutes() {
 
   // Handle onboarding completion
   const handleOnboardingComplete = (selectedMode: AppMode, selectedServerUrl?: string) => {
-    console.log('[AppRoutes] handleOnboardingComplete called', { selectedMode, selectedServerUrl });
+    log.debug('handleOnboardingComplete called', { selectedMode, selectedServerUrl });
     // Persist completion state
     appMode.set(selectedMode);
     
@@ -424,7 +428,7 @@ function AppRoutes() {
     if (!authLoading && !initialAuthCheckDone) {
       // Add a small delay to ensure state has fully propagated
       const timer = setTimeout(() => {
-        console.log('[AppRoutes] Initial auth check completed', { isAuthenticated, isGuestMode });
+        log.debug('Initial auth check completed', { isAuthenticated, isGuestMode });
         setInitialAuthCheckDone(true);
       }, 50);
       return () => clearTimeout(timer);
@@ -456,7 +460,7 @@ function AppRoutes() {
        // Only redirect to profiles if explicitly authenticated
        // Otherwise let the router handle it (LandingPage -> SignIn)
        if (isAuthenticated || isGuestMode) {
-          console.log('[AppRoutes] Tauri app at root (authenticated/guest), redirecting to /profiles');
+          log.debug('Tauri app at root (authenticated/guest), redirecting to /profiles');
           navigate('/profiles', { replace: true });
        }
     }
@@ -472,7 +476,7 @@ function AppRoutes() {
   // This prevents the web landing page from flashing on app reopen
   // Wait for BOTH authLoading to complete AND initial check to be done
   if (isTauriApp && (authLoading || !initialAuthCheckDone) && location.pathname === '/') {
-    console.log('[AppRoutes] Tauri app waiting for auth state...', { authLoading, initialAuthCheckDone });
+    log.debug('Tauri app waiting for auth state...', { authLoading, initialAuthCheckDone });
     return <SplashScreen />;
   }
   
@@ -501,6 +505,7 @@ function AppRoutes() {
         </Suspense>
       }>
         <Route index element={<DashboardPage />} />
+        <Route path="system" element={<SystemPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="audit" element={<AuditPage />} />
       </Route>

@@ -12,6 +12,9 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('AudioTranscoder')
 
 function isTauriEnvironment(): boolean {
   return typeof window !== 'undefined' &&
@@ -95,7 +98,7 @@ export class StreamingAudioTranscoder extends EventTarget {
     if (this.sharedFFmpeg) {
       this.ffmpeg = this.sharedFFmpeg
       this.ffmpegLoaded = true
-      console.log('[StreamingAudioTranscoder] Using shared FFmpeg instance')
+      log.debug('Using shared FFmpeg instance')
       return
     }
 
@@ -106,7 +109,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       // Only log important messages
       if (message.includes('Error') || message.includes('failed') ||
           message.includes('Stream mapping') || message.includes('Output #0')) {
-        console.log('[StreamingAudioTranscoder]', message)
+        log.debug('', message)
       }
     })
 
@@ -118,7 +121,7 @@ export class StreamingAudioTranscoder extends EventTarget {
     })
 
     this.ffmpegLoaded = true
-    console.log('[StreamingAudioTranscoder] FFmpeg WASM loaded (own instance)')
+    log.debug('FFmpeg WASM loaded (own instance)')
   }
 
   /**
@@ -143,7 +146,7 @@ export class StreamingAudioTranscoder extends EventTarget {
     this.totalSize = size
     this.supportsRanges = supportsRanges
 
-    console.log(`[StreamingAudioTranscoder] File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB, ranges: ${supportsRanges}`)
+    log.debug(`File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB, ranges: ${supportsRanges}`)
 
     // Create MediaSource for audio output
     this.mediaSource = new MediaSource()
@@ -176,7 +179,7 @@ export class StreamingAudioTranscoder extends EventTarget {
                  this.checkSeekConvergence()
              }
          } catch (e) {
-             console.warn('[StreamingAudioTranscoder] Error checking seek convergence:', e)
+             log.warn('Error checking seek convergence:', e)
          }
       }
 
@@ -190,12 +193,12 @@ export class StreamingAudioTranscoder extends EventTarget {
         try {
           if (this.sourceBuffer.buffered.length > 0) {
             this.audioReadyDispatched = true
-            console.log('[StreamingAudioTranscoder] Audio data appended, dispatching audioready')
+            log.debug('Audio data appended, dispatching audioready')
             this.dispatchEvent(new CustomEvent('audioready'))
           }
         } catch (e) {
           // SourceBuffer was removed from MediaSource
-          console.warn('[StreamingAudioTranscoder] SourceBuffer no longer valid:', e)
+          log.warn('SourceBuffer no longer valid:', e)
         }
       }
     })
@@ -229,11 +232,11 @@ export class StreamingAudioTranscoder extends EventTarget {
       }
 
       this.dispatchEvent(new CustomEvent('complete'))
-      console.log('[StreamingAudioTranscoder] Transcoding complete')
+      log.debug('Transcoding complete')
 
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('[StreamingAudioTranscoder] Error:', error)
+        log.error('Error:', error)
         this.dispatchEvent(new CustomEvent('error', { detail: { error } }))
       }
     }
@@ -244,11 +247,11 @@ export class StreamingAudioTranscoder extends EventTarget {
    * Handles seeking and drift correction
    */
   syncWithVideo(video: HTMLVideoElement): void {
-    console.log('[StreamingAudioTranscoder] Syncing with video element')
+    log.debug('Syncing with video element')
 
     // Handle seeking
     video.addEventListener('seeking', async () => {
-      console.log('[StreamingAudioTranscoder] Video seeking to:', video.currentTime)
+      log.debug('Video seeking to:', video.currentTime)
       
       if (this.audioElement) {
         // Sync audio time immediately
@@ -267,7 +270,7 @@ export class StreamingAudioTranscoder extends EventTarget {
         }
 
         if (!isBuffered && this.totalSize > 0 && this.duration > 0) {
-          console.log('[StreamingAudioTranscoder] Seek target not buffered, restarting transcoding...')
+          log.debug('Seek target not buffered, restarting transcoding...')
           
           // Calculate approx byte offset
           const ratio = video.currentTime / this.duration
@@ -283,7 +286,7 @@ export class StreamingAudioTranscoder extends EventTarget {
           // Align to 4KB blocks
           targetByteOffset = Math.floor(targetByteOffset / 4096) * 4096
           
-          console.log(`[StreamingAudioTranscoder] Seek target: ${video.currentTime}s, Ratio: ${ratio.toFixed(3)}, Offset: ${targetByteOffset} (with safety margin)`)
+          log.debug(`Seek target: ${video.currentTime}s, Ratio: ${ratio.toFixed(3)}, Offset: ${targetByteOffset} (with safety margin)`)
           
           await this.restartFromOffset(targetByteOffset, video.currentTime)
         }
@@ -296,7 +299,7 @@ export class StreamingAudioTranscoder extends EventTarget {
 
     // Initial check
     if (this.audioElement && this.audioElement.readyState < 3) {
-       console.log('[StreamingAudioTranscoder] Initial audio wait -> holding video')
+       log.debug('Initial audio wait -> holding video')
        audioWaiting = true
        video.pause()
     }
@@ -306,7 +309,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       if (this.audioElement && !this.audioElement.paused) {
         const diff = Math.abs(this.audioElement.currentTime - video.currentTime)
         if (diff > 0.3) {
-           console.log(`[StreamingAudioTranscoder] A/V Sync drift: ${diff.toFixed(2)}s, correcting...`)
+           log.debug(`A/V Sync drift: ${diff.toFixed(2)}s, correcting...`)
            this.audioElement.currentTime = video.currentTime
         }
       }
@@ -315,7 +318,7 @@ export class StreamingAudioTranscoder extends EventTarget {
     // --- Audio -> Video Sync ---
     if (this.audioElement) {
       this.audioElement.addEventListener('waiting', () => {
-         console.log('[StreamingAudioTranscoder] Audio buffering -> pausing video')
+         log.debug('Audio buffering -> pausing video')
          audioWaiting = true
          video.pause() 
       })
@@ -323,7 +326,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       this.audioElement.addEventListener('playing', () => {
          // Also handle case where we were waiting initially
          if (audioWaiting) {
-            console.log('[StreamingAudioTranscoder] Audio resumed -> resuming video')
+            log.debug('Audio resumed -> resuming video')
             audioWaiting = false
             if (video.paused) video.play().catch(()=>{})
          }
@@ -338,14 +341,14 @@ export class StreamingAudioTranscoder extends EventTarget {
     
     // --- Video -> Audio Sync ---
     video.addEventListener('waiting', () => {
-       console.log('[StreamingAudioTranscoder] Video buffering -> pausing audio')
+       log.debug('Video buffering -> pausing audio')
        videoWaiting = true
        this.audioElement?.pause()
     })
     
     video.addEventListener('playing', () => {
        if (videoWaiting) {
-          console.log('[StreamingAudioTranscoder] Video resumed -> resuming audio')
+          log.debug('Video resumed -> resuming audio')
           videoWaiting = false
           if (this.audioElement?.paused) this.audioElement.play().catch(()=>{})
        }
@@ -382,7 +385,7 @@ export class StreamingAudioTranscoder extends EventTarget {
      this.seekAttemptCount++
      
      if (this.seekAttemptCount > 3) {
-        console.warn(`[StreamingAudioTranscoder] Seek correction failed max times (${this.seekAttemptCount}). Giving up on convergence.`)
+        log.warn(`Seek correction failed max times (${this.seekAttemptCount}). Giving up on convergence.`)
         this.pendingSeekCheck = null
         this.seekAttemptCount = 0
      }
@@ -406,9 +409,9 @@ export class StreamingAudioTranscoder extends EventTarget {
            }
            // Set the timestamp offset so decoded audio lands at the right position
            this.sourceBuffer.timestampOffset = timeOffset
-           console.log(`[StreamingAudioTranscoder] timestampOffset set to ${timeOffset.toFixed(2)}s`)
+           log.debug(`timestampOffset set to ${timeOffset.toFixed(2)}s`)
         } catch (e) {
-           console.warn('[StreamingAudioTranscoder] Failed to reset buffer for seek:', e)
+           log.warn('Failed to reset buffer for seek:', e)
         }
      }
      
@@ -419,7 +422,7 @@ export class StreamingAudioTranscoder extends EventTarget {
      // Restart progressive download from new offset
      this.downloadAndTranscodeProgressive(byteOffset).catch(e => {
        if ((e as Error).name !== 'AbortError') {
-          console.error('[StreamingAudioTranscoder] Restart error:', e)
+          log.error('Restart error:', e)
        }
      })
   }
@@ -460,7 +463,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       const isTooEarly = closestRange.end < targetTime 
       
       if (isLate || isTooEarly) {
-          console.log(`[StreamingAudioTranscoder] Convergence: Target ${targetTime.toFixed(2)}s outside range ${closestRange.start.toFixed(2)}-${closestRange.end.toFixed(2)}s`)
+          log.debug(`Convergence: Target ${targetTime.toFixed(2)}s outside range ${closestRange.start.toFixed(2)}-${closestRange.end.toFixed(2)}s`)
           
           let byteCorrection = 0
           const bytesPerSec = this.totalSize / this.duration
@@ -468,12 +471,12 @@ export class StreamingAudioTranscoder extends EventTarget {
           if (isLate) {
               // Missed start. Go back.
               byteCorrection = closestRange.diff * bytesPerSec
-              console.log(`[StreamingAudioTranscoder] Late by ${closestRange.diff.toFixed(2)}s. Go back ~${(byteCorrection/1024).toFixed(0)}KB`)
+              log.debug(`Late by ${closestRange.diff.toFixed(2)}s. Go back ~${(byteCorrection/1024).toFixed(0)}KB`)
           } else if (isTooEarly) {
               // Too early, go forward
               // We need to cover the gap from End to Target
               const gap = targetTime - closestRange.end
-              console.log(`[StreamingAudioTranscoder] Too early by ${gap.toFixed(2)}s. Go forward.`)
+              log.debug(`Too early by ${gap.toFixed(2)}s. Go forward.`)
               byteCorrection = -(gap * bytesPerSec)
           }
           
@@ -486,10 +489,10 @@ export class StreamingAudioTranscoder extends EventTarget {
           newOffset = Math.max(0, newOffset)
           newOffset = Math.floor(newOffset / 4096) * 4096
           
-          console.log(`[StreamingAudioTranscoder] Retrying seek at offset ${newOffset}`)
+          log.debug(`Retrying seek at offset ${newOffset}`)
           this.restartFromOffset(newOffset, targetTime)
       } else {
-         console.log(`[StreamingAudioTranscoder] Seek Converged! Range [${closestRange.start.toFixed(2)}, ${closestRange.end.toFixed(2)}] covers ${targetTime.toFixed(2)}`)
+         log.debug(`Seek Converged! Range [${closestRange.start.toFixed(2)}, ${closestRange.end.toFixed(2)}] covers ${targetTime.toFixed(2)}`)
          this.pendingSeekCheck = null
          this.seekAttemptCount = 0
       }
@@ -511,7 +514,7 @@ export class StreamingAudioTranscoder extends EventTarget {
     // Cache hit
     const cached = StreamingAudioTranscoder.probeCache.get(url)
     if (cached) {
-      console.log(`[StreamingAudioTranscoder] Probe cache hit: ${(cached.size / 1024 / 1024).toFixed(1)}MB, ranges: ${cached.supportsRanges}`)
+      log.debug(`Probe cache hit: ${(cached.size / 1024 / 1024).toFixed(1)}MB, ranges: ${cached.supportsRanges}`)
       return cached
     }
 
@@ -527,7 +530,7 @@ export class StreamingAudioTranscoder extends EventTarget {
 
         if (cl > 0 && ranges) {
           // HEAD is reliable: server both reports a size and supports range requests.
-          console.log(`[StreamingAudioTranscoder] Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, Accept-Ranges: bytes`)
+          log.debug(`Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, Accept-Ranges: bytes`)
           const result = { size: cl, supportsRanges: true }
           StreamingAudioTranscoder.probeCache.set(url, result)
           return result
@@ -536,18 +539,18 @@ export class StreamingAudioTranscoder extends EventTarget {
         if (cl > 0 && !ranges) {
           // Server gave us Content-Length but explicitly says no ranges (or omitted header).
           // Return size but mark ranges unsupported — the download loop will use a single fetch.
-          console.log(`[StreamingAudioTranscoder] Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, no range support`)
+          log.debug(`Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, no range support`)
           const result = { size: cl, supportsRanges: false }
           StreamingAudioTranscoder.probeCache.set(url, result)
           return result
         }
 
         // cl === 0 (chunked/unknown length) — fall through to range probe
-        console.log('[StreamingAudioTranscoder] HEAD gave no Content-Length, trying range probe...')
+        log.debug('HEAD gave no Content-Length, trying range probe...')
       }
     } catch (e) {
       // HEAD failed (network error, CORS) — proceed to range probe
-      console.log('[StreamingAudioTranscoder] HEAD failed, falling back to range probe:', (e as Error).message)
+      log.debug('HEAD failed, falling back to range probe:', (e as Error).message)
     }
 
     // ── Strategy 2: GET bytes=0-0 range probe ────────────────────────────────
@@ -568,7 +571,7 @@ export class StreamingAudioTranscoder extends EventTarget {
         await probe.body?.cancel()  // discard the 1-byte body
 
         if (size > 0) {
-          console.log(`[StreamingAudioTranscoder] Probe via GET range: ${(size / 1024 / 1024).toFixed(1)}MB`)
+          log.debug(`Probe via GET range: ${(size / 1024 / 1024).toFixed(1)}MB`)
           const result = { size, supportsRanges: true }
           StreamingAudioTranscoder.probeCache.set(url, result)
           return result
@@ -578,14 +581,14 @@ export class StreamingAudioTranscoder extends EventTarget {
         const cl = parseInt(probe.headers.get('content-length') || '0')
         await probe.body?.cancel()
         if (cl > 0) {
-          console.log(`[StreamingAudioTranscoder] Probe via GET 200 (no range support): ${(cl / 1024 / 1024).toFixed(1)}MB`)
+          log.debug(`Probe via GET 200 (no range support): ${(cl / 1024 / 1024).toFixed(1)}MB`)
           const result = { size: cl, supportsRanges: false }
           StreamingAudioTranscoder.probeCache.set(url, result)
           return result
         }
       }
     } catch (e) {
-      console.log('[StreamingAudioTranscoder] Range probe failed:', (e as Error).message)
+      log.debug('Range probe failed:', (e as Error).message)
     }
 
     // ── Strategy 3: Full GET — read Content-Length from streaming response ───
@@ -595,20 +598,20 @@ export class StreamingAudioTranscoder extends EventTarget {
       const cl = parseInt(resp.headers.get('content-length') || '0')
       await resp.body?.cancel()
       if (cl > 0) {
-        console.log(`[StreamingAudioTranscoder] Probe via full GET: ${(cl / 1024 / 1024).toFixed(1)}MB (no ranges)`)
+        log.debug(`Probe via full GET: ${(cl / 1024 / 1024).toFixed(1)}MB (no ranges)`)
         const result = { size: cl, supportsRanges: false }
         StreamingAudioTranscoder.probeCache.set(url, result)
         return result
       }
     } catch (e) {
-      console.log('[StreamingAudioTranscoder] Full GET probe failed:', (e as Error).message)
+      log.debug('Full GET probe failed:', (e as Error).message)
     }
 
     throw new Error('Cannot determine file size: all probe strategies failed')
   }
 
   private async downloadAndTranscodeFull(): Promise<void> {
-    console.log('[StreamingAudioTranscoder] Downloading full file...')
+    log.debug('Downloading full file...')
 
     // Download with progress tracking
     const response = await fetch(this.sourceUrl, {
@@ -638,7 +641,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       // Dispatch progress
       const percent = Math.round((receivedLength / this.totalSize) * 100)
       if (percent % 10 === 0) {
-        console.log(`[StreamingAudioTranscoder] Downloaded: ${percent}%`)
+        log.debug(`Downloaded: ${percent}%`)
         this.dispatchEvent(new CustomEvent('progress', {
           detail: { percent, phase: 'downloading' }
         }))
@@ -656,7 +659,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       offset += chunk.length
     }
 
-    console.log(`[StreamingAudioTranscoder] Downloaded ${(receivedLength / 1024 / 1024).toFixed(1)}MB, transcoding...`)
+    log.debug(`Downloaded ${(receivedLength / 1024 / 1024).toFixed(1)}MB, transcoding...`)
 
     // Transcode full file
     await this.transcodeData(combined)
@@ -669,7 +672,7 @@ export class StreamingAudioTranscoder extends EventTarget {
    * downloading and transcoding in the background.
    */
   private async downloadAndTranscodeProgressive(startOffset: number = 0): Promise<void> {
-    console.log(`[StreamingAudioTranscoder] Progressive mode: starting background download from ${startOffset}...`)
+    log.debug(`Progressive mode: starting background download from ${startOffset}...`)
 
     // Capture the signal for this specific operation
     // This ensures we check the correct signal even if this.abortController is replaced by restartFromOffset
@@ -682,13 +685,13 @@ export class StreamingAudioTranscoder extends EventTarget {
 
     // If starting from middle and we don't have headers, we must fetch them first
     if (currentOffset > 0 && !this.containerHeader) {
-      console.log('[StreamingAudioTranscoder] Seeking to middle but missing headers - fetching first segment first...')
+      log.debug('Seeking to middle but missing headers - fetching first segment first...')
       try {
         const headerData = await this.downloadRange(0, this.HEADER_SIZE + 1024, signal) // Fetch enough for headers
         this.containerHeader = headerData.slice(0, this.HEADER_SIZE)
-        console.log('[StreamingAudioTranscoder] Headers recovered')
+        log.debug('Headers recovered')
       } catch (e) {
-        console.error('[StreamingAudioTranscoder] Failed to recover headers:', e)
+        log.error('Failed to recover headers:', e)
         return
       }
     }
@@ -710,7 +713,7 @@ export class StreamingAudioTranscoder extends EventTarget {
                      
                      // Throttle if we have > 300s (5 mins) buffered ahead
                      if (secondsAhead > 300) {
-                         console.log(`[StreamingAudioTranscoder] Buffer sufficient (${secondsAhead.toFixed(0)}s ahead). Pausing download...`)
+                         log.debug(`Buffer sufficient (${secondsAhead.toFixed(0)}s ahead). Pausing download...`)
                          
                          const checkInterval = 2000
                          const RESUME_THRESHOLD = 120 // Resume when drop below 2 mins
@@ -734,7 +737,7 @@ export class StreamingAudioTranscoder extends EventTarget {
                          }
                          
                          if (signal?.aborted) return
-                         console.log('[StreamingAudioTranscoder] Resuming download...')
+                         log.debug('Resuming download...')
                      }
                      break // Found our range
                  }
@@ -748,7 +751,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       const segmentEnd = Math.min(currentOffset + SEGMENT_SIZE - 1, this.totalSize - 1)
       const isFirstSegment = currentOffset === 0
 
-      console.log(`[StreamingAudioTranscoder] Downloading segment ${(segmentStart / 1024 / 1024).toFixed(0)}MB - ${(segmentEnd / 1024 / 1024).toFixed(0)}MB...`)
+      log.debug(`Downloading segment ${(segmentStart / 1024 / 1024).toFixed(0)}MB - ${(segmentEnd / 1024 / 1024).toFixed(0)}MB...`)
       
       this.dispatchEvent(new CustomEvent('progress', {
         detail: { 
@@ -761,11 +764,11 @@ export class StreamingAudioTranscoder extends EventTarget {
         const segmentData = await this.downloadRange(segmentStart, segmentEnd, signal)
         
         if (signal?.aborted) {
-          console.log('[StreamingAudioTranscoder] Aborted during download')
+          log.debug('Aborted during download')
           return
         }
 
-        console.log(`[StreamingAudioTranscoder] Segment downloaded: ${(segmentData.length / 1024 / 1024).toFixed(1)}MB`)
+        log.debug(`Segment downloaded: ${(segmentData.length / 1024 / 1024).toFixed(1)}MB`)
         
         this.dispatchEvent(new CustomEvent('progress', {
           detail: { 
@@ -793,29 +796,29 @@ export class StreamingAudioTranscoder extends EventTarget {
             combinedData.set(segmentData, this.containerHeader.length)
             await this.transcodeInitialSegment(combinedData)
           } else {
-            console.warn('[StreamingAudioTranscoder] No container header available for subsequent segment')
+            log.warn('No container header available for subsequent segment')
             break
           }
         }
 
         currentOffset = segmentEnd + 1
         
-        console.log(`[StreamingAudioTranscoder] Segment complete, next offset: ${(currentOffset / 1024 / 1024).toFixed(0)}MB`)
+        log.debug(`Segment complete, next offset: ${(currentOffset / 1024 / 1024).toFixed(0)}MB`)
 
       } catch (error) {
         if ((error as any).isRangeExceeded) {
           // 416 = the server has no more data at this offset. Treat as EOF.
           const actualSize = (error as any).actualSize
           if (typeof actualSize === 'number' && actualSize > 0 && actualSize < this.totalSize) {
-            console.log(`[StreamingAudioTranscoder] Server reports actual size ${(actualSize / 1024 / 1024).toFixed(1)}MB (was ${(this.totalSize / 1024 / 1024).toFixed(1)}MB). Stopping.`)
+            log.debug(`Server reports actual size ${(actualSize / 1024 / 1024).toFixed(1)}MB (was ${(this.totalSize / 1024 / 1024).toFixed(1)}MB). Stopping.`)
             this.totalSize = actualSize  // update so future seeks also respect this
           } else {
-            console.log('[StreamingAudioTranscoder] 416 received — reached end of ranged content, stopping.')
+            log.debug('416 received — reached end of ranged content, stopping.')
           }
           break  // Clean EOF — stop the loop
         }
 
-        console.error('[StreamingAudioTranscoder] Segment error:', error)
+        log.error('Segment error:', error)
         // For non-range errors: if we already have some audio, skip this segment and continue.
         // If this is the very first segment, re-throw so we fail loudly.
         if (currentOffset > 0) {
@@ -830,7 +833,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       detail: { percent: 100, phase: 'complete' }
     }))
 
-    console.log('[StreamingAudioTranscoder] All segments processed')
+    log.debug('All segments processed')
     this.isComplete = true
   }
 
@@ -854,7 +857,7 @@ export class StreamingAudioTranscoder extends EventTarget {
             file.name.endsWith('.mp4') || file.name.endsWith('.aac')) {
           try {
             await this.ffmpeg.deleteFile(`/${file.name}`)
-            console.log(`[StreamingAudioTranscoder] Cleaned up: ${file.name}`)
+            log.debug(`Cleaned up: ${file.name}`)
           } catch {
             // Ignore errors
           }
@@ -862,7 +865,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       }
     } catch (error) {
       // listDir might not be available in all FFmpeg builds
-      console.warn('[StreamingAudioTranscoder] Could not list FS:', error)
+      log.warn('Could not list FS:', error)
     }
   }
 
@@ -880,7 +883,7 @@ export class StreamingAudioTranscoder extends EventTarget {
     const outputFilename = `audio_${timestamp}.m4a`
 
     try {
-      console.log(`[StreamingAudioTranscoder] Writing ${(data.length / 1024 / 1024).toFixed(1)}MB to FFmpeg FS...`)
+      log.debug(`Writing ${(data.length / 1024 / 1024).toFixed(1)}MB to FFmpeg FS...`)
       await this.ffmpeg.writeFile(inputFilename, data)
 
       // Transcode to stereo AAC for browser compatibility
@@ -899,7 +902,7 @@ export class StreamingAudioTranscoder extends EventTarget {
         outputFilename
       ]
 
-      console.log('[StreamingAudioTranscoder] Transcoding initial segment...')
+      log.debug('Transcoding initial segment...')
       await this.ffmpeg.exec(args)
 
       const output = await this.ffmpeg.readFile(outputFilename)
@@ -908,10 +911,10 @@ export class StreamingAudioTranscoder extends EventTarget {
         : new Uint8Array(output)
 
       if (outputData.length > 0) {
-        console.log(`[StreamingAudioTranscoder] Initial segment transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
+        log.debug(`Initial segment transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
         this.queueSegment(outputData)
       } else {
-        console.warn('[StreamingAudioTranscoder] Initial segment produced empty output')
+        log.warn('Initial segment produced empty output')
       }
 
       // Cleanup
@@ -919,7 +922,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       await this.ffmpeg.deleteFile(outputFilename)
 
     } catch (error) {
-      console.error('[StreamingAudioTranscoder] Initial segment transcode error:', error)
+      log.error('Initial segment transcode error:', error)
       
       try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
       try { await this.ffmpeg.deleteFile(outputFilename) } catch {}
@@ -974,10 +977,10 @@ export class StreamingAudioTranscoder extends EventTarget {
         : new Uint8Array(output)
 
       if (outputData.length > 0) {
-        console.log(`[StreamingAudioTranscoder] Chunk ${chunkIndex} transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
+        log.debug(`Chunk ${chunkIndex} transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
         this.queueSegment(outputData)
       } else {
-        console.warn(`[StreamingAudioTranscoder] Chunk ${chunkIndex} produced empty output`)
+        log.warn(`Chunk ${chunkIndex} produced empty output`)
       }
 
       // Cleanup FFmpeg FS
@@ -985,7 +988,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       await this.ffmpeg.deleteFile(outputFilename)
 
     } catch (error) {
-      console.error(`[StreamingAudioTranscoder] Chunk ${chunkIndex} transcode error:`, error)
+      log.error(`Chunk ${chunkIndex} transcode error:`, error)
       
       // Cleanup on error
       try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
@@ -1039,12 +1042,12 @@ export class StreamingAudioTranscoder extends EventTarget {
         : new Uint8Array(output)
 
       if (outputData.length > 0) {
-        console.log(`[StreamingAudioTranscoder] Chunk ${chunkIndex} transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
+        log.debug(`Chunk ${chunkIndex} transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
         
         // Append to MSE
         this.queueSegment(outputData)
       } else {
-        console.warn(`[StreamingAudioTranscoder] Chunk ${chunkIndex} produced empty output`)
+        log.warn(`Chunk ${chunkIndex} produced empty output`)
       }
 
       // Cleanup
@@ -1052,7 +1055,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       await this.ffmpeg.deleteFile(outputFilename)
 
     } catch (error) {
-      console.error(`[StreamingAudioTranscoder] Chunk ${chunkIndex} transcode error:`, error)
+      log.error(`Chunk ${chunkIndex} transcode error:`, error)
 
       // Cleanup on error
       try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
@@ -1113,7 +1116,7 @@ export class StreamingAudioTranscoder extends EventTarget {
           merged.set(this.containerHeader)
           merged.set(data, this.containerHeader.length)
           inputData = merged
-          // console.log('[StreamingAudioTranscoder] Prepended header to chunk')
+          // log.debug('Prepended header to chunk')
       }
 
       // Write input to FFmpeg FS
@@ -1133,7 +1136,7 @@ export class StreamingAudioTranscoder extends EventTarget {
         outputFilename
       ]
 
-      console.log('[StreamingAudioTranscoder] Starting FFmpeg transcoding...')
+      log.debug('Starting FFmpeg transcoding...')
 
       // Execute FFmpeg
       await this.ffmpeg.exec(args)
@@ -1144,7 +1147,7 @@ export class StreamingAudioTranscoder extends EventTarget {
         ? new TextEncoder().encode(output)
         : new Uint8Array(output)
 
-      console.log(`[StreamingAudioTranscoder] Transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
+      log.debug(`Transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
 
       // Append to MSE
       this.queueSegment(outputData)
@@ -1154,7 +1157,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       await this.ffmpeg.deleteFile(outputFilename)
 
     } catch (error) {
-      console.error('[StreamingAudioTranscoder] Transcode error:', error)
+      log.error('Transcode error:', error)
 
       // Cleanup on error
       try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
@@ -1197,7 +1200,7 @@ export class StreamingAudioTranscoder extends EventTarget {
         segment.byteOffset + segment.byteLength
       ) as ArrayBuffer)
     } catch (error) {
-      console.error('[StreamingAudioTranscoder] Append error:', error)
+      log.error('Append error:', error)
       this.isAppending = false
 
       // If QuotaExceededError, remove some buffered data and retry
@@ -1216,7 +1219,7 @@ export class StreamingAudioTranscoder extends EventTarget {
   private handleQuotaExceeded(segment: Uint8Array): void {
     if (!this.sourceBuffer || !this.audioElement) return
 
-    console.warn('[StreamingAudioTranscoder] Quota exceeded, evicting buffer...')
+    log.warn('Quota exceeded, evicting buffer...')
     
     // Always re-queue the segment so we don't lose it
     this.pendingSegments.unshift(segment)
@@ -1232,7 +1235,7 @@ export class StreamingAudioTranscoder extends EventTarget {
       if (currentTime > 30) {
         const removeEnd = currentTime - 30
         if (buffered.length > 0 && buffered.start(0) < removeEnd) {
-             console.log(`[StreamingAudioTranscoder] Evicting played range: ${buffered.start(0).toFixed(2)} - ${removeEnd.toFixed(2)}`)
+             log.debug(`Evicting played range: ${buffered.start(0).toFixed(2)} - ${removeEnd.toFixed(2)}`)
              this.sourceBuffer.remove(0, removeEnd)
              removed = true
         }
@@ -1247,7 +1250,7 @@ export class StreamingAudioTranscoder extends EventTarget {
           
           // If range is completely in the future (far ahead) or completely in past
           if (start > currentTime + 300) { // 5 mins ahead
-             console.log(`[StreamingAudioTranscoder] Evicting future range: ${start.toFixed(2)} - ${end.toFixed(2)}`)
+             log.debug(`Evicting future range: ${start.toFixed(2)} - ${end.toFixed(2)}`)
              this.sourceBuffer.remove(start, end)
              removed = true
              break
@@ -1257,19 +1260,19 @@ export class StreamingAudioTranscoder extends EventTarget {
       
       // 3. Panic mode: evict everything up to 5s behind current
       if (!removed && currentTime > 5) {
-         console.log(`[StreamingAudioTranscoder] Panic eviction: 0 - ${(currentTime - 5).toFixed(2)}`)
+         log.debug(`Panic eviction: 0 - ${(currentTime - 5).toFixed(2)}`)
          this.sourceBuffer.remove(0, currentTime - 5)
          removed = true
       }
 
       if (!removed) {
-        console.warn('[StreamingAudioTranscoder] Could not find buffer to evict! Retrying in 1s...')
+        log.warn('Could not find buffer to evict! Retrying in 1s...')
         this.isAppending = false
         setTimeout(() => this.appendNextSegment(), 1000)
       }
 
     } catch (e) {
-      console.error('[StreamingAudioTranscoder] Error handling quota exceeded:', e)
+      log.error('Error handling quota exceeded:', e)
       this.isAppending = false
     }
   }
@@ -1301,7 +1304,7 @@ export class StreamingAudioTranscoder extends EventTarget {
 
   play(): void {
     this.audioElement?.play().catch(e =>
-      console.warn('[StreamingAudioTranscoder] Play failed:', e)
+      log.warn('Play failed:', e)
     )
   }
 
@@ -1341,6 +1344,6 @@ export class StreamingAudioTranscoder extends EventTarget {
       this.ffmpegLoaded = false
     }
 
-    console.log('[StreamingAudioTranscoder] Destroyed')
+    log.debug('Destroyed')
   }
 }

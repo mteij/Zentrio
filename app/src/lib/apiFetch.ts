@@ -3,6 +3,9 @@ import { appMode } from './app-mode';
 import { useAuthStore } from '../stores/authStore';
 import { recordPerfEvent } from '../utils/performance';
 import { resolveAppUrl, isGatewayResolvedUrl, toDirectRemoteUrl } from './url';
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('ApiFetch')
 
 /**
  * Fetch wrapper that prepends the server URL for Tauri apps.
@@ -51,7 +54,7 @@ export async function apiFetch(
           }
       } else if (!appMode.isGuest()) {
           // Only warn when not in guest mode — guest mode has no token by design
-          console.warn('[apiFetch] No token available for Tauri request:', url);
+          log.warn('No token available for Tauri request:', url);
       }
       
       // Use Tauri Native Fetch
@@ -72,7 +75,7 @@ export async function apiFetch(
         }
         
         if (isSessionRequest) {
-            console.log('[apiFetch] Using WebView fetch for session:', url);
+            log.debug('Using WebView fetch for session:', url);
             
             // Must use window.fetch here to ensure it uses the browser's native fetch
             // interceptor, bypassing the Tauri Rust HTTP plugin entirely.

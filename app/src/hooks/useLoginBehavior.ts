@@ -1,4 +1,7 @@
 import { useMemo } from 'react'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('useLoginBehavior')
 
 export type LoginBehavior = 'profiles' | 'last' | 'specific'
 
@@ -33,7 +36,7 @@ export function useLoginBehavior(): LoginBehaviorResult {
             }
           }
         } catch (e) {
-          console.error('Failed to parse selectedProfile:', e)
+          log.error('Failed to parse selectedProfile:', e)
         }
         // Fallback to profiles page if no last profile
         return '/profiles'
@@ -72,7 +75,7 @@ export function getLoginBehaviorRedirectPath(): string {
         }
       }
     } catch (e) {
-      console.error('Failed to parse selectedProfile:', e)
+      log.error('Failed to parse selectedProfile:', e)
     }
     return '/profiles'
   }

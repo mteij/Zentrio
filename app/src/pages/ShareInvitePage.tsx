@@ -5,6 +5,9 @@ import { Layout } from '../components'
 import { apiFetch } from '../lib/apiFetch'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from 'sonner'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('ShareInvite')
 
 interface ShareInfo {
   share: {
@@ -50,7 +53,7 @@ export function ShareInvitePage() {
         setError(data.error || 'Share not found')
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       setError('Failed to load share information')
     } finally {
       setLoading(false)
@@ -76,7 +79,7 @@ export function ShareInvitePage() {
         toast.error(data.error || 'Failed to accept share')
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Failed to accept share')
     } finally {
       setProcessing(false)
@@ -90,7 +93,7 @@ export function ShareInvitePage() {
       toast.info('Invitation declined')
       navigate('/')
     } catch (e) {
-      console.error(e)
+      log.error(e)
       toast.error('Failed to decline')
     } finally {
       setProcessing(false)

@@ -12,6 +12,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { HybridEngine } from '../services/hybrid-media/HybridEngine'
 import { TranscoderService } from '../services/hybrid-media/TranscoderService'
 import type { StreamInfo, EngineState, HybridEngineConfig, StreamType, CodecInfo, MediaMetadata } from '../services/hybrid-media/types'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('useHybridPlayer')
 
 /**
  * Check if running in Tauri environment
@@ -221,10 +224,10 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
           setState('playing')
         }
 
-        console.log('[useHybridPlayer] Engine initialized')
+        log.debug('Engine initialized')
       } catch (err) {
         if (cancelled) return
-        console.error('[useHybridPlayer] Initialization error:', err)
+        log.error('Initialization error:', err)
         const error = err instanceof Error ? err : new Error(String(err))
         setError(error)
         setState('error')

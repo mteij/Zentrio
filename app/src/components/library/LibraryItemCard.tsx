@@ -7,6 +7,9 @@ import { apiFetch } from '../../lib/apiFetch'
 import { LazyImage, RatingBadge } from '../index'
 import { ContextMenu, ContextMenuItemOrSeparator } from '../ui/ContextMenu'
 import styles from '../../styles/Streaming.module.css'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('LibraryCard')
 
 interface SharedList extends List {
   share: ListShare
@@ -49,7 +52,7 @@ export const LibraryItemCard = memo(function LibraryItemCard({
       toast.success('Removed from list')
       onRemove(item.meta_id)
     } catch (e) {
-      console.error('Failed to remove item:', e)
+      log.error('Failed to remove item:', e)
       toast.error('Failed to remove item')
     }
   }
@@ -76,7 +79,7 @@ export const LibraryItemCard = memo(function LibraryItemCard({
       onRemove(item.meta_id)
       setShowMoveModal(false)
     } catch (e) {
-      console.error('Failed to move item:', e)
+      log.error('Failed to move item:', e)
       toast.error('Failed to move item')
     }
   }
@@ -140,7 +143,7 @@ export const LibraryItemCard = memo(function LibraryItemCard({
       })
       window.dispatchEvent(new CustomEvent('history-updated'))
     } catch (e) {
-      console.error('Failed to mark as watched', e)
+      log.error('Failed to mark as watched', e)
       setIsWatched(!newWatchedState) // Revert
     }
   }
@@ -170,7 +173,7 @@ export const LibraryItemCard = memo(function LibraryItemCard({
              })
              window.dispatchEvent(new CustomEvent('history-updated'))
          } catch (e) {
-             console.error('Failed to mark episode watched', e)
+             log.error('Failed to mark episode watched', e)
          }
     }
 

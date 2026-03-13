@@ -5,6 +5,9 @@ import { validate, schemas } from '../../utils/api'
 import { getConfig } from '../../services/envParser'
 import { randomBytes } from 'crypto'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Auth')
 
 const app = createTaggedOpenAPIApp('Authentication')
 
@@ -270,7 +273,7 @@ app.get('/login-proxy', async (c) => {
         
         return c.text('Failed to generate auth URL', 500)
     } catch (e: any) {
-        console.error('Login proxy error:', e)
+        log.error('Login proxy error:', e)
         return c.text(`Login setup failed: ${e.message}`, 500)
     }
 })
@@ -311,7 +314,7 @@ app.post('/mobile-callback', async (c) => {
             const secureAttr = isSecure ? 'Secure' : ''
             const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=${sameSite}${secureAttr ? '; ' + secureAttr : ''}`
             
-            console.log(`[AuthStore] Setting session cookie: ${cookieName}=...${sessionToken.slice(-6)} (Secure: ${isSecure})`)
+            log.debug(`Setting session cookie: ${cookieName}=...${sessionToken.slice(-6)} (Secure: ${isSecure})`)
             c.header('Set-Cookie', cookieValue)
             
             return c.json({ 
@@ -423,7 +426,7 @@ app.post('/link-code', async (c) => {
                 return c.json({ linkCode })
             }
         } catch (e) {
-            console.error('Failed to validate session for link code:', e)
+            log.error('Failed to validate session for link code:', e)
         }
     }
     
@@ -477,7 +480,7 @@ app.get('/link-proxy', async (c) => {
                     c.header('Set-Cookie', cookieValue)
                 }
             } catch (e) {
-                console.error('Link code session validation failed:', e)
+                log.error('Link code session validation failed:', e)
             }
         }
     }
@@ -759,7 +762,7 @@ app.all("*", (c) => {
   const cfg = getConfig();
   if (cfg.PROXY_LOGS && (c.req.path.includes('get-session') || c.req.path.includes('session'))) {
       const authHeader = c.req.header('Authorization');
-      console.log(`[Auth Passthrough] ${c.req.method} ${c.req.path}`, {
+      log.debug(`${c.req.method} ${c.req.path}`, {
           hasAuthHeader: !!authHeader,
           authHeaderSuffix: authHeader ? `...${authHeader.slice(-6)}` : null,
           cookie: c.req.header('Cookie') ? 'present' : 'missing'

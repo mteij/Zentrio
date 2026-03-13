@@ -8,6 +8,9 @@ import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { getPackId } from '../../services/addons/stream-service'
 import { apiFetch } from '../../lib/apiFetch'
 import styles from '../../styles/Streaming.module.css'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('StreamingRow')
 
 interface StreamingRowProps {
   title: string
@@ -67,7 +70,7 @@ export const StreamingRow = memo(function StreamingRow({
       })
       window.dispatchEvent(new CustomEvent('history-updated'))
     } catch (e) {
-      console.error("Failed to remove progress", e)
+      log.error("Failed to remove progress", e)
     }
   }, [profileId])
 

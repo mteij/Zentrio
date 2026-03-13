@@ -3,6 +3,9 @@ import { toast } from 'sonner'
 import { Toggle } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('AppearanceSettings')
 
 interface AppearanceSettingsData {
   show_imdb_ratings: boolean
@@ -43,7 +46,7 @@ export function AppearanceSettings({ currentProfileId }: AppearanceSettingsProps
         }
       }
     } catch (e) {
-      console.error('Failed to load settings', e)
+      log.error('Failed to load settings', e)
     } finally {
       setLoading(false)
     }
@@ -72,7 +75,7 @@ export function AppearanceSettings({ currentProfileId }: AppearanceSettingsProps
         toast.error('Save Failed', { description: 'Failed to save settings' })
       }
     } catch (e) {
-      console.error('Failed to save settings', e)
+      log.error('Failed to save settings', e)
     }
   }
 

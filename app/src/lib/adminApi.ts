@@ -80,6 +80,29 @@ export interface AdminActivityData {
   ts: string
 }
 
+export interface AdminChartData {
+  chartData: { date: string; users: number; watches: number }[]
+}
+
+export interface AdminSystemHealth {
+  uptime: number
+  memory: {
+    rss: number
+    heapTotal: number
+    heapUsed: number
+    external: number
+  }
+  dbSize: number
+  os: {
+    platform: string
+    release: string
+    totalmem: number
+    freemem: number
+    loadavg: number[]
+  }
+}
+
+
 export interface AdminUser {
   id: string
   email: string
@@ -147,6 +170,12 @@ export interface StepUpRequestResult {
 // ── API functions ─────────────────────────────────────────────────────────────
 
 export const adminApi = {
+  getStatus: () =>
+    adminFetch<{ enabled: boolean; hasOwner: boolean }>('/api/admin/status'),
+
+  claimSetup: () =>
+    adminFetch<{ message: string }>('/api/admin/setup', { method: 'POST' }),
+
   getMe: () =>
     adminFetch<AdminMe>('/api/admin/me'),
 
@@ -155,6 +184,13 @@ export const adminApi = {
 
   getLiveActivity: () =>
     adminFetch<AdminActivityData>('/api/admin/activity/live'),
+
+  getDashboardCharts: (range: string = '30d') =>
+    adminFetch<AdminChartData>(`/api/admin/dashboard/charts?range=${range}`),
+
+  getSystemHealth: () =>
+    adminFetch<AdminSystemHealth>('/api/admin/system/health'),
+
 
   listUsers: (params?: { q?: string; limit?: number; offset?: number }) => {
     const qs = new URLSearchParams()

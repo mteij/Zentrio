@@ -1,6 +1,9 @@
 // Database migrations
 // Column additions and schema updates for existing databases
 import { db } from './connection'
+import { logger } from '../logger'
+
+const log = logger.scope('DB:Migration')
 
 // Migrations: Add new columns to watch_history for existing databases
 // SQLite will error if column already exists, so we wrap each in try/catch
@@ -135,7 +138,7 @@ try {
     !tableInfo.sql.includes('season')
   
   if (needsMigration) {
-    console.log('[Migration] Updating watch_history table for per-episode tracking...')
+    log.debug('Updating watch_history table for per-episode tracking...')
     
     // SQLite doesn't support modifying constraints, so we need to recreate the table
     // Using -1 as default for season/episode to allow simple UNIQUE constraint
@@ -182,10 +185,10 @@ try {
       CREATE INDEX IF NOT EXISTS idx_watch_history_meta ON watch_history(profile_id, meta_id);
     `)
     
-    console.log('[Migration] watch_history table migrated successfully!')
+    log.debug('watch_history table migrated successfully!')
   }
 } catch (e) {
-  console.error('[Migration] Failed to migrate watch_history table:', e)
+  log.error('Failed to migrate watch_history table:', e)
 }
 
 // Helper block to backfill/init data (idempotent checks)
@@ -201,7 +204,7 @@ try {
    // but better to leave it to application logic or hooks.
    // We will leave the migration logic OUT as requested.
 } catch (e) {
-   console.error("Initialization failed", e);
+   log.error("Initialization failed", e);
 }
 
 export {}

@@ -12,6 +12,7 @@ import viewRoutes from './routes/views'
 import apiRoutes from './routes/api/index'
 import { initImdbService } from './services/imdb'
 import { syncService } from './services/sync'
+import { db } from './services/database'
 
 // Initialize environment variables before starting the app
 initEnv()
@@ -23,16 +24,7 @@ const app = new Hono()
 const cfg = getConfig()
 const { PORT, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY, PROXY_LOGS } = cfg
 
-const banner = logger.colors.bold + logger.colors.error + `
- _____          _        _
-|__  /___ _ __ | |_ _ __(_) ___
-  / // _ \\ '_ \\| __| '__| |/ _ \\
- / /|  __/ | | | |_| |  | | (_) |
-/____\\___|_| |_|\\__|_|  |_|\\___/` + logger.colors.reset
-
-logger.raw(banner)
-
-// Get version from package.json
+// ─── Version ──────────────────────────────────────────────────────────
 let version = 'unknown'
 try {
   // @ts-ignore
@@ -42,49 +34,133 @@ try {
   version = pkg.version || 'unknown'
 } catch {}
 
-logger.info(`Starting Zentrio v${version} — performing startup checks...`)
+// ─── Startup Display ──────────────────────────────────────────────────
+const c = logger.colors
+const isDev = process.env.NODE_ENV !== 'production'
+const mode = isDev ? `${c.yellow}development${c.reset}` : `${c.green}production${c.reset}`
 
-// Basic checks & status output
+// Gather status checks
+const checks = {
+  authSecret: AUTH_SECRET && AUTH_SECRET !== 'super-secret-key-change-in-production',
+  encryptionKey: ENCRYPTION_KEY && ENCRYPTION_KEY !== 'super-secret-key-change-in-production',
+  database: !!DATABASE_URL,
+  rateLimiter: RATE_LIMIT_LIMIT > 0 && RATE_LIMIT_WINDOW_MS > 0,
+}
+
+const ok = (label: string) => `${c.green}✔${c.reset} ${label}`
+const fail = (label: string) => `${c.red}✖${c.reset} ${label}`
+const dim = (text: string) => `${c.dim}${text}${c.reset}`
+const val = (text: string) => `${c.cyan}${text}${c.reset}`
+
+// Database summary
+let dbSummary = `${c.red}not configured${c.reset}`
+if (DATABASE_URL) {
+  if (DATABASE_URL.includes('sqlite')) {
+    const dbFile = DATABASE_URL.replace(/^.*[/\\]/, '')
+    dbSummary = `SQLite ${dim('→')} ${val(dbFile)}`
+  } else {
+    dbSummary = val(DATABASE_URL.replace(/:[^:]*@/, ':***@').substring(0, 40))
+  }
+}
+
+// Rate limiter summary
+const rateSummary = checks.rateLimiter
+  ? `${val(String(RATE_LIMIT_LIMIT))} req / ${val(String(RATE_LIMIT_WINDOW_MS / 1000))}s`
+  : `${c.dim}disabled${c.reset}`
+
+// Banner
+logger.raw('')
+logger.raw(`${c.bold}${c.cyan}  ╔══════════════════════════════════════════════╗${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ║${c.reset}                                              ${c.bold}${c.cyan}║${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ║${c.reset}   ${c.bold}${c.white} _____          _        _        ${c.reset}         ${c.bold}${c.cyan}║${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ║${c.reset}   ${c.bold}${c.white}|__  /___ _ __ | |_ _ __(_) ___   ${c.reset}         ${c.bold}${c.cyan}║${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ║${c.reset}   ${c.bold}${c.white}  / // _ \\ '_ \\| __| '__| |/ _ \\  ${c.reset}         ${c.bold}${c.cyan}║${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ║${c.reset}   ${c.bold}${c.white} / /|  __/ | | | |_| |  | | (_) | ${c.reset}         ${c.bold}${c.cyan}║${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ║${c.reset}   ${c.bold}${c.white}/____\\___|_| |_|\\__|_|  |_|\\___/  ${c.reset}         ${c.bold}${c.cyan}║${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ║${c.reset}                                              ${c.bold}${c.cyan}║${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ║${c.reset}   ${dim('v' + version)}            ${dim('mode:')} ${mode}        ${c.bold}${c.cyan}║${c.reset}`)
+logger.raw(`${c.bold}${c.cyan}  ╚══════════════════════════════════════════════╝${c.reset}`)
+logger.raw('')
+
+// Check superadmin & user stats
+let userCount = 0
+let hasSuperadmin = false
 try {
-  logger.success(`Environment loaded (PORT=${PORT})`)
-} catch (e) {
-  logger.error('Failed to read environment configuration')
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM user').get() as { count: number } | undefined
+  userCount = countRow?.count ?? 0
+  hasSuperadmin = !!(db.prepare("SELECT 1 FROM user WHERE role = 'superadmin' LIMIT 1").get())
+} catch {
+  // DB might not be ready yet
 }
 
-if (!AUTH_SECRET || AUTH_SECRET === 'super-secret-key-change-in-production') {
-  logger.error('AUTH_SECRET is not configured or uses the default.')
-} else {
-  logger.success('AUTH_SECRET loaded')
+// SSO summary
+const ssoProviders: string[] = []
+if (cfg.GOOGLE_CLIENT_ID && cfg.GOOGLE_CLIENT_SECRET) ssoProviders.push('Google')
+if (cfg.GITHUB_CLIENT_ID && cfg.GITHUB_CLIENT_SECRET) ssoProviders.push('GitHub')
+if (cfg.DISCORD_CLIENT_ID && cfg.DISCORD_CLIENT_SECRET) ssoProviders.push('Discord')
+if (cfg.OIDC_CLIENT_ID && cfg.OIDC_ISSUER) ssoProviders.push(cfg.OIDC_DISPLAY_NAME || 'OIDC')
+const ssoSummary = ssoProviders.length > 0
+  ? ssoProviders.map(p => val(p)).join(dim(', '))
+  : dim('none')
+
+// Email summary
+let emailSummary = dim('not configured')
+if (cfg.RESEND_API_KEY) {
+  emailSummary = val('Resend')
+} else if (cfg.SMTP_URL || cfg.EMAIL_HOST) {
+  emailSummary = `SMTP ${dim('→')} ${val(cfg.EMAIL_HOST || 'via URL')}`
 }
 
-if (!ENCRYPTION_KEY || ENCRYPTION_KEY === 'super-secret-key-change-in-production') {
-  logger.error('ENCRYPTION_KEY is not configured or uses the default.')
-} else {
-  logger.success('ENCRYPTION_KEY loaded')
+// Status panel
+logger.raw(`  ${c.bold}${c.white}System Status${c.reset}`)
+logger.raw(`  ${dim('─────────────────────────────────────────────')}`)
+logger.raw(`  ${checks.authSecret ? ok('Auth Secret') : fail('Auth Secret')}      ${checks.authSecret ? dim('configured') : `${c.red}default/missing${c.reset}`}`)
+logger.raw(`  ${checks.encryptionKey ? ok('Encryption') : fail('Encryption')}       ${checks.encryptionKey ? dim('configured') : `${c.red}default/missing${c.reset}`}`)
+logger.raw(`  ${checks.database ? ok('Database') : fail('Database')}         ${dbSummary}`)
+logger.raw(`  ${checks.rateLimiter ? ok('Rate Limiter') : ok('Rate Limiter')}     ${rateSummary}`)
+logger.raw(`  ${ok('Proxy Logs')}       ${PROXY_LOGS ? val('enabled') : dim('disabled')}`)
+logger.raw(`  ${dim('─────────────────────────────────────────────')}`)
+logger.raw(`  ${hasSuperadmin ? ok('Superadmin') : fail('Superadmin')}       ${hasSuperadmin ? dim('claimed') : `${c.yellow}unclaimed${c.reset}`}`)
+logger.raw(`  ${ok('Users')}            ${userCount > 0 ? val(String(userCount)) + ' ' + dim('registered') : dim('none')}`)
+logger.raw(`  ${cfg.ADMIN_ENABLED ? ok('Admin Panel') : fail('Admin Panel')}      ${cfg.ADMIN_ENABLED ? val('enabled') : dim('disabled')}`)
+logger.raw(`  ${dim('─────────────────────────────────────────────')}`)
+logger.raw(`  ${ok('SSO')}              ${ssoSummary}`)
+logger.raw(`  ${(cfg.RESEND_API_KEY || cfg.SMTP_URL || cfg.EMAIL_HOST) ? ok('Email') : fail('Email')}            ${emailSummary}`)
+logger.raw(`  ${cfg.TMDB_API_KEY ? ok('TMDB') : fail('TMDB')}             ${cfg.TMDB_API_KEY ? dim('configured') : `${c.yellow}missing${c.reset}`}`)
+logger.raw(`  ${cfg.TRAKT_CLIENT_ID ? ok('Trakt') : ok('Trakt')}            ${cfg.TRAKT_CLIENT_ID ? dim('configured') : dim('not configured')}`)
+logger.raw(`  ${cfg.FANART_API_KEY ? ok('Fanart.tv') : ok('Fanart.tv')}        ${cfg.FANART_API_KEY ? dim('configured') : dim('not configured')}`)
+logger.raw(`  ${dim('─────────────────────────────────────────────')}`)
+logger.raw('')
+
+// Warnings & setup notices
+if (!checks.authSecret) {
+  logger.warn('AUTH_SECRET is not configured or uses the default — set it in .env')
+}
+if (!checks.encryptionKey) {
+  logger.warn('ENCRYPTION_KEY is not configured or uses the default — set it in .env')
+}
+if (!checks.database) {
+  logger.warn('DATABASE_URL not configured — using default location')
+}
+if (!hasSuperadmin) {
+  logger.raw('')
+  logger.raw(`  ${c.bold}${c.yellow}⚠ Setup Required${c.reset}`)
+  logger.raw(`  ${dim('─────────────────────────────────────────────')}`)
+  logger.raw(`  No superadmin has claimed this instance yet.`)
+  logger.raw(`  ${dim('1.')} Register or sign in as the first user`)
+  logger.raw(`  ${dim('2.')} Navigate to ${c.cyan}/admin${c.reset} to claim ownership`)
+  logger.raw(`  ${dim('─────────────────────────────────────────────')}`)
+  logger.raw('')
 }
 
-if (DATABASE_URL && DATABASE_URL.includes('sqlite')) {
-  logger.success(`Database: using sqlite at ${DATABASE_URL}`)
-  logger.success('Database configured')
-} else if (DATABASE_URL) {
-  logger.success(`Database configured: ${DATABASE_URL}`)
-} else {
-  logger.error('DATABASE_URL not configured')
-}
-
-if (!RATE_LIMIT_LIMIT || RATE_LIMIT_LIMIT <= 0 || !RATE_LIMIT_WINDOW_MS || RATE_LIMIT_WINDOW_MS <= 0) {
-  logger.info('Rate limiter: disabled')
-} else {
-  logger.success(`Rate limiter: ${RATE_LIMIT_LIMIT} requests / ${RATE_LIMIT_WINDOW_MS}ms`)
-}
-
-logger.info('Preparing middleware and routes...')
+logger.info('Initializing services...')
 
 // Initialize IMDb service
 initImdbService()
 
 // Initialize Sync Service
 syncService.startBackgroundSync();
+
 
 // Basic Middleware
 app.use('*', corsMiddleware())
@@ -319,8 +395,16 @@ app.get('*', async (c) => {
   }
 })
 
+// ─── Ready ────────────────────────────────────────────────────────────
+const listenPort = process.env.PORT || 3000
+logger.raw('')
+logger.raw(`  ${c.bold}${c.green}▸ Server ready${c.reset}  ${dim('on')} ${c.bold}${c.cyan}http://localhost:${listenPort}${c.reset}`)
+logger.raw(`  ${dim('  API docs   →')} ${c.cyan}http://localhost:${listenPort}/api/docs${c.reset}`)
+logger.raw(`  ${dim('  Health     →')} ${c.cyan}http://localhost:${listenPort}/api/health${c.reset}`)
+logger.raw('')
+
 export default {
-  port: process.env.PORT || 3000,
+  port: listenPort,
   fetch: app.fetch,
   idleTimeout: 60 // Increase timeout to 60s to allow for slow addon responses
 }

@@ -3,6 +3,9 @@ import { Stream } from '../services/addons/types'
 import { toast } from 'sonner'
 import { createApiEventSource } from '../lib/url'
 import { recordPerfEvent } from '../utils/performance'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('useStreamLoader')
 
 export type AddonStatus = 'idle' | 'loading' | 'done' | 'error'
 
@@ -302,7 +305,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
 
     eventSource.addEventListener('error', (e) => {
       if (isStale()) { eventSource.close(); return }
-      console.error('SSE error:', e)
+      log.error('SSE error:', e)
       setIsLoading(false)
       eventSource.close()
     })

@@ -16,6 +16,9 @@ import { toast } from 'sonner'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 import { preloadPlayer } from '../../utils/route-preloader'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('DetailsPage')
 
 interface StreamingDetailsData {
   meta: MetaDetail
@@ -100,7 +103,7 @@ export const StreamingDetails = () => {
         setInList(data.listIds.length > 0)
       }
     } catch (e) {
-      console.error("Failed to check list status", e)
+      log.error("Failed to check list status", e)
     }
   }
 
@@ -179,7 +182,7 @@ export const StreamingDetails = () => {
         }
       }
     } catch (err) {
-      console.error(err)
+      log.error(err)
       setError('Failed to load content')
     } finally {
       setLoading(false)
@@ -380,7 +383,7 @@ export const StreamingDetails = () => {
         )
       }
     } catch (e) {
-      console.error('Failed to toggle watched status', e)
+      log.error('Failed to toggle watched status', e)
       // Revert on error
       updateLocalState(!newWatched)
       toast.error('Failed to update watched status')
@@ -428,7 +431,7 @@ export const StreamingDetails = () => {
           : `Season ${season} ${watched ? 'marked as watched' : 'unmarked'}`
       )
     } catch (e) {
-      console.error('Failed to toggle season watched', e)
+      log.error('Failed to toggle season watched', e)
       toast.error('Failed to update season watched status')
     }
   }
@@ -473,7 +476,7 @@ export const StreamingDetails = () => {
           : `Series ${watched ? 'marked as watched' : 'unmarked'} (${result.episodesUpdated} episodes)`
       )
     } catch (e) {
-      console.error('Failed to mark series as watched', e)
+      log.error('Failed to mark series as watched', e)
       toast.error('Failed to update series watched status')
     }
   }
@@ -522,7 +525,7 @@ export const StreamingDetails = () => {
           : `Marked ${result.episodesUpdated} episodes before S${season}E${episode}`
       )
     } catch (e) {
-      console.error('Failed to mark episodes before', e)
+      log.error('Failed to mark episodes before', e)
       toast.error('Failed to update watched status')
     }
   }

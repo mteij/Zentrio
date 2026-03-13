@@ -3,6 +3,9 @@ import './toast.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { createLogger } from './utils/client-logger'
+
+const log = createLogger('App')
 
 // GLOBAL FETCH PATCH for broken libraries (better-auth/plugins)
 // Some updates to better-auth seem to pass a Promise as the method property
@@ -12,7 +15,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     // Intercept better-fetch method normalization probe to prevent crash in native fetch
     const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     if (urlStr.includes('fetch-options/method') || urlStr.endsWith('to-upper-case')) {
-        console.warn('[GlobalFetch] Intercepted internal check request:', urlStr);
+        log.warn('Intercepted internal check request:', urlStr);
         return new Response(JSON.stringify({ success: true }), { 
             status: 200, 
             statusText: 'OK',
@@ -22,11 +25,11 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
     let overrideMethod: any = init ? init.method : undefined;
     if (overrideMethod instanceof Promise) {
-        console.warn('[GlobalFetch] Found Promise in init.method, resolving...');
+        log.warn('Found Promise in init.method, resolving...');
         try {
             overrideMethod = await overrideMethod;
         } catch (e) {
-            console.error('[GlobalFetch] Failed to resolve method promise:', e);
+            log.error('Failed to resolve method promise:', e);
             overrideMethod = 'GET';
         }
     } 

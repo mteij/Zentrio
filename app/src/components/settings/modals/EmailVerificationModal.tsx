@@ -4,6 +4,9 @@ import { toast } from 'sonner'
 import { Modal, Button, Input } from '../../index'
 import { apiFetch } from '../../../lib/apiFetch'
 import styles from '../../../styles/Settings.module.css'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('EmailVerify')
 
 interface EmailVerificationModalProps {
   isOpen: boolean
@@ -33,7 +36,7 @@ export const EmailVerificationModal = ({ isOpen, onClose, email, onSuccess }: Em
             toast.error('Verification Failed', { description: 'Invalid code' })
         }
     } catch (e) {
-        console.error(e)
+        log.error(e)
         toast.error('Network Error')
     }
   }

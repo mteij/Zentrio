@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import Hls from 'hls.js'
 import { useCast } from '../contexts/CastContext'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('usePlayer')
 
 interface UsePlayerProps {
   url: string
@@ -53,7 +56,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
   useEffect(() => {
     const video = videoRef.current
     if (isCastConnected && video && !video.paused) {
-        console.log("Cast connected, pausing local video")
+        log.debug("Cast connected, pausing local video")
         video.pause() // Pause local if casting starts
     }
   }, [isCastConnected, videoRef])
@@ -88,10 +91,10 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     // Error handler
     const handleError = (e: Event | string) => {
       const video = videoRef.current
-      console.error('Player error event:', e)
+      log.error('Player error event:', e)
       
       if (video?.error) {
-        console.error('Video Error Details:', {
+        log.error('Video Error Details:', {
             code: video.error.code,
             message: video.error.message
         })
@@ -188,7 +191,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
       video.src = url
       if (autoPlay) {
         video.addEventListener('canplaythrough', () => {
-          video.play().catch(e => console.log('Autoplay blocked:', e))
+          video.play().catch(e => log.debug('Autoplay blocked:', e))
         }, { once: true })
       }
     } else if (isHls && Hls.isSupported()) {
@@ -218,7 +221,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
         setQualityLevels(levels)
         
         if (autoPlay) {
-          video.play().catch(e => console.log('Autoplay blocked:', e))
+          video.play().catch(e => log.debug('Autoplay blocked:', e))
         }
       })
       
@@ -230,11 +233,11 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.log('Network error, attempting to recover...')
+              log.debug('Network error, attempting to recover...')
               hls.startLoad()
               break
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.log('Media error, attempting to recover...')
+              log.debug('Media error, attempting to recover...')
               hls.recoverMediaError()
               break
             default:
@@ -249,7 +252,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
       video.src = url
       if (autoPlay) {
         video.addEventListener('canplaythrough', () => {
-          video.play().catch(e => console.log('Autoplay blocked:', e))
+          video.play().catch(e => log.debug('Autoplay blocked:', e))
         }, { once: true })
       }
     } else {
@@ -257,18 +260,18 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
       // Check if we suspect unsupported audio? 
       // We can hook into 'error' event on video too
       
-      console.log('usePlayer: Setting video src', url)
+      log.debug('usePlayer: Setting video src', url)
       video.src = url
       if (autoPlay) {
         video.addEventListener('canplaythrough', () => {
-          console.log('usePlayer: canplaythrough event')
-          video.play().catch(e => console.log('Autoplay blocked:', e))
+          log.debug('usePlayer: canplaythrough event')
+          video.play().catch(e => log.debug('Autoplay blocked:', e))
         }, { once: true })
       }
     }
 
     return () => {
-      console.log('usePlayer: Cleanup')
+      log.debug('usePlayer: Cleanup')
       video.removeEventListener('error', handleError)
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
       video.removeEventListener('waiting', handleWaiting)
@@ -296,7 +299,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     if (!video) return
     
     if (video.paused) {
-      video.play().catch(e => console.log('Play failed:', e))
+      video.play().catch(e => log.debug('Play failed:', e))
     } else {
       video.pause()
     }
@@ -373,7 +376,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     
     // Check if metadata is loaded before requesting PiP
     if (!isMetadataLoaded) {
-      console.warn('Cannot enable PiP: video metadata not loaded yet')
+      log.warn('Cannot enable PiP: video metadata not loaded yet')
       return
     }
     
@@ -384,7 +387,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
         await video.requestPictureInPicture()
       }
     } catch (error) {
-      console.error('PiP error:', error)
+      log.error('PiP error:', error)
     }
   }, [videoRef, isMetadataLoaded])
 
@@ -403,7 +406,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
         await element?.requestFullscreen()
       }
     } catch (error) {
-      console.error('Fullscreen error:', error)
+      log.error('Fullscreen error:', error)
     }
   }, [videoRef])
 

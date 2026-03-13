@@ -4,6 +4,9 @@ import {
   magicLinkClient,
   emailOTPClient,
 } from "better-auth/client/plugins";
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('AuthClient')
 
 // Add TypeScript definition for Tauri internals
 declare global {
@@ -69,7 +72,7 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
     // better-auth or a plugin sometimes tries to access properties of the fetch options as a URL
     // e.g., 'to-upper-case' when checking method normalization
     if (url.includes('fetch-options/method') || url.endsWith('to-upper-case')) {
-        console.warn('[safeFetch] Intercepted internal check request:', url);
+        log.warn('Intercepted internal check request:', url);
         return new Response(JSON.stringify({ success: true }), { 
             status: 200, 
             statusText: 'OK',
@@ -83,18 +86,18 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
     // WORKAROUND: better-auth sometimes passes a Promise as the method? 
     // We detect this and resolve it if possible, or default to GET.
     if (overrideMethod instanceof Promise) {
-        console.warn('[safeFetch] Found Promise in init.method, awaiting usage...');
+        log.warn('Found Promise in init.method, awaiting usage...');
         try {
             overrideMethod = await overrideMethod;
-            console.log('[safeFetch] Resolved method to:', overrideMethod);
+            log.debug('Resolved method to:', overrideMethod);
         } catch (e) {
-            console.error('[safeFetch] Failed to resolve method promise:', e);
+            log.error('Failed to resolve method promise:', e);
             overrideMethod = 'GET';
         }
     } 
     
     if (overrideMethod && typeof overrideMethod === 'object') {
-         console.warn('[safeFetch] Invalid method type:', typeof overrideMethod, overrideMethod);
+         log.warn('Invalid method type:', typeof overrideMethod, overrideMethod);
          // Better Fetch might pass an object proxy. Convert it to string so native fetch doesn't throw.
          try {
              const methodObj = overrideMethod;
@@ -123,12 +126,12 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
                 const parsed = JSON.parse(storage);
                 const token = parsed?.state?.session?.token;
                 if (token) {
-                    console.log(`[safeFetch] Injecting token: ...${token.slice(-6)} for ${url}`);
+                    log.debug(`Injecting token: ...${token.slice(-6)} for ${url}`);
                     headers.set('Authorization', `Bearer ${token}`);
                 }
             }
         } catch (e) {
-            console.error('[safeFetch] Failed to read token from storage:', e);
+            log.error('Failed to read token from storage:', e);
         }
     }
 
@@ -149,17 +152,17 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
             }
             
             if (isSessionRequest) {
-                console.log('[safeFetch] Using WebView fetch for session:', url);
+                log.debug('Using WebView fetch for session:', url);
                 
                 // --- DEBUG TRACING ---
-                console.log('[safeFetch] --- FETCH TRACE START ---');
-                console.log('[safeFetch] URL:', url);
-                console.log('[safeFetch] Has Auth Header:', headers.has('Authorization'));
+                log.debug('--- FETCH TRACE START ---');
+                log.debug('URL:', url);
+                log.debug('Has Auth Header:', headers.has('Authorization'));
                 if (headers.has('Authorization')) {
                     const h = headers.get('Authorization');
-                    console.log('[safeFetch] Auth Header Suffix:', h ? `...${h.slice(-6)}` : 'null');
+                    log.debug('Auth Header Suffix:', h ? `...${h.slice(-6)}` : 'null');
                 }
-                console.log('[safeFetch] --- FETCH TRACE END ---');
+                log.debug('--- FETCH TRACE END ---');
                 // ---------------------
 
                 return fetch(input, {
@@ -176,7 +179,7 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
                 headers,
             });
         } catch (e: any) {
-            console.error('[safeFetch] Tauri HTTP plugin error:', e);
+            log.error('Tauri HTTP plugin error:', e);
             throw new Error(`Network request failed: ${e?.message || 'Unknown error'} (URL: ${url})`);
         }
     }

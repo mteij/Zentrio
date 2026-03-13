@@ -3,6 +3,9 @@
 
 import { db } from '../database/connection'
 import type { AdminRole, AdminPermission, AdminRolePermission, AdminUserRole } from '../database/types'
+import { logger } from '../logger'
+
+const log = logger.scope('RBAC')
 
 // Permission keys as defined in the database
 export const Permissions = {
@@ -212,7 +215,7 @@ export function assignRoleToUser(userId: string, roleId: string): boolean {
     invalidatePermissionCache(userId)
     return true
   } catch (e) {
-    console.error('Failed to assign role:', e)
+    log.error('Failed to assign role:', e)
     return false
   }
 }
@@ -228,7 +231,7 @@ export function removeRoleFromUser(userId: string, roleId: string): boolean {
     invalidatePermissionCache(userId)
     return true
   } catch (e) {
-    console.error('Failed to remove role:', e)
+    log.error('Failed to remove role:', e)
     return false
   }
 }
@@ -251,7 +254,7 @@ export function createRole(
       .get(id, name, description || null)
     return result || null
   } catch (e) {
-    console.error('Failed to create role:', e)
+    log.error('Failed to create role:', e)
     return null
   }
 }
@@ -270,7 +273,7 @@ export function deleteRole(roleId: string): boolean {
 
     return result.changes > 0
   } catch (e) {
-    console.error('Failed to delete role:', e)
+    log.error('Failed to delete role:', e)
     return false
   }
 }
@@ -289,7 +292,7 @@ export function assignPermissionToRole(roleId: string, permissionId: string): bo
 
     return true
   } catch (e) {
-    console.error('Failed to assign permission:', e)
+    log.error('Failed to assign permission:', e)
     return false
   }
 }
@@ -308,7 +311,7 @@ export function removePermissionFromRole(roleId: string, permissionId: string): 
 
     return true
   } catch (e) {
-    console.error('Failed to remove permission:', e)
+    log.error('Failed to remove permission:', e)
     return false
   }
 }

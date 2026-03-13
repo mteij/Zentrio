@@ -2,6 +2,9 @@ import { Play, Trash2, CheckCircle } from 'lucide-react'
 import { DownloadRecord, downloadService } from '../../services/downloads/download-service'
 import styles from './Downloads.module.css'
 import { useNavigate } from 'react-router-dom'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('DownloadCard')
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
@@ -38,7 +41,7 @@ export function DownloadCard({ record, profileId, onDelete }: Props) {
       await downloadService.delete(record.id)
       onDelete(record.id)
     } catch (e) {
-      console.error('[DownloadCard] delete error', e)
+      log.error('delete error', e)
     }
   }
 

@@ -82,15 +82,22 @@ bun install
 
 ### 2. Environment Variables
 
-You'll need a `.env` file for local development. Create one in the `app` directory:
+Copy the example config and fill in your values. The `.env` file lives in the **repository root** (not `app/`):
+
+```bash
+cp .env.example .env
+```
+
+At minimum you need:
 
 ```bash
 AUTH_SECRET=dev-secret-change-in-production
 ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-DATABASE_URL=file:./data/zentrio.db
+TMDB_API_KEY=your-tmdb-api-key
+DATABASE_URL=./data/zentrio.db
 ```
 
-_Note: SQLite is included out-of-the-box._
+See [`.env.example`](../.env.example) for all available options.
 
 ### 3. Start Development Servers (Web)
 

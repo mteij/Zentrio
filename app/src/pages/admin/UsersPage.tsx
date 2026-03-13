@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Search, ChevronLeft, ChevronRight, X, Loader2, ShieldCheck, Ban, UserCheck, Shield } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, X, Loader2, ShieldCheck, Ban, UserCheck, Shield, Users as UsersIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
 import { InputDialog } from '../../components/ui/InputDialog'
@@ -263,7 +263,13 @@ export function UsersPage() {
             <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
           </div>
         ) : users.length === 0 ? (
-          <p className="text-center py-12 text-zinc-600 text-sm">No users found</p>
+          <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
+            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+              <UsersIcon className="w-6 h-6 text-zinc-400" />
+            </div>
+            <p className="text-sm font-medium text-white mb-1">No users found</p>
+            <p className="text-xs text-zinc-500">Try adjusting your search query.</p>
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>

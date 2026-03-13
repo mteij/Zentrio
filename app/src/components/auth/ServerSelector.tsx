@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { toast } from 'sonner'
 import { Server, ArrowRight, Loader2 } from "lucide-react";
 import { getServerUrl, isTauri } from "../../lib/auth-client";
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('ServerSelector')
 
 interface ServerSelectorProps {
   onServerSelected: (url: string) => void;
@@ -35,20 +38,20 @@ export function ServerSelector({ onServerSelected }: ServerSelectorProps) {
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
         try {
-          console.log('[Connection Check] Target:', cleanUrl);
+          log.debug('Target:', cleanUrl);
           const isTauriEnv = isTauri();
-          console.log('[Connection Check] Is Tauri:', isTauriEnv);
+          log.debug('Is Tauri:', isTauriEnv);
           
           let fetchFn: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
           try {
              fetchFn = isTauriEnv ? (await import('@tauri-apps/plugin-http')).fetch : fetch;
           } catch (importErr) {
-             console.error('Failed to import Tauri HTTP plugin:', importErr);
+             log.error('Failed to import Tauri HTTP plugin:', importErr);
              fetchFn = fetch;
           }
           
           const tryFetch = async (endpoint: string) => {
-            console.log(`Trying endpoint: ${endpoint}`);
+            log.debug(`Trying endpoint: ${endpoint}`);
             const r = await fetchFn(endpoint, { signal: controller.signal });
             return r;
           };
@@ -56,28 +59,28 @@ export function ServerSelector({ onServerSelected }: ServerSelectorProps) {
           let res = await tryFetch(`${cleanUrl}/api/health`);
           
           if (!res.ok && res.status === 404) {
-             console.log('/api/health returned 404, trying /health');
+             log.debug('/api/health returned 404, trying /health');
              const res2 = await tryFetch(`${cleanUrl}/health`);
              if (res2.ok) res = res2;
           }
 
           clearTimeout(timeoutId);
-          console.log('[Connection Check] Status:', res.status);
+          log.debug('Status:', res.status);
           
           if (!res.ok) {
             const text = await res.text().catch(() => '');
-            console.error('Response error:', res.status, text);
+            log.error('Response error:', res.status, text);
             throw new Error(`Server returned error ${res.status}: ${text.substring(0, 50)}`);
           }
           
           const data = await res.json();
-          console.log('[Connection Check] Data:', data);
+          log.debug('Data:', data);
           if (data.status !== "ok") {
             throw new Error(`Server status is '${data.status}' (expected 'ok')`);
           }
         } catch (fetchErr: any) {
           clearTimeout(timeoutId);
-          console.error('[Connection Check] Exception:', fetchErr);
+          log.error('Exception:', fetchErr);
           
           if (fetchErr.name === 'AbortError') {
             throw new Error("Connection timed out. Server unavailable.");

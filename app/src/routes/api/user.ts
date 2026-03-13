@@ -6,8 +6,12 @@ import { emailService } from '../../services/email'
 import { getConfig } from '../../services/envParser'
 import { createHash, randomBytes } from 'crypto'
 import { encrypt, decrypt } from '../../services/encryption'
-import { ok, err, validate, schemas } from '../../utils/api'
+import { ok, err, validate, schemas, getRequestMeta } from '../../utils/api'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+import { writeAuditEvent } from '../../services/admin/audit'
+
+const log = logger.scope('API:User')
 
 const app = createTaggedOpenAPIApp<{
   Variables: {
@@ -34,7 +38,7 @@ app.get('/settings-profiles', optionalSessionMiddleware, async (c) => {
     const profiles = settingsProfileDb.listByUserId(effectiveUser.id)
     return ok(c, profiles)
   } catch (e) {
-    console.error('Failed to list settings profiles:', e)
+    log.error('Failed to list settings profiles:', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -52,7 +56,7 @@ app.post('/settings-profiles', optionalSessionMiddleware, csrfLikeGuard, async (
     const profile = settingsProfileDb.create(effectiveUser.id, name)
     return ok(c, profile)
   } catch (e) {
-    console.error('Failed to create settings profile:', e)
+    log.error('Failed to create settings profile:', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -74,7 +78,7 @@ app.put('/settings-profiles/:id', optionalSessionMiddleware, csrfLikeGuard, asyn
     settingsProfileDb.update(id, name)
     return ok(c, { success: true })
   } catch (e) {
-    console.error('Failed to update settings profile:', e)
+    log.error('Failed to update settings profile:', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -98,7 +102,7 @@ app.delete('/settings-profiles/:id', optionalSessionMiddleware, csrfLikeGuard, a
     settingsProfileDb.delete(id)
     return ok(c, { success: true })
   } catch (e) {
-    console.error('Failed to delete settings profile:', e)
+    log.error('Failed to delete settings profile:', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -123,7 +127,7 @@ app.get('/streaming-settings', async (c) => {
     const settings = streamDb.getSettings(profile.id)
     return ok(c, settings)
   } catch (e) {
-    console.error('Failed to get streaming settings:', e)
+    log.error('Failed to get streaming settings:', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -150,7 +154,7 @@ app.put('/streaming-settings', async (c) => {
     streamDb.saveSettings(profile.id, body)
     return ok(c, undefined, 'Streaming settings saved')
   } catch (e) {
-    console.error('Failed to save streaming settings:', e)
+    log.error('Failed to save streaming settings:', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -170,7 +174,7 @@ app.get('/tmdb-api-key', async (c) => {
       try {
         tmdbApiKey = decrypt(freshUser.tmdbApiKey)
       } catch (error) {
-        console.error('Failed to decrypt TMDB API key:', error)
+        log.error('Failed to decrypt TMDB API key:', error)
         tmdbApiKey = 'DECRYPTION_FAILED'
       }
     }
@@ -179,7 +183,7 @@ app.get('/tmdb-api-key', async (c) => {
       tmdb_api_key: tmdbApiKey
     })
   } catch (error) {
-    console.error('Failed to get TMDB API key:', error)
+    log.error('Failed to get TMDB API key:', error)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -238,7 +242,7 @@ app.put('/tmdb-api-key', async (c) => {
       try {
         encryptedApiKey = encrypt(tmdb_api_key.trim())
       } catch (error) {
-        console.error('Failed to encrypt TMDB API key:', error)
+        log.error('Failed to encrypt TMDB API key:', error)
         return err(c, 500, 'SERVER_ERROR', 'Failed to encrypt API key')
       }
     }
@@ -252,9 +256,20 @@ app.put('/tmdb-api-key', async (c) => {
       return err(c, 500, 'SERVER_ERROR', 'Failed to update user settings')
     }
     
+    const { ipAddress, userAgent } = getRequestMeta(c)
+    writeAuditEvent({
+      actorId: user.id.toString(),
+      action: 'user.update_tmdb_key',
+      targetType: 'user',
+      targetId: user.id.toString(),
+      reason: tmdb_api_key ? 'Set TMDB API Key' : 'Cleared TMDB API Key',
+      ipAddress,
+      userAgent
+    })
+    
     return ok(c, { tmdb_api_key: tmdb_api_key || null }, 'TMDB API key updated successfully')
   } catch (error) {
-    console.error('Failed to update TMDB API key:', error)
+    log.error('Failed to update TMDB API key:', error)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -453,6 +468,18 @@ app.put('/settings', async (c) => {
     if (!updated) {
       return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
     }
+    
+    const { ipAddress, userAgent } = getRequestMeta(c)
+    writeAuditEvent({
+      actorId: user.id.toString(),
+      action: 'user.update_settings',
+      targetType: 'user',
+      targetId: user.id.toString(),
+      reason: 'Updated app settings',
+      ipAddress,
+      userAgent
+    })
+    
     return ok(c, undefined, 'Settings saved successfully')
   } catch (_e) {
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
@@ -544,9 +571,20 @@ app.delete('/accounts/:providerId', async (c) => {
       return err(c, 500, 'SERVER_ERROR', 'Failed to unlink account')
     }
     
+    const { ipAddress, userAgent } = getRequestMeta(c)
+    writeAuditEvent({
+      actorId: user.id.toString(),
+      action: 'user.unlink_account',
+      targetType: 'user',
+      targetId: user.id.toString(),
+      reason: `Unlinked account: ${providerId}`,
+      ipAddress,
+      userAgent
+    })
+    
     return ok(c, undefined, 'Account unlinked successfully')
   } catch (e: any) {
-    console.error('Failed to unlink account:', e)
+    log.error('Failed to unlink account:', e)
     return err(c, 500, 'SERVER_ERROR', e.message || 'Failed to unlink account')
   }
 })
@@ -576,7 +614,7 @@ app.post('/email/initiate', async (c) => {
     }), body)
 
     if (!validation.success) {
-      console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'INVALID_INPUT' }))
+      log.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'INVALID_INPUT' }))
       return err(c, 400, 'INVALID_INPUT', 'Invalid input', validation.error)
     }
 
@@ -588,14 +626,14 @@ app.post('/email/initiate', async (c) => {
 
     // Per-user rate limit: 5/hour, min 30s between attempts
     if (!rateLimitUser(user.id as any, 'email_initiate', { max: 5, windowMs: 60 * 60 * 1000, minIntervalMs: 30 * 1000 })) {
-      console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'RATE_LIMITED' }))
+      log.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'RATE_LIMITED' }))
       return err(c, 429, 'RATE_LIMITED', 'Too many requests. Try later.')
     }
 
     // Check uniqueness
     const existing = userDb.findByEmail(newEmail)
     if (existing && existing.id !== user.id) {
-      console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, targetEmailHash: hashEmail(newEmail), errorCode: 'EMAIL_IN_USE' }))
+      log.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, targetEmailHash: hashEmail(newEmail), errorCode: 'EMAIL_IN_USE' }))
       return err(c, 409, 'EMAIL_IN_USE', 'Unable to process request')
     }
 
@@ -617,16 +655,16 @@ app.post('/email/initiate', async (c) => {
     
     if (!emailSent) {
       emailChangeTokens.delete(user.id)
-      console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, targetEmailHash: hashEmail(newEmail), errorCode: 'EMAIL_SEND_FAILED' }))
+      log.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, targetEmailHash: hashEmail(newEmail), errorCode: 'EMAIL_SEND_FAILED' }))
       return err(c, 500, 'SERVER_ERROR', 'Failed to send verification email')
     }
 
-    console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'success', ip, userAgent, targetEmailHash: hashEmail(newEmail) }))
+    log.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'success', ip, userAgent, targetEmailHash: hashEmail(newEmail) }))
     return ok(c, { type: 'link' }, 'Verification link sent to new email')
   } catch (e: any) {
     const errorMessage = e?.message || 'Unknown error'
-    console.error('Email change initiation failed:', errorMessage)
-    console.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'SERVER_ERROR', errorMessage }))
+    log.error('Email change initiation failed:', errorMessage)
+    log.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, errorCode: 'SERVER_ERROR', errorMessage }))
     return err(c, 500, 'SERVER_ERROR', 'Failed to initiate email change')
   }
 })
@@ -667,6 +705,17 @@ app.get('/email/verify', async (c) => {
     // Clean up token
     emailChangeTokens.delete(userId)
     
+    const { ipAddress, userAgent } = getRequestMeta(c)
+    writeAuditEvent({
+      actorId: userId.toString(),
+      action: 'user.update_email',
+      targetType: 'user',
+      targetId: userId.toString(),
+      reason: 'Changed email mapping',
+      ipAddress,
+      userAgent
+    })
+    
     // Redirect to settings page
     const isTauri = c.req.header('User-Agent')?.includes('Tauri')
     const cfg = getConfig()
@@ -701,7 +750,7 @@ app.get('/email/verify', async (c) => {
       </html>
     `)
   } catch (e: any) {
-    console.error('Email verification failed:', e)
+    log.error('Email verification failed:', e)
     return c.text('Verification failed', 500)
   }
 })
@@ -732,6 +781,17 @@ app.put('/password', async (c) => {
         if (!res) {
              return err(c, 400, 'INVALID_INPUT', 'Failed to update password')
         }
+
+        const { ipAddress, userAgent } = getRequestMeta(c)
+        writeAuditEvent({
+          actorId: user!.id.toString(),
+          action: 'user.update_password',
+          targetType: 'user',
+          targetId: user!.id.toString(),
+          reason: 'Changed password correctly',
+          ipAddress,
+          userAgent
+        })
 
         return ok(c, undefined, 'Password updated')
     } catch (e: any) {
@@ -773,7 +833,7 @@ app.post('/password/setup', async (c) => {
     
     return ok(c, undefined, 'Password set successfully')
   } catch (e: any) {
-    console.error('Failed to set password:', e)
+    log.error('Failed to set password:', e)
     return err(c, 500, 'SERVER_ERROR', e.message || 'Failed to set password')
   }
 })
@@ -841,7 +901,7 @@ app.put('/username', async (c) => {
 
     return ok(c, { username }, 'Username updated successfully')
   } catch (error) {
-    console.error('Failed to update username:', error)
+    log.error('Failed to update username:', error)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -869,7 +929,7 @@ app.delete('/account', async (c) => {
     
     return ok(c, undefined, 'Account deleted successfully')
   } catch (e: any) {
-    console.error('Failed to delete account:', e)
+    log.error('Failed to delete account:', e)
     return err(c, 500, 'SERVER_ERROR', e.message || 'Failed to delete account')
   }
 })

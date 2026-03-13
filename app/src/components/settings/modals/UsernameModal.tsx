@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { ModalWithFooter, Button, FormGroup, Input } from '../../index'
 import { apiFetch } from '../../../lib/apiFetch'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('UsernameModal')
 
 interface UsernameModalProps {
   isOpen: boolean
@@ -31,7 +34,7 @@ export const UsernameModal = ({ isOpen, onClose, onSuccess }: UsernameModalProps
             toast.error('Update Failed', { description: 'Failed to update username' })
         }
     } catch (e) {
-        console.error(e)
+        log.error(e)
         toast.error('Network Error')
     }
   }

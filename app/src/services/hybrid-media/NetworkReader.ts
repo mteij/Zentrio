@@ -5,6 +5,9 @@
  */
 
 import type { NetworkReaderConfig } from './types'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('NetworkReader')
 
 interface CacheEntry {
   data: ArrayBuffer
@@ -60,18 +63,18 @@ export class NetworkReader {
       }
 
       this.fileSize = parseInt(contentLength, 10)
-      console.log(`[NetworkReader] File size: ${(this.fileSize / 1024 / 1024).toFixed(2)} MB`)
+      log.debug(`File size: ${(this.fileSize / 1024 / 1024).toFixed(2)} MB`)
 
       // Check Accept-Ranges header
       const acceptRanges = response.headers.get('Accept-Ranges')
       if (acceptRanges === 'bytes') {
-        console.log('[NetworkReader] Server supports Range requests (confirmed via header)')
+        log.debug('Server supports Range requests (confirmed via header)')
         return this.fileSize
       }
 
       // Step 2: Verify Range support with a real request (bytes=0-0)
       // Only needed if Accept-Ranges header is missing
-      console.log('[NetworkReader] Accept-Ranges header missing, verifying with request...')
+      log.debug('Accept-Ranges header missing, verifying with request...')
       try {
         const verifySignal = this.mergeSignals(
           this.abortController!.signal, 
@@ -84,14 +87,14 @@ export class NetworkReader {
         })
 
         if (rangeResponse.status === 206) {
-             console.log('[NetworkReader] Server supports Range requests (verified)')
+             log.debug('Server supports Range requests (verified)')
         } else if (rangeResponse.status === 200) {
-             console.warn('[NetworkReader] Server returned 200 OK for Range request. SEEKING WILL FAIL.')
+             log.warn('Server returned 200 OK for Range request. SEEKING WILL FAIL.')
         } else {
-             console.warn(`[NetworkReader] Range check failed with status ${rangeResponse.status}`)
+             log.warn(`Range check failed with status ${rangeResponse.status}`)
         }
       } catch (e) {
-          console.warn('[NetworkReader] Range check verification failed (proceeding anyway):', e)
+          log.warn('Range check verification failed (proceeding anyway):', e)
       }
       
       return this.fileSize
@@ -164,7 +167,7 @@ export class NetworkReader {
     const result = new Uint8Array(combined, startOffset, actualLength)
 
     // Log significant reads (skip small sequential ones to reduce noise if needed, but for now log all)
-    // console.log(`[NetworkReader] Read ${length} bytes at ${offset} -> ${result.byteLength} (Chunks: ${startChunk}-${endChunk})`)
+    // log.debug(`Read ${length} bytes at ${offset} -> ${result.byteLength} (Chunks: ${startChunk}-${endChunk})`)
 
     // Trigger prefetch for upcoming chunks (don't await)
     this.prefetch(endChunk + 1, this.prefetchCount).catch(() => {})

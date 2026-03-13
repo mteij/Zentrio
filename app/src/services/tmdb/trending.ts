@@ -5,6 +5,9 @@
  */
 import { TMDBClient } from './client'
 import { getMeta } from './meta'
+import { logger } from '../logger'
+
+const log = logger.scope('TMDB:Trending')
 
 export async function getTrending(tmdbClient: TMDBClient, type: string, language: string, page: number, genre: string, config: any) {
   const media_type = type === "series" ? "tv" : type
@@ -22,7 +25,7 @@ export async function getTrending(tmdbClient: TMDBClient, type: string, language
         getMeta(tmdbClient, type, language, item.id, config)
           .then(result => result.meta)
           .catch((err: any) => {
-            console.error(`Error fetching metadata for ${item.id}:`, err.message)
+            log.error(`Error fetching metadata for ${item.id}:`, err.message)
             return null
           })
       )
@@ -30,5 +33,5 @@ export async function getTrending(tmdbClient: TMDBClient, type: string, language
       const metas = (await Promise.all(metaPromises)).filter(Boolean)
       return { metas }
     })
-    .catch(console.error)
+    .catch((e: any) => log.error('Operation failed:', e))
 }

@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Settings, LogOut, Edit, X, Plus, Check, LogIn, Shield } from 'lucide-react'
 import { SimpleLayout, ConfirmDialog, ProfileModal, AnimatedBackground, SkeletonProfile } from '../components'
 import { useAuthStore } from '../stores/authStore'
 import { apiFetch } from '../lib/apiFetch'
+import { adminApi } from '../lib/adminApi'
 import { buildAvatarUrl, sanitizeImgSrc } from '../lib/url'
 import styles from './ProfilesPage.module.css'
 import { ContextMenu } from '../components/ui/ContextMenu'
 import { appMode } from '../lib/app-mode'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('ProfilesPage')
 
 interface Profile {
   id: number
@@ -42,7 +47,6 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   const [showModal, setShowModal] = useState(false)
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
   const navigate = useNavigate()
 
   // Check if in guest mode
@@ -51,14 +55,19 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   // Track auth store for token availability
   const { session, isLoading: authLoading, isAuthenticated, user: authUser } = useAuthStore();
 
-  // Check if user is admin
-  useEffect(() => {
-    // Promote/demote role changes can lag in local auth state.
-    // Use both session user and store user to reduce UI stale state.
-    const sessionUser = useAuthStore.getState().session?.user as any
-    const effectiveRole = (authUser as any)?.role || sessionUser?.role
-    setIsAdmin(isAuthenticated && effectiveRole === 'admin')
-  }, [isAuthenticated, authUser, session?.user])
+  // Check if admin console is enabled on this instance
+  const { data: adminStatus } = useQuery({
+    queryKey: ['admin-status'],
+    queryFn: () => adminApi.getStatus(),
+    staleTime: Infinity,
+    retry: false,
+  })
+
+  // Show admin button only if: user has an admin role AND admin console is enabled
+  const sessionUser = useAuthStore.getState().session?.user as any
+  const effectiveRole = (authUser as any)?.role || sessionUser?.role
+  const hasAdminRole = new Set(['superadmin', 'admin', 'moderator', 'readonly']).has(String(effectiveRole || '').toLowerCase())
+  const isAdmin = isAuthenticated && hasAdminRole && (adminStatus?.enabled ?? false)
   
   // Determine if we're in Tauri environment
   const isTauriEnv = typeof window !== 'undefined' &&
@@ -67,7 +76,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   useEffect(() => {
     // In guest mode, load profiles immediately without waiting for auth
     if (isGuestMode) {
-      console.log('[ProfilesPage] Guest mode, loading profiles directly...');
+      log.debug('Guest mode, loading profiles directly...');
       loadProfiles(0);
       return;
     }
@@ -75,20 +84,20 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
     // Wait for auth to be ready and session token to be available
     // This prevents race conditions where we fetch before token is set
     if (authLoading) {
-      console.log('[ProfilesPage] Waiting for auth to load...');
+      log.debug('Waiting for auth to load...');
       return;
     }
     
     // For Tauri, we need a token; for web, cookies handle auth
     if (isTauriEnv && isAuthenticated && !session?.token) {
-      console.log('[ProfilesPage] Authenticated but waiting for session token (Tauri mode)...');
+      log.debug('Authenticated but waiting for session token (Tauri mode)...');
       
       // Use Zustand subscribe to wait for token to become available
       const unsubscribe = useAuthStore.subscribe(
         (state) => state.session?.token,
         (token) => {
           if (token) {
-            console.log('[ProfilesPage] Token now available via subscription, loading profiles...');
+            log.debug('Token now available via subscription, loading profiles...');
             loadProfiles(0);
             unsubscribe();
           }
@@ -99,10 +108,10 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
       const fallbackTimer = setTimeout(() => {
         const freshToken = useAuthStore.getState().session?.token;
         if (freshToken) {
-          console.log('[ProfilesPage] Token found via fallback timeout, loading profiles...');
+          log.debug('Token found via fallback timeout, loading profiles...');
           loadProfiles(0);
         } else {
-          console.log('[ProfilesPage] Still no token after timeout, loading anyway (may fail)...');
+          log.debug('Still no token after timeout, loading anyway (may fail)...');
           loadProfiles(0);
         }
         unsubscribe();
@@ -114,7 +123,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
       };
     }
     
-    console.log('[ProfilesPage] Auth ready, loading profiles...', {
+    log.debug('Auth ready, loading profiles...', {
       authLoading,
       isAuthenticated,
       hasToken: !!session?.token,
@@ -127,55 +136,55 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
     try {
       const res = await apiFetch('/api/profiles');
       // Log full response for debugging
-      console.log(`[ProfilesPage] API Response: ${res.status}`, { ok: res.ok, url: res.url });
+      log.debug(`API Response: ${res.status}`, { ok: res.ok, url: res.url });
 
       if (res.status === 401) {
         // Session might be expired, try to refresh once?
         if (retryCount >= 2) {
-             console.log('[ProfilesPage] Session expired (401) and max retries reached, redirecting to login...');
+             log.debug('Session expired (401) and max retries reached, redirecting to login...');
              navigate('/');
              return;
         }
 
-        console.log('[ProfilesPage] Session expired (401), attempting refresh...');
+        log.debug('Session expired (401), attempting refresh...');
         const refreshed = await useAuthStore.getState().refreshSession();
-        console.log('[ProfilesPage] Refresh result:', refreshed);
+        log.debug('Refresh result:', refreshed);
         
         if (refreshed) {
              // Wait for state to propagate after refresh before retrying
-             console.log('[ProfilesPage] Refresh success, waiting for token propagation...');
+             log.debug('Refresh success, waiting for token propagation...');
              await new Promise(resolve => setTimeout(resolve, 100));
              
              // Verify token is now available
              const newToken = useAuthStore.getState().session?.token;
-             console.log('[ProfilesPage] New token available:', !!newToken);
+             log.debug('New token available:', !!newToken);
              
-             console.log('[ProfilesPage] Retrying loadProfiles...');
+             log.debug('Retrying loadProfiles...');
              return loadProfiles(retryCount + 1);
         }
         
         // If refresh failed, then redirect
-        console.log('[ProfilesPage] Refresh failed, redirecting to login...');
+        log.debug('Refresh failed, redirecting to login...');
         navigate('/');
         return
       }
       if (res.ok) {
         const data = await res.json()
-        console.log("Profiles loaded:", data);
+        log.debug("Profiles loaded:", data);
         setProfiles(data)
         localStorage.setItem('zentrioProfiles', JSON.stringify(data))
         if (data.length === 0) {
-           console.log("No profiles found, retrying once in 1s to handle potential consistency delay...");
+           log.debug("No profiles found, retrying once in 1s to handle potential consistency delay...");
            setTimeout(async () => {
               try {
                   const res2 = await apiFetch('/api/profiles');
                   if (res2.ok) {
                       const data2 = await res2.json();
-                      console.log("Retry profiles loaded:", data2);
+                      log.debug("Retry profiles loaded:", data2);
                       setProfiles(data2);
                       localStorage.setItem('zentrioProfiles', JSON.stringify(data2));
                       if (data2.length === 0) {
-                          console.log("Still no profiles, but allowing empty state as per user request.");
+                          log.debug("Still no profiles, but allowing empty state as per user request.");
                       }
                   }
               } catch (e) {
@@ -185,7 +194,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
         }
       }
     } catch (error) {
-      console.error('Failed to load profiles:', error)
+      log.error('Failed to load profiles:', error)
     } finally {
       setLoading(false)
     }
@@ -222,7 +231,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
       await useAuthStore.getState().logout()
       navigate('/')
     } catch (e) {
-      console.error('Logout failed', e)
+      log.error('Logout failed', e)
     }
   }
 
@@ -394,7 +403,7 @@ function ProfileCard({ profile, onClick, onEdit }: {
                 alt={profile.name}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={(e) => {
-                  console.error(`[ProfilesPage] Avatar load failed for ${profile.name} (URL: ${e.currentTarget.src})`);
+                  log.error(`Avatar load failed for ${profile.name} (URL: ${e.currentTarget.src})`);
                   // Keep the broken image container but don't show the browser's broken icon if possible
                   // Alternatively we could set a fallback initials avatar here
                   e.currentTarget.style.opacity = '0';

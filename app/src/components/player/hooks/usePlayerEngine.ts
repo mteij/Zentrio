@@ -7,6 +7,9 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { IPlayerEngine, PlayerState, MediaSource, SubtitleTrack, AudioTrack, QualityLevel } from '../engines/types'
 import { createEngine, createEngineByType, detectEngineType, isTauriEnvironment } from '../engines'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('usePlayerEngine')
 
 interface UsePlayerEngineOptions {
   /** Auto-play when source is loaded */
@@ -139,7 +142,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
 
       if (destroyed || !videoRef.current) {
         if (!videoRef.current) {
-          console.error('[usePlayerEngine] Video element not found after 5 seconds')
+          log.error('Video element not found after 5 seconds')
           setError(new Error('Video element not found'))
           setIsLoading(false)
         }
@@ -205,18 +208,18 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
         engineReadyRef.current = true
         setEngineReady(true)
         setIsLoading(false)
-        console.log('[usePlayerEngine] Engine initialized:', isTauriEnvironment() ? 'Tauri' : 'Web')
+        log.debug('Engine initialized:', isTauriEnvironment() ? 'Tauri' : 'Web')
 
         // Load pending source if any
         if (pendingSourceRef.current) {
-          console.log('[usePlayerEngine] Loading pending source:', pendingSourceRef.current.src.substring(0, 80))
+          log.debug('Loading pending source:', pendingSourceRef.current.src.substring(0, 80))
           const source = pendingSourceRef.current
           pendingSourceRef.current = null
 
           // Check if a different engine is needed for this source
           const neededType = await detectEngineType(source)
           if (neededType !== engineTypeRef.current && videoRef.current) {
-            console.log(`[usePlayerEngine] Switching engine: ${engineTypeRef.current} → ${neededType}`)
+            log.debug(`Switching engine: ${engineTypeRef.current} → ${neededType}`)
             const oldEngine = engineRef.current!
             const newEngine = await createEngineByType(neededType as any)
             attachListeners(newEngine)
@@ -240,13 +243,13 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
             try {
               await engineRef.current!.play()
             } catch (playError) {
-              console.log('[usePlayerEngine] Autoplay blocked, user interaction required')
+              log.debug('Autoplay blocked, user interaction required')
             }
           }
         }
       } catch (err) {
         if (destroyed) return
-        console.error('[usePlayerEngine] Failed to initialize engine:', err)
+        log.error('Failed to initialize engine:', err)
         setError(err instanceof Error ? err : new Error(String(err)))
         setIsLoading(false)
       }
@@ -284,7 +287,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     try {
       await engineRef.current.play()
     } catch (err) {
-      console.error('[usePlayerEngine] Play error:', err)
+      log.error('Play error:', err)
       onError?.(err instanceof Error ? err : new Error(String(err)))
     }
   }, [onError])
@@ -335,7 +338,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     try {
       await element.requestFullscreen()
     } catch (err) {
-      console.error('[usePlayerEngine] Fullscreen error:', err)
+      log.error('Fullscreen error:', err)
     }
   }, [])
 
@@ -346,7 +349,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     try {
       await document.exitFullscreen()
     } catch (err) {
-      console.error('[usePlayerEngine] Exit fullscreen error:', err)
+      log.error('Exit fullscreen error:', err)
     }
   }, [])
 
@@ -364,15 +367,15 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
   const loadSource = useCallback(async (source: MediaSource) => {
     // Guard: skip if this exact URL is already loaded
     if (source.src && source.src === loadedSrcRef.current) {
-      console.log('[usePlayerEngine] loadSource: same URL already loaded, skipping')
+      log.debug('loadSource: same URL already loaded, skipping')
       return
     }
 
-    console.log('[usePlayerEngine] loadSource called, engineReady:', engineReadyRef.current)
+    log.debug('loadSource called, engineReady:', engineReadyRef.current)
     
     // If engine isn't ready yet, queue the source for later
     if (!engineReadyRef.current || !engineRef.current) {
-      console.log('[usePlayerEngine] Engine not ready, queueing source')
+      log.debug('Engine not ready, queueing source')
       pendingSourceRef.current = source
       return
     }
@@ -386,7 +389,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
       // (e.g., web → hybrid for MKV with rare audio codecs)
       const neededType = await detectEngineType(source)
       if (neededType !== engineTypeRef.current && videoRef.current) {
-        console.log(`[usePlayerEngine] Switching engine: ${engineTypeRef.current} → ${neededType}`)
+        log.debug(`Switching engine: ${engineTypeRef.current} → ${neededType}`)
         const oldEngine = engineRef.current
         const newEngine = await createEngineByType(neededType as any)
 
@@ -418,7 +421,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
         engineTypeRef.current = neededType
       }
 
-      console.log('[usePlayerEngine] Loading source:', source.src.substring(0, 80))
+      log.debug('Loading source:', source.src.substring(0, 80))
       await engineRef.current.loadSource(source)
 
       // Seek to start time if provided
@@ -435,13 +438,13 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
         try {
           await engineRef.current.play()
         } catch (playError) {
-          console.log('[usePlayerEngine] Autoplay blocked, user interaction required')
+          log.debug('Autoplay blocked, user interaction required')
         }
       }
 
       setIsLoading(false)
     } catch (err) {
-      console.error('[usePlayerEngine] Load source error:', err)
+      log.error('Load source error:', err)
       loadedSrcRef.current = ''  // reset so a retry is possible
       setError(err instanceof Error ? err : new Error(String(err)))
       setIsLoading(false)

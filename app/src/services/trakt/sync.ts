@@ -4,6 +4,9 @@
 import { traktClient } from './client'
 import { traktAccountDb, traktSyncStateDb, watchHistoryDb, type WatchHistoryItem } from '../database'
 import type { TraktHistoryItem, TraktSyncRequest, TraktIds } from './types'
+import { logger } from '../logger'
+
+const log = logger.scope('TraktSync')
 
 interface SyncResult {
   success: boolean
@@ -46,7 +49,7 @@ class TraktSyncService {
       result.success = true
       return result
     } catch (error) {
-      console.error('[TraktSync] Sync failed:', error)
+      log.error('Sync failed:', error)
       return { ...result, error: error instanceof Error ? error.message : 'Sync failed' }
     }
   }
@@ -71,7 +74,7 @@ class TraktSyncService {
         
         return newTokens.access_token
       } catch (error) {
-        console.error('[TraktSync] Token refresh failed:', error)
+        log.error('Token refresh failed:', error)
         return null
       }
     }
@@ -146,10 +149,10 @@ class TraktSyncService {
         }
       }
 
-      console.log(`[TraktSync] Pulled ${result.added} new, ${result.updated} updated items from Trakt`)
+      log.info(`Pulled ${result.added} new, ${result.updated} updated items from Trakt`)
       return result
     } catch (error) {
-      console.error('[TraktSync] Pull failed:', error)
+      log.error('Pull failed:', error)
       throw error
     }
   }
@@ -166,7 +169,7 @@ class TraktSyncService {
       // Get local watched items - using getByProfileId which returns recent items
       const localHistory = watchHistoryDb.getByProfileId(profileId)
       
-      console.log(`[TraktSync] Local history has ${localHistory.length} items`)
+      log.debug(`Local history has ${localHistory.length} items`)
       
       // Filter to items that are marked as watched and newer than last push
       const toSync = localHistory.filter((item: WatchHistoryItem) => {
@@ -177,7 +180,7 @@ class TraktSyncService {
         return itemUpdated > new Date(lastPush)
       })
 
-      console.log(`[TraktSync] ${toSync.length} items marked as watched to potentially sync (lastPush: ${lastPush})`)
+      log.debug(`${toSync.length} items marked as watched to potentially sync (lastPush: ${lastPush})`)
 
       if (toSync.length === 0) {
         return result
@@ -192,7 +195,7 @@ class TraktSyncService {
       for (const item of toSync) {
         // Skip items without IMDB ID
         if (!item.meta_id?.startsWith('tt')) {
-          console.log(`[TraktSync] Skipping item ${item.meta_id} - no IMDB ID`)
+          log.debug(`Skipping item ${item.meta_id} - no IMDB ID`)
           continue
         }
 
@@ -214,7 +217,7 @@ class TraktSyncService {
             number: item.episode,
             watched_at: item.watched_at || new Date().toISOString()
           })
-          console.log(`[TraktSync] Adding episode ${item.meta_id} S${item.season}E${item.episode}`)
+          log.debug(`Adding episode ${item.meta_id} S${item.season}E${item.episode}`)
         }
       }
 
@@ -238,18 +241,18 @@ class TraktSyncService {
       const totalEpisodes = Array.from(showMap.values()).reduce((sum, s) => 
         sum + Array.from(s.values()).reduce((eSum, eps) => eSum + eps.length, 0), 0)
       
-      console.log(`[TraktSync] Request has ${movies.length} movies, ${shows.length} shows with ${totalEpisodes} episodes`)
+      log.info(`Request has ${movies.length} movies, ${shows.length} shows with ${totalEpisodes} episodes`)
       
       const hasItems = movies.length > 0 || shows.length > 0
       if (hasItems) {
         const response = await traktClient.addToHistory(accessToken, syncRequest)
         result.synced = (response.added?.movies || 0) + (response.added?.episodes || 0)
-        console.log(`[TraktSync] Pushed ${result.synced} items to Trakt`, response)
+        log.success(`Pushed ${result.synced} items to Trakt`)
       }
 
       return result
     } catch (error) {
-      console.error('[TraktSync] Push failed:', error)
+      log.error('Push failed:', error)
       throw error
     }
   }

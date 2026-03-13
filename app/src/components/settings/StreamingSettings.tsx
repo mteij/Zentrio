@@ -4,6 +4,9 @@ import { ChevronDown, Monitor, Disc } from 'lucide-react'
 import { Button, Toggle } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('StreamingSettings')
 
 
 interface StreamingSettingsData {
@@ -211,7 +214,7 @@ export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) 
         }
       }
     } catch (e) {
-      console.error('Failed to load settings', e)
+      log.error('Failed to load settings', e)
     } finally {
         setLoading(false)
     }
@@ -279,7 +282,7 @@ export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) 
         toast.error('Save Failed', { description: 'Failed to save settings' })
       }
     } catch (e) {
-      console.error('Failed to save settings', e)
+      log.error('Failed to save settings', e)
     }
   }
 

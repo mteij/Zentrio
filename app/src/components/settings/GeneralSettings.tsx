@@ -17,6 +17,9 @@ import { EmailModal } from './modals/EmailModal'
 import { PasswordModal } from './modals/PasswordModal'
 import { UpdateSettings } from './UpdateSettings'
 import styles from '../../styles/Settings.module.css'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('GeneralSettings')
 
 // Error message mappings for account linking errors
 const LINKING_ERROR_MESSAGES: Record<string, string> = {
@@ -82,7 +85,7 @@ export function GeneralSettings() {
         setAvailableProviders(data)
       }
     } catch (e) {
-      console.error('Failed to load providers:', e)
+      log.error('Failed to load providers:', e)
     }
   }
 
@@ -100,7 +103,7 @@ export function GeneralSettings() {
         // Don't auto-redirect here to avoid loops, just show error state
       }
     } catch (e) {
-      console.error(e)
+      log.error(e)
     } finally {
       setLoading(false)
     }
@@ -119,7 +122,7 @@ export function GeneralSettings() {
         }
       }
     } catch (e) {
-      console.error('Failed to load TMDB API key', e)
+      log.error('Failed to load TMDB API key', e)
     }
   }
 
@@ -150,7 +153,7 @@ export function GeneralSettings() {
             toast.error('Update Failed', { description: message })
         }
     } catch (e) {
-        console.error(e)
+        log.error(e)
         toast.error('Network Error', { description: 'Failed to update TMDB API Key' })
     }
   }

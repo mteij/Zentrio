@@ -19,6 +19,9 @@ import { EmailVerificationModal } from "./EmailVerificationModal";
 import { useLoginBehavior, getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
 import { useSessionDuration } from "../../hooks/useSessionDuration";
 import { useAuthStore } from "../../stores/authStore";
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('AuthForms')
 
 // Brand icons as SVG components
 const GoogleIcon = () => (
@@ -90,7 +93,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     apiFetchJson<any>('/api/auth/providers')
       .then(data => setProviders({ ...data, loaded: true }))
       .catch(err => {
-        console.error("Failed to fetch auth providers", err);
+        log.error("Failed to fetch auth providers", err);
         setProviders(p => ({ ...p, loaded: true }));
       });
   }, []);
@@ -122,7 +125,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         ? "zentrio://auth/callback" 
         : `${getClientUrl()}${redirectPath}`;
 
-      console.log('[AuthForms] Initiating social login', { provider, isTauri: isTauri() });
+      log.debug('Initiating social login', { provider, isTauri: isTauri() });
 
       if (isTauri()) {
         // Use plugin-opener for consistency across all auth flows
@@ -131,10 +134,10 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         const handoffUrl = `${serverUrl}/api/auth/native-redirect?source=tauri`;
         const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
         
-        console.log('[AuthForms] Opening external URL via opener plugin:', url);
+        log.debug('Opening external URL via opener plugin:', url);
         await openUrl(url);
       } else {
-        console.log('[AuthForms] Using authClient redirection (Web mode)');
+        log.debug('Using authClient redirection (Web mode)');
         await authClient.signIn.social({
           provider,
           callbackURL,

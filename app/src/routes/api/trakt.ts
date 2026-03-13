@@ -10,6 +10,9 @@ import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../../services
 import { getConfig } from '../../services/envParser'
 import { ok, err } from '../../utils/api'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Trakt')
 
 const trakt = createTaggedOpenAPIApp<{
   Variables: {
@@ -92,7 +95,7 @@ trakt.get('/status', async (c) => {
       lastPushSync: syncState?.last_push_sync
     })
   } catch (e) {
-    console.error('[Trakt] Status check failed:', e)
+    log.error('Status check failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to get status')
   }
 })
@@ -132,7 +135,7 @@ trakt.get('/auth-url', async (c) => {
 
     return ok(c, { authUrl, state })
   } catch (e) {
-    console.error('[Trakt] Auth URL generation failed:', e)
+    log.error('Auth URL generation failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to generate auth URL')
   }
 })
@@ -185,12 +188,12 @@ trakt.get('/callback', async (c) => {
 
     // Trigger initial sync in background
     traktSyncService.sync(profileId).catch(e => {
-      console.error('[Trakt] Initial sync failed:', e)
+      log.error('Initial sync failed:', e)
     })
 
     return c.redirect('/settings?trakt_connected=true')
   } catch (e) {
-    console.error('[Trakt] Callback failed:', e)
+    log.error('Callback failed:', e)
     return c.redirect('/settings?trakt_error=' + encodeURIComponent('auth_failed'))
   }
 })
@@ -232,7 +235,7 @@ trakt.post('/exchange-code', async (c) => {
 
     // Trigger initial sync in background
     traktSyncService.sync(parseInt(profileId)).catch(e => {
-      console.error('[Trakt] Initial sync failed:', e)
+      log.error('Initial sync failed:', e)
     })
 
     return ok(c, {
@@ -241,7 +244,7 @@ trakt.post('/exchange-code', async (c) => {
       userId: user.ids.slug
     })
   } catch (e) {
-    console.error('[Trakt] Code exchange failed:', e)
+    log.error('Code exchange failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to exchange code')
   }
 })
@@ -289,7 +292,7 @@ trakt.post('/device-code', async (c) => {
       interval: response.interval
     })
   } catch (e) {
-    console.error('[Trakt] Device code generation failed:', e)
+    log.error('Device code generation failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to generate device code')
   }
 })
@@ -350,7 +353,7 @@ trakt.get('/poll-token', async (c) => {
 
     // Trigger initial sync in background
     traktSyncService.sync(pending.profileId).catch(e => {
-      console.error('[Trakt] Initial sync failed:', e)
+      log.error('Initial sync failed:', e)
     })
 
     return ok(c, {
@@ -359,7 +362,7 @@ trakt.get('/poll-token', async (c) => {
       userId: user.ids.slug
     })
   } catch (e: any) {
-    console.error('[Trakt] Poll failed:', e)
+    log.error('Poll failed:', e)
     
     // Handle specific errors
     if (e.message?.includes('denied')) {
@@ -405,7 +408,7 @@ trakt.post('/disconnect', async (c) => {
 
     return ok(c, { disconnected: true })
   } catch (e) {
-    console.error('[Trakt] Disconnect failed:', e)
+    log.error('Disconnect failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to disconnect')
   }
 })
@@ -439,7 +442,7 @@ trakt.post('/sync', async (c) => {
       pushed: result.pushed
     })
   } catch (e) {
-    console.error('[Trakt] Manual sync failed:', e)
+    log.error('Manual sync failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Sync failed')
   }
 })
@@ -465,7 +468,7 @@ trakt.put('/sync-settings', async (c) => {
 
     return ok(c, { updated: true })
   } catch (e) {
-    console.error('[Trakt] Settings update failed:', e)
+    log.error('Settings update failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to update settings')
   }
 })
@@ -522,7 +525,7 @@ trakt.get('/recommendations', async (c) => {
         traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
         accessToken = newTokens.access_token
       } catch (e) {
-        console.error('[Trakt] Token refresh failed:', e)
+        log.error('Token refresh failed:', e)
         return ok(c, { items: [], connected: false, error: 'token_expired' })
       }
     }
@@ -572,7 +575,7 @@ trakt.get('/recommendations', async (c) => {
                 }
             }
         } catch (e) {
-            console.error(`[Trakt] Failed to hydrate item ${item.id}:`, e)
+            log.error(`Failed to hydrate item ${item.id}:`, e)
             // ignore error, return basic item
         }
         return item
@@ -600,7 +603,7 @@ trakt.get('/recommendations', async (c) => {
 
     return ok(c, { items: filteredItems, connected: true })
   } catch (e) {
-    console.error('[Trakt] Recommendations failed:', e)
+    log.error('Recommendations failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to get recommendations')
   }
 })
@@ -621,7 +624,7 @@ async function getAccessToken(profileId: number): Promise<string | null> {
       traktAccountDb.updateTokens(profileId, newTokens.access_token, newTokens.refresh_token, expiresAt)
       return newTokens.access_token
     } catch (e) {
-      console.error('[Trakt] Token refresh failed:', e)
+      log.error('Token refresh failed:', e)
       return null
     }
   }
@@ -680,7 +683,7 @@ trakt.post('/scrobble/start', async (c) => {
     
     return ok(c, { success: true, action: result.action })
   } catch (e) {
-    console.error('[Trakt] Scrobble start failed:', e)
+    log.error('Scrobble start failed:', e)
     return ok(c, { success: false, error: 'scrobble_failed' })
   }
 })
@@ -705,7 +708,7 @@ trakt.post('/scrobble/pause', async (c) => {
     
     return ok(c, { success: true, action: result.action })
   } catch (e) {
-    console.error('[Trakt] Scrobble pause failed:', e)
+    log.error('Scrobble pause failed:', e)
     return ok(c, { success: false, error: 'scrobble_failed' })
   }
 })
@@ -730,7 +733,7 @@ trakt.post('/scrobble/stop', async (c) => {
     
     return ok(c, { success: true, action: result.action })
   } catch (e) {
-    console.error('[Trakt] Scrobble stop failed:', e)
+    log.error('Scrobble stop failed:', e)
     return ok(c, { success: false, error: 'scrobble_failed' })
   }
 })
@@ -759,7 +762,7 @@ trakt.post('/checkin', async (c) => {
     
     return ok(c, { success: true, id: result.id, watchedAt: result.watched_at })
   } catch (e: any) {
-    console.error('[Trakt] Checkin failed:', e)
+    log.error('Checkin failed:', e)
     if (e.message?.includes('Already checked in')) {
       return ok(c, { success: false, error: 'already_checked_in' })
     }
@@ -785,7 +788,7 @@ trakt.delete('/checkin', async (c) => {
     
     return ok(c, { success: true })
   } catch (e) {
-    console.error('[Trakt] Cancel checkin failed:', e)
+    log.error('Cancel checkin failed:', e)
     return ok(c, { success: false, error: 'cancel_failed' })
   }
 })

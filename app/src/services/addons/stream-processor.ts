@@ -1,4 +1,7 @@
 import { Stream, Manifest, MetaDetail } from './types'
+import { logger } from '../logger'
+
+const log = logger.scope('StreamProcessor')
 
 export interface FilterOptions {
   required?: string[]
@@ -462,8 +465,8 @@ export class StreamProcessor {
     // Get sorting configuration
     const sortingItems = this.config.sortingConfig?.items?.filter(i => i.enabled) || []
     
-    console.log(`[StreamProcessor] Full sortingConfig.items:`, JSON.stringify(this.config.sortingConfig?.items))
-    console.log(`[StreamProcessor] Sorting with ${sortingItems.length} enabled criteria (in priority order):`, sortingItems.map((i, idx) => `${idx+1}. ${i.id}(${i.direction})`).join(', '))
+    log.debug(`Full sortingConfig.items:`, JSON.stringify(this.config.sortingConfig?.items))
+    log.debug(`Sorting with ${sortingItems.length} enabled criteria (in priority order):`, sortingItems.map((i, idx) => `${idx+1}. ${i.id}(${i.direction})`).join(', '))
     
     // If no sorting config, fall back to score-based sorting
     if (sortingItems.length === 0) {

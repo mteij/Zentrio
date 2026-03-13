@@ -8,6 +8,9 @@ import { getGenreList } from './genres'
 import { getLanguages } from './languages'
 import { getMeta } from './meta'
 import { fetchMDBListItems, parseMDBListItems } from './mdblist'
+import { logger } from '../logger'
+
+const log = logger.scope('TMDB:Catalog')
 
 const CATALOG_TYPES: any = {
   "default": {
@@ -323,7 +326,7 @@ export async function getCatalog(tmdbClient: TMDBClient, type: string, language:
         getMeta(tmdbClient, type, language, item.id, config)
           .then(result => result.meta)
           .catch((err: any) => {
-            console.error(`Error fetching metadata for ${item.id}:`, err.message)
+            log.error(`Error fetching metadata for ${item.id}:`, err.message)
             return null
           })
       )
@@ -332,5 +335,5 @@ export async function getCatalog(tmdbClient: TMDBClient, type: string, language:
 
       return { metas }
     })
-    .catch(console.error)
+    .catch((e: any) => log.error('Operation failed:', e))
 }

@@ -2,6 +2,9 @@
 import { db } from './connection'
 import { encrypt, decrypt } from '../encryption'
 import type { TraktAccount, TraktSyncState } from '../trakt/types'
+import { logger } from '../logger'
+
+const log = logger.scope('DB:Trakt')
 
 export const traktAccountDb = {
   // Get Trakt account for a profile
@@ -18,7 +21,7 @@ export const traktAccountDb = {
         refresh_token: decrypt(row.refresh_token)
       }
     } catch (e) {
-      console.error('Failed to decrypt Trakt tokens:', e)
+      log.error('Failed to decrypt Trakt tokens:', e)
       return null
     }
   },

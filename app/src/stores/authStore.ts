@@ -2,6 +2,9 @@ import React from 'react'
 import { create } from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
 import { authClient, getAuthClient } from '../lib/auth-client'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('AuthStore')
 
 interface User {
   id: string
@@ -97,7 +100,7 @@ export const useAuthStore = create<AuthState>()(
             // Call Better Auth sign out
             await authClient.signOut()
           } catch (error) {
-            console.error('Error during sign out:', error)
+            log.error('Error during sign out:', error)
           } finally {
             // Use internal reset to clear state
             get().reset()
@@ -136,7 +139,7 @@ export const useAuthStore = create<AuthState>()(
           // Precise concurrency check: we only skip if we are already in the middle of the async call below
           // (We use the isLoading state but only if we've already started the refresh)
           if (get().isLoading && !token && get().isAuthenticated) {
-              console.log('[AuthStore] Refresh already in progress for authenticated user, skipping duplicate call');
+              log.debug('Refresh already in progress for authenticated user, skipping duplicate call');
               return false;
           }
           
@@ -155,7 +158,7 @@ export const useAuthStore = create<AuthState>()(
             // DON'T send Authorization header when refreshing
             // Let the server use the session cookie to generate a NEW token
             // Sending the old token causes the server to return the same expired token
-            console.log(`[AuthStore] Refreshing session... Token: ${initialToken ? `...${initialToken.slice(-6)}` : 'NONE'}`);
+            log.debug(`Refreshing session... Token: ${initialToken ? `...${initialToken.slice(-6)}` : 'NONE'}`);
              
              let sessionResponse: any;
              
@@ -169,11 +172,11 @@ export const useAuthStore = create<AuthState>()(
                 if (rawResponse.ok) {
                    sessionResponse = await rawResponse.json();
                 } else {
-                   console.warn(`[AuthStore] Direct fetch get-session returned ${rawResponse.status}`);
+                   log.warn(`Direct fetch get-session returned ${rawResponse.status}`);
                    sessionResponse = { error: { message: `HTTP ${rawResponse.status}`, status: rawResponse.status } };
                 }
              } catch (fetchErr) {
-                 console.error('[AuthStore] Direct fetch fallback failed:', fetchErr);
+                 log.error('Direct fetch fallback failed:', fetchErr);
                  throw fetchErr;
              }
             
@@ -185,7 +188,7 @@ export const useAuthStore = create<AuthState>()(
             const freshToken = data?.session?.token;
             const tokenToUse = freshToken || token || get().session?.token;
             
-            console.log('[AuthStore] Session refresh response:', {
+            log.debug('Session refresh response:', {
                 hasUser: !!data?.user,
                 hasToken: !!freshToken,
                 userEmail: data?.user?.email,
@@ -210,7 +213,7 @@ export const useAuthStore = create<AuthState>()(
                 lastActivity: Date.now(),
               })
               
-              console.log('[AuthStore] Session refreshed, token set:', tokenToUse ? `...${tokenToUse.slice(-6)}` : null);
+              log.debug('Session refreshed, token set:', tokenToUse ? `...${tokenToUse.slice(-6)}` : null);
               return true
             } else {
               // Session expired or invalid
@@ -221,30 +224,30 @@ export const useAuthStore = create<AuthState>()(
               // Only preserve the session if the token has CHANGED while we were waiting.
               // If initialToken !== currentToken, it means a login happened in parallel.
               if (currentToken && currentToken !== initialToken) {
-                 console.log('[AuthStore] Token changed during refresh (concurrent login detected). Keeping new session.');
+                 log.debug('Token changed during refresh (concurrent login detected). Keeping new session.');
                  set({ isLoading: false });
                  return true; 
               }
               
-              console.warn('[AuthStore] Refresh failed: No user returned and no concurrent login.');
+              log.warn('Refresh failed: No user returned and no concurrent login.');
 
               // Check if we have a local token - if so, DON'T reset
               // The server might have rejected the cookie but the local session might still work
               const localToken = get().session?.token;
               if (localToken) {
-                console.log('[AuthStore] No user from server but local token exists - keeping user logged in');
+                log.debug('No user from server but local token exists - keeping user logged in');
                 set({ isLoading: false });
                 return true;
               }
               
               // Otherwise, the session is truly dead.
               // Force local reset so route guards stop treating the user as authenticated.
-              console.log('[AuthStore] Refresh returned no user and no local token. Resetting local auth state.');
+              log.debug('Refresh returned no user and no local token. Resetting local auth state.');
               get().reset()
               return false
             }
           } catch (error: any) {
-            console.error('Error refreshing session:', error)
+            log.error('Error refreshing session:', error)
             
             // Only reset if it's explicitly an auth error (401/403)
             // For network errors (fetch failed) or server errors (500), keep the local session
@@ -256,14 +259,14 @@ export const useAuthStore = create<AuthState>()(
                 // Check if we have a local token - if so, don't reset
                 const localToken = get().session?.token;
                 if (localToken) {
-                    console.log('[AuthStore] Auth error but local token exists - not resetting');
+                    log.debug('Auth error but local token exists - not resetting');
                     set({ isLoading: false, error: null });
                     return true;
                 }
-                console.log('[AuthStore] Auth error detected, resetting session');
+                log.debug('Auth error detected, resetting session');
                 get().reset()
             } else {
-                console.log('[AuthStore] Non-auth error during refresh, retaining session');
+                log.debug('Non-auth error during refresh, retaining session');
                 // Keep the user logged in on non-auth errors
                 set({ isLoading: false });
                 return true;
@@ -293,16 +296,16 @@ export const useAuthStore = create<AuthState>()(
             
             // If session is still fresh (not within 5 min of expiry), consider it valid
             if (now < sessionExpiry - 5 * 60 * 1000) {
-              console.log('[AuthStore] Local session valid, skipping refresh');
+              log.debug('Local session valid, skipping refresh');
               set({ isLoading: false, lastActivity: now })
               return true
             }
             
             // Session is about to expire, try to refresh
             // But don't fail hard - if refresh fails, keep the old session
-            console.log('[AuthStore] Session about to expire, attempting refresh...');
+            log.debug('Session about to expire, attempting refresh...');
             const refreshResult = await get().refreshSession().catch(e => {
-              console.error('[AuthStore] Refresh failed:', e);
+              log.error('Refresh failed:', e);
               return false;
             });
             
@@ -311,7 +314,7 @@ export const useAuthStore = create<AuthState>()(
             }
             
             // Refresh failed but we still have a local session - keep user logged in
-            console.log('[AuthStore] Refresh failed but local session exists, keeping user logged in');
+            log.debug('Refresh failed but local session exists, keeping user logged in');
             set({ isLoading: false });
             return true;
           }
@@ -337,7 +340,7 @@ export const useAuthStore = create<AuthState>()(
           // accessing get() inside here might be tricky, so we rely on the state passed in
           const isJustLoggedIn = state?.isFreshLogin;
 
-          console.log('[AuthStore] Rehydrated state:', { 
+          log.debug('Rehydrated state:', { 
               isAuthenticated: state?.isAuthenticated,
               isFreshLogin: isJustLoggedIn,
               hasSession,
@@ -354,7 +357,7 @@ export const useAuthStore = create<AuthState>()(
           
           // If this is a fresh login, absolutely do NOT trigger a refresh
           if (isJustLoggedIn) {
-              console.log('[AuthStore] Fresh login detected - suppressing auto-refresh and forcing loaded state');
+              log.debug('Fresh login detected - suppressing auto-refresh and forcing loaded state');
               if (state) {
                   state.isFreshLogin = false; // consume flag
                   state.setLoading(false); 
@@ -363,10 +366,10 @@ export const useAuthStore = create<AuthState>()(
           }
 
           if (state) {
-              console.log('[AuthStore] Cold start detected - verifying session state...');
+              log.debug('Cold start detected - verifying session state...');
               
               setTimeout(async () => {
-                  console.log('[AuthStore] Executing rehydration check (background)');
+                  log.debug('Executing rehydration check (background)');
                   
                   // If we don't have local auth state, we still need to check the server
                   // because the user might have logged in via SSO or have an active cookie
@@ -399,7 +402,7 @@ export const useSessionRefresh = () => {
     const interval = setInterval(() => {
       // Force periodic server sync so role/ban changes (e.g. admin promotion)
       // propagate even when the local session is far from expiry.
-      refreshSession().catch(console.error)
+      refreshSession().catch((e: any) => log.error('Error:', e))
     }, 5 * 60 * 1000) // 5 minutes
 
     return () => clearInterval(interval)
@@ -422,7 +425,7 @@ export const useSessionRefresh = () => {
     const handleFocus = () => {
       const gap = Date.now() - lastFocusTime
       if (gap > MIN_FOCUS_GAP_MS) {
-        checkSession().catch(console.error)
+        checkSession().catch((e: any) => log.error('Error:', e))
       }
     }
 

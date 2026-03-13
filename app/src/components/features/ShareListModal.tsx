@@ -6,6 +6,9 @@ import { Input } from '../ui/Input'
 import { apiFetch } from '../../lib/apiFetch'
 import { toast } from 'sonner'
 import { Profile } from '../../services/database'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('ShareList')
 
 interface ShareListModalProps {
   isOpen: boolean
@@ -81,7 +84,7 @@ export function ShareListModal({ isOpen, onClose, listId, listName, currentProfi
         setEmailShares(data.shares || [])
       }
     } catch (e) {
-      console.error('Failed to load sharing data:', e)
+      log.error('Failed to load sharing data:', e)
     } finally {
       setLoading(false)
     }
@@ -114,7 +117,7 @@ export function ShareListModal({ isOpen, onClose, listId, listName, currentProfi
         toast.error(data.error || 'Failed to share list')
       }
     } catch (e) {
-      console.error('Share failed:', e)
+      log.error('Share failed:', e)
       toast.error('Failed to share list')
     } finally {
       setSending(false)
@@ -134,7 +137,7 @@ export function ShareListModal({ isOpen, onClose, listId, listName, currentProfi
         toast.error('Failed to remove share')
       }
     } catch (e) {
-      console.error('Revoke failed:', e)
+      log.error('Revoke failed:', e)
       toast.error('Failed to remove share')
     }
   }
@@ -166,7 +169,7 @@ export function ShareListModal({ isOpen, onClose, listId, listName, currentProfi
         toast.error(data.error || 'Failed to share list')
       }
     } catch (e) {
-      console.error('Share failed:', e)
+      log.error('Share failed:', e)
       toast.error('Failed to share list')
     } finally {
       setSending(false)
@@ -186,7 +189,7 @@ export function ShareListModal({ isOpen, onClose, listId, listName, currentProfi
         toast.error('Failed to revoke share')
       }
     } catch (e) {
-      console.error('Revoke failed:', e)
+      log.error('Revoke failed:', e)
       toast.error('Failed to revoke share')
     }
   }

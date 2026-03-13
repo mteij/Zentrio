@@ -10,6 +10,9 @@ import { useDownloadForMedia } from '../../hooks/useDownloads'
 import dlStyles from '../downloads/Downloads.module.css'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('DetailsHeader')
 
 interface DetailsHeaderProps {
   meta: MetaDetail
@@ -72,7 +75,7 @@ export function DetailsHeader({
       })
       import('sonner').then(({ toast }) => toast.success(`Downloading: ${meta.name}`))
     } catch (e) {
-      console.error('[DetailsHeader] download start failed', e)
+      log.error('download start failed', e)
       import('sonner').then(({ toast }) => toast.error('Failed to start download'))
     }
   }

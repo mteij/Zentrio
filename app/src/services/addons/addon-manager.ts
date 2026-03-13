@@ -8,6 +8,9 @@ import { type AgeRating } from '../tmdb/age-ratings'
 // Extracted helper modules
 import { getParentalSettings, filterContent, enrichContent } from './content-filter'
 import { normalizeMetaVideos } from './meta-normalizer'
+import { logger } from '../logger'
+
+const log = logger.scope('AddonManager')
 
 const DEFAULT_TMDB_ADDON = 'zentrio://tmdb-addon'
 
@@ -51,7 +54,7 @@ export class AddonManager {
                 })
             }
         } catch (e) {
-            console.warn('Failed to init default addon', e)
+            log.warn('Failed to init default addon', e)
         }
     }
 
@@ -160,12 +163,12 @@ export class AddonManager {
         // Resolve settings profile ID
         const settingsProfileId = profileDb.getSettingsProfileId(profileId);
         if (!settingsProfileId) {
-            console.warn(`[AddonManager] No settings profile found for profile ${profileId}`);
+            log.warn(`No settings profile found for profile ${profileId}`);
             return [];
         }
 
         const addons = addonDb.getEnabledForProfile(settingsProfileId)
-        // console.log(`[AddonManager] Found ${addons.length} enabled addons for profile ${profileId} (settings: ${settingsProfileId}):`, addons.map(a => a.name))
+        // log.debug(`Found ${addons.length} enabled addons for profile ${profileId} (settings: ${settingsProfileId}):`, addons.map(a => a.name))
 
         // If no addons enabled, auto-enable the default Zentrio addon
         // (global TMDB key is always available)
@@ -195,10 +198,10 @@ export class AddonManager {
                 }
                 this.clientCache.set(normalizedUrl, client)
                 // Only init if new or not ready
-                initPromises.push(client.init().then(() => { }).catch(e => console.warn(`Failed to init ${addon.name}`, e)))
+                initPromises.push(client.init().then(() => { }).catch(e => log.warn(`Failed to init ${addon.name}`, e)))
             } else if (!client.manifest) {
                 // Retry init if failed previously or incomplete
-                initPromises.push(client.init().then(() => { }).catch(e => console.warn(`Failed to re-init ${addon.name}`, e)))
+                initPromises.push(client.init().then(() => { }).catch(e => log.warn(`Failed to re-init ${addon.name}`, e)))
             }
             clients.push(client)
         }
@@ -235,7 +238,7 @@ export class AddonManager {
                 return imdbId
             }
         } catch (e) {
-            console.warn(`[AddonManager] Failed to resolve TMDB ID ${tmdbId} to IMDB`, e)
+            log.warn(`Failed to resolve TMDB ID ${tmdbId} to IMDB`, e)
         }
         return null
     }
@@ -285,7 +288,7 @@ export class AddonManager {
                     items: filteredItems
                 }
             } catch (e) {
-                console.warn(`Failed to fetch catalog ${cat.id} from ${client.manifest!.name}`, e)
+                log.warn(`Failed to fetch catalog ${cat.id} from ${client.manifest!.name}`, e)
                 return null
             }
         }
@@ -320,7 +323,7 @@ export class AddonManager {
         // If no catalogs are found after checking all enabled addons, fallback to Zentrio addon
         // (global TMDB key is always available, so this should always work)
         if (results.length === 0) {
-            console.log(`[AddonManager] No catalogs found. Falling back to default TMDB addon.`);
+            log.debug(`No catalogs found. Falling back to default TMDB addon.`);
             const normalizedDefaultUrl = this.normalizeUrl(DEFAULT_TMDB_ADDON)
             let defaultClient = this.clientCache.get(normalizedDefaultUrl);
             if (!defaultClient) {
@@ -363,7 +366,7 @@ export class AddonManager {
                     }
                 }
             } catch (e) {
-                console.error('Failed to fetch catalogs from default TMDB addon fallback.', e);
+                log.error('Failed to fetch catalogs from default TMDB addon fallback.', e);
             }
         }
 
@@ -462,7 +465,7 @@ export class AddonManager {
                     return this.enrichItems(final, context)
                 }
             } catch (e) {
-                console.warn('Failed to fetch mixed trending from TMDB addon', e)
+                log.warn('Failed to fetch mixed trending from TMDB addon', e)
             }
         }
 
@@ -541,7 +544,7 @@ export class AddonManager {
                     }
                 }
             } catch (e) {
-                console.warn(`Failed to fetch trending ${type} from TMDB addon`, e)
+                log.warn(`Failed to fetch trending ${type} from TMDB addon`, e)
             }
         }
 
@@ -626,24 +629,24 @@ export class AddonManager {
             if (!shouldQuery) continue;
 
             try {
-                // console.log(`[AddonManager] Trying ${client.manifest.name} for meta ${type}/${primaryId}`)
+                // log.debug(`Trying ${client.manifest.name} for meta ${type}/${primaryId}`)
                 const meta = await client.getMeta(type, id, config)
                 if (meta) {
                     if (Array.isArray((meta as any).videos)) {
                         ; (meta as any).videos = normalizeMetaVideos((meta as any).videos)
                     }
-                    // console.log(`[AddonManager] Got meta from ${client.manifest.name} for ${type}/${primaryId}`)
+                    // log.debug(`Got meta from ${client.manifest.name} for ${type}/${primaryId}`)
                     return meta
                 }
             } catch (e) {
-                console.debug(`[AddonManager] getMeta failed for ${client.manifest.name}:`, e instanceof Error ? e.message : e)
+                log.debug(`getMeta failed for ${client.manifest.name}:`, e instanceof Error ? e.message : e)
             }
         }
 
         // Pass 2: For custom IDs, try ALL meta-capable addons (ignore prefix matching)
         // This catches addons that may have idPrefixes set but still handle content from other sources
         if (!isStandardId) {
-            console.log(`[AddonManager] Custom ID ${primaryId} - trying all meta-capable addons without prefix filtering`);
+            log.debug(`Custom ID ${primaryId} - trying all meta-capable addons without prefix filtering`);
 
             for (const client of sortedClients) {
                 if (!client.manifest) continue
@@ -669,7 +672,7 @@ export class AddonManager {
                         return meta
                     }
                 } catch (e) {
-                    console.debug(`[AddonManager] getMeta (pass 2) failed for ${client.manifest.name}:`, e instanceof Error ? e.message : e)
+                    log.debug(`getMeta (pass 2) failed for ${client.manifest.name}:`, e instanceof Error ? e.message : e)
                 }
             }
         }
@@ -677,7 +680,7 @@ export class AddonManager {
         // Pass 3: Fallback logic for orphaned or specific IDs
         // 3a. If ID is a TMDB ID (tmdb:...), try using Zentrio Addon explicitly, even if disabled
         if (primaryId.startsWith('tmdb:')) {
-            console.log(`[AddonManager] TMDB ID ${primaryId} not resolved by enabled addons. Attempting fallback to Zentrio Client.`);
+            log.debug(`TMDB ID ${primaryId} not resolved by enabled addons. Attempting fallback to Zentrio Client.`);
 
             const profile = context.profile
             // Use a dedicated cache key to avoid conflicts with the main client if it exists but is disabled
@@ -699,13 +702,13 @@ export class AddonManager {
                     return meta;
                 }
             } catch (e) {
-                console.warn(`Fallback to Zentrio Client failed for ${id}`, e);
+                log.warn(`Fallback to Zentrio Client failed for ${id}`, e);
             }
         }
 
         // 3b. Fallback to Cinemeta for standard IDs only (IMDB)
         if (isStandardId) {
-            console.log(`[AddonManager] Meta not found in enabled addons for ${type}/${id}. Falling back to Cinemeta.`);
+            log.debug(`Meta not found in enabled addons for ${type}/${id}. Falling back to Cinemeta.`);
 
             const cinemetaUrl = 'https://v3-cinemeta.strem.io/manifest.json';
             const alreadyTried = sortedClients.some(c => this.normalizeUrl(c.manifestUrl) === this.normalizeUrl(cinemetaUrl) && c.manifest);
@@ -730,11 +733,11 @@ export class AddonManager {
                         }
                     }
                 } catch (e) {
-                    console.warn(`Fallback to Cinemeta failed for ${type}/${id}`, e);
+                    log.warn(`Fallback to Cinemeta failed for ${type}/${id}`, e);
                 }
             }
         } else {
-            console.log(`[AddonManager] Custom ID ${id} not found in any addon. This content may not have metadata available.`);
+            log.debug(`Custom ID ${id} not found in any addon. This content may not have metadata available.`);
         }
 
         return null
@@ -756,7 +759,7 @@ export class AddonManager {
                 const searchExtra = cat.extra?.find(e => e.name === 'search')
                 if (searchExtra) {
                     try {
-                        console.log(`[AddonManager] Searching TMDB catalog "${cat.id}" for "${query}" with filters`, filters)
+                        log.debug(`Searching TMDB catalog "${cat.id}" for "${query}" with filters`, filters)
 
                         const items = await tmdbClient.getCatalog(cat.type, cat.id, { search: query }, {
                             ...context.appearanceConfig,
@@ -764,7 +767,7 @@ export class AddonManager {
                         })
                         results.push(...items)
                     } catch (e) {
-                        console.warn(`TMDB search failed for catalog ${cat.id}`, e)
+                        log.warn(`TMDB search failed for catalog ${cat.id}`, e)
                     }
                 }
             }
@@ -777,7 +780,7 @@ export class AddonManager {
         }
 
         // Fallback to searching all other addons if TMDB fails or isn't present
-        console.log('[AddonManager] TMDB search yielded no results or TMDB addon not found. Falling back to all addons.')
+        log.debug('TMDB search yielded no results or TMDB addon not found. Falling back to all addons.')
         for (const client of clients) {
             // Skip the TMDB client if we already tried it
             if (client === tmdbClient) continue;
@@ -793,7 +796,7 @@ export class AddonManager {
                         const items = await client.getCatalog(cat.type, cat.id, { search: query })
                         results.push(...items)
                     } catch (e) {
-                        console.warn(`Search failed for ${client.manifest.name}`, e)
+                        log.warn(`Search failed for ${client.manifest.name}`, e)
                     }
                 }
             }
@@ -887,7 +890,7 @@ export class AddonManager {
                             items: enriched
                         }
                     } catch (e) {
-                        console.warn(`[searchByCatalog] Failed for ${client.manifest?.name}/${cat.id}:`, e)
+                        log.warn(`Failed for ${client.manifest?.name}/${cat.id}:`, e)
                         return null
                     }
                 })()
@@ -911,7 +914,7 @@ export class AddonManager {
         const normalizedUrl = this.normalizeUrl(manifestUrl)
         const client = this.clientCache.get(normalizedUrl)
         if (!client || !client.manifest) {
-            console.warn(`[AddonManager] Client not found for ${manifestUrl} (normalized: ${normalizedUrl})`)
+            log.warn(`Client not found for ${manifestUrl} (normalized: ${normalizedUrl})`)
             return null
         }
 
@@ -947,9 +950,9 @@ export class AddonManager {
             }
         } catch (e) {
             const errorMsg = e instanceof Error ? e.message : String(e)
-            console.error(`Failed to fetch catalog ${id} from ${manifestUrl}`, e)
+            log.error(`Failed to fetch catalog ${id} from ${manifestUrl}`, e)
             if (e instanceof Error) {
-                console.error(e.stack)
+                log.error(e.stack)
             }
             return null
         }
@@ -1041,7 +1044,7 @@ export class AddonManager {
                     const items = await client.getCatalog(catalog.type, catalog.id, extra, context.appearanceConfig)
                     return items;
                 } catch (e) {
-                    console.warn(`Failed to fetch filtered items from ${client.manifest.name}`, e)
+                    log.warn(`Failed to fetch filtered items from ${client.manifest.name}`, e)
                     return []
                 }
             }
@@ -1064,7 +1067,7 @@ export class AddonManager {
         // For series, we generally need season and episode.
         // If they are missing, we might be requesting the whole series which some addons don't support and return 500.
         if (type === 'series' && (season === undefined || episode === undefined)) {
-            console.warn(`[AddonManager] Skipping stream fetch for series ${id} without season/episode`)
+            log.warn(`Skipping stream fetch for series ${id} without season/episode`)
             return []
         }
 
@@ -1149,16 +1152,16 @@ export class AddonManager {
             let attempt = 0
             while (attempt < maxRetries) {
                 try {
-                    console.log(`[${client.manifest.name}] Requesting streams for ${type}/${resolvedVideoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
+                    log.debug(`Requesting streams for ${type}/${resolvedVideoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
                     let streams = await client.getStreams(type, resolvedVideoId)
-                    console.log(`[${client.manifest.name}] Received ${streams ? streams.length : 0} streams`)
+                    log.debug(`Received ${streams ? streams.length : 0} streams`)
 
                     // Movie-selection fallback: if base-id stream call returns empty, try video ids from addon meta
                     if (type === 'movie' && (!streams || streams.length === 0)) {
                         const altVideoIds = await getMovieVideoIdsFromAddonMeta(client, baseId)
                         for (const vid of altVideoIds) {
                             try {
-                                console.log(`[${client.manifest.name}] Retrying movie streams via meta video id: ${vid}`)
+                                log.debug(`Retrying movie streams via meta video id: ${vid}`)
                                 const s2 = await client.getStreams('movie', vid)
                                 if (s2 && s2.length > 0) {
                                     streams = [...(streams || []), ...s2]
@@ -1176,13 +1179,13 @@ export class AddonManager {
                 } catch (e) {
                     if (e instanceof RetryableError && attempt < maxRetries - 1) {
                         // Addon is busy, wait and retry
-                        console.log(`[${client.manifest.name}] ${e.message} - retrying in ${e.retryAfterMs}ms...`)
+                        log.debug(`${e.message} - retrying in ${e.retryAfterMs}ms...`)
                         await new Promise(resolve => setTimeout(resolve, e.retryAfterMs))
                         attempt++
                     } else {
                         // Non-retryable error or max retries exceeded
                         const errorMsg = e instanceof Error ? e.message : String(e)
-                        console.warn(`[${client.manifest.name}] Failed to fetch streams:`, errorMsg)
+                        log.warn(`Failed to fetch streams:`, errorMsg)
                         return
                     }
                 }
@@ -1222,7 +1225,7 @@ export class AddonManager {
         try {
             meta = await this.getMeta(type, id, profileId)
         } catch (e) {
-            console.warn('Failed to fetch meta for stream processing', e)
+            log.warn('Failed to fetch meta for stream processing', e)
         }
 
         if (!meta) {
@@ -1234,7 +1237,7 @@ export class AddonManager {
             }
         }
 
-        console.log('[AddonManager] Settings sortingConfig:', JSON.stringify(settings?.sortingConfig))
+        log.debug('Settings sortingConfig:', JSON.stringify(settings?.sortingConfig))
         const processor = new StreamProcessor(settings, platform)
 
         // Flatten results for processing
@@ -1323,7 +1326,7 @@ export class AddonManager {
 
         // For series, we need season and episode
         if (type === 'series' && (season === undefined || episode === undefined)) {
-            console.warn(`[AddonManager] Skipping stream fetch for series ${id} without season/episode`)
+            log.warn(`Skipping stream fetch for series ${id} without season/episode`)
             return
         }
 
@@ -1408,15 +1411,15 @@ export class AddonManager {
 
             while (attempt < maxRetries) {
                 try {
-                    console.log(`[${client.manifest.name}] Requesting streams for ${type}/${resolvedVideoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
+                    log.debug(`Requesting streams for ${type}/${resolvedVideoId}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries})` : ''}`)
                     let streams = await client.getStreams(type, resolvedVideoId)
-                    console.log(`[${client.manifest.name}] Received ${streams ? streams.length : 0} streams`)
+                    log.debug(`Received ${streams ? streams.length : 0} streams`)
 
                     if (type === 'movie' && (!streams || streams.length === 0)) {
                         const altVideoIds = await getMovieVideoIdsFromAddonMeta(client, baseId)
                         for (const vid of altVideoIds) {
                             try {
-                                console.log(`[${client.manifest.name}] Retrying movie streams via meta video id: ${vid}`)
+                                log.debug(`Retrying movie streams via meta video id: ${vid}`)
                                 const s2 = await client.getStreams('movie', vid)
                                 if (s2 && s2.length > 0) {
                                     streams = [...(streams || []), ...s2]
@@ -1432,12 +1435,12 @@ export class AddonManager {
                     return
                 } catch (e) {
                     if (e instanceof RetryableError && attempt < maxRetries - 1) {
-                        console.log(`[${client.manifest.name}] ${e.message} - retrying in ${e.retryAfterMs}ms...`)
+                        log.debug(`${e.message} - retrying in ${e.retryAfterMs}ms...`)
                         await new Promise(resolve => setTimeout(resolve, e.retryAfterMs))
                         attempt++
                     } else {
                         const errorMsg = e instanceof Error ? e.message : String(e)
-                        console.warn(`[${client.manifest.name}] Failed to fetch streams:`, errorMsg)
+                        log.warn(`Failed to fetch streams:`, errorMsg)
                         callbacks?.onAddonError?.(client.manifest, errorMsg)
                         return
                     }
@@ -1454,7 +1457,7 @@ export class AddonManager {
         const clients = await this.getClientsForProfile(profileId)
         const results: { addon: Manifest, subtitles: Subtitle[] }[] = []
 
-        console.log(`[AddonManager] getSubtitles called for ${type}/${id}, videoHash: ${videoHash || 'none'}`)
+        log.debug(`getSubtitles called for ${type}/${id}, videoHash: ${videoHash || 'none'}`)
 
         // Resolve IDs: We might have a TMDB ID (tmdb:123) but addons might need IMDB ID (tt123)
         let tmdbId: string | null = null
@@ -1464,13 +1467,13 @@ export class AddonManager {
             tmdbId = id.replace('tmdb:', '')
             // Try to resolve to IMDB
             imdbId = await this.resolveTmdbToImdb(tmdbId, type, profileId)
-            if (imdbId) console.log(`[AddonManager] Resolved TMDB ${tmdbId} to IMDB ${imdbId}`)
+            if (imdbId) log.debug(`Resolved TMDB ${tmdbId} to IMDB ${imdbId}`)
         } else if (id.startsWith('tt')) {
             imdbId = id
             // We could resolve to TMDB here if needed, but usually subtiles support tt
         }
 
-        console.log(`[AddonManager] Available clients: ${clients.length}`)
+        log.debug(`Available clients: ${clients.length}`)
 
         const promises = clients.map(async (client) => {
             if (!client.manifest) return
@@ -1478,7 +1481,7 @@ export class AddonManager {
             // Use proper resource checking that handles object resources
             const supportsSubtitles = this.supportsResource(client.manifest, 'subtitles', type)
             if (!supportsSubtitles) {
-                // console.log(`[AddonManager] ${client.manifest.name} does NOT support subtitles resource`)
+                // log.debug(`${client.manifest.name} does NOT support subtitles resource`)
                 return
             }
 
@@ -1491,29 +1494,29 @@ export class AddonManager {
                 if (this.canHandleId(client.manifest, 'subtitles', imdbId)) {
                     targetId = imdbId
                     canHandle = true
-                    // console.log(`[AddonManager] Using resolved IMDB ID ${targetId} for ${client.manifest.name}`)
+                    // log.debug(`Using resolved IMDB ID ${targetId} for ${client.manifest.name}`)
                 }
             }
 
             if (!canHandle) {
-                // console.log(`[AddonManager] ${client.manifest.name} cannot handle ID ${id}`)
+                // log.debug(`${client.manifest.name} cannot handle ID ${id}`)
                 return
             }
 
             try {
-                // console.log(`[AddonManager] Requesting subtitles from ${client.manifest.name} for ${type}/${targetId}`)
+                // log.debug(`Requesting subtitles from ${client.manifest.name} for ${type}/${targetId}`)
                 const subtitles = await client.getSubtitles(type, targetId, videoHash)
-                // console.log(`[AddonManager] Received ${subtitles ? subtitles.length : 0} subtitles from ${client.manifest.name}`)
+                // log.debug(`Received ${subtitles ? subtitles.length : 0} subtitles from ${client.manifest.name}`)
                 if (subtitles && subtitles.length > 0) {
                     results.push({ addon: client.manifest, subtitles })
                 }
             } catch (e) {
-                console.warn(`[AddonManager] Failed to fetch subtitles from ${client.manifest.name}:`, e)
+                log.warn(`Failed to fetch subtitles from ${client.manifest.name}:`, e)
             }
         })
 
         await Promise.allSettled(promises)
-        console.log(`[AddonManager] Total subtitle results before filtering: ${results.length} addon groups`)
+        log.debug(`Total subtitle results before filtering: ${results.length} addon groups`)
 
         // Post-process results: Deduplicate and Flatten
         const allSubtitles: Subtitle[] = []
@@ -1595,12 +1598,12 @@ export class AddonManager {
             })
         })
 
-        console.log(`[AddonManager] Filtered results.`)
+        log.debug(`Filtered results.`)
 
         if (results.length === 0) {
-            console.warn('[AddonManager] No subtitle results from any addon. Consider installing a subtitle addon like:')
-            console.warn('[AddonManager] - OpenSubtitles: https://github.com/openSubtitles/stremio-addon')
-            console.warn('[AddonManager] Most torrent/video streaming addons do NOT provide subtitles.')
+            log.warn('No subtitle results from any addon. Consider installing a subtitle addon like:')
+            log.warn('- OpenSubtitles: https://github.com/openSubtitles/stremio-addon')
+            log.warn('Most torrent/video streaming addons do NOT provide subtitles.')
         }
 
         return results
@@ -1678,13 +1681,13 @@ export class AddonManager {
         const client = this.clientCache.get(normalizedUrl)
 
         if (!client || !client.manifest) {
-            console.warn(`[AddonManager] Client not found for ${manifestUrl}`)
+            log.warn(`Client not found for ${manifestUrl}`)
             return []
         }
 
         const catalog = client.manifest.catalogs.find(c => c.type === catalogType && c.id === catalogId)
         if (!catalog) {
-            console.warn(`[AddonManager] Catalog ${catalogId} not found in ${client.manifest.name}`)
+            log.warn(`Catalog ${catalogId} not found in ${client.manifest.name}`)
             return []
         }
 
@@ -1716,7 +1719,7 @@ export class AddonManager {
             return this.enrichItems(filteredItems, context)
         } catch (e) {
             const errorMsg = e instanceof Error ? e.message : String(e)
-            console.error(`[AddonManager] Failed to fetch catalog ${catalogId} from ${manifestUrl}`, e)
+            log.error(`Failed to fetch catalog ${catalogId} from ${manifestUrl}`, e)
             return []
         }
     }

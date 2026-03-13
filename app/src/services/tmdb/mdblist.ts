@@ -5,6 +5,9 @@
  */
 import { TMDBClient } from './client'
 import { getMeta } from './meta'
+import { logger } from '../logger'
+
+const log = logger.scope('TMDB:MDBList')
 
 export async function fetchMDBListItems(listId: string, apiKey: string, language: string, page: number) {
   const offset = (page * 20) - 20
@@ -17,7 +20,7 @@ export async function fetchMDBListItems(listId: string, apiKey: string, language
       ...(data.shows || [])
     ]
   } catch (err: any) {
-    console.error("Error retrieving MDBList items:", err.message, err)
+    log.error("Error retrieving MDBList items:", err.message, err)
     return []
   }
 }
@@ -64,7 +67,7 @@ export async function parseMDBListItems(tmdbClient: TMDBClient, items: any[], ty
     getMeta(tmdbClient, item.type, language, item.id, config)
       .then(result => result.meta)
       .catch(err => {
-        console.error(`Error fetching metadata for ${item.id}:`, err.message)
+        log.error(`Error fetching metadata for ${item.id}:`, err.message)
         return null
       })
   )

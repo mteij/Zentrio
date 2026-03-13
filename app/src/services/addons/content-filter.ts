@@ -4,6 +4,9 @@ import { profileProxySettingsDb, watchHistoryDb } from '../database'
 import { tmdbService } from '../tmdb/index'
 import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../tmdb/age-ratings'
 import type { MetaPreview } from './types'
+import { logger } from '../logger'
+
+const log = logger.scope('ContentFilter')
 
 // ID resolution cache for IMDB -> TMDB mapping
 const idResolutionCache = new Map<string, string>()
@@ -170,7 +173,7 @@ export async function enrichContent(items: MetaPreview[], profileId: number): Pr
             return item;
         });
     } catch (e) {
-        console.warn('Failed to enrich content with watch status', e);
+        log.warn('Failed to enrich content with watch status', e);
         return items;
     }
 }

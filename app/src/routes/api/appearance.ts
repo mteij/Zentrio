@@ -2,6 +2,9 @@ import { appearanceDb, profileDb, userDb, type User } from '../../services/datab
 import { optionalSessionMiddleware } from '../../middleware/session'
 import { ok, err } from '../../utils/api'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Appearance')
 
 const appearance = createTaggedOpenAPIApp<{
   Variables: {
@@ -53,7 +56,7 @@ appearance.get('/settings', optionalSessionMiddleware, async (c) => {
     const settings = appearanceDb.getSettings(settingsProfileId)
     return c.json({ data: settings })
   } catch (e) {
-    console.error('Failed to get appearance settings', e)
+    log.error('Failed to get appearance settings', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -104,7 +107,7 @@ appearance.put('/settings', optionalSessionMiddleware, async (c) => {
     appearanceDb.saveSettings(settingsProfileId, settings)
     return c.json({ success: true })
   } catch (e) {
-    console.error('Failed to save appearance settings', e)
+    log.error('Failed to save appearance settings', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })

@@ -6,6 +6,9 @@ import styles from '../../styles/Settings.module.css';
 import { apiFetch } from '../../lib/apiFetch';
 import { appMode } from '../../lib/app-mode';
 import { isTauri } from '../../lib/auth-client';
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('CloudSync')
 
 interface SyncState {
   id: number;
@@ -50,7 +53,7 @@ export function CloudSyncSettings() {
         }
       }
     } catch (err) {
-      console.error('Failed to load sync state:', err);
+      log.error('Failed to load sync state:', err);
     } finally {
       setLoading(false);
     }
@@ -145,7 +148,7 @@ export function CloudSyncSettings() {
       setSyncState(null);
       toast.success('Disconnected', { description: 'Cloud sync has been disabled' });
     } catch (err) {
-      console.error('Failed to disconnect:', err);
+      log.error('Failed to disconnect:', err);
       toast.error('Disconnect Failed', { description: 'Failed to disconnect from cloud sync' });
     }
   }
@@ -162,7 +165,7 @@ export function CloudSyncSettings() {
       await loadSyncState();
       toast.success('Sync Complete', { description: 'Your data has been synchronized' });
     } catch (err) {
-      console.error('Failed to sync:', err);
+      log.error('Failed to sync:', err);
       toast.error('Sync Failed', { description: 'Failed to synchronize data' });
     } finally {
       if (btn) {

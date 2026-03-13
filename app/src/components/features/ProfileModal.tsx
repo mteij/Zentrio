@@ -4,6 +4,9 @@ import { Button, FormGroup, Input, Modal, ConfirmDialog } from '../index'
 import { apiFetch } from '../../lib/apiFetch'
 import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 import { toast } from 'sonner'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('ProfileModal')
 
 // Avatar styles available in DiceBear
 const AVATAR_STYLES = [
@@ -104,7 +107,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
       const data = await res.json()
       setTraktStatus(data.data)
     } catch (e) {
-      console.error('Failed to get Trakt status:', e)
+      log.error('Failed to get Trakt status:', e)
     }
   }, [profile?.id])
 
@@ -135,7 +138,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
           toast.error(data.data.status === 'denied' ? 'Authorization denied' : 'Code expired')
         }
       } catch (e) {
-        console.error('Polling error:', e)
+        log.error('Polling error:', e)
       }
     }, (deviceCode.interval || 5) * 1000)
 
@@ -155,7 +158,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
         }
       }
     } catch (e) {
-      console.error('Failed to load settings profiles', e)
+      log.error('Failed to load settings profiles', e)
     }
   }
 
@@ -177,7 +180,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
         setAvatar(data.seed)
       }
     } catch (e) {
-      console.error('Failed to generate avatar', e)
+      log.error('Failed to generate avatar', e)
     }
   }
 
@@ -203,7 +206,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
         setPolling(true)
       }
     } catch (e) {
-      console.error('Device code error:', e)
+      log.error('Device code error:', e)
       toast.error('Failed to get device code')
     } finally {
       setTraktLoading(false)
@@ -222,7 +225,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
       toast.success('Disconnected from Trakt')
       fetchTraktStatus()
     } catch (e) {
-      console.error('Disconnect error:', e)
+      log.error('Disconnect error:', e)
       toast.error('Failed to disconnect')
     } finally {
       setTraktLoading(false)
@@ -247,7 +250,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
         toast.success('Sync completed')
       }
     } catch (e) {
-      console.error('Sync error:', e)
+      log.error('Sync error:', e)
       toast.error('Failed to sync')
     } finally {
       setSyncing(false)

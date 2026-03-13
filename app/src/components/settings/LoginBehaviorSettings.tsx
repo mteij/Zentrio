@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { LoginBehavior } from '../../hooks/useLoginBehavior'
 import { useSessionDuration, SessionDuration } from '../../hooks/useSessionDuration'
 import { apiFetch } from '../../lib/apiFetch'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('LoginBehavior')
 
 interface Profile {
   id: number
@@ -41,7 +44,7 @@ export function LoginBehaviorSettings() {
         setProfiles(data)
       }
     } catch (e) {
-      console.error('Failed to load profiles:', e)
+      log.error('Failed to load profiles:', e)
     } finally {
       setLoading(false)
     }

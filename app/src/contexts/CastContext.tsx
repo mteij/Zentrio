@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('CastCtx')
 
 // Type definitions for Chrome Cast API (using local types to avoid conflicts with Vidstack)
 interface ChromeCastApi {
@@ -75,12 +78,12 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
 
       cast.initialize(apiConfig, onInitSuccess, onError)
     } catch (e) {
-      console.error('Cast initialization error', e)
+      log.error('Cast initialization error', e)
     }
   }
 
   const sessionListener = (session: any) => {
-    console.log('Cast Session established', session.sessionId)
+    log.debug('Cast Session established', session.sessionId)
     setCastSession(session)
     setIsConnected(true)
     session.addUpdateListener(sessionUpdateListener)
@@ -95,17 +98,17 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
 
   const receiverListener = (availability: string) => {
     // availability: "available" | "unavailable"
-    console.log('Cast Receiver availability:', availability)
+    log.debug('Cast Receiver availability:', availability)
     const cast = getChromeCast()
     setCastReceiverAvailable(availability === cast?.ReceiverAvailability?.AVAILABLE)
   }
 
   const onInitSuccess = () => {
-    console.log('Cast API initialized')
+    log.debug('Cast API initialized')
   }
 
   const onError = (e: any) => {
-    console.warn('Cast API Error', e)
+    log.warn('Cast API Error', e)
   }
 
   const castMedia = useCallback(async (url: string, type: string, title?: string, image?: string, subtitles?: any[]) => {
@@ -125,7 +128,7 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
                  }, reject)
             });
         } catch (e) {
-            console.error("Failed to request session", e)
+            log.error("Failed to request session", e)
             toast.error("Could not connect to Chromecast")
             return;
         }
@@ -169,7 +172,7 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
         })
         toast.success(`Casting to ${currentSession.receiver.friendlyName}`)
     } catch (e) {
-        console.error("Cast load media failed", e)
+        log.error("Cast load media failed", e)
         toast.error("Failed to cast media")
     }
   }, [castSession])
@@ -182,7 +185,7 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
                   setIsConnected(false)
                   toast.info("Disconnected from Cast")
               },
-              (e: any) => console.error("Cast leave error", e) 
+              (e: any) => log.error("Cast leave error", e) 
           )
       }
   }, [castSession])

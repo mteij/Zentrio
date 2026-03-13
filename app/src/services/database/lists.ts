@@ -2,6 +2,9 @@
 import { db } from './connection'
 import { randomBytes } from 'crypto'
 import type { List, ListItem, ListShare, ProfileSharedList, ProfileListShare, Profile } from './types'
+import { logger } from '../logger'
+
+const log = logger.scope('DB:Lists')
 
 export const listDb = {
   create: (profileId: number, name: string, isDefault: boolean = false): List => {
@@ -245,7 +248,7 @@ export const listDb = {
       `).run(profileId, shareId)
       return true
     } catch (e) {
-      console.error('Failed to link share to profile:', e)
+      log.error('Failed to link share to profile:', e)
       return false
     }
   },

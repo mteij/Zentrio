@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { ModalWithFooter, Button, FormGroup, Input } from '../../index'
 import { apiFetch } from '../../../lib/apiFetch'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('PasswordModal')
 
 interface PasswordModalProps {
   isOpen: boolean
@@ -46,7 +49,7 @@ export const PasswordModal = ({ isOpen, onClose, hasPassword, onSuccess }: Passw
             toast.error('Update Failed', { description: 'Failed to update password' })
         }
     } catch (e) {
-        console.error(e)
+        log.error(e)
     }
   }
 
@@ -77,7 +80,7 @@ export const PasswordModal = ({ isOpen, onClose, hasPassword, onSuccess }: Passw
             toast.error('Setup Failed', { description: data.message || 'Failed to set password' })
         }
     } catch (e) {
-        console.error(e)
+        log.error(e)
         toast.error('Error', { description: 'Failed to set password' })
     }
   }

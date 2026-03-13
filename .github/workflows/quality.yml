@@ -21,6 +21,7 @@ jobs:
       rustfmt_ok: ${{ steps.rustfmt.outputs.fmt_ok }}
       clippy_errors: ${{ steps.clippy.outputs.errors }}
       clippy_warnings: ${{ steps.clippy.outputs.warnings }}
+      knip_unused_files: ${{ steps.knip.outputs.unused_files }}
       score: ${{ steps.score.outputs.score }}
       grade: ${{ steps.score.outputs.grade }}
       color: ${{ steps.score.outputs.color }}
@@ -84,6 +85,23 @@ jobs:
           echo "errors=${errors}" >> "$GITHUB_OUTPUT"
           echo "warnings=${warnings}" >> "$GITHUB_OUTPUT"
           echo "📊 ESLint: ${errors} error(s), ${warnings} warning(s)"
+
+      # ── Dead Code (Knip) ────────────────────────────────────────────────────
+      - name: Dead Code (knip)
+        id: knip
+        run: |
+          set +e
+          cd app
+          knip_out=$(bun run knip --reporter json 2>/dev/null || echo '{}')
+          unused_files=$(echo "$knip_out" | node -e "
+            try {
+              const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+              console.log((d.files || []).length);
+            } catch(e) { console.log(0); }
+          " || echo "0")
+          unused_files=$(echo "${unused_files:-0}" | tr -d '\n' | head -1)
+          echo "unused_files=${unused_files}" >> "$GITHUB_OUTPUT"
+          echo "📊 Knip: ${unused_files} unused file(s)"
 
       # ── Unit Tests ──────────────────────────────────────────────────────────
       - name: Unit Tests
@@ -161,6 +179,7 @@ jobs:
           ESLINT_ERRORS="${{ steps.eslint.outputs.errors || '0' }}"
           ESLINT_WARNINGS="${{ steps.eslint.outputs.warnings || '0' }}"
           TESTS_PASSED="${{ steps.tests.outputs.passed || 'false' }}"
+          KNIP_UNUSED="${{ steps.knip.outputs.unused_files || '0' }}"
           CLIPPY_ERRORS="${{ steps.clippy.outputs.errors || '0' }}"
           CLIPPY_WARNINGS="${{ steps.clippy.outputs.warnings || '0' }}"
           RUSTFMT_OK="${{ steps.rustfmt.outputs.fmt_ok || 'false' }}"
@@ -171,6 +190,7 @@ jobs:
           #   ESLint errors:       -10 per error (max -50)
           #   ESLint warnings:     -3 per warning (max -30)
           #   Tests failed:        -25
+          #   Unused files (knip): -3 per file (max -15)
           #   Rust fmt issues:     -10
           #   Clippy errors:       -10 per error (max -30)
           #   Clippy warnings:     -3 per warning (max -20)
@@ -182,6 +202,7 @@ jobs:
           esl_err  = int(os.environ.get('ESLINT_ERRORS', '0'))
           esl_warn = int(os.environ.get('ESLINT_WARNINGS', '0'))
           tests_ok = os.environ.get('TESTS_PASSED', 'false') == 'true'
+          knip_files = int(os.environ.get('KNIP_UNUSED', '0'))
           clip_err = int(os.environ.get('CLIPPY_ERRORS', '0'))
           clip_w   = int(os.environ.get('CLIPPY_WARNINGS', '0'))
           rustfmt_ok = os.environ.get('RUSTFMT_OK', 'false') == 'true'
@@ -192,6 +213,7 @@ jobs:
           score -= min(esl_warn * 3,  30)
           if not tests_ok:
               score -= 25
+          score -= min(knip_files * 3, 15)
           if not rustfmt_ok:
               score -= 10
           score -= min(clip_err * 10, 30)
@@ -234,6 +256,7 @@ jobs:
             "eslint_errors": "${{ steps.eslint.outputs.errors }}",
             "eslint_warnings": "${{ steps.eslint.outputs.warnings }}",
             "tests_passed": "${{ steps.tests.outputs.passed }}",
+            "knip_unused_files": "${{ steps.knip.outputs.unused_files }}",
             "rustfmt_ok": "${{ steps.rustfmt.outputs.fmt_ok }}",
             "clippy_errors": "${{ steps.clippy.outputs.errors }}",
             "clippy_warnings": "${{ steps.clippy.outputs.warnings }}",
@@ -264,6 +287,7 @@ jobs:
           echo "| ESLint errors | ${{ steps.eslint.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| ESLint warnings | ${{ steps.eslint.outputs.warnings }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Tests | ${{ steps.tests.outputs.passed == 'true' && '✅ passed' || '❌ failed' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Unused files (knip) | ${{ steps.knip.outputs.unused_files }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Rust fmt | ${{ steps.rustfmt.outputs.fmt_ok == 'true' && '✅ OK' || '❌ issues' }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Clippy errors | ${{ steps.clippy.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Clippy warnings | ${{ steps.clippy.outputs.warnings }} |" >> "$GITHUB_STEP_SUMMARY"

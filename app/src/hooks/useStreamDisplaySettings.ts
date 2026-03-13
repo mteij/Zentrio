@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import { apiFetch } from '../lib/apiFetch'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('useStreamDisplay')
 
 export interface StreamDisplaySettings {
   showAddonName: boolean
@@ -42,7 +45,7 @@ export function useStreamDisplaySettings(profileId: string | undefined): StreamD
           }
         }
       } catch (e) {
-        console.error('Failed to load stream display settings', e)
+        log.error('Failed to load stream display settings', e)
       }
     }
 

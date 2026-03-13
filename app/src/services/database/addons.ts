@@ -1,6 +1,9 @@
 // Addon database operations
 import { db } from './connection'
 import type { Addon, ProfileAddon } from './types'
+import { logger } from '../logger'
+
+const log = logger.scope('DB:Addons')
 
 export const addonDb = {
   create: (data: {
@@ -166,7 +169,7 @@ export const addonDb = {
   removeFromProfile: (settingsProfileId: number, addonId: number): void => {
     // Ensure we have valid numbers to prevent accidental mass deletion
     if (!settingsProfileId || !addonId || isNaN(settingsProfileId) || isNaN(addonId)) {
-        console.error(`[Database] Invalid parameters for removeFromProfile: settingsProfileId=${settingsProfileId}, addonId=${addonId}`);
+        log.error(`Invalid parameters for removeFromProfile: settingsProfileId=${settingsProfileId}, addonId=${addonId}`);
         return;
     }
 

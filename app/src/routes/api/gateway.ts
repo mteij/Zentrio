@@ -1,5 +1,8 @@
 import { getConfig } from '../../services/envParser'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Gateway')
 
 const gateway = createTaggedOpenAPIApp('Gateway')
 
@@ -88,8 +91,8 @@ const gatewayProxyHandler = async (c: any) => {
   reqHeaders.delete('origin')
   reqHeaders.set('x-zentrio-gateway', '1')
 
-  console.log(`[Gateway] Forwarding ${c.req.method} ${targetUrl.toString()}`);
-  console.log(`[Gateway] Has Authorization:`, reqHeaders.has('authorization') || reqHeaders.has('Authorization'));
+  log.debug(`Forwarding ${c.req.method} ${targetUrl.toString()}`);
+  log.debug(`Has Authorization:`, reqHeaders.has('authorization') || reqHeaders.has('Authorization'));
   
   const init: RequestInit = {
     method: 'GET',

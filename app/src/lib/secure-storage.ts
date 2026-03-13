@@ -11,6 +11,9 @@
  */
 
 import { isTauri } from './auth-client';
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('SecureStorage')
 
 // Type for stored auth data
 interface StoredAuthData {
@@ -35,7 +38,7 @@ async function getStore() {
     storeInstance = await load('auth-store.json');
     return storeInstance;
   } catch (e) {
-    console.error('[SecureStorage] Failed to load store:', e);
+    log.error('Failed to load store:', e);
     return null;
   }
 }
@@ -55,10 +58,10 @@ export async function saveAuthData(data: StoredAuthData): Promise<void> {
     if (store) {
       await store.set('auth', data);
       await store.save();
-      console.log('[SecureStorage] Auth data saved');
+      log.debug('Auth data saved');
     }
   } catch (e) {
-    console.error('[SecureStorage] Failed to save:', e);
+    log.error('Failed to save:', e);
     // Fallback to localStorage
     localStorage.setItem('zentrio-auth-storage', JSON.stringify({ state: data }));
   }
@@ -77,7 +80,7 @@ export async function loadAuthData(): Promise<StoredAuthData | null> {
         return parsed.state || null;
       }
     } catch (e) {
-      console.error('[SecureStorage] Failed to parse localStorage:', e);
+      log.error('Failed to parse localStorage:', e);
     }
     return null;
   }
@@ -86,11 +89,11 @@ export async function loadAuthData(): Promise<StoredAuthData | null> {
     const store = await getStore();
     if (store) {
       const data = await store.get('auth') as StoredAuthData | null;
-      console.log('[SecureStorage] Auth data loaded:', !!data);
+      log.debug('Auth data loaded:', !!data);
       return data || null;
     }
   } catch (e) {
-    console.error('[SecureStorage] Failed to load:', e);
+    log.error('Failed to load:', e);
   }
   
   // Fallback to localStorage migration
@@ -102,12 +105,12 @@ export async function loadAuthData(): Promise<StoredAuthData | null> {
       // Migrate to secure storage
       if (data) {
         await saveAuthData(data);
-        console.log('[SecureStorage] Migrated from localStorage to secure storage');
+        log.debug('Migrated from localStorage to secure storage');
       }
       return data || null;
     }
   } catch (e) {
-    console.error('[SecureStorage] Migration failed:', e);
+    log.error('Migration failed:', e);
   }
   
   return null;
@@ -127,10 +130,10 @@ export async function clearAuthData(): Promise<void> {
     if (store) {
       await store.delete('auth');
       await store.save();
-      console.log('[SecureStorage] Auth data cleared');
+      log.debug('Auth data cleared');
     }
   } catch (e) {
-    console.error('[SecureStorage] Failed to clear:', e);
+    log.error('Failed to clear:', e);
   }
   
   // Also clear localStorage (migration cleanup)

@@ -10,6 +10,9 @@ import { TraktRecommendationsRow } from '../../components/streaming/TraktRecomme
 import { MetaPreview } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import styles from '../../styles/Streaming.module.css'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('ExplorePage')
 
 // -- Internal GenreRow Component --
 interface GenreRowProps {
@@ -170,7 +173,7 @@ export const StreamingExplore = () => {
             setSkip(data.items?.length || 0)
             if ((data.items?.length || 0) < 20) setHasMore(false)
         } catch (e) {
-            console.error(e)
+            log.error(e)
         } finally {
             setLoadingFiltered(false)
         }
@@ -194,7 +197,7 @@ export const StreamingExplore = () => {
             setHasMore(false)
         }
     } catch (e) {
-        console.error(e)
+        log.error(e)
     } finally {
         loadingMoreRef.current = false
     }

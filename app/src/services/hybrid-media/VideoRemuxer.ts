@@ -8,6 +8,9 @@
  */
 
 import type { VideoPacket, CodecInfo, VideoRemuxerConfig } from './types'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('VideoRemuxer')
 
 // NAL unit type constants
 const NAL_TYPE_SPS = 7
@@ -67,7 +70,7 @@ export class VideoRemuxer extends EventTarget {
       const MP4Box = await import('mp4box')
       this.mp4box = MP4Box.default || MP4Box
     } catch (error) {
-      console.warn('[VideoRemuxer] mp4box.js not available, using fallback', error)
+      log.warn('mp4box.js not available, using fallback', error)
     }
 
     // Create MediaSource
@@ -95,18 +98,18 @@ export class VideoRemuxer extends EventTarget {
 
           this.sourceBuffer.addEventListener('error', (e: Event) => {
             const sb = e.target as SourceBuffer
-            console.error('[VideoRemuxer] SourceBuffer error event:', e)
-            console.error('[VideoRemuxer] SourceBuffer error object:', (sb as any)?.error)
-            console.error('[VideoRemuxer] MediaSource readyState:', this.mediaSource?.readyState)
+            log.error('SourceBuffer error event:', e)
+            log.error('SourceBuffer error object:', (sb as any)?.error)
+            log.error('MediaSource readyState:', this.mediaSource?.readyState)
             this.dispatchEvent(new CustomEvent('error', { detail: { error: e } }))
           })
 
           this.isInitialized = true
-          console.log(`[VideoRemuxer] Initialized with codec: ${codecInfo.codecString}`)
+          log.debug(`Initialized with codec: ${codecInfo.codecString}`)
           
           // Process extradata immediately if available
           if (codecInfo.extradata && codecInfo.extradata.length > 0) {
-            console.log('[VideoRemuxer] Processing extradata for SPS/PPS')
+            log.debug('Processing extradata for SPS/PPS')
             try {
               // Try to detect format of extradata
               const isAnnexB = this.detectAnnexB(codecInfo.extradata)
@@ -119,7 +122,7 @@ export class VideoRemuxer extends EventTarget {
                 }
               } else {
                 // AVCC (H.264) or HVCC (H.265) parsing
-                console.log('[VideoRemuxer] Extradata is not Annex-B, attempting configuration record parsing')
+                log.debug('Extradata is not Annex-B, attempting configuration record parsing')
                 
                 if (codecInfo.codecId === 173) { // HEVC
                    // Parse hvcC
@@ -132,7 +135,7 @@ export class VideoRemuxer extends EventTarget {
                        // format: [ver][profile_space...][...][lengthSizeMinusOne]
                        // actually it's byte 21 (0-indexed) & 0x03
                        this.nalLengthSize = (codecInfo.extradata[21] & 0x03) + 1
-                       console.log(`[VideoRemuxer] HEVC NAL length size: ${this.nalLengthSize}`)
+                       log.debug(`HEVC NAL length size: ${this.nalLengthSize}`)
 
                        const numOfArrays = parser.getUint8(22)
                        let offset = 23
@@ -160,7 +163,7 @@ export class VideoRemuxer extends EventTarget {
                        }
                      }
                    } catch (e) {
-                     console.warn('[VideoRemuxer] Failed to parse hvcC extradata:', e)
+                     log.warn('Failed to parse hvcC extradata:', e)
                    }
                 } else if (codecInfo.codecId === 27) { // H.264
                    // Parse avcC
@@ -190,24 +193,24 @@ export class VideoRemuxer extends EventTarget {
                         }
                      }
                    } catch (e) {
-                     console.warn('[VideoRemuxer] Failed to parse avcC extradata:', e)
+                     log.warn('Failed to parse avcC extradata:', e)
                    }
                 }
               }
               
               if (this.sps && this.pps) {
-                console.log('[VideoRemuxer] SPS/PPS extracted from extradata')
+                log.debug('SPS/PPS extracted from extradata')
               }
               
               // If we have VPS (HEVC), we're good
               if (this.vps) {
-                 console.log('[VideoRemuxer] VPS extracted properly')
+                 log.debug('VPS extracted properly')
               }
             } catch (e) {
-              console.error('[VideoRemuxer] Failed to parse extradata:', e)
+              log.error('Failed to parse extradata:', e)
             }
           } else {
-             console.warn('[VideoRemuxer] No extradata available during attach.')
+             log.warn('No extradata available during attach.')
           }
 
           // If pixel format is missing/unspecified, warn but proceed. 
@@ -215,7 +218,7 @@ export class VideoRemuxer extends EventTarget {
           // If pixel format is missing/unspecified, warn but proceed. 
           // MediaMetadata often doesn't need it for basic playback if container is right.
           if (!this.width || !this.height) {
-              console.warn('[VideoRemuxer] Video dimensions missing, might cause playback issues.')
+              log.warn('Video dimensions missing, might cause playback issues.')
           }
           
           resolve()
@@ -247,7 +250,7 @@ export class VideoRemuxer extends EventTarget {
       // Only log if it changes or is first detection
       if (this.isAnnexB !== packetIsAnnexB) {
          this.isAnnexB = packetIsAnnexB
-         console.log(`[VideoRemuxer] Packet format detected: ${this.isAnnexB ? 'Annex-B' : 'AVCC'}`)
+         log.debug(`Packet format detected: ${this.isAnnexB ? 'Annex-B' : 'AVCC'}`)
       }
     }
 
@@ -287,7 +290,7 @@ export class VideoRemuxer extends EventTarget {
         this.baseMediaDecodeTime = Math.round(packet.pts * 90000) // Convert to 90kHz
       } else {
         // Wait for SPS/PPS
-        console.log('[VideoRemuxer] Waiting for SPS/PPS...')
+        log.debug('Waiting for SPS/PPS...')
         return
       }
     }
@@ -302,7 +305,7 @@ export class VideoRemuxer extends EventTarget {
 
     // DEBUG LOGGING (Reduced frequency or disabled)
     // if (this.sequenceNumber % 30 === 0) {
-    //   console.log(`[VideoRemuxer] Pushing segment #${this.sequenceNumber}`, {
+    //   log.debug(`Pushing segment #${this.sequenceNumber}`, {
     //      pts: packet.pts,
     //      dts: packet.dts,
     //      baseMediaDecodeTime: this.baseMediaDecodeTime,
@@ -1101,11 +1104,11 @@ export class VideoRemuxer extends EventTarget {
     } catch (error: any) {
       this.isAppending = false
       if (error.name === 'InvalidStateError') {
-          console.warn('[VideoRemuxer] InvalidStateError during append - SourceBuffer removed or TS closed?', error)
+          log.warn('InvalidStateError during append - SourceBuffer removed or TS closed?', error)
           // Don't throw, just drop the segment as the buffer is likely dead
           this.pendingSegments = [] 
       } else {
-          console.error('[VideoRemuxer] Error appending segment:', error)
+          log.error('Error appending segment:', error)
           throw error // Re-throw other errors
       }
     }
@@ -1123,7 +1126,7 @@ export class VideoRemuxer extends EventTarget {
     
     if (this.pendingSegments.length > 0 && this.sourceBuffer && !this.sourceBuffer.updating) {
       const segment = this.pendingSegments.shift()!
-      console.log(`[VideoRemuxer] Appending buffered segment: ${segment.byteLength} bytes`)
+      log.debug(`Appending buffered segment: ${segment.byteLength} bytes`)
       this.appendSegment(segment)
     }
   }
@@ -1165,7 +1168,7 @@ export class VideoRemuxer extends EventTarget {
           })
         }
       } catch (error) {
-        console.error('[VideoRemuxer] Error flushing:', error)
+        log.error('Error flushing:', error)
       }
     }
   }

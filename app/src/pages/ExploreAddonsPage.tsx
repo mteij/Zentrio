@@ -6,6 +6,9 @@ import { SimpleLayout, Button, LoadingSpinner, AnimatedBackground, SkeletonAddon
 import styles from '../styles/Addons.module.css'
 import settingsStyles from '../styles/Settings.module.css'
 import { apiFetch } from '../lib/apiFetch'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('ExploreAddons')
 
 interface Addon {
   manifest: {
@@ -252,7 +255,7 @@ export function ExploreAddonsPage() {
                       installed = await installedRes.json();
                   }
               } catch (e) {
-                  console.error('Failed to fetch installed addons', e);
+                  log.error('Failed to fetch installed addons', e);
               }
           }
 
@@ -261,7 +264,7 @@ export function ExploreAddonsPage() {
           setInstalledAddons(installed);
 
       } catch (err) {
-        console.error(err)
+        log.error(err)
         setError('Failed to load addons')
       } finally {
         setLoading(false)
@@ -276,7 +279,7 @@ export function ExploreAddonsPage() {
               setInstalledAddons(await res.json());
           }
       } catch (e) {
-          console.error(e);
+          log.error(e);
       }
   }
 
@@ -303,7 +306,7 @@ export function ExploreAddonsPage() {
             toast.error('Installation Failed', { description: err.error || 'Failed to install addon' })
         }
     } catch (e) {
-        console.error(e)
+        log.error(e)
         const errorMsg = e instanceof Error ? e.message : 'Error installing addon';
         toast.error('Installation Error', { description: errorMsg })
     } finally {
@@ -325,7 +328,7 @@ export function ExploreAddonsPage() {
               toast.error('Error', { description: 'Failed to uninstall addon' })
           }
       } catch (e) {
-          console.error(e);
+          log.error(e);
           toast.error('Error', { description: 'Network error uninstalling addon' })
       } finally {
           setProcessingAddonId(null);

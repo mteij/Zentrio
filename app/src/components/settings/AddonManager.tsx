@@ -5,6 +5,9 @@ import { Button, Input, Toggle } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 import { isTauri } from '../../lib/auth-client'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('AddonManagerUI')
 
 interface Addon {
   id: string
@@ -69,7 +72,7 @@ const AddonConfigModal = ({
                 toast.error('Failed', { description: err.error || 'Failed to install addon' })
             }
         } catch (e) {
-            console.error(e)
+            log.error(e)
             toast.error('Error', { description: 'Network error installing addon' })
         } finally {
             setInstalling(false)
@@ -142,7 +145,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
         setAddons(data)
       }
     } catch (e) {
-      console.error('Failed to load addons', e)
+      log.error('Failed to load addons', e)
     } finally {
       setLoading(false)
     }
@@ -176,7 +179,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
         toast.error('Installation Failed', { description: err.error || 'Failed to install addon' })
       }
     } catch (e) {
-      console.error('Failed to install addon', e)
+      log.error('Failed to install addon', e)
       toast.error('Network Error', { description: 'Network error' })
     } finally {
       setInstalling(false)
@@ -198,7 +201,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
         body: JSON.stringify({ addonId, enabled })
       })
     } catch (e) {
-      console.error('Failed to toggle addon', e)
+      log.error('Failed to toggle addon', e)
       // Revert on error
       setAddons(addons.map(a => a.id === addonId ? { ...a, enabled: !enabled } : a))
     }
@@ -216,7 +219,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
         toast.error('Removal Failed', { description: 'Failed to remove addon' })
       }
     } catch (e) {
-      console.error('Failed to remove addon', e)
+      log.error('Failed to remove addon', e)
     }
   }
 
@@ -232,7 +235,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
         const { openUrl } = await import('@tauri-apps/plugin-opener')
         await openUrl(configUrl)
       } catch (e) {
-        console.error('Failed to open URL via Tauri opener', e)
+        log.error('Failed to open URL via Tauri opener', e)
         window.open(configUrl, '_blank', 'noopener,noreferrer')
       }
     } else {
@@ -247,7 +250,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
       await navigator.clipboard.writeText(addon.manifest_url)
       toast.success('Link Copied', { description: `${addon.name} manifest URL copied to clipboard` })
     } catch (e) {
-      console.error('Failed to copy to clipboard', e)
+      log.error('Failed to copy to clipboard', e)
       toast.error('Copy Failed', { description: 'Failed to copy link to clipboard' })
     }
   }
@@ -261,7 +264,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
         body: JSON.stringify({ addonIds })
       })
     } catch (e) {
-      console.error('Failed to reorder addons', e)
+      log.error('Failed to reorder addons', e)
       toast.error('Reorder Failed', { description: 'Failed to save addon order' })
       loadAddons(currentProfileId) // Revert on error
     }

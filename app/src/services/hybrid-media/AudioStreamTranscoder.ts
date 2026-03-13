@@ -15,6 +15,9 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('AudioStream')
 
 /**
  * Check if running in Tauri environment
@@ -92,7 +95,7 @@ export class AudioStreamTranscoder extends EventTarget {
       // Only log important messages
       if (message.includes('Error') || message.includes('failed') || 
           message.includes('Stream mapping') || message.includes('Output #0')) {
-        console.log('[AudioTranscoder]', message)
+        log.debug('', message)
       }
     })
 
@@ -104,7 +107,7 @@ export class AudioStreamTranscoder extends EventTarget {
     })
 
     this.ffmpegLoaded = true
-    console.log('[AudioTranscoder] FFmpeg WASM loaded')
+    log.debug('FFmpeg WASM loaded')
   }
 
   /**
@@ -129,7 +132,7 @@ export class AudioStreamTranscoder extends EventTarget {
       throw new Error('Cannot determine file size')
     }
 
-    console.log(`[AudioTranscoder] File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB`)
+    log.debug(`File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB`)
 
     // Create MediaSource for audio output
     this.mediaSource = new MediaSource()
@@ -168,7 +171,7 @@ export class AudioStreamTranscoder extends EventTarget {
       
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('[AudioTranscoder] Error:', error)
+        log.error('Error:', error)
         this.dispatchEvent(new CustomEvent('error', { detail: { error } }))
       }
     }
@@ -183,7 +186,7 @@ export class AudioStreamTranscoder extends EventTarget {
     let chunkCount = 0
     const totalChunks = Math.ceil(this.totalSize / chunkSize)
 
-    console.log(`[AudioTranscoder] Starting download (${totalChunks} chunks of ${(chunkSize / 1024 / 1024).toFixed(0)}MB)`)
+    log.debug(`Starting download (${totalChunks} chunks of ${(chunkSize / 1024 / 1024).toFixed(0)}MB)`)
     this.isDownloading = true
 
     while (offset < this.totalSize) {
@@ -205,7 +208,7 @@ export class AudioStreamTranscoder extends EventTarget {
       this.downloadedSize = offset + chunk.length
       const percent = Math.round((this.downloadedSize / this.totalSize) * 100)
       
-      console.log(`[AudioTranscoder] Downloaded chunk ${chunkCount}/${totalChunks} (${percent}%)`)
+      log.debug(`Downloaded chunk ${chunkCount}/${totalChunks} (${percent}%)`)
       
       this.dispatchEvent(new CustomEvent('progress', { 
         detail: { 
@@ -222,7 +225,7 @@ export class AudioStreamTranscoder extends EventTarget {
                            this.downloadedSize >= this.totalSize * 0.15 // 15% of file
         
         if (bufferReady) {
-          console.log(`[AudioTranscoder] Buffer ready (${(this.downloadedSize / 1024 / 1024).toFixed(0)}MB), starting initial transcode...`)
+          log.debug(`Buffer ready (${(this.downloadedSize / 1024 / 1024).toFixed(0)}MB), starting initial transcode...`)
           this.hasInitialTranscode = true
           // Start transcode in parallel (don't await)
           this.transcodeCurrentBuffer(false)
@@ -232,7 +235,7 @@ export class AudioStreamTranscoder extends EventTarget {
       offset += chunkSize
     }
 
-    console.log('[AudioTranscoder] Download complete')
+    log.debug('Download complete')
     this.isDownloading = false
     this.downloadComplete = true
 
@@ -242,7 +245,7 @@ export class AudioStreamTranscoder extends EventTarget {
     }
 
     // Final transcode with complete file
-    console.log('[AudioTranscoder] Starting final transcode with complete file...')
+    log.debug('Starting final transcode with complete file...')
     await this.transcodeCurrentBuffer(true)
   }
 
@@ -262,7 +265,7 @@ export class AudioStreamTranscoder extends EventTarget {
 
     try {
       // Combine downloaded chunks and write to FFmpeg FS
-      console.log(`[AudioTranscoder] Combining ${this.chunks.length} chunks...`)
+      log.debug(`Combining ${this.chunks.length} chunks...`)
       
       this.dispatchEvent(new CustomEvent('progress', {
         detail: {
@@ -287,7 +290,7 @@ export class AudioStreamTranscoder extends EventTarget {
         offset += chunk.length
       }
 
-      console.log(`[AudioTranscoder] Writing input file to FFmpeg FS (${(totalSize / 1024 / 1024).toFixed(2)}MB)...`)
+      log.debug(`Writing input file to FFmpeg FS (${(totalSize / 1024 / 1024).toFixed(2)}MB)...`)
       await this.ffmpeg.writeFile(inputFilename, combinedBuffer)
 
       // Try to delete output file first if it exists (avoid conflicts)
@@ -310,9 +313,9 @@ export class AudioStreamTranscoder extends EventTarget {
         outputFilename
       ]
 
-      console.log('[AudioTranscoder] Executing FFmpeg:', args.join(' '))
-      console.log('[AudioTranscoder] Audio stream index:', this.audioStreamIndex)
-      console.log('[AudioTranscoder] Source URL:', this.sourceUrl)
+      log.debug('Executing FFmpeg:', args.join(' '))
+      log.debug('Audio stream index:', this.audioStreamIndex)
+      log.debug('Source URL:', this.sourceUrl)
       
       // Setup custom error handler
       let ffmpegError: any = null
@@ -320,25 +323,25 @@ export class AudioStreamTranscoder extends EventTarget {
       
       const logHandler = ({ message }: { message: string }) => {
         ffmpegOutput += message + '\n'
-        console.log('[AudioTranscoder] FFmpeg:', message)
+        log.debug('FFmpeg:', message)
       }
       
       this.ffmpeg.on('log', logHandler)
       
       try {
         const result = await this.ffmpeg.exec(args)
-        console.log('[AudioTranscoder] FFmpeg exec completed, result:', result)
+        log.debug('FFmpeg exec completed, result:', result)
       } catch (execError: any) {
-        console.error('[AudioTranscoder] FFmpeg exec failed:', execError)
-        console.error('[AudioTranscoder] FFmpeg output captured:', ffmpegOutput)
-        console.error('[AudioTranscoder] Exec error type:', typeof execError)
-        console.error('[AudioTranscoder] Exec error constructor:', execError?.constructor?.name)
+        log.error('FFmpeg exec failed:', execError)
+        log.error('FFmpeg output captured:', ffmpegOutput)
+        log.error('Exec error type:', typeof execError)
+        log.error('Exec error constructor:', execError?.constructor?.name)
         
         // Try to get more error details
         try {
-          console.error('[AudioTranscoder] Exec error keys:', Object.keys(execError))
+          log.error('Exec error keys:', Object.keys(execError))
           for (const key of Object.keys(execError)) {
-            console.error(`[AudioTranscoder] Exec error.${key}:`, (execError as any)[key])
+            log.error(`Exec error.${key}:`, (execError as any)[key])
           }
         } catch (e) {}
         
@@ -350,15 +353,15 @@ export class AudioStreamTranscoder extends EventTarget {
       }
 
       // Read output
-      console.log('[AudioTranscoder] Reading output file...')
+      log.debug('Reading output file...')
       const output = await this.ffmpeg.readFile(outputFilename)
       const outputData = typeof output === 'string'
         ? new TextEncoder().encode(output)
         : new Uint8Array(output)
-      console.log('[AudioTranscoder] Output file read successfully')
+      log.debug('Output file read successfully')
 
       if (outputData.length > 0) {
-        console.log(`[AudioTranscoder] Transcoded ${(outputData.length / 1024).toFixed(0)}KB of audio`)
+        log.debug(`Transcoded ${(outputData.length / 1024).toFixed(0)}KB of audio`)
         // Queue for MSE
         this.queueSegment(outputData)
         
@@ -367,7 +370,7 @@ export class AudioStreamTranscoder extends EventTarget {
           this.firstDataAppended = true
           // Wait a moment for append to complete, then dispatch ready event
           setTimeout(() => {
-            console.log('[AudioTranscoder] Audio ready to play')
+            log.debug('Audio ready to play')
             this.dispatchEvent(new CustomEvent('audioready'))
           }, 100)
         }
@@ -378,7 +381,7 @@ export class AudioStreamTranscoder extends EventTarget {
         await this.ffmpeg.deleteFile(inputFilename)
         await this.ffmpeg.deleteFile(outputFilename)
       } catch (e) {
-        console.warn('[AudioTranscoder] Cleanup error:', e)
+        log.warn('Cleanup error:', e)
       }
 
       if (isFinal) {
@@ -388,29 +391,29 @@ export class AudioStreamTranscoder extends EventTarget {
         if (this.mediaSource?.readyState === 'open') {
           this.mediaSource.endOfStream()
         }
-        console.log('[AudioTranscoder] Transcoding complete')
+        log.debug('Transcoding complete')
         this.dispatchEvent(new CustomEvent('complete'))
       }
 
     } catch (error) {
-      console.error('[AudioTranscoder] Transcode error:', error)
-      console.error('[AudioTranscoder] Error type:', typeof error)
-      console.error('[AudioTranscoder] Error constructor:', error?.constructor?.name)
+      log.error('Transcode error:', error)
+      log.error('Error type:', typeof error)
+      log.error('Error constructor:', error?.constructor?.name)
       
       // Try to extract more details from the error
       if (error) {
         try {
           const errorStr = String(error)
-          console.error('[AudioTranscoder] Error string:', errorStr)
+          log.error('Error string:', errorStr)
         } catch (e) {}
         
         try {
           const keys = Object.keys(error)
           if (keys.length > 0) {
-            console.error('[AudioTranscoder] Error keys:', keys)
+            log.error('Error keys:', keys)
             for (const key of keys) {
               try {
-                console.error(`[AudioTranscoder] Error.${key}:`, (error as any)[key])
+                log.error(`Error.${key}:`, (error as any)[key])
               } catch (e) {}
             }
           }
@@ -418,23 +421,23 @@ export class AudioStreamTranscoder extends EventTarget {
       }
       
       // Cleanup files on error - use a more aggressive cleanup
-      console.log('[AudioTranscoder] Attempting cleanup after error...')
+      log.debug('Attempting cleanup after error...')
       const filesToDelete = [inputFilename, outputFilename]
       for (const filename of filesToDelete) {
         try {
           await this.ffmpeg!.deleteFile(filename)
-          console.log(`[AudioTranscoder] Deleted ${filename}`)
+          log.debug(`Deleted ${filename}`)
         } catch (e) {
-          console.warn(`[AudioTranscoder] Could not delete ${filename}:`, e)
+          log.warn(`Could not delete ${filename}:`, e)
         }
       }
       
       // Don't fail on intermediate transcodes, but log the error
       if (!isFinal) {
-        console.warn('[AudioTranscoder] Intermediate transcode failed, continuing...')
+        log.warn('Intermediate transcode failed, continuing...')
       } else {
         // Final transcode failed - this is a critical error
-        console.error('[AudioTranscoder] Final transcode failed - audio cannot be played')
+        log.error('Final transcode failed - audio cannot be played')
         this.dispatchEvent(new CustomEvent('error', { detail: { error } }))
       }
     } finally {
@@ -471,7 +474,7 @@ export class AudioStreamTranscoder extends EventTarget {
         segment.byteOffset + segment.byteLength
       ) as ArrayBuffer)
     } catch (error) {
-      console.error('[AudioTranscoder] Append error:', error)
+      log.error('Append error:', error)
       this.isAppending = false
     }
   }
@@ -503,7 +506,7 @@ export class AudioStreamTranscoder extends EventTarget {
 
   play(): void {
     this.audioElement?.play().catch(e => 
-      console.warn('[AudioTranscoder] Play failed:', e)
+      log.warn('Play failed:', e)
     )
   }
 
@@ -544,6 +547,6 @@ export class AudioStreamTranscoder extends EventTarget {
       this.ffmpegLoaded = false
     }
 
-    console.log('[AudioTranscoder] Destroyed')
+    log.debug('Destroyed')
   }
 }

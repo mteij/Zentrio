@@ -8,6 +8,9 @@ import { QualityPicker } from '../downloads/QualityPicker'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('EpisodeList')
 
 interface EpisodeListProps {
   meta: MetaDetail
@@ -75,7 +78,7 @@ export function EpisodeList({
         toast.success(`Downloading: ${pickerEpisode.title}`)
       )
     } catch (e) {
-      console.error('[EpisodeList] episode download error', e)
+      log.error('episode download error', e)
       import('sonner').then(({ toast }) => toast.error('Failed to start download'))
     }
   }

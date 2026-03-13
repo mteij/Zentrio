@@ -1,4 +1,7 @@
 import { useCallback } from 'react'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('useExtPlayer')
 
 interface ExternalPlayerOptions {
   url: string
@@ -18,7 +21,7 @@ export function useExternalPlayer() {
         await openUrl(url)
         return { success: true, message: 'Opened in external player' }
       } catch (error) {
-        console.error('Failed to open externally:', error)
+        log.error('Failed to open externally:', error)
         return { success: false, message: 'Failed to open in external player' }
       }
     }

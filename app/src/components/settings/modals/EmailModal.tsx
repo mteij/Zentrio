@@ -4,6 +4,9 @@ import { toast } from 'sonner'
 import { MailCheck } from 'lucide-react'
 import { ModalWithFooter, Button, FormGroup, Input } from '../../index'
 import { apiFetch } from '../../../lib/apiFetch'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('EmailModal')
 
 interface EmailModalProps {
   isOpen: boolean
@@ -35,7 +38,7 @@ export const EmailModal = ({ isOpen, onClose, onSuccess }: EmailModalProps) => {
             toast.error('Email Change Failed', { description: data.message || 'Failed to initiate email change' })
         }
     } catch (e) {
-        console.error(e)
+        log.error(e)
         toast.error('Network Error')
     } finally {
         setIsLoading(false)

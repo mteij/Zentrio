@@ -4,6 +4,9 @@ import { Button, Modal } from '../../index';
 type UpdateStatus = 'idle' | 'downloading' | 'installing' | 'done' | 'error';
 import { Download, AlertCircle, Loader2, Sparkles, RefreshCw, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('UpdateModal')
 
 interface UpdateData {
   version: string;
@@ -117,7 +120,7 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
       onClose();
 
     } catch (e: any) {
-      console.error('Update failed:', e);
+      log.error('Update failed:', e);
       setDownloadError(e.message || 'Failed to download update');
       setStatus('error');
       setDownloading(false);

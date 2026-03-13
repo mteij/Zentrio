@@ -1,6 +1,9 @@
 // Stream settings database operations
 import { db } from './connection'
 import type { StreamSettings } from './types'
+import { logger } from '../logger'
+
+const log = logger.scope('DB:Stream')
 
 export const streamDb = {
   getSettings: (settingsProfileId: number): StreamSettings => {
@@ -12,7 +15,7 @@ export const streamDb = {
       try {
         return JSON.parse(row.config);
       } catch (e) {
-        console.error('Failed to parse stream settings', e);
+        log.error('Failed to parse stream settings', e);
       }
     }
     // Default settings

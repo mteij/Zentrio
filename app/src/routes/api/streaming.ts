@@ -5,6 +5,9 @@ import { ok, err } from '../../utils/api'
 import { streamCache, StreamCache } from '../../services/addons/stream-cache'
 import { getParentalSettings, filterContent } from '../../services/addons/content-filter'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Streaming')
 
 const streaming = createTaggedOpenAPIApp<{
   Variables: {
@@ -22,17 +25,17 @@ async function ensureNextEpisodeInContinueWatching(
   currentEpisode: number
 ) {
   try {
-    console.log(`[NextEpisode] Checking next episode for ${metaId} after S${currentSeason}E${currentEpisode}`)
+    log.debug(`Checking next episode for ${metaId} after S${currentSeason}E${currentEpisode}`)
     
     // 1. Get metadata to find next episode
     // We assume 'series' type because only series have next episodes
     const meta = await addonManager.getMeta('series', metaId, profileId)
     if (!meta) {
-        console.log(`[NextEpisode] No metadata found for ${metaId}`)
+        log.debug(`No metadata found for ${metaId}`)
         return
     }
     if (!meta.videos || meta.videos.length === 0) {
-        console.log(`[NextEpisode] No videos found in metadata for ${metaId}`)
+        log.debug(`No videos found in metadata for ${metaId}`)
         return
     }
 
@@ -43,12 +46,12 @@ async function ensureNextEpisodeInContinueWatching(
     })
 
     const currentIndex = sortedVideos.findIndex((v: any) => v.season === currentSeason && v.episode === currentEpisode)
-    console.log(`[NextEpisode] Current index: ${currentIndex} / ${sortedVideos.length}`)
+    log.debug(`Current index: ${currentIndex} / ${sortedVideos.length}`)
     
     // 3. Get next video if exists
     if (currentIndex !== -1 && currentIndex < sortedVideos.length - 1) {
       const nextVideo = sortedVideos[currentIndex + 1]
-      console.log(`[NextEpisode] Found next video: S${nextVideo.season}E${nextVideo.episode}`)
+      log.debug(`Found next video: S${nextVideo.season}E${nextVideo.episode}`)
       
       // 4. Check if next video is already in history (started or watched)
       const existingProgress = watchHistoryDb.getProgress(
@@ -77,10 +80,10 @@ async function ensureNextEpisodeInContinueWatching(
         })
       }
     } else {
-        console.log(`[NextEpisode] No next video found (last episode?)`)
+        log.debug(`No next video found (last episode?)`)
     }
   } catch (e) {
-    console.error('[NextEpisode] Failed to ensure next episode:', e)
+    log.error('Failed to ensure next episode:', e)
   }
 }
 
@@ -126,7 +129,7 @@ streaming.get('/settings', optionalSessionMiddleware, async (c) => {
     const settings = streamDb.getSettings(settingsProfileId)
     return c.json({ data: settings })
   } catch (e) {
-    console.error('Failed to get streaming settings', e)
+    log.error('Failed to get streaming settings', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -174,7 +177,7 @@ streaming.put('/settings', optionalSessionMiddleware, async (c) => {
     streamDb.saveSettings(settingsProfileId, settings)
     return c.json({ success: true })
   } catch (e) {
-    console.error('Failed to save streaming settings', e)
+    log.error('Failed to save streaming settings', e)
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -458,7 +461,7 @@ streaming.get('/streams-live/:type/:id', async (c) => {
         })
         closeController()
       } catch (e) {
-        console.error('SSE stream error:', e)
+        log.error('SSE stream error:', e)
         sendEvent('error', { message: e instanceof Error ? e.message : 'Unknown error' })
         closeController()
       }
@@ -479,7 +482,7 @@ streaming.get('/subtitles/:type/:id', async (c) => {
   const { profileId, videoHash } = c.req.query()
   
   if (!profileId) {
-    console.log('[Subtitles] No profileId provided')
+    log.debug('No profileId provided')
     return c.json({ subtitles: [] })
   }
   
@@ -492,7 +495,7 @@ streaming.get('/subtitles/:type/:id', async (c) => {
   }
   
   try {
-    console.log(`[Subtitles] Fetching for ${type}/${id} with videoHash: ${videoHash || 'none'}`)
+    log.debug(`Fetching for ${type}/${id} with videoHash: ${videoHash || 'none'}`)
     const results = await addonManager.getSubtitles(type, id, parseInt(profileId), videoHash)
     
     debugInfo.addonsQueried = results.length
@@ -502,9 +505,9 @@ streaming.get('/subtitles/:type/:id', async (c) => {
       supportsSubtitles: r.addon.resources?.includes('subtitles') || r.addon.resources?.some((res: any) => res?.name === 'subtitles')
     }))
     
-    console.log(`[Subtitles] Received ${results.length} addon results`)
+    log.debug(`Received ${results.length} addon results`)
     results.forEach(r => {
-      console.log(`[Subtitles] ${r.addon.name}: ${r.subtitles.length} subtitles`)
+      log.debug(`${r.addon.name}: ${r.subtitles.length} subtitles`)
     })
     
     // Flatten subtitles from all addons into a single list with addon info
@@ -517,16 +520,16 @@ streaming.get('/subtitles/:type/:id', async (c) => {
     
     debugInfo.totalSubtitles = subtitles.length
     
-    console.log(`[Subtitles] Total subtitles: ${subtitles.length}`)
+    log.debug(`Total subtitles: ${subtitles.length}`)
     if (subtitles.length === 0) {
-      console.warn('[Subtitles] No subtitles available. Consider installing a subtitle addon like OpenSubtitles.')
+      log.warn('No subtitles available. Consider installing a subtitle addon like OpenSubtitles.')
       debugInfo.message = 'No subtitle results from any addon'
     }
     
     // Include debug info in response
     return c.json({ subtitles, debug: debugInfo })
   } catch (e) {
-    console.error('[Subtitles] API error:', e)
+    log.error('API error:', e)
     debugInfo.error = e instanceof Error ? e.message : String(e)
     return c.json({ subtitles: [], debug: debugInfo })
   }
@@ -545,7 +548,7 @@ streaming.get('/search', async (c) => {
     const results = await addonManager.search(q, parseInt(profileId), filters)
     return c.json({ results })
   } catch (e) {
-    console.error('Search API error:', e)
+    log.error('Search API error:', e)
     return c.json({ results: [] })
   }
 })
@@ -565,7 +568,7 @@ streaming.get('/search-catalogs', async (c) => {
     const catalogs = await addonManager.searchByCatalog(q, parseInt(profileId), filters)
     return c.json({ catalogs })
   } catch (e) {
-    console.error('Catalog search API error:', e)
+    log.error('Catalog search API error:', e)
     return c.json({ catalogs: [] })
   }
 })
@@ -589,7 +592,7 @@ streaming.get('/catalog', async (c) => {
     }
     return c.json({ items })
   } catch (e) {
-    console.error('Failed to fetch catalog items', e)
+    log.error('Failed to fetch catalog items', e)
     return c.json({ items: [] })
   }
 })
@@ -614,7 +617,7 @@ streaming.get('/catalog-items', async (c) => {
     )
     return c.json({ items })
   } catch (e) {
-    console.error(`Failed to fetch catalog items for ${id}`, e)
+    log.error(`Failed to fetch catalog items for ${id}`, e)
     return c.json({ items: [] })
   }
 })
@@ -677,7 +680,7 @@ streaming.post('/progress', async (c) => {
 
     return c.json({ success: true })
   } catch (e) {
-    console.error('Failed to save progress', e)
+    log.error('Failed to save progress', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -716,7 +719,7 @@ streaming.delete('/progress/:type/:id', async (c) => {
 
     return c.json({ success: true })
   } catch (e) {
-    console.error('Failed to delete progress', e)
+    log.error('Failed to delete progress', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -755,7 +758,7 @@ streaming.get('/progress/:type/:id', async (c) => {
       isWatched: progress?.is_watched || false
     })
   } catch (e) {
-    console.error('Failed to get item progress', e)
+    log.error('Failed to get item progress', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -778,7 +781,7 @@ streaming.get('/series-progress/:id', async (c) => {
       lastWatched: lastWatched ? { season: lastWatched.season, episode: lastWatched.episode } : null
     })
   } catch (e) {
-    console.error('Failed to get series progress', e)
+    log.error('Failed to get series progress', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -858,7 +861,7 @@ streaming.post('/mark-watched', async (c) => {
               })
             }
             traktSynced = true
-            console.log(`[Trakt] Pushed watched: ${metaId}${metaType === 'series' ? ` S${season}E${episode}` : ''}`)
+            log.debug(`Pushed watched: ${metaId}${metaType === 'series' ? ` S${season}E${episode}` : ''}`)
           } else {
             // Remove from Trakt history
             if (metaType === 'movie') {
@@ -877,10 +880,10 @@ streaming.post('/mark-watched', async (c) => {
               })
             }
             traktSynced = true
-            console.log(`[Trakt] Removed unwatched: ${metaId} S${season}E${episode}`)
+            log.debug(`Removed unwatched: ${metaId} S${season}E${episode}`)
           }
         } catch (e) {
-          console.error('[Trakt] Failed to sync mark-watched:', e)
+          log.error('Failed to sync mark-watched:', e)
           // Don't fail the request, local change still succeeded
         }
       }
@@ -888,7 +891,7 @@ streaming.post('/mark-watched', async (c) => {
 
     return c.json({ success: true, traktSynced })
   } catch (e) {
-    console.error('Failed to mark as watched', e)
+    log.error('Failed to mark as watched', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -947,16 +950,16 @@ streaming.post('/mark-season-watched', async (c) => {
             })
           }
           traktSynced = true
-          console.log(`[Trakt] ${watched ? 'Pushed' : 'Removed'} season ${season} (${episodes.length} episodes)`)
+          log.debug(`${watched ? 'Pushed' : 'Removed'} season ${season} (${episodes.length} episodes)`)
         } catch (e) {
-          console.error('[Trakt] Failed to sync season watched:', e)
+          log.error('Failed to sync season watched:', e)
         }
       }
     }
 
     return c.json({ success: true, traktSynced })
   } catch (e) {
-    console.error('Failed to mark season as watched', e)
+    log.error('Failed to mark season as watched', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -976,20 +979,20 @@ streaming.post('/mark-series-watched', async (c) => {
     // If allEpisodes is missing, fetch from metadata
     if (!allEpisodes || !Array.isArray(allEpisodes)) {
         try {
-            console.log(`[MarkSeries] allEpisodes missing for ${metaId}, fetching metadata...`)
+            log.debug(`allEpisodes missing for ${metaId}, fetching metadata...`)
             const meta = await addonManager.getMeta('series', metaId, pId)
             if (meta && meta.videos) {
                 allEpisodes = meta.videos.map((v: any) => ({
                     season: v.season,
                     episode: v.number || v.episode
                 }))
-                console.log(`[MarkSeries] Retrieved ${allEpisodes.length} episodes from metadata`)
+                log.debug(`Retrieved ${allEpisodes.length} episodes from metadata`)
             } else {
-                console.warn(`[MarkSeries] No metadata or videos found for ${metaId}`)
+                log.warn(`No metadata or videos found for ${metaId}`)
                 allEpisodes = []
             }
         } catch (e) {
-            console.error(`[MarkSeries] Failed to fetch metadata for ${metaId}:`, e)
+            log.error(`Failed to fetch metadata for ${metaId}:`, e)
             return c.json({ error: 'Failed to retrieve series episodes' }, 500)
         }
     }
@@ -1055,16 +1058,16 @@ streaming.post('/mark-series-watched', async (c) => {
             })
           }
           traktSynced = true
-          console.log(`[Trakt] ${watched ? 'Pushed' : 'Removed'} entire series (${allEpisodes.length} episodes)`)
+          log.debug(`${watched ? 'Pushed' : 'Removed'} entire series (${allEpisodes.length} episodes)`)
         } catch (e) {
-          console.error('[Trakt] Failed to sync series watched:', e)
+          log.error('Failed to sync series watched:', e)
         }
       }
     }
 
     return c.json({ success: true, traktSynced, episodesUpdated: allEpisodes.length })
   } catch (e) {
-    console.error('Failed to mark series as watched', e)
+    log.error('Failed to mark series as watched', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -1143,16 +1146,16 @@ streaming.post('/mark-episodes-before', async (c) => {
             })
           }
           traktSynced = true
-          console.log(`[Trakt] ${watched ? 'Pushed' : 'Removed'} ${episodesToMark.length} episodes before S${season}E${episode}`)
+          log.debug(`${watched ? 'Pushed' : 'Removed'} ${episodesToMark.length} episodes before S${season}E${episode}`)
         } catch (e) {
-          console.error('[Trakt] Failed to sync episodes before:', e)
+          log.error('Failed to sync episodes before:', e)
         }
       }
     }
 
     return c.json({ success: true, traktSynced, episodesUpdated: episodesToMark.length })
   } catch (e) {
-    console.error('Failed to mark episodes before', e)
+    log.error('Failed to mark episodes before', e)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -1192,9 +1195,9 @@ streaming.get('/details/:type/:id', optionalSessionMiddleware, async (c) => {
           ...(fallbackData.genres && { genres: fallbackData.genres }),
           ...(fallbackData.released && { released: fallbackData.released }),
         }
-        console.log(`[Streaming] Using fallback meta for ${type}/${id}:`, meta?.name ?? 'Unknown')
+        log.debug(`Using fallback meta for ${type}/${id}:`, meta?.name ?? 'Unknown')
       } catch (e) {
-        console.warn('Failed to parse metaFallback:', e)
+        log.warn('Failed to parse metaFallback:', e)
       }
     }
     
@@ -1250,7 +1253,7 @@ streaming.get('/details/:type/:id', optionalSessionMiddleware, async (c) => {
     
     return c.json({ meta, inLibrary, watchProgress, seriesProgress, lastWatchedEpisode })
   } catch (e) {
-    console.error('Streaming details error:', e)
+    log.error('Streaming details error:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to load content')
   }
 })
@@ -1271,7 +1274,7 @@ streaming.get('/filters', optionalSessionMiddleware, async (c) => {
     const filters = await addonManager.getAvailableFilters(pId)
     return c.json({ filters })
   } catch (e) {
-    console.error('Streaming filters error:', e)
+    log.error('Streaming filters error:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to load filters')
   }
 })
@@ -1348,7 +1351,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
             return allowedKeys.has(key)
           })
         } catch (e) {
-          console.warn('[Dashboard] Failed to apply parental filtering on history (guest mode)', e)
+          log.warn('Failed to apply parental filtering on history (guest mode)', e)
           // Strict fallback: if filtering fails and parental controls are enabled, hide the list.
           filteredHistory = []
         }
@@ -1410,7 +1413,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
             }
           }
         } catch (e) {
-          console.warn('[Dashboard] Failed to build continueWatchingHero (guest mode):', e)
+          log.warn('Failed to build continueWatchingHero (guest mode):', e)
         }
 
         if (!continueWatchingHero) {
@@ -1534,7 +1537,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           return allowedKeys.has(key)
         })
       } catch (e) {
-        console.warn('[Dashboard] Failed to apply parental filtering on history', e)
+        log.warn('Failed to apply parental filtering on history', e)
         // Strict fallback: if filtering fails and parental controls are enabled, hide the list.
         filteredHistory = []
       }
@@ -1601,7 +1604,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           }
         }
       } catch (e) {
-        console.warn('[Dashboard] Failed to build continueWatchingHero:', e)
+        log.warn('Failed to build continueWatchingHero:', e)
       }
 
       if (!continueWatchingHero) {
@@ -1639,7 +1642,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
       profile
     })
   } catch (e) {
-    console.error('Streaming dashboard error:', e)
+    log.error('Streaming dashboard error:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to load dashboard')
   }
 })

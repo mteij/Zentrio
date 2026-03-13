@@ -1,6 +1,9 @@
 import * as nodemailer from 'nodemailer'
 import { Resend } from 'resend'
 import { getConfig } from './envParser'
+import { logger } from './logger'
+
+const log = logger.scope('Email')
 import { 
   getMagicLinkTemplate, 
   getOtpTemplate, 
@@ -61,7 +64,7 @@ class SmtpProvider implements EmailProvider {
   }
 
   async sendMail(options: SendMailOptions): Promise<void> {
-    console.log(`[email] Sending mail to ${options.to} via SMTP...`)
+    log.info(`Sending mail to ${options.to} via SMTP...`)
     const start = Date.now()
     
     try {
@@ -81,9 +84,9 @@ class SmtpProvider implements EmailProvider {
           )
         )
       ])
-      console.log(`[email] sent to ${options.to} in ${Date.now() - start}ms`)
+      log.success(`Sent to ${options.to} in ${Date.now() - start}ms`)
     } catch (err: any) {
-      console.error(`[email] Failed to send to ${options.to} after ${Date.now() - start}ms:`, err?.message || err)
+      log.error(`Failed to send to ${options.to} after ${Date.now() - start}ms:`, err?.message || err)
       throw err
     }
   }
@@ -124,12 +127,12 @@ class DevFallbackProvider implements EmailProvider {
 
   constructor() {
     this.transporter = nodemailer.createTransport({ jsonTransport: true })
-    console.warn('[email] No email provider configured; using DevFallback (emails will not be sent).')
+    log.warn('No email provider configured; using DevFallback (emails will not be sent).')
   }
 
   async sendMail(options: SendMailOptions): Promise<void> {
     const result = await this.transporter.sendMail(options)
-    console.log('[email] DevFallback would send:', JSON.parse(result.message).subject)
+    log.info('DevFallback would send:', JSON.parse(result.message).subject)
   }
 }
 
@@ -189,17 +192,17 @@ class EmailService {
 
     const smtpProvider = () => {
       if (smtpUrl) {
-        console.log('[email] Using SMTP provider (URL)')
+        log.info('Using SMTP provider (URL)')
         return new SmtpProvider(smtpUrl)
       }
       const port = cfg.EMAIL_PORT
       const secure = cfg.EMAIL_SECURE
-      console.log(`[email] Using SMTP provider (${host}:${port})`)
+      log.info(`Using SMTP provider (${host}:${port})`)
       return new SmtpProvider({ host, port, secure, auth: { user, pass } })
     }
 
     const resendProvider = () => {
-      console.log('[email] Using Resend provider')
+      log.info('Using Resend provider')
       return new ResendProvider(resendApiKey)
     }
 
@@ -321,7 +324,7 @@ class EmailService {
       })
       return true
     } catch (error: any) {
-      console.error('Failed to send magic link:', error?.message || error)
+      log.error('Failed to send magic link:', error?.message || error)
       return false
     }
   }
@@ -339,7 +342,7 @@ class EmailService {
       })
       return true
     } catch (error: any) {
-      console.error('Failed to send OTP:', error?.message || error)
+      log.error('Failed to send OTP:', error?.message || error)
       return false
     }
   }
@@ -357,7 +360,7 @@ class EmailService {
       })
       return true
     } catch (error: any) {
-      console.error('Failed to send welcome email:', error?.message || error)
+      log.error('Failed to send welcome email:', error?.message || error)
       return false
     }
   }
@@ -375,7 +378,7 @@ class EmailService {
       })
       return true
     } catch (error: any) {
-      console.error('Failed to send verification email:', error?.message || error)
+      log.error('Failed to send verification email:', error?.message || error)
       return false
     }
   }
@@ -393,7 +396,7 @@ class EmailService {
       })
       return true
     } catch (error: any) {
-      console.error('Failed to send reset password email:', error?.message || error)
+      log.error('Failed to send reset password email:', error?.message || error)
       return false
     }
   }
@@ -416,7 +419,7 @@ class EmailService {
       })
       return true
     } catch (error: any) {
-      console.error('Failed to send list share invitation:', error?.message || error)
+      log.error('Failed to send list share invitation:', error?.message || error)
       return false
     }
   }

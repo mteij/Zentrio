@@ -1,22 +1,57 @@
 import { createTaggedOpenAPIApp } from './openapi-route'
 import { adminSessionMiddleware, adminStepUpMiddleware, requirePermission } from '../../middleware/admin'
 import { db, userDb } from '../../services/database'
-import { err, ok } from '../../utils/api'
+import { err, ok, getRequestMeta } from '../../utils/api'
+import { getConfig } from '../../services/envParser'
 import { writeAuditEvent, queryAuditLog, verifyAuditChain, getAuditStats, getAuditHistoryForTarget } from '../../services/admin/audit'
 import { createChallenge, verifyChallenge, getChallengeStatus, getOtpDestinationEmail } from '../../services/admin/stepup'
 import { emailService } from '../../services/email'
 import { Permissions, invalidatePermissionCache } from '../../services/admin/rbac'
+import * as os from 'os'
+import * as fs from 'fs'
+import * as path from 'path'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Admin')
 
 const app = createTaggedOpenAPIApp('Admin')
 
-// Helper to extract IP and user agent from request
-function getRequestMeta(c: any) {
-  const headers = c.req.raw.headers
-  return {
-    ipAddress: c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown',
-    userAgent: headers.get('user-agent') || 'unknown',
+// Public — no auth required. Frontend uses this to show/hide the admin button and setup flow.
+app.get('/status', async (c) => {
+  const { ADMIN_ENABLED } = getConfig()
+  const hasOwner = !!(db.prepare("SELECT 1 FROM user WHERE role = 'superadmin' LIMIT 1").get())
+  return ok(c, { enabled: ADMIN_ENABLED, hasOwner })
+})
+
+// Claim superadmin — only works when admin is enabled and no superadmin exists yet.
+// Requires the user to be logged in. First logged-in user to call this becomes superadmin.
+app.post('/setup', async (c) => {
+  const { ADMIN_ENABLED } = getConfig()
+
+  if (!ADMIN_ENABLED) {
+    return err(c, 403, 'FORBIDDEN', 'Admin console is not enabled on this instance')
   }
-}
+
+  const hasOwner = !!(db.prepare("SELECT 1 FROM user WHERE role = 'superadmin' LIMIT 1").get())
+  if (hasOwner) {
+    return err(c, 409, 'ALREADY_CONFIGURED', 'Admin setup has already been completed')
+  }
+
+  const session = await (await import('../../services/auth')).auth.api.getSession({
+    headers: c.req.raw.headers,
+  })
+
+  if (!session?.user) {
+    return err(c, 401, 'UNAUTHORIZED', 'You must be logged in to claim admin access')
+  }
+
+  db.prepare("UPDATE user SET role = 'superadmin', updatedAt = ? WHERE id = ?")
+    .run(new Date().toISOString(), session.user.id)
+
+  log.debug(`${session.user.email} claimed superadmin`)
+
+  return ok(c, { message: 'Admin setup complete. You are now superadmin.' })
+})
 
 app.get('/me', adminSessionMiddleware, async (c) => {
   const adminUser = (c as any).get('adminUser') as any
@@ -58,7 +93,7 @@ app.get('/stats', adminSessionMiddleware, requirePermission(Permissions.STATS_RE
       ts: new Date().toISOString(),
     })
   } catch (e) {
-    console.error('Admin stats failed', e)
+    log.error('Admin stats failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to fetch admin stats')
   }
 })
@@ -97,10 +132,166 @@ app.get('/activity/live', adminSessionMiddleware, requirePermission(Permissions.
       ts: new Date().toISOString(),
     })
   } catch (e) {
-    console.error('Admin activity failed', e)
+    log.error('Admin activity failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to fetch admin activity')
   }
 })
+
+app.get('/dashboard/charts', adminSessionMiddleware, requirePermission(Permissions.STATS_READ), async (c) => {
+  try {
+    const range = c.req.query('range') || '30d' // '24h', '7d', '30d', 'all'
+    
+    let dateFilterUsers = ''
+    let dateFilterWatches = ''
+    let groupExprUsers = ''
+    let groupExprWatches = ''
+    let dataPoints = 30
+    
+    if (range === '24h') {
+      dateFilterUsers = "WHERE createdAt >= datetime('now', '-24 hours')"
+      dateFilterWatches = "WHERE updated_at >= datetime('now', '-24 hours')"
+      groupExprUsers = "strftime('%Y-%m-%d %H:00', createdAt)"
+      groupExprWatches = "strftime('%Y-%m-%d %H:00', updated_at)"
+      dataPoints = 24
+    } else if (range === '7d') {
+      dateFilterUsers = "WHERE createdAt >= date('now', '-7 days')"
+      dateFilterWatches = "WHERE updated_at >= date('now', '-7 days')"
+      groupExprUsers = "date(createdAt)"
+      groupExprWatches = "date(updated_at)"
+      dataPoints = 7
+    } else if (range === 'all') {
+      dateFilterUsers = ""
+      dateFilterWatches = ""
+      groupExprUsers = "date(createdAt)"
+      groupExprWatches = "date(updated_at)"
+      dataPoints = 0
+    } else {
+      dateFilterUsers = "WHERE createdAt >= date('now', '-30 days')"
+      dateFilterWatches = "WHERE updated_at >= date('now', '-30 days')"
+      groupExprUsers = "date(createdAt)"
+      groupExprWatches = "date(updated_at)"
+      dataPoints = 30
+    }
+
+    const recentUsers = db.prepare(`
+      SELECT ${groupExprUsers} as date, COUNT(*) as count 
+      FROM user 
+      ${dateFilterUsers}
+      GROUP BY ${groupExprUsers}
+      ORDER BY date ASC
+    `).all() as { date: string, count: number }[]
+
+    const recentWatches = db.prepare(`
+      SELECT ${groupExprWatches} as date, COUNT(*) as count 
+      FROM watch_history 
+      ${dateFilterWatches}
+      GROUP BY ${groupExprWatches}
+      ORDER BY date ASC
+    `).all() as { date: string, count: number }[]
+
+    const chartData: any[] = []
+    
+    if (range === 'all') {
+      const allDates = Array.from(new Set([...recentUsers.map(u => u.date), ...recentWatches.map(w => w.date)])).filter(Boolean).sort()
+      for (const d of allDates) {
+        chartData.push({
+          date: d,
+          label: d,
+          users: recentUsers.find(u => u.date === d)?.count || 0,
+          watches: recentWatches.find(w => w.date === d)?.count || 0
+        })
+      }
+    } else if (range === '24h') {
+      const today = new Date()
+      today.setMinutes(0, 0, 0)
+      for (let i = 23; i >= 0; i--) {
+        const d = new Date(today)
+        d.setHours(d.getHours() - i)
+        const dateStr = d.toISOString().replace('T', ' ').substring(0, 14) + ':00'
+        const labelStr = `${d.getHours().toString().padStart(2, '0')}:00`
+        chartData.push({
+          date: dateStr,
+          label: labelStr,
+          users: recentUsers.find(u => u.date === dateStr)?.count || 0,
+          watches: recentWatches.find(w => w.date === dateStr)?.count || 0
+        })
+      }
+    } else {
+      // 7d or 30d
+      const today = new Date()
+      for (let i = dataPoints - 1; i >= 0; i--) {
+        const d = new Date(today)
+        d.setDate(d.getDate() - i)
+        const dateStr = d.toISOString().split('T')[0]
+        chartData.push({
+          date: dateStr,
+          label: dateStr.slice(5),
+          users: recentUsers.find(u => u.date === dateStr)?.count || 0,
+          watches: recentWatches.find(w => w.date === dateStr)?.count || 0
+        })
+      }
+    }
+
+    // Audit: admin viewed charts
+    const adminUser = (c as any).get('adminUser') as any
+    const { ipAddress, userAgent } = getRequestMeta(c)
+    writeAuditEvent({
+      actorId: adminUser.id,
+      action: 'admin.dashboard.charts',
+      targetType: 'system',
+      ipAddress,
+      userAgent,
+      after: { range }
+    })
+
+    return ok(c, { chartData })
+  } catch (e) {
+    log.error('Admin charts failed', e)
+    return err(c, 500, 'SERVER_ERROR', 'Failed to fetch admin chart data')
+  }
+})
+
+app.get('/system/health', adminSessionMiddleware, requirePermission(Permissions.STATS_READ), async (c) => {
+  try {
+    const memory = process.memoryUsage()
+    let dbSize = 0
+    
+    // Estimate database size
+    try {
+      const { DATABASE_URL } = getConfig()
+      let dbPathStr = DATABASE_URL || './data/zentrio.db'
+      if (!path.isAbsolute(dbPathStr)) {
+        dbPathStr = path.join(process.cwd(), dbPathStr)
+      }
+      const stat = fs.statSync(dbPathStr)
+      dbSize = stat.size
+    } catch (e) {
+      log.warn('Failed to stat database file:', e)
+    }
+
+    return ok(c, {
+      uptime: process.uptime(),
+      memory: {
+        rss: memory.rss,
+        heapTotal: memory.heapTotal,
+        heapUsed: memory.heapUsed,
+        external: memory.external,
+      },
+      dbSize,
+      os: {
+        platform: os.platform(),
+        release: os.release(),
+        totalmem: os.totalmem(),
+        freemem: os.freemem(),
+        loadavg: os.loadavg(),
+      }
+    })
+  } catch (e) {
+    log.error('System health failed', e)
+    return err(c, 500, 'SERVER_ERROR', 'Failed to fetch system health')
+  }
+})
+
 
 app.get('/users', adminSessionMiddleware, requirePermission(Permissions.USERS_READ), async (c) => {
   try {
@@ -157,7 +348,7 @@ app.get('/users', adminSessionMiddleware, requirePermission(Permissions.USERS_RE
       },
     })
   } catch (e) {
-    console.error('Admin users list failed', e)
+    log.error('Admin users list failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to list users')
   }
 })
@@ -183,7 +374,7 @@ app.get('/users/:id', adminSessionMiddleware, requirePermission(Permissions.USER
 
     return ok(c, { user, roles, recentActivity })
   } catch (e) {
-    console.error('Admin user detail failed', e)
+    log.error('Admin user detail failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to fetch user')
   }
 })
@@ -241,7 +432,7 @@ app.post('/users/:id/role', adminSessionMiddleware, requirePermission(Permission
       role: updated.role,
     }, 'User role updated')
   } catch (e) {
-    console.error('Admin role update failed', e)
+    log.error('Admin role update failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to update user role')
   }
 })
@@ -298,7 +489,7 @@ app.post('/users/:id/ban', adminSessionMiddleware, requirePermission(Permissions
       banExpires: updated.banExpires,
     }, 'User banned')
   } catch (e) {
-    console.error('Admin ban failed', e)
+    log.error('Admin ban failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to ban user')
   }
 })
@@ -351,7 +542,7 @@ app.post('/users/:id/unban', adminSessionMiddleware, requirePermission(Permissio
       banned: updated.banned,
     }, 'User unbanned')
   } catch (e) {
-    console.error('Admin unban failed', e)
+    log.error('Admin unban failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to unban user')
   }
 })
@@ -393,7 +584,7 @@ app.get('/audit', adminSessionMiddleware, requirePermission(Permissions.AUDIT_RE
       pagination: { limit, offset },
     })
   } catch (e) {
-    console.error('Admin audit query failed', e)
+    log.error('Admin audit query failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to query audit log')
   }
 })
@@ -415,7 +606,7 @@ app.get('/audit/stats', adminSessionMiddleware, requirePermission(Permissions.AU
 
     return ok(c, stats)
   } catch (e) {
-    console.error('Admin audit stats failed', e)
+    log.error('Admin audit stats failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to get audit stats')
   }
 })
@@ -442,7 +633,7 @@ app.post('/audit/verify', adminSessionMiddleware, requirePermission(Permissions.
 
     return ok(c, { valid: true, message: 'Audit chain integrity verified' })
   } catch (e) {
-    console.error('Admin audit verify failed', e)
+    log.error('Admin audit verify failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to verify audit chain')
   }
 })
@@ -468,9 +659,9 @@ app.post('/stepup/request', adminSessionMiddleware, async (c) => {
       // In non-production: log OTP to console as a dev fallback so step-up can be tested
       // without valid email credentials (mirrors phone OTP dev fallback in auth.ts)
       if (process.env.NODE_ENV !== 'production') {
-        console.warn(`[StepUp] Email delivery failed — dev fallback OTP for ${emailDest}: ${otp}`)
+        log.warn(`Email delivery failed — dev fallback OTP for ${emailDest}: ${otp}`)
       } else {
-        console.error('Failed to send step-up OTP email:', emailErr)
+        log.error('Failed to send step-up OTP email:', emailErr)
         return err(c, 500, 'EMAIL_FAILED', 'Failed to send verification code. Please try again.')
       }
     }
@@ -492,7 +683,7 @@ app.post('/stepup/request', adminSessionMiddleware, async (c) => {
       message: 'Verification code sent to your email',
     })
   } catch (e: any) {
-    console.error('Admin step-up request failed', e)
+    log.error('Admin step-up request failed', e)
     if (e.message?.includes('Too many active challenges')) {
       return err(c, 429, 'RATE_LIMITED', e.message)
     }
@@ -546,7 +737,7 @@ app.post('/stepup/verify', adminSessionMiddleware, async (c) => {
       message: 'Step-up verification successful',
     })
   } catch (e) {
-    console.error('Admin step-up verify failed', e)
+    log.error('Admin step-up verify failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to verify step-up challenge')
   }
 })
@@ -561,7 +752,7 @@ app.get('/stepup/status', adminSessionMiddleware, async (c) => {
       hasValidStepUp: status.used > 0,
     })
   } catch (e) {
-    console.error('Admin step-up status failed', e)
+    log.error('Admin step-up status failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to get step-up status')
   }
 })

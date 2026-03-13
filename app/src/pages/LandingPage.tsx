@@ -7,6 +7,9 @@ import { Loader2, ArrowRight, Mail } from "lucide-react";
 import { authClient, getClientUrl, getServerUrl, isTauri } from '../lib/auth-client';
 import { apiFetch, apiFetchJson } from '../lib/apiFetch';
 import { getLoginBehaviorRedirectPath } from '../hooks/useLoginBehavior';
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('LandingPage')
 
 // Brand icons as SVG components
 const GoogleIcon = () => (
@@ -53,7 +56,7 @@ export function LandingPage({ version }: LandingPageProps) {
   useEffect(() => {
     apiFetchJson<any>('/api/auth/providers')
       .then(data => setProviders(data))
-      .catch(err => console.error("Failed to fetch auth providers", err));
+      .catch(err => log.error("Failed to fetch auth providers", err));
   }, []);
 
   const hasSocialProviders = providers.google || providers.github || providers.discord;
@@ -66,13 +69,13 @@ export function LandingPage({ version }: LandingPageProps) {
          ? "zentrio://auth/callback" 
          : `${getClientUrl()}${redirectPath}`; // Not strictly needed for Tauri shell open but good for consistency
 
-      console.log('[LandingPage] Initiating social login', { provider, isTauri: isTauri() });
+      log.debug('Initiating social login', { provider, isTauri: isTauri() });
 
       if (isTauri()) {
         // Use plugin-opener like OnboardingWizard for consistency
         const { openUrl } = await import('@tauri-apps/plugin-opener');
         const serverUrl = getServerUrl();
-        console.log('[LandingPage] Target Server URL:', serverUrl);
+        log.debug('Target Server URL:', serverUrl);
         
         // Check if we are pointing to production but want local
         if (serverUrl.includes('zentrio.eu') && import.meta.env.DEV) {
@@ -84,7 +87,7 @@ export function LandingPage({ version }: LandingPageProps) {
         const handoffUrl = `${serverUrl}/api/auth/native-redirect?source=tauri`;
         const url = `${serverUrl}/api/auth/login-proxy?provider=${provider}&callbackURL=${encodeURIComponent(handoffUrl)}`;
         
-        console.log('[LandingPage] Opening external URL via opener plugin:', url);
+        log.debug('Opening external URL via opener plugin:', url);
         await openUrl(url);
       } else {
         await authClient.signIn.social({
@@ -93,7 +96,7 @@ export function LandingPage({ version }: LandingPageProps) {
         });
       }
     } catch (e) {
-      console.error("Social login failed", e);
+      log.error("Social login failed", e);
       toast.error(`Login failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
@@ -117,7 +120,7 @@ export function LandingPage({ version }: LandingPageProps) {
         navigate(`/register?email=${encodeURIComponent(email)}`);
       }
     } catch (err) {
-      console.error("Check failed", err);
+      log.error("Check failed", err);
       navigate(`/signin?email=${encodeURIComponent(email)}`);
     } finally {
       setIsChecking(false);

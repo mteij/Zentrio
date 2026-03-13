@@ -16,6 +16,9 @@ import type {
   AudioTrack,
   QualityLevel
 } from './types'
+import { createLogger } from '../../../utils/client-logger'
+
+const log = createLogger('WebEngine')
 
 /**
  * Extended HTMLVideoElement with audioTracks support (Safari/Chrome experimental)
@@ -92,7 +95,7 @@ export class WebPlayerEngine implements IPlayerEngine {
 
   async initialize(videoElement: HTMLVideoElement): Promise<void> {
     if (this.video) {
-      console.warn('[WebPlayerEngine] Already initialized, destroying previous instance')
+      log.warn('Already initialized, destroying previous instance')
       await this.destroy()
     }
 
@@ -107,7 +110,7 @@ export class WebPlayerEngine implements IPlayerEngine {
       paused: videoElement.paused
     }
 
-    console.log('[WebPlayerEngine] Initialized')
+    log.debug('Initialized')
   }
 
   async loadSource(source: MediaSource): Promise<void> {
@@ -121,7 +124,7 @@ export class WebPlayerEngine implements IPlayerEngine {
     this.currentSource = source
     const { src, type } = source
 
-    console.log('[WebPlayerEngine] Loading source:', src.substring(0, 80), 'type:', type)
+    log.debug('Loading source:', src.substring(0, 80), 'type:', type)
 
     // Reset state
     this.state = {
@@ -152,7 +155,7 @@ export class WebPlayerEngine implements IPlayerEngine {
 
     // Check if HLS is natively supported (Safari)
     if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
-      console.log('[WebPlayerEngine] Using native HLS support')
+      log.debug('Using native HLS support')
       this.video.src = src
       this.video.load()
       return
@@ -163,7 +166,7 @@ export class WebPlayerEngine implements IPlayerEngine {
       throw new Error('[WebPlayerEngine] HLS is not supported in this browser')
     }
 
-    console.log('[WebPlayerEngine] Using HLS.js')
+    log.debug('Using HLS.js')
 
     this.hls = new Hls({
       enableWorker: true,
@@ -181,13 +184,13 @@ export class WebPlayerEngine implements IPlayerEngine {
 
     // Set up HLS.js event listeners
     this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      console.log('[WebPlayerEngine] HLS manifest parsed')
+      log.debug('HLS manifest parsed')
       this.emit('canplay')
     })
 
     this.hls.on(Hls.Events.ERROR, (_, data) => {
       if (data.fatal) {
-        console.error('[WebPlayerEngine] HLS fatal error:', data)
+        log.error('HLS fatal error:', data)
         this.emit('error', new Error(`HLS error: ${data.type} - ${data.details}`))
       }
     })
@@ -219,7 +222,7 @@ export class WebPlayerEngine implements IPlayerEngine {
   }
 
   async destroy(): Promise<void> {
-    console.log('[WebPlayerEngine] Destroying...')
+    log.debug('Destroying...')
 
     await this.cleanupSource()
 
@@ -231,7 +234,7 @@ export class WebPlayerEngine implements IPlayerEngine {
     this.video = null
     this.currentSource = null
 
-    console.log('[WebPlayerEngine] Destroyed')
+    log.debug('Destroyed')
   }
 
   // ============================================
@@ -248,7 +251,7 @@ export class WebPlayerEngine implements IPlayerEngine {
       this.state.paused = false
       this.emit('statechange', { paused: false })
     } catch (error) {
-      console.error('[WebPlayerEngine] Play error:', error)
+      log.error('Play error:', error)
       throw error
     }
   }
@@ -516,7 +519,7 @@ export class WebPlayerEngine implements IPlayerEngine {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
           (handler as Function)(...args)
         } catch (error) {
-          console.error(`[WebPlayerEngine] Error in ${event} handler:`, error)
+          log.error(`Error in ${event} handler:`, error)
         }
       })
     }

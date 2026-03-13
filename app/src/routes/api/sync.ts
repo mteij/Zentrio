@@ -2,6 +2,9 @@ import { syncService } from '../../services/sync'
 import { auth } from '../../services/auth'
 import { db } from '../../services/database'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { logger } from '../../services/logger'
+
+const log = logger.scope('API:Sync')
 
 const app = createTaggedOpenAPIApp('Sync')
 
@@ -49,7 +52,7 @@ app.post('/configure', async (c) => {
     
     return c.json({ success: true });
   } catch (e: any) {
-    console.error('Sync configuration error:', e);
+    log.error('Sync configuration error:', e);
     return c.json({ success: false, error: e.message }, 500);
   }
 });
@@ -137,7 +140,7 @@ app.post('/token', async (c) => {
       expiresAt: tokenData.expiresAt
     })
   } catch (e: any) {
-    console.error('Sync token generation error:', e)
+    log.error('Sync token generation error:', e)
     return c.json({ error: e.message }, 500)
   }
 })
@@ -155,7 +158,7 @@ function validateSyncToken(token: string): { userId: string } | null {
     
     return { userId: decoded.userId }
   } catch (error) {
-    console.error('Token validation error:', error)
+    log.error('Token validation error:', error)
     return null
   }
 }
@@ -198,7 +201,7 @@ app.post('/push', async (c) => {
     
     return c.json({ success: true, mappings: result })
   } catch (e: any) {
-    console.error('Sync push error:', e)
+    log.error('Sync push error:', e)
     return c.json({ error: e.message }, 500)
   }
 })
@@ -241,7 +244,7 @@ app.get('/pull', async (c) => {
     
     return c.json(changes)
   } catch (e: any) {
-    console.error('Sync pull error:', e)
+    log.error('Sync pull error:', e)
     return c.json({ error: e.message }, 500)
   }
 })
@@ -298,7 +301,7 @@ async function processSyncPayload(payload: any, _userId: string) {
             })
           }
         } catch (error) {
-          console.error(`Error processing ${entityType} record:`, error)
+          log.error(`Error processing ${entityType} record:`, error)
         }
       }
     })()
@@ -327,7 +330,7 @@ async function getChangesSince(since: string | undefined, userId: string) {
       
       changes[entity] = records
     } catch (error) {
-      console.error(`Error fetching ${entity} changes:`, error)
+      log.error(`Error fetching ${entity} changes:`, error)
       changes[entity] = []
     }
   }

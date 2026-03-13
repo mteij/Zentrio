@@ -8,6 +8,9 @@
 import { useEffect, useRef } from 'react';
 import { isTauri } from './auth-client';
 import { useAuthStore } from '../stores/authStore';
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('AppLifecycle')
 
 /**
  * Hook to handle app lifecycle events
@@ -34,9 +37,9 @@ export function useAppLifecycle() {
           mode: 'no-cors'
         });
         clearTimeout(timeout);
-        console.log('[AppLifecycle] Connectivity check passed');
+        log.debug('Connectivity check passed');
       } catch (e) {
-        console.warn('[AppLifecycle] Connectivity check failed:', e);
+        log.warn('Connectivity check failed:', e);
         // Only show on Android (mobile Tauri)
         const { type } = await import('@tauri-apps/plugin-os');
         const osType = await type();
@@ -69,17 +72,17 @@ export function useAppLifecycle() {
         // Only revalidate after the window has been hidden long enough that the session
         // genuinely might have changed (e.g. SSO login in external browser).
         if (timeSinceLastChange > MIN_BACKGROUND_MS) {
-          console.log('[AppLifecycle] App resumed after', Math.round(timeSinceLastChange / 1000), 'seconds, checking session...');
+          log.debug('App resumed after', Math.round(timeSinceLastChange / 1000), 'seconds, checking session...');
           try {
             const valid = await refreshSession();
             if (valid) {
-              console.log('[AppLifecycle] Session valid/restored');
+              log.debug('Session valid/restored');
             }
           } catch (e) {
-            console.error('[AppLifecycle] Failed to revalidate session:', e);
+            log.error('Failed to revalidate session:', e);
           }
         } else {
-          console.log('[AppLifecycle] Short focus gap (' + Math.round(timeSinceLastChange / 1000) + 's), skipping session refresh');
+          log.debug('Short focus gap (' + Math.round(timeSinceLastChange / 1000) + 's), skipping session refresh');
         }
       }
       lastVisibilityChange.current = Date.now();
@@ -97,14 +100,14 @@ export function useAppLifecycle() {
         const unlisten = await listen('tauri://focus', async () => {
           const timeSinceLastChange = Date.now() - lastVisibilityChange.current;
           if (timeSinceLastChange > MIN_BACKGROUND_MS) {
-            console.log('[AppLifecycle] Window focused after long gap, checking session...');
+            log.debug('Window focused after long gap, checking session...');
             await refreshSession();
           }
           lastVisibilityChange.current = Date.now();
         });
         unlistenFn = unlisten;
       } catch (e) {
-        console.error('[AppLifecycle] Failed to setup Tauri listener:', e);
+        log.error('Failed to setup Tauri listener:', e);
       }
     };
 

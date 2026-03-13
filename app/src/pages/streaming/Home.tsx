@@ -7,6 +7,9 @@ import { WatchHistoryItem } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 import { useAuthStore } from '../../stores/authStore'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('HomePage')
 
 interface CatalogMetadata {
   addon: { id: string; name: string; logo?: string }
@@ -27,7 +30,7 @@ interface DashboardData {
 }
 
 const fetchDashboard = async (profileId: string) => {
-  console.log('[Home] fetchDashboard called for:', profileId);
+  log.debug('fetchDashboard called for:', profileId);
   const res = await apiFetch(`/api/streaming/dashboard?profileId=${profileId}`)
   if (!res.ok) {
     if (res.status === 401) {
@@ -97,7 +100,7 @@ export const StreamingHome = () => {
   // Handle unauthorized redirect
   useEffect(() => {
     if (error?.message === 'Unauthorized') {
-      console.log('[Home] 401 Unauthorized received, logging out locally...');
+      log.debug('401 Unauthorized received, logging out locally...');
       useAuthStore.getState().logout();
       navigate('/')
     }

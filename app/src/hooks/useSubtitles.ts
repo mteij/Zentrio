@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('useSubtitles')
 
 interface Subtitle {
   id: string
@@ -150,7 +153,7 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
       
       return track.id
     } catch (error) {
-      console.error('Failed to load subtitles:', error)
+      log.error('Failed to load subtitles:', error)
       return null
     }
   }, [])

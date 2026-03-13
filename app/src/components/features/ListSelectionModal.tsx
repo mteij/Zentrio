@@ -6,6 +6,9 @@ import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { apiFetch } from '../../lib/apiFetch'
 import { MetaPreview } from '../../services/addons/types'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('ListSelection')
 
 interface ListSelectionModalProps {
   isOpen: boolean
@@ -43,7 +46,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item, onChange 
         setLists(data.lists)
       }
     } catch (e) {
-      console.error("Failed to load lists", e)
+      log.error("Failed to load lists", e)
     } finally {
       setLoading(false)
     }
@@ -57,7 +60,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item, onChange 
         setSelectedLists(data.listIds)
       }
     } catch (e) {
-      console.error("Failed to check lists", e)
+      log.error("Failed to check lists", e)
     }
   }
 
@@ -91,7 +94,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item, onChange 
       onChange?.()
     } catch (e) {
       // Revert on error
-      console.error("Failed to toggle list item", e)
+      log.error("Failed to toggle list item", e)
       if (isSelected) {
           setSelectedLists(prev => [...prev, listId])
       } else {
@@ -125,7 +128,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item, onChange 
         onChange?.()
       }
     } catch (e) {
-      console.error("Failed to create list", e)
+      log.error("Failed to create list", e)
     } finally {
       setSubmitting(false)
     }

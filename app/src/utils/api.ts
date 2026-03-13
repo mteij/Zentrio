@@ -46,6 +46,21 @@ export const err = (
   )
 }
 
+export function getRequestMeta(c: Context) {
+  const headers = c.req.raw.headers
+  // Try proxy headers first, then fallback to node-specific socket info if available
+  const ip = headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+             headers.get('x-real-ip') || 
+             //@ts-ignore
+             c.env?.incoming?.socket?.remoteAddress || 
+             '127.0.0.1' // Fallback for local dev through tools that strip IPs
+  
+  return {
+    ipAddress: ip,
+    userAgent: headers.get('user-agent') || 'unknown',
+  }
+}
+
 // Validation helper
 export const validate = async <T>(schema: z.Schema<T>, data: any): Promise<{ success: true; data: T } | { success: false; error: any }> => {
   const result = await schema.safeParseAsync(data)

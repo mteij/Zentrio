@@ -1,4 +1,7 @@
 import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle, AddonResponse } from './types'
+import { logger } from '../logger'
+
+const log = logger.scope('AddonClient')
 
 // Special error class for retryable addon errors
 export class RetryableError extends Error {
@@ -68,7 +71,7 @@ export class AddonClient {
       this.manifest = await res.json()
       return this.manifest!
     } catch (e) {
-      console.error(`[AddonClient] Failed to init ${this.baseUrl}`, e)
+      log.error(`Failed to init ${this.baseUrl}`, e)
       throw e
     }
   }
@@ -120,14 +123,14 @@ export class AddonClient {
     const url = `${this.baseUrl}/subtitles/${type}/${id}${hashPart}.json`
     
     const addonName = this.manifest?.name || 'Unknown'
-    console.log(`[AddonClient] ${addonName} fetching subtitles from: ${url}`)
+    log.debug(`${addonName} fetching subtitles from: ${url}`)
     
     try {
       const result = await this.fetchResource<Subtitle[]>(url, 'subtitles', RESOURCE_TIMEOUTS.subtitles)
-      console.log(`[AddonClient] ${addonName} returned ${Array.isArray(result) ? result.length : 0} subtitles`)
+      log.debug(`${addonName} returned ${Array.isArray(result) ? result.length : 0} subtitles`)
       return result
     } catch (e) {
-      console.error(`[AddonClient] ${addonName} failed to fetch subtitles:`, e)
+      log.error(`${addonName} failed to fetch subtitles:`, e)
       throw e
     }
   }
@@ -162,7 +165,7 @@ export class AddonClient {
       if (e instanceof Error && e.name === 'AbortError') {
         throw new Error(`Request timeout after ${timeoutMs}ms`)
       }
-      // console.error(`[AddonClient] Error fetching ${url}`, e)
+      // log.error(`Error fetching ${url}`, e)
       throw e
     } finally {
       clearTimeout(timeout)

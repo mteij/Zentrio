@@ -9,6 +9,9 @@ import { useEffect } from 'react'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { shouldPreload } from '../../utils/route-preloader'
 import { useAuthStore } from '../../stores/authStore'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('StreamingLayout')
 
 const fetchProfile = async (profileId: string) => {
   // Use lightweight profile endpoint instead of heavy dashboard
@@ -54,7 +57,7 @@ export const StreamingLayout = () => {
 
   useEffect(() => {
     if (error?.message === 'Unauthorized') {
-      console.log('[StreamingLayout] 401 Unauthorized received, logging out locally...');
+      log.debug('401 Unauthorized received, logging out locally...');
       useAuthStore.getState().logout();
       navigate('/')
     }
