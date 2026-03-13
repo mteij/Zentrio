@@ -5,6 +5,7 @@ import { Play, Check, ArrowLeft, Zap, HardDrive, Wifi } from 'lucide-react'
 import { SkeletonStreamList } from '../../components'
 import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
 import { CompactStreamItem } from '../../components/features/CompactStreamItem'
+import { cacheTopStream } from '../../lib/topStreamCache'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail, Stream } from '../../services/addons/types'
 import type { AddonLoadingState } from '../../hooks/useStreamLoader'
@@ -101,19 +102,12 @@ export function StreamSelector({
     if (filteredStreams && filteredStreams.length > 0) {
       const top = filteredStreams[0]
       if (top.stream.url) {
-        const payload = JSON.stringify({
-          url: top.stream.url,
-          addonId: top.addon?.id || '',
-        })
-        // Generic key (used by movie download + fallback for series)
-        sessionStorage.setItem(`top_stream_${meta.id}`, payload)
-        // Per-episode key (used by EpisodeList download option on the correct episode)
-        if (selectedEpisode) {
-          sessionStorage.setItem(
-            `top_stream_${meta.id}_${selectedEpisode.season}_${selectedEpisode.number}`,
-            payload
-          )
-        }
+        cacheTopStream(
+          meta.id,
+          { url: top.stream.url, addonId: top.addon?.id || '' },
+          selectedEpisode?.season,
+          selectedEpisode?.number
+        )
       }
     }
   }, [filteredStreams, meta.id, selectedEpisode])

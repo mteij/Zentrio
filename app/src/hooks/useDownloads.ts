@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { downloadService, DownloadRecord, DownloadQuality } from '../services/downloads/download-service'
 import { useDownloadStore } from '../stores/downloadStore'
+import { getTopStream } from '../lib/topStreamCache'
 
 interface ProgressEvent {
   id: string
@@ -56,14 +57,22 @@ export function useDownloads(profileId: string | undefined) {
     const unlisteners: Array<() => void> = []
 
     listen<ProgressEvent>('download:progress', (e) => {
-      updateProgress(e.payload.id, e.payload.progress, e.payload.downloadedBytes)
+      updateProgress(e.payload.id, e.payload.progress, e.payload.downloadedBytes, e.payload.speed)
     }).then((fn) => {
       if (cancelled) fn()
       else unlisteners.push(fn)
     })
 
     listen<StatusEvent>('download:status', (e) => {
-      updateStatus(e.payload.id, e.payload.status as any, e.payload.filePath)
+      updateStatus(e.payload.id, e.payload.status as any, e.payload.filePath, e.payload.error)
+
+      // Refresh terminal-state records from DB so fileSize/errorMessage stay accurate
+      if (['completed', 'failed', 'cancelled'].includes(e.payload.status) && profileRef.current) {
+        downloadService
+          .list(profileRef.current)
+          .then(setDownloads)
+          .catch(console.error)
+      }
     }).then((fn) => {
       if (cancelled) fn()
       else unlisteners.push(fn)
@@ -75,21 +84,22 @@ export function useDownloads(profileId: string | undefined) {
       // Only handle events for the currently active profile
       if (pid !== profileRef.current) return
 
-      // Look up the stream URL from sessionStorage (set by the stream selector UI)
-      const streamKey = `top_stream_${mediaId}_${season}_${episode}`
-      const fallbackKey = `top_stream_${mediaId}`
-      const streamJson = sessionStorage.getItem(streamKey) || sessionStorage.getItem(fallbackKey)
+      const stream = await getTopStream({
+        profileId: pid,
+        mediaType: 'series',
+        mediaId,
+        season,
+        episode,
+      })
 
-      if (!streamJson) {
-        // Stream not cached — user hasn't browsed to this episode yet; notify instead
+      if (!stream) {
         import('sonner').then(({ toast }) =>
-          toast.info(`Smart Download: Open ${title} to download the next episode`, { duration: 6000 })
+          toast.info('Smart Download: could not resolve the next episode source yet', { duration: 6000 })
         )
         return
       }
 
       try {
-        const stream = JSON.parse(streamJson)
         const id = await downloadService.start({
           profileId: pid,
           mediaType: 'series',

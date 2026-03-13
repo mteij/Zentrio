@@ -1,6 +1,6 @@
 [package]
 name = "zentrio"
-version = "0.5.2"
+version = "0.5.3"
 description = "Zentrio - Stream Your Way"
 authors = ["you"]
 edition = "2021"
@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"

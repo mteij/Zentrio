@@ -397,10 +397,11 @@ app.get('*', async (c) => {
 
 // ─── Ready ────────────────────────────────────────────────────────────
 const listenPort = process.env.PORT || 3000
+const serverUrl = cfg.APP_URL || `http://localhost:${listenPort}`
 logger.raw('')
-logger.raw(`  ${c.bold}${c.green}▸ Server ready${c.reset}  ${dim('on')} ${c.bold}${c.cyan}http://localhost:${listenPort}${c.reset}`)
-logger.raw(`  ${dim('  API docs   →')} ${c.cyan}http://localhost:${listenPort}/api/docs${c.reset}`)
-logger.raw(`  ${dim('  Health     →')} ${c.cyan}http://localhost:${listenPort}/api/health${c.reset}`)
+logger.raw(`  ${c.bold}${c.green}▸ Server ready${c.reset}  ${dim('on')} ${c.bold}${c.cyan}${serverUrl}${c.reset}`)
+logger.raw(`  ${dim('  API docs   →')} ${c.cyan}${serverUrl}/api/docs${c.reset}`)
+logger.raw(`  ${dim('  Health     →')} ${c.cyan}${serverUrl}/api/health${c.reset}`)
 logger.raw('')
 
 export default {

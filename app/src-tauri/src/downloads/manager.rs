@@ -529,7 +529,8 @@ async fn run_download(
 ) -> Result<(), String> {
     let client = Client::builder()
         .user_agent("Zentrio/1.0")
-        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .read_timeout(std::time::Duration::from_secs(120))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -553,7 +554,7 @@ async fn run_download(
         req = req.header("Range", format!("bytes={}-", start_byte));
     }
 
-    let response = req.send().await.map_err(|e| {
+    let mut response = req.send().await.map_err(|e| {
         let msg = e.to_string();
         if let Ok(d) = db.lock() {
             d.update_error(id, &msg).ok();
@@ -571,22 +572,74 @@ async fn run_download(
         msg
     })?;
 
+    // If resume was requested but server ignored Range and returned 200,
+    // restart from byte 0 to avoid appending duplicate bytes.
+    let mut effective_start_byte = start_byte;
+    if start_byte > 0 && response.status() == reqwest::StatusCode::OK {
+        log::warn!(
+            "[Downloads] Server ignored Range resume for {}. Restarting from byte 0.",
+            id
+        );
+        effective_start_byte = 0;
+        let _ = tokio::fs::remove_file(&part_path).await;
+        response = client.get(stream_url).send().await.map_err(|e| {
+            let msg = e.to_string();
+            if let Ok(d) = db.lock() {
+                d.update_error(id, &msg).ok();
+            }
+            emit_status(
+                &app,
+                StatusPayload {
+                    id: id.to_string(),
+                    status: "failed".into(),
+                    file_path: None,
+                    error: Some(msg.clone()),
+                },
+            );
+            notifier::notify_failed(&app, title);
+            msg
+        })?;
+    }
+
+    if !response.status().is_success() {
+        let msg = format!("Download request failed with HTTP {}", response.status());
+        if let Ok(d) = db.lock() {
+            d.update_error(id, &msg).ok();
+        }
+        emit_status(
+            &app,
+            StatusPayload {
+                id: id.to_string(),
+                status: "failed".into(),
+                file_path: None,
+                error: Some(msg.clone()),
+            },
+        );
+        notifier::notify_failed(&app, title);
+        return Err(msg);
+    }
+
     let total_size = response
         .headers()
         .get("content-length")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<i64>().ok())
-        .map(|s| s + start_byte)
+        .map(|s| s + effective_start_byte)
         .unwrap_or(0);
 
-    let mut file = tokio::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
+    let mut file_options = tokio::fs::OpenOptions::new();
+    file_options.create(true).write(true);
+    if effective_start_byte > 0 {
+        file_options.append(true);
+    } else {
+        file_options.truncate(true);
+    }
+    let mut file = file_options
         .open(&part_path)
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut downloaded = start_byte;
+    let mut downloaded = effective_start_byte;
     let mut last_progress = -10.0_f64;
     let mut last_notif_progress: u8 = 0;
     let mut last_notif_time = Instant::now();

@@ -1,4 +1,5 @@
 import { Pause, Play, X, AlertCircle, RefreshCw } from 'lucide-react'
+import { CircularProgress } from '../ui/CircularProgress'
 import { DownloadRecord, downloadService } from '../../services/downloads/download-service'
 import styles from './Downloads.module.css'
 import { createLogger } from '../../utils/client-logger'
@@ -6,9 +7,21 @@ import { createLogger } from '../../utils/client-logger'
 const log = createLogger('DownloadProgress')
 
 function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB'
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function formatEta(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0s'
+  const total = Math.max(0, Math.round(seconds))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
 }
 
 interface Props {
@@ -21,6 +34,14 @@ export function DownloadProgress({ record, onDelete }: Props) {
   const isPaused = record.status === 'paused'
   const isFailed = record.status === 'failed'
   const progress = Math.max(0, Math.min(100, record.progress))
+  const speed = Number.isFinite(record.speed) ? (record.speed as number) : 0
+  const inferredTotalSize = record.fileSize > 0
+    ? record.fileSize
+    : (progress > 0 ? Math.round(record.downloadedBytes / (progress / 100)) : 0)
+  const remainingBytes = Math.max(0, inferredTotalSize - record.downloadedBytes)
+  const etaSeconds = isActive && speed > 0 && remainingBytes > 0
+    ? Math.ceil(remainingBytes / speed)
+    : null
 
   const handlePauseResume = async () => {
     try {
@@ -73,20 +94,30 @@ export function DownloadProgress({ record, onDelete }: Props) {
             <span>{record.errorMessage || 'Download failed'}</span>
           </div>
         ) : (
-          <>
-            <div className={styles.progressBarTrack}>
-              <div
-                className={`${styles.progressBarFill} ${isPaused ? styles.progressBarPaused : ''}`}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
             <div className={styles.progressStats}>
-              <span>{Math.round(progress)}%</span>
-              {record.fileSize > 0 && (
-                <span>{formatBytes(record.downloadedBytes)} / {formatBytes(record.fileSize)}</span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <CircularProgress 
+                  progress={progress} 
+                  showText={true} 
+                  size={36} 
+                  strokeWidth={3} 
+                  color={isPaused ? 'rgba(255, 255, 255, 0.5)' : '#a855f7'}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span>
+                    {formatBytes(record.downloadedBytes)}
+                    {inferredTotalSize > 0 ? ` / ${formatBytes(inferredTotalSize)}` : ''}
+                  </span>
+                  {(isActive || isPaused) && speed > 0 && (
+                    <span>
+                      {formatBytes(speed)}/s
+                      {etaSeconds ? ` · ETA ${formatEta(etaSeconds)}` : ''}
+                    </span>
+                  )}
+                  {isPaused && <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>Paused</span>}
+                </div>
+              </div>
             </div>
-          </>
         )}
       </div>
 

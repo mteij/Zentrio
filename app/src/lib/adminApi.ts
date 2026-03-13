@@ -116,6 +116,7 @@ export interface AdminUser {
   phoneNumberVerified?: boolean
   createdAt: string
   updatedAt: string
+  lastActive?: string | null
 }
 
 export interface AdminUserRole {

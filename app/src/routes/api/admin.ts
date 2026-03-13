@@ -66,7 +66,7 @@ app.get('/me', adminSessionMiddleware, async (c) => {
 app.get('/stats', adminSessionMiddleware, requirePermission(Permissions.STATS_READ), async (c) => {
   try {
     const users = (db.prepare('SELECT COUNT(*) as count FROM user').get() as { count: number }).count
-    const admins = (db.prepare("SELECT COUNT(*) as count FROM user WHERE lower(role) = 'admin'").get() as { count: number }).count
+    const admins = (db.prepare("SELECT COUNT(*) as count FROM user WHERE lower(role) IN ('admin', 'superadmin')").get() as { count: number }).count
     const profiles = (db.prepare('SELECT COUNT(*) as count FROM profiles').get() as { count: number }).count
     const activeSessions = (db.prepare('SELECT COUNT(*) as count FROM proxy_sessions WHERE is_active = 1').get() as { count: number }).count
     const watchedItems = (db.prepare('SELECT COUNT(*) as count FROM watch_history WHERE is_watched = 1').get() as { count: number }).count
@@ -303,21 +303,24 @@ app.get('/users', adminSessionMiddleware, requirePermission(Permissions.USERS_RE
 
     const users = db.prepare(`
       SELECT
-        id,
-        email,
-        name,
-        role,
-        banned,
-        banReason,
-        banExpires,
-        emailVerified,
-        phoneNumber,
-        phoneNumberVerified,
-        createdAt,
-        updatedAt
-      FROM user
-      WHERE (? = '' OR lower(email) LIKE ? OR lower(name) LIKE ?)
-      ORDER BY createdAt DESC
+        u.id,
+        u.email,
+        u.name,
+        u.role,
+        u.banned,
+        u.banReason,
+        u.banExpires,
+        u.emailVerified,
+        u.phoneNumber,
+        u.phoneNumberVerified,
+        u.createdAt,
+        u.updatedAt,
+        MAX(s.updatedAt) as lastActive
+      FROM user u
+      LEFT JOIN session s ON s.userId = u.id
+      WHERE (? = '' OR lower(u.email) LIKE ? OR lower(u.name) LIKE ?)
+      GROUP BY u.id
+      ORDER BY u.createdAt DESC
       LIMIT ? OFFSET ?
     `).all(q, like, like, limit, offset)
 
@@ -357,9 +360,13 @@ app.get('/users/:id', adminSessionMiddleware, requirePermission(Permissions.USER
   try {
     const targetId = c.req.param('id')
     const user = db.prepare(`
-      SELECT id, email, name, role, banned, banReason, banExpires,
-             emailVerified, phoneNumber, phoneNumberVerified, createdAt, updatedAt
-      FROM user WHERE id = ?
+      SELECT u.id, u.email, u.name, u.role, u.banned, u.banReason, u.banExpires,
+             u.emailVerified, u.phoneNumber, u.phoneNumberVerified, u.createdAt, u.updatedAt,
+             MAX(s.updatedAt) as lastActive
+      FROM user u
+      LEFT JOIN session s ON s.userId = u.id
+      WHERE u.id = ?
+      GROUP BY u.id
     `).get(targetId) as any
 
     if (!user) return err(c, 404, 'NOT_FOUND', 'User not found')

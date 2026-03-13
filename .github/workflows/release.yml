@@ -21,7 +21,7 @@ permissions:
   contents: write
 
 env:
-  NODE_VERSION: 20
+  NODE_VERSION: 24
   BUN_VERSION: latest
 
 jobs:
@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -45,7 +45,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 

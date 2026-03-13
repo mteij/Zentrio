@@ -30,6 +30,18 @@ function StatCard({ label, value, icon: Icon, color = 'text-zinc-300', loading =
   )
 }
 
+function formatMetaId(metaId: string): string {
+  // meta_id can be a comma-separated list of addon stream IDs; take the first recognizable one
+  const first = metaId.split(',')[0]
+  // Known prefixes: tmdb:123, tt1234567, tbm:hash, mg_123, etc.
+  const tmdb = first.match(/^tmdb:(\d+)$/)
+  if (tmdb) return `TMDB #${tmdb[1]}`
+  const imdb = first.match(/^(tt\d+)$/)
+  if (imdb) return imdb[1]
+  // Fallback: truncate to 30 chars
+  return first.length > 30 ? `${first.slice(0, 30)}…` : first
+}
+
 function formatRelativeTime(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime()
   const secs = Math.floor(diff / 1000)
@@ -222,9 +234,9 @@ export function DashboardPage() {
               activity?.recentWatchEvents.map((e) => (
                 <div key={e.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs text-zinc-300 truncate">{e.title || e.meta_id}</p>
+                    <p className="text-xs text-zinc-300 truncate">{e.title || formatMetaId(e.meta_id)}</p>
                     <p className="text-xs text-zinc-600 capitalize">
-                      {e.meta_type}{e.season != null && e.season > 0 ? ` S${e.season}E${e.episode}` : ''}
+                      {e.meta_type}{e.season != null && e.season >= 0 && e.episode != null && e.episode >= 0 ? ` S${e.season}E${e.episode}` : ''}
                     </p>
                   </div>
                   <span className="text-xs text-zinc-500 shrink-0">

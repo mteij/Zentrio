@@ -79,6 +79,7 @@ fn download_list(
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StorageStats {
     pub total_bytes: i64,
     pub count: i64,

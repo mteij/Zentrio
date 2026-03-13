@@ -208,6 +208,7 @@ export const StreamingPlayer = () => {
   const [duration, setDuration] = useState(0)
   const lastSavedRef = useRef(0)
   const traktStartedRef = useRef(false)
+  const blobUrlRef = useRef<string | null>(null)
 
   /* ─── Find New Stream hook ─── */
   const { preload: preloadStreams, findNext, isFinding } = useFindNewStream(meta, profileId)
@@ -298,6 +299,20 @@ export const StreamingPlayer = () => {
     init()
     return () => { cancelled = true }
   }, [searchParamsKey, profileId, location.state, navigate])
+
+  // Revoke temporary blob URLs created for offline playback when source changes/unmounts.
+  useEffect(() => {
+    const sourceUrl = stream?.url
+    if (!sourceUrl || !sourceUrl.startsWith('blob:')) return
+    blobUrlRef.current = sourceUrl
+
+    return () => {
+      if (blobUrlRef.current === sourceUrl) {
+        URL.revokeObjectURL(sourceUrl)
+        blobUrlRef.current = null
+      }
+    }
+  }, [stream?.url])
 
   /* ─── Preload alternative streams in background once meta is ready ─── */
   useEffect(() => {

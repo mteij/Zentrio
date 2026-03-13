@@ -611,6 +611,7 @@ export const StreamingDetails = () => {
               onSelect={handleEpisodeSelect}
               showImdbRatings={showImdbRatings}
               showAgeRatings={showAgeRatings}
+              profileId={profileId || ''}
             />
           )}
 

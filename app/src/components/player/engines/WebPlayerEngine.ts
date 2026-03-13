@@ -20,6 +20,16 @@ import { createLogger } from '../../../utils/client-logger'
 
 const log = createLogger('WebEngine')
 
+function isBenignPlayInterruption(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const combined = `${error.name} ${error.message}`.toLowerCase()
+  return (
+    combined.includes('aborterror') ||
+    combined.includes('the play() request was interrupted') ||
+    combined.includes('interrupted by a new load request')
+  )
+}
+
 /**
  * Extended HTMLVideoElement with audioTracks support (Safari/Chrome experimental)
  */
@@ -251,6 +261,10 @@ export class WebPlayerEngine implements IPlayerEngine {
       this.state.paused = false
       this.emit('statechange', { paused: false })
     } catch (error) {
+      if (isBenignPlayInterruption(error)) {
+        log.debug('Play interrupted by source reload')
+        return
+      }
       log.error('Play error:', error)
       throw error
     }

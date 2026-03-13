@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use m3u8_rs::{MasterPlaylist, MediaPlaylist, Playlist};
-use reqwest::Client;
+use reqwest::{Client, Url};
 use tauri::AppHandle;
 use tokio::io::AsyncWriteExt;
 
@@ -25,7 +25,8 @@ pub async fn download_hls(
 ) -> Result<(), String> {
     let client = Client::builder()
         .user_agent("Zentrio/1.0")
-        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .read_timeout(std::time::Duration::from_secs(120))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -35,6 +36,8 @@ pub async fn download_hls(
         .send()
         .await
         .map_err(|e| format!("Failed to fetch playlist: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("Playlist request failed: {e}"))?
         .bytes()
         .await
         .map_err(|e| format!("Failed to read playlist body: {e}"))?;
@@ -62,9 +65,12 @@ pub async fn download_hls(
     let final_path = file_store::download_file_path(&app, profile_id, id);
     let part_path = file_store::part_file_path(&app, profile_id, id);
 
+    // HLS segment-level resume is not implemented, so always restart the temp file cleanly.
+    let _ = tokio::fs::remove_file(&part_path).await;
     let mut output = tokio::fs::OpenOptions::new()
         .create(true)
-        .append(true)
+        .write(true)
+        .truncate(true)
         .open(&part_path)
         .await
         .map_err(|e| e.to_string())?;
@@ -202,13 +208,8 @@ fn pick_variant(
     let variant = selected.ok_or("No suitable variant found")?;
     let uri = &variant.uri;
 
-    // Resolve relative URI
-    if uri.starts_with("http") {
-        Ok(uri.clone())
-    } else {
-        let base = base_url.rfind('/').map(|i| &base_url[..=i]).unwrap_or(base_url);
-        Ok(format!("{}{}", base, uri))
-    }
+    resolve_url(base_url, uri)
+        .ok_or_else(|| format!("Failed to resolve variant URL: {}", uri))
 }
 
 async fn fetch_media_segments(client: &Client, media_url: &str) -> Result<Vec<String>, String> {
@@ -216,6 +217,8 @@ async fn fetch_media_segments(client: &Client, media_url: &str) -> Result<Vec<St
         .get(media_url)
         .send()
         .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
         .map_err(|e| e.to_string())?
         .bytes()
         .await
@@ -229,18 +232,20 @@ async fn fetch_media_segments(client: &Client, media_url: &str) -> Result<Vec<St
 }
 
 fn resolve_segments(media: &MediaPlaylist, base_url: &str) -> Vec<String> {
-    let base = base_url.rfind('/').map(|i| &base_url[..=i]).unwrap_or(base_url);
     media
         .segments
         .iter()
-        .map(|seg| {
-            if seg.uri.starts_with("http") {
-                seg.uri.clone()
-            } else {
-                format!("{}{}", base, seg.uri)
-            }
-        })
+        .filter_map(|seg| resolve_url(base_url, &seg.uri))
         .collect()
+}
+
+fn resolve_url(base_url: &str, uri: &str) -> Option<String> {
+    if let Ok(abs) = Url::parse(uri) {
+        return Some(abs.to_string());
+    }
+
+    let base = Url::parse(base_url).ok()?;
+    base.join(uri).ok().map(|u| u.to_string())
 }
 
 async fn download_segment(client: &Client, url: &str) -> Result<Vec<u8>, String> {
@@ -248,6 +253,9 @@ async fn download_segment(client: &Client, url: &str) -> Result<Vec<u8>, String>
     loop {
         match client.get(url).send().await {
             Ok(resp) => {
+                if !resp.status().is_success() {
+                    return Err(format!("Segment request failed with HTTP {}", resp.status()));
+                }
                 return resp.bytes().await
                     .map(|b| b.to_vec())
                     .map_err(|e| e.to_string());

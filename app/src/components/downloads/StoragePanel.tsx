@@ -16,7 +16,13 @@ interface Props {
 const GB = 1024 * 1024 * 1024
 const MB = 1024 * 1024
 
+function toFiniteNumber(value: unknown, fallback: number = 0): number {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : fallback
+}
+
 function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB'
   if (bytes < MB) return `${(bytes / 1024).toFixed(0)} KB`
   if (bytes < GB) return `${(bytes / MB).toFixed(1)} MB`
   return `${(bytes / GB).toFixed(2)} GB`
@@ -41,10 +47,34 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    downloadService.storageStats(profileId).then(setStats).catch((e: any) => log.error('Error:', e))
-    downloadService.getDirectory().then(setDir).catch((e: any) => log.error('Error:', e))
-    downloadService.getQuota(profileId).then(setQuota).catch((e: any) => log.error('Error:', e))
-    downloadService.getSmartDefaults(profileId).then(setSmart).catch((e: any) => log.error('Error:', e))
+    let cancelled = false
+    const load = async () => {
+      try {
+        const [rawStats, rawDir, rawQuota, rawSmart] = await Promise.all([
+          downloadService.storageStats(profileId),
+          downloadService.getDirectory(),
+          downloadService.getQuota(profileId),
+          downloadService.getSmartDefaults(profileId),
+        ])
+        if (cancelled) return
+        setStats({
+          totalBytes: toFiniteNumber((rawStats as any)?.totalBytes ?? (rawStats as any)?.total_bytes),
+          count: toFiniteNumber((rawStats as any)?.count),
+        })
+        setDir(typeof rawDir === 'string' ? rawDir : '')
+        setQuota(Math.max(0, toFiniteNumber(rawQuota)))
+        setSmart({
+          smartDownload: Boolean((rawSmart as any)?.smartDownload),
+          autoDelete: Boolean((rawSmart as any)?.autoDelete),
+        })
+      } catch (e) {
+        log.error('Error:', e)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [profileId])
 
   const handleChangeDir = async () => {
@@ -82,11 +112,11 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
     } finally { setSaving(false) }
   }
 
-  const usedPercent = quota > 0 && stats ? Math.min((stats.totalBytes / quota) * 100, 100) : 0
+  const usedPercent = quota > 0 && stats ? Math.min((toFiniteNumber(stats.totalBytes) / quota) * 100, 100) : 0
 
   return (
-    <div className={styles.pickerOverlay} onClick={onClose}>
-      <div className={styles.pickerSheet} onClick={(e) => e.stopPropagation()}>
+    <div className={`${styles.pickerOverlay} ${styles.storageOverlay}`} onClick={onClose}>
+      <div className={`${styles.pickerSheet} ${styles.storageSheet}`} onClick={(e) => e.stopPropagation()}>
         <div className={styles.pickerHeader}>
           <div className={styles.pickerHandle} />
           <div className={styles.pickerTitle}>

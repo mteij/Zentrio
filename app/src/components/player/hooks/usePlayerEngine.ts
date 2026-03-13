@@ -11,6 +11,16 @@ import { createLogger } from '../../../utils/client-logger'
 
 const log = createLogger('usePlayerEngine')
 
+function isBenignPlayInterruption(error: unknown): boolean {
+  const err = error as { name?: unknown; message?: unknown } | null
+  const combined = `${String(err?.name ?? '')} ${String(err?.message ?? error ?? '')}`.toLowerCase()
+  return (
+    combined.includes('aborterror') ||
+    combined.includes('the play() request was interrupted') ||
+    combined.includes('interrupted by a new load request')
+  )
+}
+
 interface UsePlayerEngineOptions {
   /** Auto-play when source is loaded */
   autoPlay?: boolean
@@ -242,7 +252,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
           if (autoPlay) {
             try {
               await engineRef.current!.play()
-            } catch (playError) {
+            } catch {
               log.debug('Autoplay blocked, user interaction required')
             }
           }
@@ -287,6 +297,10 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     try {
       await engineRef.current.play()
     } catch (err) {
+      if (isBenignPlayInterruption(err)) {
+        log.debug('Play interrupted by source reload')
+        return
+      }
       log.error('Play error:', err)
       onError?.(err instanceof Error ? err : new Error(String(err)))
     }
@@ -437,7 +451,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
       if (autoPlay) {
         try {
           await engineRef.current.play()
-        } catch (playError) {
+        } catch {
           log.debug('Autoplay blocked, user interaction required')
         }
       }

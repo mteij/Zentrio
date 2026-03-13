@@ -29,6 +29,20 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+function formatRelativeTime(iso: string | null | undefined): string {
+  if (!iso) return 'Never'
+  const diff = Date.now() - new Date(iso).getTime()
+  const secs = Math.floor(diff / 1000)
+  if (secs < 60) return `${secs}s ago`
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 30) return `${days}d ago`
+  return formatDate(iso)
+}
+
 // ── User Detail Drawer ────────────────────────────────────────────────────────
 
 interface DrawerProps {
@@ -106,6 +120,7 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
                 <StatusBadge banned={user.banned} />
               </div>
               <p className="text-xs text-zinc-600 mt-1">Joined {formatDate(user.createdAt)}</p>
+              <p className="text-xs text-zinc-600">Last active {formatRelativeTime(user.lastActive)}</p>
               {user.banReason && (
                 <p className="text-xs text-red-400 mt-1">Ban reason: {user.banReason}</p>
               )}
@@ -278,6 +293,7 @@ export function UsersPage() {
                 <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden sm:table-cell">Role</th>
                 <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden md:table-cell">Status</th>
                 <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden lg:table-cell">Joined</th>
+                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden xl:table-cell">Last Active</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -296,6 +312,9 @@ export function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-zinc-500 text-xs hidden lg:table-cell">
                     {formatDate(user.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-500 text-xs hidden xl:table-cell">
+                    {formatRelativeTime(user.lastActive)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

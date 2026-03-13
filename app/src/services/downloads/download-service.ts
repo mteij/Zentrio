@@ -20,6 +20,8 @@ export interface DownloadRecord {
   filePath: string
   fileSize: number
   downloadedBytes: number
+  /** Live transfer speed in bytes/s (frontend-only, not persisted) */
+  speed?: number
   addedAt: number
   completedAt?: number
   lastWatchedAt?: number

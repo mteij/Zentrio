@@ -35,6 +35,14 @@
     },
     "dialog:default",
     "fs:default",
+    "fs:allow-read-file",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$APPDATA/zentrio/downloads/**/*" },
+        { "path": "$APPLOCALDATA/zentrio/downloads/**/*" }
+      ]
+    },
     {
       "identifier": "http:default",
       "allow": [

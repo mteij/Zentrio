@@ -1,6 +1,6 @@
 // Details Header Component
 // Extracted from Details.tsx
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play, Youtube, Check, List, Info, Eye, EyeOff, Download, CheckCircle, Loader } from 'lucide-react'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
@@ -8,6 +8,7 @@ import { QualityPicker } from '../downloads/QualityPicker'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadForMedia } from '../../hooks/useDownloads'
 import { useDownloadStore } from '../../stores/downloadStore'
+import { getTopStream, readCachedTopStream, resolveTopStream } from '../../lib/topStreamCache'
 import dlStyles from '../downloads/Downloads.module.css'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
@@ -48,23 +49,41 @@ export function DetailsHeader({
 }: DetailsHeaderProps) {
   const navigate = useNavigate()
   const [showQualityPicker, setShowQualityPicker] = useState(false)
+  const [resolvingDownloadStream, setResolvingDownloadStream] = useState(false)
   const existingDownload = useDownloadForMedia(meta.id)
   const addDownload = useDownloadStore((s) => s.addDownload)
+
+  // Warm a fresh top stream for movie downloads in the background.
+  useEffect(() => {
+    if (meta.type !== 'movie' || !profileId) return
+    const cached = readCachedTopStream(meta.id)
+    if (cached && !cached.stale) return
+    void resolveTopStream({
+      profileId,
+      mediaType: meta.type,
+      mediaId: meta.id,
+      forceRefresh: Boolean(cached),
+    })
+  }, [meta.id, meta.type, profileId])
 
   const handleDownload = async (quality: DownloadQuality) => {
     setShowQualityPicker(false)
     if (!meta || !profileId) return
 
-    // Pull the top stream URL from the page's loaded streams (stored in sessionStorage by StreamSelector)
-    const streamJson = sessionStorage.getItem(`top_stream_${meta.id}`)
-    if (!streamJson) {
-      // Stream not resolved yet; user needs to open the stream selector first
-      import('sonner').then(({ toast }) => toast.info('Open a stream first, then download it.'))
-      return
-    }
-
     try {
-      const stream = JSON.parse(streamJson)
+      setResolvingDownloadStream(true)
+      const stream = await getTopStream({
+        profileId: profileId.toString(),
+        mediaType: meta.type,
+        mediaId: meta.id,
+      })
+      if (!stream) {
+        import('sonner').then(({ toast }) =>
+          toast.error('Could not resolve a stream yet. Please try again in a moment.')
+        )
+        return
+      }
+
       const id = await downloadService.start({
         profileId: profileId.toString(),
         mediaType: meta.type as 'movie' | 'series',
@@ -100,6 +119,8 @@ export function DetailsHeader({
     } catch (e) {
       log.error('download start failed', e)
       import('sonner').then(({ toast }) => toast.error('Failed to start download'))
+    } finally {
+      setResolvingDownloadStream(false)
     }
   }
 
@@ -171,6 +192,14 @@ export function DetailsHeader({
                       <button className={`${dlStyles.downloadBtn} ${dlStyles.downloadBtnActive}`} disabled>
                         <Loader size={16} className="animate-spin" />
                         Downloading…
+                      </button>
+                    )
+                  }
+                  if (resolvingDownloadStream) {
+                    return (
+                      <button className={`${dlStyles.downloadBtn} ${dlStyles.downloadBtnActive}`} disabled>
+                        <Loader size={16} className="animate-spin" />
+                        Resolving source...
                       </button>
                     )
                   }

@@ -1,12 +1,17 @@
 // Episode List Component
 // Extracted from Details.tsx
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Play, Eye, EyeOff, ChevronUp, Check, Download } from 'lucide-react'
 import { LazyImage } from '../../components'
 import { ContextMenu } from '../../components/ui/ContextMenu'
 import { QualityPicker } from '../downloads/QualityPicker'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadStore } from '../../stores/downloadStore'
+import {
+  getTopStream,
+  readCachedTopStream,
+  resolveTopStream,
+} from '../../lib/topStreamCache'
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
 import { createLogger } from '../../utils/client-logger'
@@ -45,34 +50,81 @@ export function EpisodeList({
   const [pickerEpisode, setPickerEpisode] = useState<{ season: number; episode: number; title: string; episodeId: string } | null>(null)
   const addDownload = useDownloadStore((s) => s.addDownload)
 
+  // Warm stream resolution while quality picker is open.
+  useEffect(() => {
+    if (!pickerEpisode || !profileId) return
+    const cached = readCachedTopStream(meta.id, pickerEpisode.season, pickerEpisode.episode)
+    if (cached && !cached.stale) return
+    void resolveTopStream({
+      profileId,
+      mediaType: meta.type,
+      mediaId: meta.id,
+      season: pickerEpisode.season,
+      episode: pickerEpisode.episode,
+      forceRefresh: Boolean(cached),
+    })
+  }, [meta.id, meta.type, pickerEpisode, profileId])
+
+  // Background prefetch: keep one stream warmed for the current season.
+  useEffect(() => {
+    if (!meta.videos || !profileId) return
+    const seasonEpisodes = meta.videos
+      .filter((v: any) => v.season === selectedSeason)
+      .sort((a: any, b: any) => (a.episode ?? a.number) - (b.episode ?? b.number))
+    const firstEpisode = seasonEpisodes[0]
+    if (!firstEpisode) return
+
+    const episodeNumber = (firstEpisode as any).episode ?? (firstEpisode as any).number
+    if (typeof episodeNumber !== 'number') return
+
+    const cached = readCachedTopStream(meta.id, selectedSeason, episodeNumber)
+    if (cached && !cached.stale) return
+    void resolveTopStream({
+      profileId,
+      mediaType: meta.type,
+      mediaId: meta.id,
+      season: selectedSeason,
+      episode: episodeNumber,
+      forceRefresh: Boolean(cached),
+    })
+  }, [meta.id, meta.type, meta.videos, profileId, selectedSeason])
+
   const handleDownloadEpisode = async (quality: DownloadQuality) => {
     if (!pickerEpisode) return
+    const selected = pickerEpisode
     setPickerEpisode(null)
 
-    const key = `top_stream_${meta.id}_${pickerEpisode.season}_${pickerEpisode.episode}`
-    const fallbackKey = `top_stream_${meta.id}`
-    const streamJson = sessionStorage.getItem(key) || sessionStorage.getItem(fallbackKey)
-
-    if (!streamJson) {
-      import('sonner').then(({ toast }) =>
-        toast.info('Select a stream for this episode first, then download.')
-      )
+    if (!profileId) {
+      import('sonner').then(({ toast }) => toast.error('Missing profile context for download'))
       return
     }
 
     try {
-      const stream = JSON.parse(streamJson)
+      const stream = await getTopStream({
+        profileId,
+        mediaType: meta.type,
+        mediaId: meta.id,
+        season: selected.season,
+        episode: selected.episode,
+      })
+      if (!stream) {
+        import('sonner').then(({ toast }) =>
+          toast.error('Could not resolve a stream for this episode. Please try again.')
+        )
+        return
+      }
+
       const id = await downloadService.start({
         profileId,
         mediaType: 'series',
         mediaId: meta.id,
-        episodeId: pickerEpisode.episodeId,
+        episodeId: selected.episodeId,
         title: meta.name,
-        episodeTitle: pickerEpisode.title,
-        season: pickerEpisode.season,
-        episode: pickerEpisode.episode,
+        episodeTitle: selected.title,
+        season: selected.season,
+        episode: selected.episode,
         posterPath: meta.poster || '',
-        streamUrl: stream.url || '',
+        streamUrl: stream.url,
         addonId: stream.addonId || '',
         quality,
       })
@@ -82,11 +134,11 @@ export function EpisodeList({
         profileId,
         mediaType: 'series',
         mediaId: meta.id,
-        episodeId: pickerEpisode.episodeId,
+        episodeId: selected.episodeId,
         title: meta.name,
-        episodeTitle: pickerEpisode.title,
-        season: pickerEpisode.season,
-        episode: pickerEpisode.episode,
+        episodeTitle: selected.title,
+        season: selected.season,
+        episode: selected.episode,
         posterPath: meta.poster || '',
         status: 'queued',
         progress: 0,
@@ -102,7 +154,7 @@ export function EpisodeList({
         autoDelete: false,
       })
       import('sonner').then(({ toast }) =>
-        toast.success(`Downloading: ${pickerEpisode.title}`)
+        toast.success(`Downloading: ${selected.title}`)
       )
     } catch (e) {
       log.error('episode download error', e)
@@ -253,16 +305,33 @@ export function EpisodeList({
                     <span className={styles.episodeTitle} style={{ opacity: isWatched ? 0.7 : 1 }}>
                       {ep.title || ep.name || `Episode ${epNum}`}
                     </span>
-                    <button 
-                        className={styles.episodePlayBtn}
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
-                        }}
-                        title="Quick play"
-                    >
-                      <Play size={18} fill="currentColor" />
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                          className={styles.episodePlayBtn}
+                          onClick={(e) => {
+                              e.stopPropagation()
+                              setPickerEpisode({
+                                season: ep.season,
+                                episode: epNum,
+                                title: ep.title || ep.name || `Episode ${epNum}`,
+                                episodeId: ep.id || `${ep.season}:${epNum}`,
+                              })
+                          }}
+                          title="Download"
+                      >
+                        <Download size={18} fill="currentColor" strokeWidth={1} />
+                      </button>
+                      <button 
+                          className={styles.episodePlayBtn}
+                          onClick={(e) => {
+                              e.stopPropagation()
+                              onPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
+                          }}
+                          title="Quick play"
+                      >
+                        <Play size={18} fill="currentColor" />
+                      </button>
+                    </div>
                   </div>
                   <div className={styles.episodeMeta}>
                     {showImdbRatings && ep.rating && (
