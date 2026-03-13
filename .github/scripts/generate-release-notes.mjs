@@ -1,7 +1,8 @@
- // @ts-nocheck
+// @ts-nocheck
 /**
- * Generate release notes using Gemini if GEMINI_API_KEY is available, otherwise
- * fall back to a conventional commit summary.
+ * Generate release notes using NanoGPT if NANOGPT_API_KEY is available.
+ * The prompt is grounded in real code changes (diffs + file churn) and
+ * architecture context so notes do not rely only on commit messages.
  *
  * Usage (from repo root in CI):
  *   node .github/scripts/generate-release-notes.mjs
@@ -10,8 +11,33 @@
  *   RELEASE_NOTES.md in the repo root
  */
 import { execSync } from 'node:child_process';
-import { writeFileSync, readFileSync } from 'node:fs';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+
+const ARCHITECTURE_PATH = './llm/ARCHITECTURE.md';
+const MAX_ARCH_CONTEXT_CHARS = 12000;
+const MAX_DIFFSTAT_CHARS = 6000;
+const MAX_PATCH_CONTEXT_CHARS = 28000;
+const MAX_COMMIT_LINES = 120;
+const MAX_FILES_EVIDENCE = 180;
+
+const SUBSYSTEM_RULES = [
+  ['.github/workflows/', 'CI / Workflows'],
+  ['.github/scripts/', 'Release Tooling'],
+  ['app/src/routes/api/', 'Backend API Routes'],
+  ['app/src/services/', 'Backend Services'],
+  ['app/src/middleware/', 'Backend Middleware'],
+  ['app/src/hooks/', 'Frontend Hooks'],
+  ['app/src/components/', 'Frontend Components'],
+  ['app/src/pages/', 'Frontend Pages'],
+  ['app/src/stores/', 'Frontend State'],
+  ['app/src/lib/', 'Frontend Core Lib'],
+  ['app/src/utils/', 'Frontend Utilities'],
+  ['app/src/styles/', 'Frontend Styles'],
+  ['app/src/', 'App Core'],
+  ['landing/', 'Landing Site'],
+  ['llm/', 'LLM Docs'],
+  ['docs/', 'Documentation'],
+];
 
 function sh(cmd, fallback = '') {
   try {
@@ -19,6 +45,16 @@ function sh(cmd, fallback = '') {
   } catch {
     return fallback;
   }
+}
+
+function truncate(text, maxChars, label) {
+  if (!text || text.length <= maxChars) return text || '';
+  const omitted = text.length - maxChars;
+  return `${text.slice(0, maxChars)}\n\n...[${label} truncated: ${omitted} chars omitted]`;
+}
+
+function shellEscape(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
 function getVersion() {
@@ -32,146 +68,317 @@ function getVersion() {
 }
 
 function getPrevTag(currentTag) {
-  // Try to find the last GitHub release first (to skip intermediate docker tags)
   try {
-    // We want the latest release that is NOT the current tag (in case it was already created)
-    // Since this runs before release creation usually, the latest release is the previous one.
-    const lastRelease = sh('gh release list --limit 1 --exclude-drafts --exclude-pre-releases --json tagName -q ".[0].tagName"', '');
+    const lastRelease = sh(
+      'gh release list --limit 1 --exclude-drafts --exclude-pre-releases --json tagName -q ".[0].tagName"',
+      '',
+    );
     if (lastRelease && lastRelease !== currentTag) {
       console.log(`[release-notes] Found previous release tag via GitHub CLI: ${lastRelease}`);
       return lastRelease;
     }
-  } catch (e) {
+  } catch {
     console.log('[release-notes] Could not determine previous release via GitHub CLI, falling back to git tags.');
   }
 
-  // Prefer semantic tags sorted descending, then pick the one after current in the list
-  const tags = sh('git tag --list --sort=-version:refname', '').split('\n').map(s => s.trim()).filter(Boolean);
-  const currentIndex = tags.findIndex(t => t === currentTag);
+  const tags = sh('git tag --list --sort=-version:refname', '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const currentIndex = tags.findIndex((t) => t === currentTag);
   if (currentIndex !== -1 && currentIndex < tags.length - 1) {
     return tags[currentIndex + 1];
   }
 
-  // Fallback: try to find any tag that's not the current one
-  const prev = tags.find(t => t !== currentTag);
+  const prev = tags.find((t) => t !== currentTag);
   if (prev) return prev;
 
-  // Final fallback to describe
-  const d = sh('git describe --abbrev=0 --tags HEAD~1 2>/dev/null', '');
-  if (d && d !== currentTag) return d;
+  const described = sh('git describe --abbrev=0 --tags HEAD~1', '');
+  if (described && described !== currentTag) return described;
   return '';
 }
 
-function getCommitRange(prevTag) {
-  if (prevTag) {
-    return sh(`git log --pretty=format:%H%x09%ad%x09%s%x09%b --date=short ${prevTag}..HEAD`, '');
-  }
-  // First release: collect last 100 commits
-  return sh('git log -n 100 --pretty=format:%H%x09%ad%x09%s%x09%b --date=short', '');
+function getRangeSpec(prevTag) {
+  if (prevTag) return `${prevTag}..HEAD`;
+  const root = sh('git rev-list --max-parents=0 HEAD', '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
+  if (root) return `${root}..HEAD`;
+  return 'HEAD~100..HEAD';
 }
 
-function basicMarkdownNotes(version, prevTag, commitLog) {
-  if (!commitLog) {
+function getCommitLog(prevTag, rangeSpec) {
+  if (prevTag) {
+    return sh(`git log --max-count=250 --pretty=format:%H%x09%ad%x09%s%x09%b --date=short ${rangeSpec}`, '');
+  }
+  return sh('git log --max-count=250 --pretty=format:%H%x09%ad%x09%s%x09%b --date=short', '');
+}
+
+function parseCommits(commitLog) {
+  if (!commitLog) return [];
+  return commitLog
+    .split('\n')
+    .map((line) => {
+      const [hash, date, subject, body] = line.split('\t');
+      return {
+        hash: hash?.slice(0, 7) || '',
+        date: date || '',
+        subject: (subject || '').trim(),
+        body: (body || '').trim(),
+      };
+    })
+    .filter((entry) => entry.subject || entry.body);
+}
+
+function getChangedFiles(rangeSpec) {
+  const byPath = new Map();
+
+  const statusRaw = sh(`git diff --name-status ${rangeSpec}`, '');
+  for (const line of statusRaw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const cols = trimmed.split('\t');
+    const statusRawValue = cols[0] || 'M';
+    const status = statusRawValue[0] || 'M';
+
+    let path = cols[1] || '';
+    let previousPath = '';
+    if ((status === 'R' || status === 'C') && cols.length >= 3) {
+      previousPath = cols[1] || '';
+      path = cols[2] || '';
+    }
+
+    if (!path) continue;
+    byPath.set(path, {
+      path,
+      previousPath,
+      status,
+      statusRaw: statusRawValue,
+      added: 0,
+      deleted: 0,
+      churn: 0,
+    });
+  }
+
+  const numStatRaw = sh(`git diff --numstat ${rangeSpec}`, '');
+  for (const line of numStatRaw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const cols = trimmed.split('\t');
+    if (cols.length < 3) continue;
+
+    const added = cols[0] === '-' ? 0 : Number.parseInt(cols[0], 10) || 0;
+    const deleted = cols[1] === '-' ? 0 : Number.parseInt(cols[1], 10) || 0;
+    const path = cols.slice(2).join('\t');
+    if (!path) continue;
+
+    const existing = byPath.get(path) || {
+      path,
+      previousPath: '',
+      status: 'M',
+      statusRaw: 'M',
+      added: 0,
+      deleted: 0,
+      churn: 0,
+    };
+
+    existing.added = added;
+    existing.deleted = deleted;
+    existing.churn = added + deleted;
+    byPath.set(path, existing);
+  }
+
+  return Array.from(byPath.values()).sort((a, b) => {
+    if (b.churn !== a.churn) return b.churn - a.churn;
+    return a.path.localeCompare(b.path);
+  });
+}
+
+function detectSubsystem(path) {
+  const normalized = (path || '').replace(/\\/g, '/');
+  for (const [prefix, name] of SUBSYSTEM_RULES) {
+    if (normalized.startsWith(prefix)) return name;
+  }
+  return 'Other';
+}
+
+function summarizeSubsystems(changedFiles) {
+  const map = new Map();
+  for (const file of changedFiles) {
+    const subsystem = detectSubsystem(file.path);
+    const existing = map.get(subsystem) || {
+      subsystem,
+      fileCount: 0,
+      churn: 0,
+      samplePaths: [],
+    };
+    existing.fileCount += 1;
+    existing.churn += file.churn || 0;
+    if (existing.samplePaths.length < 4) {
+      existing.samplePaths.push(file.path);
+    }
+    map.set(subsystem, existing);
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    if (b.churn !== a.churn) return b.churn - a.churn;
+    return b.fileCount - a.fileCount;
+  });
+}
+
+function formatCommitEvidence(commits, maxLines = MAX_COMMIT_LINES) {
+  if (!commits.length) return '(no commits)';
+  const rows = commits.slice(0, maxLines).map((commit) => {
+    const title = commit.subject || commit.body.split('\n')[0] || '(no subject)';
+    return `- ${commit.hash} | ${commit.date} | ${title}`;
+  });
+  if (commits.length > maxLines) {
+    rows.push(`- ... (${commits.length - maxLines} more commits omitted)`);
+  }
+  return rows.join('\n');
+}
+
+function formatChangedFilesEvidence(changedFiles, maxFiles = MAX_FILES_EVIDENCE) {
+  if (!changedFiles.length) return '(no changed files)';
+  const rows = changedFiles.slice(0, maxFiles).map((file) => {
+    const churn = file.churn > 0 ? ` +${file.added}/-${file.deleted}` : '';
+    const renamed = file.previousPath ? ` (from ${file.previousPath})` : '';
+    return `- [${file.status}] ${file.path}${renamed}${churn}`;
+  });
+  if (changedFiles.length > maxFiles) {
+    rows.push(`- ... (${changedFiles.length - maxFiles} more files omitted)`);
+  }
+  return rows.join('\n');
+}
+
+function formatSubsystemEvidence(subsystems) {
+  if (!subsystems.length) return '(no subsystem summary)';
+  return subsystems
+    .map((item) => {
+      const samples = item.samplePaths.length ? ` | examples: ${item.samplePaths.join(', ')}` : '';
+      return `- ${item.subsystem}: ${item.fileCount} files, churn ${item.churn}${samples}`;
+    })
+    .join('\n');
+}
+
+function getDiffStat(rangeSpec) {
+  return truncate(sh(`git diff --stat ${rangeSpec}`, ''), MAX_DIFFSTAT_CHARS, 'diffstat');
+}
+
+function getFocusedPatch(rangeSpec, changedFiles) {
+  if (!changedFiles.length) return '';
+  const focusFiles = changedFiles
+    .filter((file) => file.churn > 0)
+    .slice(0, 12)
+    .map((file) => file.path);
+
+  const selectedFiles = focusFiles.length ? focusFiles : changedFiles.slice(0, 12).map((file) => file.path);
+  const fileArgs = selectedFiles.map(shellEscape).join(' ');
+
+  const patch = fileArgs
+    ? sh(`git diff --unified=1 --no-color ${rangeSpec} -- ${fileArgs}`, '')
+    : sh(`git diff --unified=1 --no-color ${rangeSpec}`, '');
+
+  return truncate(patch, MAX_PATCH_CONTEXT_CHARS, 'patch excerpts');
+}
+
+function architectureKeywordsForChanges(changedFiles) {
+  const paths = changedFiles.map((file) => file.path.replace(/\\/g, '/'));
+  const keywords = new Set();
+
+  if (paths.some((p) => p.startsWith('app/src/routes/api/'))) keywords.add('src/routes/api/');
+  if (paths.some((p) => p.startsWith('app/src/services/'))) keywords.add('src/services/');
+  if (paths.some((p) => p.startsWith('app/src/middleware/'))) keywords.add('src/middleware/');
+  if (paths.some((p) => p.startsWith('app/src/hooks/'))) keywords.add('src/hooks/');
+  if (paths.some((p) => p.startsWith('app/src/components/'))) keywords.add('src/components/');
+  if (paths.some((p) => p.startsWith('app/src/pages/'))) keywords.add('src/pages/');
+  if (paths.some((p) => p.startsWith('app/src/lib/'))) keywords.add('src/lib/');
+  if (paths.some((p) => p.startsWith('app/src/stores/'))) keywords.add('src/stores/');
+  if (paths.some((p) => p.startsWith('.github/workflows/'))) keywords.add('canonical patterns');
+  if (paths.some((p) => p.startsWith('.github/scripts/'))) keywords.add('canonical patterns');
+  if (paths.some((p) => p.startsWith('llm/'))) keywords.add('architecture');
+
+  return Array.from(keywords);
+}
+
+function getArchitectureContext(changedFiles) {
+  if (!existsSync(ARCHITECTURE_PATH)) return '';
+  const architectureText = readFileSync(ARCHITECTURE_PATH, 'utf8');
+  const keywords = architectureKeywordsForChanges(changedFiles);
+  if (!keywords.length) {
+    return truncate(architectureText, MAX_ARCH_CONTEXT_CHARS, 'architecture context');
+  }
+
+  const sections = architectureText.split('\n## ');
+  const intro = sections[0] || '';
+  const matched = [];
+
+  for (let i = 1; i < sections.length; i += 1) {
+    const section = `## ${sections[i]}`;
+    const lower = section.toLowerCase();
+    if (keywords.some((keyword) => lower.includes(keyword.toLowerCase()))) {
+      matched.push(section);
+    }
+  }
+
+  const merged = [intro.trim(), ...matched].filter(Boolean).join('\n\n');
+  return truncate(merged || architectureText, MAX_ARCH_CONTEXT_CHARS, 'architecture context');
+}
+
+function basicMarkdownNotes(version, prevTag, analysis) {
+  const { commits, changedFiles, subsystems } = analysis;
+  if (!commits.length && !changedFiles.length) {
     return [
-      '🎉 **Welcome to the first release of Zentrio!**',
+      `Release \`${version}\` has been published.`,
       '',
-      'We\'re excited to launch Zentrio with this initial release that brings you a powerful and feature-rich experience. This version includes the core functionality and features we\'ve been working hard to build.',
-      '',
-      'Thank you for being part of our early community! Your feedback and support help us shape the future of Zentrio.',
-      ''
+      'No commit or diff details were available at generation time.',
     ].join('\n');
   }
 
-  const commits = commitLog.split('\n').map(l => {
-    const [hash, date, subject, body] = l.split('\t');
-    const cleanSubject = (subject || '').trim();
-    const cleanBody = (body || '').trim();
-    const fullMessage = cleanBody ? `${cleanSubject}\n\n${cleanBody}` : cleanSubject;
-    return {
-      hash: hash?.slice(0, 7) || '',
-      date: date || '',
-      message: fullMessage
-    };
-  }).filter(c => c.message);
+  const lines = [];
+  lines.push(`Release \`${version}\` summarizes concrete code changes rather than commit text only.`);
+  if (prevTag) {
+    lines.push(`Compared against \`${prevTag}\`.`);
+  }
+  lines.push('');
 
-  // Group commits by type (conventional commits)
-  const grouped = {
-    '🚀 Features': [],
-    '🐛 Bug Fixes': [],
-    '💄 Improvements': [],
-    '📝 Documentation': [],
-    '🔧 Configuration': [],
-    '⚙️ Chore': [],
-    '🔄 Other': []
-  };
-
-  commits.forEach(commit => {
-    const msg = commit.message.toLowerCase();
-    let category = '🔄 Other';
-    
-    if (msg.startsWith('feat') || msg.includes('add') || msg.includes('new') || msg.includes('implement')) {
-      category = '🚀 Features';
-    } else if (msg.startsWith('fix') || msg.includes('bug') || msg.includes('issue') || msg.includes('resolve')) {
-      category = '🐛 Bug Fixes';
-    } else if (msg.startsWith('refactor') || msg.startsWith('perf') || msg.includes('improve') || msg.includes('optimize')) {
-      category = '💄 Improvements';
-    } else if (msg.startsWith('docs') || msg.includes('documentation') || msg.includes('readme')) {
-      category = '📝 Documentation';
-    } else if (msg.includes('config') || msg.includes('setting') || msg.includes('env')) {
-      category = '🔧 Configuration';
-    } else if (msg.startsWith('chore') || msg.startsWith('build') || msg.startsWith('ci') || msg.includes('update')) {
-      category = '⚙️ Chore';
+  if (subsystems.length) {
+    lines.push('### Highlights by area');
+    for (const area of subsystems.slice(0, 8)) {
+      lines.push(`- ${area.subsystem}: ${area.fileCount} files changed (churn ${area.churn})`);
     }
-
-    grouped[category].push(`- ${commit.message} (${commit.date}, ${commit.hash})`);
-  });
-
-  // Count total changes
-  const totalChanges = commits.length;
-  const hasFeatures = grouped['🚀 Features'].length > 0;
-  const hasFixes = grouped['🐛 Bug Fixes'].length > 0;
-
-  // Build engaging summary
-  let summary = `🎉 **What\'s new in version ${version}**\n\n`;
-  
-  if (hasFeatures && hasFixes) {
-    summary += `This release brings **exciting new features** and **important bug fixes** to improve your Zentrio experience. We\'ve carefully reviewed and implemented ${totalChanges} changes based on your feedback and our ongoing commitment to excellence.\n\n`;
-  } else if (hasFeatures) {
-    summary += `This release introduces **exciting new features** to enhance your Zentrio experience! We\'ve added ${totalChanges} improvements to make the platform even more powerful and user-friendly.\n\n`;
-  } else if (hasFixes) {
-    summary += `This release focuses on **stability and reliability** with important bug fixes and optimizations. We've addressed ${totalChanges} issues to ensure a smoother experience.\n\n`;
-  } else {
-    summary += `This release includes ${totalChanges} improvements and optimizations to make Zentrio even better. We've been working hard to enhance the platform based on your feedback.\n\n`;
+    lines.push('');
   }
 
-  // Build the final notes
-  const sections = [summary];
-  Object.entries(grouped).forEach(([title, items]) => {
-    if (items.length > 0) {
-      sections.push(`\n### ${title}\n`);
-      sections.push(...items);
+  if (changedFiles.length) {
+    lines.push('### Key file changes');
+    for (const file of changedFiles.slice(0, 12)) {
+      const churn = file.churn > 0 ? ` (+${file.added}/-${file.deleted})` : '';
+      const renamed = file.previousPath ? ` (from ${file.previousPath})` : '';
+      lines.push(`- [${file.status}] \`${file.path}\`${renamed}${churn}`);
     }
-  });
+    lines.push('');
+  }
 
-  sections.push('\n---\n');
-  sections.push('**Links:**\n- 🌐 [Public Instance](https://zentrio.eu)\n- 📚 [Documentation](https://docs.zentrio.eu)\n');
-  sections.push('\n🙏 **Thank you for using Zentrio!**\n');
+  if (commits.length) {
+    lines.push('### Notable commits');
+    for (const commit of commits.slice(0, 12)) {
+      const title = commit.subject || commit.body.split('\n')[0] || '(no subject)';
+      lines.push(`- ${title} (${commit.hash})`);
+    }
+  }
 
-  return sections.join('\n');
+  return lines.join('\n').trim();
 }
 
 async function generateWithNanoGPT(prompt, apiKey) {
-  // NanoGPT OpenAI-compatible API with GLM 5
   const endpoint = 'https://nano-gpt.com/api/v1/chat/completions';
   const body = {
     model: 'zai-org/glm-5:thinking',
-    messages: [
-      {
-        role: 'user',
-        content: prompt,
-      },
-    ],
-    temperature: 0.3,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.2,
     max_tokens: 4096,
   };
 
@@ -179,7 +386,7 @@ async function generateWithNanoGPT(prompt, apiKey) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });
@@ -194,120 +401,189 @@ async function generateWithNanoGPT(prompt, apiKey) {
   return text.trim();
 }
 
+function getReleaseTypeContext(version, prevTag, tag) {
+  const current = version.replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
+  const previous = (prevTag || '').replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
+
+  const major = Number.parseInt(current?.[1] || '0', 10);
+  const minor = Number.parseInt(current?.[2] || '0', 10);
+  const prevMajor = Number.parseInt(previous?.[1] || '0', 10);
+  const prevMinor = Number.parseInt(previous?.[2] || '0', 10);
+
+  if (previous && major > prevMajor) {
+    return {
+      type: 'major',
+      context: `This is a MAJOR release (${prevTag} -> ${tag}). Emphasize major capabilities, migration impact, and any breaking changes.`,
+    };
+  }
+
+  if (previous && minor > prevMinor) {
+    return {
+      type: 'minor',
+      context: `This is a MINOR release (${prevTag} -> ${tag}). Emphasize new capabilities and important improvements.`,
+    };
+  }
+
+  return {
+    type: 'patch',
+    context: `This is a PATCH release (${prevTag || 'previous tag unavailable'} -> ${tag}). Keep notes concise and focus on fixes, reliability, and maintenance.`,
+  };
+}
+
+function buildPrompt(input) {
+  const {
+    tag,
+    prevTag,
+    releaseType,
+    releaseContext,
+    commitEvidence,
+    changedFilesEvidence,
+    subsystemEvidence,
+    diffStat,
+    focusedPatch,
+    architectureContext,
+  } = input;
+
+  const releaseGuidelines = {
+    major: [
+      '- Lead with a milestone summary.',
+      '- Add a "Breaking Changes" section only when evidence supports it.',
+      '- Include upgrade guidance when relevant.',
+    ],
+    minor: [
+      '- Lead with the most important new capabilities.',
+      '- Explain user impact for significant improvements.',
+      '- Group related changes into coherent sections.',
+    ],
+    patch: [
+      '- Keep the output tight and practical.',
+      '- Prioritize bug fixes, stability, and maintenance work.',
+      '- Avoid over-celebratory language.',
+    ],
+  };
+
+  return [
+    'You are writing GitHub release notes for Zentrio.',
+    `Target version: ${tag}`,
+    prevTag ? `Previous version: ${prevTag}` : 'Previous version: (first release or unavailable)',
+    '',
+    releaseContext,
+    '',
+    'Evidence handling rules:',
+    '- Infer changes from code evidence first, not from commit wording.',
+    '- Evidence priority: focused patch excerpts > diff stats > changed file list > commit subjects.',
+    '- Use architecture context to interpret component purpose and user impact.',
+    '- Do not invent features or breaking changes.',
+    '- If something is uncertain, describe it as internal maintenance/refactor.',
+    '',
+    'Output constraints:',
+    '- Markdown only.',
+    '- No top-level title (GitHub already provides it).',
+    '- Use concise bullets.',
+    '- Include commit hash references when possible: (abc1234).',
+    '- Use sections only when meaningful: Features, Bug Fixes, Improvements, Maintenance, Breaking Changes.',
+    '',
+    'Release-type guidance:',
+    ...(releaseGuidelines[releaseType] || releaseGuidelines.patch),
+    '',
+    'Architecture context:',
+    architectureContext || '(ARCHITECTURE.md not available)',
+    '',
+    'Subsystem summary:',
+    subsystemEvidence || '(none)',
+    '',
+    'Changed files:',
+    changedFilesEvidence || '(none)',
+    '',
+    'Diff stat:',
+    diffStat || '(none)',
+    '',
+    'Focused patch excerpts:',
+    focusedPatch || '(none)',
+    '',
+    'Commits (secondary evidence):',
+    commitEvidence || '(none)',
+  ].join('\n');
+}
+
 async function main() {
   const version = getVersion();
   const tag = version.startsWith('v') ? version : `v${version}`;
   const prevTag = getPrevTag(tag);
-  const commitLog = getCommitRange(prevTag);
+  const rangeSpec = getRangeSpec(prevTag);
+  const commitLog = getCommitLog(prevTag, rangeSpec);
 
-  // Parse semantic version to determine release type
-  const semverMatch = version.replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
-  const [, major, minor, patch] = semverMatch || ['0', '0', '0'];
-  const prevSemverMatch = (prevTag || '').replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
-  const [, prevMajor, prevMinor] = prevSemverMatch || ['0', '0', '0'];
+  const commits = parseCommits(commitLog);
+  const changedFiles = getChangedFiles(rangeSpec);
+  const subsystems = summarizeSubsystems(changedFiles);
+  const architectureContext = getArchitectureContext(changedFiles);
 
-  let releaseType = 'patch';
-  let releaseContext = '';
+  const commitEvidence = formatCommitEvidence(commits);
+  const changedFilesEvidence = formatChangedFilesEvidence(changedFiles);
+  const subsystemEvidence = formatSubsystemEvidence(subsystems);
+  const diffStat = getDiffStat(rangeSpec);
+  const focusedPatch = getFocusedPatch(rangeSpec, changedFiles);
 
-  if (prevSemverMatch && parseInt(major) > parseInt(prevMajor)) {
-    releaseType = 'major';
-    releaseContext = `This is a **MAJOR** release (${prevTag} → ${tag}). Major releases introduce significant new features, architectural changes, or breaking changes. The tone should be celebratory and highlight the milestone nature of this release.`;
-  } else if (prevSemverMatch && parseInt(minor) > parseInt(prevMinor)) {
-    releaseType = 'minor';
-    releaseContext = `This is a **MINOR** release (${prevTag} → ${tag}). Minor releases add new features and notable improvements while maintaining backward compatibility. Focus on new capabilities and enhancements.`;
-  } else {
-    releaseContext = `This is a **PATCH** release (${prevTag} → ${tag}). Patch releases focus on bug fixes, security patches, and small improvements. Keep the notes concise and focused on stability improvements.`;
-  }
-
-  const releaseGuidelines = {
-    major: [
-      `- Lead with an exciting, milestone-focused summary paragraph`,
-      `- Highlight breaking changes prominently with a dedicated "⚠️ Breaking Changes" section if applicable`,
-      `- Emphasize new major features with detailed explanations`,
-      `- Include a brief "Upgrade Guide" section if there are breaking changes`,
-      `- The tone should be celebratory but professional`,
-    ],
-    minor: [
-      `- Lead with a clear summary of new features and improvements`,
-      `- Focus on new capabilities and how they benefit users`,
-      `- Group changes logically with clear section headers`,
-      `- The tone should be informative and forward-looking`,
-    ],
-    patch: [
-      `- Keep the notes brief and to the point`,
-      `- Focus on what was fixed and improved`,
-      `- Consolidate related fixes into single bullet points where sensible`,
-      `- The tone should be straightforward and reassuring`,
-    ],
-  };
-
-  const prompt = [
-    `You are an expert release notes writer for Zentrio, a modern streaming media application.`,
-    `Write clean, professional GitHub release notes in Markdown for version ${tag}.`,
-    ``,
+  const { type: releaseType, context: releaseContext } = getReleaseTypeContext(version, prevTag, tag);
+  const prompt = buildPrompt({
+    tag,
+    prevTag,
+    releaseType,
     releaseContext,
-    ``,
-    `Inputs:`,
-    `- Version: ${tag}`,
-    prevTag ? `- Previous version: ${prevTag}` : `- Previous version: (first release)`,
-    `- Commits (hash, date, subject, body):`,
-    commitLog || '(no commits)',
-    ``,
-    `Format Guidelines:`,
-    ...releaseGuidelines[releaseType],
-    ``,
-    `General Rules:`,
-    `- Use these sections as needed: 🚀 Features, 🐛 Bug Fixes, 💄 Improvements, 🔧 Maintenance`,
-    `- Write clear, scannable bullet points`,
-    `- Use \`code formatting\` for technical terms, file names, and commands`,
-    `- Include commit hash references in parentheses at the end: (abc1234)`,
-    `- Do NOT include a title - GitHub adds one automatically`,
-    `- Do NOT invent changes - only document what's in the commits`,
-    `- Be concise - quality over quantity`,
-  ].join('\n');
+    commitEvidence,
+    changedFilesEvidence,
+    subsystemEvidence,
+    diffStat,
+    focusedPatch,
+    architectureContext,
+  });
 
   const apiKey = process.env.NANOGPT_API_KEY || '';
   let notes = '';
-  let usedAi = false;
 
   if (apiKey) {
-    console.log('[release-notes] Using NanoGPT with GLM 5');
+    console.log('[release-notes] Using NanoGPT with diff-aware prompt and architecture context.');
     try {
       const ai = await generateWithNanoGPT(prompt, apiKey);
       if (ai && ai.length > 20) {
         notes = ai.trim();
-        usedAi = true;
       } else {
-        console.log('[release-notes] NanoGPT returned empty or too-short output, falling back to conventional notes.');
+        console.log('[release-notes] NanoGPT returned empty or too-short output; using deterministic fallback.');
       }
-    } catch (e) {
-      console.error('[release-notes] NanoGPT API call failed, falling back to conventional notes:', e?.message || e);
+    } catch (error) {
+      console.error('[release-notes] NanoGPT API call failed; using deterministic fallback:', error?.message || error);
     }
   } else {
-    console.log('[release-notes] No NANOGPT_API_KEY found, using conventional notes.');
+    console.log('[release-notes] No NANOGPT_API_KEY found; using deterministic fallback.');
   }
 
   if (!notes) {
-    notes = basicMarkdownNotes(version, prevTag, commitLog);
+    notes = basicMarkdownNotes(version, prevTag, { commits, changedFiles, subsystems });
   }
-  // Remove redundant top-level title; GitHub release already has one
+
   notes = notes.replace(/^\s*#{1,6}\s.*\r?\n+/, '').trimStart();
 
-  const links = '\n\n---\n\n**Links:**\n- 🌐 [Public Instance](https://zentrio.eu)\n- 📚 [Documentation](https://docs.zentrio.eu)';
-  const disclaimer = "\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.";
-  writeFileSync('RELEASE_NOTES.md', notes + links + disclaimer, 'utf8');
-  // Emit a small marker file if AI was actually used
+  const links = '\n\n---\n\n**Links:**\n- [Public Instance](https://zentrio.eu)\n- [Documentation](https://docs.zentrio.eu)';
+  const disclaimer =
+    '\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.';
 
+  writeFileSync('RELEASE_NOTES.md', notes + links + disclaimer, 'utf8');
   console.log('Release notes written to RELEASE_NOTES.md');
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
-  // Still write a minimal fallback to avoid failing the workflow
   try {
-    const v = getVersion();
-    const disclaimer = "\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.";
-writeFileSync('RELEASE_NOTES.md', `- Automated release notes generation failed. See commit history for details.\n` + disclaimer, 'utf8');
-  } catch {}
+    const version = getVersion();
+    const disclaimer =
+      '\n\n> Notice: This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.';
+    writeFileSync(
+      'RELEASE_NOTES.md',
+      `- Automated release notes generation failed for version ${version}. See commit history and diff for details.\n${disclaimer}`,
+      'utf8',
+    );
+  } catch {
+    // no-op
+  }
   process.exit(0);
 });
