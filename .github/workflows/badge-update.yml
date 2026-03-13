@@ -68,42 +68,12 @@ jobs:
           echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
           echo "color=$COLOR" >> "$GITHUB_OUTPUT"
 
-          python3 - <<'PYEOF'
-          import json, os
-          from pathlib import Path
-
-          score = os.environ.get('SCORE', '?')
-          grade = os.environ.get('GRADE', '?')
-          color = os.environ.get('COLOR', 'lightgrey')
-
-          data = {
-            'schemaVersion': 1,
-            'label': 'code quality',
-            'message': f'{score}/100 ({grade})',
-            'color': color,
-            'cacheSeconds': 60,
-          }
-
-          out = Path('.github/badges/quality.json')
-          out.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
-          print(f'✅ Wrote {out}')
-          print(json.dumps(data, indent=2))
-          PYEOF
-
-      - name: Check if badge changed
-        id: check
-        run: |
-          if git diff --quiet -- .github/badges/quality.json 2>/dev/null; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No badge changes detected"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Badge changes detected"
-          fi
-
-      - name: Commit and push changes
-        if: steps.check.outputs.changed == 'true'
-        uses: stefanzweifel/git-auto-commit-action@v5
+      - name: Update Gist with badge data
+        uses: Schneegans/dynamic-badges-action@v1.7.0
         with:
-          commit_message: "chore: update quality badge [skip ci]"
-          file_pattern: .github/badges/quality.json
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 92598bd8ebd40beb60c71b870c3933d7
+          filename: zentrio-quality-badge.json
+          label: code quality
+          message: ${{ steps.generate.outputs.score }}/100 (${{ steps.generate.outputs.grade }})
+          color: ${{ steps.generate.outputs.color }}

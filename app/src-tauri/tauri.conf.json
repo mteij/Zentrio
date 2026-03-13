@@ -54,8 +54,10 @@
     "macOS": {
       "dmg": {
         "background": "icons/dmg-background.png",
-        "windowWidth": 540,
-        "windowHeight": 380,
+        "windowSize": {
+          "width": 540,
+          "height": 380
+        },
         "appPosition": {
           "x": 130,
           "y": 180
