@@ -229,6 +229,16 @@ jobs:
           echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
           echo "LINUXDEPLOY_PLUGIN_APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
 
+      # Fix linuxdeploy in Tauri action by downloading manually, as AppImage bundling fails on GitHub Actions
+      - name: Setup linuxdeploy (Linux only)
+        if: matrix.name == 'linux'
+        run: |
+          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          sudo cp linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
+          sudo cp linuxdeploy-plugin-appimage-x86_64.AppImage /usr/local/bin/linuxdeploy-plugin-appimage
+
       # Desktop Build (Linux, Windows, macOS Desktop)
       - name: Build Tauri App (Desktop)
         if: matrix.name != 'android' && matrix.name != 'ios'
