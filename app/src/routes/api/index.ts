@@ -11,6 +11,8 @@ import syncApiRoutes from './sync'
 import traktApiRoutes from './trakt'
 import gatewayApiRoutes from './gateway'
 import adminApiRoutes from './admin'
+import { addonProxyRouter } from './proxy'
+import { tmdbProxyRouter } from './tmdb-proxy'
 import { getConfig } from '../../services/envParser'
 import { db } from '../../services/database'
 import {
@@ -39,6 +41,8 @@ app.route('/sync', syncApiRoutes)
 app.route('/trakt', traktApiRoutes)
 app.route('/gateway', gatewayApiRoutes)
 app.route('/admin', adminApiRoutes)
+app.route('/addon-proxy', addonProxyRouter)
+app.route('/tmdb', tmdbProxyRouter)
 
 // Health check with OpenAPI documentation
 interface HealthStats {

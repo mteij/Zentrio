@@ -1,171 +1,156 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { apiFetch } from '../lib/apiFetch'
+import { apiFetch, apiFetchJson } from '../lib/apiFetch'
 import { List, ListItem } from '../services/database'
-import { 
-  type SharedList, 
-  type PendingInvite, 
-  type AvailableSharedList, 
-  type ProfileSharedList, 
+import {
+  type SharedList,
+  type PendingInvite,
+  type AvailableSharedList,
+  type ProfileSharedList,
 } from '../components/library/LibrarySidebar'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('useLibraryData')
 
+// Stale time: 60s — navigating back to Library within a minute shows cached data instantly
+const LISTS_STALE_TIME = 60 * 1000
+const ITEMS_STALE_TIME = 30 * 1000
+
+interface LibraryListsData {
+  myLists: List[]
+  accountSharedLists: SharedList[]
+  profileSharedLists: ProfileSharedList[]
+  pendingInvites: PendingInvite[]
+  availableFromOtherProfiles: AvailableSharedList[]
+}
+
+async function fetchLibraryLists(profileId: string): Promise<LibraryListsData> {
+  const [listsRes, sharedRes, profileSharedRes, pendingRes, availableRes] = await Promise.all([
+    apiFetch(`/api/lists?profileId=${profileId}`),
+    apiFetch(`/api/lists/shared-for-profile/${profileId}`),
+    apiFetch(`/api/lists/profile-shared/${profileId}`),
+    apiFetch('/api/lists/pending-invites'),
+    apiFetch(`/api/lists/available-from-other-profiles/${profileId}`)
+  ])
+
+  const [listsData, sharedData, profileSharedData, pendingData, availableData] = await Promise.all([
+    listsRes.json(),
+    sharedRes.json(),
+    profileSharedRes.json(),
+    pendingRes.json(),
+    availableRes.json()
+  ])
+
+  let myLists: List[] = listsData.lists || []
+
+  if (myLists.length === 0) {
+    const createRes = await apiFetch('/api/lists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId, name: 'My Library' })
+    })
+    const createData = await createRes.json()
+    if (createData.list) myLists = [createData.list]
+  }
+
+  return {
+    myLists,
+    accountSharedLists: (sharedData.lists || []).filter((l: SharedList) => l.isLinkedToThisProfile),
+    profileSharedLists: profileSharedData.lists || [],
+    pendingInvites: pendingData.invites || [],
+    availableFromOtherProfiles: availableData.lists || [],
+  }
+}
+
+async function fetchListItems(listId: number, profileId: string): Promise<ListItem[]> {
+  const data = await apiFetchJson<{ items: ListItem[] }>(`/api/lists/${listId}/items?profileId=${profileId}`)
+  return data.items || []
+}
+
 export function useLibraryData(profileId: string | undefined, listId: string | undefined) {
   const navigate = useNavigate()
-  
-  // Lists state
+  const queryClient = useQueryClient()
+
+  // TanStack Query for the sidebar lists — cached for 60s so return visits are instant
+  const listsQuery = useQuery({
+    queryKey: ['library-lists', profileId],
+    queryFn: () => fetchLibraryLists(profileId!),
+    enabled: !!profileId,
+    staleTime: LISTS_STALE_TIME,
+    refetchOnWindowFocus: false,
+  })
+
+  // Derive the active list ID: prefer URL param, fall back to first own list
+  const activeListId = listId
+    ? parseInt(listId)
+    : listsQuery.data?.myLists[0]?.id ?? null
+
+  // TanStack Query for the active list's items — fires in parallel with listsQuery when listId
+  // is already in the URL (both queries start at the same time on mount)
+  const itemsQuery = useQuery({
+    queryKey: ['library-items', profileId, activeListId],
+    queryFn: () => fetchListItems(activeListId!, profileId!),
+    enabled: !!profileId && !!activeListId,
+    staleTime: ITEMS_STALE_TIME,
+    refetchOnWindowFocus: false,
+  })
+
+  // Local state for optimistic updates (leave list, decline invite, remove item).
+  // Initialised from query data and updated optimistically on user actions.
   const [myLists, setMyLists] = useState<List[]>([])
   const [accountSharedLists, setAccountSharedLists] = useState<SharedList[]>([])
   const [profileSharedLists, setProfileSharedLists] = useState<ProfileSharedList[]>([])
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
   const [availableFromOtherProfiles, setAvailableFromOtherProfiles] = useState<AvailableSharedList[]>([])
-  
-  // Current list state
   const [activeList, setActiveList] = useState<List | SharedList | ProfileSharedList | null>(null)
   const [items, setItems] = useState<ListItem[]>([])
-  
-  // UI state
-  const [listsLoading, setListsLoading] = useState(true)
-  const [itemsLoading, setItemsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const loadItems = useCallback(async (lid: number, signal?: AbortSignal) => {
-    setItemsLoading(true)
-    try {
-      const itemsRes = await apiFetch(`/api/lists/${lid}/items?profileId=${profileId}`, { signal })
-      const itemsData = await itemsRes.json()
-      if (!signal?.aborted) {
-        setItems(itemsData.items || [])
-      }
-    } catch (err: any) {
-      if (err.name !== 'AbortError' && err.message !== 'Request cancelled' && !signal?.aborted) {
-          log.error(err)
-          setItems([])
-      }
-    } finally {
-      if (!signal?.aborted) {
-        setItemsLoading(false)
-      }
-    }
-  }, [profileId])
-
-  const loadLibrary = useCallback(async (signal?: AbortSignal) => {
-    if (!profileId) return
-    setListsLoading(true)
-    setError('')
-    try {
-      const [listsRes, sharedRes, profileSharedRes, pendingRes, availableRes] = await Promise.all([
-          apiFetch(`/api/lists?profileId=${profileId}`, { signal }),
-          apiFetch(`/api/lists/shared-for-profile/${profileId}`, { signal }),
-          apiFetch(`/api/lists/profile-shared/${profileId}`, { signal }),
-          apiFetch('/api/lists/pending-invites', { signal }),
-          apiFetch(`/api/lists/available-from-other-profiles/${profileId}`, { signal })
-      ])
-      
-      const [listsData, sharedData, profileSharedData, pendingData, availableData] = await Promise.all([
-          listsRes.json(),
-          sharedRes.json(),
-          profileSharedRes.json(),
-          pendingRes.json(),
-          availableRes.json()
-      ])
-      
-      if (signal?.aborted) return
-
-      let ownLists = listsData.lists || []
-      
-      if (ownLists.length === 0) {
-        // Create default list if none exist
-        const createRes = await apiFetch('/api/lists', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profileId, name: 'My Library' }),
-            signal
-        })
-        const createData = await createRes.json()
-        if (createData.list) {
-            ownLists = [createData.list]
-        }
-      }
-      
-      const newAccountSharedLists = (sharedData.lists || []).filter((l: SharedList) => l.isLinkedToThisProfile);
-      const newProfileSharedLists = profileSharedData.lists || [];
-      
-      setPendingInvites(pendingData.invites || [])
-      setAvailableFromOtherProfiles(availableData.lists || [])
-      setMyLists(ownLists)
-      setAccountSharedLists(newAccountSharedLists)
-      setProfileSharedLists(newProfileSharedLists)
-      
-      // Determine active list from URL or default
-      let currentList: List | SharedList | ProfileSharedList | null = null
-      
-      if (listId) {
-        const id = parseInt(listId)
-        currentList = ownLists.find((l: List) => l.id === id) ||
-          newAccountSharedLists.find((l: SharedList) => l.id === id) ||
-          newProfileSharedLists.find((l: ProfileSharedList) => l.id === id) ||
-          null
-      }
-      
-      if (!currentList && ownLists.length > 0) {
-        currentList = ownLists[0]
-      }
-      
-      if (currentList) {
-          setActiveList(currentList)
-          // Only load items here if we don't have a listId in URL (default list case)
-          // If we DO have listId, the useEffect will handle it when loading becomes false
-          if (!listId && currentList.id) {
-            loadItems(currentList.id, signal)
-          } else if (!currentList.id) {
-            setItems([])
-          }
-      }
-      
-    } catch (err: any) {
-      if (err.name !== 'AbortError' && err.message !== 'Request cancelled' && !signal?.aborted) {
-          log.error(err)
-          setError('Failed to load library')
-      }
-    } finally {
-      if (!signal?.aborted) {
-          setListsLoading(false)
-      }
-    }
-  }, [profileId, listId, loadItems])
-
-  // Initial load
+  // Sync query data → local state when it (re)loads
   useEffect(() => {
-    if (!profileId) return
-    const controller = new AbortController()
-    loadLibrary(controller.signal)
-    return () => controller.abort()
-  }, [profileId, loadLibrary])
+    if (!listsQuery.data) return
+    const { myLists: ql, accountSharedLists: qa, profileSharedLists: qp, pendingInvites: qpi, availableFromOtherProfiles: qav } = listsQuery.data
+    setMyLists(ql)
+    setAccountSharedLists(qa)
+    setProfileSharedLists(qp)
+    setPendingInvites(qpi)
+    setAvailableFromOtherProfiles(qav)
 
-  // Handle URL listId changes
+    // Resolve active list
+    const id = listId ? parseInt(listId) : null
+    const found = id
+      ? (ql.find(l => l.id === id) || qa.find(l => l.id === id) || qp.find(l => l.id === id) || null)
+      : ql[0] || null
+    setActiveList(found)
+  }, [listsQuery.data, listId])
+
+  // Sync items query → local items state
   useEffect(() => {
-    let controller: AbortController | null = null
-    if (listId && !listsLoading) {
-      const id = parseInt(listId)
-      const found = myLists.find(l => l.id === id) ||
-        accountSharedLists.find(l => l.id === id) ||
-        profileSharedLists.find(l => l.id === id)
-      
-      if (found) {
-        if (activeList?.id !== found.id) {
-            setActiveList(found)
-        }
-        controller = new AbortController()
-        loadItems(id, controller.signal)
-      }
+    if (itemsQuery.data) setItems(itemsQuery.data)
+  }, [itemsQuery.data])
+
+  // Expose a loadItems for cases where the page calls it directly (e.g. list selection)
+  const loadItems = useCallback(async (lid: number) => {
+    // Prefetch into the query cache so the result is available instantly next time
+    await queryClient.fetchQuery({
+      queryKey: ['library-items', profileId, lid],
+      queryFn: () => fetchListItems(lid, profileId!),
+      staleTime: ITEMS_STALE_TIME,
+    }).then(data => setItems(data)).catch(e => {
+      log.error(e)
+      setItems([])
+    })
+  }, [profileId, queryClient])
+
+  const refreshLibrary = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['library-lists', profileId] })
+    if (activeListId) {
+      queryClient.invalidateQueries({ queryKey: ['library-items', profileId, activeListId] })
     }
-    return () => controller?.abort()
-  }, [listId, myLists, accountSharedLists, profileSharedLists, listsLoading, activeList, loadItems])
+  }, [profileId, activeListId, queryClient])
 
   // Actions
   const createList = async (name: string) => {
@@ -178,6 +163,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
       const data = await res.json()
       if (data.list) {
         setMyLists(prev => [...prev, data.list])
+        queryClient.invalidateQueries({ queryKey: ['library-lists', profileId] })
         toast.success('List created!')
         return true
       }
@@ -189,28 +175,29 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
     }
   }
 
-  const deleteList = async (listId: number) => {
+  const deleteList = async (lid: number) => {
     try {
-      await apiFetch(`/api/lists/${listId}`, { method: 'DELETE' })
-      setMyLists(prev => prev.filter(l => l.id !== listId))
-      if (activeList?.id === listId) {
-        // If deleted list was active, switch to first available
-        const nextList = myLists.find(l => l.id !== listId)
-        if (nextList) {
-           navigate(`/streaming/${profileId}/library/${nextList.id}`, { replace: true })
-        }
+      await apiFetch(`/api/lists/${lid}`, { method: 'DELETE' })
+      setMyLists(prev => prev.filter(l => l.id !== lid))
+      queryClient.invalidateQueries({ queryKey: ['library-lists', profileId] })
+      if (activeList?.id === lid) {
+        const nextList = myLists.find(l => l.id !== lid)
+        if (nextList) navigate(`/streaming/${profileId}/library/${nextList.id}`, { replace: true })
       }
       toast.success('List deleted')
-    } catch (e) {
+    } catch {
       toast.error('Failed to delete list')
     }
   }
 
   const selectList = (list: List | SharedList | ProfileSharedList) => {
-      if (activeList?.id !== list.id) {
-          navigate(`/streaming/${profileId}/library/${list.id}`, { replace: true })
-      }
+    if (activeList?.id !== list.id) {
+      navigate(`/streaming/${profileId}/library/${list.id}`, { replace: true })
+    }
   }
+
+  const listsLoading = listsQuery.isLoading
+  const itemsLoading = itemsQuery.isLoading
 
   return {
     state: {
@@ -236,7 +223,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
       setItems
     },
     actions: {
-      refreshLibrary: () => loadLibrary(),
+      refreshLibrary,
       loadItems,
       createList,
       deleteList,

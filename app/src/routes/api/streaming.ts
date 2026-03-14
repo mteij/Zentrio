@@ -3,7 +3,7 @@ import { streamDb, watchHistoryDb, profileDb, addonDb, listDb, userDb, type User
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { ok, err } from '../../utils/api'
 import { streamCache, StreamCache } from '../../services/addons/stream-cache'
-import { getParentalSettings, filterContent } from '../../services/addons/content-filter'
+import { getParentalSettings, filterContent, enrichContent } from '../../services/addons/content-filter'
 import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
 
@@ -1655,6 +1655,33 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
   } catch (e) {
     log.error('Streaming dashboard error:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to load dashboard')
+  }
+})
+
+// POST /api/streaming/filter-enrich
+// Accepts client-fetched catalog items, applies server-side parental filtering
+// and watch history enrichment, then returns the processed items.
+streaming.post('/filter-enrich', optionalSessionMiddleware, async (c) => {
+  try {
+    const body = await c.req.json<{ items: any[], profileId: number }>()
+    if (!body?.items || !body?.profileId) {
+      return err(c, 400, 'INVALID_INPUT', 'items and profileId are required')
+    }
+
+    const { items, profileId } = body
+    const parentalSettings = getParentalSettings(profileId)
+
+    let filtered = items
+    if (parentalSettings.enabled) {
+      const profile = profileDb.findWithSettingsById(profileId)
+      filtered = await filterContent(items, parentalSettings, profile?.user_id ?? undefined)
+    }
+
+    const enriched = await enrichContent(filtered, profileId)
+    return c.json({ items: enriched })
+  } catch (e) {
+    log.error('filter-enrich error:', e)
+    return err(c, 500, 'SERVER_ERROR', 'Failed to filter content')
   }
 })
 

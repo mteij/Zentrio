@@ -54,7 +54,7 @@ Each file is a self-contained Hono router mounted under `/api/*`.
 | `auth.ts` | `/api/auth` | Better Auth (email, magic link, OTP, 2FA, SSO) |
 | `profiles.ts` | `/api/profiles` | User profiles CRUD |
 | `user.ts` | `/api/user` | User settings, TMDB API key |
-| `streaming.ts` | `/api/streaming` | Stream URL resolution |
+| `streaming.ts` | `/api/streaming` | Stream URL resolution. Also exposes `POST /api/streaming/filter-enrich` — accepts `{ items: MetaPreview[], profileId: number }`, applies server-side parental filtering + watch history enrichment, returns `{ items: MetaPreview[] }`. Call this after any client-side addon fetch. |
 | `addons.ts` | `/api/addons` | Stremio-compatible addon management |
 | `lists.ts` | `/api/lists` | Watchlists with sharing |
 | `appearance.ts` | `/api/appearance` | Theme/appearance settings |
@@ -63,6 +63,8 @@ Each file is a self-contained Hono router mounted under `/api/*`.
 | `gateway.ts` | `/api/gateway` | Proxy gateway |
 | `admin.ts` | `/api/admin` | Admin panel (RBAC + step-up auth) |
 | `avatar.ts` | `/api/avatar` | Avatar generation |
+| `proxy.ts` | `/api/addon-proxy` | Thin CORS proxy for external addon URLs (web only — Tauri fetches directly). Accepts `?url=<encoded>`, validates against SSRF, passes response through unchanged. |
+| `tmdb-proxy.ts` | `/api/tmdb` | TMDB API proxy — injects the API key server-side so it never reaches the client. Endpoints: `GET /trending`, `GET /trending/:type`, `GET /catalog/:type/:id`, `GET /meta/:type/:id`. |
 | `openapi.ts` | `/api/openapi.json` | OpenAPI spec generator (Zod → OpenAPI schema) |
 | `openapi-route.ts` | `/api/docs` | Scalar UI + spec endpoint mounting |
 | `views.ts` | (non-API) | Server-side redirect routes (e.g. deep link redirects) |
@@ -228,8 +230,12 @@ These are the canonical client-side utilities. Do not duplicate them.
 | `app-lifecycle.tsx` | App startup logic: version checks, migration, splash screen. |
 | `secure-storage.ts` | Abstraction over localStorage/Tauri store for sensitive data. |
 | `url.ts` | URL construction utilities. |
+| `addon-fetch.ts` | Platform-aware fetch for **external addon URLs**: Tauri → direct HTTP via `@tauri-apps/plugin-http` (no CORS), Web → routes through `/api/addon-proxy`. Use this instead of `apiFetch` when fetching from third-party Stremio addon URLs. |
+| `addon-client.ts` | Client-side Stremio addon client (`ClientAddonClient`) with in-memory TTL cache. Use `getAddonClient(manifestUrl)` for a cached instance. `ZENTRIO_TMDB_ADDON = 'zentrio://tmdb-addon'` identifies the built-in TMDB addon — route it to `/api/tmdb/*` instead of fetching directly. |
 
 **Rule:** Never call `fetch('/api/...')` directly in components or hooks. Use `apiFetch` or a typed client.
+
+**Rule for addon fetching:** Use `addon-client.ts` / `addon-fetch.ts` for external Stremio addon URL calls. Never use raw `fetch()` for addon URLs on the client — CORS will block it in the browser. After fetching, call `POST /api/streaming/filter-enrich` to apply server-side parental filtering and watch history enrichment.
 
 ---
 

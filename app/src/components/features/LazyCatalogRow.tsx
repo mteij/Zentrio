@@ -7,6 +7,7 @@ import { ContentCard, ContentItem } from './ContentCard'
 import { SkeletonCard } from '../ui/SkeletonCard'
 import { useScrollRow } from '../../hooks/useScrollRow'
 import { apiFetchJson } from '../../lib/apiFetch'
+import { getAddonClient, ZENTRIO_TMDB_ADDON } from '../../lib/addon-client'
 import styles from '../../styles/Streaming.module.css'
 
 interface CatalogMetadata {
@@ -31,14 +32,35 @@ const fetchCatalogItems = async (
   type: string,
   id: string
 ): Promise<MetaPreview[]> => {
-  const params = new URLSearchParams({
-    profileId,
-    manifestUrl,
-    type,
-    id
-  })
-  const data = await apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog-items?${params}`)
-  return data.items || []
+  let items: MetaPreview[]
+
+  if (manifestUrl === ZENTRIO_TMDB_ADDON || manifestUrl.startsWith('zentrio://')) {
+    // TMDB addon: server proxy keeps the API key secret
+    const data = await apiFetchJson<{ metas: MetaPreview[] }>(
+      `/api/tmdb/catalog/${type}/${id}?profileId=${profileId}`
+    )
+    items = data.metas || []
+  } else {
+    // Third-party addon: fetch directly from addon URL (Tauri: direct, Web: CORS proxy)
+    const client = getAddonClient(manifestUrl)
+    items = await client.getCatalog(type, id)
+  }
+
+  // Apply server-side parental filtering + watch history enrichment
+  if (items.length > 0) {
+    try {
+      const enriched = await apiFetchJson<{ items: MetaPreview[] }>('/api/streaming/filter-enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, profileId: parseInt(profileId) }),
+      })
+      return enriched.items || items
+    } catch {
+      return items
+    }
+  }
+
+  return items
 }
 
 /**

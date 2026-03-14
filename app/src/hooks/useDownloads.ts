@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { listen } from '@tauri-apps/api/event'
 import { toast } from 'sonner'
-import { downloadService, DownloadRecord, DownloadQuality } from '../services/downloads/download-service'
 import { useDownloadStore } from '../stores/downloadStore'
-import { getTopStream } from '../lib/topStreamCache'
+import { isTauri } from '../lib/auth-client'
+import type { DownloadRecord, DownloadQuality } from '../services/downloads/download-service'
 
 interface ProgressEvent {
   id: string
@@ -36,114 +35,104 @@ interface SmartNextEvent {
 /**
  * Initializes the download store for a profile and wires up Tauri event listeners.
  * Should be mounted once inside StreamingLayout (or downloads page).
+ * No-ops on web (downloads are a Tauri-only feature).
  */
 export function useDownloads(profileId: string | undefined) {
   const { setDownloads, updateProgress, updateStatus, addDownload } = useDownloadStore()
   const profileRef = useRef(profileId)
   profileRef.current = profileId
 
-  // Load initial downloads from Rust DB
+  // Load initial downloads from Rust DB (Tauri only)
   useEffect(() => {
-    if (!profileId) return
-    downloadService
-      .list(profileId)
-      .then(setDownloads)
-      .catch(console.error)
+    if (!profileId || !isTauri()) return
+    import('../services/downloads/download-service').then(({ downloadService }) => {
+      downloadService.list(profileId).then(setDownloads).catch(console.error)
+    })
   }, [profileId])
 
-  // Subscribe to live progress/status/smart-next events from the Rust backend
+  // Subscribe to live progress/status/smart-next events from the Rust backend (Tauri only)
   useEffect(() => {
-    // Track unlisteners so we can cancel even if promises haven't resolved yet
+    if (!isTauri()) return
+
     let cancelled = false
     const unlisteners: Array<() => void> = []
 
-    listen<ProgressEvent>('download:progress', (e) => {
-      updateProgress(e.payload.id, e.payload.progress, e.payload.downloadedBytes, e.payload.speed)
-    }).then((fn) => {
-      if (cancelled) fn()
-      else unlisteners.push(fn)
-    })
+    async function setup() {
+      const [{ listen }, { downloadService }, { getTopStream }] = await Promise.all([
+        import('@tauri-apps/api/event'),
+        import('../services/downloads/download-service'),
+        import('../lib/topStreamCache'),
+      ])
 
-    listen<StatusEvent>('download:status', (e) => {
-      updateStatus(e.payload.id, e.payload.status as any, e.payload.filePath, e.payload.error)
+      if (cancelled) return
 
-      // Refresh terminal-state records from DB so fileSize/errorMessage stay accurate
-      if (['completed', 'failed', 'cancelled'].includes(e.payload.status) && profileRef.current) {
-        downloadService
-          .list(profileRef.current)
-          .then(setDownloads)
-          .catch(console.error)
-      }
-    }).then((fn) => {
-      if (cancelled) fn()
-      else unlisteners.push(fn)
-    })
+      listen<ProgressEvent>('download:progress', (e) => {
+        updateProgress(e.payload.id, e.payload.progress, e.payload.downloadedBytes, e.payload.speed)
+      }).then((fn) => { if (cancelled) fn(); else unlisteners.push(fn) })
 
-    listen<SmartNextEvent>('download:queue_next', async (e) => {
-      const { profileId: pid, mediaId, season, episode, title, posterPath, addonId, quality, smartDownload, autoDelete } = e.payload
+      listen<StatusEvent>('download:status', (e) => {
+        updateStatus(e.payload.id, e.payload.status as any, e.payload.filePath, e.payload.error)
+        if (['completed', 'failed', 'cancelled'].includes(e.payload.status) && profileRef.current) {
+          downloadService.list(profileRef.current).then(setDownloads).catch(console.error)
+        }
+      }).then((fn) => { if (cancelled) fn(); else unlisteners.push(fn) })
 
-      // Only handle events for the currently active profile
-      if (pid !== profileRef.current) return
+      listen<SmartNextEvent>('download:queue_next', async (e) => {
+        const { profileId: pid, mediaId, season, episode, title, posterPath, addonId, quality, smartDownload, autoDelete } = e.payload
+        if (pid !== profileRef.current) return
 
-      const stream = await getTopStream({
-        profileId: pid,
-        mediaType: 'series',
-        mediaId,
-        season,
-        episode,
-      })
+        const stream = await getTopStream({ profileId: pid, mediaType: 'series', mediaId, season, episode })
+        if (!stream) {
+          toast.info('Smart Download: could not resolve the next episode source yet', { duration: 6000 })
+          return
+        }
 
-      if (!stream) {
-        toast.info('Smart Download: could not resolve the next episode source yet', { duration: 6000 })
-        return
-      }
+        try {
+          const id = await downloadService.start({
+            profileId: pid,
+            mediaType: 'series',
+            mediaId,
+            title,
+            episodeTitle: `S${season}:E${episode}`,
+            season,
+            episode,
+            posterPath,
+            streamUrl: stream.url || '',
+            addonId: addonId || stream.addonId || '',
+            quality: quality as DownloadQuality,
+            smartDownload,
+            autoDelete,
+          })
+          addDownload({
+            id,
+            profileId: pid,
+            mediaType: 'series',
+            mediaId,
+            title,
+            episodeTitle: `S${season}:E${episode}`,
+            season,
+            episode,
+            posterPath,
+            status: 'queued',
+            progress: 0,
+            quality: quality as DownloadQuality,
+            filePath: '',
+            fileSize: 0,
+            downloadedBytes: 0,
+            addedAt: Date.now(),
+            watchedPercent: 0,
+            streamUrl: stream.url || '',
+            addonId: addonId || stream.addonId || '',
+            smartDownload,
+            autoDelete,
+          })
+        } catch (err) {
+          console.error('[SmartDownloads] Failed to start next episode download', err)
+        }
+      }).then((fn) => { if (cancelled) fn(); else unlisteners.push(fn) })
+    }
 
-      try {
-        const id = await downloadService.start({
-          profileId: pid,
-          mediaType: 'series',
-          mediaId,
-          title,
-          episodeTitle: `S${season}:E${episode}`,
-          season,
-          episode,
-          posterPath,
-          streamUrl: stream.url || '',
-          addonId: addonId || stream.addonId || '',
-          quality: quality as DownloadQuality,
-          smartDownload,
-          autoDelete,
-        })
-        addDownload({
-          id,
-          profileId: pid,
-          mediaType: 'series',
-          mediaId,
-          title,
-          episodeTitle: `S${season}:E${episode}`,
-          season,
-          episode,
-          posterPath,
-          status: 'queued',
-          progress: 0,
-          quality: quality as DownloadQuality,
-          filePath: '',
-          fileSize: 0,
-          downloadedBytes: 0,
-          addedAt: Date.now(),
-          watchedPercent: 0,
-          streamUrl: stream.url || '',
-          addonId: addonId || stream.addonId || '',
-          smartDownload,
-          autoDelete,
-        })
-      } catch (err) {
-        console.error('[SmartDownloads] Failed to start next episode download', err)
-      }
-    }).then((fn) => {
-      if (cancelled) fn()
-      else unlisteners.push(fn)
-    })
+    setup()
 
     return () => {
       cancelled = true
