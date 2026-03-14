@@ -123,7 +123,7 @@ export const StreamingLayout = () => {
           staleTime: 1000 * 60 * 10
         })
       }
-    }, 1200)
+    }, 300)
 
     return () => clearTimeout(timer)
   }, [profileId, queryClient, location.pathname])

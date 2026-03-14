@@ -364,10 +364,12 @@ export const useAuthStore = create<AuthState>()(
 
           if (state) {
               log.debug('Cold start detected - verifying session state...');
-              
-              setTimeout(async () => {
+
+              // Use queueMicrotask to defer session check without an artificial delay.
+              // The 500ms timeout was removed as it blocked the UI unnecessarily on every cold start.
+              Promise.resolve().then(async () => {
                   log.debug('Executing rehydration check (background)');
-                  
+
                   // If we don't have local auth state, we still need to check the server
                   // because the user might have logged in via SSO or have an active cookie
                   if (!state.isAuthenticated && !hasSession && typeof state.refreshSession === 'function') {
@@ -375,12 +377,12 @@ export const useAuthStore = create<AuthState>()(
                   } else if (typeof state.checkSession === 'function') {
                       await state.checkSession();
                   }
-                  
+
                   // Ensure loading state is false after check completes (e.g. for unauthenticated guests)
                   if (typeof state.setLoading === 'function') {
                       state.setLoading(false);
                   }
-              }, 500);
+              });
           }
         },
       }

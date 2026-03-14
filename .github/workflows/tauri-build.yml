@@ -16,6 +16,9 @@ on:
         required: false
         type: string
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: write
 
@@ -216,6 +219,11 @@ jobs:
         working-directory: ./app
         run: |
           bun build src/index.ts --compile --target bun-darwin-arm64 --outfile src-tauri/bin/zentrio-server-aarch64-apple-darwin
+
+      # AppImage requires FUSE or extract-and-run mode; set globally so linuxdeploy inherits it
+      - name: Configure AppImage environment (Linux only)
+        if: matrix.name == 'linux'
+        run: echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
 
       # Desktop Build (Linux, Windows, macOS Desktop)
       - name: Build Tauri App (Desktop)

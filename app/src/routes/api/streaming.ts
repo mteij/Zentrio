@@ -1379,10 +1379,24 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
       }))
 
+      // Kick off all external addon calls in parallel
+      const heroCandidate = deduplicatedHistory.length > 0 ? deduplicatedHistory[0] : null
+      const heroMeta = heroCandidate
+        ? addonManager.getMeta(heroCandidate.meta_type, heroCandidate.meta_id, pId).catch(() => null)
+        : Promise.resolve(null)
+
+      const [catalogMetadata, trending, trendingMovies, trendingSeries, resolvedHeroMeta] = await Promise.all([
+        addonManager.getCatalogMetadata(pId),
+        addonManager.getTrending(pId),
+        addonManager.getTrendingByType(pId, 'movie'),
+        addonManager.getTrendingByType(pId, 'series'),
+        heroMeta,
+      ])
+
       // Continue Watching Hero (enriched via addonManager -> uses global TMDB key fallback)
       let continueWatchingHero: any = null
-      if (deduplicatedHistory.length > 0) {
-        const h = deduplicatedHistory[0]
+      if (heroCandidate) {
+        const h = heroCandidate
         const season = h.season !== undefined && h.season >= 0 ? h.season : null
         const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
         const episodeDisplay = h.meta_type === 'series' && season !== null && episode !== null ? `S${season}:E${episode}` : null
@@ -1393,27 +1407,23 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           lastStream = null
         }
 
-        try {
-          const meta = await addonManager.getMeta(h.meta_type, h.meta_id, pId)
-          if (meta) {
-            continueWatchingHero = {
-              id: (meta as any).id,
-              type: (meta as any).type,
-              name: (meta as any).name,
-              poster: (meta as any).poster,
-              background: (meta as any).background,
-              logo: (meta as any).logo,
-              description: (meta as any).description,
-              releaseInfo: (meta as any).releaseInfo,
-              imdbRating: (meta as any).imdbRating,
-              season,
-              episode,
-              episodeDisplay,
-              lastStream
-            }
+        const meta = resolvedHeroMeta
+        if (meta) {
+          continueWatchingHero = {
+            id: (meta as any).id,
+            type: (meta as any).type,
+            name: (meta as any).name,
+            poster: (meta as any).poster,
+            background: (meta as any).background,
+            logo: (meta as any).logo,
+            description: (meta as any).description,
+            releaseInfo: (meta as any).releaseInfo,
+            imdbRating: (meta as any).imdbRating,
+            season,
+            episode,
+            episodeDisplay,
+            lastStream
           }
-        } catch (e) {
-          log.warn('Failed to build continueWatchingHero (guest mode):', e)
         }
 
         if (!continueWatchingHero) {
@@ -1429,12 +1439,6 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           }
         }
       }
-      
-      // Get catalog metadata for the guest profile (uses Cinemeta fallback if no addons)
-      const catalogMetadata = await addonManager.getCatalogMetadata(pId)
-      const trending = await addonManager.getTrending(pId)
-      const trendingMovies = await addonManager.getTrendingByType(pId, 'movie')
-      const trendingSeries = await addonManager.getTrendingByType(pId, 'series')
       
       const enabledAddons = profileDb.getSettingsProfileId(pId) ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!) : [];
       const showFallbackToast = enabledAddons.length === 0 && catalogMetadata.length === 0;
@@ -1570,10 +1574,27 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
       lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
     }))
 
+    // Kick off all external addon calls in parallel
+    const heroCandidate = deduplicatedHistory.length > 0 ? deduplicatedHistory[0] : null
+    const heroMeta = heroCandidate
+      ? addonManager.getMeta(heroCandidate.meta_type, heroCandidate.meta_id, pId).catch((e) => {
+          log.warn('Failed to build continueWatchingHero:', e)
+          return null
+        })
+      : Promise.resolve(null)
+
+    const [catalogMetadata, trending, trendingMovies, trendingSeries, resolvedHeroMeta] = await Promise.all([
+      addonManager.getCatalogMetadata(pId),
+      addonManager.getTrending(pId),
+      addonManager.getTrendingByType(pId, 'movie'),
+      addonManager.getTrendingByType(pId, 'series'),
+      heroMeta,
+    ])
+
     // Continue Watching Hero (enriched via addonManager -> uses global TMDB key fallback)
     let continueWatchingHero: any = null
-    if (deduplicatedHistory.length > 0) {
-      const h = deduplicatedHistory[0]
+    if (heroCandidate) {
+      const h = heroCandidate
       const season = h.season !== undefined && h.season >= 0 ? h.season : null
       const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
       const episodeDisplay = h.meta_type === 'series' && season !== null && episode !== null ? `S${season}:E${episode}` : null
@@ -1584,27 +1605,23 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         lastStream = null
       }
 
-      try {
-        const meta = await addonManager.getMeta(h.meta_type, h.meta_id, pId)
-        if (meta) {
-          continueWatchingHero = {
-            id: (meta as any).id,
-            type: (meta as any).type,
-            name: (meta as any).name,
-            poster: (meta as any).poster,
-            background: (meta as any).background,
-            logo: (meta as any).logo,
-            description: (meta as any).description,
-            releaseInfo: (meta as any).releaseInfo,
-            imdbRating: (meta as any).imdbRating,
-            season,
-            episode,
-            episodeDisplay,
-            lastStream
-          }
+      const meta = resolvedHeroMeta
+      if (meta) {
+        continueWatchingHero = {
+          id: (meta as any).id,
+          type: (meta as any).type,
+          name: (meta as any).name,
+          poster: (meta as any).poster,
+          background: (meta as any).background,
+          logo: (meta as any).logo,
+          description: (meta as any).description,
+          releaseInfo: (meta as any).releaseInfo,
+          imdbRating: (meta as any).imdbRating,
+          season,
+          episode,
+          episodeDisplay,
+          lastStream
         }
-      } catch (e) {
-        log.warn('Failed to build continueWatchingHero:', e)
       }
 
       if (!continueWatchingHero) {
@@ -1620,12 +1637,6 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         }
       }
     }
-    
-    // Use catalog metadata for lazy loading - don't fetch items here
-    const catalogMetadata = await addonManager.getCatalogMetadata(pId)
-    const trending = await addonManager.getTrending(pId)
-    const trendingMovies = await addonManager.getTrendingByType(pId, 'movie')
-    const trendingSeries = await addonManager.getTrendingByType(pId, 'series')
     
     // Determine if the fallback was used by checking enabled addons
     const enabledAddons = profileDb.getSettingsProfileId(pId) ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!) : [];
