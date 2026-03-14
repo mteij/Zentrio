@@ -183,6 +183,9 @@ jobs:
           echo "CXX_aarch64_linux_android=$NDK_TOOLCHAIN/aarch64-linux-android24-clang++" >> $GITHUB_ENV
           echo "AR_aarch64_linux_android=$NDK_TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
           echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$NDK_TOOLCHAIN/aarch64-linux-android24-clang" >> $GITHUB_ENV
+          
+          # Force openssl-sys to use the vendored feature instead of failing on pkg-config cross-compilation
+          echo "OPENSSL_NO_PKG_CONFIG=1" >> $GITHUB_ENV
 
       - name: Setup Gradle cache (Android only)
         if: matrix.name == 'android'
