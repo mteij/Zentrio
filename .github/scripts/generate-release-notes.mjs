@@ -393,11 +393,17 @@ async function generateWithNanoGPT(prompt, apiKey) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
+    console.error(`[release-notes-debug] NanoGPT API error HTTP ${res.status}:`, text);
     throw new Error(`NanoGPT API error ${res.status}: ${text}`);
   }
 
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content || '';
+  
+  if (!text) {
+    console.error('[release-notes-debug] NanoGPT returned empty content. Full response:', JSON.stringify(data));
+  }
+  
   return text.trim();
 }
 
@@ -463,25 +469,28 @@ function buildPrompt(input) {
   };
 
   return [
-    'You are writing GitHub release notes for Zentrio.',
+    'You are writing professional GitHub release notes for Zentrio.',
     `Target version: ${tag}`,
     prevTag ? `Previous version: ${prevTag}` : 'Previous version: (first release or unavailable)',
     '',
     releaseContext,
     '',
-    'Evidence handling rules:',
-    '- Infer changes from code evidence first, not from commit wording.',
-    '- Evidence priority: focused patch excerpts > diff stats > changed file list > commit subjects.',
-    '- Use architecture context to interpret component purpose and user impact.',
-    '- Do not invent features or breaking changes.',
-    '- If something is uncertain, describe it as internal maintenance/refactor.',
+    'CRITICAL GUIDELINES FOR DEALING WITH COMMIT MESSAGES:',
+    '- The author is often lazy with commit messages (e.g., "fixed stuff", "updates").',
+    '- DO NOT rely heavily on commit subjects or bodies.',
+    '- IGNORING poor commit messages is preferred. Instead, deduce the ACTUAL changes by deeply analyzing the `focusedPatch` diffs and `changedFilesEvidence`.',
+    '- Translate technical code churn (e.g., "Refactored EpisodeList") into user-facing value (e.g., "Improved episode list rendering").',
     '',
     'Output constraints:',
     '- Markdown only.',
     '- No top-level title (GitHub already provides it).',
-    '- Use concise bullets.',
+    '- Keep bullet points concise and user-focused.',
     '- Include commit hash references when possible: (abc1234).',
-    '- Use sections only when meaningful: Features, Bug Fixes, Improvements, Maintenance, Breaking Changes.',
+    '- You MUST organize the changes into these specific sections (omit sections that have no matching changes):',
+    '  - 🚀 **New Features**',
+    '  - 🐛 **Bug Fixes**',
+    '  - 💅 **UI/UX Improvements**',
+    '  - 🔧 **Under the Hood** (Maintenance, refactors, CI/CD)',
     '',
     'Release-type guidance:',
     ...(releaseGuidelines[releaseType] || releaseGuidelines.patch),

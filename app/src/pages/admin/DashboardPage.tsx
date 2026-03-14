@@ -1,8 +1,230 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { RefreshCw, Users, ShieldCheck, Ban, LayoutGrid, MonitorPlay, Eye, Loader2 } from 'lucide-react'
-import { adminApi } from '../../lib/adminApi'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
+import { RefreshCw, Users, ShieldCheck, Ban, LayoutGrid, MonitorPlay, Eye, Loader2, Monitor, Globe, Zap } from 'lucide-react'
+import { adminApi, type PlatformStats } from '../../lib/adminApi'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts'
+
+// ── Client distribution colours ──────────────────────────────────────────────
+
+const PLATFORM_COLORS: Record<string, string> = {
+  'Tauri (Windows)': '#f59e0b',
+  'Tauri (macOS)':   '#fb923c',
+  'Tauri (Linux)':   '#f97316',
+  'Tauri (Android)': '#10b981',
+  'Tauri (iOS)':     '#818cf8',
+  'Tauri (Desktop)': '#d97706',
+  'Windows':         '#3b82f6',
+  'macOS':           '#a78bfa',
+  'Linux':           '#22d3ee',
+  'Android':         '#4ade80',
+  'iOS':             '#f472b6',
+  'Other':           '#3f3f46',
+}
+
+const BROWSER_COLORS: Record<string, string> = {
+  'Chrome':  '#fbbf24',
+  'Firefox': '#fb923c',
+  'Safari':  '#60a5fa',
+  'Edge':    '#818cf8',
+  'Opera':   '#f87171',
+  'Other':   '#3f3f46',
+}
+
+const platformColor = (name: string) => PLATFORM_COLORS[name] ?? '#3f3f46'
+const browserColor  = (name: string) => BROWSER_COLORS[name]  ?? '#3f3f46'
+const isTauriPlatform = (name: string) => name.startsWith('Tauri')
+
+// ── ClientDistribution widget ─────────────────────────────────────────────────
+
+function ClientDistribution({ data, loading }: { data: PlatformStats | undefined; loading: boolean }) {
+  if (loading && !data) {
+    return (
+      <div className="bg-black/30 border border-white/10 rounded-xl p-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
+      </div>
+    )
+  }
+
+  if (data?.disabled) {
+    return (
+      <div className="bg-black/30 border border-white/10 rounded-xl p-6 flex items-center justify-center">
+        <p className="text-sm text-zinc-600">Analytics disabled</p>
+      </div>
+    )
+  }
+
+  if (!data || data.total === 0) {
+    return (
+      <div className="bg-black/30 border border-white/10 rounded-xl p-6 flex items-center justify-center">
+        <p className="text-sm text-zinc-600">No session data yet</p>
+      </div>
+    )
+  }
+
+  const webTotal    = data.browsers.reduce((s, b) => s + b.count, 0)
+  const nativeTotal = data.total - webTotal
+  const nativePct   = data.total > 0 ? Math.round((nativeTotal / data.total) * 100) : 0
+  const webPct      = 100 - nativePct
+
+  return (
+    <div className="bg-black/30 border border-white/10 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+        <Monitor className="w-4 h-4 text-zinc-400" />
+        <span className="text-sm font-medium text-white">Client Distribution</span>
+        <span className="ml-auto text-xs text-zinc-600 tabular-nums">{data.total} sessions</span>
+      </div>
+
+      {/* Native vs Web segmented bar */}
+      <div className="px-4 pt-3 pb-1">
+        <div className="flex rounded-full overflow-hidden h-1.5 mb-2">
+          {nativePct > 0 && (
+            <div
+              className="h-full transition-all duration-700"
+              style={{ width: `${nativePct}%`, background: 'linear-gradient(90deg, #f59e0b, #fb923c)' }}
+            />
+          )}
+          {webPct > 0 && (
+            <div
+              className="h-full transition-all duration-700"
+              style={{ width: `${webPct}%`, background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)' }}
+            />
+          )}
+        </div>
+        <div className="flex items-center gap-4 text-xs text-zinc-500">
+          {nativeTotal > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-3 h-3 text-amber-400" />
+              Native app — {nativePct}%
+            </span>
+          )}
+          {webTotal > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Globe className="w-3 h-3 text-blue-400" />
+              Web browser — {webPct}%
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-4 grid lg:grid-cols-2 gap-6">
+
+        {/* Left: donut + platform legend */}
+        <div>
+          <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-3">Platforms</p>
+
+          {/* Donut chart */}
+          <div className="relative h-44">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data.platforms}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={48}
+                  outerRadius={72}
+                  paddingAngle={2}
+                  dataKey="count"
+                  nameKey="name"
+                  startAngle={90}
+                  endAngle={-270}
+                  strokeWidth={0}
+                >
+                  {data.platforms.map((p) => (
+                    <Cell key={p.name} fill={platformColor(p.name)} opacity={0.9} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#18181b', borderColor: '#ffffff15', fontSize: '12px', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e4e4e7' }}
+                  formatter={(value, name) => [`${value} session${value !== 1 ? 's' : ''}`, String(name)]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Center label — sits on top of the donut hole */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+              <span className="text-2xl font-bold text-white tabular-nums leading-none">{data.total}</span>
+              <span className="text-[11px] text-zinc-500 mt-0.5">sessions</span>
+            </div>
+          </div>
+
+          {/* Platform legend */}
+          <div className="mt-3 space-y-1.5">
+            {data.platforms.map(({ name, count }) => {
+              const pct   = Math.round((count / data.total) * 100)
+              const color = platformColor(name)
+              const native = isTauriPlatform(name)
+              return (
+                <div key={name} className="flex items-center gap-2 group">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-xs text-zinc-300 flex-1 truncate">
+                    {name}
+                    {native && (
+                      <span className="ml-1.5 text-[10px] text-amber-400/50 font-medium">app</span>
+                    )}
+                  </span>
+                  <span className="text-xs text-zinc-500 tabular-nums shrink-0">{count}</span>
+                  <span className="text-xs text-zinc-700 tabular-nums shrink-0 w-8 text-right">{pct}%</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Right: browser bars */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-3">
+            <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider flex-1">Web Browsers</p>
+            {webTotal > 0 && (
+              <span className="text-xs text-zinc-700 tabular-nums">{webTotal} sessions</span>
+            )}
+          </div>
+
+          {data.browsers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-2">
+              {nativeTotal > 0 ? (
+                <>
+                  <Zap className="w-5 h-5 text-amber-400/40" />
+                  <p className="text-xs text-zinc-600 text-center">All sessions are from<br />the native app</p>
+                </>
+              ) : (
+                <p className="text-xs text-zinc-600">No web sessions yet</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {data.browsers.map(({ name, count }) => {
+                const pct   = webTotal > 0 ? Math.round((count / webTotal) * 100) : 0
+                const color = browserColor(name)
+                return (
+                  <div key={name}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                        <span className="text-xs text-zinc-300">{name}</span>
+                      </div>
+                      <span className="text-xs text-zinc-500 tabular-nums">
+                        {count} <span className="text-zinc-700">({pct}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.75 }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function StatCard({ label, value, icon: Icon, color = 'text-zinc-300', loading = false }: {
   label: string
@@ -75,13 +297,20 @@ export function DashboardPage() {
     refetchInterval: 60_000,
   })
 
+  const { data: platformStats, isLoading: platformLoading } = useQuery({
+    queryKey: ['admin-platform-stats'],
+    queryFn: () => adminApi.getPlatformStats(),
+    refetchInterval: 60_000,
+  })
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['admin-stats'] })
     qc.invalidateQueries({ queryKey: ['admin-activity'] })
     qc.invalidateQueries({ queryKey: ['admin-charts'] })
+    qc.invalidateQueries({ queryKey: ['admin-platform-stats'] })
   }
 
-  const isLoading = statsLoading || activityLoading || chartsLoading
+  const isLoading = statsLoading || activityLoading || chartsLoading || platformLoading
 
   return (
     <div className="space-y-6">
@@ -187,6 +416,9 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Platform / client distribution */}
+      <ClientDistribution data={platformStats} loading={platformLoading} />
 
       {/* Activity tables */}
       <div className="grid lg:grid-cols-2 gap-4">

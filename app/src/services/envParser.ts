@@ -108,6 +108,15 @@ export function getConfig() {
 
   // Admin security
   const ADMIN_ENABLED = process.env.ADMIN_ENABLED === 'true'
+  // Optional token that must be provided when claiming initial superadmin.
+  // If unset, any authenticated user can claim on an unconfigured instance.
+  const ADMIN_SETUP_TOKEN = (process.env.ADMIN_SETUP_TOKEN || '').trim() || null
+
+  // Analytics: aggregate platform/browser stats shown in the admin dashboard.
+  // Defaults to true when admin is enabled, false otherwise.
+  // Set ANALYTICS_ENABLED=false to disable even when admin is on.
+  // Always false when ADMIN_ENABLED=false (nothing to display anyway).
+  const ANALYTICS_ENABLED = ADMIN_ENABLED && parseBoolean(process.env.ANALYTICS_ENABLED, true)
  
   return {
     PORT,
@@ -131,6 +140,8 @@ export function getConfig() {
     OIDC_ISSUER,
     OIDC_DISPLAY_NAME,
     ADMIN_ENABLED,
+    ADMIN_SETUP_TOKEN,
+    ANALYTICS_ENABLED,
     TMDB_API_KEY: process.env.TMDB_API_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     // Trakt Integration

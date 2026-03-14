@@ -59,7 +59,7 @@ async function filterAndEnrich(items: MetaPreview[], profileId: string): Promise
  * Routing logic:
  * - manifestUrl = 'zentrio://tmdb-addon' → /api/tmdb/catalog/:type/:id (server injects API key)
  * - manifestUrl = real HTTPS URL → ClientAddonClient fetches directly from the addon URL
- *   (Tauri: direct HTTP, Web: via /api/addon-proxy CORS proxy), then server applies
+ *   (Tauri: direct HTTP, Web: direct fetch first with temporary /api/addon-proxy fallback), then server applies
  *   parental filter + watch history enrichment via /api/streaming/filter-enrich
  * - no manifestUrl (genre/type filter) → /api/streaming/catalog (server-side, profile-aware)
  */

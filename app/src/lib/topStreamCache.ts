@@ -1,5 +1,5 @@
-import { createApiEventSource } from './url'
 import { apiFetch } from './apiFetch'
+import { resolveStreamsProgressive } from './stream-resolver'
 
 export const STREAM_CACHE_FRESH_MS = 2 * 60 * 1000
 export const STREAM_RESOLVE_TIMEOUT_MS = 10000
@@ -180,57 +180,46 @@ export async function resolveTopStream({
 
   const promise = new Promise<CachedTopStream | null>((resolve) => {
     let settled = false
-    let url = `/api/streaming/streams-live/${mediaType}/${mediaId}?profileId=${profileId}`
-    if (scoped) {
-      url += `&season=${season}&episode=${episode}`
-    }
-    if (forceRefresh) {
-      url += '&refresh=true'
-    }
-
-    const es = createApiEventSource(url)
+    let timeout = 0
 
     const finish = (stream: CachedTopStream | null) => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
-      es.close()
+      resolver.cancel()
       if (stream) {
         cacheTopStream(mediaId, stream, scoped ? season : undefined, scoped ? episode : undefined)
       }
       resolve(stream)
     }
 
-    es.addEventListener('first-playable', (e) => {
-      try {
-        finish(readFromEvent(JSON.parse(e.data)))
-      } catch {
-        finish(null)
-      }
-    })
-
-    es.addEventListener('addon-result', (e) => {
-      try {
-        const stream = readFromEvent(JSON.parse(e.data))
+    const resolver = resolveStreamsProgressive({
+      type: mediaType,
+      id: mediaId,
+      profileId,
+      season,
+      episode,
+      forceRefresh,
+    }, {
+      onFirstPlayable: (data) => {
+        finish(readFromEvent(data))
+      },
+      onAddonResult: (data) => {
+        const stream = readFromEvent(data)
         if (stream) finish(stream)
-      } catch {
-        // Ignore malformed intermediate event payloads.
+      },
+      onComplete: (data) => {
+        finish(readFromEvent(data))
       }
     })
 
-    es.addEventListener('complete', (e) => {
-      try {
-        finish(readFromEvent(JSON.parse(e.data)))
-      } catch {
-        finish(null)
-      }
-    })
-
-    es.addEventListener('error', () => finish(null))
-
-    const timeout = window.setTimeout(() => {
+    timeout = window.setTimeout(() => {
       finish(null)
     }, effectiveTimeoutMs)
+
+    void resolver.done.then((data) => {
+      if (!data) finish(null)
+    })
   })
 
   inFlightResolvers.set(inFlightKey, promise)

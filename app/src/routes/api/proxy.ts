@@ -30,8 +30,9 @@ function isAllowedUrl(urlStr: string): boolean {
 }
 
 // GET /api/addon-proxy?url=<encoded-addon-url>
-// Thin CORS proxy so web browsers can reach external addon URLs.
-// Tauri apps bypass this entirely via @tauri-apps/plugin-http.
+// Temporary hosted compatibility bridge so web browsers can reach external
+// addon URLs when direct fetch is blocked by CORS. Tauri apps bypass this
+// entirely via @tauri-apps/plugin-http.
 proxy.get('/', async (c) => {
   const targetUrl = c.req.query('url')
   if (!targetUrl) return c.json({ error: 'Missing url parameter' }, 400)

@@ -6,7 +6,8 @@ const log = createLogger('AddonFetch')
 /**
  * Fetch from an external addon URL using the correct transport for the platform:
  * - Tauri (desktop/mobile): direct HTTP via @tauri-apps/plugin-http — no CORS restrictions
- * - Web browser: routed through /api/addon-proxy to avoid CORS
+ * - Web browser: direct fetch first when CORS permits it, then temporary fallback
+ *   to /api/addon-proxy for compatibility with non-CORS addons
  */
 export async function addonFetch(url: string, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController()
@@ -21,9 +22,17 @@ export async function addonFetch(url: string, timeoutMs = 15000): Promise<Respon
         headers: { 'User-Agent': 'Zentrio/1.0' },
       } as any)
     } else {
-      const proxyUrl = `/api/addon-proxy?url=${encodeURIComponent(url)}`
-      log.debug('Web proxy fetch:', url)
-      return await fetch(proxyUrl, { signal: controller.signal })
+      try {
+        log.debug('Web direct fetch:', url)
+        return await fetch(url, {
+          signal: controller.signal,
+          headers: { 'User-Agent': 'Zentrio/1.0' },
+        })
+      } catch {
+        const proxyUrl = `/api/addon-proxy?url=${encodeURIComponent(url)}`
+        log.debug('Web proxy fallback fetch:', url)
+        return await fetch(proxyUrl, { signal: controller.signal })
+      }
     }
   } finally {
     clearTimeout(timeout)

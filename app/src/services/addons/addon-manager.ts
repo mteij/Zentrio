@@ -952,7 +952,7 @@ export class AddonManager {
             const errorMsg = e instanceof Error ? e.message : String(e)
             log.error(`Failed to fetch catalog ${id} from ${manifestUrl}`, e)
             if (e instanceof Error) {
-                log.error(e.stack)
+                log.error(e.stack || e.message)
             }
             return null
         }

@@ -171,6 +171,29 @@ if (PROXY_LOGS) {
 app.use('*', securityHeaders)
 app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
 
+// Lazily record the client platform when the app sends X-Zentrio-Client header.
+// Only runs when analytics are enabled (requires ADMIN_ENABLED=true and ANALYTICS_ENABLED!=false).
+app.use('*', async (c, next) => {
+  const { ANALYTICS_ENABLED } = getConfig()
+  if (ANALYTICS_ENABLED) {
+    const clientType = c.req.header('X-Zentrio-Client')
+    if (clientType) {
+      const authHeader = c.req.header('Authorization')
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+      if (token) {
+        try {
+          db.prepare(`
+            INSERT INTO session_client_hints (session_token, client_type, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT (session_token) DO UPDATE SET client_type = excluded.client_type, updated_at = excluded.updated_at
+          `).run(token, clientType, new Date().toISOString())
+        } catch (_) { /* non-critical */ }
+      }
+    }
+  }
+  await next()
+})
+
 
 
 // Serve bundled assets (JS/CSS) from Vite build

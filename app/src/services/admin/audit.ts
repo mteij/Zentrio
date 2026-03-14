@@ -1,6 +1,7 @@
 // Admin Audit Service with hash-chained tamper-evident logging
-import { createHash } from 'crypto'
+import { createHash, createHmac } from 'crypto'
 import { db } from '../database/connection'
+import { getConfig } from '../envParser'
 import type { AdminAuditLog } from '../database/types'
 
 export interface AuditEventInput {
@@ -16,10 +17,13 @@ export interface AuditEventInput {
 }
 
 /**
- * Compute SHA-256 hash of audit entry data
+ * Compute HMAC-SHA256 of audit entry data, keyed with ENCRYPTION_KEY.
+ * Using a keyed HMAC prevents an attacker with direct DB write access from
+ * reforging a valid hash chain without also knowing the server secret.
  */
 function computeHash(data: string): string {
-  return createHash('sha256').update(data).digest('hex')
+  const { ENCRYPTION_KEY } = getConfig()
+  return createHmac('sha256', ENCRYPTION_KEY).update(data).digest('hex')
 }
 
 /**
@@ -44,8 +48,16 @@ function buildCanonicalString(entry: Omit<AdminAuditLog, 'id' | 'hash_curr'>): s
 }
 
 /**
- * Get the hash of the most recent audit entry
- * Returns a genesis hash if no entries exist
+ * Compute the genesis hash (chain seed) using HMAC-SHA256 keyed with ENCRYPTION_KEY.
+ */
+function genesisHash(): string {
+  const { ENCRYPTION_KEY } = getConfig()
+  return createHmac('sha256', ENCRYPTION_KEY).update('ZENTRIO_ADMIN_AUDIT_GENESIS').digest('hex')
+}
+
+/**
+ * Get the hash of the most recent audit entry.
+ * Returns a genesis hash if no entries exist.
  */
 function getPreviousHash(): string {
   const row = db
@@ -54,12 +66,7 @@ function getPreviousHash(): string {
     )
     .get()
 
-  if (row) {
-    return row.hash_curr
-  }
-
-  // Genesis hash for first entry
-  return createHash('sha256').update('ZENTRIO_ADMIN_AUDIT_GENESIS').digest('hex')
+  return row ? row.hash_curr : genesisHash()
 }
 
 /**
@@ -101,6 +108,7 @@ export function writeAuditEvent(input: AuditEventInput): AdminAuditLog {
         string | null,
         string,
         string,
+        string,
       ]
     >(
       `INSERT INTO admin_audit_log 
@@ -112,13 +120,13 @@ export function writeAuditEvent(input: AuditEventInput): AdminAuditLog {
     .get(
       entry.actor_id,
       entry.action,
-      entry.target_type,
-      entry.target_id,
-      entry.reason,
-      entry.before_json,
-      entry.after_json,
-      entry.ip_address,
-      entry.user_agent,
+      entry.target_type ?? null,
+      entry.target_id ?? null,
+      entry.reason ?? null,
+      entry.before_json ?? null,
+      entry.after_json ?? null,
+      entry.ip_address ?? null,
+      entry.user_agent ?? null,
       entry.hash_prev,
       hashCurr,
       entry.created_at
@@ -224,9 +232,12 @@ export function verifyAuditChain(): { valid: boolean; firstInvalidId: number | n
     return { valid: true, firstInvalidId: null }
   }
 
-  // Check genesis entry
-  const genesisHash = createHash('sha256').update('ZENTRIO_ADMIN_AUDIT_GENESIS').digest('hex')
-  if (logs[0].hash_prev !== genesisHash) {
+  // Accept either the HMAC genesis (new installs / post-upgrade entries) or
+  // the legacy plain-SHA256 genesis (entries written before the HMAC upgrade).
+  // This allows the chain to verify correctly across the migration boundary.
+  const legacyGenesisHash = createHash('sha256').update('ZENTRIO_ADMIN_AUDIT_GENESIS').digest('hex')
+  const firstHashPrev = logs[0].hash_prev
+  if (firstHashPrev !== genesisHash() && firstHashPrev !== legacyGenesisHash) {
     return {
       valid: false,
       firstInvalidId: logs[0].id,
@@ -254,9 +265,11 @@ export function verifyAuditChain(): { valid: boolean; firstInvalidId: number | n
     }
 
     const canonical = buildCanonicalString(entry)
-    const computedHash = computeHash(canonical)
+    // Accept HMAC (new) or plain SHA256 (pre-migration) hash for this entry
+    const hmacHash = computeHash(canonical)
+    const legacyHash = createHash('sha256').update(canonical).digest('hex')
 
-    if (computedHash !== log.hash_curr) {
+    if (log.hash_curr !== hmacHash && log.hash_curr !== legacyHash) {
       return {
         valid: false,
         firstInvalidId: log.id,

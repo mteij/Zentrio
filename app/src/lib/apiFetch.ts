@@ -7,6 +7,34 @@ import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('ApiFetch')
 
+function buildJsonParseError(sourceLabel: string, rawText: string, contentType: string | null): Error {
+  const trimmed = rawText.trim()
+  const preview = trimmed.slice(0, 160).replace(/\s+/g, ' ')
+  const looksLikeHtml =
+    (contentType || '').toLowerCase().includes('text/html') ||
+    /^<!doctype html/i.test(trimmed) ||
+    /^<html/i.test(trimmed)
+
+  if (looksLikeHtml) {
+    return new Error(
+      `API request returned HTML instead of JSON for ${sourceLabel}. This usually means the app is talking to an older server or a frontend fallback page. Preview: ${preview}`
+    )
+  }
+
+  return new Error(`API request returned invalid JSON for ${sourceLabel}. Preview: ${preview}`)
+}
+
+async function parseJsonResponse<T>(res: Response, sourceLabel: string): Promise<T> {
+  const rawText = await res.text()
+  if (!rawText.trim()) return undefined as T
+
+  try {
+    return JSON.parse(rawText) as T
+  } catch {
+    throw buildJsonParseError(sourceLabel, rawText, res.headers.get('content-type'))
+  }
+}
+
 /**
  * Fetch wrapper that prepends the server URL for Tauri apps.
  * In Tauri, relative paths like '/api/...' are converted to absolute URLs
@@ -36,6 +64,19 @@ export async function apiFetch(
   const headers = new Headers(init?.headers);
   if (appMode.isGuest()) {
     headers.set('X-Guest-Mode', 'true');
+  }
+
+  // Identify Tauri platform on every request so the analytics middleware can
+  // record the client hint regardless of which fetch path is used.
+  if (isTauri() && !headers.has('X-Zentrio-Client')) {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+    let tauriPlatform = 'tauri-desktop'
+    if (/android/i.test(ua))            tauriPlatform = 'tauri-android'
+    else if (/iphone|ipad/i.test(ua))   tauriPlatform = 'tauri-ios'
+    else if (/windows nt/i.test(ua))    tauriPlatform = 'tauri-windows'
+    else if (/macintosh|mac os x/i.test(ua)) tauriPlatform = 'tauri-macos'
+    else if (/linux/i.test(ua))         tauriPlatform = 'tauri-linux'
+    headers.set('X-Zentrio-Client', tauriPlatform)
   }
   
   // Inject Bearer token if available (for Tauri cross-origin auth)
@@ -192,5 +233,6 @@ export async function apiFetchJson<T = unknown>(
     const text = await res.text().catch(() => '');
     throw new Error(`API request failed: ${res.status} ${res.statusText} - ${text}`);
   }
-  return res.json();
+  const sourceLabel = typeof input === 'string' ? input : input.toString()
+  return parseJsonResponse<T>(res, sourceLabel);
 }

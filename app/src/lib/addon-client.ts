@@ -27,6 +27,34 @@ const CACHE_TTLS = {
   meta: 10 * 60 * 1000,     // 10 minutes
 }
 
+function buildAddonJsonError(url: string, rawText: string, contentType: string | null): Error {
+  const trimmed = rawText.trim()
+  const preview = trimmed.slice(0, 160).replace(/\s+/g, ' ')
+  const looksLikeHtml =
+    (contentType || '').toLowerCase().includes('text/html') ||
+    /^<!doctype html/i.test(trimmed) ||
+    /^<html/i.test(trimmed)
+
+  if (looksLikeHtml) {
+    return new Error(
+      `Addon returned HTML instead of JSON for ${url}. This usually means the addon is blocked, fronted by an anti-bot page, or the app fell back to a non-addon URL. Preview: ${preview}`
+    )
+  }
+
+  return new Error(`Addon returned invalid JSON for ${url}. Preview: ${preview}`)
+}
+
+async function parseAddonJson<T>(res: Response, url: string): Promise<T> {
+  const rawText = await res.text()
+  if (!rawText.trim()) return {} as T
+
+  try {
+    return JSON.parse(rawText) as T
+  } catch {
+    throw buildAddonJsonError(url, rawText, res.headers.get('content-type'))
+  }
+}
+
 function getCached<T>(key: string): T | null {
   const entry = responseCache.get(key)
   if (!entry) return null
@@ -73,7 +101,7 @@ export class ClientAddonClient {
 
     const res = await addonFetch(`${this.baseUrl}/manifest.json`, RESOURCE_TIMEOUTS.manifest)
     if (!res.ok) throw new Error(`Failed to fetch manifest from ${this.baseUrl}: ${res.statusText}`)
-    const manifest = await res.json() as Manifest
+    const manifest = await parseAddonJson<Manifest>(res, `${this.baseUrl}/manifest.json`)
     this.manifest = manifest
     setCache(cacheKey, manifest, CACHE_TTLS.manifest)
     return manifest
@@ -132,8 +160,9 @@ export class ClientAddonClient {
     const res = await addonFetch(url, timeoutMs)
     if (!res.ok) throw new Error(`Addon request failed (${res.status}): ${url}`)
 
-    const data = await res.json()
-    if (data?.err) throw new Error(data.err)
+    const data = await parseAddonJson<Record<string, unknown>>(res, url)
+    const addonError = typeof data?.err === 'string' ? data.err : null
+    if (addonError) throw new Error(addonError)
 
     const result = data?.[extractKey]
     if (result === undefined || result === null) {

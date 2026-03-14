@@ -1,5 +1,6 @@
 import { addonDb } from '../../services/database'
 import { AddonClient } from '../../services/addons/client'
+import { optionalSessionMiddleware } from '../../middleware/session'
 import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
 
@@ -65,8 +66,18 @@ app.delete('/:id', (c) => {
 })
 
 // Get enabled addons for a profile (legacy support + resolution)
-app.get('/profile/:profileId', (c) => {
-  const profileId = parseInt(c.req.param('profileId'))
+app.get('/profile/:profileId', optionalSessionMiddleware, async (c) => {
+  const rawProfileId = c.req.param('profileId')
+  let profileId: number
+
+  if (rawProfileId === 'guest') {
+    const { userDb } = require('../../services/database')
+    const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+    profileId = guestDefaultProfile.id
+  } else {
+    profileId = parseInt(rawProfileId)
+  }
+
   // Resolve settings profile
   const { profileDb } = require('../../services/database'); // Lazy import to avoid circular dep if any
   const settingsProfileId = profileDb.getSettingsProfileId(profileId);

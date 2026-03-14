@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
-import { userDb, verifyPassword, profileProxySettingsDb, profileDb, streamDb, settingsProfileDb, type User } from '../../services/database'
+import { db, userDb, verifyPassword, profileProxySettingsDb, profileDb, streamDb, settingsProfileDb, type User } from '../../services/database'
 import { auth } from '../../services/auth'
 import { emailService } from '../../services/email'
 import { getConfig } from '../../services/envParser'
@@ -593,8 +593,26 @@ app.delete('/accounts/:providerId', async (c) => {
 // Custom implementation because better-auth's changeEmail requires standard emailVerification
 // which is disabled when using emailOTP plugin
 
-// In-memory store for email change tokens (userId -> { newEmail, token, expiresAt })
-const emailChangeTokens = new Map<string, { newEmail: string; token: string; expiresAt: number }>()
+// Email change token helpers — persisted in DB so they survive server restarts
+function storeEmailChangeToken(userId: string, newEmail: string, token: string, expiresAt: number): void {
+  const tokenHash = createHash('sha256').update(token).digest('hex')
+  db.prepare(`
+    INSERT OR REPLACE INTO email_change_tokens (user_id, new_email, token_hash, expires_at, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(userId, newEmail, tokenHash, expiresAt, Date.now())
+}
+
+function getEmailChangeToken(userId: string): { newEmail: string; token: string; expiresAt: number } | null {
+  const row = db.prepare(
+    'SELECT new_email, token_hash, expires_at FROM email_change_tokens WHERE user_id = ?'
+  ).get(userId) as { new_email: string; token_hash: string; expires_at: number } | undefined
+  if (!row) return null
+  return { newEmail: row.new_email, token: row.token_hash, expiresAt: row.expires_at }
+}
+
+function deleteEmailChangeToken(userId: string): void {
+  db.prepare('DELETE FROM email_change_tokens WHERE user_id = ?').run(userId)
+}
 
 // [PUT /email] Deprecated direct update
 app.put('/email', async (c) => {
@@ -641,9 +659,9 @@ app.post('/email/initiate', async (c) => {
     const token = randomBytes(32).toString('hex')
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000 // 24 hours
     
-    // Store token
-    emailChangeTokens.set(user.id, { newEmail, token, expiresAt })
-    
+    // Store token in DB (survives server restarts)
+    storeEmailChangeToken(user.id, newEmail, token, expiresAt)
+
     // Determine callback URL based on client type
     const isTauri = c.req.header('User-Agent')?.includes('Tauri')
     const cfg = getConfig()
@@ -654,7 +672,7 @@ app.post('/email/initiate', async (c) => {
     const emailSent = await emailService.sendVerificationEmail(newEmail, verificationUrl)
     
     if (!emailSent) {
-      emailChangeTokens.delete(user.id)
+      deleteEmailChangeToken(user.id)
       log.info(JSON.stringify({ ts: new Date().toISOString(), userId: user.id, action: 'email_change_initiate', result: 'error', ip, userAgent, targetEmailHash: hashEmail(newEmail), errorCode: 'EMAIL_SEND_FAILED' }))
       return err(c, 500, 'SERVER_ERROR', 'Failed to send verification email')
     }
@@ -679,31 +697,32 @@ app.get('/email/verify', async (c) => {
       return c.text('Invalid verification link', 400)
     }
     
-    const stored = emailChangeTokens.get(userId)
-    if (!stored || stored.token !== token) {
+    const stored = getEmailChangeToken(userId)
+    const tokenHash = createHash('sha256').update(token).digest('hex')
+    if (!stored || stored.token !== tokenHash) {
       return c.text('Invalid or expired verification link', 400)
     }
-    
+
     if (Date.now() > stored.expiresAt) {
-      emailChangeTokens.delete(userId)
+      deleteEmailChangeToken(userId)
       return c.text('Verification link has expired', 400)
     }
-    
+
     // Check if email is still available
     const existing = userDb.findByEmail(stored.newEmail)
     if (existing && existing.id !== userId) {
-      emailChangeTokens.delete(userId)
+      deleteEmailChangeToken(userId)
       return c.text('Email address is no longer available', 409)
     }
-    
+
     // Update email in database
     const updated = await userDb.update(userId, { email: stored.newEmail })
     if (!updated) {
       return c.text('Failed to update email', 500)
     }
-    
+
     // Clean up token
-    emailChangeTokens.delete(userId)
+    deleteEmailChangeToken(userId)
     
     const { ipAddress, userAgent } = getRequestMeta(c)
     writeAuditEvent({

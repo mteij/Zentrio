@@ -85,6 +85,11 @@ export const securityHeaders = async (c: Context, next: Next) => {
   c.header('X-Content-Type-Options', 'nosniff')
   c.header('X-XSS-Protection', '1; mode=block')
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
+
+  // HSTS — only set on HTTPS (production). Prevents downgrade attacks.
+  if (isProductionEnv()) {
+    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  }
   
   // Conditional Isolation Headers - ENABLED ONLY FOR PLAYER
   // Regex to match /streaming/:profileId/player

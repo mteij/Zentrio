@@ -17,6 +17,14 @@ The codebase lives entirely in `app/src/`. All commands run from `app/` using Bu
 
 ---
 
+## Streaming Boundary
+
+Zentrio is in a transition state.
+
+- **Target architecture:** the hosted backend owns auth, profiles, settings, history, sync, enrichment, and trusted first-party integrations. Third-party addon stream resolution happens on the client, and media playback goes directly from client to the final media URL.
+- **Phase 1 current state:** third-party stream resolution now runs client-side for the main playback flow. Web may still fall back to `/api/addon-proxy` as a temporary hosted compatibility bridge for non-CORS addons. Metadata/catalog/details remain mixed between backend and client paths for now.
+- **Compatibility rule:** newer clients must tolerate older servers during rollout. The client-side resolver should detect incompatible backend responses and gracefully fall back to the legacy server stream endpoints instead of failing hard.
+
 ## Runtime Environments
 
 Two distinct runtime contexts exist in this project. Always know which one you are writing code for.
@@ -233,7 +241,11 @@ These are the canonical client-side utilities. Do not duplicate them.
 | `addon-fetch.ts` | Platform-aware fetch for **external addon URLs**: Tauri → direct HTTP via `@tauri-apps/plugin-http` (no CORS), Web → routes through `/api/addon-proxy`. Use this instead of `apiFetch` when fetching from third-party Stremio addon URLs. |
 | `addon-client.ts` | Client-side Stremio addon client (`ClientAddonClient`) with in-memory TTL cache. Use `getAddonClient(manifestUrl)` for a cached instance. `ZENTRIO_TMDB_ADDON = 'zentrio://tmdb-addon'` identifies the built-in TMDB addon — route it to `/api/tmdb/*` instead of fetching directly. |
 
+`stream-resolver.ts` is the client-side third-party stream resolver. It loads enabled addons and stream settings from the backend, resolves streams progressively on the client, and applies the shared `StreamProcessor` without relying on `/api/streaming/streams-live` for the main playback flow.
+
 **Rule:** Never call `fetch('/api/...')` directly in components or hooks. Use `apiFetch` or a typed client.
+
+**Addon boundary note:** Use `addon-client.ts` / `addon-fetch.ts` for third-party addon URLs. Do not use `apiFetch` for those external requests. After fetching addon metadata or catalog results, call `POST /api/streaming/filter-enrich` for server-side parental filtering and watch history enrichment.
 
 **Rule for addon fetching:** Use `addon-client.ts` / `addon-fetch.ts` for external Stremio addon URL calls. Never use raw `fetch()` for addon URLs on the client — CORS will block it in the browser. After fetching, call `POST /api/streaming/filter-enrich` to apply server-side parental filtering and watch history enrichment.
 

@@ -53,16 +53,14 @@ export async function getUserPermissions(userId: string): Promise<Set<string>> {
        FROM admin_permissions p
        JOIN admin_role_permissions rp ON rp.permission_id = p.id
        JOIN admin_user_roles ur ON ur.role_id = rp.role_id
-       WHERE ur.user_id = ?`,
-      [userId]
+       WHERE ur.user_id = ?`
     )
     .all(userId)
 
   // 2. Get permissions from user's role field (legacy support during transition)
   const user = db
     .query<{ role: string }, [string]>(
-      `SELECT role FROM user WHERE id = ?`,
-      [userId]
+      `SELECT role FROM user WHERE id = ?`
     )
     .get(userId)
 
@@ -182,8 +180,7 @@ export function getRolePermissions(roleId: string): AdminPermission[] {
        FROM admin_permissions p
        JOIN admin_role_permissions rp ON rp.permission_id = p.id
        WHERE rp.role_id = ?
-       ORDER BY p.category, p.key`,
-      [roleId]
+       ORDER BY p.category, p.key`
     )
     .all(roleId)
 }
@@ -198,8 +195,7 @@ export function getUserRoles(userId: string): AdminRole[] {
        FROM admin_roles r
        JOIN admin_user_roles ur ON ur.role_id = r.id
        WHERE ur.user_id = ?
-       ORDER BY r.name`,
-      [userId]
+       ORDER BY r.name`
     )
     .all(userId)
 }

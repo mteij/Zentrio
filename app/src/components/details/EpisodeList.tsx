@@ -16,6 +16,7 @@ import {
 import styles from '../../styles/Streaming.module.css'
 import type { MetaDetail } from '../../services/addons/types'
 import { createLogger } from '../../utils/client-logger'
+import { isTauri } from '../../lib/auth-client'
 
 const log = createLogger('EpisodeList')
 
@@ -225,7 +226,7 @@ export function EpisodeList({
                   icon: Play,
                   onClick: () => onPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
                 },
-                {
+                ...(isTauri() ? [{
                   label: 'Download episode',
                   icon: Download,
                   onClick: () => setPickerEpisode({
@@ -234,7 +235,7 @@ export function EpisodeList({
                     title: ep.title || ep.name || `Episode ${epNum}`,
                     episodeId: ep.id || `${ep.season}:${epNum}`,
                   })
-                },
+                }] : []),
                 { type: 'separator' },
                 {
                   label: isWatched ? 'Mark as unwatched' : 'Mark as watched',
@@ -303,21 +304,23 @@ export function EpisodeList({
                       {ep.title || ep.name || `Episode ${epNum}`}
                     </span>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                          className={styles.episodePlayBtn}
-                          onClick={(e) => {
-                              e.stopPropagation()
-                              setPickerEpisode({
-                                season: ep.season,
-                                episode: epNum,
-                                title: ep.title || ep.name || `Episode ${epNum}`,
-                                episodeId: ep.id || `${ep.season}:${epNum}`,
-                              })
-                          }}
-                          title="Download"
-                      >
-                        <Download size={18} fill="currentColor" strokeWidth={1} />
-                      </button>
+                      {isTauri() && (
+                        <button
+                            className={styles.episodePlayBtn}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setPickerEpisode({
+                                  season: ep.season,
+                                  episode: epNum,
+                                  title: ep.title || ep.name || `Episode ${epNum}`,
+                                  episodeId: ep.id || `${ep.season}:${epNum}`,
+                                })
+                            }}
+                            title="Download"
+                        >
+                          <Download size={18} fill="currentColor" strokeWidth={1} />
+                        </button>
+                      )}
                       <button 
                           className={styles.episodePlayBtn}
                           onClick={(e) => {

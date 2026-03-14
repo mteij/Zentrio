@@ -27,11 +27,11 @@ export interface VerifyResult {
 }
 
 /**
- * Generate a cryptographically secure 6-digit OTP
+ * Generate a cryptographically secure 8-digit OTP
  */
 function generateOTP(): string {
-  // Generate cryptographically secure 6-digit number (000000-999999)
-  return String(randomInt(0, 1000000)).padStart(6, '0')
+  // 8 digits → 100 million possibilities, significantly harder to brute-force than 6 digits
+  return String(randomInt(0, 100000000)).padStart(8, '0')
 }
 
 /**

@@ -154,6 +154,13 @@ export interface AuditStats {
   uniqueActors: number
 }
 
+export interface PlatformStats {
+  total: number
+  platforms: { name: string; count: number }[]
+  browsers: { name: string; count: number }[]
+  disabled?: boolean
+}
+
 export interface StepUpStatus {
   total: number
   active: number
@@ -172,10 +179,13 @@ export interface StepUpRequestResult {
 
 export const adminApi = {
   getStatus: () =>
-    adminFetch<{ enabled: boolean; hasOwner: boolean }>('/api/admin/status'),
+    adminFetch<{ enabled: boolean; hasOwner: boolean; requiresSetupToken: boolean }>('/api/admin/status'),
 
-  claimSetup: () =>
-    adminFetch<{ message: string }>('/api/admin/setup', { method: 'POST' }),
+  claimSetup: (setupToken?: string) =>
+    adminFetch<{ message: string }>('/api/admin/setup', {
+      method: 'POST',
+      body: setupToken ? JSON.stringify({ setupToken }) : undefined,
+    }),
 
   getMe: () =>
     adminFetch<AdminMe>('/api/admin/me'),
@@ -191,6 +201,9 @@ export const adminApi = {
 
   getSystemHealth: () =>
     adminFetch<AdminSystemHealth>('/api/admin/system/health'),
+
+  getPlatformStats: () =>
+    adminFetch<PlatformStats>('/api/admin/stats/platforms'),
 
 
   listUsers: (params?: { q?: string; limit?: number; offset?: number }) => {

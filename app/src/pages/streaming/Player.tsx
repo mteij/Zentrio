@@ -16,8 +16,9 @@ import { toast } from 'sonner'
 import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import styles from '../../styles/Player.module.css'
 import { apiFetch } from '../../lib/apiFetch'
-import { resolveBeaconUrl, createApiEventSource } from '../../lib/url'
+import { resolveBeaconUrl } from '../../lib/url'
 import type { FlatStream } from '../../hooks/useStreamLoader'
+import { resolveStreamsProgressive, type StreamResolveHandle } from '../../lib/stream-resolver'
 import { createLogger } from '../../utils/client-logger'
 
 const log = createLogger('PlayerPage')
@@ -64,13 +65,14 @@ function mergeSubtitleTracks(base: PlayerSubtitleTrack[], inc: PlayerSubtitleTra
 /**
  * Manages loading all available streams and cycling through them,
  * excluding previously-tried URLs (including the current stream).
- * Respects the priority order set by the backend StreamProcessor (user settings).
+ * Respects the priority order set by the shared client/server StreamProcessor.
  */
 function useFindNewStream(meta: MetaInfo | null, profileId: string | undefined) {
   const allStreamsRef = useRef<FlatStream[]>([])
   const triedUrlsRef = useRef<Set<string>>(new Set())
   const loadedRef = useRef(false)
-  const eventSourceRef = useRef<EventSource | null>(null)
+  const resolverRef = useRef<StreamResolveHandle | null>(null)
+  const loadPromiseRef = useRef<Promise<FlatStream[]>>(Promise.resolve([]))
   const [isFinding, setIsFinding] = useState(false)
 
   // Reset when meta/episode changes (e.g. after navigating to a new stream)
@@ -78,14 +80,15 @@ function useFindNewStream(meta: MetaInfo | null, profileId: string | undefined) 
     allStreamsRef.current = []
     triedUrlsRef.current = new Set()
     loadedRef.current = false
-    eventSourceRef.current?.close()
-    eventSourceRef.current = null
+    resolverRef.current?.cancel()
+    resolverRef.current = null
+    loadPromiseRef.current = Promise.resolve([])
     setIsFinding(false)  // clear any stuck loading state from a previous findNext call
   }, [meta?.id, meta?.season, meta?.episode])
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { eventSourceRef.current?.close() }
+    return () => { resolverRef.current?.cancel() }
   }, [])
 
   /**
@@ -96,26 +99,41 @@ function useFindNewStream(meta: MetaInfo | null, profileId: string | undefined) 
     if (!meta || !profileId || loadedRef.current) return
     loadedRef.current = true
 
-    let url = `/api/streaming/streams-live/${meta.type}/${meta.id}?profileId=${profileId}`
-    if (meta.season !== undefined && meta.episode !== undefined) {
-      url += `&season=${meta.season}&episode=${meta.episode}`
-    }
-
-    const es = createApiEventSource(url)
-    eventSourceRef.current = es
-
-    es.addEventListener('addon-result', (e) => {
-      const data = JSON.parse(e.data)
-      if (data.allStreams) allStreamsRef.current = data.allStreams
+    resolverRef.current?.cancel()
+    const resolver = resolveStreamsProgressive({
+      type: meta.type,
+      id: meta.id,
+      profileId,
+      season: meta.season,
+      episode: meta.episode,
+      meta: {
+        id: meta.id,
+        type: meta.type,
+        name: meta.name,
+        poster: meta.poster,
+        videos: meta.videos?.map((video) => ({
+          id: video.id,
+          title: video.title || '',
+          released: '',
+          season: video.season,
+          episode: video.number,
+        })),
+      },
+    }, {
+      onAddonResult: (data) => {
+        if (data.allStreams) allStreamsRef.current = data.allStreams
+      },
+      onComplete: (data) => {
+        allStreamsRef.current = data.allStreams
+      }
     })
 
-    es.addEventListener('complete', (e) => {
-      const data = JSON.parse(e.data)
-      if (data.allStreams) allStreamsRef.current = data.allStreams
-      es.close()
+    resolverRef.current = resolver
+    loadPromiseRef.current = resolver.done.then((data) => {
+      const allStreams = data?.allStreams || []
+      allStreamsRef.current = allStreams
+      return allStreams
     })
-
-    es.addEventListener('error', () => { es.close() })
   }, [meta, profileId])
 
   /**
@@ -146,38 +164,20 @@ function useFindNewStream(meta: MetaInfo | null, profileId: string | undefined) 
     }
 
     // Slow path: wait for streams to load (up to 15s)
-    return new Promise<Stream | null>((resolve) => {
-      const timeout = setTimeout(() => {
-        es?.close()
-        setIsFinding(false)
-        resolve(null)
-      }, 15000)
+    if (!loadedRef.current) {
+      preload()
+    }
 
-      let url = `/api/streaming/streams-live/${meta!.type}/${meta!.id}?profileId=${profileId}`
-      if (meta!.season !== undefined && meta!.episode !== undefined) {
-        url += `&season=${meta!.season}&episode=${meta!.episode}`
-      }
-
-      const es = createApiEventSource(url)
-
-      es.addEventListener('complete', (e) => {
-        const data = JSON.parse(e.data)
-        if (data.allStreams) allStreamsRef.current = data.allStreams
-        const result = pick()
-        clearTimeout(timeout)
-        es.close()
-        setIsFinding(false)
-        if (result?.url) triedUrlsRef.current.add(result.url)
-        resolve(result)
+    const result = await Promise.race<Stream | null>([
+      loadPromiseRef.current.then(() => pick()),
+      new Promise<Stream | null>((resolve) => {
+        window.setTimeout(() => resolve(null), 15000)
       })
+    ])
 
-      es.addEventListener('error', () => {
-        clearTimeout(timeout)
-        es.close()
-        setIsFinding(false)
-        resolve(null)
-      })
-    })
+    setIsFinding(false)
+    if (result?.url) triedUrlsRef.current.add(result.url)
+    return result
   }, [meta, profileId])
 
   return { preload, findNext, isFinding }

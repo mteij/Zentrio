@@ -13,13 +13,14 @@ const navItems = [
   { to: '/admin/audit', label: 'Audit Log', icon: ScrollText, end: false },
 ]
 
-function SetupScreen() {
+function SetupScreen({ requiresSetupToken }: { requiresSetupToken: boolean }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [claimed, setClaimed] = useState(false)
+  const [setupToken, setSetupToken] = useState('')
 
   const { mutate: claim, isPending, error } = useMutation({
-    mutationFn: () => adminApi.claimSetup(),
+    mutationFn: () => adminApi.claimSetup(requiresSetupToken ? setupToken : undefined),
     onSuccess: () => {
       setClaimed(true)
       queryClient.invalidateQueries({ queryKey: ['admin-status'] })
@@ -62,13 +63,23 @@ function SetupScreen() {
             <p>Make sure you are the intended instance owner before proceeding.</p>
           </div>
 
+          {requiresSetupToken && (
+            <input
+              type="password"
+              placeholder="Setup token"
+              value={setupToken}
+              onChange={(e) => setSetupToken(e.target.value)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-white/30"
+            />
+          )}
+
           {error instanceof AdminApiError && (
             <p className="text-red-400 text-sm">{error.message}</p>
           )}
 
           <button
             onClick={() => claim()}
-            disabled={isPending}
+            disabled={isPending || (requiresSetupToken && !setupToken.trim())}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-lg transition-colors font-medium text-sm"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
@@ -116,7 +127,7 @@ export function AdminLayout() {
       <SimpleLayout title="Admin Setup">
         <AnimatedBackground />
         <div className="relative min-h-screen text-white">
-          <SetupScreen />
+          <SetupScreen requiresSetupToken={!!status.requiresSetupToken} />
         </div>
       </SimpleLayout>
     )

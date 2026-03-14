@@ -81,6 +81,21 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
     }
 
     const headers = new Headers(init?.headers);
+
+    // Identify the Tauri platform so the server can distinguish native app sessions
+    // from regular web browser sessions (they share the same WebView user-agent).
+    // We combine isTauri() with the WebView UA to tell apart desktop OSes and mobile.
+    if (isTauri()) {
+      const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      let tauriPlatform = 'tauri-desktop'
+      if (/android/i.test(ua))        tauriPlatform = 'tauri-android'
+      else if (/iphone|ipad/i.test(ua)) tauriPlatform = 'tauri-ios'
+      else if (/windows nt/i.test(ua))  tauriPlatform = 'tauri-windows'
+      else if (/macintosh|mac os x/i.test(ua)) tauriPlatform = 'tauri-macos'
+      else if (/linux/i.test(ua))       tauriPlatform = 'tauri-linux'
+      headers.set('X-Zentrio-Client', tauriPlatform)
+    }
+
     let overrideMethod: any = init ? init.method : undefined;
     
     // WORKAROUND: better-auth sometimes passes a Promise as the method? 

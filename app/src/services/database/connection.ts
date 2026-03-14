@@ -546,4 +546,21 @@ db.exec(`
     ('role_readonly', 'perm_stats_read'),
     ('role_readonly', 'perm_activity_read'),
     ('role_readonly', 'perm_users_read');
+
+  -- Client-type hints: maps session tokens to their client platform (e.g. tauri-desktop)
+  -- Populated lazily by middleware when X-Zentrio-Client header is present
+  CREATE TABLE IF NOT EXISTS session_client_hints (
+    session_token TEXT PRIMARY KEY,
+    client_type   TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+  );
+
+  -- Pending email change verifications (persisted so they survive server restarts)
+  CREATE TABLE IF NOT EXISTS email_change_tokens (
+    user_id    TEXT PRIMARY KEY,
+    new_email  TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
  `)

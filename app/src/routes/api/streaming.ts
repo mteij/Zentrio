@@ -194,9 +194,9 @@ streaming.get('/streams/:type/:id', async (c) => {
 })
 
 /**
- * SSE endpoint for progressive stream loading.
- * Streams addon results as they arrive instead of waiting for all addons.
- * Uses StreamProcessor for proper filtering, sorting, and deduplication.
+ * Transitional SSE endpoint for progressive stream loading.
+ * Phase 1 moves the main third-party client flow to the client-side stream
+ * resolver, but this route remains for backward compatibility.
  * 
  * Events:
  * - addon-start: { addon: { id, name, logo } } - Addon started loading

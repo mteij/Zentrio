@@ -30,9 +30,18 @@ const pendingDeviceCodes = new Map<string, {
   expiresAt: number
   interval: number
   profileId: number
+  userId: string
 }>()
 
-// Cleanup expired codes periodically
+// Store pending OAuth states in memory (with expiry) for CSRF/IDOR protection
+const pendingOAuthStates = new Map<string, {
+  profileId: number
+  userId: string
+  redirectUri: string
+  expiresAt: number
+}>()
+
+// Cleanup expired codes and states periodically
 setInterval(() => {
   const now = Date.now()
   for (const [key, value] of pendingDeviceCodes) {
@@ -40,7 +49,20 @@ setInterval(() => {
       pendingDeviceCodes.delete(key)
     }
   }
+  for (const [key, value] of pendingOAuthStates) {
+    if (value.expiresAt < now) {
+      pendingOAuthStates.delete(key)
+    }
+  }
 }, 60000)
+
+/**
+ * Verify that the authenticated user owns the given profileId.
+ */
+function userOwnsProfile(userId: string, profileId: number): boolean {
+  const profile = profileDb.findById(profileId)
+  return profile?.user_id === userId
+}
 
 // ============================================================================
 // Public routes (check if Trakt is configured)
@@ -111,6 +133,11 @@ trakt.get('/auth-url', async (c) => {
       return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
     }
 
+    const sessionUser = c.get('user')
+    if (!sessionUser) {
+      return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    }
+
     if (!traktClient.isConfigured()) {
       return err(c, 400, 'NOT_CONFIGURED', 'Trakt integration is not configured')
     }
@@ -120,16 +147,29 @@ trakt.get('/auth-url', async (c) => {
       return err(c, 400, 'INVALID_INPUT', 'profileId required')
     }
 
+    const pId = parseInt(profileId)
+    if (isNaN(pId) || !userOwnsProfile(sessionUser.id, pId)) {
+      return err(c, 403, 'FORBIDDEN', 'Access denied')
+    }
+
     const cfg = getConfig()
-    
-    // Generate a state token that includes the profile ID
+
+    // Generate a state token and store it server-side (prevents IDOR/CSRF on callback)
     const stateToken = randomBytes(16).toString('hex')
     const state = `${profileId}:${stateToken}`
-    
+
     // Determine redirect URI based on context
-    const redirectUri = isTauri === 'true' 
+    const redirectUri = isTauri === 'true'
       ? 'zentrio://trakt/callback'
       : `${cfg.APP_URL}/api/trakt/callback`
+
+    // Store state server-side so /callback can validate it
+    pendingOAuthStates.set(stateToken, {
+      profileId: pId,
+      userId: sessionUser.id,
+      redirectUri,
+      expiresAt: Date.now() + 15 * 60 * 1000, // 15 minutes
+    })
 
     const authUrl = traktClient.getAuthUrl(redirectUri, state)
 
@@ -154,16 +194,27 @@ trakt.get('/callback', async (c) => {
       return c.redirect('/settings?trakt_error=missing_params')
     }
 
-    // Parse state to get profile ID
-    const [profileIdStr] = state.split(':')
-    const profileId = parseInt(profileIdStr)
-
-    if (isNaN(profileId)) {
+    // Validate state token server-side to prevent IDOR/CSRF
+    const stateToken = state.split(':')[1]
+    if (!stateToken) {
       return c.redirect('/settings?trakt_error=invalid_state')
     }
 
-    const cfg = getConfig()
-    const redirectUri = `${cfg.APP_URL}/api/trakt/callback`
+    const pendingState = pendingOAuthStates.get(stateToken)
+    if (!pendingState) {
+      return c.redirect('/settings?trakt_error=invalid_state')
+    }
+
+    // One-time use
+    pendingOAuthStates.delete(stateToken)
+
+    if (Date.now() > pendingState.expiresAt) {
+      return c.redirect('/settings?trakt_error=state_expired')
+    }
+
+    // Use profileId from server-stored state, not from user-controlled URL
+    const profileId = pendingState.profileId
+    const redirectUri = pendingState.redirectUri
 
     // Exchange code for tokens
     const tokens = await traktClient.exchangeCode(code, redirectUri)
@@ -198,31 +249,62 @@ trakt.get('/callback', async (c) => {
   }
 })
 
-// [POST /exchange-code] Exchange auth code for tokens (SPA flow)
+// [POST /exchange-code] Exchange auth code for tokens (SPA/Tauri flow)
 trakt.post('/exchange-code', async (c) => {
   try {
     if (c.get('guestMode')) {
       return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
     }
 
-    const body = await c.req.json()
-    const { code, profileId, redirectUri } = body
-
-    if (!code || !profileId || !redirectUri) {
-      return err(c, 400, 'INVALID_INPUT', 'code, profileId, and redirectUri required')
+    const sessionUser = c.get('user')
+    if (!sessionUser) {
+      return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
     }
+
+    const body = await c.req.json()
+    const { code, state } = body
+
+    if (!code || !state) {
+      return err(c, 400, 'INVALID_INPUT', 'code and state required')
+    }
+
+    // Validate state token server-side
+    const stateToken = state.split(':')[1]
+    if (!stateToken) {
+      return err(c, 400, 'INVALID_INPUT', 'Invalid state parameter')
+    }
+
+    const pendingState = pendingOAuthStates.get(stateToken)
+    if (!pendingState) {
+      return err(c, 400, 'INVALID_STATE', 'State token not found or expired')
+    }
+
+    // One-time use
+    pendingOAuthStates.delete(stateToken)
+
+    if (Date.now() > pendingState.expiresAt) {
+      return err(c, 400, 'STATE_EXPIRED', 'State token has expired')
+    }
+
+    // Verify authenticated user matches state owner
+    if (sessionUser.id !== pendingState.userId) {
+      return err(c, 403, 'FORBIDDEN', 'Session mismatch')
+    }
+
+    const profileId = pendingState.profileId
+    const redirectUri = pendingState.redirectUri
 
     // Exchange code for tokens
     const tokens = await traktClient.exchangeCode(code, redirectUri)
-    
+
     // Get user info
     const user = await traktClient.getUser(tokens.access_token)
-    
+
     // Calculate expiry time
     const expiresAt = new Date((tokens.created_at + tokens.expires_in) * 1000)
 
     // Save to database
-    traktAccountDb.upsert(parseInt(profileId), {
+    traktAccountDb.upsert(profileId, {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_at: expiresAt,
@@ -231,10 +313,10 @@ trakt.post('/exchange-code', async (c) => {
     })
 
     // Initialize sync state
-    traktSyncStateDb.getOrCreate(parseInt(profileId))
+    traktSyncStateDb.getOrCreate(profileId)
 
     // Trigger initial sync in background
-    traktSyncService.sync(parseInt(profileId)).catch(e => {
+    traktSyncService.sync(profileId).catch(e => {
       log.error('Initial sync failed:', e)
     })
 
@@ -260,6 +342,11 @@ trakt.post('/device-code', async (c) => {
       return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
     }
 
+    const sessionUser = c.get('user')
+    if (!sessionUser) {
+      return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    }
+
     if (!traktClient.isConfigured()) {
       return err(c, 400, 'NOT_CONFIGURED', 'Trakt integration is not configured')
     }
@@ -271,8 +358,13 @@ trakt.post('/device-code', async (c) => {
       return err(c, 400, 'INVALID_INPUT', 'profileId required')
     }
 
+    const pId = parseInt(profileId)
+    if (isNaN(pId) || !userOwnsProfile(sessionUser.id, pId)) {
+      return err(c, 403, 'FORBIDDEN', 'Access denied')
+    }
+
     const response = await traktClient.getDeviceCode()
-    
+
     // Store the device code for polling
     const pollToken = randomBytes(16).toString('hex')
     pendingDeviceCodes.set(pollToken, {
@@ -281,7 +373,8 @@ trakt.post('/device-code', async (c) => {
       verificationUrl: response.verification_url,
       expiresAt: Date.now() + (response.expires_in * 1000),
       interval: response.interval,
-      profileId: parseInt(profileId)
+      profileId: pId,
+      userId: sessionUser.id,
     })
 
     return ok(c, {
@@ -304,6 +397,11 @@ trakt.get('/poll-token', async (c) => {
       return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
     }
 
+    const sessionUser = c.get('user')
+    if (!sessionUser) {
+      return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    }
+
     const { pollToken } = c.req.query()
 
     if (!pollToken) {
@@ -313,6 +411,11 @@ trakt.get('/poll-token', async (c) => {
     const pending = pendingDeviceCodes.get(pollToken)
     if (!pending) {
       return err(c, 404, 'NOT_FOUND', 'Poll token not found or expired')
+    }
+
+    // Verify the polling user is the one who initiated the device code
+    if (sessionUser.id !== pending.userId) {
+      return err(c, 403, 'FORBIDDEN', 'Access denied')
     }
 
     // Check if expired
@@ -384,6 +487,11 @@ trakt.post('/disconnect', async (c) => {
       return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
     }
 
+    const sessionUser = c.get('user')
+    if (!sessionUser) {
+      return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    }
+
     const body = await c.req.json()
     const { profileId } = body
 
@@ -392,6 +500,9 @@ trakt.post('/disconnect', async (c) => {
     }
 
     const pId = parseInt(profileId)
+    if (isNaN(pId) || !userOwnsProfile(sessionUser.id, pId)) {
+      return err(c, 403, 'FORBIDDEN', 'Access denied')
+    }
     const account = traktAccountDb.getByProfileId(pId)
 
     if (account) {
@@ -424,6 +535,11 @@ trakt.post('/sync', async (c) => {
       return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
     }
 
+    const sessionUser = c.get('user')
+    if (!sessionUser) {
+      return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    }
+
     const body = await c.req.json()
     const { profileId } = body
 
@@ -431,7 +547,12 @@ trakt.post('/sync', async (c) => {
       return err(c, 400, 'INVALID_INPUT', 'profileId required')
     }
 
-    const result = await traktSyncService.sync(parseInt(profileId))
+    const pId = parseInt(profileId)
+    if (isNaN(pId) || !userOwnsProfile(sessionUser.id, pId)) {
+      return err(c, 403, 'FORBIDDEN', 'Access denied')
+    }
+
+    const result = await traktSyncService.sync(pId)
     
     if (!result.success) {
       return err(c, 500, 'SYNC_FAILED', result.error || 'Sync failed')
@@ -454,6 +575,11 @@ trakt.put('/sync-settings', async (c) => {
       return err(c, 403, 'GUEST_MODE_DISABLED', 'Trakt integration is disabled in guest mode')
     }
 
+    const sessionUser = c.get('user')
+    if (!sessionUser) {
+      return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+    }
+
     const body = await c.req.json()
     const { profileId, syncEnabled, pushToTrakt } = body
 
@@ -461,7 +587,12 @@ trakt.put('/sync-settings', async (c) => {
       return err(c, 400, 'INVALID_INPUT', 'profileId required')
     }
 
-    traktSyncStateDb.updateSettings(parseInt(profileId), {
+    const pId = parseInt(profileId)
+    if (isNaN(pId) || !userOwnsProfile(sessionUser.id, pId)) {
+      return err(c, 403, 'FORBIDDEN', 'Access denied')
+    }
+
+    traktSyncStateDb.updateSettings(pId, {
       sync_enabled: syncEnabled,
       push_to_trakt: pushToTrakt
     })

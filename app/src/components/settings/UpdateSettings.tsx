@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../index';
-import { RefreshCw, Download, CheckCircle, Smartphone, Globe } from 'lucide-react';
+import { RefreshCw, Download, CheckCircle, Smartphone, Globe, Server } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { UpdateModal } from './modals/UpdateModal';
 import { toast } from 'sonner';
+import { apiFetchJson } from '../../lib/apiFetch';
+import { getServerUrl } from '../../lib/auth-client';
 import { createLogger } from '../../utils/client-logger'
 
 const log = createLogger('UpdateSettings')
@@ -12,9 +14,17 @@ declare const __APP_VERSION__: string;
 
 type PlatformType = 'windows' | 'macos' | 'linux' | 'linux-deb' | 'linux-rpm' | 'android' | 'ios' | 'web';
 
+type HealthResponse = {
+  app?: {
+    version?: string
+  }
+  version?: string
+}
+
 export function UpdateSettings() {
   const [loading, setLoading] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('Unknown');
+  const [serverVersion, setServerVersion] = useState<string>('Checking...');
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateData, setUpdateData] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
@@ -51,7 +61,31 @@ export function UpdateSettings() {
     init();
   }, []);
 
+  useEffect(() => {
+    const loadServerVersion = async () => {
+      try {
+        let health: HealthResponse
+
+        try {
+          health = await apiFetchJson<HealthResponse>('/api/health')
+        } catch (apiError) {
+          log.warn('Failed to load /api/health, trying /health fallback:', apiError)
+          health = await apiFetchJson<HealthResponse>('/health')
+        }
+
+        const version = health?.app?.version || health?.version
+        setServerVersion(version || 'Unknown')
+      } catch (error) {
+        log.warn('Failed to load server version:', error)
+        setServerVersion('Unavailable')
+      }
+    }
+
+    void loadServerVersion()
+  }, [])
+
   const isTauriUpdaterSupported = (p: PlatformType) => p === 'windows' || p === 'macos';
+  const connectedServerLabel = isTauri ? getServerUrl().replace(/^https?:\/\//, '') : 'This server'
 
   const checkForUpdates = async (silent = false) => {
     setLoading(true);
@@ -177,6 +211,14 @@ export function UpdateSettings() {
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-zinc-400">Current Version:</span>
                 <span className="font-mono text-zinc-200 bg-white/5 px-2 py-0.5 rounded text-sm">{currentVersion}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="text-zinc-400 inline-flex items-center gap-1.5">
+                  <Server size={14} />
+                  Server:
+                </span>
+                <span className="text-zinc-300 text-sm">{connectedServerLabel}</span>
+                <span className="font-mono text-zinc-200 bg-white/5 px-2 py-0.5 rounded text-sm">{serverVersion}</span>
               </div>
               <p className="text-sm text-zinc-500 mt-2">
                 {lastChecked 

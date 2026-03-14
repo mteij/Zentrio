@@ -18,15 +18,16 @@ const app = createTaggedOpenAPIApp('Admin')
 
 // Public — no auth required. Frontend uses this to show/hide the admin button and setup flow.
 app.get('/status', async (c) => {
-  const { ADMIN_ENABLED } = getConfig()
+  const { ADMIN_ENABLED, ADMIN_SETUP_TOKEN } = getConfig()
   const hasOwner = !!(db.prepare("SELECT 1 FROM user WHERE role = 'superadmin' LIMIT 1").get())
-  return ok(c, { enabled: ADMIN_ENABLED, hasOwner })
+  return ok(c, { enabled: ADMIN_ENABLED, hasOwner, requiresSetupToken: !!ADMIN_SETUP_TOKEN })
 })
 
 // Claim superadmin — only works when admin is enabled and no superadmin exists yet.
-// Requires the user to be logged in. First logged-in user to call this becomes superadmin.
+// Requires the user to be logged in. If ADMIN_SETUP_TOKEN is configured, the token
+// must be supplied in the request body, preventing arbitrary users from claiming ownership.
 app.post('/setup', async (c) => {
-  const { ADMIN_ENABLED } = getConfig()
+  const { ADMIN_ENABLED, ADMIN_SETUP_TOKEN } = getConfig()
 
   if (!ADMIN_ENABLED) {
     return err(c, 403, 'FORBIDDEN', 'Admin console is not enabled on this instance')
@@ -35,6 +36,15 @@ app.post('/setup', async (c) => {
   const hasOwner = !!(db.prepare("SELECT 1 FROM user WHERE role = 'superadmin' LIMIT 1").get())
   if (hasOwner) {
     return err(c, 409, 'ALREADY_CONFIGURED', 'Admin setup has already been completed')
+  }
+
+  // Verify setup token when configured
+  if (ADMIN_SETUP_TOKEN) {
+    const body = await c.req.json().catch(() => ({}))
+    const providedToken = String(body?.setupToken || '').trim()
+    if (!providedToken || providedToken !== ADMIN_SETUP_TOKEN) {
+      return err(c, 403, 'INVALID_SETUP_TOKEN', 'Invalid or missing admin setup token')
+    }
   }
 
   const session = await (await import('../../services/auth')).auth.api.getSession({
@@ -137,61 +147,43 @@ app.get('/activity/live', adminSessionMiddleware, requirePermission(Permissions.
   }
 })
 
+// Pre-built query fragments for each allowed chart range.
+// All SQL is hardcoded here; no user input is ever interpolated into queries.
+const CHART_RANGE_QUERIES = {
+  '24h': {
+    usersSQL: `SELECT strftime('%Y-%m-%d %H:00', createdAt) as date, COUNT(*) as count FROM user WHERE createdAt >= datetime('now', '-24 hours') GROUP BY strftime('%Y-%m-%d %H:00', createdAt) ORDER BY date ASC`,
+    watchesSQL: `SELECT strftime('%Y-%m-%d %H:00', updated_at) as date, COUNT(*) as count FROM watch_history WHERE updated_at >= datetime('now', '-24 hours') GROUP BY strftime('%Y-%m-%d %H:00', updated_at) ORDER BY date ASC`,
+    dataPoints: 24,
+  },
+  '7d': {
+    usersSQL: `SELECT date(createdAt) as date, COUNT(*) as count FROM user WHERE createdAt >= date('now', '-7 days') GROUP BY date(createdAt) ORDER BY date ASC`,
+    watchesSQL: `SELECT date(updated_at) as date, COUNT(*) as count FROM watch_history WHERE updated_at >= date('now', '-7 days') GROUP BY date(updated_at) ORDER BY date ASC`,
+    dataPoints: 7,
+  },
+  'all': {
+    usersSQL: `SELECT date(createdAt) as date, COUNT(*) as count FROM user GROUP BY date(createdAt) ORDER BY date ASC`,
+    watchesSQL: `SELECT date(updated_at) as date, COUNT(*) as count FROM watch_history GROUP BY date(updated_at) ORDER BY date ASC`,
+    dataPoints: 0,
+  },
+  '30d': {
+    usersSQL: `SELECT date(createdAt) as date, COUNT(*) as count FROM user WHERE createdAt >= date('now', '-30 days') GROUP BY date(createdAt) ORDER BY date ASC`,
+    watchesSQL: `SELECT date(updated_at) as date, COUNT(*) as count FROM watch_history WHERE updated_at >= date('now', '-30 days') GROUP BY date(updated_at) ORDER BY date ASC`,
+    dataPoints: 30,
+  },
+} as const
+
 app.get('/dashboard/charts', adminSessionMiddleware, requirePermission(Permissions.STATS_READ), async (c) => {
   try {
-    const range = c.req.query('range') || '30d' // '24h', '7d', '30d', 'all'
-    
-    let dateFilterUsers = ''
-    let dateFilterWatches = ''
-    let groupExprUsers = ''
-    let groupExprWatches = ''
-    let dataPoints = 30
-    
-    if (range === '24h') {
-      dateFilterUsers = "WHERE createdAt >= datetime('now', '-24 hours')"
-      dateFilterWatches = "WHERE updated_at >= datetime('now', '-24 hours')"
-      groupExprUsers = "strftime('%Y-%m-%d %H:00', createdAt)"
-      groupExprWatches = "strftime('%Y-%m-%d %H:00', updated_at)"
-      dataPoints = 24
-    } else if (range === '7d') {
-      dateFilterUsers = "WHERE createdAt >= date('now', '-7 days')"
-      dateFilterWatches = "WHERE updated_at >= date('now', '-7 days')"
-      groupExprUsers = "date(createdAt)"
-      groupExprWatches = "date(updated_at)"
-      dataPoints = 7
-    } else if (range === 'all') {
-      dateFilterUsers = ""
-      dateFilterWatches = ""
-      groupExprUsers = "date(createdAt)"
-      groupExprWatches = "date(updated_at)"
-      dataPoints = 0
-    } else {
-      dateFilterUsers = "WHERE createdAt >= date('now', '-30 days')"
-      dateFilterWatches = "WHERE updated_at >= date('now', '-30 days')"
-      groupExprUsers = "date(createdAt)"
-      groupExprWatches = "date(updated_at)"
-      dataPoints = 30
-    }
+    const rangeParam = c.req.query('range') || '30d'
+    const rangeKey = (rangeParam in CHART_RANGE_QUERIES ? rangeParam : '30d') as keyof typeof CHART_RANGE_QUERIES
+    const { usersSQL, watchesSQL, dataPoints } = CHART_RANGE_QUERIES[rangeKey]
 
-    const recentUsers = db.prepare(`
-      SELECT ${groupExprUsers} as date, COUNT(*) as count 
-      FROM user 
-      ${dateFilterUsers}
-      GROUP BY ${groupExprUsers}
-      ORDER BY date ASC
-    `).all() as { date: string, count: number }[]
-
-    const recentWatches = db.prepare(`
-      SELECT ${groupExprWatches} as date, COUNT(*) as count 
-      FROM watch_history 
-      ${dateFilterWatches}
-      GROUP BY ${groupExprWatches}
-      ORDER BY date ASC
-    `).all() as { date: string, count: number }[]
+    const recentUsers = db.prepare(usersSQL).all() as { date: string, count: number }[]
+    const recentWatches = db.prepare(watchesSQL).all() as { date: string, count: number }[]
 
     const chartData: any[] = []
     
-    if (range === 'all') {
+    if (rangeKey === 'all') {
       const allDates = Array.from(new Set([...recentUsers.map(u => u.date), ...recentWatches.map(w => w.date)])).filter(Boolean).sort()
       for (const d of allDates) {
         chartData.push({
@@ -201,7 +193,7 @@ app.get('/dashboard/charts', adminSessionMiddleware, requirePermission(Permissio
           watches: recentWatches.find(w => w.date === d)?.count || 0
         })
       }
-    } else if (range === '24h') {
+    } else if (rangeKey === '24h') {
       const today = new Date()
       today.setMinutes(0, 0, 0)
       for (let i = 23; i >= 0; i--) {
@@ -241,13 +233,84 @@ app.get('/dashboard/charts', adminSessionMiddleware, requirePermission(Permissio
       targetType: 'system',
       ipAddress,
       userAgent,
-      after: { range }
+      after: { range: rangeKey }
     })
 
     return ok(c, { chartData })
   } catch (e) {
     log.error('Admin charts failed', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to fetch admin chart data')
+  }
+})
+
+app.get('/stats/platforms', adminSessionMiddleware, requirePermission(Permissions.STATS_READ), async (c) => {
+  const { ANALYTICS_ENABLED } = getConfig()
+  if (!ANALYTICS_ENABLED) {
+    return ok(c, { total: 0, platforms: [], browsers: [], disabled: true })
+  }
+  try {
+    // Join with client hints so Tauri Desktop sessions aren't misclassified
+    // as Windows/macOS/Linux based on their WebView user-agent.
+    // Include all sessions regardless of userAgent. Sessions created by the Tauri
+    // HTTP plugin (reqwest) may have a null/non-browser UA; they should still be
+    // counted, relying on the session_client_hints.client_type for classification.
+    const sessions = db.prepare(`
+      SELECT s.userAgent, sch.client_type
+      FROM session s
+      LEFT JOIN session_client_hints sch ON sch.session_token = s.token
+    `).all() as { userAgent: string | null; client_type: string | null }[]
+
+    const platforms: Record<string, number> = {}
+    const browsers: Record<string, number> = {}
+
+    // Map client_type hint → display name. When a Tauri hint is present the UA-based
+    // OS detection would still work but would show the wrong category (e.g. a Tauri
+    // Windows session looks like plain "Windows" in the UA).
+    const tauriLabels: Record<string, string> = {
+      'tauri-windows': 'Tauri (Windows)',
+      'tauri-macos':   'Tauri (macOS)',
+      'tauri-linux':   'Tauri (Linux)',
+      'tauri-android': 'Tauri (Android)',
+      'tauri-ios':     'Tauri (iOS)',
+      'tauri-desktop': 'Tauri (Desktop)', // legacy / unknown OS fallback
+    }
+
+    for (const { userAgent: ua, client_type } of sessions) {
+      // Platform — prefer the explicit hint, fall back to UA parsing for web sessions
+      let platform = 'Other'
+      if (client_type && tauriLabels[client_type]) {
+        platform = tauriLabels[client_type]
+      } else if (ua && /android/i.test(ua)) platform = 'Android'
+      else if (ua && /iphone|ipad/i.test(ua)) platform = 'iOS'
+      else if (ua && /windows nt/i.test(ua)) platform = 'Windows'
+      else if (ua && /macintosh|mac os x/i.test(ua)) platform = 'macOS'
+      else if (ua && /linux/i.test(ua)) platform = 'Linux'
+      platforms[platform] = (platforms[platform] || 0) + 1
+
+      // Skip browser breakdown for Tauri sessions — the WebView browser name
+      // (e.g. "Chrome" on Android WebView) is not meaningful for a native app.
+      if (client_type && tauriLabels[client_type]) continue
+      let browser = 'Other'
+      if (ua && /edg\//i.test(ua)) browser = 'Edge'
+      else if (ua && /opr\//i.test(ua)) browser = 'Opera'
+      else if (ua && /firefox\//i.test(ua)) browser = 'Firefox'
+      else if (ua && /chrome\//i.test(ua)) browser = 'Chrome'
+      else if (ua && /safari\//i.test(ua)) browser = 'Safari'
+      browsers[browser] = (browsers[browser] || 0) + 1
+    }
+
+    return ok(c, {
+      total: sessions.length,
+      platforms: Object.entries(platforms)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
+      browsers: Object.entries(browsers)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
+    })
+  } catch (e) {
+    log.error('Admin platform stats failed', e)
+    return err(c, 500, 'SERVER_ERROR', 'Failed to fetch platform stats')
   }
 })
 

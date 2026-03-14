@@ -23,23 +23,27 @@ export const sessionMiddleware = createMiddleware(async (c, next) => {
 
 /**
  * Optional session middleware - allows guest mode requests to proceed without authentication.
- * 
+ *
  * Guest mode is detected via:
- * - profileId=guest query parameter
- * - guestMode=true query parameter
- * - X-Guest-Mode: true header
- * 
+ * - profileId=guest query parameter (Tauri app passes this when browsing as guest)
+ * - X-Guest-Mode: true header (set by the Tauri app's safeFetch)
+ *
+ * NOTE: The guestMode=true query parameter has been removed to reduce the attack surface.
+ * Only profileId=guest and the X-Guest-Mode header are accepted, both of which require
+ * deliberate action by the caller.  Any route that must never be accessible without a
+ * real session should use sessionMiddleware instead of this middleware.
+ *
  * In guest mode, the middleware sets the guest user and a 'guestMode' flag.
  * For connected mode (normal profileId), authentication is still required.
  */
 export const optionalSessionMiddleware = createMiddleware(async (c, next) => {
-  const { profileId, guestMode: guestModeParam } = c.req.query()
+  const { profileId } = c.req.query()
   const guestModeHeader = c.req.header('X-Guest-Mode')
-  
-  // Detect guest mode via multiple methods
-  const isGuestMode = 
-    profileId === 'guest' || 
-    guestModeParam === 'true' || 
+
+  // Detect guest mode: explicit guest profile ID or dedicated header only.
+  // Query-param ?guestMode=true has been removed to prevent accidental auth bypass.
+  const isGuestMode =
+    profileId === 'guest' ||
     guestModeHeader === 'true'
   
   // Guest mode: use guest user without authentication

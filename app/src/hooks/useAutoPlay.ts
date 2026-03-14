@@ -1,10 +1,10 @@
 /**
  * useAutoPlay Hook - Unified auto-play functionality for streaming
- * 
+ *
  * Handles:
  * 1. Instant resume with lastStream (same episode)
- * 2. Pack matching for series (prefer streams from same torrent pack)
- * 3. Background stream fetching via SSE
+ * 2. Pack matching for series
+ * 3. Background stream fetching via the client-side stream resolver
  * 4. Automatic navigation to player
  */
 
@@ -12,14 +12,14 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Stream } from '../services/addons/types'
-import { 
-  selectBestStreamWithPackPriority, 
-  getPackId,
+import {
+  selectBestStreamWithPackPriority,
   DEFAULT_AUTO_PLAY_CONFIG,
-  AutoPlayConfig 
+  AutoPlayConfig,
+  isStreamCached
 } from '../services/addons/stream-service'
 import { FlatStream } from './useStreamLoader'
-import { createApiEventSource } from '../lib/url'
+import { resolveStreamsProgressive, type StreamResolveHandle } from '../lib/stream-resolver'
 
 export interface AutoPlayMeta {
   id: string
@@ -33,52 +33,25 @@ export interface AutoPlayParams {
   meta: AutoPlayMeta
   season?: number
   episode?: number
-  /** If resuming the same episode, use this stream directly */
   lastStream?: Stream
-  /** infoHash or bingeGroup from last-watched episode for pack matching */
   preferredPackId?: string | null
 }
 
 export interface UseAutoPlayResult {
-  /** Start auto-play process */
   startAutoPlay: (params: AutoPlayParams) => void
-  /** Whether currently loading streams */
   isLoading: boolean
-  /** Cancel ongoing auto-play */
   cancel: () => void
 }
 
-/**
- * Hook for unified auto-play functionality
- * 
- * Usage:
- * ```tsx
- * const { startAutoPlay, isLoading } = useAutoPlay()
- * 
- * // For continue watching with lastStream:
- * startAutoPlay({ 
- *   profileId, 
- *   meta: { id, type, name, poster },
- *   season: 1, 
- *   episode: 5,
- *   lastStream: item.lastStream,
- *   preferredPackId: getPackId(item.lastStream)
- * })
- * 
- * // For new play (will fetch streams):
- * startAutoPlay({ profileId, meta, season, episode })
- * ```
- */
 export function useAutoPlay(): UseAutoPlayResult {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
-  const eventSourceRef = useRef<EventSource | null>(null)
+  const resolverRef = useRef<StreamResolveHandle | null>(null)
   const toastIdRef = useRef<string | number | null>(null)
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      eventSourceRef.current?.close()
+      resolverRef.current?.cancel()
       if (toastIdRef.current) {
         toast.dismiss(toastIdRef.current)
       }
@@ -86,8 +59,8 @@ export function useAutoPlay(): UseAutoPlayResult {
   }, [])
 
   const cancel = useCallback(() => {
-    eventSourceRef.current?.close()
-    eventSourceRef.current = null
+    resolverRef.current?.cancel()
+    resolverRef.current = null
     setIsLoading(false)
     if (toastIdRef.current) {
       toast.dismiss(toastIdRef.current)
@@ -102,28 +75,23 @@ export function useAutoPlay(): UseAutoPlayResult {
     season?: number,
     episode?: number
   ) => {
-    // Dismiss loading toast
     if (toastIdRef.current) {
       toast.dismiss(toastIdRef.current)
       toastIdRef.current = null
     }
 
-    const playerMeta = {
-      id: meta.id,
-      type: meta.type,
-      name: meta.name,
-      poster: meta.poster,
-      season,
-      episode
-    }
-
-    // Navigate to player with stream in state (avoids URL encoding issues)
-    // Use replace: false so the back button goes to the previous page (details)
     navigate(`/streaming/${profileId}/player`, {
       replace: false,
       state: {
         stream,
-        meta: playerMeta
+        meta: {
+          id: meta.id,
+          type: meta.type,
+          name: meta.name,
+          poster: meta.poster,
+          season,
+          episode
+        }
       }
     })
   }, [navigate])
@@ -131,125 +99,101 @@ export function useAutoPlay(): UseAutoPlayResult {
   const startAutoPlay = useCallback((params: AutoPlayParams) => {
     const { profileId, meta, season, episode, lastStream, preferredPackId } = params
 
-    // Case 1: We have a lastStream - use it directly
     if (lastStream) {
       navigateToPlayer(profileId, lastStream, meta, season, episode)
       return
     }
 
-    // Case 2: Need to fetch streams
     setIsLoading(true)
-    
-    // Show loading toast
+
     const loadingMessage = meta.type === 'series' && season && episode
       ? `Finding best stream for S${season}:E${episode}...`
       : `Finding best stream for ${meta.name}...`
-    
+
     toastIdRef.current = toast.loading(loadingMessage, { id: 'autoplay-loading' })
-
-    // Close any existing connection
-    eventSourceRef.current?.close()
-
-    // Build SSE URL
-    let url = `/api/streaming/streams-live/${meta.type}/${meta.id}?profileId=${profileId}`
-    if (season !== undefined && episode !== undefined) {
-      url += `&season=${season}&episode=${episode}`
-    }
-
-    // Create EventSource for progressive stream loading
-    const eventSource = createApiEventSource(url)
-    eventSourceRef.current = eventSource
+    resolverRef.current?.cancel()
 
     let allStreams: FlatStream[] = []
     let hasNavigated = false
 
-    // Listen for addon results
-    eventSource.addEventListener('addon-result', (e) => {
-      const data = JSON.parse(e.data)
-      
-      // Use the globally sorted allStreams from the server
-      if (data.allStreams) {
-        allStreams = data.allStreams
-      }
-      
-      // Try to auto-play as soon as we have good streams
-      if (!hasNavigated && allStreams.length > 0) {
-        const config: AutoPlayConfig = { ...DEFAULT_AUTO_PLAY_CONFIG }
-        const selected = selectBestStreamWithPackPriority(
-          allStreams.map(s => ({ stream: s.stream, addon: s.addon })),
-          config,
-          preferredPackId
-        )
-        
-        if (selected) {
-          // Check if this is a cached stream (good enough for early play)
-          const isCached = selected.stream.name?.includes('⚡') || 
-                          selected.stream.title?.includes('⚡') ||
-                          selected.stream.name?.toLowerCase().includes('cached')
-          
-          if (isCached) {
-            hasNavigated = true
-            eventSource.close()
-            setIsLoading(false)
-            navigateToPlayer(profileId, selected.stream, meta, season, episode)
-          }
-        }
-      }
-    })
+    const maybeNavigateEarly = () => {
+      if (hasNavigated || allStreams.length === 0) return
 
-    // Listen for completion
-    eventSource.addEventListener('complete', (e) => {
-      const data = JSON.parse(e.data)
-      if (data.allStreams) {
-        allStreams = data.allStreams
-      }
-
-      eventSource.close()
-      setIsLoading(false)
-
-      if (hasNavigated) return
-
-      if (allStreams.length === 0) {
-        if (toastIdRef.current) {
-          toast.dismiss(toastIdRef.current)
-          toastIdRef.current = null
-        }
-        toast.error('No streams found. Please try manually.')
-        return
-      }
-
-      // Select best stream with pack priority
       const config: AutoPlayConfig = { ...DEFAULT_AUTO_PLAY_CONFIG }
       const selected = selectBestStreamWithPackPriority(
-        allStreams.map(s => ({ stream: s.stream, addon: s.addon })),
+        allStreams.map((item) => ({ stream: item.stream, addon: item.addon })),
         config,
         preferredPackId
       )
 
-      if (selected) {
-        navigateToPlayer(profileId, selected.stream, meta, season, episode)
-      } else {
-        if (toastIdRef.current) {
-          toast.dismiss(toastIdRef.current)
-          toastIdRef.current = null
-        }
-        toast.error('Could not select a stream. Please try manually.')
-      }
-    })
+      if (!selected) return
+      if (!isStreamCached(selected.stream)) return
 
-    // Handle SSE errors
-    eventSource.addEventListener('error', () => {
-      eventSource.close()
+      hasNavigated = true
+      resolverRef.current?.cancel()
       setIsLoading(false)
-      if (!hasNavigated) {
-        if (toastIdRef.current) {
-          toast.dismiss(toastIdRef.current)
-          toastIdRef.current = null
+      navigateToPlayer(profileId, selected.stream, meta, season, episode)
+    }
+
+    const resolver = resolveStreamsProgressive({
+      type: meta.type,
+      id: meta.id,
+      profileId,
+      season,
+      episode,
+      meta,
+    }, {
+      onAddonResult: (data) => {
+        if (data.allStreams) {
+          allStreams = data.allStreams
         }
-        toast.error('Failed to load streams. Please try again.')
+        maybeNavigateEarly()
+      },
+      onComplete: (data) => {
+        allStreams = data.allStreams || allStreams
+        setIsLoading(false)
+
+        if (hasNavigated) return
+
+        if (allStreams.length === 0) {
+          if (toastIdRef.current) {
+            toast.dismiss(toastIdRef.current)
+            toastIdRef.current = null
+          }
+          toast.error('No streams found. Please try manually.')
+          return
+        }
+
+        const config: AutoPlayConfig = { ...DEFAULT_AUTO_PLAY_CONFIG }
+        const selected = selectBestStreamWithPackPriority(
+          allStreams.map((item) => ({ stream: item.stream, addon: item.addon })),
+          config,
+          preferredPackId
+        )
+
+        if (selected) {
+          navigateToPlayer(profileId, selected.stream, meta, season, episode)
+        } else {
+          if (toastIdRef.current) {
+            toast.dismiss(toastIdRef.current)
+            toastIdRef.current = null
+          }
+          toast.error('Could not select a stream. Please try manually.')
+        }
       }
     })
 
+    resolverRef.current = resolver
+
+    void resolver.done.then((result) => {
+      if (result || hasNavigated) return
+      setIsLoading(false)
+      if (toastIdRef.current) {
+        toast.dismiss(toastIdRef.current)
+        toastIdRef.current = null
+      }
+      toast.error('Failed to load streams. Please try again.')
+    })
   }, [navigateToPlayer])
 
   return {
