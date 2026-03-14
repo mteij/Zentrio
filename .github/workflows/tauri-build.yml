@@ -154,7 +154,7 @@ jobs:
 
       - name: Setup Java (Android only)
         if: matrix.name == 'android'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: "zulu"
           java-version: "17"
@@ -168,6 +168,7 @@ jobs:
         run: sdkmanager "ndk;26.1.10909125"
 
       - name: Configure Android NDK environment
+        id: ndk_config
         if: matrix.name == 'android'
         run: |
           ANDROID_NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
@@ -175,6 +176,7 @@ jobs:
 
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
           echo "$NDK_TOOLCHAIN" >> $GITHUB_PATH
+          echo "ndk_home=$ANDROID_NDK_HOME" >> $GITHUB_OUTPUT
 
           # Set the compilers directly to the specific API level binaries
           echo "CC_aarch64_linux_android=$NDK_TOOLCHAIN/aarch64-linux-android24-clang" >> $GITHUB_ENV
@@ -184,7 +186,7 @@ jobs:
 
       - name: Setup Gradle cache (Android only)
         if: matrix.name == 'android'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -220,10 +222,12 @@ jobs:
         run: |
           bun build src/index.ts --compile --target bun-darwin-arm64 --outfile src-tauri/bin/zentrio-server-aarch64-apple-darwin
 
-      # AppImage requires FUSE or extract-and-run mode; set globally so linuxdeploy inherits it
+      # AppImage requires FUSE or extract-and-run mode; set globally so linuxdeploy and its plugin inherit it
       - name: Configure AppImage environment (Linux only)
         if: matrix.name == 'linux'
-        run: echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+        run: |
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+          echo "LINUXDEPLOY_PLUGIN_APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
 
       # Desktop Build (Linux, Windows, macOS Desktop)
       - name: Build Tauri App (Desktop)
@@ -233,8 +237,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          NO_STRIP: true
+          NO_STRIP: 1
           APPIMAGE_EXTRACT_AND_RUN: 1
+          LINUXDEPLOY_PLUGIN_APPIMAGE_EXTRACT_AND_RUN: 1
         with:
           projectPath: ./app
           tagName: ${{ needs.create-release.outputs.tag_name }}
@@ -246,7 +251,8 @@ jobs:
         if: matrix.name == 'android'
         working-directory: ./app
         env:
-          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          NDK_HOME: ${{ steps.ndk_config.outputs.ndk_home }}
+          ANDROID_NDK_HOME: ${{ steps.ndk_config.outputs.ndk_home }}
         run: |
           # Decode keystore from base64
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
