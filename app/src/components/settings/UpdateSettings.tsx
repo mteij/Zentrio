@@ -64,15 +64,7 @@ export function UpdateSettings() {
   useEffect(() => {
     const loadServerVersion = async () => {
       try {
-        let health: HealthResponse
-
-        try {
-          health = await apiFetchJson<HealthResponse>('/api/health')
-        } catch (apiError) {
-          log.warn('Failed to load /api/health, trying /health fallback:', apiError)
-          health = await apiFetchJson<HealthResponse>('/health')
-        }
-
+        const health = await apiFetchJson<HealthResponse>('/api/health')
         const version = health?.app?.version || health?.version
         setServerVersion(version || 'Unknown')
       } catch (error) {

@@ -1,6 +1,6 @@
 import { apiFetchJson } from './apiFetch'
 import { getAddonClient } from './addon-client'
-import { getServerUrl, isTauri } from './auth-client'
+import { isTauri } from './auth-client'
 import { createLogger } from '../utils/client-logger'
 import type { MetaDetail, Stream, Manifest } from '../services/addons/types'
 import { StreamProcessor, type StreamConfig } from '../services/addons/stream-processor'
@@ -8,8 +8,6 @@ import { StreamProcessor, type StreamConfig } from '../services/addons/stream-pr
 const log = createLogger('StreamResolver')
 
 const STREAM_CACHE_TTL_MS = 2 * 60 * 1000
-const LEGACY_RESOLVER_PREFERENCE_TTL_MS = 10 * 60 * 1000
-const LEGACY_RESOLVER_STORAGE_PREFIX = 'zentrio_stream_resolver_legacy:'
 const RETRY_PATTERNS = [
   /scraping in progress/i,
   /please try again/i,
@@ -45,15 +43,6 @@ type CachedStreamResolution = {
 
 type StreamingDetailsResponse = {
   meta?: MetaDetail
-}
-
-type LegacyStreamGroup = {
-  addon: Manifest
-  streams: Stream[]
-}
-
-type LegacyStreamsResponse = {
-  streams?: LegacyStreamGroup[]
 }
 
 export type ResolvedFlatStream = {
@@ -120,69 +109,6 @@ export type StreamResolveHandle = {
 }
 
 const resolutionCache = new Map<string, CachedStreamResolution>()
-
-function getCompatibilityScope(): string {
-  if (typeof window === 'undefined') return 'server'
-  if (isTauri()) return getServerUrl()
-  return window.location.origin
-}
-
-function getLegacyPreferenceKey(): string {
-  return `${LEGACY_RESOLVER_STORAGE_PREFIX}${getCompatibilityScope()}`
-}
-
-function rememberLegacyResolverPreference(): void {
-  if (typeof window === 'undefined') return
-  try {
-    sessionStorage.setItem(
-      getLegacyPreferenceKey(),
-      JSON.stringify({ expiresAt: Date.now() + LEGACY_RESOLVER_PREFERENCE_TTL_MS })
-    )
-  } catch {
-    // Ignore sessionStorage issues and continue with in-memory behavior.
-  }
-}
-
-function clearLegacyResolverPreference(): void {
-  if (typeof window === 'undefined') return
-  try {
-    sessionStorage.removeItem(getLegacyPreferenceKey())
-  } catch {
-    // Ignore sessionStorage issues.
-  }
-}
-
-function shouldPreferLegacyResolver(): boolean {
-  if (typeof window === 'undefined') return false
-
-  try {
-    const raw = sessionStorage.getItem(getLegacyPreferenceKey())
-    if (!raw) return false
-    const parsed = JSON.parse(raw) as { expiresAt?: number }
-    if (typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-      return true
-    }
-    sessionStorage.removeItem(getLegacyPreferenceKey())
-  } catch {
-    clearLegacyResolverPreference()
-  }
-
-  return false
-}
-
-function normalizeErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-function looksLikeHtmlJsonMismatch(message: string): boolean {
-  const normalized = message.toLowerCase()
-  return normalized.includes('returned html instead of json') ||
-    normalized.includes('invalid json') ||
-    normalized.includes('unexpected token') ||
-    normalized.includes('not valid json') ||
-    normalized.includes('<!doctype html') ||
-    normalized.includes('<html')
-}
 
 function buildCacheKey(params: StreamResolveParams): string {
   return [
@@ -481,107 +407,11 @@ function emitCachedResults(entry: CachedStreamResolution, callbacks: StreamResol
   return payload
 }
 
-function flattenLegacyStreams(groups: LegacyStreamGroup[]): ResolvedFlatStream[] {
-  return groups
-    .flatMap((group, groupIndex) =>
-      group.streams.map((stream, streamIndex) => {
-        const sortIndex = typeof (stream.behaviorHints as any)?.sortIndex === 'number'
-          ? Number((stream.behaviorHints as any).sortIndex)
-          : (groupIndex * 10_000) + streamIndex
-
-        return {
-          sortIndex,
-          item: {
-            stream,
-            addon: toResolverAddon(group.addon),
-          } satisfies ResolvedFlatStream,
-        }
-      })
-    )
-    .sort((a, b) => a.sortIndex - b.sortIndex)
-    .map(({ item }) => item)
-}
-
-async function resolveStreamsViaLegacyApi(
-  params: StreamResolveParams,
-  cacheKey: string,
-  callbacks: StreamResolverCallbacks,
-): Promise<CompletePayload> {
-  const query = new URLSearchParams({
-    profileId: params.profileId,
-  })
-
-  if (typeof params.season === 'number') {
-    query.set('season', String(params.season))
-  }
-  if (typeof params.episode === 'number') {
-    query.set('episode', String(params.episode))
-  }
-
-  const response = await apiFetchJson<LegacyStreamsResponse>(
-    `/api/streaming/streams/${params.type}/${encodeURIComponent(params.id)}?${query.toString()}`
-  )
-
-  const groups = Array.isArray(response?.streams) ? response.streams : []
-  const allStreams = flattenLegacyStreams(groups)
-
-  let firstPlayableSent = false
-  for (const group of groups) {
-    const addon = toResolverAddon(group.addon)
-    callbacks.onAddonStart?.({ addon })
-    callbacks.onAddonResult?.({
-      addon,
-      count: Array.isArray(group.streams) ? group.streams.length : 0,
-      allStreams,
-    })
-
-    if (!firstPlayableSent && allStreams.length > 0) {
-      firstPlayableSent = true
-      callbacks.onFirstPlayable?.({
-        stream: allStreams[0],
-        totalCount: allStreams.length,
-      })
-    }
-  }
-
-  const payload = {
-    allStreams,
-    totalCount: allStreams.length,
-    fromCache: false,
-  }
-
-  resolutionCache.set(cacheKey, {
-    cachedAt: Date.now(),
-    allStreams,
-  })
-
-  callbacks.onComplete?.(payload)
-  return payload
-}
-
 export function resolveStreamsProgressive(params: StreamResolveParams, callbacks: StreamResolverCallbacks = {}): StreamResolveHandle {
   let cancelled = false
   const cacheKey = buildCacheKey(params)
 
   const done = (async (): Promise<CompletePayload | null> => {
-    let fallbackAttempted = false
-
-    const fallbackToLegacy = async (reason: string, error: unknown): Promise<CompletePayload | null> => {
-      if (fallbackAttempted || cancelled) return null
-      fallbackAttempted = true
-
-      log.warn(`Falling back to legacy server stream resolver (${reason}):`, error)
-      rememberLegacyResolverPreference()
-
-      try {
-        return await resolveStreamsViaLegacyApi(params, cacheKey, callbacks)
-      } catch (legacyError) {
-        clearLegacyResolverPreference()
-        log.error('Legacy stream resolver fallback failed:', legacyError)
-        return null
-      }
-    }
-
     try {
       if (!params.forceRefresh) {
         const cached = resolutionCache.get(cacheKey)
@@ -594,23 +424,11 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
 
       callbacks.onCacheStatus?.({ fromCache: false, cacheAgeMs: 0 })
 
-      if (shouldPreferLegacyResolver()) {
-        return await fallbackToLegacy('stored compatibility preference', new Error('Legacy resolver preference is active'))
-      }
-
-      let enabledAddons: EnabledAddon[]
-      let settings: StreamConfig | undefined
-      let meta: MetaDetail | null
-
-      try {
-        ;[enabledAddons, settings, meta] = await Promise.all([
-          fetchEnabledAddons(params.profileId),
-          fetchSettings(params.profileId),
-          fetchMeta(params),
-        ])
-      } catch (error) {
-        return await fallbackToLegacy('server bootstrap failed', error)
-      }
+      const [enabledAddons, settings, meta] = await Promise.all([
+        fetchEnabledAddons(params.profileId),
+        fetchSettings(params.profileId),
+        fetchMeta(params),
+      ])
 
       if (cancelled) return null
 
@@ -647,10 +465,6 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
         try {
           manifest = await client.init()
         } catch (error) {
-          if (looksLikeHtmlJsonMismatch(normalizeErrorMessage(error))) {
-            return await fallbackToLegacy(`addon manifest fetch failed for ${addon.name}`, error)
-          }
-
           callbacks.onAddonError?.({
             addon: {
               id: addon.manifest_url,
@@ -719,10 +533,6 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
               continue
             }
 
-            if (looksLikeHtmlJsonMismatch(normalizeErrorMessage(error))) {
-              return await fallbackToLegacy(`addon stream fetch failed for ${resolverAddon.name}`, error)
-            }
-
             callbacks.onAddonError?.({
               addon: resolverAddon,
               error: error instanceof Error ? error.message : String(error),
@@ -740,7 +550,6 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
         fromCache: false,
       }
 
-      clearLegacyResolverPreference()
       resolutionCache.set(cacheKey, {
         cachedAt: Date.now(),
         allStreams,

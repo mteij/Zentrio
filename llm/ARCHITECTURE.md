@@ -23,7 +23,7 @@ Zentrio is in a transition state.
 
 - **Target architecture:** the hosted backend owns auth, profiles, settings, history, sync, enrichment, and trusted first-party integrations. Third-party addon stream resolution happens on the client, and media playback goes directly from client to the final media URL.
 - **Phase 1 current state:** third-party stream resolution now runs client-side for the main playback flow. Web may still fall back to `/api/addon-proxy` as a temporary hosted compatibility bridge for non-CORS addons. Metadata/catalog/details remain mixed between backend and client paths for now.
-- **Compatibility rule:** newer clients must tolerate older servers during rollout. The client-side resolver should detect incompatible backend responses and gracefully fall back to the legacy server stream endpoints instead of failing hard.
+- **Alpha rule:** client and server are expected to be updated together. Stable-version compatibility work can be added later, but the alpha codepath stays optimized for the current stack.
 
 ## Runtime Environments
 
