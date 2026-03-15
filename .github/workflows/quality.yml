@@ -192,15 +192,15 @@ jobs:
         if: always()
         run: |
           # Inputs (default to 0 if not available)
-          TS_ERRORS="${{ steps.typecheck.outputs.errors || '0' }}"
-          ESLINT_ERRORS="${{ steps.eslint.outputs.errors || '0' }}"
-          ESLINT_WARNINGS="${{ steps.eslint.outputs.warnings || '0' }}"
-          TESTS_PASSED="${{ steps.tests.outputs.passed || 'false' }}"
-          SERVER_BUILD_OK="${{ steps.server_build.outputs.ok || 'false' }}"
-          KNIP_UNUSED="${{ steps.knip.outputs.unused_files || '0' }}"
-          CLIPPY_ERRORS="${{ steps.clippy.outputs.errors || '0' }}"
-          CLIPPY_WARNINGS="${{ steps.clippy.outputs.warnings || '0' }}"
-          RUSTFMT_OK="${{ steps.rustfmt.outputs.fmt_ok || 'false' }}"
+          export TS_ERRORS="${{ steps.typecheck.outputs.errors || '0' }}"
+          export ESLINT_ERRORS="${{ steps.eslint.outputs.errors || '0' }}"
+          export ESLINT_WARNINGS="${{ steps.eslint.outputs.warnings || '0' }}"
+          export TESTS_PASSED="${{ steps.tests.outputs.passed || 'false' }}"
+          export SERVER_BUILD_OK="${{ steps.server_build.outputs.ok || 'false' }}"
+          export KNIP_UNUSED="${{ steps.knip.outputs.unused_files || '0' }}"
+          export CLIPPY_ERRORS="${{ steps.clippy.outputs.errors || '0' }}"
+          export CLIPPY_WARNINGS="${{ steps.clippy.outputs.warnings || '0' }}"
+          export RUSTFMT_OK="${{ steps.rustfmt.outputs.fmt_ok || 'false' }}"
 
           # Scoring (100 points, deductions):
           #   TypeScript errors:   -10 per error (max -50)
