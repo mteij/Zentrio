@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Settings, HardDrive, Trash2, FolderOpen, CheckCircle, Zap, RotateCcw } from 'lucide-react'
-import { open } from '@tauri-apps/plugin-dialog'
+import { X, Settings, HardDrive, Trash2, CheckCircle, Zap, RotateCcw } from 'lucide-react'
 import { downloadService, StorageStats, SmartDefaults } from '../../services/downloads/download-service'
 import styles from './Downloads.module.css'
 import { createLogger } from '../../utils/client-logger'
@@ -40,7 +39,6 @@ const QUOTA_OPTIONS = [
 
 export function StoragePanel({ profileId, onClose, onClear }: Props) {
   const [stats, setStats] = useState<StorageStats | null>(null)
-  const [dir, setDir] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const [quota, setQuota] = useState(0)
   const [smart, setSmart] = useState<SmartDefaults>({ smartDownload: false, autoDelete: false })
@@ -50,9 +48,8 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
     let cancelled = false
     const load = async () => {
       try {
-        const [rawStats, rawDir, rawQuota, rawSmart] = await Promise.all([
+        const [rawStats, rawQuota, rawSmart] = await Promise.all([
           downloadService.storageStats(profileId),
-          downloadService.getDirectory(),
           downloadService.getQuota(profileId),
           downloadService.getSmartDefaults(profileId),
         ])
@@ -61,7 +58,6 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
           totalBytes: toFiniteNumber((rawStats as any)?.totalBytes ?? (rawStats as any)?.total_bytes),
           count: toFiniteNumber((rawStats as any)?.count),
         })
-        setDir(typeof rawDir === 'string' ? rawDir : '')
         setQuota(Math.max(0, toFiniteNumber(rawQuota)))
         setSmart({
           smartDownload: Boolean((rawSmart as any)?.smartDownload),
@@ -76,18 +72,6 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
       cancelled = true
     }
   }, [profileId])
-
-  const handleChangeDir = async () => {
-    try {
-      const selected = await open({ directory: true, multiple: false, title: 'Select Download Folder' })
-      if (typeof selected === 'string' && selected) {
-        await downloadService.setDirectory(selected)
-        setDir(selected)
-      }
-    } catch (e) {
-      log.error('folder picker error', e)
-    }
-  }
 
   const handleClear = async () => {
     if (!confirmed) { setConfirmed(true); return }
@@ -145,16 +129,6 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
             <div className={styles.quotaFill} style={{ width: `${usedPercent}%` }} />
           </div>
         )}
-
-        {/* ── Download folder ── */}
-        <div className={styles.storageDirRow}>
-          <span className={styles.storageDirLabel}>Download folder</span>
-          <span className={styles.storageDirPath}>{dir || '—'}</span>
-          <button className={styles.storageActionBtn} onClick={handleChangeDir}>
-            <FolderOpen size={15} />
-            Change
-          </button>
-        </div>
 
         {/* ── Storage quota ── */}
         <div className={styles.smartSection}>

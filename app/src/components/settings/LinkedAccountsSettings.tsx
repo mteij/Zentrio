@@ -33,9 +33,9 @@ export function LinkedAccountsSettings({
 
   // Get provider display name
   const getProviderDisplayName = (providerId: string): string => {
-    if (providerId === 'oidc') {
-      return typeof (availableProviders as any).oidcName === 'string' ? (availableProviders as any).oidcName : 'OpenID'
-    }
+    const oidcProviders: { id: string; name: string }[] = (availableProviders as any).oidcProviders || []
+    const oidcMatch = oidcProviders.find(p => p.id === providerId)
+    if (oidcMatch) return oidcMatch.name
     const names: Record<string, string> = {
       'credential': 'Email & Password',
       'google': 'Google',
@@ -87,10 +87,10 @@ export function LinkedAccountsSettings({
         ))}
         
         {/* Available providers to link */}
-        {(['google', 'github', 'discord', 'oidc'] as const)
+        {(['google', 'github', 'discord'] as const)
           .filter(provider => availableProviders[provider] && !linkedAccounts.find(a => a.providerId === provider))
           .map(provider => (
-            <button 
+            <button
               key={provider}
               onClick={() => onLink(provider)}
               disabled={linkingProvider === provider}
@@ -98,6 +98,19 @@ export function LinkedAccountsSettings({
             >
               <Link className="w-3 h-3" />
               {linkingProvider === provider ? 'Linking...' : getProviderDisplayName(provider)}
+            </button>
+          ))}
+        {((availableProviders as any).oidcProviders as { id: string; name: string }[] | undefined || [])
+          .filter(p => !linkedAccounts.find(a => a.providerId === p.id))
+          .map(p => (
+            <button
+              key={p.id}
+              onClick={() => onLink(p.id)}
+              disabled={linkingProvider === p.id}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-700/50 text-zinc-300 border border-white/10 hover:bg-zinc-600/50 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Link className="w-3 h-3" />
+              {linkingProvider === p.id ? 'Linking...' : p.name}
             </button>
           ))}
       </div>

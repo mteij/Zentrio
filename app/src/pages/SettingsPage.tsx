@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Settings as SettingsIcon } from 'lucide-react'
+import { Palette, Puzzle, Play, AlertTriangle, ArrowLeft, Settings as SettingsIcon, Download } from 'lucide-react'
 import { SimpleLayout, AnimatedBackground } from '../components/index'
 import { SettingsProfileSelector } from '../components/features/SettingsProfileSelector'
 import { appMode } from '../lib/app-mode'
@@ -10,6 +10,7 @@ import { StreamingSettings } from '../components/settings/StreamingSettings'
 import { DangerZoneSettings } from '../components/settings/DangerZoneSettings'
 import { AddonManager } from '../components/settings/AddonManager'
 import { GeneralSettings } from '../components/settings/GeneralSettings'
+import { DownloadSettings } from '../components/settings/DownloadSettings'
 import styles from '../styles/Settings.module.css'
 
 export function SettingsPage() {
@@ -32,6 +33,7 @@ export function SettingsPage() {
     { key: 'appearance', label: 'Appearance', icon: Palette },
     { key: 'addons', label: 'Addons', icon: Puzzle },
     { key: 'streaming', label: 'Streaming', icon: Play },
+    { key: 'downloads', label: 'Downloads', icon: Download },
     ...(!isGuestMode ? [{ key: 'danger', label: 'Danger Zone', icon: AlertTriangle }] : [])
   ]
 
@@ -78,6 +80,7 @@ export function SettingsPage() {
     if (effectiveTab === 'addons') return <AddonManager currentProfileId={currentProfileId} onProfileChange={wrappedProfileChange} />
     if (effectiveTab === 'appearance') return <AppearanceSettings currentProfileId={currentProfileId} onProfileChange={wrappedProfileChange} />
     if (effectiveTab === 'streaming') return <StreamingSettings currentProfileId={currentProfileId} onProfileChange={wrappedProfileChange} />
+    if (effectiveTab === 'downloads') return <DownloadSettings />
     if (effectiveTab === 'danger') return <DangerZoneSettings />
     return <GeneralSettings />
   }

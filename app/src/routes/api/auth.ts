@@ -199,8 +199,7 @@ app.get('/providers', (c) => {
         google: !!cfg.GOOGLE_CLIENT_ID && !!cfg.GOOGLE_CLIENT_SECRET,
         github: !!cfg.GITHUB_CLIENT_ID && !!cfg.GITHUB_CLIENT_SECRET,
         discord: !!cfg.DISCORD_CLIENT_ID && !!cfg.DISCORD_CLIENT_SECRET,
-        oidc: !!cfg.OIDC_CLIENT_ID && !!cfg.OIDC_CLIENT_SECRET && !!cfg.OIDC_ISSUER,
-        oidcName: cfg.OIDC_DISPLAY_NAME || 'OpenID'
+        oidcProviders: cfg.OIDC_PROVIDERS.map(p => ({ id: p.id, name: p.name, icon: p.icon ?? null })),
     })
 })
 
@@ -248,15 +247,19 @@ app.get('/login-proxy', async (c) => {
     }
 
     // Construct the Better Auth social login URL
-    // We use the underlying API to generate the authorization URL
+    // OIDC providers (genericOAuth) use signInWithOAuth2; social providers use signInSocial
+    const cfg = getConfig()
+    const isOidcProvider = cfg.OIDC_PROVIDERS.some(p => p.id === provider)
     try {
-        const authResponse = await auth.api.signInSocial({
-            body: {
-                provider: provider as any,
-                callbackURL: callbackURL
-            },
-            asResponse: true // CRITICAL: Get full response to capture Set-Cookie headers for state
-        });
+        const authResponse = isOidcProvider
+            ? await (auth.api as any).signInWithOAuth2({
+                body: { providerId: provider, callbackURL: callbackURL },
+                asResponse: true,
+            })
+            : await auth.api.signInSocial({
+                body: { provider: provider as any, callbackURL: callbackURL },
+                asResponse: true,
+            });
 
         const authUrl = await authResponse.json();
 
@@ -452,6 +455,7 @@ app.get('/link-proxy', async (c) => {
     const provider = c.req.query('provider')
     const callbackURL = c.req.query('callbackURL')
     const linkCode = c.req.query('linkCode')
+    const isOidcProvider = getConfig().OIDC_PROVIDERS.some(p => p.id === provider)
     
     if (!provider || !callbackURL) {
         return c.text('Missing provider or callbackURL', 400)
@@ -564,12 +568,13 @@ app.get('/link-proxy', async (c) => {
                     <p>Linking ${provider}...</p>
                 </div>
                 <script>
-                    fetch('/api/auth/link-social/${provider}', {
+                    fetch('${isOidcProvider ? '/api/auth/oauth2/link' : `/api/auth/link-social/${provider}`}', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
-                        body: JSON.stringify({
-                            callbackURL: '${callbackURL}'
+                        body: JSON.stringify(${isOidcProvider
+                            ? `{ providerId: '${provider}', callbackURL: '${callbackURL}' }`
+                            : `{ callbackURL: '${callbackURL}' }`
                         })
                     })
                     .then(res => res.json())

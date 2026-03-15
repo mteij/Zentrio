@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Zap, HardDrive, Users, Volume2, Info, X, Globe } from 'lucide-react'
+import { Zap, HardDrive, Users, Volume2, Info, X, Globe, Download } from 'lucide-react'
 import { FlatStream } from '../../hooks/useStreamLoader'
 
 interface CompactStreamItemProps {
@@ -9,6 +9,7 @@ interface CompactStreamItemProps {
   index: number
   showAddonName?: boolean
   mode?: 'simple' | 'advanced'  // simple = essential tags, advanced = all tags
+  onDownload?: () => void
 }
 
 // Format bytes to human readable
@@ -237,7 +238,7 @@ function InfoOverlay({ item, onClose }: { item: FlatStream; onClose: () => void 
  * Compact Stream Item - Streamlined tags
  * Shows: Cached, Resolution, Source, HDR/DV, Size, Languages, Info button
  */
-export function CompactStreamItem({ item, onClick, index: _index, showAddonName = false, mode = 'simple' }: CompactStreamItemProps) {
+export function CompactStreamItem({ item, onClick, index: _index, showAddonName = false, mode = 'simple', onDownload }: CompactStreamItemProps) {
   const [showInfoOverlay, setShowInfoOverlay] = useState(false)
   const { addon, parsed } = item
   
@@ -431,11 +432,34 @@ export function CompactStreamItem({ item, onClick, index: _index, showAddonName 
           </span>
         )}
 
+        {/* Download button */}
+        {onDownload && (
+          <button
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDownload() }}
+            style={{
+              marginLeft: showAddonName ? '0' : 'auto',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: 'none',
+              padding: '6px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+              flexShrink: 0,
+              transition: 'all 0.2s'
+            }}
+            title="Download this stream"
+          >
+            <Download size={14} />
+          </button>
+        )}
+
         {/* Info button */}
         <button
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowInfoOverlay(true) }}
           style={{
-            marginLeft: showAddonName ? '0' : 'auto',
+            marginLeft: onDownload || showAddonName ? '0' : 'auto',
             background: 'rgba(255, 255, 255, 0.06)',
             border: 'none',
             padding: '6px',

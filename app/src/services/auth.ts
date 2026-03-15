@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { bearer, emailOTP, magicLink, oidcProvider, openAPI, phoneNumber, twoFactor } from "better-auth/plugins";
+import { bearer, emailOTP, genericOAuth, magicLink, oidcProvider, openAPI, phoneNumber, twoFactor } from "better-auth/plugins";
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "fs";
 import { dirname, isAbsolute, join } from "path";
@@ -95,13 +95,6 @@ export const auth = betterAuth({
             clientSecret: cfg.DISCORD_CLIENT_SECRET || "",
             redirectURI: `${cfg.APP_URL}/api/auth/callback/discord`,
         },
-        oidc: {
-            enabled: !!cfg.OIDC_CLIENT_ID && !!cfg.OIDC_CLIENT_SECRET && !!cfg.OIDC_ISSUER,
-            clientId: cfg.OIDC_CLIENT_ID || "",
-            clientSecret: cfg.OIDC_CLIENT_SECRET || "",
-            issuer: cfg.OIDC_ISSUER || "",
-            redirectURI: `${cfg.APP_URL}/api/auth/callback/oidc`,
-        },
     },
     plugins: [
         twoFactor({
@@ -121,7 +114,7 @@ export const auth = betterAuth({
             }
         }),
         emailOTP({
-            async sendVerificationOTP({ email, otp, _type }) {
+            async sendVerificationOTP({ email, otp, type: _type }) {
                 await emailService.sendOTP(email, otp);
             },
         }),
@@ -141,6 +134,18 @@ export const auth = betterAuth({
         oidcProvider({
             loginPage: "/login",
         }),
+        ...(cfg.OIDC_PROVIDERS.length > 0 ? [
+            genericOAuth({
+                config: cfg.OIDC_PROVIDERS.map(p => ({
+                    providerId: p.id,
+                    clientId: p.clientId,
+                    clientSecret: p.clientSecret,
+                    discoveryUrl: `${p.issuer}/.well-known/openid-configuration`,
+                    redirectURI: `${cfg.APP_URL}/api/auth/callback/${p.id}`,
+                    scopes: ["openid", "email", "profile"],
+                })),
+            }),
+        ] : []),
         bearer()
     ],
     user: {
@@ -202,7 +207,7 @@ export const auth = betterAuth({
     account: {
         accountLinking: {
             enabled: true,
-            trustedProviders: ["google", "github", "discord", "oidc"],
+            trustedProviders: ["google", "github", "discord", ...cfg.OIDC_PROVIDERS.map(p => p.id)],
             allowDifferentEmails: true,
         },
     },

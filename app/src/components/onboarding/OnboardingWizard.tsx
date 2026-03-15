@@ -88,10 +88,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     google: boolean;
     github: boolean;
     discord: boolean;
-    oidc: boolean;
-    oidcName: string;
+    oidcProviders: { id: string; name: string; icon: string | null }[];
   }>({
-    google: false, github: false, discord: false, oidc: false, oidcName: 'OpenID'
+    google: false, github: false, discord: false, oidcProviders: []
   });
   
   // Fetch available providers
@@ -133,10 +132,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }, [isAuthenticated, user, onComplete, serverUrl, completedRef]);
   
   // Social login handler
-  const handleSocialLogin = async (provider: 'google' | 'github' | 'discord' | 'oidc') => {
+  const handleSocialLogin = async (provider: 'google' | 'github' | 'discord') => {
     try {
       setSocialLoading(provider);
-      
+
       if (isTauri()) {
         const { openUrl } = await import('@tauri-apps/plugin-opener');
         const srvUrl = getServerUrl();
@@ -146,6 +145,26 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       } else {
         const callbackURL = `${getClientUrl()}/profiles`;
         await authClient.signIn.social({ provider, callbackURL });
+      }
+    } catch (e: any) {
+      toast.error('Login Failed', { description: e.message || 'Could not sign in' });
+      setSocialLoading(null);
+    }
+  };
+
+  const handleOidcLogin = async (providerId: string) => {
+    try {
+      setSocialLoading(providerId);
+
+      if (isTauri()) {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        const srvUrl = getServerUrl();
+        const handoffUrl = `${srvUrl}/api/auth/native-redirect?source=tauri`;
+        const url = `${srvUrl}/api/auth/login-proxy?provider=${providerId}&callbackURL=${encodeURIComponent(handoffUrl)}`;
+        await openUrl(url);
+      } else {
+        const callbackURL = `${getClientUrl()}/profiles`;
+        await authClient.signIn.oauth2({ providerId, callbackURL } as any);
       }
     } catch (e: any) {
       toast.error('Login Failed', { description: e.message || 'Could not sign in' });
@@ -305,7 +324,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     onComplete('guest');
   };
   
-  const hasSocialProviders = providers.google || providers.github || providers.discord || providers.oidc;
+  const hasSocialProviders = providers.google || providers.github || providers.discord || providers.oidcProviders.length > 0;
   
   return (
     <div 
@@ -479,7 +498,24 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     Continue with Discord
                   </button>
                 )}
-                
+                {providers.oidcProviders.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleOidcLogin(p.id)}
+                    disabled={!!socialLoading}
+                    className="w-full flex items-center justify-center gap-3 bg-white/10 border border-white/15 text-white hover:bg-white/15 py-3.5 rounded-xl transition-all font-medium text-[15px] disabled:opacity-50"
+                  >
+                    {socialLoading === p.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : p.icon ? (
+                      <img src={p.icon} alt={p.name} className="w-5 h-5 object-contain" />
+                    ) : (
+                      <KeyRound className="w-5 h-5 text-zinc-300" />
+                    )}
+                    Continue with {p.name}
+                  </button>
+                ))}
+
                 {/* Divider */}
                 {hasSocialProviders && (
                   <div className="relative flex items-center gap-4 py-2">

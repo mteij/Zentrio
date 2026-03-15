@@ -127,7 +127,7 @@ Mounts the API surface and also owns:
 
 | File | Mount | Purpose |
 | --- | --- | --- |
-| `auth.ts` | `/api/auth` | Better Auth flows plus native/mobile helper endpoints like provider discovery, identify, link proxy, and mobile callback handling |
+| `auth.ts` | `/api/auth` | Better Auth flows plus native/mobile helper endpoints like provider discovery, identify, link proxy, and mobile callback handling. `/providers` returns `oidcProviders[]` for multi-OIDC. OIDC login/link goes through `signInWithOAuth2`/`oauth2/link` (genericOAuth); social providers still use `signInSocial`/`link-social`. |
 | `profiles.ts` | `/api/profiles` | Profile CRUD plus per-profile proxy/filter settings |
 | `user.ts` | `/api/user` | Settings profiles, user settings, linked accounts, TMDB key, email/password/username/account management |
 | `streaming.ts` | `/api/streaming` | Streaming settings, dashboard data, details, catalog/search, progress/history, subtitles, stream endpoints, IntroDB segment fetch/submit, filter-enrich |
@@ -233,9 +233,10 @@ Server-side business logic lives in `app/src/services/`.
 | --- | --- |
 | `logger.ts` | Canonical Bun/server logger. Never use `console.log` in server code. |
 | `envParser.ts` | Canonical env loader and typed config reader. The only place that should interpret `process.env`. |
-| `auth.ts` | Better Auth server configuration and plugin wiring |
-| `email.ts` | Outbound email sending |
+| `auth.ts` | Better Auth server configuration and plugin wiring. Uses `genericOAuth` for multi-OIDC support. |
+| `email.ts` | Outbound email sending with ordered provider fallback (SMTP / Resend). Exports `resolveConfiguredProviderOrder` for testable priority logic. |
 | `email/templates.ts` | Email HTML templates |
+| `email.test.ts` | Unit tests for email provider ordering and fallback logic |
 | `encryption.ts` | Secret-backed encryption/decryption helpers |
 | `imdb.ts` | IMDb dataset ingest/update logic |
 | `sync.ts` | Background sync orchestration |
@@ -357,7 +358,7 @@ Shared client singletons and transport utilities.
 
 | File | Purpose |
 | --- | --- |
-| `auth-client.ts` | Better Auth client singleton, Tauri-aware fetch behavior, auth/session helpers, `isTauri()` |
+| `auth-client.ts` | Better Auth client singleton, Tauri-aware fetch behavior, auth/session helpers, `isTauri()`. Includes `genericOAuthClient` plugin for multi-OIDC flows. |
 | `apiFetch.ts` | Canonical client wrapper for `/api/*` requests |
 | `adminApi.ts` | Typed admin API wrapper and step-up UI integration |
 | `addon-fetch.ts` | External addon fetch transport: Tauri direct HTTP, web direct fetch first, proxy fallback second |
@@ -446,7 +447,7 @@ Important areas:
 | `library/` | Watchlist/library UI |
 | `onboarding/` | Native first-run setup |
 | `player/` | Zentrio player UI, engines, and player hooks |
-| `settings/` | Settings sections and settings modals |
+| `settings/` | Settings sections and settings modals. `DownloadSettings.tsx` handles native download quality and storage path configuration. |
 | `streaming/` | Streaming-page specific helpers/loaders |
 | `ui/` | Generic primitives and skeleton/loading components |
 
@@ -603,7 +604,8 @@ Important live config groups:
 - server: `PORT`, `APP_URL`, `CLIENT_URL`, `DATABASE_URL`
 - security: `AUTH_SECRET`, `ENCRYPTION_KEY`, `HEALTH_TOKEN`
 - admin: `ADMIN_ENABLED`, `ADMIN_SETUP_TOKEN`, `ANALYTICS_ENABLED`
-- email: SMTP/Resend vars plus timeout/backoff tuning
+- email: `EMAIL_PROVIDER` (smtp|resend|auto, default auto = SMTP first then Resend), SMTP vars (`SMTP_URL` or `EMAIL_HOST`/`EMAIL_USER`/`EMAIL_PASS`/`EMAIL_PORT`/`EMAIL_SECURE`), `RESEND_API_KEY`, timeout/backoff tuning
+- SSO: `GOOGLE_CLIENT_ID`/`SECRET`, `GITHUB_CLIENT_ID`/`SECRET`, `DISCORD_CLIENT_ID`/`SECRET`; multi-OIDC via `OIDC_1_CLIENT_ID`, `OIDC_1_CLIENT_SECRET`, `OIDC_1_ISSUER`, `OIDC_1_NAME`, `OIDC_1_ID` (repeat for `OIDC_2_*`, etc., up to 20); legacy single-OIDC vars (`OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ISSUER`, `OIDC_DISPLAY_NAME`) still accepted
 - integrations: `TMDB_API_KEY`, `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`, `FANART_API_KEY`, `IMDB_UPDATE_INTERVAL_HOURS`
 - tuning: `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_LIMIT`, `PROXY_LOGS`, `LOG_LEVEL`
 

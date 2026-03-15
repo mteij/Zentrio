@@ -46,7 +46,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
   const onEndedRef = useRef(onEnded)
   const durationRef = useRef(duration)
   const initialVolumeApplied = useRef(false)
-  const { isConnected: isCastConnected, _castSession } = useCast()
+  const { isConnected: isCastConnected } = useCast()
   
   // Audio analysis refs to prevent recreating source nodes
   const _audioContextRef = useRef<AudioContext | null>(null)

@@ -1474,6 +1474,25 @@
   letter-spacing: 0.02em;
 }
 
+.streamDownloadBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.streamDownloadBtn:hover {
+  background: rgba(229, 9, 20, 0.15);
+  color: var(--accent, #e50914);
+}
+
 .badgeCached {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;

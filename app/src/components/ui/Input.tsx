@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   wrapperClassName?: string;
@@ -62,7 +62,7 @@ export function Input({
 }
 
 // kept for backward compatibility if needed, but encouraged to use prop on Input
-export function FormGroup({ label, htmlFor, children, className = '', id }: { label?: string, htmlFor?: string, children: React.ReactNode, className?: string, id?: string }) {
+export function FormGroup({ label, htmlFor, children, className = '', id }: { label?: string, htmlFor?: string, children: ReactNode, className?: string, id?: string }) {
   return (
     <div id={id} className={`mb-5 ${className}`}>
       {label && <label htmlFor={htmlFor} className="block mb-2 text-[#b3b3b3] text-base">{label}</label>}

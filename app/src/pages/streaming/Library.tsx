@@ -42,7 +42,6 @@ export const StreamingLibrary = () => {
       error
     },
     setters: {
-      _setMyLists,
       setAccountSharedLists,
       setProfileSharedLists,
       setPendingInvites,

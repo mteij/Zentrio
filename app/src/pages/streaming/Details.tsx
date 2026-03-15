@@ -14,6 +14,8 @@ import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { useStreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
 import { useStreamLoader } from '../../hooks/useStreamLoader'
 import { apiFetch } from '../../lib/apiFetch'
+import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
+import { useDownloadStore } from '../../stores/downloadStore'
 import { MetaDetail, Stream } from '../../services/addons/types'
 import styles from '../../styles/Streaming.module.css'
 import { createLogger } from '../../utils/client-logger'
@@ -48,6 +50,7 @@ export const StreamingDetails = () => {
   const location = useLocation()
   const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
   const streamDisplaySettings = useStreamDisplaySettings(profileId)
+  const downloadStore = useDownloadStore()
   const [data, setData] = useState<StreamingDetailsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -284,6 +287,94 @@ export const StreamingDetails = () => {
         autoPlayRef.current = false
     }
   }, [handlePlay, streams, streamsComplete])
+
+  const handleDownloadStream = useCallback(async (stream: Stream) => {
+    if (!profileId || !data?.meta) return
+    const meta = data.meta
+    const quality = (localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality
+
+    const isSeries = meta.type === 'series' && selectedEpisode != null
+    const existing = downloadStore.downloads.find((d) => {
+      if (d.mediaId !== meta.id) return false
+      if (isSeries) return d.season === selectedEpisode!.season && d.episode === selectedEpisode!.number
+      return true
+    })
+
+    const doDownload = async () => {
+      if (existing) {
+        try {
+          await downloadService.delete(existing.id)
+          downloadStore.removeDownload(existing.id)
+        } catch (e) {
+          log.error('delete existing download failed', e)
+        }
+      }
+      try {
+        const id = await downloadService.start({
+          profileId,
+          mediaType: meta.type as 'movie' | 'series',
+          mediaId: meta.id,
+          ...(isSeries ? {
+            episodeId: `${meta.id}:${selectedEpisode!.season}:${selectedEpisode!.number}`,
+            episodeTitle: selectedEpisode!.title,
+            season: selectedEpisode!.season,
+            episode: selectedEpisode!.number,
+          } : {}),
+          title: meta.name,
+          posterPath: meta.poster || '',
+          streamUrl: stream.url || '',
+          addonId: (stream as any).addonId || '',
+          quality,
+          subtitleUrls: (stream as any).subtitles,
+        })
+        downloadStore.addDownload({
+          id,
+          profileId,
+          mediaType: meta.type as 'movie' | 'series',
+          mediaId: meta.id,
+          ...(isSeries ? {
+            episodeId: `${meta.id}:${selectedEpisode!.season}:${selectedEpisode!.number}`,
+            episodeTitle: selectedEpisode!.title,
+            season: selectedEpisode!.season,
+            episode: selectedEpisode!.number,
+          } : {}),
+          title: meta.name,
+          posterPath: meta.poster || '',
+          status: 'queued',
+          progress: 0,
+          quality,
+          filePath: '',
+          fileSize: 0,
+          downloadedBytes: 0,
+          addedAt: Date.now(),
+          watchedPercent: 0,
+          streamUrl: stream.url || '',
+          addonId: (stream as any).addonId || '',
+          smartDownload: false,
+          autoDelete: false,
+        })
+        toast.success(`Downloading: ${isSeries ? `${meta.name} S${selectedEpisode!.season}:E${selectedEpisode!.number}` : meta.name}`)
+      } catch (e) {
+        log.error('stream download start failed', e)
+        toast.error('Failed to start download')
+      }
+    }
+
+    if (existing && ['queued', 'downloading', 'paused'].includes(existing.status)) {
+      toast.info('Already downloading this item')
+      return
+    }
+
+    if (existing?.status === 'completed') {
+      toast(`Already downloaded. Replace with this stream?`, {
+        action: { label: 'Replace', onClick: () => void doDownload() },
+        duration: 6000,
+      })
+      return
+    }
+
+    void doDownload()
+  }, [profileId, data, selectedEpisode, downloadStore])
 
   const handleEpisodeSelect = (season: number, number: number, title: string, autoPlay: boolean = false) => {
     setSelectedEpisode({ season, number, title })
@@ -567,7 +658,7 @@ export const StreamingDetails = () => {
     )
   }
 
-  const { meta, _inLibrary } = data
+  const { meta } = data
 
   return (
     <Layout title={meta.name} showHeader={false} showFooter={false}>
@@ -616,8 +707,10 @@ export const StreamingDetails = () => {
               streamsLoading={streamsLoading}
               cacheStatus={cacheStatus}
               streamDisplaySettings={streamDisplaySettings}
+              profileId={profileId || ''}
               onRefresh={refreshStreams}
               onPlay={handlePlay}
+              onDownload={handleDownloadStream}
               onBack={() => setView('episodes')}
             />
           )}

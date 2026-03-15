@@ -29,6 +29,36 @@ interface EmailProvider {
   sendMail(options: SendMailOptions): Promise<void>
 }
 
+type EmailProviderKey = 'smtp' | 'resend'
+
+export function resolveConfiguredProviderOrder(options: {
+  preference: string
+  smtpConfigured: boolean
+  resendConfigured: boolean
+}): EmailProviderKey[] {
+  const { preference, smtpConfigured, resendConfigured } = options
+  const order: EmailProviderKey[] = []
+
+  const pushProvider = (provider: EmailProviderKey) => {
+    if (provider === 'smtp' && smtpConfigured && !order.includes('smtp')) {
+      order.push('smtp')
+    }
+    if (provider === 'resend' && resendConfigured && !order.includes('resend')) {
+      order.push('resend')
+    }
+  }
+
+  if (preference === 'resend') {
+    pushProvider('resend')
+    pushProvider('smtp')
+    return order
+  }
+
+  pushProvider('smtp')
+  pushProvider('resend')
+  return order
+}
+
 // =============================================================================
 // SMTP Provider (via Nodemailer)
 // =============================================================================
@@ -147,12 +177,13 @@ const EMAIL_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
 const emailRateMap = new Map<string, { count: number; resetAt: number }>()
 
 // Periodic cleanup of expired rate-limit entries
-setInterval(() => {
+const emailRateCleanupTimer = setInterval(() => {
   const now = Date.now()
   for (const [addr, entry] of emailRateMap) {
     if (now >= entry.resetAt) emailRateMap.delete(addr)
   }
 }, 5 * 60 * 1000)
+emailRateCleanupTimer.unref?.()
 
 class EmailService {
   private providers?: EmailProvider[]
@@ -163,13 +194,22 @@ class EmailService {
   }
 
   private inBackoff(providerName: string): boolean {
+    return this.getBackoffRemainingMs(providerName) > 0
+  }
+
+  private getBackoffRemainingMs(providerName: string): number {
     const last = this.providerLastFailure.get(providerName)
-    if (!last) return false
-    return Date.now() - last < this.getProviderBackoffMs()
+    if (!last) return 0
+    const remaining = this.getProviderBackoffMs() - (Date.now() - last)
+    return Math.max(0, remaining)
   }
 
   private markFailure(providerName: string) {
     this.providerLastFailure.set(providerName, Date.now())
+  }
+
+  private clearFailure(providerName: string) {
+    this.providerLastFailure.delete(providerName)
   }
 
   private buildProviders(): EmailProvider[] {
@@ -187,53 +227,54 @@ class EmailService {
 
     // Selection:
     // - EMAIL_PROVIDER=resend|smtp|auto (default auto)
-    // - auto prefers Resend if configured (fast, no SMTP networking), else SMTP
-    const pref = cfg.EMAIL_PROVIDER
+    // - auto prefers SMTP when available, then falls back to Resend
+    const rawPreference = cfg.EMAIL_PROVIDER
+    const pref = rawPreference === 'smtp' || rawPreference === 'resend' || rawPreference === 'auto'
+      ? rawPreference
+      : 'auto'
 
     const smtpProvider = () => {
       if (smtpUrl) {
-        log.info('Using SMTP provider (URL)')
+        log.info('Configured SMTP provider (URL)')
         return new SmtpProvider(smtpUrl)
       }
       const port = cfg.EMAIL_PORT
       const secure = cfg.EMAIL_SECURE
-      log.info(`Using SMTP provider (${host}:${port})`)
+      log.info(`Configured SMTP provider (${host}:${port})`)
       return new SmtpProvider({ host, port, secure, auth: { user, pass } })
     }
 
     const resendProvider = () => {
-      log.info('Using Resend provider')
+      log.info('Configured Resend provider')
       return new ResendProvider(resendApiKey)
     }
 
     const providers: EmailProvider[] = []
-
-    const pushSmtp = () => {
-      if (smtpConfigured) providers.push(smtpProvider())
-    }
-    const pushResend = () => {
-      if (resendConfigured) providers.push(resendProvider())
+    const providerFactories: Record<EmailProviderKey, () => EmailProvider> = {
+      smtp: smtpProvider,
+      resend: resendProvider
     }
 
-    if (pref === 'resend') {
-      pushResend()
-      pushSmtp()
-    } else if (pref === 'smtp') {
-      pushSmtp()
-      pushResend()
-    } else {
-      // auto
-      if (resendConfigured) pushResend()
-      else pushSmtp()
-      // Add the other as failover
-      if (providers.length === 0) {
-        pushSmtp()
-        pushResend()
-      } else if (providers[0].name === 'Resend') {
-        pushSmtp()
-      } else {
-        pushResend()
-      }
+    if (pref !== rawPreference) {
+      log.warn(`Unknown EMAIL_PROVIDER "${rawPreference}", defaulting to auto (SMTP first, Resend fallback).`)
+    } else if (pref === 'smtp' && !smtpConfigured && resendConfigured) {
+      log.warn('EMAIL_PROVIDER=smtp was requested, but SMTP is not fully configured. Falling back to Resend.')
+    } else if (pref === 'resend' && !resendConfigured && smtpConfigured) {
+      log.warn('EMAIL_PROVIDER=resend was requested, but Resend is not configured. Falling back to SMTP.')
+    }
+
+    const configuredOrder = resolveConfiguredProviderOrder({
+      preference: pref,
+      smtpConfigured,
+      resendConfigured
+    })
+
+    if (configuredOrder.length > 0) {
+      log.info(`Email provider priority: ${configuredOrder.map((provider) => provider.toUpperCase()).join(' -> ')}`)
+    }
+
+    for (const provider of configuredOrder) {
+      providers.push(providerFactories[provider]())
     }
 
     if (providers.length === 0) {
@@ -267,22 +308,48 @@ class EmailService {
   private async sendViaProviders(options: SendMailOptions): Promise<void> {
     this.checkRateLimit(options.to)
     let lastErr: unknown = null
-
-    for (const provider of this.getProviders()) {
-      if (this.inBackoff(provider.name)) {
-        continue
+    const providers = this.getProviders()
+    const skippedProviders: string[] = []
+    const availableProviders = providers.filter((provider) => {
+      const remainingMs = this.getBackoffRemainingMs(provider.name)
+      if (remainingMs <= 0) {
+        return true
       }
 
+      skippedProviders.push(`${provider.name} (${remainingMs}ms backoff remaining)`)
+      return false
+    })
+    const providersToTry = availableProviders.length > 0 ? availableProviders : providers
+    const attemptedProviders: string[] = []
+
+    if (skippedProviders.length > 0) {
+      log.warn(`Skipping email providers in backoff: ${skippedProviders.join(', ')}`)
+    }
+
+    if (providers.length > 0 && availableProviders.length === 0) {
+      log.warn('All configured email providers are in backoff. Retrying them in priority order for this attempt.')
+    }
+
+    for (const provider of providersToTry) {
+      attemptedProviders.push(provider.name)
       try {
         await provider.sendMail(options)
+        this.clearFailure(provider.name)
+        if (attemptedProviders.length > 1) {
+          log.warn(`Email delivery succeeded via fallback provider ${provider.name}.`)
+        }
         return
       } catch (e) {
         lastErr = e
         this.markFailure(provider.name)
+        const lastErrorMessage = e instanceof Error ? e.message : String(e)
+        const hasMoreProviders = attemptedProviders.length < providersToTry.length
+        log.warn(`Email provider ${provider.name} failed. ${hasMoreProviders ? 'Trying next provider.' : 'No more providers available.'} Last error: ${lastErrorMessage}`)
       }
     }
 
-    throw (lastErr instanceof Error ? lastErr : new Error('Failed to send email (all providers failed)'))
+    const lastErrorMessage = lastErr instanceof Error ? lastErr.message : 'Unknown email delivery failure'
+    throw new Error(`Failed to send email after trying ${attemptedProviders.join(' -> ') || 'no providers'}. Last error: ${lastErrorMessage}`)
   }
 
   // Strict, conservative recipient validation

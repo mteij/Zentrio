@@ -64,15 +64,26 @@ pub async fn download_subtitles(
                             path: path.to_string_lossy().to_string(),
                         });
                     } else {
-                        log::warn!("[Subtitles] Failed to write subtitle file for lang={}", entry.lang);
+                        log::warn!(
+                            "[Subtitles] Failed to write subtitle file for lang={}",
+                            entry.lang
+                        );
                     }
                 }
             }
             Ok(resp) => {
-                log::warn!("[Subtitles] HTTP {} for subtitle lang={}", resp.status(), entry.lang);
+                log::warn!(
+                    "[Subtitles] HTTP {} for subtitle lang={}",
+                    resp.status(),
+                    entry.lang
+                );
             }
             Err(e) => {
-                log::warn!("[Subtitles] Failed to download subtitle lang={}: {}", entry.lang, e);
+                log::warn!(
+                    "[Subtitles] Failed to download subtitle lang={}: {}",
+                    entry.lang,
+                    e
+                );
             }
         }
     }

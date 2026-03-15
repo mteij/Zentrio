@@ -97,12 +97,15 @@ pub async fn download_hls(
         let seg_bytes = download_segment(&client, url).await.map_err(|e| {
             let msg = format!("Segment fetch failed: {e}");
             db.lock().unwrap().update_error(id, &msg).ok();
-            emit_status(&app, StatusPayload {
-                id: id.to_string(),
-                status: "failed".into(),
-                file_path: None,
-                error: Some(msg.clone()),
-            });
+            emit_status(
+                &app,
+                StatusPayload {
+                    id: id.to_string(),
+                    status: "failed".into(),
+                    file_path: None,
+                    error: Some(msg.clone()),
+                },
+            );
             notifier::notify_failed(&app, title);
             msg
         })?;
@@ -189,13 +192,16 @@ fn pick_variant(
     let selected = match quality_pref {
         "standard" => {
             // Pick the lowest quality that is ≥ 720p or the first available
-            variants.iter().rev()
+            variants
+                .iter()
+                .rev()
                 .find(|v| v.bandwidth >= 1_000_000)
                 .or_else(|| variants.last())
         }
         "higher" => {
             // Pick the best quality ≤ 8 Mbps (≈1080p)
-            variants.iter()
+            variants
+                .iter()
                 .find(|v| v.bandwidth <= 8_000_000)
                 .or_else(|| variants.first())
         }
@@ -208,8 +214,7 @@ fn pick_variant(
     let variant = selected.ok_or("No suitable variant found")?;
     let uri = &variant.uri;
 
-    resolve_url(base_url, uri)
-        .ok_or_else(|| format!("Failed to resolve variant URL: {}", uri))
+    resolve_url(base_url, uri).ok_or_else(|| format!("Failed to resolve variant URL: {}", uri))
 }
 
 async fn fetch_media_segments(client: &Client, media_url: &str) -> Result<Vec<String>, String> {
@@ -254,9 +259,14 @@ async fn download_segment(client: &Client, url: &str) -> Result<Vec<u8>, String>
         match client.get(url).send().await {
             Ok(resp) => {
                 if !resp.status().is_success() {
-                    return Err(format!("Segment request failed with HTTP {}", resp.status()));
+                    return Err(format!(
+                        "Segment request failed with HTTP {}",
+                        resp.status()
+                    ));
                 }
-                return resp.bytes().await
+                return resp
+                    .bytes()
+                    .await
                     .map(|b| b.to_vec())
                     .map_err(|e| e.to_string());
             }

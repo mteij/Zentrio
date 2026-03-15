@@ -45,10 +45,36 @@
                 />
               </svg>
             </a>
+
+            <button
+              class="icon-btn hamburger-btn"
+              :class="{ open: mobileMenuOpen }"
+              @click="mobileMenuOpen = !mobileMenuOpen"
+              aria-label="Toggle menu"
+              :aria-expanded="mobileMenuOpen"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line v-if="!mobileMenuOpen" x1="3" y1="6" x2="21" y2="6" />
+                <line v-if="!mobileMenuOpen" x1="3" y1="12" x2="21" y2="12" />
+                <line v-if="!mobileMenuOpen" x1="3" y1="18" x2="21" y2="18" />
+                <line v-if="mobileMenuOpen" x1="4" y1="4" x2="20" y2="20" />
+                <line v-if="mobileMenuOpen" x1="20" y1="4" x2="4" y2="20" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
     </nav>
+
+    <!-- Mobile menu -->
+    <div class="mobile-menu" :class="{ open: mobileMenuOpen }" @click.self="mobileMenuOpen = false">
+      <div class="mobile-menu-inner">
+        <a href="https://app.zentrio.eu" class="mobile-link highlight" @click="mobileMenuOpen = false">Zentrio Web</a>
+        <router-link to="/releases" class="mobile-link" @click="mobileMenuOpen = false">Releases</router-link>
+        <a href="https://docs.zentrio.eu" class="mobile-link" @click="mobileMenuOpen = false">Documentation</a>
+        <a href="https://github.com/mteij/Zentrio" target="_blank" class="mobile-link" @click="mobileMenuOpen = false">GitHub</a>
+      </div>
+    </div>
 
     <main class="main-content">
       <router-view v-slot="{ Component }">
@@ -104,10 +130,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch } from "vue";
+import { useRoute } from "vue-router";
 
 const isScrolled = ref(false);
+const mobileMenuOpen = ref(false);
 const currentYear = computed(() => new Date().getFullYear());
+const route = useRoute();
+
+watch(route, () => {
+  mobileMenuOpen.value = false;
+});
 
 // Use requestAnimationFrame to batch scroll updates and prevent forced reflow
 let rafId = null;
@@ -482,6 +515,66 @@ h6 {
   opacity: 0;
 }
 
+/* Mobile menu */
+.hamburger-btn {
+  display: none;
+}
+
+.mobile-menu {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.mobile-menu.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.mobile-menu-inner {
+  position: absolute;
+  top: 72px;
+  left: 0;
+  right: 0;
+  background: rgba(13, 13, 15, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0 16px;
+  transform: translateY(-8px);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-menu.open .mobile-menu-inner {
+  transform: translateY(0);
+}
+
+.mobile-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 14px 24px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.mobile-link:hover,
+.mobile-link.router-link-active {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mobile-link.highlight {
+  color: var(--text);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .nav-right {
@@ -489,7 +582,15 @@ h6 {
   }
 
   .nav-links {
-    display: none; /* Can add hamburger menu later if needed, simple for now */
+    display: none;
+  }
+
+  .hamburger-btn {
+    display: flex;
+  }
+
+  .mobile-menu {
+    display: block;
   }
 
   .nav-actions {

@@ -84,7 +84,7 @@ openssl rand -hex 32
 
 Email is optional, but features like magic links, verification, password flows, and admin step-up work better with it configured.
 
-Choose one provider path:
+You can configure SMTP, Resend, or both. In `EMAIL_PROVIDER=auto`, Zentrio prefers SMTP and falls back to Resend when SMTP is unavailable or failing.
 
 ### SMTP
 
@@ -113,10 +113,10 @@ Shared email tuning:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `EMAIL_PROVIDER` | `auto` | `auto`, `smtp`, or `resend` |
+| `EMAIL_PROVIDER` | `auto` | `auto`, `smtp`, or `resend`. `auto` prefers SMTP, then Resend |
 | `EMAIL_SMTP_TIMEOUT_MS` | `8000` | SMTP connect/request timeout |
 | `EMAIL_SEND_TIMEOUT_MS` | `10000` | Overall send timeout |
-| `EMAIL_PROVIDER_BACKOFF_MS` | `300000` | Backoff after provider failures |
+| `EMAIL_PROVIDER_BACKOFF_MS` | `300000` | How long a failed provider stays deprioritized before being preferred again |
 
 ## Admin and Health
 

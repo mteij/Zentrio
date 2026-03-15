@@ -47,10 +47,9 @@ export function LandingPage({ version }: LandingPageProps) {
     google: boolean;
     github: boolean;
     discord: boolean;
-    oidc: boolean;
-    oidcName: string;
+    oidcProviders: { id: string; name: string; icon: string | null }[];
   }>({
-    google: false, github: false, discord: false, oidc: false, oidcName: 'OpenID'
+    google: false, github: false, discord: false, oidcProviders: []
   });
 
   useEffect(() => {

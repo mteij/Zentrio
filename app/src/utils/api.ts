@@ -51,7 +51,8 @@ export function getRequestMeta(c: Context) {
   // Use the LAST entry in X-Forwarded-For — this is appended by the nearest
   // trusted proxy and is much harder to spoof than the first (client-supplied) entry.
   const xff = headers.get('x-forwarded-for')
-  const ip = (xff ? xff.split(',').at(-1)!.trim() : null) ||
+  const forwardedFor = xff ? xff.split(',') : null
+  const ip = (forwardedFor ? forwardedFor[forwardedFor.length - 1]?.trim() : null) ||
              headers.get('x-real-ip') ||
              //@ts-ignore: runtime typing gap
              c.env?.incoming?.socket?.remoteAddress ||

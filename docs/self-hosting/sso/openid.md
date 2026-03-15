@@ -1,44 +1,87 @@
 # OpenID Connect
 
-Zentrio supports generic OpenID Connect (OIDC) providers. This allows you to integrate with any Identity Provider (IdP) that supports the standard.
+Zentrio supports multiple generic OpenID Connect (OIDC) providers simultaneously. You can connect any Identity Provider (IdP) that implements the OIDC standard — Authentik, Keycloak, Okta, Dex, etc.
 
-## Configuration
+## Multiple providers
 
-To configure a generic OIDC provider, add the following to your `.env` file:
+Use numbered env vars to configure up to 20 OIDC providers. Each set is independent:
 
 ```bash
-AUTH_OIDC_ID=your-client-id
-AUTH_OIDC_SECRET=your-client-secret
-AUTH_OIDC_ISSUER=https://your-idp.com/application/o/zentrio/
+# Provider 1
+OIDC_1_CLIENT_ID=your-client-id
+OIDC_1_CLIENT_SECRET=your-client-secret
+OIDC_1_ISSUER=https://your-idp.com/application/o/zentrio/
+OIDC_1_NAME=My SSO          # Button label shown to users
+OIDC_1_ID=my-sso            # Optional slug — determines the callback URL (default: oidc-1)
+OIDC_1_ICON=https://your-idp.com/favicon.ico  # Optional icon URL shown on the login button
+
+# Provider 2
+OIDC_2_CLIENT_ID=...
+OIDC_2_CLIENT_SECRET=...
+OIDC_2_ISSUER=https://second-idp.example.com/
+OIDC_2_NAME=Company SSO
 ```
+
+The callback (redirect) URI for each provider is:
+
+```
+https://your-zentrio-instance.com/api/auth/callback/<ID>
+```
+
+Where `<ID>` is the value of `OIDC_N_ID` (defaults to `oidc-1`, `oidc-2`, etc.).
+
+## Single provider (legacy)
+
+If you only need one OIDC provider, you can use the original single-provider vars:
+
+```bash
+OIDC_CLIENT_ID=your-client-id
+OIDC_CLIENT_SECRET=your-client-secret
+OIDC_ISSUER=https://your-idp.com/application/o/zentrio/
+OIDC_DISPLAY_NAME=My SSO   # Optional, defaults to "OpenID"
+OIDC_ICON=https://your-idp.com/favicon.ico  # Optional
+```
+
+The callback URI for the legacy format uses the fixed ID `oidc`:
+
+```
+https://your-zentrio-instance.com/api/auth/callback/oidc
+```
+
+## Environment variable reference
+
+| Variable | Required | Description |
+|---|---|---|
+| `OIDC_N_CLIENT_ID` | Yes | OAuth2 client ID |
+| `OIDC_N_CLIENT_SECRET` | Yes | OAuth2 client secret |
+| `OIDC_N_ISSUER` | Yes | Issuer URL (used to discover endpoints via `/.well-known/openid-configuration`) |
+| `OIDC_N_NAME` | No | Display name on the login button (default: `OpenID N`) |
+| `OIDC_N_ID` | No | URL-safe slug for the callback path (default: `oidc-N`) |
+| `OIDC_N_ICON` | No | URL of an icon/logo to show on the login button |
 
 ## Example: Authentik
 
-Here is how you can set up Authentik as an OIDC provider for Zentrio.
+### 1. Create a provider in Authentik
 
-### Setup Instructions
+1. Log in to your Authentik instance as an admin.
+2. Go to **Applications** → **Providers**.
+3. Create a new **OAuth2/OpenID Provider**:
+   - **Name**: Zentrio
+   - **Redirect URI**: `https://your-zentrio-instance.com/api/auth/callback/oidc-1`
+   - **Client Type**: Confidential
+   - **Signing Key**: Select your certificate
+4. Note the **Client ID** and **Client Secret**.
+5. Go to **Applications** → **Applications** and create a new application linked to this provider.
+6. Find your **Issuer URL** — typically `https://authentik.your-domain.com/application/o/zentrio/`.
 
-1.  Log in to your Authentik instance as an admin.
-2.  Go to **Applications** > **Providers**.
-3.  Create a new **OAuth2/OpenID Provider**.
-    - **Name**: Zentrio
-    - **Redirect URI/Origin (Regex)**: `https://your-zentrio-instance.com/api/auth/callback/oidc`
-    - **Client Type**: Confidential
-    - **Signing Key**: Select your certificate
-4.  Note the **Client ID** and **Client Secret**.
-5.  Go to **Applications** > **Applications**.
-6.  Create a new Application.
-    - **Name**: Zentrio
-    - **Provider**: Select the provider you just created.
-7.  Ensure the application is assigned to a policy/flow so users can access it.
-8.  You will also need your **Issuer** URL, which is usually `https://authentik.your-domain.com/application/o/zentrio/`.
-
-### Configuration
-
-Add the Authentik details to your `.env` as the OIDC provider:
+### 2. Configure Zentrio
 
 ```bash
-AUTH_OIDC_ID=your-authentik-client-id
-AUTH_OIDC_SECRET=your-authentik-client-secret
-AUTH_OIDC_ISSUER=https://authentik.your-domain.com/application/o/zentrio/
+OIDC_1_CLIENT_ID=your-authentik-client-id
+OIDC_1_CLIENT_SECRET=your-authentik-client-secret
+OIDC_1_ISSUER=https://authentik.your-domain.com/application/o/zentrio/
+OIDC_1_NAME=Authentik
+OIDC_1_ICON=https://authentik.your-domain.com/static/dist/assets/icons/icon.png
 ```
+
+Restart Zentrio after changing OIDC configuration.

@@ -5,18 +5,8 @@
 [dev]
   command = "bun run dev"
 
-# Allow static files (sitemap, robots, etc.) to be served directly
-[[redirects]]
-  from = "/sitemap.xml"
-  to = "/sitemap.xml"
-  status = 200
-
-[[redirects]]
-  from = "/robots.txt"
-  to = "/robots.txt"
-  status = 200
-
 # SPA fallback - all other routes go to index.html
+# Note: static files in dist/ (sitemap.xml, robots.txt, etc.) are served directly by Netlify before this rule
 [[redirects]]
   from = "/*"
   to = "/index.html"

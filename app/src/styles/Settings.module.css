@@ -1490,3 +1490,221 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* ============================================
+   Download Settings
+   ============================================ */
+.dlSettingDesc {
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+  font-size: var(--text-sm, 0.875rem);
+  margin: -12px 0 20px;
+  line-height: 1.5;
+}
+
+.dlSavedBadge {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.dlQualityList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dlQualityRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md, 12px);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-align: left;
+  width: 100%;
+  color: var(--text, #fff);
+}
+
+.dlQualityRow:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.dlQualityRowActive {
+  border-color: var(--accent, #e50914);
+  background: rgba(229, 9, 20, 0.08);
+}
+
+.dlQualityIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm, 8px);
+  flex-shrink: 0;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.dlQualityRowActive .dlQualityIcon {
+  background: rgba(229, 9, 20, 0.15);
+  color: var(--accent, #e50914);
+}
+
+.dlQualityText {
+  flex: 1;
+  min-width: 0;
+}
+
+.dlQualityLabel {
+  display: block;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  color: var(--text, #fff);
+}
+
+.dlQualityDesc {
+  display: block;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+  margin-top: 2px;
+}
+
+.dlQualityRadio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dlQualityRadioActive {
+  border-color: var(--accent, #e50914);
+  background: var(--accent, #e50914);
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.2);
+}
+
+.dlFolderRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md, 12px);
+}
+
+.dlFolderPath {
+  flex: 1;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.dlFolderBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm, 8px);
+  color: var(--text, #fff);
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.dlFolderBtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.dlStatsLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+  font-size: var(--text-sm, 0.875rem);
+  padding: 12px 0;
+}
+
+.dlProfileList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.dlProfileRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dlProfileRow:last-child {
+  border-bottom: none;
+}
+
+.dlProfileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dlProfileName {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  color: var(--text, #fff);
+}
+
+.dlProfileUsage {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.dlClearBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm, 8px);
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dlClearBtn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.dlClearBtnConfirm {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.spin {
+  animation: spinAnim 0.8s linear infinite;
+}
+
+@keyframes spinAnim {
+  to { transform: rotate(360deg); }
+}

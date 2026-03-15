@@ -103,11 +103,41 @@ export function getConfig() {
   const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID
   const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET
   
-  // OpenID Connect
-  const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID
-  const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET
-  const OIDC_ISSUER = process.env.OIDC_ISSUER
-  const OIDC_DISPLAY_NAME = process.env.OIDC_DISPLAY_NAME || 'OpenID'
+  // OpenID Connect — supports multiple providers via numbered env vars:
+  //   OIDC_1_CLIENT_ID, OIDC_1_CLIENT_SECRET, OIDC_1_ISSUER, OIDC_1_NAME, OIDC_1_ID (optional slug)
+  //   OIDC_2_CLIENT_ID, OIDC_2_CLIENT_SECRET, OIDC_2_ISSUER, ...
+  // Also supports legacy single-provider vars (OIDC_CLIENT_ID etc.) for backward compat.
+  const OIDC_PROVIDERS: Array<{ id: string; clientId: string; clientSecret: string; issuer: string; name: string; icon?: string }> = []
+
+  for (let i = 1; i <= 20; i++) {
+    const clientId = process.env[`OIDC_${i}_CLIENT_ID`]
+    const clientSecret = process.env[`OIDC_${i}_CLIENT_SECRET`]
+    const issuer = process.env[`OIDC_${i}_ISSUER`]
+    if (!clientId || !clientSecret || !issuer) break
+    OIDC_PROVIDERS.push({
+      id: (process.env[`OIDC_${i}_ID`] || `oidc-${i}`).trim(),
+      clientId,
+      clientSecret,
+      issuer,
+      name: process.env[`OIDC_${i}_NAME`] || `OpenID ${i}`,
+      icon: process.env[`OIDC_${i}_ICON`] || undefined,
+    })
+  }
+
+  // Legacy single-provider support (backward compat — uses providerId 'oidc')
+  const legacyClientId = process.env.OIDC_CLIENT_ID
+  const legacyClientSecret = process.env.OIDC_CLIENT_SECRET
+  const legacyIssuer = process.env.OIDC_ISSUER
+  if (legacyClientId && legacyClientSecret && legacyIssuer) {
+    OIDC_PROVIDERS.push({
+      id: 'oidc',
+      clientId: legacyClientId,
+      clientSecret: legacyClientSecret,
+      issuer: legacyIssuer,
+      name: process.env.OIDC_DISPLAY_NAME || 'OpenID',
+      icon: process.env.OIDC_ICON || undefined,
+    })
+  }
 
   // Health endpoint token — if set, full internal stats (sessions, memory, watched items)
   // are only returned when the caller sends `Authorization: Bearer <HEALTH_TOKEN>`.
@@ -143,10 +173,7 @@ export function getConfig() {
     GITHUB_CLIENT_SECRET,
     DISCORD_CLIENT_ID,
     DISCORD_CLIENT_SECRET,
-    OIDC_CLIENT_ID,
-    OIDC_CLIENT_SECRET,
-    OIDC_ISSUER,
-    OIDC_DISPLAY_NAME,
+    OIDC_PROVIDERS,
     HEALTH_TOKEN,
     ADMIN_ENABLED,
     ADMIN_SETUP_TOKEN,

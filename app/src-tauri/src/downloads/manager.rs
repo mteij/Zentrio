@@ -103,7 +103,10 @@ impl DownloadManager {
             return;
         }
 
-        log::info!("[Downloads] Restoring {} pending download(s) from previous session", pending.len());
+        log::info!(
+            "[Downloads] Restoring {} pending download(s) from previous session",
+            pending.len()
+        );
 
         let mut queue = match self.queue.lock() {
             Ok(q) => q,
@@ -143,7 +146,9 @@ impl DownloadManager {
         let db = self.db.lock().map_err(|_| "DB lock poisoned".to_string())?;
 
         // Enforce storage quota before inserting
-        let quota = db.get_quota(&payload.profile_id).map_err(|e| e.to_string())?;
+        let quota = db
+            .get_quota(&payload.profile_id)
+            .map_err(|e| e.to_string())?;
         if quota > 0 {
             let (used, _) = db
                 .get_storage_stats(&payload.profile_id)
@@ -157,13 +162,16 @@ impl DownloadManager {
         }
 
         // Resolve smart download and auto-delete flags: explicit override > profile default > false
-        let (profile_smart, profile_auto_delete) =
-            db.get_smart_defaults(&payload.profile_id).unwrap_or((false, false));
+        let (profile_smart, profile_auto_delete) = db
+            .get_smart_defaults(&payload.profile_id)
+            .unwrap_or((false, false));
         let smart_download = payload.smart_download.unwrap_or(profile_smart);
         let auto_delete = payload.auto_delete.unwrap_or(profile_auto_delete);
 
         // Serialize subtitle URLs for storage
-        let subtitle_urls_json = payload.subtitle_urls.as_ref()
+        let subtitle_urls_json = payload
+            .subtitle_urls
+            .as_ref()
             .filter(|v| !v.is_empty())
             .and_then(|v| serde_json::to_string(v).ok());
 
@@ -402,11 +410,7 @@ impl DownloadManager {
             .map_err(|e| e.to_string())
     }
 
-    pub fn delete_all_for_profile(
-        &self,
-        app: AppHandle,
-        profile_id: &str,
-    ) -> Result<(), String> {
+    pub fn delete_all_for_profile(&self, app: AppHandle, profile_id: &str) -> Result<(), String> {
         let ids = self
             .db
             .lock()
@@ -487,16 +491,19 @@ fn dispatch_pending(
                 // Download subtitles if provided and not already downloaded
                 if let Some(urls_json) = subtitle_urls_json.as_deref() {
                     // Only download if subtitle_paths not yet set
-                    let already_done = db2.lock().ok()
+                    let already_done = db2
+                        .lock()
+                        .ok()
                         .and_then(|d| d.get_by_id(&id).ok().flatten())
                         .and_then(|r| r.subtitle_paths)
                         .map(|p| !p.is_empty())
                         .unwrap_or(false);
 
                     if !already_done {
-                        if let Some(paths_json) = super::subtitles::download_subtitles(
-                            &app2, &profile_id, &id, urls_json
-                        ).await {
+                        if let Some(paths_json) =
+                            super::subtitles::download_subtitles(&app2, &profile_id, &id, urls_json)
+                                .await
+                        {
                             if let Ok(d) = db2.lock() {
                                 d.update_subtitle_paths(&id, &paths_json).ok();
                             }
@@ -527,11 +534,14 @@ async fn smart_download_hook(
     completed_id: &str,
     auto_delete: bool,
 ) {
-    let next_ep =
-        match db.lock().ok().and_then(|d| d.get_next_episode(completed_id).ok().flatten()) {
-            Some(ep) => ep,
-            None => return,
-        };
+    let next_ep = match db
+        .lock()
+        .ok()
+        .and_then(|d| d.get_next_episode(completed_id).ok().flatten())
+    {
+        Some(ep) => ep,
+        None => return,
+    };
 
     // Optionally delete the completed file to free space before the next download
     if auto_delete {
@@ -817,7 +827,8 @@ async fn run_download(
 
     let size = file_store::file_size(&final_path);
     if let Ok(d) = db.lock() {
-        d.update_complete(id, &final_path.to_string_lossy(), size).ok();
+        d.update_complete(id, &final_path.to_string_lossy(), size)
+            .ok();
     }
 
     emit_status(

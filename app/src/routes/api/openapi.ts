@@ -127,8 +127,11 @@ export const AuthProvidersSchema = z.object({
   google: z.boolean().openapi({ example: true }),
   github: z.boolean().openapi({ example: true }),
   discord: z.boolean().openapi({ example: false }),
-  oidc: z.boolean().openapi({ example: false }),
-  oidcName: z.string().openapi({ example: 'OpenID' }),
+  oidcProviders: z.array(z.object({
+    id: z.string().openapi({ example: 'oidc-1' }),
+    name: z.string().openapi({ example: 'Keycloak' }),
+    icon: z.string().nullable().openapi({ example: null }),
+  })).openapi({ example: [] }),
 }).openapi('AuthProviders')
 
 // Generate OpenAPI spec endpoint

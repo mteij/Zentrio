@@ -31,7 +31,7 @@ export const TraktRecommendationsRow = ({
   showImdbRatings = true,
   showAgeRatings = true
 }: TraktRecommendationsRowProps) => {
-  const { data, _isLoading, _error } = useQuery({
+  const { data } = useQuery({
     queryKey: ['trakt-recommendations', profileId, type],
     queryFn: async () => {
       const res = await apiFetch(`/api/trakt/recommendations?profileId=${profileId}&type=${type}&limit=20`)

@@ -22,7 +22,7 @@ const app = new Hono()
 
 // Load runtime config
 const cfg = getConfig()
-const { _PORT, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY, PROXY_LOGS } = cfg
+const { RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY, PROXY_LOGS } = cfg
 
 // ─── Version ──────────────────────────────────────────────────────────
 let version = 'unknown'
@@ -99,17 +99,40 @@ const ssoProviders: string[] = []
 if (cfg.GOOGLE_CLIENT_ID && cfg.GOOGLE_CLIENT_SECRET) ssoProviders.push('Google')
 if (cfg.GITHUB_CLIENT_ID && cfg.GITHUB_CLIENT_SECRET) ssoProviders.push('GitHub')
 if (cfg.DISCORD_CLIENT_ID && cfg.DISCORD_CLIENT_SECRET) ssoProviders.push('Discord')
-if (cfg.OIDC_CLIENT_ID && cfg.OIDC_ISSUER) ssoProviders.push(cfg.OIDC_DISPLAY_NAME || 'OIDC')
+for (const p of cfg.OIDC_PROVIDERS) ssoProviders.push(p.name)
 const ssoSummary = ssoProviders.length > 0
   ? ssoProviders.map(p => val(p)).join(dim(', '))
   : dim('none')
 
 // Email summary
+const smtpConfigured = !!cfg.SMTP_URL || (!!cfg.EMAIL_HOST && !!cfg.EMAIL_USER && !!cfg.EMAIL_PASS)
+const resendConfigured = !!cfg.RESEND_API_KEY
+const emailPreference = cfg.EMAIL_PROVIDER === 'smtp' || cfg.EMAIL_PROVIDER === 'resend' || cfg.EMAIL_PROVIDER === 'auto'
+  ? cfg.EMAIL_PROVIDER
+  : 'auto'
+const emailPriority: string[] = []
+const pushEmailProvider = (provider: 'smtp' | 'resend') => {
+  if (provider === 'smtp' && smtpConfigured && !emailPriority.includes('SMTP')) {
+    emailPriority.push('SMTP')
+  }
+  if (provider === 'resend' && resendConfigured && !emailPriority.includes('Resend')) {
+    emailPriority.push('Resend')
+  }
+}
+
+if (emailPreference === 'resend') {
+  pushEmailProvider('resend')
+  pushEmailProvider('smtp')
+} else {
+  pushEmailProvider('smtp')
+  pushEmailProvider('resend')
+}
+
 let emailSummary = dim('not configured')
-if (cfg.RESEND_API_KEY) {
-  emailSummary = val('Resend')
-} else if (cfg.SMTP_URL || cfg.EMAIL_HOST) {
-  emailSummary = `SMTP ${dim('→')} ${val(cfg.EMAIL_HOST || 'via URL')}`
+if (emailPriority.length === 1 && emailPriority[0] === 'SMTP') {
+  emailSummary = `SMTP ${dim('->')} ${val(cfg.EMAIL_HOST || 'via URL')}`
+} else if (emailPriority.length > 1) {
+  emailSummary = emailPriority.map((provider) => val(provider)).join(` ${dim('->')} `)
 }
 
 // Status panel
@@ -126,7 +149,7 @@ logger.raw(`  ${ok('Users')}            ${userCount > 0 ? val(String(userCount))
 logger.raw(`  ${cfg.ADMIN_ENABLED ? ok('Admin Panel') : fail('Admin Panel')}      ${cfg.ADMIN_ENABLED ? val('enabled') : dim('disabled')}`)
 logger.raw(`  ${dim('─────────────────────────────────────────────')}`)
 logger.raw(`  ${ok('SSO')}              ${ssoSummary}`)
-logger.raw(`  ${(cfg.RESEND_API_KEY || cfg.SMTP_URL || cfg.EMAIL_HOST) ? ok('Email') : fail('Email')}            ${emailSummary}`)
+logger.raw(`  ${(smtpConfigured || resendConfigured) ? ok('Email') : fail('Email')}            ${emailSummary}`)
 logger.raw(`  ${cfg.TMDB_API_KEY ? ok('TMDB') : fail('TMDB')}             ${cfg.TMDB_API_KEY ? dim('configured') : `${c.yellow}missing${c.reset}`}`)
 logger.raw(`  ${cfg.TRAKT_CLIENT_ID ? ok('Trakt') : ok('Trakt')}            ${cfg.TRAKT_CLIENT_ID ? dim('configured') : dim('not configured')}`)
 logger.raw(`  ${cfg.FANART_API_KEY ? ok('Fanart.tv') : ok('Fanart.tv')}        ${cfg.FANART_API_KEY ? dim('configured') : dim('not configured')}`)

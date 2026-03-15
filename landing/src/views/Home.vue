@@ -4,7 +4,7 @@
       <div class="container">
         <div class="hero-content">
           <h1 class="hero-title fade-in-up">
-            <span class="text-gradient">Stream anything. Own everything.</span>
+            <span class="text-gradient">Stream anything.<br>Own everything.</span>
           </h1>
 
           <p class="hero-subtitle fade-in-up delay-1">

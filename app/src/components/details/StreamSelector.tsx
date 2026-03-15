@@ -1,6 +1,6 @@
 // Stream Selector Component
 // Extracted from Details.tsx
-import { Check, HardDrive, Play, Wifi, Zap } from 'lucide-react'
+import { Check, Download, HardDrive, Play, Wifi, Zap } from 'lucide-react'
 import { useEffect } from 'react'
 import { SkeletonStreamList } from '../../components'
 import { CompactStreamItem } from '../../components/features/CompactStreamItem'
@@ -73,8 +73,10 @@ interface StreamSelectorProps {
     showAddonName: boolean
     showDescription: boolean
   }
+  profileId: string
   onRefresh: () => void
   onPlay: (stream: Stream) => void
+  onDownload?: (stream: Stream) => void
   onBack: () => void
 }
 
@@ -91,7 +93,8 @@ export function StreamSelector({
   cacheStatus,
   streamDisplaySettings,
   onRefresh,
-  onPlay
+  onPlay,
+  onDownload,
 }: StreamSelectorProps) {
 
   // Cache the top stream in sessionStorage so the download button can pick up
@@ -240,6 +243,7 @@ export function StreamSelector({
                                 index={idx}
                                 showAddonName={streamDisplaySettings.showAddonName}
                                 mode={streamDisplaySettings.streamDisplayMode === 'compact-advanced' ? 'advanced' : 'simple'}
+                                onDownload={onDownload ? () => onDownload(item.stream) : undefined}
                             />
                         ))
                     ) : (
@@ -283,6 +287,15 @@ export function StreamSelector({
                                             )}
                                             {info.hasDV && (
                                                 <span className={`${styles.streamBadge} ${styles.badgeDV}`}>DV</span>
+                                            )}
+                                            {onDownload && (
+                                                <button
+                                                    className={styles.streamDownloadBtn}
+                                                    onClick={(e) => { e.stopPropagation(); onDownload(stream) }}
+                                                    title="Download this stream"
+                                                >
+                                                    <Download size={13} />
+                                                </button>
                                             )}
                                         </div>
                                     </div>

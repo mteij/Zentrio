@@ -104,20 +104,21 @@ fn download_purge_profile(
 }
 
 #[tauri::command]
-fn download_set_directory(
-    app: tauri::AppHandle,
-    path: String,
-) -> Result<(), String> {
-    file_store::set_custom_dir(&app, std::path::Path::new(&path))
-        .map_err(|e| e.to_string())
+fn download_set_directory(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    file_store::set_custom_dir(&app, std::path::Path::new(&path)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn download_get_directory(app: tauri::AppHandle) -> String {
-    let data_dir = app.path()
+    let data_dir = app
+        .path()
         .app_data_dir()
         .unwrap_or_else(|_| std::path::PathBuf::from("."));
-    data_dir.join("zentrio").join("downloads").to_string_lossy().to_string()
+    data_dir
+        .join("zentrio")
+        .join("downloads")
+        .to_string_lossy()
+        .to_string()
 }
 
 #[tauri::command]
@@ -150,7 +151,10 @@ fn download_get_smart_defaults(
     profile_id: String,
 ) -> Result<SmartDefaults, String> {
     let (smart_download, auto_delete) = state.get_smart_defaults(&profile_id)?;
-    Ok(SmartDefaults { smart_download, auto_delete })
+    Ok(SmartDefaults {
+        smart_download,
+        auto_delete,
+    })
 }
 
 #[tauri::command]

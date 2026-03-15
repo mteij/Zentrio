@@ -1,13 +1,17 @@
-# Zentrio
-
 <div align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=E50914&height=120&section=header" />
+
   <img src="app/public/static/logo/icon-512.png" alt="Zentrio" width="128" height="128" />
+
+  <h1>Zentrio</h1>
 
   <h3>Stream anything. Own everything.</h3>
 
+  [![Typing SVG](https://readme-typing-svg.demolab.com?font=Inter&size=18&pause=2000&color=E50914&center=true&vCenter=true&width=500&lines=Multi-profile+streaming%2C+self-hosted.;Stremio-compatible+addon+ecosystem.;Native+apps+for+desktop+and+mobile.;Your+data%2C+your+server.)](https://git.io/typing-svg)
+
   <p>
     <a href="https://zentrio.eu"><strong>Website</strong></a> |
-    <a href="https://app.zentrio.eu"><strong>Live Demo</strong></a> |
+    <a href="https://app.zentrio.eu"><strong>Public Instance</strong></a> |
     <a href="https://zentrio.eu/releases"><strong>Download</strong></a> |
     <a href="https://docs.zentrio.eu"><strong>Docs</strong></a> |
     <a href="https://github.com/Mteij/Zentrio/issues"><strong>Issues</strong></a>
@@ -20,6 +24,8 @@
     <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black" alt="Tauri"></a>
     <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
     <a href="https://github.com/MichielEijpe/Zentrio/actions/workflows/quality.yml"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mteij/92598bd8ebd40beb60c71b870c3933d7/raw/zentrio-quality-badge.json&style=for-the-badge" alt="Code Quality"></a>
+    <a href="https://github.com/Mteij/Zentrio/stargazers"><img src="https://img.shields.io/github/stars/mteij/Zentrio?style=for-the-badge&color=E50914&labelColor=1a1a1a" alt="Stars"></a>
+    <a href="https://github.com/Mteij/Zentrio/releases"><img src="https://img.shields.io/github/downloads/mteij/Zentrio/total?style=for-the-badge&color=E50914&labelColor=1a1a1a" alt="Downloads"></a>
   </p>
 
   <img src="landing/public/app-screenshot-1000.png" alt="Zentrio App Screenshot" width="800" style="border-radius: 8px; margin-top: 16px;" />
@@ -34,9 +40,7 @@ Zentrio was developed with significant AI assistance. Much of the code, architec
 
 </details>
 
-> **Not ready to self-host?** Try the [public instance](https://app.zentrio.eu) first — no setup required.
-
----
+> **Not ready to self-host?** Use the [public instance](https://app.zentrio.eu) — no setup required.
 
 ## Why Zentrio?
 
@@ -47,8 +51,6 @@ Zentrio was developed with significant AI assistance. Much of the code, architec
 **Native apps for desktop and mobile.** Zentrio ships as a Tauri app for Windows, macOS, Linux, and Android — with native auth flows, local-first reads, and offline downloads.
 
 **Your data, your server.** One `.env`, SQLite, and a single `docker compose up`. No external databases, no cloud dependencies, no account required to self-host.
-
----
 
 ## Quick Start
 
@@ -75,8 +77,6 @@ Zentrio will be available at `http://localhost:3000`. The first user to register
 
 > Full setup guide: [docs/self-hosting.md](docs/self-hosting.md)
 
----
-
 ## Download
 
 Native desktop and mobile apps are available from the releases page.
@@ -84,8 +84,6 @@ Native desktop and mobile apps are available from the releases page.
 **[→ zentrio.eu/releases](https://zentrio.eu/releases)** — Windows, macOS, Linux, Android
 
 Or grab the latest from [GitHub Releases](https://github.com/Mteij/Zentrio/releases).
-
----
 
 ## Features
 
@@ -99,8 +97,6 @@ Or grab the latest from [GitHub Releases](https://github.com/Mteij/Zentrio/relea
 | **Flexible Auth** | Email/password, magic links, OTP, 2FA, SSO (Google, GitHub, Discord, OIDC) |
 | **Admin Dashboard** | Audit logs, platform analytics, user management, step-up verification |
 | **API-first** | Full OpenAPI spec at `/api/docs`, Stremio-compatible addon endpoints |
-
----
 
 ## Local Development
 
@@ -130,8 +126,6 @@ bun run tauri:dev    # Desktop app
 
 The `.env` file lives in the **repository root** (not `app/`). See `.env.example` for all options.
 
----
-
 ## Architecture
 
 - **Frontend:** React 19 + React Router v7 + TanStack Query + Zustand
@@ -141,13 +135,9 @@ The `.env` file lives in the **repository root** (not `app/`). See `.env.example
 
 Full contributor map: [llm/ARCHITECTURE.md](llm/ARCHITECTURE.md)
 
----
-
 ## Contributing
 
 Contributions are welcome. Please open an issue before starting significant work so we can discuss direction. See [docs/contributing.md](docs/contributing.md) for guidelines.
-
----
 
 ## Acknowledgements
 
@@ -158,8 +148,6 @@ Contributions are welcome. Please open an issue before starting significant work
 - [DiceBear](https://www.dicebear.com) — profile avatar generation.
 - [Better Auth](https://www.better-auth.com) — authentication.
 
----
-
 ## Trademark Notice
 
 Zentrio is an independent project. It supports Stremio-compatible addons but is not affiliated with, endorsed by, or sponsored by Stremio. "Stremio" and related marks belong to their respective owners.
@@ -167,3 +155,7 @@ Zentrio is an independent project. It supports Stremio-compatible addons but is 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+<div align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=E50914&height=120&section=footer" />
+</div>

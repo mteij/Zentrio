@@ -220,8 +220,6 @@ export function ZentrioPlayer({
     state,
     isLoading,
     error,
-    _play,
-    _pause,
     seek,
     setVolume,
     setMuted,
@@ -410,8 +408,18 @@ export function ZentrioPlayer({
 
       switch (e.key) {
         case ' ': case 'k': e.preventDefault(); togglePlayPause(); break
-        case 'ArrowLeft': e.preventDefault(); seek(Math.max(0, state.currentTime - 10)); flashSeek('left', 10); break
-        case 'ArrowRight': e.preventDefault(); seek(Math.min(state.duration, state.currentTime + 10)); flashSeek('right', 10); break
+        case 'ArrowLeft':
+          e.preventDefault()
+          seek(Math.max(0, state.currentTime - 10))
+          setSeekFeedback({ dir: 'left', secs: 10 })
+          setTimeout(() => setSeekFeedback(null), 600)
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          seek(Math.min(state.duration, state.currentTime + 10))
+          setSeekFeedback({ dir: 'right', secs: 10 })
+          setTimeout(() => setSeekFeedback(null), 600)
+          break
         case 'ArrowUp': e.preventDefault(); setVolume(Math.min(1, state.volume + 0.1)); break
         case 'ArrowDown': e.preventDefault(); setVolume(Math.max(0, state.volume - 0.1)); break
         case 'f': e.preventDefault(); toggleFullscreen(); break
@@ -421,7 +429,7 @@ export function ZentrioPlayer({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [flashSeek, togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
+  }, [togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
 
   /* ── Menu click-outside (desktop + mobile) ── */
   useEffect(() => {
@@ -436,11 +444,6 @@ export function ZentrioPlayer({
   }, [openMenu])
 
   /* ── Seek feedback flash ── */
-  const flashSeek = useCallback((dir: 'left' | 'right', secs: number) => {
-    setSeekFeedback({ dir, secs })
-    setTimeout(() => setSeekFeedback(null), 600)
-  }, [])
-
   /* ── Volume OSD ── */
   const showVolumeOSD = useCallback((v: number) => {
     setVolumeOSD(Math.round(v * 100))
@@ -537,10 +540,12 @@ export function ZentrioPlayer({
         const x = g.startX - rect.left
         if (x < rect.width * 0.35) {
           seek(Math.max(0, state.currentTime - 10))
-          flashSeek('left', 10)
+          setSeekFeedback({ dir: 'left', secs: 10 })
+          setTimeout(() => setSeekFeedback(null), 600)
         } else if (x > rect.width * 0.65) {
           seek(Math.min(state.duration, state.currentTime + 10))
-          flashSeek('right', 10)
+          setSeekFeedback({ dir: 'right', secs: 10 })
+          setTimeout(() => setSeekFeedback(null), 600)
         } else {
           togglePlayPause()
         }
@@ -552,7 +557,7 @@ export function ZentrioPlayer({
 
     g.seeking = false
     g.voluming = false
-  }, [hoverTime, seek, state.currentTime, state.duration, togglePlayPause, flashSeek])
+  }, [hoverTime, seek, state.currentTime, state.duration, togglePlayPause])
 
   /* ── PiP ── */
   const togglePip = useCallback(async () => {

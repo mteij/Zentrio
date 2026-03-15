@@ -91,7 +91,9 @@ app.get('/:id', async (c) => {
 
   // Ensure Zentrio addon is enabled for the new profile's settings profile
   if (profile.settings_profile_id) {
-    const zentrioAddon = db.prepare("SELECT id FROM addons WHERE manifest_url = 'zentrio://tmdb-addon'").get()
+    const zentrioAddon = db
+      .prepare("SELECT id FROM addons WHERE manifest_url = 'zentrio://tmdb-addon'")
+      .get() as { id: number } | undefined
     if (zentrioAddon) {
       addonDb.enableForProfile(profile.settings_profile_id, zentrioAddon.id)
     }

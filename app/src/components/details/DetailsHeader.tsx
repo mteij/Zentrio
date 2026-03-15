@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Play, Youtube, Check, List, Eye, EyeOff, Download, CheckCircle, Loader, ChevronLeft, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
-import { QualityPicker } from '../downloads/QualityPicker'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadForMedia } from '../../hooks/useDownloads'
 import { useDownloadStore } from '../../stores/downloadStore'
@@ -49,7 +48,6 @@ export function DetailsHeader({
   children,
 }: DetailsHeaderProps) {
   const navigate = useNavigate()
-  const [showQualityPicker, setShowQualityPicker] = useState(false)
   const [resolvingDownloadStream, setResolvingDownloadStream] = useState(false)
   const existingDownload = useDownloadForMedia(meta.id)
   const addDownload = useDownloadStore((s) => s.addDownload)
@@ -67,9 +65,9 @@ export function DetailsHeader({
     })
   }, [meta.id, meta.type, profileId])
 
-  const handleDownload = async (quality: DownloadQuality) => {
-    setShowQualityPicker(false)
+  const handleDownload = async (quality?: DownloadQuality) => {
     if (!meta || !profileId) return
+    const resolvedQuality: DownloadQuality = quality ?? ((localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality)
 
     try {
       setResolvingDownloadStream(true)
@@ -91,7 +89,7 @@ export function DetailsHeader({
         posterPath: meta.poster || '',
         streamUrl: stream.url || '',
         addonId: stream.addonId || '',
-        quality,
+        quality: resolvedQuality,
         subtitleUrls: stream.subtitles,
       })
       addDownload({
@@ -103,7 +101,7 @@ export function DetailsHeader({
         posterPath: meta.poster || '',
         status: 'queued',
         progress: 0,
-        quality,
+        quality: resolvedQuality,
         filePath: '',
         fileSize: 0,
         downloadedBytes: 0,
@@ -256,7 +254,7 @@ export function DetailsHeader({
                   return (
                     <button
                       className={styles.downloadBtn}
-                      onClick={() => setShowQualityPicker(true)}
+                      onClick={() => { void handleDownload() }}
                       title="Download for offline viewing"
                     >
                       <Download size={15} />
@@ -332,14 +330,6 @@ export function DetailsHeader({
         </div>
       </div>
 
-      {/* Quality picker modal */}
-      {showQualityPicker && (
-        <QualityPicker
-          title={meta.name}
-          onConfirm={handleDownload}
-          onClose={() => setShowQualityPicker(false)}
-        />
-      )}
     </>
   )
 }

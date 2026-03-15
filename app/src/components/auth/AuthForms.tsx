@@ -78,15 +78,13 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     google: boolean;
     github: boolean;
     discord: boolean;
-    oidc: boolean;
-    oidcName: string;
+    oidcProviders: { id: string; name: string; icon: string | null }[];
     loaded: boolean;
   }>({
     google: false,
     github: false,
     discord: false,
-    oidc: false,
-    oidcName: 'OpenID',
+    oidcProviders: [],
     loaded: false
   });
 
@@ -115,9 +113,9 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     setShowOtpInput(false);
   }, [mode, hasEmailParam]);
 
-  const hasSocialProviders = providers.google || providers.github || providers.discord || providers.oidc;
+  const hasSocialProviders = providers.google || providers.github || providers.discord || providers.oidcProviders.length > 0;
 
-  const handleSocialLogin = async (provider: "google" | "github" | "discord" | "oidc") => {
+  const handleSocialLogin = async (provider: "google" | "github" | "discord") => {
     try {
       setSocialLoading(provider);
       const redirectPath = getLoginBehaviorRedirectPath();
@@ -146,6 +144,27 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       }
     } catch (_e: any) {
       toast.error('Login Failed', { description: _e.message || 'Failed to initiate social login' })
+      setSocialLoading(null);
+    }
+  };
+
+  const handleOidcLogin = async (providerId: string) => {
+    try {
+      setSocialLoading(providerId);
+      const redirectPath = getLoginBehaviorRedirectPath();
+
+      if (isTauri()) {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        const serverUrl = getServerUrl();
+        const handoffUrl = `${serverUrl}/api/auth/native-redirect?source=tauri`;
+        const url = `${serverUrl}/api/auth/login-proxy?provider=${providerId}&callbackURL=${encodeURIComponent(handoffUrl)}`;
+        await openUrl(url);
+      } else {
+        const callbackURL = `${getClientUrl()}${redirectPath}`;
+        await authClient.signIn.oauth2({ providerId, callbackURL } as any);
+      }
+    } catch (_e: any) {
+      toast.error('Login Failed', { description: _e.message || 'Failed to initiate login' });
       setSocialLoading(null);
     }
   };
@@ -357,6 +376,24 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                         Continue with Discord
                       </button>
                     )}
+                    {providers.oidcProviders.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleOidcLogin(p.id)}
+                        disabled={!!socialLoading}
+                        className="flex items-center justify-center gap-3 bg-white/10 border border-white/15 text-white hover:bg-white/15 !py-3 !rounded-xl transition-all font-medium text-[15px] !w-full disabled:opacity-50"
+                      >
+                        {socialLoading === p.id ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : p.icon ? (
+                          <img src={p.icon} alt={p.name} className="w-5 h-5 object-contain" />
+                        ) : (
+                          <KeyRound className="w-5 h-5 text-zinc-300" />
+                        )}
+                        Continue with {p.name}
+                      </button>
+                    ))}
                   </div>
               ) : null}
 

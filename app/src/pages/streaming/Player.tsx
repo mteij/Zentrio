@@ -205,7 +205,7 @@ export const StreamingPlayer = () => {
   const blobUrlRef = useRef<string | null>(null)
 
   /* ─── Find New Stream hook ─── */
-  const { preload: preloadStreams, findNext, _isFinding } = useFindNewStream(meta, profileId)
+  const { preload: preloadStreams, findNext } = useFindNewStream(meta, profileId)
 
   /* ─── Parse URL / location state ─── */
   useEffect(() => {

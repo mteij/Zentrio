@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result, params};
+use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -110,7 +110,8 @@ impl DownloadDb {
     }
 
     fn migrate(&self) -> Result<()> {
-        self.conn.execute_batch("
+        self.conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS downloads (
                 id TEXT PRIMARY KEY,
                 profile_id TEXT NOT NULL,
@@ -150,13 +151,24 @@ impl DownloadDb {
                 smart_download_default INTEGER NOT NULL DEFAULT 0,
                 auto_delete_default INTEGER NOT NULL DEFAULT 0
             );
-        ")?;
+        ",
+        )?;
 
         // Idempotent schema migrations for existing databases
-        let _ = self.conn.execute("ALTER TABLE downloads ADD COLUMN smart_download INTEGER NOT NULL DEFAULT 0", []);
-        let _ = self.conn.execute("ALTER TABLE downloads ADD COLUMN auto_delete INTEGER NOT NULL DEFAULT 0", []);
-        let _ = self.conn.execute("ALTER TABLE downloads ADD COLUMN subtitle_urls TEXT", []);
-        let _ = self.conn.execute("ALTER TABLE downloads ADD COLUMN subtitle_paths TEXT", []);
+        let _ = self.conn.execute(
+            "ALTER TABLE downloads ADD COLUMN smart_download INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE downloads ADD COLUMN auto_delete INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
+        let _ = self
+            .conn
+            .execute("ALTER TABLE downloads ADD COLUMN subtitle_urls TEXT", []);
+        let _ = self
+            .conn
+            .execute("ALTER TABLE downloads ADD COLUMN subtitle_paths TEXT", []);
 
         Ok(())
     }
@@ -188,7 +200,7 @@ impl DownloadDb {
              downloaded_bytes, added_at, completed_at, last_watched_at, watched_percent,
              stream_url, addon_id, error_message, smart_download, auto_delete,
              subtitle_urls, subtitle_paths
-             FROM downloads WHERE profile_id = ?1 ORDER BY added_at DESC"
+             FROM downloads WHERE profile_id = ?1 ORDER BY added_at DESC",
         )?;
         let rows = stmt.query_map([profile_id], |row| {
             Ok(DownloadRecord {
@@ -235,7 +247,7 @@ impl DownloadDb {
              downloaded_bytes, added_at, completed_at, last_watched_at, watched_percent,
              stream_url, addon_id, error_message, smart_download, auto_delete,
              subtitle_urls, subtitle_paths
-             FROM downloads WHERE id = ?1"
+             FROM downloads WHERE id = ?1",
         )?;
         let mut rows = stmt.query_map([id], |row| {
             Ok(DownloadRecord {
@@ -320,7 +332,8 @@ impl DownloadDb {
     }
 
     pub fn delete(&self, id: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM downloads WHERE id = ?1", [id])?;
+        self.conn
+            .execute("DELETE FROM downloads WHERE id = ?1", [id])?;
         Ok(())
     }
 
@@ -333,7 +346,7 @@ impl DownloadDb {
              downloaded_bytes, added_at, completed_at, last_watched_at, watched_percent,
              stream_url, addon_id, error_message, smart_download, auto_delete,
              subtitle_urls, subtitle_paths
-             FROM downloads WHERE status IN ('queued','downloading') ORDER BY added_at ASC"
+             FROM downloads WHERE status IN ('queued','downloading') ORDER BY added_at ASC",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(DownloadRecord {
@@ -395,11 +408,15 @@ impl DownloadDb {
     }
 
     pub fn delete_all_for_profile(&self, profile_id: &str) -> Result<Vec<String>> {
-        let mut stmt = self.conn.prepare("SELECT id FROM downloads WHERE profile_id=?1")?;
-        let ids: Vec<String> = stmt.query_map([profile_id], |r| r.get(0))?
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM downloads WHERE profile_id=?1")?;
+        let ids: Vec<String> = stmt
+            .query_map([profile_id], |r| r.get(0))?
             .filter_map(|r| r.ok())
             .collect();
-        self.conn.execute("DELETE FROM downloads WHERE profile_id=?1", [profile_id])?;
+        self.conn
+            .execute("DELETE FROM downloads WHERE profile_id=?1", [profile_id])?;
         Ok(ids)
     }
 
@@ -500,7 +517,12 @@ impl DownloadDb {
         Ok(result.unwrap_or((false, false)))
     }
 
-    pub fn set_smart_defaults(&self, profile_id: &str, smart: bool, auto_delete: bool) -> Result<()> {
+    pub fn set_smart_defaults(
+        &self,
+        profile_id: &str,
+        smart: bool,
+        auto_delete: bool,
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT INTO profile_settings (profile_id, smart_download_default, auto_delete_default) VALUES (?1, ?2, ?3)
              ON CONFLICT(profile_id) DO UPDATE SET smart_download_default=excluded.smart_download_default, auto_delete_default=excluded.auto_delete_default",

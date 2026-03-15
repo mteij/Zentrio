@@ -747,7 +747,7 @@ streaming.delete('/progress/:type/:id', optionalSessionMiddleware, async (c) => 
 // Get single item progress (specifically for initializing the video player)
 streaming.get('/progress/:type/:id', optionalSessionMiddleware, async (c) => {
   try {
-    const { _type, id } = c.req.param()
+    const { id } = c.req.param()
     const { profileId, season, episode } = c.req.query()
 
     if (!profileId) {

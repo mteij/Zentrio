@@ -1,6 +1,7 @@
 import { createAuthClient } from "better-auth/client";
 import {
     emailOTPClient,
+    genericOAuthClient,
     magicLinkClient,
     twoFactorClient,
 } from "better-auth/client/plugins";
@@ -224,6 +225,7 @@ const createClient = () => createAuthClient({
     }),
     magicLinkClient(),
     emailOTPClient(),
+    genericOAuthClient(),
   ],
 });
 

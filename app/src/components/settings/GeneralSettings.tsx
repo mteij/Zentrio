@@ -242,9 +242,9 @@ export function GeneralSettings() {
 
   // Get provider display name
   const getProviderDisplayName = (providerId: string): string => {
-    if (providerId === 'oidc') {
-      return typeof availableProviders.oidcName === 'string' ? availableProviders.oidcName : 'OpenID'
-    }
+    const oidcProviders: { id: string; name: string }[] = (availableProviders as any).oidcProviders || []
+    const oidcMatch = oidcProviders.find(p => p.id === providerId)
+    if (oidcMatch) return oidcMatch.name
     const names: Record<string, string> = {
       'credential': 'Email & Password',
       'google': 'Google',
