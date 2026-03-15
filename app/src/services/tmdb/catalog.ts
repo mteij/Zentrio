@@ -276,7 +276,7 @@ async function buildParameters(tmdbClient: TMDBClient, type: string, language: s
     parameters.with_watch_monetization_types = "flatrate|free|ads"
   } else {
     switch (id) {
-      case "tmdb.top":
+      case "tmdb.top": {
         const matched = genre ? findGenreId(genre, genreList) : undefined
         // Removed validation logging
         parameters.with_genres = matched
@@ -285,7 +285,8 @@ async function buildParameters(tmdbClient: TMDBClient, type: string, language: s
           parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy"
         }
         break
-      case "tmdb.year":
+      }
+      case "tmdb.year": {
         const year = genre ? parseInt(genre) : new Date().getFullYear()
         if (type === "movie") {
             parameters.primary_release_year = year
@@ -293,10 +294,12 @@ async function buildParameters(tmdbClient: TMDBClient, type: string, language: s
             parameters.first_air_date_year = year
         }
         break
-      case "tmdb.language":
+      }
+      case "tmdb.language": {
         const findGenre = genre ? findLanguageCode(genre, languages) : language.split("-")[0]
         parameters.with_original_language = findGenre
         break
+      }
       default:
         break
     }

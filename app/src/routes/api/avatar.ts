@@ -1,4 +1,4 @@
-import { generateAvatar, generateRandomAvatar, isValidAvatarStyle, DEFAULT_AVATAR_STYLE, AVATAR_STYLES, AVATAR_STYLE_NAMES, type AvatarStyle } from '../../services/avatar'
+import { AVATAR_STYLES, AVATAR_STYLE_NAMES, DEFAULT_AVATAR_STYLE, generateAvatar, generateRandomAvatar, isValidAvatarStyle, type AvatarStyle } from '../../services/avatar'
 import { createTaggedOpenAPIApp } from './openapi-route'
 
 const app = createTaggedOpenAPIApp('Avatar')
@@ -30,7 +30,7 @@ app.get('/', async (c) => {
             'Cache-Control': 'no-store' // Random should not be cached tightly
           }
         })
-    } catch (error) {
+    } catch (_error) {
         return c.json({ error: 'Failed to generate avatar' }, 500)
     }
 })
@@ -49,7 +49,7 @@ app.get('/random', async (c) => {
       style,
       dataUrl: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
     })
-  } catch (error) {
+  } catch (_error) {
     return c.json({ error: 'Failed to generate random avatar' }, 500)
   }
 })
@@ -69,7 +69,7 @@ app.get('/:seed', async (c) => {
         'Cache-Control': 'public, max-age=86400' // Cache for 24 hours
       }
     })
-  } catch (error) {
+  } catch (_error) {
     return c.json({ error: 'Failed to generate avatar' }, 500)
   }
 })

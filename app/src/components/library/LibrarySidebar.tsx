@@ -1,8 +1,8 @@
 // Library Sidebar Components
 // Extracted from Library.tsx for better maintainability
-import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, ChevronRight, Share2, Trash2, LogOut, MoreVertical } from 'lucide-react'
+import { ChevronDown, ChevronRight, LogOut, MoreVertical, Share2, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import type { List, ListShare, Profile } from '../../services/database'
 
 // Types for shared lists
@@ -112,7 +112,7 @@ interface ListSidebarItemProps {
 }
 
 export function ListSidebarItem({ 
-  list, isActive, sharingType, sharedBy, onClick, 
+  list, isActive, sharedBy, onClick, 
   onShare, onDelete, onLeave, showActions 
 }: ListSidebarItemProps) {
   const [menuOpen, setMenuOpen] = useState(false)

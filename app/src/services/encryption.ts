@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypt
 import { getConfig } from './envParser'
 import { logger } from './logger'
 
-const log = logger.scope('Encryption')
+const _log = logger.scope('Encryption')
 const { ENCRYPTION_KEY } = getConfig()
 
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
@@ -24,20 +24,15 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(encryptedText: string): string {
-  try {
-    const [ivHex, authTagHex, encryptedHex] = encryptedText.split(':')
-    if (!ivHex || !authTagHex || !encryptedHex) {
-      throw new Error('Invalid encrypted text format')
-    }
-    const iv = Buffer.from(ivHex, 'hex')
-    const authTag = Buffer.from(authTagHex, 'hex')
-    const encrypted = Buffer.from(encryptedHex, 'hex')
-    const decipher = createDecipheriv(algorithm, key, iv)
-    decipher.setAuthTag(authTag)
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
-    return decrypted.toString('utf8')
-  } catch (error) {
-    log.error('Decryption failed:', error)
-    return ''
+  const [ivHex, authTagHex, encryptedHex] = encryptedText.split(':')
+  if (!ivHex || !authTagHex || !encryptedHex) {
+    throw new Error('Invalid encrypted text format')
   }
+  const iv = Buffer.from(ivHex, 'hex')
+  const authTag = Buffer.from(authTagHex, 'hex')
+  const encrypted = Buffer.from(encryptedHex, 'hex')
+  const decipher = createDecipheriv(algorithm, key, iv)
+  decipher.setAuthTag(authTag)
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
+  return decrypted.toString('utf8')
 }

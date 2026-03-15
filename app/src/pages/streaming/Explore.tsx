@@ -1,15 +1,15 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Filter, X } from 'lucide-react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
-import { Layout, StreamingRow, SkeletonRow, Hero, SkeletonHero, LazyImage, RatingBadge, SkeletonCard } from '../../components'
+import { ArrowLeft, ChevronDown, Filter, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Hero, Layout, LazyImage, RatingBadge, SkeletonCard, SkeletonHero, SkeletonRow, StreamingRow } from '../../components'
 import { TraktRecommendationsRow } from '../../components/streaming/TraktRecommendationsRow'
 import { useRootScrollPinned } from '../../hooks/useRootScrollPinned'
+import { apiFetchJson } from '../../lib/apiFetch'
 
-import { MetaPreview } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
+import { MetaPreview } from '../../services/addons/types'
 import styles from '../../styles/Streaming.module.css'
 import { createLogger } from '../../utils/client-logger'
 
@@ -108,7 +108,7 @@ const POPULAR_GENRES = ['Action', 'Adventure', 'Comedy', 'Science Fiction', 'Dra
 export const StreamingExplore = () => {
   const { profileId } = useParams<{ profileId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
+  const _navigate = useNavigate()
   const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
 
   // State for view toggle
@@ -260,7 +260,7 @@ export const StreamingExplore = () => {
   }
 
   const genres = filtersData?.filters?.genres || []
-  const types = filtersData?.filters?.types || ['movie', 'series']
+  const _types = filtersData?.filters?.types || ['movie', 'series']
   
   const trending = dashboardData?.trending || []
   const trendingMovies = dashboardData?.trendingMovies || []

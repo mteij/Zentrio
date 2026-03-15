@@ -1,7 +1,7 @@
 // Database migrations
 // Column additions and schema updates for existing databases
-import { db } from './connection'
 import { logger } from '../logger'
+import { db } from './connection'
 
 const log = logger.scope('DB:Migration')
 
@@ -105,7 +105,7 @@ const columnMigrations = [
 for (const sql of columnMigrations) {
   try {
     db.exec(sql)
-  } catch (e) {
+  } catch (_e) {
     // Column already exists, ignore
   }
 }
@@ -113,7 +113,7 @@ for (const sql of columnMigrations) {
 // Unique index for phone number plugin (safe/idempotent)
 try {
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_user_phone_number ON user(phoneNumber)')
-} catch (e) {
+} catch (_e) {
   // Ignore for legacy databases with inconsistent states
 }
 
@@ -121,7 +121,7 @@ try {
 try {
   db.exec('UPDATE watch_history SET season = -1 WHERE season IS NULL')
   db.exec('UPDATE watch_history SET episode = -1 WHERE episode IS NULL')
-} catch (e) {
+} catch (_e) {
   // Ignore if columns do not exist yet
 }
 
@@ -207,4 +207,4 @@ try {
    log.error("Initialization failed", e);
 }
 
-export {}
+export { }

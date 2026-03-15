@@ -86,6 +86,10 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
   } = options
 
   const engineRef = useRef<HybridEngine | null>(null)
+  const onEndedRef = useRef(onEnded)
+  const onTimeUpdateRef = useRef(onTimeUpdate)
+  const onErrorRef = useRef(onError)
+  const onTranscodingProgressRef = useRef(onTranscodingProgress)
   
   const [isReady, setIsReady] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -97,6 +101,13 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
   const [error, setError] = useState<Error | null>(null)
   const [needsHybridPlayback, setNeedsHybridPlayback] = useState(false)
   const [transcodingProgress, setTranscodingProgress] = useState<number | null>(null)
+
+  useEffect(() => {
+    onEndedRef.current = onEnded
+    onTimeUpdateRef.current = onTimeUpdate
+    onErrorRef.current = onError
+    onTranscodingProgressRef.current = onTranscodingProgress
+  }, [onEnded, onError, onTimeUpdate, onTranscodingProgress])
 
   // Initialize engine when URL changes
   useEffect(() => {
@@ -139,7 +150,7 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
           const error = new Error('Hybrid playback is not supported in Tauri apps. Use native playback instead.')
           setError(error)
           setState('error')
-          onError?.(error)
+          onErrorRef.current?.(error)
           return
         }
 
@@ -170,7 +181,7 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
             if (cancelled) return
             setError(error)
             setState('error')
-            onError?.(error)
+            onErrorRef.current?.(error)
           },
           onProgress: (data) => {
             config?.onProgress?.(data)
@@ -193,21 +204,21 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
           const pct = typeof detail?.progress === 'number' ? Math.round(detail.progress * 100) : null
           if (cancelled) return
           setTranscodingProgress(pct)
-          if (pct !== null) onTranscodingProgress?.(pct)
+          if (pct !== null) onTranscodingProgressRef.current?.(pct)
         })
 
         engine.addEventListener('timeupdate', (e: Event) => {
           const detail = (e as CustomEvent<{ currentTime: number }>).detail
           if (cancelled) return
           setCurrentTime(detail.currentTime ?? 0)
-          onTimeUpdate?.(detail.currentTime ?? 0, engine.getDuration())
+          onTimeUpdateRef.current?.(detail.currentTime ?? 0, engine.getDuration())
         })
 
         engine.addEventListener('ended', () => {
           if (cancelled) return
           setIsPlaying(false)
           setState('paused')
-          onEnded?.()
+          onEndedRef.current?.()
         })
 
         // Initialize with video element
@@ -231,7 +242,7 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
         const error = err instanceof Error ? err : new Error(String(err))
         setError(error)
         setState('error')
-        onError?.(error)
+        onErrorRef.current?.(error)
       }
     }
 
@@ -245,7 +256,7 @@ export function useHybridPlayer(options: UseHybridPlayerOptions): UseHybridPlaye
         engineRef.current = null
       }
     }
-  }, [url]) // Only re-initialize on URL change
+  }, [url, autoPlay, config, videoRef])
 
   // Play handler
   const play = useCallback(async () => {

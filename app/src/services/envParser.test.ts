@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { getConfig, initEnv } from './envParser'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getConfig } from './envParser'
 
 describe('envParser', () => {
   const originalEnv = process.env

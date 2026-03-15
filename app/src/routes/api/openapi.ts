@@ -6,12 +6,14 @@ export const ErrorSchema = z.object({
   error: z.string().openapi({ example: 'An error occurred' }),
 }).openapi('Error')
 
-export const HealthStatsSchema = z.object({
+// Public stats — always present, no token required.
+export const HealthStatsPublicSchema = z.object({
   users: z.number().openapi({ example: 10 }),
   profiles: z.number().openapi({ example: 15 }),
   addons: z.number().openapi({ example: 5 }),
-  active_sessions: z.number().openapi({ example: 3 }),
   watched_items: z.number().openapi({ example: 42 }),
+  // active_sessions is only included when a valid HEALTH_TOKEN is provided
+  active_sessions: z.number().optional().openapi({ example: 3 }),
 }).openapi('HealthStats')
 
 export const HealthResponseSchema = z.object({
@@ -19,14 +21,16 @@ export const HealthResponseSchema = z.object({
   timestamp: z.string().openapi({ example: '2024-01-01T00:00:00.000Z' }),
   app: z.object({
     version: z.string().openapi({ example: '0.4.12' }),
-    uptime: z.number().openapi({ example: 3600 }),
-    memory: z.number().openapi({ example: 52428800 }),
+    // uptime and memory are only included when a valid HEALTH_TOKEN is provided
+    uptime: z.number().optional().openapi({ example: 3600 }),
+    memory: z.number().optional().openapi({ example: 52428800 }),
   }),
+  // environment is only included when a valid HEALTH_TOKEN is provided
   environment: z.object({
     database: z.string().openapi({ example: 'configured' }),
     auth: z.string().openapi({ example: 'configured' }),
-  }),
-  stats: HealthStatsSchema,
+  }).optional(),
+  stats: HealthStatsPublicSchema,
 }).openapi('HealthResponse')
 
 // API Info Response Schema

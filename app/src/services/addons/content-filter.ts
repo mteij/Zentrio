@@ -1,10 +1,10 @@
 // Content Filter Service
 // Handles parental controls, content filtering, and enrichment
 import { profileProxySettingsDb, watchHistoryDb } from '../database'
-import { tmdbService } from '../tmdb/index'
-import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../tmdb/age-ratings'
-import type { MetaPreview } from './types'
 import { logger } from '../logger'
+import { AGE_RATINGS, toStandardAgeRating, type AgeRating } from '../tmdb/age-ratings'
+import { tmdbService } from '../tmdb/index'
+import type { MetaPreview } from './types'
 
 const log = logger.scope('ContentFilter')
 
@@ -105,7 +105,7 @@ export async function filterContent(
                 if (tmdbId) {
                     cert = await tmdbService.getAgeRating(tmdbClient, tmdbId, type, 'en-US');
                 }
-            } catch (e) {
+            } catch (_e) {
                 // Silently fail
             }
         }

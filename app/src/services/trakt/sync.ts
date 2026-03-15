@@ -1,10 +1,10 @@
 // Trakt Sync Service
 // Handles bidirectional watch history synchronization
 
-import { traktClient } from './client'
 import { traktAccountDb, traktSyncStateDb, watchHistoryDb, type WatchHistoryItem } from '../database'
-import type { TraktHistoryItem, TraktSyncRequest, TraktIds } from './types'
 import { logger } from '../logger'
+import { traktClient } from './client'
+import type { TraktHistoryItem, TraktIds, TraktSyncRequest } from './types'
 
 const log = logger.scope('TraktSync')
 
@@ -258,7 +258,7 @@ class TraktSyncService {
   }
 
   // Convert Trakt history item to local format
-  private convertTraktToLocal(item: TraktHistoryItem, profileId: number): {
+  private convertTraktToLocal(item: TraktHistoryItem, _profileId: number): {
     meta_id: string
     meta_type: 'movie' | 'series'
     season: number

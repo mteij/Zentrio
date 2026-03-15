@@ -1,6 +1,6 @@
-import { addonFetch } from './addon-fetch'
+import type { Manifest, MetaDetail, MetaPreview, Stream } from '../services/addons/types'
 import { createLogger } from '../utils/client-logger'
-import type { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from '../services/addons/types'
+import { addonFetch } from './addon-fetch'
 
 const log = createLogger('ClientAddonClient')
 

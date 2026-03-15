@@ -1,26 +1,26 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from 'sonner'
-import { authClient, getClientUrl, getServerUrl, isTauri } from "../../lib/auth-client";
-import { apiFetch, apiFetchJson } from "../../lib/apiFetch";
-import { 
-  Mail, 
-  Lock, 
-  ArrowRight, 
-  ArrowLeft,
-  Loader2,
-  User as UserIcon,
-  Sparkles,
-  KeyRound
+import { AnimatePresence, motion } from "framer-motion";
+import {
+    ArrowLeft,
+    ArrowRight,
+    KeyRound,
+    Loader2,
+    Lock,
+    Mail,
+    Sparkles,
+    User as UserIcon
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from 'sonner';
+import { apiFetch, apiFetchJson } from "../../lib/apiFetch";
+import { appMode } from '../../lib/app-mode';
+import { authClient, getClientUrl, getServerUrl, isTauri } from "../../lib/auth-client";
 import { EmailVerificationModal } from "./EmailVerificationModal";
-import { appMode } from '../../lib/app-mode'
 
-import { useLoginBehavior, getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
+import { getLoginBehaviorRedirectPath, useLoginBehavior } from "../../hooks/useLoginBehavior";
 import { useSessionDuration } from "../../hooks/useSessionDuration";
 import { useAuthStore } from "../../stores/authStore";
-import { createLogger } from '../../utils/client-logger'
+import { createLogger } from '../../utils/client-logger';
 
 const log = createLogger('AuthForms')
 

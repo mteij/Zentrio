@@ -48,7 +48,7 @@ export function useDownloads(profileId: string | undefined) {
     import('../services/downloads/download-service').then(({ downloadService }) => {
       downloadService.list(profileId).then(setDownloads).catch(console.error)
     })
-  }, [profileId])
+  }, [profileId, setDownloads])
 
   // Subscribe to live progress/status/smart-next events from the Rust backend (Tauri only)
   useEffect(() => {
@@ -138,7 +138,7 @@ export function useDownloads(profileId: string | undefined) {
       cancelled = true
       unlisteners.forEach((fn) => fn())
     }
-  }, [])
+  }, [addDownload, setDownloads, updateProgress, updateStatus])
 
   const downloads = useDownloadStore((s) => s.downloads)
 

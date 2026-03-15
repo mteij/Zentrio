@@ -2,15 +2,15 @@
 // Handles authentication flows, sync operations, and recommendations
 
 import { randomBytes } from 'crypto'
-import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
-import { traktAccountDb, traktSyncStateDb, profileDb, profileProxySettingsDb, type User } from '../../services/database'
-import { traktClient, traktSyncService } from '../../services/trakt'
+import { optionalSessionMiddleware } from '../../middleware/session'
 import { addonManager } from '../../services/addons/addon-manager'
-import { toStandardAgeRating, AGE_RATINGS, type AgeRating } from '../../services/tmdb/age-ratings'
+import { profileDb, profileProxySettingsDb, traktAccountDb, traktSyncStateDb, type User } from '../../services/database'
 import { getConfig } from '../../services/envParser'
-import { ok, err } from '../../utils/api'
-import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
+import { AGE_RATINGS, toStandardAgeRating, type AgeRating } from '../../services/tmdb/age-ratings'
+import { traktClient, traktSyncService } from '../../services/trakt'
+import { err, ok } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
 const log = logger.scope('API:Trakt')
 
@@ -509,7 +509,7 @@ trakt.post('/disconnect', async (c) => {
       // Revoke token (best effort)
       try {
         await traktClient.revokeToken(account.access_token)
-      } catch (e) {
+      } catch (_e) {
         // Ignore revocation errors
       }
 

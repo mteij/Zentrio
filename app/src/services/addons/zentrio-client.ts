@@ -1,8 +1,8 @@
-import { AddonClient } from './client'
-import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
-import { tmdbService } from '../tmdb/index'
 import { userDb } from '../database'
 import { logger } from '../logger'
+import { tmdbService } from '../tmdb/index'
+import { AddonClient } from './client'
+import { Manifest, MetaDetail, MetaPreview, Stream } from './types'
 
 const log = logger.scope('Zentrio')
 
@@ -213,7 +213,7 @@ export class ZentrioAddonClient extends AddonClient {
     return res.meta
   }
 
-  async getStreams(type: string, id: string): Promise<Stream[]> {
+  async getStreams(_type: string, _id: string): Promise<Stream[]> {
     // Zentrio addon doesn't provide streams itself, it relies on other addons or just metadata.
     // But if we want to support trailers as streams?
     return []

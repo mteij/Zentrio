@@ -1,14 +1,14 @@
 // Stream Selector Component
 // Extracted from Details.tsx
+import { Check, HardDrive, Play, Wifi, Zap } from 'lucide-react'
 import { useEffect } from 'react'
-import { Play, Check, Zap, HardDrive, Wifi } from 'lucide-react'
 import { SkeletonStreamList } from '../../components'
-import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
 import { CompactStreamItem } from '../../components/features/CompactStreamItem'
-import { cacheTopStream } from '../../lib/topStreamCache'
-import styles from '../../styles/Streaming.module.css'
-import type { MetaDetail, Stream } from '../../services/addons/types'
+import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
 import type { AddonLoadingState } from '../../hooks/useStreamLoader'
+import { cacheTopStream } from '../../lib/topStreamCache'
+import type { MetaDetail, Stream } from '../../services/addons/types'
+import styles from '../../styles/Streaming.module.css'
 
 // Helper to parse stream information
 const parseStreamInfo = (stream: Stream) => {
@@ -91,8 +91,7 @@ export function StreamSelector({
   cacheStatus,
   streamDisplaySettings,
   onRefresh,
-  onPlay,
-  onBack
+  onPlay
 }: StreamSelectorProps) {
 
   // Cache the top stream in sessionStorage so the download button can pick up

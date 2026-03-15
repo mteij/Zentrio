@@ -1,14 +1,14 @@
-import { AddonClient, RetryableError } from './client'
-import { ZentrioAddonClient } from './zentrio-client'
-import { Manifest, MetaPreview, MetaDetail, Stream, Subtitle } from './types'
-import { addonDb, streamDb, profileDb } from '../database'
-import { StreamProcessor, ParsedStream } from './stream-processor'
-import { tmdbService } from '../tmdb/index'
+import { addonDb, appearanceDb, profileDb, streamDb } from '../database'
 import { type AgeRating } from '../tmdb/age-ratings'
+import { tmdbService } from '../tmdb/index'
+import { AddonClient, RetryableError } from './client'
+import { StreamProcessor } from './stream-processor'
+import { Manifest, MetaDetail, MetaPreview, Stream, Subtitle } from './types'
+import { ZentrioAddonClient } from './zentrio-client'
 // Extracted helper modules
-import { getParentalSettings, filterContent, enrichContent } from './content-filter'
-import { normalizeMetaVideos } from './meta-normalizer'
 import { logger } from '../logger'
+import { enrichContent, filterContent, getParentalSettings } from './content-filter'
+import { normalizeMetaVideos } from './meta-normalizer'
 
 const log = logger.scope('AddonManager')
 
@@ -133,7 +133,6 @@ export class AddonManager {
         }
 
         if (settingsProfileId) {
-            const { appearanceDb } = require('../database')
             const appearance = appearanceDb.getSettings(settingsProfileId)
             appearanceConfig = {
                 enableAgeRating: appearance ? appearance.show_age_ratings : true,
@@ -275,7 +274,7 @@ export class AddonManager {
 
                             // Safety break if we aren't getting anything new (infinite loop of same items?)
                             // Standard addons shouldn't return same items for different skip, but who knows.
-                        } catch (e) {
+                        } catch (_e) {
                             break; // Stop on error
                         }
                     }
@@ -353,7 +352,7 @@ export class AddonManager {
                                     filteredItems = [...filteredItems, ...nextFiltered];
                                     currentSkip += nextItems.length;
                                     attempts++;
-                                } catch (e) { break; }
+                                } catch (_e) { break; }
                             }
                         }
 
@@ -455,7 +454,7 @@ export class AddonManager {
                                 combined.push(...extraCombined);
                                 currentSkip += 20; // We fetch 20 items per batch (10 movies + 10 series)
                                 attempts++;
-                            } catch (e) {
+                            } catch (_e) {
                                 break;
                             }
                         }
@@ -484,7 +483,7 @@ export class AddonManager {
                         return filtered; // Defer enrichment until we pick one
                     }
                 }
-            } catch (e) {
+            } catch (_e) {
                 // ignore
             }
             return null;
@@ -534,7 +533,7 @@ export class AddonManager {
                                     filtered = [...filtered, ...nextFiltered];
                                     currentSkip += nextItems.length;
                                     attempts++;
-                                } catch (e) {
+                                } catch (_e) {
                                     break;
                                 }
                             }
@@ -682,7 +681,7 @@ export class AddonManager {
         if (primaryId.startsWith('tmdb:')) {
             log.debug(`TMDB ID ${primaryId} not resolved by enabled addons. Attempting fallback to Zentrio Client.`);
 
-            const profile = context.profile
+            const _profile = context.profile
             // Use a dedicated cache key to avoid conflicts with the main client if it exists but is disabled
             const fallbackKey = `fallback:${DEFAULT_TMDB_ADDON}`;
             let zentrioClient = this.clientCache.get(fallbackKey);
@@ -929,7 +928,7 @@ export class AddonManager {
             let filteredItems = await this.applyParentalFilter(items, context)
 
             // If we filtered out items and have less than expected (e.g. < 20), try fetching next page
-            // @ts-ignore
+            // @ts-ignore: runtime typing gap
             if (context.parentalSettings.enabled && filteredItems.length < 20 && items.length > 0) {
                 const nextSkip = (skip || 0) + items.length;
                 const extraNext = { ...extra, skip: nextSkip.toString() };
@@ -939,7 +938,7 @@ export class AddonManager {
                         const nextFiltered = await this.applyParentalFilter(nextItems, context)
                         filteredItems = [...filteredItems, ...nextFiltered];
                     }
-                } catch (e) {
+                } catch (_e) {
                     // Ignore error on next page fetch
                 }
             }
@@ -949,7 +948,7 @@ export class AddonManager {
                 items: await this.enrichItems(filteredItems, context)
             }
         } catch (e) {
-            const errorMsg = e instanceof Error ? e.message : String(e)
+            const _errorMsg = e instanceof Error ? e.message : String(e)
             log.error(`Failed to fetch catalog ${id} from ${manifestUrl}`, e)
             if (e instanceof Error) {
                 log.error(e.stack || e.message)
@@ -1556,7 +1555,7 @@ export class AddonManager {
             byLang[lang].push(sub)
         })
 
-        const filteredResults: { addon: Manifest, subtitles: Subtitle[] }[] = []
+        const _filteredResults: { addon: Manifest, subtitles: Subtitle[] }[] = []
 
         // Re-group for the return format (which expects grouped by addon, but we can return a single "Combined" group or keep original structure but filtered)
         // The current return type is { addon: Manifest, subtitles: Subtitle[] }[]
@@ -1710,7 +1709,7 @@ export class AddonManager {
                         filteredItems = [...filteredItems, ...nextFiltered]
                         currentSkip += nextItems.length
                         attempts++
-                    } catch (e) {
+                    } catch (_e) {
                         break
                     }
                 }
@@ -1718,7 +1717,7 @@ export class AddonManager {
 
             return this.enrichItems(filteredItems, context)
         } catch (e) {
-            const errorMsg = e instanceof Error ? e.message : String(e)
+            const _errorMsg = e instanceof Error ? e.message : String(e)
             log.error(`Failed to fetch catalog ${catalogId} from ${manifestUrl}`, e)
             return []
         }

@@ -1,15 +1,24 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowRight, ArrowLeft, Loader2, Server, X, Mail, Lock, User as UserIcon, Sparkles, KeyRound
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+    ArrowLeft,
+    ArrowRight,
+    KeyRound,
+    Loader2,
+    Lock,
+    Mail,
+    Server,
+    Sparkles,
+    User as UserIcon,
+    X
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { appMode } from '../../lib/app-mode';
-import { resetAuthClient, isTauri, authClient, getServerUrl, getClientUrl } from '../../lib/auth-client';
 import { apiFetchJson } from '../../lib/apiFetch';
-import { ParticleBackground } from '../ui/ParticleBackground';
+import { appMode } from '../../lib/app-mode';
+import { authClient, getClientUrl, getServerUrl, isTauri, resetAuthClient } from '../../lib/auth-client';
 import { useAuthStore } from '../../stores/authStore';
-import { createLogger } from '../../utils/client-logger'
+import { createLogger } from '../../utils/client-logger';
+import { ParticleBackground } from '../ui/ParticleBackground';
 
 const log = createLogger('Onboarding')
 
@@ -106,7 +115,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             token: sessionData.session?.token
           });
         }
-      } catch (e) {
+      } catch (_e) {
         // Expected if not logged in
       }
     };
@@ -145,7 +154,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   };
   
   // Helper to ensure token is propagated before completing
-  const waitForTokenAndComplete = async (expectedToken?: string) => {
+  const waitForTokenAndComplete = async (_expectedToken?: string) => {
     // Give Zustand a moment to propagate state
     await new Promise(resolve => setTimeout(resolve, 50));
     

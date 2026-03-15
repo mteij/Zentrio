@@ -1,8 +1,8 @@
-import { db, profileDb, profileProxySettingsDb, userDb, User, Profile } from '../../services/database'
 import { optionalSessionMiddleware } from '../../middleware/session'
-import { createTaggedOpenAPIApp } from './openapi-route'
 import { writeAuditEvent } from '../../services/admin/audit'
+import { addonDb, db, Profile, profileDb, profileProxySettingsDb, User, userDb } from '../../services/database'
 import { getRequestMeta } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
  
 const app = createTaggedOpenAPIApp<{
   Variables: {
@@ -91,7 +91,6 @@ app.get('/:id', async (c) => {
 
   // Ensure Zentrio addon is enabled for the new profile's settings profile
   if (profile.settings_profile_id) {
-    const { addonDb, db } = require('../../services/database')
     const zentrioAddon = db.prepare("SELECT id FROM addons WHERE manifest_url = 'zentrio://tmdb-addon'").get()
     if (zentrioAddon) {
       addonDb.enableForProfile(profile.settings_profile_id, zentrioAddon.id)

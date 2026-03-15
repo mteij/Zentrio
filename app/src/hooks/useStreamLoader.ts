@@ -14,7 +14,7 @@ export interface AddonLoadingState {
   error?: string
 }
 
-export interface FlatStream extends ResolvedFlatStream {}
+export type FlatStream = ResolvedFlatStream
 
 export interface CacheStatus {
   fromCache: boolean

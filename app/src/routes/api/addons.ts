@@ -1,12 +1,20 @@
-import { addonDb } from '../../services/database'
+import { addonDb, db, profileDb, userDb, type User } from '../../services/database'
 import { AddonClient } from '../../services/addons/client'
-import { optionalSessionMiddleware } from '../../middleware/session'
+import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
 
 const log = logger.scope('API:Addons')
 
-const app = createTaggedOpenAPIApp('Addons')
+const app = createTaggedOpenAPIApp<{
+  Variables: { user: User; guestMode: boolean; session: any }
+}>('Addons')
+
+// Returns the user_id that owns a given settings profile, or null if not found.
+function getSettingsProfileOwner(settingsProfileId: number): string | null {
+  const row = db.prepare('SELECT user_id FROM profiles WHERE settings_profile_id = ?').get(settingsProfileId) as { user_id: string } | null
+  return row?.user_id ?? null
+}
 
 // List all installed addons
 app.get('/', (c) => {
@@ -15,7 +23,7 @@ app.get('/', (c) => {
 })
 
 // Install an addon
-app.post('/', async (c) => {
+app.post('/', sessionMiddleware, async (c) => {
   const { manifestUrl, settingsProfileId } = await c.req.json()
   if (!manifestUrl) return c.json({ error: 'Manifest URL required' }, 400)
 
@@ -59,7 +67,7 @@ app.post('/', async (c) => {
 })
 
 // Delete an addon
-app.delete('/:id', (c) => {
+app.delete('/:id', sessionMiddleware, (c) => {
   const id = parseInt(c.req.param('id'))
   addonDb.delete(id)
   return c.json({ success: true })
@@ -71,7 +79,6 @@ app.get('/profile/:profileId', optionalSessionMiddleware, async (c) => {
   let profileId: number
 
   if (rawProfileId === 'guest') {
-    const { userDb } = require('../../services/database')
     const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
     profileId = guestDefaultProfile.id
   } else {
@@ -79,9 +86,8 @@ app.get('/profile/:profileId', optionalSessionMiddleware, async (c) => {
   }
 
   // Resolve settings profile
-  const { profileDb } = require('../../services/database'); // Lazy import to avoid circular dep if any
-  const settingsProfileId = profileDb.getSettingsProfileId(profileId);
-  if (!settingsProfileId) return c.json([]);
+  const settingsProfileId = profileDb.getSettingsProfileId(profileId)
+  if (!settingsProfileId) return c.json([])
   
   const addons = addonDb.getEnabledForProfile(settingsProfileId)
   return c.json(addons)
@@ -102,24 +108,44 @@ app.get('/settings-profile/:settingsProfileId/manage', (c) => {
 })
 
 // Toggle addon for settings profile
-app.post('/settings-profile/:settingsProfileId/toggle', async (c) => {
+app.post('/settings-profile/:settingsProfileId/toggle', optionalSessionMiddleware, async (c) => {
   const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
+  const isGuestMode = c.get('guestMode') as boolean
+  const sessionUser = c.get('user')
+
+  if (!isGuestMode && sessionUser) {
+    const ownerId = getSettingsProfileOwner(settingsProfileId)
+    if (ownerId !== sessionUser.id) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+  }
+
   const { addonId, enabled } = await c.req.json()
-  
+
   if (enabled) {
     addonDb.enableForProfile(settingsProfileId, addonId)
   } else {
     addonDb.disableForProfile(settingsProfileId, addonId)
   }
-  
+
   return c.json({ success: true })
 })
 
 // Reorder addons for settings profile
-app.post('/settings-profile/:settingsProfileId/reorder', async (c) => {
+app.post('/settings-profile/:settingsProfileId/reorder', optionalSessionMiddleware, async (c) => {
   const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
+  const isGuestMode = c.get('guestMode') as boolean
+  const sessionUser = c.get('user')
+
+  if (!isGuestMode && sessionUser) {
+    const ownerId = getSettingsProfileOwner(settingsProfileId)
+    if (ownerId !== sessionUser.id) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+  }
+
   const { addonIds } = await c.req.json()
-  
+
   if (!Array.isArray(addonIds)) {
     return c.json({ error: 'addonIds must be an array' }, 400)
   }
@@ -129,15 +155,25 @@ app.post('/settings-profile/:settingsProfileId/reorder', async (c) => {
 })
 
 // Remove addon from settings profile
-app.delete('/settings-profile/:settingsProfileId/:addonId', (c) => {
+app.delete('/settings-profile/:settingsProfileId/:addonId', optionalSessionMiddleware, (c) => {
   const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
   const addonId = parseInt(c.req.param('addonId'))
-  
-  log.debug(`DELETE /settings-profile/${settingsProfileId}/${addonId}`);
-  
+
+  log.debug(`DELETE /settings-profile/${settingsProfileId}/${addonId}`)
+
   if (isNaN(settingsProfileId) || isNaN(addonId)) {
-    log.error('Invalid parameters for remove addon');
-    return c.json({ error: 'Invalid parameters' }, 400);
+    log.error('Invalid parameters for remove addon')
+    return c.json({ error: 'Invalid parameters' }, 400)
+  }
+
+  const isGuestMode = c.get('guestMode') as boolean
+  const sessionUser = c.get('user')
+
+  if (!isGuestMode && sessionUser) {
+    const ownerId = getSettingsProfileOwner(settingsProfileId)
+    if (ownerId !== sessionUser.id) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
   }
 
   addonDb.removeFromProfile(settingsProfileId, addonId)

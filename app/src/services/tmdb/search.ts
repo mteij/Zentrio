@@ -3,11 +3,10 @@
  * Original source: https://github.com/mrcanelas/tmdb-addon
  * Licensed under Apache License 2.0
  */
-import { TMDBClient } from './client'
-import { Utils } from './utils'
-import { getGenreList } from './genres'
 import { transliterate } from 'transliteration'
-import { AGE_RATINGS } from './age-ratings'
+import { TMDBClient } from './client'
+import { getGenreList } from './genres'
+import { Utils } from './utils'
 
 function isNonLatin(text: string) {
   // eslint-disable-next-line no-control-regex

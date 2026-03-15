@@ -198,10 +198,10 @@ export function DetailsHeader({
                     IMDb {meta.imdbRating}
                   </span>
                 )}
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error: intentional type mismatch */}
                 {showAgeRatings && (meta.certification || meta.rating || meta.contentRating) && (
                   <span className={`${styles.metaBadge} ${styles.metaBadgeRating}`}>
-                    {/* @ts-expect-error */}
+                    {/* @ts-expect-error: intentional type mismatch */}
                     {meta.certification || meta.rating || meta.contentRating}
                   </span>
                 )}

@@ -7,19 +7,19 @@
  * All player UI is handled by <ZentrioPlayer />.
  */
 
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
-import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Layout, SkeletonPlayer } from '../../components'
 import { ZentrioPlayer, type EpisodeInfo } from '../../components/player/ZentrioPlayer'
-import type { Stream } from '../../services/addons/types'
-import { toast } from 'sonner'
 import { useExternalPlayer } from '../../hooks/useExternalPlayer'
-import styles from '../../styles/Player.module.css'
+import type { FlatStream } from '../../hooks/useStreamLoader'
 import { apiFetch } from '../../lib/apiFetch'
+import { resolveStreamsProgressive, type StreamResolveHandle } from '../../lib/stream-resolver'
 import { getStoredPlayerOrientation, setTauriPlayerMode } from '../../lib/tauri-player-mode'
 import { resolveBeaconUrl } from '../../lib/url'
-import type { FlatStream } from '../../hooks/useStreamLoader'
-import { resolveStreamsProgressive, type StreamResolveHandle } from '../../lib/stream-resolver'
+import type { Stream } from '../../services/addons/types'
+import styles from '../../styles/Player.module.css'
 import { createLogger } from '../../utils/client-logger'
 
 const log = createLogger('PlayerPage')
@@ -168,7 +168,7 @@ function useFindNewStream(meta: MetaInfo | null, profileId: string | undefined) 
     setIsFinding(false)
     if (result?.url) triedUrlsRef.current.add(result.url)
     return result
-  }, [meta, profileId])
+  }, [preload])
 
   return { preload, findNext, isFinding }
 }
@@ -205,7 +205,7 @@ export const StreamingPlayer = () => {
   const blobUrlRef = useRef<string | null>(null)
 
   /* ─── Find New Stream hook ─── */
-  const { preload: preloadStreams, findNext, isFinding } = useFindNewStream(meta, profileId)
+  const { preload: preloadStreams, findNext, _isFinding } = useFindNewStream(meta, profileId)
 
   /* ─── Parse URL / location state ─── */
   useEffect(() => {

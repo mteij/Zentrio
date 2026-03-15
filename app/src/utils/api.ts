@@ -28,7 +28,7 @@ export const ok = <T>(c: Context, data?: T, message?: string) => {
 // Error response helper
 export const err = (
   c: Context,
-  status: 400 | 401 | 403 | 404 | 409 | 410 | 429 | 500,
+  status: 400 | 401 | 403 | 404 | 409 | 410 | 429 | 500 | 502,
   code: string,
   message: string,
   details?: unknown
@@ -48,13 +48,15 @@ export const err = (
 
 export function getRequestMeta(c: Context) {
   const headers = c.req.raw.headers
-  // Try proxy headers first, then fallback to node-specific socket info if available
-  const ip = headers.get('x-forwarded-for')?.split(',')[0].trim() || 
-             headers.get('x-real-ip') || 
-             //@ts-ignore
-             c.env?.incoming?.socket?.remoteAddress || 
-             '127.0.0.1' // Fallback for local dev through tools that strip IPs
-  
+  // Use the LAST entry in X-Forwarded-For — this is appended by the nearest
+  // trusted proxy and is much harder to spoof than the first (client-supplied) entry.
+  const xff = headers.get('x-forwarded-for')
+  const ip = (xff ? xff.split(',').at(-1)!.trim() : null) ||
+             headers.get('x-real-ip') ||
+             //@ts-ignore: runtime typing gap
+             c.env?.incoming?.socket?.remoteAddress ||
+             '127.0.0.1'
+
   return {
     ipAddress: ip,
     userAgent: headers.get('user-agent') || 'unknown',

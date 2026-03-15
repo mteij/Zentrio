@@ -1,11 +1,11 @@
+import { AnimatePresence, motion } from 'framer-motion'
+import { Compass, Download, Home, Library, Search, User, X } from 'lucide-react'
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Compass, Library, Search, User, X, Download } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { createHoverPreloader } from '../../utils/route-preloader'
-import styles from '../../styles/Streaming.module.css'
-import { useState, useRef, useEffect, useMemo, startTransition, useCallback } from 'react'
-import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 import { isTauri } from '../../lib/auth-client'
+import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
+import styles from '../../styles/Streaming.module.css'
+import { createHoverPreloader } from '../../utils/route-preloader'
 
 interface NavbarProps {
   profileId: number | string
@@ -117,7 +117,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
             style={{ '--active-index': safeActiveIndex } as React.CSSProperties}
         >
             <div className={styles.activeIndicator} />
-            {items.map(({ to, icon: Icon, label, path, exact, id, onMouseEnter, onFocus, onClick, ...linkProps }) => (
+            {items.map(({ to, icon: Icon, label, path, exact, id, onMouseEnter, onFocus, onClick, ..._linkProps }) => (
                 <a 
                     key={to}
                     href={to}

@@ -1,8 +1,8 @@
 // Global type declarations for Zentrio
 
 // Augment React to accept Firefox's non-standard orient attribute for range inputs
-declare namespace React {
-  interface InputHTMLAttributes<T> {
+declare module 'react' {
+  interface InputHTMLAttributes<_T> {
     orient?: 'horizontal' | 'vertical'
   }
 }
@@ -28,4 +28,4 @@ declare module 'mp4box' {
   export default MP4Box
 }
 
-export {};
+export { };

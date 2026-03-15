@@ -1,8 +1,8 @@
-import './index.css'
-import './toast.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import './index.css'
+import './toast.css'
 import { createLogger } from './utils/client-logger'
 
 const log = createLogger('App')
@@ -41,7 +41,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
            overrideMethod = typeof methodObj.toString === 'function' && methodObj.toString() !== '[object Object]' 
               ? methodObj.toString() 
               : (init?.body ? 'POST' : 'GET');
-        } catch(e) {
+        } catch(_e) {
            overrideMethod = init?.body ? 'POST' : 'GET';
         }
     }

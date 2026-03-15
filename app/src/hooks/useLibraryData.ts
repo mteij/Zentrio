@@ -1,16 +1,16 @@
 
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import {
+    type AvailableSharedList,
+    type PendingInvite,
+    type ProfileSharedList,
+    type SharedList,
+} from '../components/library/LibrarySidebar'
 import { apiFetch, apiFetchJson } from '../lib/apiFetch'
 import { List, ListItem } from '../services/database'
-import {
-  type SharedList,
-  type PendingInvite,
-  type AvailableSharedList,
-  type ProfileSharedList,
-} from '../components/library/LibrarySidebar'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('useLibraryData')
@@ -107,7 +107,7 @@ export function useLibraryData(profileId: string | undefined, listId: string | u
   const [availableFromOtherProfiles, setAvailableFromOtherProfiles] = useState<AvailableSharedList[]>([])
   const [activeList, setActiveList] = useState<List | SharedList | ProfileSharedList | null>(null)
   const [items, setItems] = useState<ListItem[]>([])
-  const [error, setError] = useState('')
+  const [error, _setError] = useState('')
 
   // Sync query data → local state when it (re)loads
   useEffect(() => {

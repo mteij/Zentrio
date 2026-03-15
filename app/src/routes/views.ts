@@ -1,14 +1,6 @@
 import { Hono } from 'hono'
-import { auth } from '../services/auth'
  
 const app = new Hono()
-
-async function isAuthenticated(c: any): Promise<boolean> {
-  const session = await auth.api.getSession({
-    headers: c.req.raw.headers
-  })
-  return !!session
-}
  
 // JSX Component Routes (New)
 // We now serve the SPA for the root route as well, letting the client handle routing

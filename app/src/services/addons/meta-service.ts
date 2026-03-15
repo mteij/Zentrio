@@ -3,7 +3,7 @@
  * Provides helpers for ID handling, addon selection, and metadata enrichment.
  */
 
-import { MetaDetail, MetaPreview, Manifest } from './types'
+import { Manifest, MetaDetail } from './types'
 
 /**
  * Check if an ID is a "standard" ID (IMDB or TMDB format)

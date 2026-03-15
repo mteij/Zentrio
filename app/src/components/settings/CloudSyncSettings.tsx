@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { Button, Input, ConfirmDialog } from '../index';
 import { createAuthClient } from "better-auth/client";
-import styles from '../../styles/Settings.module.css';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { apiFetch } from '../../lib/apiFetch';
 import { appMode } from '../../lib/app-mode';
 import { isTauri } from '../../lib/auth-client';
-import { createLogger } from '../../utils/client-logger'
+import styles from '../../styles/Settings.module.css';
+import { createLogger } from '../../utils/client-logger';
+import { Button, ConfirmDialog, Input } from '../index';
 
 const log = createLogger('CloudSync')
 
@@ -70,7 +70,7 @@ export function CloudSyncSettings() {
         baseURL: serverUrl
       });
 
-      const { data: signInData, error: signInError } = await remoteAuth.signIn.email({
+      const { data: _signInData, error: signInError } = await remoteAuth.signIn.email({
         email,
         password,
       });
@@ -188,7 +188,7 @@ export function CloudSyncSettings() {
           <div className={styles.settingInfo}>
             <h3>Upgrade to Connected Mode</h3>
             <p>
-              You're currently using Guest Mode. Cloud sync, multiple profiles, and cross-device synchronization 
+              You&apos;re currently using Guest Mode. Cloud sync, multiple profiles, and cross-device synchronization 
               are available when connected to a Zentrio server.
             </p>
           </div>

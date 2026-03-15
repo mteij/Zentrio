@@ -1,13 +1,13 @@
-import { useState, useEffect, memo } from 'react'
-import { Eye, FolderInput, Trash2, X, Check } from 'lucide-react'
-import { toast } from 'sonner'
+import { Check, Eye, FolderInput, Trash2, X } from 'lucide-react'
+import { memo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ListItem, List, ListShare } from '../../services/database'
+import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
-import { LazyImage, RatingBadge } from '../index'
-import { ContextMenu, ContextMenuItemOrSeparator } from '../ui/ContextMenu'
+import { List, ListItem, ListShare } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
 import { createLogger } from '../../utils/client-logger'
+import { LazyImage, RatingBadge } from '../index'
+import { ContextMenu, ContextMenuItemOrSeparator } from '../ui/ContextMenu'
 
 const log = createLogger('LibraryCard')
 
@@ -35,9 +35,7 @@ export const LibraryItemCard = memo(function LibraryItemCard({
   profileId,
   currentListId,
   moveTargetLists,
-  isOwner,
   canRemove,
-  canAdd,
   showImdbRatings,
   onRemove
 }: LibraryItemCardProps) {
@@ -114,18 +112,18 @@ export const LibraryItemCard = memo(function LibraryItemCard({
   }
   
   // Local state for optimistic updates
-  // @ts-expect-error
+  // @ts-expect-error: intentional type mismatch
   const [isWatched, setIsWatched] = useState(item.is_watched);
 
   useEffect(() => {
-    // @ts-expect-error
+    // @ts-expect-error: intentional type mismatch
     setIsWatched(item.is_watched);
   }, [item]); // simplified dependency
 
   const toggleWatched = async () => {
     const newWatchedState = !isWatched;
     setIsWatched(newWatchedState);
-    // @ts-expect-error
+    // @ts-expect-error: intentional type mismatch
     item.is_watched = newWatchedState;
 
     try {
@@ -149,9 +147,9 @@ export const LibraryItemCard = memo(function LibraryItemCard({
   }
   
   const markEpisodeWatched = async () => {
-         // @ts-expect-error
+         // @ts-expect-error: intentional type mismatch
          if (!item.episodeDisplay) return;
-         // @ts-expect-error
+         // @ts-expect-error: intentional type mismatch
          const match = item.episodeDisplay.match(/S(\d+):E(\d+)/);
          if (!match) return;
          
@@ -179,10 +177,10 @@ export const LibraryItemCard = memo(function LibraryItemCard({
 
   // Prepend Watch action
   // If it's a series and has an active episode, show "Mark Episode" option too
-  // @ts-expect-error
+  // @ts-expect-error: intentional type mismatch
   if (item.type === 'series' && item.episodeDisplay) {
     contextItems.unshift({
-        // @ts-expect-error
+        // @ts-expect-error: intentional type mismatch
         label: `Mark ${item.episodeDisplay} Watched`,
         icon: Check,
         onClick: markEpisodeWatched

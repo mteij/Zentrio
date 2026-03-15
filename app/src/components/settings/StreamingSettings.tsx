@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { ChevronDown, Disc, Eye, EyeOff, Monitor } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { ChevronDown, Monitor, Disc, Eye, EyeOff } from 'lucide-react'
-import { Button, Toggle } from '../index'
-import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import styles from '../../styles/Settings.module.css'
 import { createLogger } from '../../utils/client-logger'
+import { Button, Toggle } from '../index'
 
 const log = createLogger('StreamingSettings')
 
@@ -105,7 +105,7 @@ export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) 
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, _index: number) => {
     e.preventDefault()
     if (!draggedItem) return
   }
@@ -610,7 +610,7 @@ export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) 
                       <div>
                           <label style={{ color: '#bbb', fontWeight: 500, fontSize: '0.9rem' }}>Show Unconfirmed Segments</label>
                           <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>
-                              Include segments with few community votes. Marked as "Unconfirmed" in the player.
+                              Include segments with few community votes. Marked as &quot;Unconfirmed&quot; in the player.
                           </p>
                       </div>
                       <Toggle

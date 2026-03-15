@@ -1,4 +1,4 @@
-import { Stream, Manifest, MetaDetail } from './types'
+import { Manifest, MetaDetail, Stream } from './types'
 
 export interface FilterOptions {
   required?: string[]
@@ -169,7 +169,7 @@ export class StreamProcessor {
         dts: /\b(dts(-?hd)?)(?:$|[^\w]|\d|_)/i,
         truehd: /\b(truehd)\b/i,
         eac3: /\b(ddp|eac-?3|dd\+)(?:$|[^\w]|\d|_)/i,
-        ac3: /\b(ac-?3|dd[\s\.]?5\.?1)(?:$|[^\w]|\d|_)/i,
+        ac3: /\b(ac-?3|dd[\s.]?5\.?1)(?:$|[^\w]|\d|_)/i,
         aac: /\b(aac)(?:$|[^\w]|\d|_)/i,
         mp3: /\b(mp3)(?:$|[^\w]|\d|_)/i,
         opus: /\b(opus)(?:$|[^\w]|\d|_)/i,
@@ -458,7 +458,7 @@ export class StreamProcessor {
     return true
   }
 
-  private sortStreams(streams: ParsedStream[], meta: MetaDetail): ParsedStream[] {
+  private sortStreams(streams: ParsedStream[], _meta: MetaDetail): ParsedStream[] {
     // Get sorting configuration
     const sortingItems = this.config.sortingConfig?.items?.filter(i => i.enabled) || []
 
@@ -546,32 +546,36 @@ export class StreamProcessor {
         const multiplier = sortItem.direction === 'desc' ? 1 : -1
 
         switch (sortItem.id) {
-          case 'cached':
+          case 'cached': {
             // Cached streams should sort higher (or lower if asc)
             const aCached = a.parsed.isCached ? 1 : 0
             const bCached = b.parsed.isCached ? 1 : 0
             comparison = (bCached - aCached) * multiplier
             break
+          }
 
-          case 'resolution':
+          case 'resolution': {
             const aRes = resolutionPriority[a.parsed.resolution?.toLowerCase() || 'unknown'] || 0
             const bRes = resolutionPriority[b.parsed.resolution?.toLowerCase() || 'unknown'] || 0
             comparison = (bRes - aRes) * multiplier
             break
+          }
 
-          case 'size':
+          case 'size': {
             const aSize = a.parsed.size || 0
             const bSize = b.parsed.size || 0
             comparison = (bSize - aSize) * multiplier
             break
+          }
 
-          case 'seeders':
+          case 'seeders': {
             const aSeeders = a.parsed.seeders || 0
             const bSeeders = b.parsed.seeders || 0
             comparison = (bSeeders - aSeeders) * multiplier
             break
+          }
 
-          case 'quality':
+          case 'quality': {
             // Quality based on source type, encode, visual tags
             // Source type priority: bluray > web > hdtv > unknown > telesync > cam
             const sourceTypePriority: Record<string, number> = {
@@ -604,8 +608,9 @@ export class StreamProcessor {
             const bQuality = getQualityScore(b)
             comparison = (bQuality - aQuality) * multiplier
             break
+          }
 
-          case 'language':
+          case 'language': {
             // Language preference - score by position in preferred list (earlier = higher priority)
             const preferredLangs = this.config.filters?.language?.preferred || []
             
@@ -631,6 +636,7 @@ export class StreamProcessor {
             const bLangScore = getLangScore(b)
             comparison = (bLangScore - aLangScore) * multiplier
             break
+          }
 
           default:
             break

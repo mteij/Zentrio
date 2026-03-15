@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input } from './Input';
+import { Modal } from './Modal';
 
 interface InputDialogProps {
   isOpen: boolean;
@@ -63,7 +63,7 @@ export function InputDialog({
   };
 
   // Reset value when dialog opens
-  const handleOpen = () => {
+  const _handleOpen = () => {
     setValue(defaultValue);
     setError(null);
   };

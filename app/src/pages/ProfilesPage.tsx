@@ -1,17 +1,17 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Settings, LogOut, Edit, X, Plus, Check, LogIn, Shield } from 'lucide-react'
-import { SimpleLayout, ConfirmDialog, AnimatedBackground, SkeletonProfile } from '../components'
+import { Check, Edit, LogIn, LogOut, Plus, Settings, Shield } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { AnimatedBackground, ConfirmDialog, SimpleLayout, SkeletonProfile } from '../components'
 import { ProfileModal } from '../components/features/ProfileModal'
-import { useAuthStore } from '../stores/authStore'
-import { apiFetch } from '../lib/apiFetch'
-import { adminApi } from '../lib/adminApi'
-import { buildAvatarUrl, sanitizeImgSrc } from '../lib/url'
-import styles from './ProfilesPage.module.css'
 import { ContextMenu } from '../components/ui/ContextMenu'
+import { adminApi } from '../lib/adminApi'
+import { apiFetch } from '../lib/apiFetch'
 import { appMode } from '../lib/app-mode'
+import { buildAvatarUrl, sanitizeImgSrc } from '../lib/url'
+import { useAuthStore } from '../stores/authStore'
 import { createLogger } from '../utils/client-logger'
+import styles from './ProfilesPage.module.css'
 
 const log = createLogger('ProfilesPage')
 
@@ -30,7 +30,7 @@ interface ProfilesPageProps {
   user?: any
 }
 
-export function ProfilesPage({ user }: ProfilesPageProps) {
+export function ProfilesPage(_props: ProfilesPageProps) {
   const [profiles, setProfiles] = useState<Profile[]>(() => {
     // Initialize from cache if available
     try {
@@ -98,6 +98,74 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   const isTauriEnv = typeof window !== 'undefined' &&
     ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined);
   
+  const loadProfiles = useCallback(async (retryCount = 0) => {
+    try {
+      const res = await apiFetch('/api/profiles');
+      // Log full response for debugging
+      log.debug(`API Response: ${res.status}`, { ok: res.ok, url: res.url });
+
+      if (res.status === 401) {
+        // Session might be expired, try to refresh once?
+        if (retryCount >= 2) {
+             log.debug('Session expired (401) and max retries reached, redirecting to login...');
+             navigate('/');
+             return;
+        }
+
+        log.debug('Session expired (401), attempting refresh...');
+        const refreshed = await useAuthStore.getState().refreshSession();
+        log.debug('Refresh result:', refreshed);
+        
+        if (refreshed) {
+             // Wait for state to propagate after refresh before retrying
+             log.debug('Refresh success, waiting for token propagation...');
+             await new Promise(resolve => setTimeout(resolve, 100));
+             
+             // Verify token is now available
+             const newToken = useAuthStore.getState().session?.token;
+             log.debug('New token available:', !!newToken);
+             
+             log.debug('Retrying loadProfiles...');
+             return loadProfiles(retryCount + 1);
+        }
+        
+        // If refresh failed, then redirect
+        log.debug('Refresh failed, redirecting to login...');
+        navigate('/');
+        return
+      }
+      if (res.ok) {
+        const data = await res.json()
+        log.debug("Profiles loaded:", data);
+        setProfiles(data)
+        localStorage.setItem('zentrioProfiles', JSON.stringify(data))
+        if (data.length === 0) {
+           log.debug("No profiles found, retrying once in 1s to handle potential consistency delay...");
+           setTimeout(async () => {
+              try {
+                  const res2 = await apiFetch('/api/profiles');
+                  if (res2.ok) {
+                      const data2 = await res2.json();
+                      log.debug("Retry profiles loaded:", data2);
+                      setProfiles(data2);
+                      localStorage.setItem('zentrioProfiles', JSON.stringify(data2));
+                      if (data2.length === 0) {
+                          log.debug("Still no profiles, but allowing empty state as per user request.");
+                      }
+                  }
+              } catch (_e) {
+                  // ignore
+              }
+           }, 1000);
+        }
+      }
+    } catch (error) {
+      log.error('Failed to load profiles:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [navigate])
+
   useEffect(() => {
     // In guest mode, load profiles immediately without waiting for auth
     if (isGuestMode) {
@@ -155,75 +223,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
       isTauriEnv
     });
     loadProfiles(0);
-  }, [authLoading, session?.token, isAuthenticated, isTauriEnv, isGuestMode])
-
-  const loadProfiles = async (retryCount = 0) => {
-    try {
-      const res = await apiFetch('/api/profiles');
-      // Log full response for debugging
-      log.debug(`API Response: ${res.status}`, { ok: res.ok, url: res.url });
-
-      if (res.status === 401) {
-        // Session might be expired, try to refresh once?
-        if (retryCount >= 2) {
-             log.debug('Session expired (401) and max retries reached, redirecting to login...');
-             navigate('/');
-             return;
-        }
-
-        log.debug('Session expired (401), attempting refresh...');
-        const refreshed = await useAuthStore.getState().refreshSession();
-        log.debug('Refresh result:', refreshed);
-        
-        if (refreshed) {
-             // Wait for state to propagate after refresh before retrying
-             log.debug('Refresh success, waiting for token propagation...');
-             await new Promise(resolve => setTimeout(resolve, 100));
-             
-             // Verify token is now available
-             const newToken = useAuthStore.getState().session?.token;
-             log.debug('New token available:', !!newToken);
-             
-             log.debug('Retrying loadProfiles...');
-             return loadProfiles(retryCount + 1);
-        }
-        
-        // If refresh failed, then redirect
-        log.debug('Refresh failed, redirecting to login...');
-        navigate('/');
-        return
-      }
-      if (res.ok) {
-        const data = await res.json()
-        log.debug("Profiles loaded:", data);
-        setProfiles(data)
-        localStorage.setItem('zentrioProfiles', JSON.stringify(data))
-        if (data.length === 0) {
-           log.debug("No profiles found, retrying once in 1s to handle potential consistency delay...");
-           setTimeout(async () => {
-              try {
-                  const res2 = await apiFetch('/api/profiles');
-                  if (res2.ok) {
-                      const data2 = await res2.json();
-                      log.debug("Retry profiles loaded:", data2);
-                      setProfiles(data2);
-                      localStorage.setItem('zentrioProfiles', JSON.stringify(data2));
-                      if (data2.length === 0) {
-                          log.debug("Still no profiles, but allowing empty state as per user request.");
-                      }
-                  }
-              } catch (e) {
-                  // ignore
-              }
-           }, 1000);
-        }
-      }
-    } catch (error) {
-      log.error('Failed to load profiles:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [authLoading, session?.token, isAuthenticated, isTauriEnv, isGuestMode, loadProfiles])
 
   const handleProfileClick = (profile: Profile) => {
     if (editMode) {

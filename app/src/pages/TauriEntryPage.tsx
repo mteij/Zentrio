@@ -1,8 +1,6 @@
 import { SimpleLayout, Button } from '../components/index'
 
-interface TauriEntryPageProps {}
-
-export function TauriEntryPage({}: TauriEntryPageProps) {
+export function TauriEntryPage() {
   return (
     <SimpleLayout title="Welcome to Zentrio" disableThemeSync={true} className="h-[100vh] h-[var(--app-height,100vh)] flex flex-col overflow-hidden">
       <div style={{

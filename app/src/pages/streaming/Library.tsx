@@ -1,26 +1,25 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, Share2, Users, LogOut, Library as LibraryIcon, Trash2, Mail, Check, X as XIcon, UserPlus, ChevronDown, ChevronRight, Lock, Globe, User, MoreVertical } from 'lucide-react'
-import { Layout, RatingBadge, LazyImage, SkeletonCard, LoadErrorState } from '../../components'
-import { List, ListItem, ListShare, Profile } from '../../services/database'
-import styles from '../../styles/Streaming.module.css'
-import { apiFetch } from '../../lib/apiFetch'
+import { Check, ChevronDown, Globe, Library as LibraryIcon, Lock, LogOut, Mail, Plus, Share2, Trash2, User, UserPlus, Users, X as XIcon } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Layout, LoadErrorState, SkeletonCard } from '../../components'
 import { ShareListModal } from '../../components/features/ShareListModal'
 import { useLibraryData } from '../../hooks/useLibraryData'
+import { apiFetch } from '../../lib/apiFetch'
+import { List } from '../../services/database'
+import styles from '../../styles/Streaming.module.css'
 
-import { LibraryItemCard } from '../../components/library/LibraryItemCard'
-import { 
-  SidebarSection, 
-  ListSidebarItem, 
-  type SharedList, 
-  type PendingInvite, 
-  type AvailableSharedList, 
-  type ProfileShare, 
-  type ProfileSharedList, 
-  type SharingType 
-} from '../../components/library/LibrarySidebar'
 import { toast } from 'sonner'
+import { LibraryItemCard } from '../../components/library/LibraryItemCard'
+import {
+    ListSidebarItem,
+    SidebarSection,
+    type AvailableSharedList,
+    type PendingInvite,
+    type ProfileSharedList,
+    type SharedList,
+    type SharingType
+} from '../../components/library/LibrarySidebar'
 import { createLogger } from '../../utils/client-logger'
 
 const log = createLogger('LibraryPage')
@@ -43,7 +42,7 @@ export const StreamingLibrary = () => {
       error
     },
     setters: {
-      setMyLists,
+      _setMyLists,
       setAccountSharedLists,
       setProfileSharedLists,
       setPendingInvites,

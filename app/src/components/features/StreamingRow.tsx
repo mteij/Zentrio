@@ -1,14 +1,13 @@
-import { useState, useEffect, memo, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MetaPreview } from '../../services/addons/types'
-import { ContentCard, ContentItem } from './ContentCard'
-import { useScrollRow } from '../../hooks/useScrollRow'
 import { useAutoPlay } from '../../hooks/useAutoPlay'
-import { getPackId } from '../../services/addons/stream-service'
+import { useScrollRow } from '../../hooks/useScrollRow'
 import { apiFetch } from '../../lib/apiFetch'
+import { getPackId } from '../../services/addons/stream-service'
 import styles from '../../styles/Streaming.module.css'
 import { createLogger } from '../../utils/client-logger'
+import { ContentCard, ContentItem } from './ContentCard'
 
 const log = createLogger('StreamingRow')
 
@@ -38,7 +37,7 @@ export const StreamingRow = memo(function StreamingRow({
   isContinueWatching = false, 
   isRanked = false 
 }: StreamingRowProps) {
-  const navigate = useNavigate()
+  const _navigate = useNavigate()
   const { startAutoPlay } = useAutoPlay()
   
   // Local items state for optimistic updates (e.g., removing from continue watching)

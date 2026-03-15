@@ -6,23 +6,32 @@
  * next-episode popup, find-new-stream popup) lives here.
  */
 
-import { useRef, useEffect, useCallback, useState } from 'react'
 import {
-  Play, Pause, Volume2, VolumeX, Volume1,
-  Maximize, Minimize, Settings, Subtitles,
-  RotateCcw, RotateCw,
-  ChevronLeft, ChevronRight,
-  ExternalLink,
-  PictureInPicture2, Cast,
-  SkipForward as NextEpIcon,
-  AlertTriangle, RefreshCw, X,
-  Sun, Moon,
-  Flag, Crosshair, Check, Loader2
+    AlertTriangle,
+    Cast,
+    Check,
+    ChevronLeft, ChevronRight,
+    Crosshair,
+    ExternalLink,
+    Flag,
+    Loader2,
+    Maximize, Minimize,
+    SkipForward as NextEpIcon,
+    Pause,
+    PictureInPicture2,
+    Play,
+    RefreshCw,
+    RotateCcw, RotateCw,
+    Settings, Subtitles,
+    Volume1,
+    Volume2, VolumeX,
+    X
 } from 'lucide-react'
-import { usePlayerEngine } from './hooks/usePlayerEngine'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getStoredPlayerOrientation, setTauriPlayerMode, type PlayerOrientationMode } from '../../lib/tauri-player-mode'
-import type { MediaSource, SubtitleTrack, AudioTrack, QualityLevel } from './engines/types'
 import styles from '../../styles/ZentrioPlayer.module.css'
+import type { SubtitleTrack } from './engines/types'
+import { usePlayerEngine } from './hooks/usePlayerEngine'
 
 /* ─────────────────────── Types ─────────────────────── */
 
@@ -211,8 +220,8 @@ export function ZentrioPlayer({
     state,
     isLoading,
     error,
-    play,
-    pause,
+    _play,
+    _pause,
     seek,
     setVolume,
     setMuted,
@@ -251,7 +260,7 @@ export function ZentrioPlayer({
   /* ── Load source on change ── */
   useEffect(() => {
     if (src) loadSource({ src, type })
-  }, [src, type]) // loadSource is stable — its only deps are startTime/autoPlay (primitives)
+  }, [loadSource, src, type])
 
   /* ── Subtitles ── */
   useEffect(() => {
@@ -284,7 +293,7 @@ export function ZentrioPlayer({
         } else {
           so?.unlock?.()
         }
-      } catch (e) {
+      } catch (_e) {
         // Silently ignore - lock() requires fullscreen and user gesture
       }
     }
@@ -297,7 +306,7 @@ export function ZentrioPlayer({
       try {
         const so = screen.orientation as any
         so?.unlock?.()
-      } catch (e) {
+      } catch (_e) {
         // Silently ignore
       }
     }
@@ -307,7 +316,7 @@ export function ZentrioPlayer({
     setOrientationMode(mode)
     try {
       localStorage.setItem('zentrio_orientation', mode)
-    } catch (e) {}
+    } catch (_e) {}
   }
 
   /* ── Fullscreen sync ── */
@@ -412,7 +421,7 @@ export function ZentrioPlayer({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
+  }, [flashSeek, togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
 
   /* ── Menu click-outside (desktop + mobile) ── */
   useEffect(() => {
@@ -512,7 +521,7 @@ export function ZentrioPlayer({
     }
   }, [state.duration, state.volume, setVolume, showVolumeOSD])
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  const handleTouchEnd = useCallback((_e: React.TouchEvent) => {
     const g = gestureRef.current
     if (g.seeking && hoverTime) {
       seek(hoverTime.time)

@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { logger as honoLogger } from 'hono/logger'
-import { corsMiddleware, securityHeaders, rateLimiter } from './middleware/security'
-import { join, extname } from 'path'
-import { initEnv, getConfig } from './services/envParser'
+import { extname, join } from 'path'
+import { bodyLimit, corsMiddleware, rateLimiter, securityHeaders } from './middleware/security'
+import { getConfig, initEnv } from './services/envParser'
 import { logger } from './services/logger'
 
 // Import route modules
@@ -10,9 +10,9 @@ import viewRoutes from './routes/views'
 
 // Import API route modules
 import apiRoutes from './routes/api/index'
+import { db } from './services/database'
 import { initImdbService } from './services/imdb'
 import { syncService } from './services/sync'
-import { db } from './services/database'
 
 // Initialize environment variables before starting the app
 initEnv()
@@ -22,14 +22,14 @@ const app = new Hono()
 
 // Load runtime config
 const cfg = getConfig()
-const { PORT, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY, PROXY_LOGS } = cfg
+const { _PORT, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_LIMIT, DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY, PROXY_LOGS } = cfg
 
 // ─── Version ──────────────────────────────────────────────────────────
 let version = 'unknown'
 try {
-  // @ts-ignore
+  // @ts-ignore: runtime typing gap
   const pkgPath = join(import.meta.dir, '..', 'package.json')
-  // @ts-ignore
+  // @ts-ignore: runtime typing gap
   const pkg = await Bun.file(pkgPath).json()
   version = pkg.version || 'unknown'
 } catch {}
@@ -170,6 +170,9 @@ if (PROXY_LOGS) {
 }
 app.use('*', securityHeaders)
 app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
+// Reject oversized request bodies before they reach route handlers (1 MB limit).
+// Streaming/upload routes that legitimately need larger payloads should override locally.
+app.use('/api/*', bodyLimit(1 * 1024 * 1024))
 
 // Lazily record the client platform when the app sends X-Zentrio-Client header.
 // Only runs when analytics are enabled (requires ADMIN_ENABLED=true and ANALYTICS_ENABLED!=false).
@@ -199,10 +202,10 @@ app.use('*', async (c, next) => {
 // Serve bundled assets (JS/CSS) from Vite build
 app.get('/assets/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/assets\//, '')
-  // @ts-ignore
+  // @ts-ignore: runtime typing gap
   const filePath = join(import.meta.dir, 'assets', reqPath)
   try {
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const file = Bun.file(filePath)
     const typeMap: Record<string, string> = {
       '.html': 'text/html; charset=utf-8',
@@ -237,19 +240,19 @@ app.get('/assets/*', async (c) => {
 app.get('/static/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/static\//, '')
   // Try dist/static first (production/Docker), then public/static (development)
-  // @ts-ignore
+  // @ts-ignore: runtime typing gap
   const distPath = join(process.cwd(), 'dist', 'static', reqPath)
-  // @ts-ignore
+  // @ts-ignore: runtime typing gap
   const publicPath = join(process.cwd(), 'public', 'static', reqPath)
 
   let filePath = distPath
-  // @ts-ignore
+  // @ts-ignore: runtime typing gap
   if (!(await Bun.file(distPath).exists())) {
     filePath = publicPath
   }
 
   try {
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const file = Bun.file(filePath)
     const typeMap: Record<string, string> = {
       '.html': 'text/html; charset=utf-8',
@@ -284,21 +287,21 @@ app.get('/static/*', async (c) => {
 })
 
 // Favicon at root for browser defaults
-app.get('/favicon.ico', async (c) => {
+app.get('/favicon.ico', async (_c) => {
   try {
     // Try dist/static first (production/Docker), then public/static (development)
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const distPath = join(process.cwd(), 'dist', 'static', 'logo', 'favicon', 'favicon.ico')
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const publicPath = join(process.cwd(), 'public', 'static', 'logo', 'favicon', 'favicon.ico')
 
     let filePath = distPath
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     if (!(await Bun.file(distPath).exists())) {
       filePath = publicPath
     }
 
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const file = Bun.file(filePath)
     return new Response(file, {
       headers: {
@@ -316,18 +319,18 @@ app.get('/favicon.ico', async (c) => {
 app.get('/sw.js', async () => {
   try {
     // Try dist/static first (production/Docker), then public/static (development)
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const distPath = join(process.cwd(), 'dist', 'static', 'sw.js')
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const publicPath = join(process.cwd(), 'public', 'static', 'sw.js')
 
     let filePath = distPath
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     if (!(await Bun.file(distPath).exists())) {
       filePath = publicPath
     }
 
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const file = Bun.file(filePath)
 
     return new Response(file, {
@@ -351,7 +354,7 @@ app.get('/', async (c) => {
     // Try to serve index.html from dist (production) or src (dev fallthrough)
     // using process.cwd() for reliability in Docker
     const distPath = join(process.cwd(), 'dist', 'index.html')
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const distFile = Bun.file(distPath)
     
     if (await distFile.exists()) {
@@ -361,9 +364,9 @@ app.get('/', async (c) => {
     }
     
     // Dev fallback: usually handled by Vite, but if we are here:
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const srcPath = join(import.meta.dir, '..', 'index.html') // In dev, meta.dir is src/
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const srcFile = Bun.file(srcPath)
      if (await srcFile.exists()) {
        return new Response(srcFile, {
@@ -388,7 +391,7 @@ app.get('*', async (c) => {
   try {
     // Check for production build first using CWD
     const distPath = join(process.cwd(), 'dist', 'index.html')
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const indexFile = Bun.file(distPath)
     
     if (await indexFile.exists()) {
@@ -400,9 +403,9 @@ app.get('*', async (c) => {
     // In development (src/index.ts is running), import.meta.dir is .../src
     // So look for .../index.html? No, Vite keeps it in root.
     
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const devPath = join(process.cwd(), 'index.html') // Root level index.html
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const devFile = Bun.file(devPath)
     if (await devFile.exists()) {
        return new Response(devFile, {

@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
-import { X, Mail, Share2, Trash2, Users, Eye, Plus, Edit3, User, Globe } from 'lucide-react'
-import { Modal } from '../ui/Modal'
-import { Button } from '../ui/Button'
-import { Input } from '../ui/Input'
-import { apiFetch } from '../../lib/apiFetch'
+import { Edit3, Eye, Globe, Mail, Plus, Trash2, User, Users } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { apiFetch } from '../../lib/apiFetch'
 import { Profile } from '../../services/database'
 import { createLogger } from '../../utils/client-logger'
+import { Button } from '../ui/Button'
+import { Input } from '../ui/Input'
+import { Modal } from '../ui/Modal'
 
 const log = createLogger('ShareList')
 
@@ -48,17 +48,7 @@ export function ShareListModal({ isOpen, onClose, listId, listName, currentProfi
   const [permission, setPermission] = useState<'read' | 'add' | 'full'>('read')
   const [sending, setSending] = useState(false)
 
-  useEffect(() => {
-    if (isOpen) {
-      loadData()
-      // Reset form
-      setEmail('')
-      setSelectedProfileId(null)
-      setPermission('read')
-    }
-  }, [isOpen, listId])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       // Load all profiles for this account
@@ -88,7 +78,17 @@ export function ShareListModal({ isOpen, onClose, listId, listName, currentProfi
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentProfileId, listId])
+
+  useEffect(() => {
+    if (isOpen) {
+      loadData()
+      // Reset form
+      setEmail('')
+      setSelectedProfileId(null)
+      setPermission('read')
+    }
+  }, [isOpen, loadData])
 
   // --- Profile Sharing ---
 

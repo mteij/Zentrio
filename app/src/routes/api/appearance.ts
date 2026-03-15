@@ -1,8 +1,8 @@
-import { appearanceDb, profileDb, userDb, type User } from '../../services/database'
 import { optionalSessionMiddleware } from '../../middleware/session'
-import { ok, err } from '../../utils/api'
-import { createTaggedOpenAPIApp } from './openapi-route'
+import { appearanceDb, profileDb, userDb, type User } from '../../services/database'
 import { logger } from '../../services/logger'
+import { err } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
 const log = logger.scope('API:Appearance')
 

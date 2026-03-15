@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { createLogger } from '../utils/client-logger'
 
@@ -45,7 +45,55 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
   const [castReceiverAvailable, setCastReceiverAvailable] = useState(false)
   const [castSession, setCastSession] = useState<any>(null)
   const [isConnected, setIsConnected] = useState(false)
-  const contextValueRef = useRef<any>(null)
+  const _contextValueRef = useRef<any>(null)
+
+  const sessionUpdateListener = useCallback((isAlive: boolean) => {
+    if (!isAlive) {
+      setCastSession(null)
+      setIsConnected(false)
+    }
+  }, [])
+
+  const sessionListener = useCallback((session: any) => {
+    log.debug('Cast Session established', session.sessionId)
+    setCastSession(session)
+    setIsConnected(true)
+    session.addUpdateListener(sessionUpdateListener)
+  }, [sessionUpdateListener])
+
+  const receiverListener = useCallback((availability: string) => {
+    // availability: "available" | "unavailable"
+    log.debug('Cast Receiver availability:', availability)
+    const cast = getChromeCast()
+    setCastReceiverAvailable(availability === cast?.ReceiverAvailability?.AVAILABLE)
+  }, [])
+
+  const onInitSuccess = useCallback(() => {
+    log.debug('Cast API initialized')
+  }, [])
+
+  const onError = useCallback((e: any) => {
+    log.warn('Cast API Error', e)
+  }, [])
+
+  const initializeCastApi = useCallback(() => {
+    try {
+      const cast = getChromeCast()
+      if (!cast) return
+
+      const sessionRequest = new cast.SessionRequest(cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID)
+
+      const apiConfig = new cast.ApiConfig(
+        sessionRequest,
+        sessionListener,
+        receiverListener
+      )
+
+      cast.initialize(apiConfig, onInitSuccess, onError)
+    } catch (e) {
+      log.error('Cast initialization error', e)
+    }
+  }, [onError, onInitSuccess, receiverListener, sessionListener])
 
   // Initialize Cast API
   useEffect(() => {
@@ -59,59 +107,11 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
     // Check if API is already loaded
     const cast = getChromeCast()
     if (cast?.isAvailable) {
-        initializeCastApi();
+        initializeCastApi()
     }
-  }, [])
+  }, [initializeCastApi])
 
-  const initializeCastApi = () => {
-    try {
-      const cast = getChromeCast()
-      if (!cast) return
-      
-      const sessionRequest = new cast.SessionRequest(cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID)
-      
-      const apiConfig = new cast.ApiConfig(
-        sessionRequest,
-        sessionListener,
-        receiverListener
-      )
-
-      cast.initialize(apiConfig, onInitSuccess, onError)
-    } catch (e) {
-      log.error('Cast initialization error', e)
-    }
-  }
-
-  const sessionListener = (session: any) => {
-    log.debug('Cast Session established', session.sessionId)
-    setCastSession(session)
-    setIsConnected(true)
-    session.addUpdateListener(sessionUpdateListener)
-  }
-
-  const sessionUpdateListener = (isAlive: boolean) => {
-    if (!isAlive) {
-      setCastSession(null)
-      setIsConnected(false)
-    }
-  }
-
-  const receiverListener = (availability: string) => {
-    // availability: "available" | "unavailable"
-    log.debug('Cast Receiver availability:', availability)
-    const cast = getChromeCast()
-    setCastReceiverAvailable(availability === cast?.ReceiverAvailability?.AVAILABLE)
-  }
-
-  const onInitSuccess = () => {
-    log.debug('Cast API initialized')
-  }
-
-  const onError = (e: any) => {
-    log.warn('Cast API Error', e)
-  }
-
-  const castMedia = useCallback(async (url: string, type: string, title?: string, image?: string, subtitles?: any[]) => {
+  const castMedia = useCallback(async (url: string, type: string, title?: string, image?: string, _subtitles?: any[]) => {
     const cast = getChromeCast()
     if (!cast) {
       toast.error("Cast API not available")
@@ -144,7 +144,7 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
                      resolve(s)
                  }, reject)
              })
-         } catch(e) {
+         } catch(_e) {
              return; // User cancelled or error
          }
     }
@@ -175,7 +175,7 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
         log.error("Cast load media failed", e)
         toast.error("Failed to cast media")
     }
-  }, [castSession])
+  }, [castSession, sessionListener])
 
   const disconnect = useCallback(() => {
       if (castSession) {

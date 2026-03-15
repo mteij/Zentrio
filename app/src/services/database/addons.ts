@@ -1,7 +1,7 @@
 // Addon database operations
+import { logger } from '../logger'
 import { db } from './connection'
 import type { Addon, ProfileAddon } from './types'
-import { logger } from '../logger'
 
 const log = logger.scope('DB:Addons')
 
@@ -26,7 +26,7 @@ export const addonDb = {
         logo_url = excluded.logo_url,
         behavior_hints = excluded.behavior_hints
     `)
-    const result = stmt.run(
+    const _result = stmt.run(
       data.manifest_url,
       data.name,
       data.version || null,
@@ -128,7 +128,7 @@ export const addonDb = {
         if (row.behavior_hints) {
             try {
                 behaviorHints = JSON.parse(row.behavior_hints)
-            } catch (e) {}
+            } catch (_e) {}
         }
         return {
             ...row,

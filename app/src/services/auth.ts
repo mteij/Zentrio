@@ -1,11 +1,11 @@
 import { betterAuth } from "better-auth";
+import { bearer, emailOTP, magicLink, oidcProvider, openAPI, phoneNumber, twoFactor } from "better-auth/plugins";
 import { Database } from "bun:sqlite";
-import { twoFactor, magicLink, emailOTP, openAPI, oidcProvider, bearer, phoneNumber } from "better-auth/plugins";
-import { getConfig } from "./envParser";
-import { join, isAbsolute, dirname } from "path";
-import { mkdirSync, existsSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
+import { dirname, isAbsolute, join } from "path";
 import { emailService } from "./email";
-import { logger } from './logger'
+import { getConfig } from "./envParser";
+import { logger } from './logger';
 
 const log = logger.scope('Auth')
 
@@ -64,14 +64,14 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
         requireEmailVerification: true,
-        async sendResetPassword({ user, url, token }: any, request: any) {
+        async sendResetPassword({ user, url, _token }: any, _request: any) {
             await emailService.sendResetPasswordEmail(user.email, url);
         },
     },
     emailVerification: {
         sendOnSignUp: true,
         autoSignInAfterVerification: true,
-        async sendVerificationEmail({ user, url, token }: any, request: any) {
+        async sendVerificationEmail({ user, url, _token }: any, _request: any) {
             // Send verification email for email change flow
             await emailService.sendVerificationEmail(user.email, url);
         },
@@ -108,7 +108,7 @@ export const auth = betterAuth({
             issuer: "Zentrio",
         }),
         magicLink({
-            sendMagicLink: async ({ email, token, url }, request) => {
+            sendMagicLink: async ({ email, token, url }, _request) => {
                 let magicLinkUrl = url;
                 // Check if the callback URL is for Tauri (zentrio://)
                 // The url is typically: baseURL + /magic-link/verify?token=...&callbackURL=...
@@ -121,7 +121,7 @@ export const auth = betterAuth({
             }
         }),
         emailOTP({
-            async sendVerificationOTP({ email, otp, type }) {
+            async sendVerificationOTP({ email, otp, _type }) {
                 await emailService.sendOTP(email, otp);
             },
         }),

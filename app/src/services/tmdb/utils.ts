@@ -191,7 +191,7 @@ export const Utils = {
     try {
       const decoded = decompressFromEncodedURIComponent(catalogChoices)
       config = JSON.parse(decoded)
-    } catch (e) {
+    } catch (_e) {
       try {
         config = JSON.parse(catalogChoices)
       } catch {
@@ -203,7 +203,7 @@ export const Utils = {
     return config
   },
 
-  async parseMediaImage(type: string, id: string, imagePath: string | null, language: string, rpdbkey?: string, mediaType: string = "poster", rpdbMediaTypes: any = null) {
+  async parseMediaImage(type: string, id: string, imagePath: string | null, language: string, rpdbkey?: string, mediaType: string = "poster", _rpdbMediaTypes: any = null) {
     const tmdbSize = mediaType === "backdrop" || mediaType === "logo" ? "original" : "w500"
     const tmdbImage = imagePath ? `https://image.tmdb.org/t/p/${tmdbSize}${imagePath}` : null
     return tmdbImage

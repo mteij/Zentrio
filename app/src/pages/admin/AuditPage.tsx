@@ -16,16 +16,20 @@ function formatDate(iso: string) {
 
 function JsonBlock({ json }: { json: string | null | undefined }) {
   if (!json) return <span className="text-zinc-600 italic">—</span>
+  let formatted: string | null = null
   try {
-    const parsed = JSON.parse(json)
+    formatted = JSON.stringify(JSON.parse(json), null, 2)
+  } catch {
+    // invalid JSON, render as-is
+  }
+  if (formatted !== null) {
     return (
       <pre className="text-xs text-emerald-400 font-mono whitespace-pre-wrap break-all bg-black/30 rounded p-2 mt-1">
-        {JSON.stringify(parsed, null, 2)}
+        {formatted}
       </pre>
     )
-  } catch {
-    return <span className="text-xs text-zinc-400 font-mono">{json}</span>
   }
+  return <span className="text-xs text-zinc-400 font-mono">{json}</span>
 }
 
 function AuditRow({ entry }: { entry: AdminAuditEntry }) {

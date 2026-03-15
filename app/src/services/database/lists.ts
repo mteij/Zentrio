@@ -1,8 +1,8 @@
 // List database operations
-import { db } from './connection'
 import { randomBytes } from 'crypto'
-import type { List, ListItem, ListShare, ProfileSharedList, ProfileListShare, Profile } from './types'
 import { logger } from '../logger'
+import { db } from './connection'
+import type { List, ListItem, ListShare, Profile, ProfileListShare } from './types'
 
 const log = logger.scope('DB:Lists')
 

@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Button, InputDialog, ConfirmDialog } from '../index'
-import styles from '../../styles/Settings.module.css'
-import { useAuthStore } from '../../stores/authStore'
 import { apiFetch } from '../../lib/apiFetch'
+import { useAuthStore } from '../../stores/authStore'
+import styles from '../../styles/Settings.module.css'
 import { createLogger } from '../../utils/client-logger'
+import { Button, ConfirmDialog, InputDialog } from '../index'
 
 const log = createLogger('DangerZone')
 
 export function DangerZoneSettings() {
   const [showTypeDelete, setShowTypeDelete] = useState(false)
   const [showFinalConfirm, setShowFinalConfirm] = useState(false)
-  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [_deleteConfirmation, setDeleteConfirmation] = useState('')
 
   const handleDeleteRequest = () => {
     setShowTypeDelete(true)

@@ -296,7 +296,7 @@ export class AudioStreamTranscoder extends EventTarget {
       // Try to delete output file first if it exists (avoid conflicts)
       try {
         await this.ffmpeg.deleteFile(outputFilename)
-      } catch (e) {
+      } catch (_e) {
         // File doesn't exist, that's fine
       }
 
@@ -318,7 +318,6 @@ export class AudioStreamTranscoder extends EventTarget {
       log.debug('Source URL:', this.sourceUrl)
       
       // Setup custom error handler
-      let ffmpegError: any = null
       let ffmpegOutput = ''
       
       const logHandler = ({ message }: { message: string }) => {
@@ -343,9 +342,8 @@ export class AudioStreamTranscoder extends EventTarget {
           for (const key of Object.keys(execError)) {
             log.error(`Exec error.${key}:`, (execError as any)[key])
           }
-        } catch (e) {}
+        } catch (_e) {}
         
-        ffmpegError = execError
         throw execError
       } finally {
         // Remove log handler
@@ -405,7 +403,7 @@ export class AudioStreamTranscoder extends EventTarget {
         try {
           const errorStr = String(error)
           log.error('Error string:', errorStr)
-        } catch (e) {}
+        } catch (_e) {}
         
         try {
           const keys = Object.keys(error)
@@ -414,10 +412,10 @@ export class AudioStreamTranscoder extends EventTarget {
             for (const key of keys) {
               try {
                 log.error(`Error.${key}:`, (error as any)[key])
-              } catch (e) {}
+              } catch (_e) {}
             }
           }
-        } catch (e) {}
+        } catch (_e) {}
       }
       
       // Cleanup files on error - use a more aggressive cleanup

@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Puzzle, Settings, Trash2, X, Share2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react'
+import { ChevronDown, ChevronUp, Puzzle, Settings, Share2, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Button, Input, Toggle } from '../index'
-import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 import { isTauri } from '../../lib/auth-client'
+import styles from '../../styles/Settings.module.css'
 import { createLogger } from '../../utils/client-logger'
+import { Button, Input, Toggle } from '../index'
 
 const log = createLogger('AddonManagerUI')
 
@@ -29,7 +29,6 @@ const AddonConfigModal = ({
     onClose,
     profileId,
     replaceAddonId,
-    replacePosition,
     onSuccess
 }: {
     isOpen: boolean

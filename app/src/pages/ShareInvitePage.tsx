@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Check, X, Library, LogIn, UserPlus, Loader2 } from 'lucide-react'
 import { Layout } from '../components'
@@ -36,13 +36,7 @@ export function ShareInvitePage() {
   const [error, setError] = useState('')
   const [processing, setProcessing] = useState(false)
 
-  useEffect(() => {
-    if (token) {
-      loadShareInfo()
-    }
-  }, [token])
-
-  const loadShareInfo = async () => {
+  const loadShareInfo = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/lists/share/${token}`)
       if (res.ok) {
@@ -58,7 +52,13 @@ export function ShareInvitePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
+
+  useEffect(() => {
+    if (token) {
+      loadShareInfo()
+    }
+  }, [loadShareInfo, token])
 
   const handleAccept = async () => {
     if (!isAuthenticated) {
@@ -248,7 +248,7 @@ export function ShareInvitePage() {
           </div>
 
           <h1 style={{ margin: '0 0 8px', fontSize: '1.75rem', fontWeight: '700' }}>
-            You've been invited!
+            You&apos;ve been invited!
           </h1>
           
           <p style={{ color: '#999', marginBottom: '24px' }}>
@@ -264,7 +264,7 @@ export function ShareInvitePage() {
             marginBottom: '24px'
           }}>
             <h2 style={{ margin: '0 0 8px', fontSize: '1.25rem', color: '#e50914' }}>
-              "{shareInfo.list?.name || 'Unknown List'}"
+              &quot;{shareInfo.list?.name || 'Unknown List'}&quot;
             </h2>
             <p style={{ margin: '0 0 12px', color: '#888', fontSize: '0.9rem' }}>
               {shareInfo.itemCount} {shareInfo.itemCount === 1 ? 'item' : 'items'}

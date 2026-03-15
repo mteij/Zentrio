@@ -1,39 +1,80 @@
-import { listDb, userDb, profileDb, watchHistoryDb, type User, type ListShare } from '../../services/database'
-import { sessionMiddleware } from '../../middleware/session'
+import { optionalSessionMiddleware, sessionMiddleware } from '../../middleware/session'
+import { listDb, profileDb, userDb, watchHistoryDb, type User } from '../../services/database'
 import { emailService } from '../../services/email'
 import { getConfig } from '../../services/envParser'
-import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
 const log = logger.scope('API:Lists')
 
 const lists = createTaggedOpenAPIApp<{
   Variables: {
     user: User
+    guestMode: boolean
+    session: any
   }
 }>('Lists')
+
+// All list endpoints require at minimum an optional session (guest or authenticated).
+lists.use('/*', optionalSessionMiddleware)
+
+// Resolve the effective user (guest or authenticated) from context.
+function getEffectiveUser(c: any) {
+  const isGuestMode = c.get('guestMode') as boolean
+  return isGuestMode ? userDb.getOrCreateGuestUser() : (c.get('user') as User | null)
+}
+
+// Verify the effective user owns the given profile ID.
+// Returns the profile on success, or null if not found / not owned.
+function verifyProfileOwnership(c: any, profileId: number) {
+  const user = getEffectiveUser(c)
+  if (!user) return null
+  const profile = profileDb.findById(profileId)
+  if (!profile || profile.user_id !== user.id) return null
+  return profile
+}
+
+// Verify the effective user owns the list (via profile ownership).
+function verifyListOwnership(c: any, listId: number) {
+  const list = listDb.getById(listId)
+  if (!list) return null
+  if (!verifyProfileOwnership(c, list.profile_id)) return null
+  return list
+}
 
 // Get all lists for a profile
 lists.get('/', async (c) => {
   const { profileId } = c.req.query()
-  const allLists = listDb.getAll(parseInt(profileId))
+  const pId = parseInt(profileId)
+  if (!verifyProfileOwnership(c, pId)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+  const allLists = listDb.getAll(pId)
   return c.json({ lists: allLists })
 })
 
 // Get default list for profile
 lists.get('/default', async (c) => {
   const { profileId } = c.req.query()
-  const list = listDb.getDefault(parseInt(profileId))
+  const pId = parseInt(profileId)
+  if (!verifyProfileOwnership(c, pId)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+  const list = listDb.getDefault(pId)
   return c.json({ list })
 })
 
 // Create a new list
 lists.post('/', async (c) => {
   const { profileId, name, isDefault } = await c.req.json()
+  const pId = parseInt(profileId)
+  if (!verifyProfileOwnership(c, pId)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
   try {
-    const newList = listDb.create(parseInt(profileId), name, isDefault)
+    const newList = listDb.create(pId, name, isDefault)
     return c.json({ list: newList })
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Failed to create list' }, 500)
   }
 })
@@ -42,10 +83,19 @@ lists.post('/', async (c) => {
 lists.put('/:id/default', async (c) => {
   const listId = parseInt(c.req.param('id'))
   const { profileId } = await c.req.json()
+  const pId = parseInt(profileId)
+  if (!verifyProfileOwnership(c, pId)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+  // Also verify the list belongs to this profile
+  const list = listDb.getById(listId)
+  if (!list || list.profile_id !== pId) {
+    return c.json({ error: 'List not found' }, 404)
+  }
   try {
-    listDb.setDefault(parseInt(profileId), listId)
+    listDb.setDefault(pId, listId)
     return c.json({ success: true })
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Failed to set default list' }, 500)
   }
 })
@@ -53,10 +103,13 @@ lists.put('/:id/default', async (c) => {
 // Delete a list (owner only)
 lists.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'))
+  if (!verifyListOwnership(c, id)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
   try {
     listDb.delete(id)
     return c.json({ success: true })
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Failed to delete list' }, 500)
   }
 })
@@ -77,7 +130,7 @@ lists.get('/:id/items', async (c) => {
         }
     })
     
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const ids = Array.from(distinctIds)
     const statusMap = watchHistoryDb.getBatchStatus(parseInt(profileId), ids)
     
@@ -105,11 +158,14 @@ lists.get('/:id/items', async (c) => {
 // Add item to list
 lists.post('/:id/items', async (c) => {
   const listId = parseInt(c.req.param('id'))
+  if (!verifyListOwnership(c, listId)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
   const { metaId, type, title, poster, imdbRating } = await c.req.json()
   try {
     listDb.addItem({ list_id: listId, meta_id: metaId, type, title, poster, imdb_rating: imdbRating })
     return c.json({ success: true })
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Failed to add item' }, 500)
   }
 })
@@ -117,11 +173,14 @@ lists.post('/:id/items', async (c) => {
 // Remove item from list
 lists.delete('/:id/items/:metaId', async (c) => {
   const listId = parseInt(c.req.param('id'))
+  if (!verifyListOwnership(c, listId)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
   const metaId = c.req.param('metaId')
   try {
     listDb.removeItem(listId, metaId)
     return c.json({ success: true })
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Failed to remove item' }, 500)
   }
 })
@@ -130,7 +189,11 @@ lists.delete('/:id/items/:metaId', async (c) => {
 lists.get('/check/:metaId', async (c) => {
   const metaId = c.req.param('metaId')
   const { profileId } = c.req.query()
-  const listIds = listDb.getListsForItem(parseInt(profileId), metaId)
+  const pId = parseInt(profileId)
+  if (!verifyProfileOwnership(c, pId)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+  const listIds = listDb.getListsForItem(pId, metaId)
   return c.json({ listIds })
 })
 

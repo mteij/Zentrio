@@ -450,7 +450,7 @@ export class StreamingAudioTranscoder extends EventTarget {
              break
          }
          
-         const diffStart = start - targetTime
+         const _diffStart = start - targetTime
          
          if (Math.abs(start - targetTime) < Math.abs(closestRange.diff)) {
             closestRange = { start, end, diff: start - targetTime }
@@ -631,7 +631,7 @@ export class StreamingAudioTranscoder extends EventTarget {
     let receivedLength = 0
 
     // Read chunks
-    while (true) {
+    for (;;) {
       const { done, value } = await reader.read()
       if (done) break
 
@@ -742,7 +742,7 @@ export class StreamingAudioTranscoder extends EventTarget {
                      break // Found our range
                  }
              }
-         } catch(e) { 
+         } catch(_e) { 
              // Ignore errors (SourceBuffer might be invalid temporarily)
          }
       }
@@ -1003,7 +1003,7 @@ export class StreamingAudioTranscoder extends EventTarget {
    * For the first chunk, we need to generate a proper fMP4 init segment
    * For subsequent chunks, we generate continuation segments
    */
-  private async transcodeChunk(data: Uint8Array, chunkIndex: number, isFirst: boolean): Promise<void> {
+  private async transcodeChunk(data: Uint8Array, chunkIndex: number, _isFirst: boolean): Promise<void> {
     if (!this.ffmpeg) return
 
     // Clean up FS before each transcode to prevent memory issues

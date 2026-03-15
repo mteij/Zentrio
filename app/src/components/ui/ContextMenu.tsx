@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { vibrate } from '@tauri-apps/plugin-haptics'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface ContextMenuItem {
   label: string
@@ -131,7 +131,7 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
         vibrate(50).catch(() => {
           if (navigator.vibrate) navigator.vibrate(50)
         })
-      } catch (err) {
+      } catch (_err) {
         if (navigator.vibrate) navigator.vibrate(50)
       }
       isLongPressActive.current = true

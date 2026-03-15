@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { ArrowLeft, Check, Download, Filter, Search, Settings, Star, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Search, Filter, ArrowLeft, Download, Star, Settings, Trash2, Check, X } from 'lucide-react'
-import { SimpleLayout, Button, LoadingSpinner, AnimatedBackground, SkeletonAddonCard } from '../components'
+import { AnimatedBackground, Button, LoadingSpinner, SimpleLayout, SkeletonAddonCard } from '../components'
+import { apiFetch } from '../lib/apiFetch'
 import styles from '../styles/Addons.module.css'
 import settingsStyles from '../styles/Settings.module.css'
-import { apiFetch } from '../lib/apiFetch'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('ExploreAddons')
@@ -205,7 +205,7 @@ export function ExploreAddonsPage() {
   const [addons, setAddons] = useState<Addon[]>([])
   const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [_error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [activeProfileId, setActiveProfileId] = useState<string>('')

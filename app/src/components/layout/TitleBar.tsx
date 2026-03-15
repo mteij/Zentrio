@@ -1,9 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '../../lib/apiFetch';
-import { getServerUrl } from '../../lib/auth-client';
-import { useAuthStore } from '../../stores/authStore';
-import { createLogger } from '../../utils/client-logger'
+import { createLogger } from '../../utils/client-logger';
 
 const log = createLogger('TitleBar')
 
@@ -24,12 +21,12 @@ const getDesktopPlatform = (): 'macos' | 'windows' | 'linux' => {
 };
 
 export function TitleBar() {
-  const [isVisible, setIsVisible] = useState(() => isTauri());
+  const [isVisible, _setIsVisible] = useState(() => isTauri());
   const [isMaximized, setIsMaximized] = useState(false);
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [platform] = useState(getDesktopPlatform);
   const initialized = useRef(false);
-  const navigate = useNavigate();
+  const _navigate = useNavigate();
   
   // Detect mobile platform (Android/iOS) to hide titlebar
   useEffect(() => {
@@ -92,7 +89,7 @@ export function TitleBar() {
         const updateMaximizedState = async () => {
           try {
             setIsMaximized(await appWindow.isMaximized());
-          } catch (e) {}
+          } catch (_e) {}
         };
         updateMaximizedState();
 

@@ -11,7 +11,7 @@ export async function getLanguages(tmdbClient: TMDBClient) {
     tmdbClient.languages(),
   ])
   return primaryTranslations.map((element: string) => {
-    const [language, country] = element.split("-")
+    const [language, _country] = element.split("-")
     const findLanguage = languages.find((obj: any) => obj.iso_639_1 === language)
     return { iso_639_1: element, name: findLanguage?.english_name || element }
   })

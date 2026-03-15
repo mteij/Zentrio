@@ -55,11 +55,10 @@ export function Layout({
             set('--bg-card', t.background.tertiary);
           }
         }
-      } catch (e) {}
+      } catch (_e) {}
     }
   }, [disableThemeSync]);
 
-  const jsKey = additionalJS.join(',');
   useEffect(() => {
     // Handle additional JS
     const scripts: HTMLScriptElement[] = []
@@ -77,7 +76,7 @@ export function Layout({
             }
         })
     }
-  }, [jsKey]);
+  }, [additionalJS]);
 
 
   return (
@@ -136,7 +135,7 @@ export function SimpleLayout({ title, children, className = '', disableThemeSync
             set('--bg-card', t.background.tertiary);
           }
         }
-      } catch (e) {}
+      } catch (_e) {}
     }
   }, [disableThemeSync]);
 

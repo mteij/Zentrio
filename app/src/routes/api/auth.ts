@@ -1,11 +1,11 @@
+import { randomBytes } from 'crypto'
 import { z } from 'zod'
 import { auth } from '../../services/auth'
 import { userDb } from '../../services/database'
-import { validate, schemas } from '../../utils/api'
 import { getConfig } from '../../services/envParser'
-import { randomBytes } from 'crypto'
-import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
+import { schemas, validate } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
 const log = logger.scope('API:Auth')
 
@@ -322,7 +322,7 @@ app.post('/mobile-callback', async (c) => {
                 user: session.user,
                 token: sessionToken
             })
-        } catch (e: any) {
+        } catch (_e: any) {
             return c.json({ error: 'Session validation failed' }, 401)
         }
     }
@@ -357,7 +357,7 @@ app.post('/mobile-callback', async (c) => {
             }
             
             // Force Secure and SameSite=None for Android WebView cross-origin support
-            const isSecure = true 
+            const _isSecure = true 
             const cookieName = "better-auth.session_token"
             const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=None; Secure`
             
@@ -474,7 +474,7 @@ app.get('/link-proxy', async (c) => {
                 if (session && session.user) {
                     // Set the session cookie so the OAuth flow works
                     // Force Secure and SameSite=None for Android WebView cross-origin support
-                    const isSecure = true
+                    const _isSecure = true
                     const cookieName = "better-auth.session_token"
                     const cookieValue = `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=None; Secure`
                     c.header('Set-Cookie', cookieValue)
@@ -784,7 +784,7 @@ app.all("*", (c) => {
                 const newReq = new Request(newUrl.toString(), c.req.raw);
                 return auth.handler(newReq);
             }
-        } catch (e) {
+        } catch (_e) {
             // Fall back
         }
     }

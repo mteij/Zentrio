@@ -1,6 +1,5 @@
-import { db, profileDb, settingsProfileDb, addonDb, streamDb, appearanceDb, watchHistoryDb, listDb } from './database';
-import { getConfig } from './envParser';
-import { logger } from './logger'
+import { db } from './database';
+import { logger } from './logger';
 
 const log = logger.scope('Sync')
 
@@ -179,7 +178,7 @@ export class SyncService {
     
     // Let's just clear dirty for now.
     const tables = ['profiles', 'settings_profiles', 'profile_addons', 'stream_settings', 'appearance_settings', 'watch_history', 'lists', 'list_items'];
-    for (const table of tables) {
+    for (const _table of tables) {
         // We should only clear dirty for the items we sent.
         // But we don't have the list of IDs easily accessible here without re-querying or passing it.
         // Let's assume we can just clear all dirty flags for now (optimistic).
@@ -249,7 +248,7 @@ export class SyncService {
         db.prepare(`UPDATE ${table} SET ${sets}, dirty = FALSE WHERE id = ?`).run(...vals);
     };
     
-    const remove = (id: number) => {
+    const _remove = (_id: number) => {
         // Hard delete or soft delete?
         // If remote says deleted, we should probably hard delete locally or soft delete.
         // Let's soft delete to be safe, or hard delete if we want to clean up.

@@ -47,23 +47,24 @@ function formatUptime(seconds: number) {
   return parts.length > 0 ? parts.join(' ') : '< 1m'
 }
 
+// Simulated server logs for illustration since no real endpoint exists yet.
+// Defined at module level to avoid calling Date.now() during render.
+const now = Date.now()
+const MOCK_LOGS = [
+  { time: new Date(now - 12000).toISOString(), level: 'INFO', msg: 'Started background task runner' },
+  { time: new Date(now - 45000).toISOString(), level: 'WARN', msg: 'High memory usage detected on main thread' },
+  { time: new Date(now - 86000).toISOString(), level: 'INFO', msg: 'Addon manager synchronized successfully' },
+  { time: new Date(now - 145000).toISOString(), level: 'INFO', msg: 'User profile defaults updated' },
+  { time: new Date(now - 320000).toISOString(), level: 'ERROR', msg: 'Failed to retrieve metadata for tmdb:12345' },
+  { time: new Date(now - 410000).toISOString(), level: 'INFO', msg: 'Database connection established securely' },
+]
+
 export function SystemPage() {
   const { data: health, isLoading, error } = useQuery<AdminSystemHealth>({
     queryKey: ['admin-system-health'],
     queryFn: () => adminApi.getSystemHealth(),
     refetchInterval: 15_000, // Refresh every 15s instead of 30s for more "live" feel
   })
-
-  // Simulated server logs for illustration since no real endpoint exists yet. 
-  // In a real application, we'd fetch actual tailing logs from the server.
-  const logs = [
-    { time: new Date(Date.now() - 12000).toISOString(), level: 'INFO', msg: 'Started background task runner' },
-    { time: new Date(Date.now() - 45000).toISOString(), level: 'WARN', msg: 'High memory usage detected on main thread' },
-    { time: new Date(Date.now() - 86000).toISOString(), level: 'INFO', msg: 'Addon manager synchronized successfully' },
-    { time: new Date(Date.now() - 145000).toISOString(), level: 'INFO', msg: 'User profile defaults updated' },
-    { time: new Date(Date.now() - 320000).toISOString(), level: 'ERROR', msg: 'Failed to retrieve metadata for tmdb:12345' },
-    { time: new Date(Date.now() - 410000).toISOString(), level: 'INFO', msg: 'Database connection established securely' },
-  ]
 
   return (
     <div className="space-y-6">
@@ -118,7 +119,7 @@ export function SystemPage() {
           </span>
         </div>
         <div className="flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed space-y-1 bg-[#1a1b1e]">
-          {logs.map((log, i) => {
+          {MOCK_LOGS.map((log, i) => {
              const isError = log.level === 'ERROR'
              const isWarn = log.level === 'WARN'
              return (

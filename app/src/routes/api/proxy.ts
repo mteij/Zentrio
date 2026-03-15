@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { auth } from '../../services/auth'
 import { logger } from '../../services/logger'
 
 const log = logger.scope('AddonProxy')
@@ -7,14 +8,21 @@ const proxy = new Hono()
 const PRIVATE_IP_PATTERNS = [
   /^localhost$/i,
   /^127\./,
-  /^0\.0\.0\.0$/,
+  // 0.0.0.0/8 — on Linux, 0.x.x.x routes to loopback
+  /^0\./,
   /^::1$/,
   /^10\./,
   /^172\.(1[6-9]|2\d|3[01])\./,
   /^192\.168\./,
+  // Link-local (includes cloud metadata 169.254.169.254)
   /^169\.254\./,
+  // IPv6 unique-local and link-local
   /^fc00:/i,
   /^fe80:/i,
+  // IPv6-mapped IPv4 loopback/private (::ffff:127.x, ::ffff:10.x, etc.)
+  /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|0\.)/i,
+  // IPv6 loopback written as mapped
+  /^0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}:ffff:7f/i,
 ]
 
 function isAllowedUrl(urlStr: string): boolean {
@@ -22,7 +30,14 @@ function isAllowedUrl(urlStr: string): boolean {
     const parsed = new URL(urlStr)
     if (!['https:', 'http:'].includes(parsed.protocol)) return false
     const host = parsed.hostname
+    // Reject empty or obviously non-public hosts
+    if (!host || host === '') return false
     if (PRIVATE_IP_PATTERNS.some(p => p.test(host))) return false
+    // Reject bare numeric IPs that look like decimal-encoded addresses
+    // (e.g. 2130706433 == 127.0.0.1). URL.hostname normalises these on
+    // some runtimes, so the regex above already catches them, but an extra
+    // guard doesn't hurt.
+    if (/^\d+$/.test(host)) return false
     return true
   } catch {
     return false
@@ -33,7 +48,13 @@ function isAllowedUrl(urlStr: string): boolean {
 // Temporary hosted compatibility bridge so web browsers can reach external
 // addon URLs when direct fetch is blocked by CORS. Tauri apps bypass this
 // entirely via @tauri-apps/plugin-http.
+// Requires an authenticated session to prevent the server from being used
+// as an open proxy by unauthenticated third parties.
 proxy.get('/', async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+  if (!session?.user) {
+    return c.json({ error: 'Authentication required' }, 401)
+  }
   const targetUrl = c.req.query('url')
   if (!targetUrl) return c.json({ error: 'Missing url parameter' }, 400)
 

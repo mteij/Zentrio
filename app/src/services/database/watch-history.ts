@@ -206,7 +206,7 @@ export const watchHistoryDb = {
     const placeHolders = metaIds.map(() => '?').join(',')
     const stmt = db.prepare(`SELECT * FROM watch_history WHERE profile_id = ? AND meta_id IN (${placeHolders}) AND deleted_at IS NULL`)
     
-    // @ts-ignore
+    // @ts-ignore: runtime typing gap
     const rows = stmt.all(profileId, ...metaIds) as WatchHistoryItem[]
     const result: Record<string, { isWatched: boolean, progress: number, duration: number, lastStream?: any }> = {}
     
@@ -225,7 +225,7 @@ export const watchHistoryDb = {
             if (row.last_stream) {
                  try {
                     result[row.meta_id].lastStream = JSON.parse(row.last_stream)
-                 } catch (e) {}
+                 } catch (_e) {}
             }
         } else {
              // For Series: Find the most recently updated "In Progress" episode
@@ -242,7 +242,7 @@ export const watchHistoryDb = {
                  if (currentRowDate > existingLastDate) {
                      (result[row.meta_id] as any)._lastUpdate = currentRowDate;
                      result[row.meta_id].progress = progressPercent;
-                     // @ts-ignore
+                     // @ts-ignore: runtime typing gap
                      result[row.meta_id].episodeDisplay = `S${row.season}:E${row.episode}`;
                      result[row.meta_id].lastStream = row.last_stream ? JSON.parse(row.last_stream) : undefined;
                  }

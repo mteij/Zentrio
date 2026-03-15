@@ -7,20 +7,20 @@
  * Handles Annex-B to AVCC conversion for compatibility.
  */
 
-import type { VideoPacket, CodecInfo, VideoRemuxerConfig } from './types'
 import { createLogger } from '../../utils/client-logger'
+import type { CodecInfo, VideoPacket, VideoRemuxerConfig } from './types'
 
 const log = createLogger('VideoRemuxer')
 
 // NAL unit type constants
 const NAL_TYPE_SPS = 7
 const NAL_TYPE_PPS = 8
-const NAL_TYPE_IDR = 5
-const NAL_TYPE_SLICE = 1
+const _NAL_TYPE_IDR = 5
+const _NAL_TYPE_SLICE = 1
 
 // Start code patterns
-const START_CODE_3 = new Uint8Array([0x00, 0x00, 0x01])
-const START_CODE_4 = new Uint8Array([0x00, 0x00, 0x00, 0x01])
+const _START_CODE_3 = new Uint8Array([0x00, 0x00, 0x01])
+const _START_CODE_4 = new Uint8Array([0x00, 0x00, 0x00, 0x01])
 
 interface NALUnit {
   type: number
@@ -844,7 +844,7 @@ export class VideoRemuxer extends EventTarget {
     // Calculate new size
     let newSize = 0
     let offset = 0
-    const nalCount = 0
+    const _nalCount = 0
     
     // First pass to calculate size
     while (offset < data.length) {
@@ -1018,7 +1018,7 @@ export class VideoRemuxer extends EventTarget {
   /**
    * Parse SPS for video dimensions
    */
-  private parseSPS(sps: Uint8Array): { width: number; height: number } {
+  private parseSPS(_sps: Uint8Array): { width: number; height: number } {
     // Simplified SPS parsing - extract width/height
     // For a proper implementation, use a full H.264 bitstream parser
     
@@ -1197,7 +1197,7 @@ export class VideoRemuxer extends EventTarget {
         if (this.mediaSource?.readyState === 'open') {
           this.mediaSource.removeSourceBuffer(this.sourceBuffer)
         }
-      } catch (e) {
+      } catch (_e) {
         // Ignore errors during cleanup
       }
       this.sourceBuffer = null
@@ -1207,7 +1207,7 @@ export class VideoRemuxer extends EventTarget {
       if (this.mediaSource.readyState === 'open') {
         try {
           this.mediaSource.endOfStream()
-        } catch (e) {
+        } catch (_e) {
           // Ignore
         }
       }

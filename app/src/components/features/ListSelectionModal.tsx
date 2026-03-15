@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Plus, Check, Film, Tv, List as ListIcon, Sparkles, FolderPlus } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Modal } from '../ui/Modal'
-import { Button } from '../ui/Button'
-import { Input } from '../ui/Input'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Film, FolderPlus, Plus, Sparkles, Tv } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../../lib/apiFetch'
 import { MetaPreview } from '../../services/addons/types'
 import { createLogger } from '../../utils/client-logger'
+import { Button } from '../ui/Button'
+import { Input } from '../ui/Input'
+import { Modal } from '../ui/Modal'
 
 const log = createLogger('ListSelection')
 
@@ -31,14 +31,7 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item, onChange 
   const [newListName, setNewListName] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    if (isOpen) {
-      loadLists()
-      checkInLists()
-    }
-  }, [isOpen, profileId, item.id])
-
-  const loadLists = async () => {
+  const loadLists = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/lists?profileId=${profileId}`)
       if (res.ok) {
@@ -50,9 +43,9 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item, onChange 
     } finally {
       setLoading(false)
     }
-  }
+  }, [profileId])
 
-  const checkInLists = async () => {
+  const checkInLists = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/lists/check/${encodeURIComponent(item.id)}?profileId=${profileId}&t=${Date.now()}`)
       if (res.ok) {
@@ -62,7 +55,14 @@ export function ListSelectionModal({ isOpen, onClose, profileId, item, onChange 
     } catch (e) {
       log.error("Failed to check lists", e)
     }
-  }
+  }, [item.id, profileId])
+
+  useEffect(() => {
+    if (isOpen) {
+      loadLists()
+      checkInLists()
+    }
+  }, [checkInLists, isOpen, loadLists])
 
   const handleToggleList = async (listId: number) => {
     const isSelected = selectedLists.includes(listId)

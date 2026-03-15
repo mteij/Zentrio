@@ -1,6 +1,6 @@
 // User database operations
 import { db } from './connection'
-import type { User, Profile, ProfileProxySettings } from './types'
+import type { Profile, User } from './types'
 
 // Forward declarations to avoid circular imports - these will be resolved at runtime
 let profileDb: any

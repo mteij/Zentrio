@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { Button, InputDialog, ConfirmDialog } from '../index'
 import { apiFetch } from '../../lib/apiFetch'
@@ -39,7 +39,7 @@ export function SettingsProfileSelector({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const loadProfiles = async () => {
+  const loadProfiles = useCallback(async () => {
     try {
       const res = await apiFetch('/api/user/settings-profiles')
       if (res.ok) {
@@ -51,11 +51,11 @@ export function SettingsProfileSelector({
     } catch (e) {
       log.error('Failed to load profiles', e)
     }
-  }
+  }, [onProfilesLoaded])
 
   useEffect(() => {
     loadProfiles()
-  }, [])
+  }, [loadProfiles])
 
   const handleCreateProfile = async (name: string) => {
     try {

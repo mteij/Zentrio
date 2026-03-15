@@ -10,10 +10,10 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
+import { createLogger } from '../../utils/client-logger'
 import { NetworkReader } from './NetworkReader'
 import { StreamingAudioTranscoder } from './StreamingAudioTranscoder'
-import type { HybridEngineConfig, StreamInfo, MediaMetadata, CombinedStreamInfo } from './types'
-import { createLogger } from '../../utils/client-logger'
+import type { CombinedStreamInfo, HybridEngineConfig, MediaMetadata } from './types'
 
 const log = createLogger('HybridEngine')
 
@@ -91,7 +91,6 @@ export class HybridEngine extends EventTarget {
     this.codecInfo.clear()
 
     const streams = this.metadata.streams || []
-    let hasVideo = false
     let hasAudio = false
 
     // Browser-supported audio codecs
@@ -101,7 +100,6 @@ export class HybridEngine extends EventTarget {
 
     for (const stream of streams) {
       if (stream.codec_type === 'video' && stream.index !== undefined) {
-        hasVideo = true
         const codecName = (stream.codec_name || '').toLowerCase()
         const needsTranscode = !supportedVideoCodecs.includes(codecName)
         this.codecInfo.set(stream.index, {
@@ -632,7 +630,7 @@ export class HybridEngine extends EventTarget {
         resolve()
       }
       
-      const handleError = (e: Event) => {
+      const handleError = (_e: Event) => {
         this.videoElement!.removeEventListener('loadedmetadata', handleLoadedMetadata)
         this.videoElement!.removeEventListener('error', handleError)
         reject(new Error('Failed to load WebM video'))
@@ -780,7 +778,7 @@ export class HybridEngine extends EventTarget {
       const chunks: Uint8Array[] = []
       let receivedLength = 0
 
-      while (true) {
+      for (;;) {
         const { done, value } = await reader.read()
         if (done) break
 
@@ -1275,7 +1273,7 @@ export class HybridEngine extends EventTarget {
           })
         }
         this.mediaSource.removeSourceBuffer(this.videoSourceBuffer)
-      } catch (e) {
+      } catch (_e) {
         // Ignore
       }
       this.videoSourceBuffer = null
@@ -1285,7 +1283,7 @@ export class HybridEngine extends EventTarget {
       if (this.mediaSource.readyState === 'open') {
         try {
           this.mediaSource.endOfStream()
-        } catch (e) {
+        } catch (_e) {
           // Ignore
         }
       }
@@ -1303,7 +1301,7 @@ export class HybridEngine extends EventTarget {
     if (this.ffmpeg) {
       try {
         await this.ffmpeg.terminate()
-      } catch (e) {
+      } catch (_e) {
         // Ignore
       }
       this.ffmpeg = null

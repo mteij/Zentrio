@@ -29,8 +29,21 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
   const [isEnabled, setIsEnabled] = useState(true)
   const intervalRef = useRef<number | null>(null)
 
+  // Parse timestamp to seconds
+  const parseTimestamp = useCallback((timestamp: string): number => {
+    const parts = timestamp.split(':')
+    if (parts.length === 3) {
+      const [hours, minutes, seconds] = parts
+      return parseFloat(hours) * 3600 + parseFloat(minutes) * 60 + parseFloat(seconds)
+    } else if (parts.length === 2) {
+      const [minutes, seconds] = parts
+      return parseFloat(minutes) * 60 + parseFloat(seconds)
+    }
+    return 0
+  }, [])
+
   // Parse VTT format
-  const parseVTT = (content: string): Subtitle[] => {
+  const parseVTT = useCallback((content: string): Subtitle[] => {
     const subtitles: Subtitle[] = []
     const lines = content.split('\n')
     let i = 0
@@ -74,10 +87,10 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
     }
 
     return subtitles
-  }
+  }, [parseTimestamp])
 
   // Parse SRT format
-  const parseSRT = (content: string): Subtitle[] => {
+  const parseSRT = useCallback((content: string): Subtitle[] => {
     const subtitles: Subtitle[] = []
     const blocks = content.split(/\r?\n\r?\n/)
 
@@ -107,20 +120,7 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
     }
 
     return subtitles
-  }
-
-  // Parse timestamp to seconds
-  const parseTimestamp = (timestamp: string): number => {
-    const parts = timestamp.split(':')
-    if (parts.length === 3) {
-      const [hours, minutes, seconds] = parts
-      return parseFloat(hours) * 3600 + parseFloat(minutes) * 60 + parseFloat(seconds)
-    } else if (parts.length === 2) {
-      const [minutes, seconds] = parts
-      return parseFloat(minutes) * 60 + parseFloat(seconds)
-    }
-    return 0
-  }
+  }, [parseTimestamp])
 
   // Load subtitles from URL
   const loadSubtitles = useCallback(async (url: string, label: string = 'English', language: string = 'en') => {
@@ -156,7 +156,7 @@ export function useSubtitles({ videoRef }: UseSubtitlesProps) {
       log.error('Failed to load subtitles:', error)
       return null
     }
-  }, [])
+  }, [parseSRT, parseVTT])
 
   // Add subtitles manually (for embedded subtitle data)
   const addSubtitleTrack = useCallback((subtitles: Subtitle[], label: string, language: string = 'en') => {

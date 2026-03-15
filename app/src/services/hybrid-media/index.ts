@@ -23,29 +23,19 @@ export function isTauriEnvironment(): boolean {
 
 // Core types
 export type {
-  StreamType,
-  StreamInfo,
-  CodecInfo,
-  VideoPacket,
-  AudioPacket,
-  SeekRequest,
-  EngineState,
-  EngineEvents,
-  NetworkReaderConfig,
-  VideoRemuxerConfig,
-  HybridEngineConfig,
-  KeyframeEntry
+    AudioPacket, CodecInfo, EngineEvents, EngineState, HybridEngineConfig,
+    KeyframeEntry, NetworkReaderConfig, SeekRequest, StreamInfo, StreamType, VideoPacket, VideoRemuxerConfig
 } from './types'
 
 // Core classes
-export { HybridEngine } from './HybridEngine'
-export { NetworkReader } from './NetworkReader'
-export { VideoRemuxer } from './VideoRemuxer'
-export { TranscoderService } from './TranscoderService'
 export { AudioStreamTranscoder } from './AudioStreamTranscoder'
 export { ChunkedAudioTranscoder } from './ChunkedAudioTranscoder'
-export { StreamingAudioTranscoder } from './StreamingAudioTranscoder'
 export { Demuxer } from './Demuxer'
+export { HybridEngine } from './HybridEngine'
+export { NetworkReader } from './NetworkReader'
+export { StreamingAudioTranscoder } from './StreamingAudioTranscoder'
+export { TranscoderService } from './TranscoderService'
+export { VideoRemuxer } from './VideoRemuxer'
 
 /**
  * Quick check if a URL might need hybrid playback
@@ -56,7 +46,7 @@ export { Demuxer } from './Demuxer'
  *
  * IMPORTANT: Always returns false in Tauri environment
  */
-export function mightNeedHybridPlayback(url: string): boolean {
+export function mightNeedHybridPlayback(_url: string): boolean {
   // Hybrid playback is not supported in Tauri - always return false
   if (isTauriEnvironment()) {
     return false

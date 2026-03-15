@@ -1,23 +1,23 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Check } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Button } from '../index'
-import { authClient, getClientUrl } from '../../lib/auth-client'
 import { apiFetch } from '../../lib/apiFetch'
 import { appMode } from '../../lib/app-mode'
+import { authClient, getClientUrl } from '../../lib/auth-client'
+import { Button } from '../index'
 
-import { TwoFactorSetupModal } from '../auth/TwoFactorSetupModal'
-import { ServerConnectionIndicator } from '../auth/ServerConnectionIndicator'
-import { LoginBehaviorSettings } from './LoginBehaviorSettings'
-import { TmdbSettings } from './TmdbSettings'
-import { LinkedAccountsSettings } from './LinkedAccountsSettings'
-import { UsernameModal } from './modals/UsernameModal'
-import { EmailModal } from './modals/EmailModal'
-import { PasswordModal } from './modals/PasswordModal'
-import { UpdateSettings } from './UpdateSettings'
 import styles from '../../styles/Settings.module.css'
 import { createLogger } from '../../utils/client-logger'
+import { ServerConnectionIndicator } from '../auth/ServerConnectionIndicator'
+import { TwoFactorSetupModal } from '../auth/TwoFactorSetupModal'
+import { LinkedAccountsSettings } from './LinkedAccountsSettings'
+import { LoginBehaviorSettings } from './LoginBehaviorSettings'
+import { EmailModal } from './modals/EmailModal'
+import { PasswordModal } from './modals/PasswordModal'
+import { UsernameModal } from './modals/UsernameModal'
+import { TmdbSettings } from './TmdbSettings'
+import { UpdateSettings } from './UpdateSettings'
 
 const log = createLogger('GeneralSettings')
 
@@ -30,10 +30,10 @@ const LINKING_ERROR_MESSAGES: Record<string, string> = {
 }
 
 export function GeneralSettings() {
-  const navigate = useNavigate()
+  const _navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [_loading, setLoading] = useState(true)
   
   // Check if in guest mode
   const isGuestMode = appMode.isGuest()

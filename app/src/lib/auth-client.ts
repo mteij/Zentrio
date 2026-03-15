@@ -1,10 +1,10 @@
 import { createAuthClient } from "better-auth/client";
 import {
-  twoFactorClient,
-  magicLinkClient,
-  emailOTPClient,
+    emailOTPClient,
+    magicLinkClient,
+    twoFactorClient,
 } from "better-auth/client/plugins";
-import { createLogger } from '../utils/client-logger'
+import { createLogger } from '../utils/client-logger';
 
 const log = createLogger('AuthClient')
 
@@ -119,7 +119,7 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
              overrideMethod = typeof methodObj.toString === 'function' && methodObj.toString() !== '[object Object]' 
                 ? methodObj.toString() 
                 : (init?.body ? 'POST' : 'GET');
-         } catch(e) {
+         } catch(_e) {
              overrideMethod = init?.body ? 'POST' : 'GET';
          }
     }

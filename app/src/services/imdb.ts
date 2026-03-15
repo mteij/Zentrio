@@ -1,10 +1,10 @@
 import { Database } from 'bun:sqlite'
-import { existsSync, mkdirSync, createWriteStream, renameSync, unlinkSync, createReadStream } from 'fs'
-import { join, dirname } from 'path'
-import { createGunzip } from 'zlib'
+import { createReadStream, createWriteStream, existsSync, mkdirSync, unlinkSync } from 'fs'
+import { dirname, join } from 'path'
 import { createInterface } from 'readline'
-import { logger } from './logger'
+import { createGunzip } from 'zlib'
 import { getConfig } from './envParser'
+import { logger } from './logger'
 
 // Configuration
 const DB_PATH = join(process.cwd(), 'data', 'imdb', 'ratings.db')
@@ -73,7 +73,7 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
   const reader = response.body.getReader()
 
   try {
-    while (true) {
+    for (;;) {
       const { done, value } = await reader.read()
       if (done) break
       fileStream.write(value)

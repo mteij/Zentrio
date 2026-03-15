@@ -1,15 +1,15 @@
-import { z } from 'zod'
-import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
-import { db, userDb, verifyPassword, profileProxySettingsDb, profileDb, streamDb, settingsProfileDb, type User } from '../../services/database'
-import { auth } from '../../services/auth'
-import { emailService } from '../../services/email'
-import { getConfig } from '../../services/envParser'
 import { createHash, randomBytes } from 'crypto'
-import { encrypt, decrypt } from '../../services/encryption'
-import { ok, err, validate, schemas, getRequestMeta } from '../../utils/api'
-import { createTaggedOpenAPIApp } from './openapi-route'
-import { logger } from '../../services/logger'
+import { z } from 'zod'
+import { optionalSessionMiddleware, sessionMiddleware } from '../../middleware/session'
 import { writeAuditEvent } from '../../services/admin/audit'
+import { auth } from '../../services/auth'
+import { db, profileDb, settingsProfileDb, streamDb, userDb, type User } from '../../services/database'
+import { emailService } from '../../services/email'
+import { decrypt, encrypt } from '../../services/encryption'
+import { getConfig } from '../../services/envParser'
+import { logger } from '../../services/logger'
+import { err, getRequestMeta, ok, schemas, validate } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
 const log = logger.scope('API:User')
 
@@ -229,7 +229,7 @@ app.put('/tmdb-api-key', async (c) => {
     if (freshUser?.tmdbApiKey) {
       try {
         currentKey = decrypt(freshUser.tmdbApiKey)
-      } catch (e) {}
+      } catch (_e) {}
     }
 
     if (currentKey === tmdb_api_key) {
@@ -326,57 +326,71 @@ async function csrfLikeGuard(c: any, next: any) {
     }
   }
 
-  // Reconstruct expected origin honoring reverse proxy headers (TLS termination etc.)
-  const rawUrl = c.req.url
-  const url = new URL(rawUrl)
-  const xfProto =
-    (c.req.header('x-forwarded-proto') ||
-      c.req.header('x-forwarded-scheme') ||
-      url.protocol.replace(':', '')).toLowerCase()
-  const xfHost =
-    (c.req.header('x-forwarded-host') ||
-      c.req.header('host') ||
-      url.host).toLowerCase()
-  const expectedOrigin = `${xfProto}://${xfHost}`
+  // Validate the request Origin/Referer against the server's configured trusted origins.
+  // We do NOT use X-Forwarded-Host or X-Forwarded-Proto here — those are user-controlled
+  // headers that an attacker could forge to make any origin appear trusted.
+  const cfg = getConfig()
+  const trustedOrigins = new Set(
+    [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'https://localhost',
+      'tauri://localhost',
+      'http://tauri.localhost',
+      'https://tauri.localhost',
+      cfg.APP_URL,
+      cfg.CLIENT_URL,
+    ]
+      .filter(Boolean)
+      .map((o) => {
+        try { return new URL(o as string).origin } catch { return null }
+      })
+      .filter(Boolean) as string[]
+  )
 
-  const checkSameHost = (candidate: string): boolean => {
+  const isTrustedOrigin = (candidate: string): boolean => {
     try {
-      const cand = new URL(candidate)
-      const exp = new URL(expectedOrigin)
-      
-      // Allow Tauri WebView origins (tauri://localhost, https://tauri.localhost)
-      if (cand.hostname === 'localhost' && (cand.protocol === 'tauri:' || cand.protocol === 'https:')) {
+      const parsed = new URL(candidate)
+      // Always allow Tauri WebView origins
+      if (parsed.hostname === 'localhost' &&
+          (parsed.protocol === 'tauri:' || parsed.protocol === 'https:')) {
         return true
       }
-
-      // Allow localhost/127.0.0.1 port mismatch for development (Vite proxy vs Hono server)
-      if ((cand.hostname === 'localhost' || cand.hostname === '127.0.0.1') &&
-          (exp.hostname === 'localhost' || exp.hostname === '127.0.0.1')) {
-          return true
+      // Allow any localhost origin in development (Vite proxy vs Hono port mismatch)
+      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+        return true
       }
-
-      // Accept when host matches even if scheme differs (common behind HTTPS-terminating proxy)
-      return cand.host.toLowerCase() === exp.host.toLowerCase()
+      return trustedOrigins.has(parsed.origin)
     } catch {
       return false
     }
   }
 
-  const hdrOrigin = (c.req.header('origin') || '').toLowerCase()
+  const hdrOrigin = (c.req.header('origin') || '').trim()
   if (hdrOrigin) {
-    if (!checkSameHost(hdrOrigin)) {
+    if (!isTrustedOrigin(hdrOrigin)) {
       return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
     }
   } else {
-    const referer = c.req.header('referer') || ''
+    const referer = (c.req.header('referer') || '').trim()
     if (referer) {
-      if (!checkSameHost(referer)) {
+      if (!isTrustedOrigin(referer)) {
         return err(c, 403, 'CSRF_CHECK_FAILED', 'CSRF checks failed')
       }
     }
   }
 
   return next()
+}
+
+// HTML escape helper — prevents XSS when interpolating values into HTML responses
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
 }
 
 // Audit helpers
@@ -523,7 +537,7 @@ app.get('/accounts', async (c) => {
       providerId: a.providerId,
       createdAt: a.createdAt
     })))
-  } catch (e) {
+  } catch (_e) {
     return err(c, 500, 'SERVER_ERROR', 'Unexpected error')
   }
 })
@@ -740,11 +754,14 @@ app.get('/email/verify', async (c) => {
     const cfg = getConfig()
     const redirectUrl = isTauri ? 'tauri://localhost/settings' : `${cfg.CLIENT_URL}/settings`
     
+    const safeEmail = escapeHtml(stored.newEmail)
+    const safeRedirectUrl = escapeHtml(redirectUrl)
     return c.html(`
       <!DOCTYPE html>
       <html>
       <head>
         <title>Email Verified</title>
+        <meta http-equiv="refresh" content="3;url=${safeRedirectUrl}">
         <style>
           body { font-family: system-ui, sans-serif; background: #09090b; color: #e4e4e7; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
           .container { text-align: center; padding: 2rem; }
@@ -757,14 +774,9 @@ app.get('/email/verify', async (c) => {
       <body>
         <div class="container">
           <h1>✓ Email Verified</h1>
-          <p>Your email has been successfully changed to ${stored.newEmail}.</p>
-          <p><a href="${redirectUrl}">Go to Settings</a></p>
+          <p>Your email has been successfully changed to ${safeEmail}.</p>
+          <p><a href="${safeRedirectUrl}">Go to Settings</a></p>
         </div>
-        <script>
-          setTimeout(() => {
-            window.location.href = '${redirectUrl}';
-          }, 3000);
-        </script>
       </body>
       </html>
     `)

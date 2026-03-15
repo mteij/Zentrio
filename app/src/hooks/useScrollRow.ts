@@ -107,40 +107,6 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
       })
     }
   }, [stopMomentum])
-
-
-  const handleMouseUp = useCallback(() => {
-    setIsDown(false)
-    
-    // Start momentum if there's velocity
-    if (Math.abs(velocityRef.current) > 0.5) {
-      const applyMomentum = () => {
-        if (!containerRef.current) return
-        
-        velocityRef.current *= friction
-        containerRef.current.scrollLeft -= velocityRef.current
-        
-        if (Math.abs(velocityRef.current) > 0.5) {
-          rafIdRef.current = requestAnimationFrame(applyMomentum)
-        } else {
-          stopMomentum()
-        }
-      }
-      rafIdRef.current = requestAnimationFrame(applyMomentum)
-    } else {
-      stopMomentum()
-    }
-
-    // Clear dragging flag after a tick (to prevent click)
-    setTimeout(() => {
-      isDraggingRef.current = false
-    }, 0)
-
-    // Remove global listeners
-    document.removeEventListener('mousemove', handleGlobalMouseMove as any)
-    document.removeEventListener('mouseup', handleMouseUp)
-  }, [friction, stopMomentum])
-
   // Define handleGlobalMouseMove outside so it can be referenced in handleMouseDown
   // We use a ref to access the latest state/refs without re-binding
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
@@ -172,6 +138,38 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
       }
     }
   }, [multiplier])
+
+  const handleMouseUp = useCallback(() => {
+    setIsDown(false)
+    
+    // Start momentum if there's velocity
+    if (Math.abs(velocityRef.current) > 0.5) {
+      const applyMomentum = () => {
+        if (!containerRef.current) return
+        
+        velocityRef.current *= friction
+        containerRef.current.scrollLeft -= velocityRef.current
+        
+        if (Math.abs(velocityRef.current) > 0.5) {
+          rafIdRef.current = requestAnimationFrame(applyMomentum)
+        } else {
+          stopMomentum()
+        }
+      }
+      rafIdRef.current = requestAnimationFrame(applyMomentum)
+    } else {
+      stopMomentum()
+    }
+
+    // Clear dragging flag after a tick (to prevent click)
+    setTimeout(() => {
+      isDraggingRef.current = false
+    }, 0)
+
+    // Remove global listeners
+    document.removeEventListener('mousemove', handleGlobalMouseMove as any)
+    document.removeEventListener('mouseup', handleMouseUp)
+  }, [friction, handleGlobalMouseMove, stopMomentum])
 
   // Mouse handlers for drag scrolling
   const handleMouseDown = useCallback((e: React.MouseEvent) => {

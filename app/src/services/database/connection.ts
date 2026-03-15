@@ -1,7 +1,7 @@
 // Database connection and schema initialization
 import { Database } from 'bun:sqlite'
-import { join, dirname, isAbsolute } from 'path'
-import { mkdirSync, existsSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
+import { dirname, isAbsolute, join } from 'path'
 import { getConfig } from '../envParser'
 
 // Initialize SQLite database (honor DATABASE_URL to support Docker volume persistence)

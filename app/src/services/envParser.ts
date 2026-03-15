@@ -82,9 +82,12 @@ export function getConfig() {
   const CLIENT_URL = process.env.CLIENT_URL ?? 'http://localhost:5173'
 
   const ENCRYPTION_KEY = getSecret('ENCRYPTION_KEY', 'super-secret-key-change-in-production')
-  // Rate limit settings (configurable via environment variables)
+  // Rate limit settings (configurable via environment variables).
+  // Default: 500 requests per 15 minutes per IP — sufficient for active users
+  // (browsing, playback progress pings, catalog loads) without enabling abuse.
+  // Lower this via RATE_LIMIT_LIMIT if you want tighter control.
   const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000)
-  const RATE_LIMIT_LIMIT = Number(process.env.RATE_LIMIT_LIMIT ?? 100)
+  const RATE_LIMIT_LIMIT = Number(process.env.RATE_LIMIT_LIMIT ?? 500)
 
   // Logging toggles
   // PROXY_LOGS controls the request logger middleware (Hono logger) that prints "-->" and "<--" lines.
@@ -105,6 +108,11 @@ export function getConfig() {
   const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET
   const OIDC_ISSUER = process.env.OIDC_ISSUER
   const OIDC_DISPLAY_NAME = process.env.OIDC_DISPLAY_NAME || 'OpenID'
+
+  // Health endpoint token — if set, full internal stats (sessions, memory, watched items)
+  // are only returned when the caller sends `Authorization: Bearer <HEALTH_TOKEN>`.
+  // Public stats (user count, addon count) are always returned without a token.
+  const HEALTH_TOKEN = (process.env.HEALTH_TOKEN || '').trim() || null
 
   // Admin security
   const ADMIN_ENABLED = process.env.ADMIN_ENABLED === 'true'
@@ -139,6 +147,7 @@ export function getConfig() {
     OIDC_CLIENT_SECRET,
     OIDC_ISSUER,
     OIDC_DISPLAY_NAME,
+    HEALTH_TOKEN,
     ADMIN_ENABLED,
     ADMIN_SETUP_TOKEN,
     ANALYTICS_ENABLED,

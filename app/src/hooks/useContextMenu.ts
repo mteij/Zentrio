@@ -30,16 +30,16 @@ export function useContextMenu(options?: UseContextMenuOptions) {
     e.stopPropagation() // Stop bubbling
 
     let clientX, clientY
-    // @ts-expect-error
+    // @ts-expect-error: intentional type mismatch
     if (e.touches && e.touches.length > 0) {
-      // @ts-expect-error
+      // @ts-expect-error: intentional type mismatch
       clientX = e.touches[0].clientX
-      // @ts-expect-error
+      // @ts-expect-error: intentional type mismatch
       clientY = e.touches[0].clientY
     } else {
-      // @ts-expect-error
+      // @ts-expect-error: intentional type mismatch
       clientX = e.clientX
-      // @ts-expect-error
+      // @ts-expect-error: intentional type mismatch
       clientY = e.clientY
     }
 

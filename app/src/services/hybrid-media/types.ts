@@ -126,7 +126,7 @@ export interface EngineEvents {
   'streamsdetected': { streams: StreamInfo[] }
   'buffering': { isBuffering: boolean }
   'error': { error: Error }
-  'ended': {}
+  'ended': Record<string, never>
   'audioready': { audioElement: HTMLAudioElement }
   'seeked': { time: number }
   'progress': { progress: number }

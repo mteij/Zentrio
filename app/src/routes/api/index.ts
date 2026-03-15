@@ -13,6 +13,7 @@ import gatewayApiRoutes from './gateway'
 import adminApiRoutes from './admin'
 import { addonProxyRouter } from './proxy'
 import { tmdbProxyRouter } from './tmdb-proxy'
+import pkg from '../../../package.json'
 import { getConfig } from '../../services/envParser'
 import { db } from '../../services/database'
 import {
@@ -59,7 +60,7 @@ app.openapi({
   path: '/health',
   tags: ['System'],
   summary: 'Health Check',
-  description: 'Returns the health status of the API including database connectivity, environment configuration, and usage statistics.',
+  description: 'Returns the health status of the API. Public stats (users, profiles, addons, watched_items) are always included. Internal stats (active_sessions, uptime, memory, environment) require `Authorization: Bearer <HEALTH_TOKEN>`.',
   responses: {
     200: {
       content: {
@@ -79,50 +80,64 @@ app.openapi({
     },
   },
 }, (c) => {
-  const { DATABASE_URL, AUTH_SECRET } = getConfig()
+  const { DATABASE_URL, AUTH_SECRET, HEALTH_TOKEN } = getConfig()
 
-  // Gather stats
-  let stats: HealthStats = {}
+  // Determine if the caller is presenting a valid health token
+  const authHeader = c.req.header('authorization') ?? ''
+  const providedToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
+  const isAuthorized = !!HEALTH_TOKEN && providedToken === HEALTH_TOKEN
+
+  // Public stats — always returned (safe for landing page / Docker healthcheck).
+  // Aggregate counts are not sensitive; only system internals are token-gated.
+  const publicStats = { users: 0, addons: 0, profiles: 0, watched_items: 0 }
   try {
-    const userCount = (db.prepare('SELECT COUNT(*) as count FROM user').get() as { count: number }).count
-    const profileCount = (db.prepare('SELECT COUNT(*) as count FROM profiles').get() as { count: number }).count
-    const addonCount = (db.prepare('SELECT COUNT(*) as count FROM addons').get() as { count: number }).count
-    const activeSessions = (db.prepare('SELECT COUNT(*) as count FROM proxy_sessions WHERE is_active = 1').get() as { count: number }).count
-    const watchedItems = (db.prepare('SELECT COUNT(*) as count FROM watch_history WHERE is_watched = 1').get() as { count: number }).count
-
-    stats = {
-      users: userCount,
-      profiles: profileCount,
-      addons: addonCount,
-      active_sessions: activeSessions,
-      watched_items: watchedItems
-    }
+    publicStats.users = (db.prepare('SELECT COUNT(*) as count FROM user').get() as { count: number }).count
+    publicStats.addons = (db.prepare('SELECT COUNT(*) as count FROM addons').get() as { count: number }).count
+    publicStats.profiles = (db.prepare('SELECT COUNT(*) as count FROM profiles').get() as { count: number }).count
+    publicStats.watched_items = (db.prepare('SELECT COUNT(*) as count FROM watch_history WHERE is_watched = 1').get() as { count: number }).count
   } catch (e) {
-    log.error('Failed to fetch health stats', e)
-    stats = { error: 'Failed to fetch stats' }
+    log.error('Failed to fetch public health stats', e)
   }
 
   // Get version safely
   let version = 'unknown'
   try {
-    // @ts-ignore
-    const pkg = require('../../../package.json')
     version = pkg.version
   } catch {}
 
-  return c.json({
+  const base = {
     status: 'ok',
     timestamp: new Date().toISOString(),
+    app: { version },
+    stats: publicStats as any,
+  }
+
+  if (!isAuthorized) {
+    return c.json(base, 200)
+  }
+
+  // Internal stats — only returned with a valid HEALTH_TOKEN
+  let internalStats: HealthStats = {}
+  try {
+    const activeSessions = (db.prepare('SELECT COUNT(*) as count FROM proxy_sessions WHERE is_active = 1').get() as { count: number }).count
+    internalStats = { active_sessions: activeSessions }
+  } catch (e) {
+    log.error('Failed to fetch internal health stats', e)
+    internalStats = { error: 'Failed to fetch stats' }
+  }
+
+  return c.json({
+    ...base,
     app: {
       version,
       uptime: process.uptime(),
-      memory: process.memoryUsage().rss
+      memory: process.memoryUsage().rss,
     },
     environment: {
       database: DATABASE_URL ? 'configured' : 'not configured',
       auth: AUTH_SECRET ? 'configured' : 'not configured',
     },
-    stats: stats as { users: number; profiles: number; addons: number; active_sessions: number; watched_items: number }
+    stats: { ...publicStats, ...internalStats } as { users: number; profiles: number; addons: number; active_sessions: number; watched_items: number },
   }, 200)
 })
 

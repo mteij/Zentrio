@@ -103,6 +103,7 @@ Pick **one** provider. Leave all unconfigured to disable email.
 | Variable | Default | Description |
 |---|---|---|
 | `ADMIN_ENABLED` | `false` | Enable the admin console |
+| `ADMIN_SETUP_TOKEN` | — | Optional token required to claim initial superadmin. If unset, any user can claim on a fresh instance. Generate: `openssl rand -hex 24` |
 | `STEP_UP_MAX_AGE_MINUTES` | `10` | How long a step-up verification is valid for sensitive actions |
 
 #### First-time setup
@@ -123,6 +124,20 @@ Once set up, you can promote other users to `admin`, `moderator`, or `readonly` 
 | `FANART_API_KEY` | — | [Fanart.tv](https://fanart.tv/get-an-api-key/) API key for artwork |
 | `IMDB_UPDATE_INTERVAL_HOURS` | `24` | IMDB ratings refresh interval in hours |
 
+### Health Endpoint
+
+`GET /api/health` always returns basic public stats (user count, addon count) — safe for use on a landing page or in Docker healthchecks.
+
+Full internal stats (active sessions, memory usage, watched items) are only included when the request carries a valid token:
+
+```
+Authorization: Bearer <HEALTH_TOKEN>
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `HEALTH_TOKEN` | — | Bearer token that unlocks full internal stats. Generate: `openssl rand -hex 24` |
+
 ### Logging & Tuning
 
 | Variable | Default | Description |
@@ -130,7 +145,7 @@ Once set up, you can promote other users to `admin`, `moderator`, or `readonly` 
 | `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error` |
 | `PROXY_LOGS` | `true` | Enable Hono request logger (`-->` / `<--` lines) |
 | `RATE_LIMIT_WINDOW_MS` | `900000` | Rate limit window (15 min). Set to `0` to disable |
-| `RATE_LIMIT_LIMIT` | `100` | Max requests per window per IP. Set to `0` to disable |
+| `RATE_LIMIT_LIMIT` | `500` | Max requests per window per IP. Set to `0` to disable |
 
 ---
 

@@ -16,8 +16,8 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
-import type { MediaMetadata, MediaStream, MediaFormat } from './types'
 import { createLogger } from '../../utils/client-logger'
+import type { MediaFormat, MediaMetadata, MediaStream } from './types'
 
 const log = createLogger('Transcoder')
 
@@ -249,12 +249,12 @@ class TranscoderServiceClass {
       // Cleanup files on error
       try {
         await this.ffmpeg.deleteFile(inputFilename)
-      } catch (err) {
+      } catch (_err) {
         // Ignore cleanup errors
       }
       try {
         await this.ffmpeg.deleteFile(outputFilename)
-      } catch (err) {
+      } catch (_err) {
         // Ignore cleanup errors
       }
       
@@ -333,7 +333,7 @@ class TranscoderServiceClass {
       // Cleanup input file on error - use try/catch to handle case where file might not exist
       try {
         await this.ffmpeg.deleteFile(inputFilename)
-      } catch (err) {
+      } catch (_err) {
         // Ignore cleanup errors
       }
       
@@ -425,7 +425,7 @@ class TranscoderServiceClass {
       const streams: MediaStream[] = []
       // Match: Stream #0:0(eng): Video: wrapped_avframe, yuv420p10le...
       // OR: Stream #0:0[eng]: Video: h264, yuv420p...
-      const streamRegex = /Stream\s+#\d+:(\d+)(?:\(([^\)]+)\)|\[([^\]]+)\])?:\s+(\w+):\s+([^\s,]+)/g
+      const streamRegex = /Stream\s+#\d+:(\d+)(?:\(([^)]+)\)|\[([^\]]+)\])?:\s+(\w+):\s+([^\s,]+)/g
       let match
 
       while ((match = streamRegex.exec(probeOutput)) !== null) {
@@ -488,7 +488,7 @@ class TranscoderServiceClass {
       // Cleanup input file on error - use try/catch to handle case where file might not exist
       try {
         await this.ffmpeg.deleteFile(inputFilename)
-      } catch (err) {
+      } catch (_err) {
         // Ignore cleanup errors
       }
       

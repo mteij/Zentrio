@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Pencil, Tv, ExternalLink, Loader2, Check, Unplug, RefreshCw } from 'lucide-react'
-import { Button } from '../ui/Button'
-import { FormGroup, Input } from '../ui/Input'
-import { Modal } from '../ui/Modal'
-import { ConfirmDialog } from '../ui/ConfirmDialog'
+import { ExternalLink, Loader2, Pencil, RefreshCw, Tv, Unplug } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
 import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
-import { toast } from 'sonner'
 import { createLogger } from '../../utils/client-logger'
+import { Button } from '../ui/Button'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
+import { FormGroup, Input } from '../ui/Input'
+import { Modal } from '../ui/Modal'
 
 const log = createLogger('ProfileModal')
 
@@ -54,7 +54,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
   const [error, setError] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showStylePicker, setShowStylePicker] = useState(false)
-  const [activeProfileId, setActiveProfileId] = useState<number | null>(null)
+  const [_activeProfileId, setActiveProfileId] = useState<number | null>(null)
 
   // Trakt integration state
   const [traktStatus, setTraktStatus] = useState<{
@@ -73,31 +73,6 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
   } | null>(null)
   const [polling, setPolling] = useState(false)
   const [syncing, setSyncing] = useState(false)
-
-  useEffect(() => {
-    if (isOpen) {
-      loadSettingsProfiles()
-      
-      try {
-        const stored = localStorage.getItem('selectedProfile')
-        if (stored) {
-            const p = JSON.parse(stored)
-            setActiveProfileId(p.id)
-        }
-      } catch {}
-
-      if (profile) {
-        setName(profile.name)
-        setAvatar(profile.avatar)
-        setAvatarStyle(profile.avatar_style || DEFAULT_AVATAR_STYLE)
-        setAgeRating(profile.nsfw_age_rating || 18)
-        setSettingsProfileId(profile.settings_profile_id ? String(profile.settings_profile_id) : '')
-      } else {
-        resetForm()
-        generateNewAvatar(DEFAULT_AVATAR_STYLE)
-      }
-    }
-  }, [isOpen, profile])
 
   // Fetch Trakt status when profile changes
   const fetchTraktStatus = useCallback(async () => {
@@ -148,7 +123,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
     return () => clearInterval(pollInterval)
   }, [polling, deviceCode, fetchTraktStatus])
 
-  const loadSettingsProfiles = async () => {
+  const loadSettingsProfiles = useCallback(async () => {
     try {
       const res = await apiFetch('/api/user/settings-profiles')
       if (res.ok) {
@@ -163,7 +138,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
     } catch (e) {
       log.error('Failed to load settings profiles', e)
     }
-  }
+  }, [profile, settingsProfileId])
 
   const resetForm = () => {
     setName('')
@@ -174,7 +149,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
     setError('')
   }
 
-  const generateNewAvatar = async (style?: string) => {
+  const generateNewAvatar = useCallback(async (style?: string) => {
     try {
       const styleToUse = style || avatarStyle
       const res = await apiFetch(`/api/avatar/random?style=${encodeURIComponent(styleToUse)}`)
@@ -185,7 +160,32 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
     } catch (e) {
       log.error('Failed to generate avatar', e)
     }
-  }
+  }, [avatarStyle])
+
+  useEffect(() => {
+    if (isOpen) {
+      loadSettingsProfiles()
+
+      try {
+        const stored = localStorage.getItem('selectedProfile')
+        if (stored) {
+            const p = JSON.parse(stored)
+            setActiveProfileId(p.id)
+        }
+      } catch {}
+
+      if (profile) {
+        setName(profile.name)
+        setAvatar(profile.avatar)
+        setAvatarStyle(profile.avatar_style || DEFAULT_AVATAR_STYLE)
+        setAgeRating(profile.nsfw_age_rating || 18)
+        setSettingsProfileId(profile.settings_profile_id ? String(profile.settings_profile_id) : '')
+      } else {
+        resetForm()
+        generateNewAvatar(DEFAULT_AVATAR_STYLE)
+      }
+    }
+  }, [generateNewAvatar, isOpen, loadSettingsProfiles, profile])
 
   const handleStyleSelect = (newStyle: string) => {
     setAvatarStyle(newStyle)
@@ -648,7 +648,7 @@ export function ProfileModal({ isOpen, onClose, profile, onSave }: ProfileModalP
             </Button>
 
             <p className="text-xs text-white/30 text-center">
-              You'll enter a code at trakt.tv/activate to authorize
+              You&apos;ll enter a code at trakt.tv/activate to authorize
             </p>
           </div>
         )}

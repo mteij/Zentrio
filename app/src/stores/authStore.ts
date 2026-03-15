@@ -1,9 +1,9 @@
 import React from 'react'
 import { create } from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
-import { authClient, getAuthClient } from '../lib/auth-client'
-import { appMode } from '../lib/app-mode'
 import { apiFetch } from '../lib/apiFetch'
+import { appMode } from '../lib/app-mode'
+import { authClient } from '../lib/auth-client'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('AuthStore')

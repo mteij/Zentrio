@@ -123,6 +123,43 @@ export const securityHeaders = async (c: Context, next: Next) => {
   )
 }
 
+/**
+ * Extract a best-effort client IP for rate-limiting purposes.
+ *
+ * Security rationale: X-Forwarded-For / X-Real-IP are user-controlled headers.
+ * An attacker can forge them to rotate through arbitrary IPs and bypass rate limits.
+ * We mitigate this by:
+ *  1. Taking only the LAST entry in X-Forwarded-For (the one appended by the nearest
+ *     trusted proxy), not the first (which is what the client claims).
+ *  2. Validating the extracted value looks like an IP address before trusting it.
+ *  3. Falling back to 'unknown' so all unidentifiable clients share one bucket —
+ *     better than giving each forged IP its own fresh quota.
+ */
+function extractClientIp(c: Context): string {
+  const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/
+  const IPV6_RE = /^[0-9a-f:]+$/i
+
+  // Prefer X-Real-IP (set by trusted reverse proxies like Nginx)
+  const realIp = (c.req.header('x-real-ip') || '').trim()
+  if (realIp && (IPV4_RE.test(realIp) || IPV6_RE.test(realIp))) {
+    return realIp
+  }
+
+  // Use the LAST entry of X-Forwarded-For to get the proxy-appended address
+  // rather than the client-claimed first entry.
+  const xff = c.req.header('x-forwarded-for') || ''
+  if (xff) {
+    const parts = xff.split(',').map((s) => s.trim()).filter(Boolean)
+    // Take the rightmost entry (appended by the outermost trusted proxy)
+    const candidate = parts[parts.length - 1] || ''
+    if (candidate && (IPV4_RE.test(candidate) || IPV6_RE.test(candidate))) {
+      return candidate
+    }
+  }
+
+  return 'unknown'
+}
+
 export const rateLimiter = (options: { windowMs: number; limit: number }) => {
   return async (c: Context, next: Next) => {
     const { windowMs, limit } = options
@@ -132,7 +169,7 @@ export const rateLimiter = (options: { windowMs: number; limit: number }) => {
       return await next()
     }
 
-    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown'
+    const ip = extractClientIp(c)
     const now = Date.now()
 
     if (!rateLimitMap.has(ip)) {
@@ -164,3 +201,19 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000) // Clean up every 5 minutes
+
+/**
+ * Reject requests whose Content-Length exceeds maxBytes.
+ * Prevents trivial memory-exhaustion DoS on any endpoint that reads a body.
+ * Note: clients can omit Content-Length (chunked encoding), so this is a
+ * best-effort guard rather than a hard guarantee — it catches the common case.
+ */
+export const bodyLimit = (maxBytes: number) => {
+  return async (c: Context, next: Next) => {
+    const contentLength = c.req.header('content-length')
+    if (contentLength && parseInt(contentLength, 10) > maxBytes) {
+      return c.json({ error: 'Request body too large' }, 413)
+    }
+    await next()
+  }
+}

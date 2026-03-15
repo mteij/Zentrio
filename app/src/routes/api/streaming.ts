@@ -1,11 +1,12 @@
+import { optionalSessionMiddleware, sessionMiddleware } from '../../middleware/session'
 import { addonManager } from '../../services/addons/addon-manager'
-import { streamDb, watchHistoryDb, profileDb, addonDb, listDb, userDb, type User } from '../../services/database'
-import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
-import { ok, err } from '../../utils/api'
+import { enrichContent, filterContent, getParentalSettings } from '../../services/addons/content-filter'
 import { streamCache, StreamCache } from '../../services/addons/stream-cache'
-import { getParentalSettings, filterContent, enrichContent } from '../../services/addons/content-filter'
-import { createTaggedOpenAPIApp } from './openapi-route'
+import { StreamProcessor } from '../../services/addons/stream-processor'
+import { addonDb, listDb, profileDb, streamDb, userDb, watchHistoryDb, type User } from '../../services/database'
 import { logger } from '../../services/logger'
+import { err } from '../../utils/api'
+import { createTaggedOpenAPIApp } from './openapi-route'
 
 const log = logger.scope('API:Streaming')
 
@@ -256,7 +257,7 @@ streaming.get('/streams-live/:type/:id', async (c) => {
         if (isClosed) return
         try {
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
-        } catch (e) {
+        } catch (_e) {
           isClosed = true
         }
       }
@@ -266,7 +267,7 @@ streaming.get('/streams-live/:type/:id', async (c) => {
         isClosed = true
         try {
           controller.close()
-        } catch (e) {
+        } catch (_e) {
           // Already closed
         }
       }
@@ -322,7 +323,7 @@ streaming.get('/streams-live/:type/:id', async (c) => {
       let meta: any = null
       try {
         meta = await addonManager.getMeta(type, id, pId)
-      } catch (e) {
+      } catch (_e) {
         // Fallback minimal meta
         meta = { id, type, name: 'Unknown' }
       }
@@ -348,7 +349,6 @@ streaming.get('/streams-live/:type/:id', async (c) => {
         }
 
         // Use StreamProcessor for proper filtering, sorting, deduplication
-        const { StreamProcessor } = require('../../services/addons/stream-processor')
         const processor = new StreamProcessor(settings, platform)
         
         // Flatten all streams for processing
@@ -623,23 +623,33 @@ streaming.get('/catalog-items', async (c) => {
 })
 
 
-streaming.post('/progress', async (c) => {
+streaming.post('/progress', optionalSessionMiddleware, async (c) => {
   try {
     const body = await c.req.json()
     const { profileId, metaId, metaType, season, episode, episodeId, title, poster, duration, position } = body
-    
+
     if (!profileId || !metaId || !metaType) {
       return c.json({ error: 'Missing required fields' }, 400)
     }
 
+    const isGuestMode = c.get('guestMode') as boolean
+    const sessionUser = c.get('user')
+
     let pId: number
-    if (profileId === 'guest' || c.req.header('X-Guest-Mode') === 'true' || c.req.query('guestMode') === 'true') {
+    if (profileId === 'guest' || isGuestMode) {
       const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
       pId = guestDefaultProfile.id
     } else {
       pId = parseInt(profileId)
       if (Number.isNaN(pId)) {
         return c.json({ error: 'Invalid profileId' }, 400)
+      }
+      // Verify the authenticated user owns this profile
+      if (sessionUser) {
+        const profile = profileDb.findById(pId)
+        if (!profile || profile.user_id !== sessionUser.id) {
+          return c.json({ error: 'Forbidden' }, 403)
+        }
       }
     }
 
@@ -685,23 +695,32 @@ streaming.post('/progress', async (c) => {
   }
 })
 
-streaming.delete('/progress/:type/:id', async (c) => {
+streaming.delete('/progress/:type/:id', optionalSessionMiddleware, async (c) => {
   try {
     const { type, id } = c.req.param()
     const { profileId, season, episode } = c.req.query()
-    
+
     if (!profileId) {
       return c.json({ error: 'Missing defined profileId' }, 400)
     }
 
+    const isGuestMode = c.get('guestMode') as boolean
+    const sessionUser = c.get('user')
+
     let pId: number
-    if (profileId === 'guest' || c.req.header('X-Guest-Mode') === 'true' || c.req.query('guestMode') === 'true') {
+    if (profileId === 'guest' || isGuestMode) {
       const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
       pId = guestDefaultProfile.id
     } else {
       pId = parseInt(profileId)
       if (Number.isNaN(pId)) {
         return c.json({ error: 'Invalid profileId' }, 400)
+      }
+      if (sessionUser) {
+        const profile = profileDb.findById(pId)
+        if (!profile || profile.user_id !== sessionUser.id) {
+          return c.json({ error: 'Forbidden' }, 403)
+        }
       }
     }
 
@@ -726,23 +745,32 @@ streaming.delete('/progress/:type/:id', async (c) => {
 
 // Get series watch progress (all episodes)
 // Get single item progress (specifically for initializing the video player)
-streaming.get('/progress/:type/:id', async (c) => {
+streaming.get('/progress/:type/:id', optionalSessionMiddleware, async (c) => {
   try {
-    const { type, id } = c.req.param()
+    const { _type, id } = c.req.param()
     const { profileId, season, episode } = c.req.query()
-    
+
     if (!profileId) {
       return c.json({ error: 'profileId required' }, 400)
     }
 
+    const isGuestMode = c.get('guestMode') as boolean
+    const sessionUser = c.get('user')
+
     let pId: number
-    if (profileId === 'guest' || c.req.header('X-Guest-Mode') === 'true' || c.req.query('guestMode') === 'true') {
+    if (profileId === 'guest' || isGuestMode) {
       const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
       pId = guestDefaultProfile.id
     } else {
       pId = parseInt(profileId)
       if (Number.isNaN(pId)) {
         return c.json({ error: 'Invalid profileId' }, 400)
+      }
+      if (sessionUser) {
+        const profile = profileDb.findById(pId)
+        if (!profile || profile.user_id !== sessionUser.id) {
+          return c.json({ error: 'Forbidden' }, 403)
+        }
       }
     }
     const progress = watchHistoryDb.getProgress(
@@ -763,16 +791,24 @@ streaming.get('/progress/:type/:id', async (c) => {
   }
 })
 
-streaming.get('/series-progress/:id', async (c) => {
+streaming.get('/series-progress/:id', optionalSessionMiddleware, async (c) => {
   try {
     const { id } = c.req.param()
     const { profileId } = c.req.query()
-    
+
     if (!profileId) {
       return c.json({ error: 'profileId required' }, 400)
     }
 
+    const isGuestMode = c.get('guestMode') as boolean
+    const sessionUser = c.get('user')
     const pId = parseInt(profileId)
+    if (!isGuestMode && sessionUser) {
+      const profile = profileDb.findById(pId)
+      if (!profile || profile.user_id !== sessionUser.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+      }
+    }
     const episodeProgress = watchHistoryDb.getSeriesProgress(pId, id)
     const lastWatched = watchHistoryDb.getLastWatchedEpisode(pId, id)
 
@@ -787,16 +823,24 @@ streaming.get('/series-progress/:id', async (c) => {
 })
 
 // Mark item as watched/unwatched
-streaming.post('/mark-watched', async (c) => {
+streaming.post('/mark-watched', optionalSessionMiddleware, async (c) => {
   try {
     const body = await c.req.json()
     const { profileId, metaId, metaType, season, episode, watched } = body
-    
+
     if (!profileId || !metaId || !metaType || watched === undefined) {
       return c.json({ error: 'Missing required fields' }, 400)
     }
 
+    const isGuestMode = c.get('guestMode') as boolean
+    const sessionUser = c.get('user')
     const pId = parseInt(profileId)
+    if (!isGuestMode && sessionUser) {
+      const profile = profileDb.findById(pId)
+      if (!profile || profile.user_id !== sessionUser.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+      }
+    }
     
     watchHistoryDb.markAsWatched(
       pId,
@@ -897,16 +941,24 @@ streaming.post('/mark-watched', async (c) => {
 })
 
 // Mark entire season as watched/unwatched
-streaming.post('/mark-season-watched', async (c) => {
+streaming.post('/mark-season-watched', optionalSessionMiddleware, async (c) => {
   try {
     const body = await c.req.json()
     const { profileId, metaId, metaType, season, watched, episodes } = body
-    
+
     if (!profileId || !metaId || !metaType || season === undefined || watched === undefined || !episodes) {
       return c.json({ error: 'Missing required fields (need episodes array)' }, 400)
     }
 
+    const isGuestMode = c.get('guestMode') as boolean
+    const sessionUser = c.get('user')
     const pId = parseInt(profileId)
+    if (!isGuestMode && sessionUser) {
+      const profile = profileDb.findById(pId)
+      if (!profile || profile.user_id !== sessionUser.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+      }
+    }
     
     watchHistoryDb.markSeasonWatched(
       pId,
@@ -965,16 +1017,24 @@ streaming.post('/mark-season-watched', async (c) => {
 })
 
 // Mark entire series as watched/unwatched (all episodes)
-streaming.post('/mark-series-watched', async (c) => {
+streaming.post('/mark-series-watched', optionalSessionMiddleware, async (c) => {
   try {
     const body = await c.req.json()
-    let { profileId, metaId, watched, allEpisodes } = body
-    
+    const { profileId, metaId, watched, allEpisodes } = body
+
     if (!profileId || !metaId || watched === undefined) {
       return c.json({ error: 'Missing required fields' }, 400)
     }
 
+    const isGuestMode = c.get('guestMode') as boolean
+    const sessionUser = c.get('user')
     const pId = parseInt(profileId)
+    if (!isGuestMode && sessionUser) {
+      const profile = profileDb.findById(pId)
+      if (!profile || profile.user_id !== sessionUser.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+      }
+    }
 
     // If allEpisodes is missing, fetch from metadata
     if (!allEpisodes || !Array.isArray(allEpisodes)) {
@@ -1073,16 +1133,24 @@ streaming.post('/mark-series-watched', async (c) => {
 })
 
 // Mark all episodes before a specific episode as watched
-streaming.post('/mark-episodes-before', async (c) => {
+streaming.post('/mark-episodes-before', optionalSessionMiddleware, async (c) => {
   try {
     const body = await c.req.json()
     const { profileId, metaId, season, episode, watched, allEpisodes } = body
-    
+
     if (!profileId || !metaId || season === undefined || episode === undefined || watched === undefined || !allEpisodes) {
       return c.json({ error: 'Missing required fields' }, 400)
     }
 
+    const isGuestMode = c.get('guestMode') as boolean
+    const sessionUser = c.get('user')
     const pId = parseInt(profileId)
+    if (!isGuestMode && sessionUser) {
+      const profile = profileDb.findById(pId)
+      if (!profile || profile.user_id !== sessionUser.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+      }
+    }
     
     // Filter episodes that come before the target episode
     const episodesToMark = allEpisodes.filter((ep: { season: number; episode: number }) => {

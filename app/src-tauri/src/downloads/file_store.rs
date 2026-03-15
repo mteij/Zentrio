@@ -15,7 +15,8 @@ pub fn downloads_dir(app: &tauri::AppHandle, profile_id: &str) -> PathBuf {
 
 /// Returns the path to the per-app downloads SQLite database.
 pub fn db_path(app: &tauri::AppHandle) -> PathBuf {
-    let data_dir = app.path()
+    let data_dir = app
+        .path()
         .app_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
     data_dir.join("zentrio").join("downloads.db")
@@ -43,24 +44,44 @@ fn custom_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
     let path_file = data_dir.join("zentrio").join("download_dir.txt");
     let raw = std::fs::read_to_string(path_file).ok()?;
     let trimmed = raw.trim();
-    if trimmed.is_empty() { None } else { Some(PathBuf::from(trimmed)) }
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(trimmed))
+    }
 }
 
 /// Persists the custom download directory.
 pub fn set_custom_dir(app: &tauri::AppHandle, new_path: &Path) -> std::io::Result<()> {
-    let data_dir = app.path()
+    let data_dir = app
+        .path()
         .app_data_dir()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     let dir = data_dir.join("zentrio");
     std::fs::create_dir_all(&dir)?;
-    std::fs::write(dir.join("download_dir.txt"), new_path.to_string_lossy().as_bytes())
+    std::fs::write(
+        dir.join("download_dir.txt"),
+        new_path.to_string_lossy().as_bytes(),
+    )
 }
 
 /// Returns the path for a downloaded subtitle file.
-pub fn subtitle_file_path(app: &tauri::AppHandle, profile_id: &str, id: &str, lang: &str) -> PathBuf {
+pub fn subtitle_file_path(
+    app: &tauri::AppHandle,
+    profile_id: &str,
+    id: &str,
+    lang: &str,
+) -> PathBuf {
     // Sanitize lang to avoid path traversal
-    let safe_lang: String = lang.chars().filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_').collect();
-    let safe_lang = if safe_lang.is_empty() { "und".to_string() } else { safe_lang };
+    let safe_lang: String = lang
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    let safe_lang = if safe_lang.is_empty() {
+        "und".to_string()
+    } else {
+        safe_lang
+    };
     downloads_dir(app, profile_id).join(format!("{}_{}.vtt", id, safe_lang))
 }
 

@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { toast } from 'sonner'
 import Hls from 'hls.js'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCast } from '../contexts/CastContext'
 import { createLogger } from '../utils/client-logger'
 
@@ -45,12 +44,13 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
   
   const hlsRef = useRef<Hls | null>(null)
   const onEndedRef = useRef(onEnded)
+  const durationRef = useRef(duration)
   const initialVolumeApplied = useRef(false)
-  const { isConnected: isCastConnected, castSession } = useCast()
+  const { isConnected: isCastConnected, _castSession } = useCast()
   
   // Audio analysis refs to prevent recreating source nodes
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const _audioContextRef = useRef<AudioContext | null>(null)
+  const _audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
   
   // Effect to pause local video when cast connects
   useEffect(() => {
@@ -65,6 +65,10 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
   useEffect(() => {
     onEndedRef.current = onEnded
   }, [onEnded])
+
+  useEffect(() => {
+    durationRef.current = duration
+  }, [duration])
 
 
 
@@ -135,7 +139,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     const handleDurationChange = () => {
         // If the video reports Infinity, but we have a known finite duration (e.g. from transcoder)
         // then don't overwrite our good duration with Infinity
-        if (!Number.isFinite(video.duration) && duration > 0) {
+        if (!Number.isFinite(video.duration) && durationRef.current > 0) {
             return
         }
         setDuration(video.duration)
@@ -321,10 +325,8 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     const targetTime = Math.max(0, Math.min(time, currentDuration))
     
     // Check if target time is buffered
-    let isBuffered = false;
     for (let i = 0; i < video.buffered.length; i++) {
         if (targetTime >= video.buffered.start(i) && targetTime <= video.buffered.end(i)) {
-            isBuffered = true;
             break;
         }
     }

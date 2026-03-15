@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { AlertCircle, Download, ExternalLink, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { createLogger } from '../../../utils/client-logger';
 import { Button, Modal } from '../../index';
 
 type UpdateStatus = 'idle' | 'downloading' | 'installing' | 'done' | 'error';
-import { Download, AlertCircle, Loader2, Sparkles, RefreshCw, ExternalLink } from 'lucide-react';
-import { toast } from 'sonner';
-import { createLogger } from '../../../utils/client-logger'
 
 const log = createLogger('UpdateModal')
 
@@ -30,7 +30,7 @@ interface UpdateModalProps {
   platformName?: string;
 }
 
-export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTauri = true, platformName }: UpdateModalProps) {
+export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platformName }: UpdateModalProps) {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [downloadError, setDownloadError] = useState('');
@@ -197,7 +197,7 @@ export function UpdateModal({ isOpen, onClose, updateData, currentVersion, isTau
 
         {/* Changelog */}
         <div className="space-y-2">
-          <h5 className="text-sm font-medium text-zinc-300">What's New</h5>
+          <h5 className="text-sm font-medium text-zinc-300">What&apos;s New</h5>
           <div className="bg-zinc-950/50 rounded-lg border border-white/5 p-4 max-h-60 overflow-y-auto custom-scrollbar">
             <pre className="whitespace-pre-wrap text-sm text-zinc-400 font-sans">
               {(() => {
@@ -347,7 +347,7 @@ async function downloadAsset(
   let receivedLength = 0;
   const chunks: Uint8Array[] = [];
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
 

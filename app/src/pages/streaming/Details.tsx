@@ -1,23 +1,23 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
-import { Layout, SkeletonDetails, LoadErrorState } from '../../components'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Layout, LoadErrorState, SkeletonDetails } from '../../components'
 import { InfoModal } from '../../components/features/InfoModal'
 import { ListSelectionModal } from '../../components/features/ListSelectionModal'
 
+import { toast } from 'sonner'
 import { DetailsHeader } from '../../components/details/DetailsHeader'
 import { EpisodeList } from '../../components/details/EpisodeList'
 import { StreamSelector } from '../../components/details/StreamSelector'
-import { MetaDetail, Stream, Manifest } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
-import { useStreamLoader, FlatStream, AddonLoadingState } from '../../hooks/useStreamLoader'
-import { useStreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
 import { useAutoPlay } from '../../hooks/useAutoPlay'
-import { toast } from 'sonner'
-import styles from '../../styles/Streaming.module.css'
+import { useStreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
+import { useStreamLoader } from '../../hooks/useStreamLoader'
 import { apiFetch } from '../../lib/apiFetch'
-import { preloadPlayer } from '../../utils/route-preloader'
+import { MetaDetail, Stream } from '../../services/addons/types'
+import styles from '../../styles/Streaming.module.css'
 import { createLogger } from '../../utils/client-logger'
+import { preloadPlayer } from '../../utils/route-preloader'
 
 const log = createLogger('DetailsPage')
 
@@ -52,7 +52,7 @@ export const StreamingDetails = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null)
-  const [episodes, setEpisodes] = useState<any[]>([])
+  const [_episodes, _setEpisodes] = useState<any[]>([])
   const [view, setView] = useState<'details' | 'episodes' | 'streams'>('details')
   const [selectedEpisode, setSelectedEpisode] = useState<{ season: number, number: number, title: string } | null>(null)
   const [showInfoModal, setShowInfoModal] = useState(false)
@@ -72,27 +72,28 @@ export const StreamingDetails = () => {
     cacheStatus,
     loadStreams: loadStreamsProgressive,
     refreshStreams,
-    reset: resetStreams
+    reset: _resetStreams
   } = useStreamLoader()
 
 
-  useEffect(() => {
-    if (!profileId || !type || !id) {
-      navigate('/profiles')
-      return
-    }
-    loadDetails()
-    checkListStatus()
+  const loadStreams = useCallback((season?: number, episode?: number, overrideId?: string, autoPlay: boolean = false) => {
+    autoPlayRef.current = autoPlay
     
-    const handleHistoryUpdate = () => {
-      loadDetails()
-    }
+    // Do not force imdb_id here; addons may require custom IDs.
+    // Backend will resolve the best addon-compatible ID (custom vs imdb_id) per addon.
+    const fetchId = overrideId || id
+    if (!fetchId || !profileId) return
     
-    window.addEventListener('history-updated', handleHistoryUpdate)
-    return () => window.removeEventListener('history-updated', handleHistoryUpdate)
-  }, [profileId, type, id])
+    loadStreamsProgressive(
+      type || '',
+      fetchId,
+      profileId,
+      season,
+      episode
+    )
+  }, [id, loadStreamsProgressive, profileId, type])
 
-  const checkListStatus = async () => {
+  const checkListStatus = useCallback(async () => {
     // Prefer using loaded data meta.id, fallback to params id
     const checkId = data?.meta?.id || id
     if (!profileId || !checkId) return
@@ -106,9 +107,9 @@ export const StreamingDetails = () => {
     } catch (e) {
       log.error("Failed to check list status", e)
     }
-  }
+  }, [data?.meta?.id, id, profileId])
 
-  const loadDetails = async () => {
+  const loadDetails = useCallback(async () => {
     try {
       // Get metaFallback from URL if present (for addons without meta resource)
       const searchParams = new URLSearchParams(window.location.search)
@@ -188,46 +189,27 @@ export const StreamingDetails = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id, loadStreams, location.state, navigate, profileId, type])
+
+  useEffect(() => {
+    if (!profileId || !type || !id) {
+      navigate('/profiles')
+      return
+    }
+    loadDetails()
+    checkListStatus()
+    
+    const handleHistoryUpdate = () => {
+      loadDetails()
+    }
+    
+    window.addEventListener('history-updated', handleHistoryUpdate)
+    return () => window.removeEventListener('history-updated', handleHistoryUpdate)
+  }, [checkListStatus, id, loadDetails, navigate, profileId, type])
 
   // State for auto-play tracking
   const autoPlayRef = useRef<boolean>(false)
   
-  const loadStreams = (season?: number, episode?: number, overrideId?: string, autoPlay: boolean = false) => {
-    autoPlayRef.current = autoPlay
-    
-    // Do not force imdb_id here; addons may require custom IDs.
-    // Backend will resolve the best addon-compatible ID (custom vs imdb_id) per addon.
-    const fetchId = overrideId || id
-    if (!fetchId || !profileId) return
-    
-    loadStreamsProgressive(
-      type || '',
-      fetchId,
-      profileId,
-      season,
-      episode
-    )
-  }
-  
-  // Handle auto-play when streams arrive
-  // Handle auto-play when streams arrive
-  useEffect(() => {
-    if (autoPlayRef.current && streams.length > 0) {
-      toast.dismiss('autoplay-loading')
-      // streams is now a flat sorted list (FlatStream[])
-      // Pass true to replace history (skip details page on back)
-      handlePlay(streams[0].stream)
-      autoPlayRef.current = false
-    } else if (autoPlayRef.current && streamsComplete && streams.length === 0) {
-        // Fallback if no streams found
-        toast.dismiss('autoplay-loading')
-        toast.error('No auto-play streams found. Please select manually.')
-        setView('streams')
-        autoPlayRef.current = false
-    }
-  }, [streams, streamsComplete])
-
   // filteredStreams comes from hook - already sorted by backend sortIndex
   // totalStreamCount is now based on totalCount from hook
 
@@ -241,7 +223,7 @@ export const StreamingDetails = () => {
   // Quick play for episodes - uses unified auto-play hook
   const { startAutoPlay } = useAutoPlay()
   
-  const handleQuickPlay = (season: number, number: number, title: string) => {
+  const handleQuickPlay = (season: number, number: number, _title: string) => {
     if (!data) return
     
     // Use unified auto-play hook for background stream fetching
@@ -273,7 +255,7 @@ export const StreamingDetails = () => {
     })
   }
 
-  const handlePlay = (stream: Stream) => {
+  const handlePlay = useCallback((stream: Stream) => {
     const meta = {
       id: data!.meta.id,
       type: data!.meta.type,
@@ -284,7 +266,24 @@ export const StreamingDetails = () => {
     }
     preloadPlayer()
     navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`, { replace: false })
-  }
+  }, [data, navigate, profileId, selectedEpisode?.number, selectedEpisode?.season])
+
+  // Handle auto-play when streams arrive
+  useEffect(() => {
+    if (autoPlayRef.current && streams.length > 0) {
+      toast.dismiss('autoplay-loading')
+      // streams is now a flat sorted list (FlatStream[])
+      // Pass true to replace history (skip details page on back)
+      handlePlay(streams[0].stream)
+      autoPlayRef.current = false
+    } else if (autoPlayRef.current && streamsComplete && streams.length === 0) {
+        // Fallback if no streams found
+        toast.dismiss('autoplay-loading')
+        toast.error('No auto-play streams found. Please select manually.')
+        setView('streams')
+        autoPlayRef.current = false
+    }
+  }, [handlePlay, streams, streamsComplete])
 
   const handleEpisodeSelect = (season: number, number: number, title: string, autoPlay: boolean = false) => {
     setSelectedEpisode({ season, number, title })
@@ -292,7 +291,7 @@ export const StreamingDetails = () => {
     loadStreams(season, number, undefined, autoPlay)
   }
 
-  const toggleLibrary = async () => {
+  const _toggleLibrary = async () => {
     // Implement library toggle logic here
     // For now just toggle local state
     if (data) {
@@ -568,7 +567,7 @@ export const StreamingDetails = () => {
     )
   }
 
-  const { meta, inLibrary } = data
+  const { meta, _inLibrary } = data
 
   return (
     <Layout title={meta.name} showHeader={false} showFooter={false}>

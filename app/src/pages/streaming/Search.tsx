@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Loader2, Filter } from 'lucide-react'
-import { Layout, AnimatedBackground } from '../../components'
-import { MetaPreview } from '../../services/addons/types'
+import { Filter, Loader2, Search } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { AnimatedBackground, Layout } from '../../components'
 import { SearchCatalogRow } from '../../components/features/SearchCatalogRow'
-import styles from '../../styles/Streaming.module.css'
-import { apiFetch } from '../../lib/apiFetch'
-import { createLogger } from '../../utils/client-logger'
 import { useRootScrollPinned } from '../../hooks/useRootScrollPinned'
+import { apiFetch } from '../../lib/apiFetch'
+import { MetaPreview } from '../../services/addons/types'
+import styles from '../../styles/Streaming.module.css'
+import { createLogger } from '../../utils/client-logger'
 
 const log = createLogger('SearchPage')
 
@@ -23,7 +23,7 @@ export const StreamingSearch = () => {
   const navigate = useNavigate()
   const [catalogResults, setCatalogResults] = useState<CatalogSearchResult[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [_error, setError] = useState('')
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   const stickyHeader = useRootScrollPinned({ extraTopPx: 10 })
   const inputRef = useRef<HTMLInputElement>(null)
@@ -84,18 +84,6 @@ export const StreamingSearch = () => {
   // Ref to track the latest search request and cancel stale ones
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    if (!profileId) {
-      navigate('/profiles')
-      return
-    }
-    if (query) {
-      performSearch(query, typeParam)
-    } else {
-      setCatalogResults([])
-    }
-  }, [profileId, query, typeParam])
-  
   // Debounce effect: update URL after 300ms of no typing
   useEffect(() => {
     // Don't debounce if input matches current query (prevents loops)
@@ -117,7 +105,7 @@ export const StreamingSearch = () => {
     return () => clearTimeout(timer)
   }, [inputValue, query, searchParams, setSearchParams])
 
-  const performSearch = async (q: string, type: string) => {
+  const performSearch = useCallback(async (q: string, type: string) => {
     // Cancel any previous in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -154,7 +142,19 @@ export const StreamingSearch = () => {
         setLoading(false)
       }
     }
-  }
+  }, [profileId])
+
+  useEffect(() => {
+    if (!profileId) {
+      navigate('/profiles')
+      return
+    }
+    if (query) {
+      performSearch(query, typeParam)
+    } else {
+      setCatalogResults([])
+    }
+  }, [navigate, performSearch, profileId, query, typeParam])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -274,7 +274,7 @@ export const StreamingSearch = () => {
         <div className={styles.contentContainer}>
           {query && catalogResults.length > 0 && (
             <h1 className={styles.searchResultsHeading}>
-              Results for "{query}"
+              Results for &quot;{query}&quot;
             </h1>
           )}
           
@@ -287,7 +287,7 @@ export const StreamingSearch = () => {
                 Start typing to search for movies and series...
               </div>
           ) : catalogResults.length === 0 ? (
-              <div style={{ padding: '60px', color: '#aaa', fontSize: '1.2rem' }}>No results found for "{query}".</div>
+              <div style={{ padding: '60px', color: '#aaa', fontSize: '1.2rem' }}>No results found for &quot;{query}&quot;.</div>
           ) : (
               <div className={styles.catalogRows}>
                 {catalogResults.map((result) => (

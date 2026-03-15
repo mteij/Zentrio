@@ -2,9 +2,7 @@ import { motion } from 'framer-motion';
 import { Button, Input, Message } from '../components/index';
 import { ParticleBackground } from '../components/ui/ParticleBackground';
 
-interface ResetPasswordPageProps {}
-
-export function ResetPasswordPage({}: ResetPasswordPageProps) {
+export function ResetPasswordPage() {
   return (
     <>
       <ParticleBackground />

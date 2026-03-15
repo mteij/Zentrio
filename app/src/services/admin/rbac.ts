@@ -2,7 +2,7 @@
 // Provides granular permission management for admin operations
 
 import { db } from '../database/connection'
-import type { AdminRole, AdminPermission, AdminRolePermission, AdminUserRole } from '../database/types'
+import type { AdminPermission, AdminRole } from '../database/types'
 import { logger } from '../logger'
 
 const log = logger.scope('RBAC')

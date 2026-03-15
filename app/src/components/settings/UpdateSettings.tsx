@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Button } from '../index';
-import { RefreshCw, Download, CheckCircle, Smartphone, Globe, Server } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
-import { UpdateModal } from './modals/UpdateModal';
+import { CheckCircle, Download, Globe, RefreshCw, Server, Smartphone } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { apiFetchJson } from '../../lib/apiFetch';
 import { getServerUrl } from '../../lib/auth-client';
-import { createLogger } from '../../utils/client-logger'
+import { createLogger } from '../../utils/client-logger';
+import { Button } from '../index';
+import { UpdateModal } from './modals/UpdateModal';
 
 const log = createLogger('UpdateSettings')
 
@@ -53,7 +53,7 @@ export function UpdateSettings() {
             } catch (e) {
                 log.error("Failed to detect platform", e);
             }
-        } catch (e) {
+        } catch (_e) {
             setCurrentVersion(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'Web');
             setIsTauri(false);
         }
