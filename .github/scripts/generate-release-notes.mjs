@@ -127,9 +127,28 @@ const TOKEN_ALIASES = new Map([
   ['streaming', 'streaming'],
 ]);
 
+const FEATURE_RULES = [
+  {
+    id: 'introdb',
+    patterns: [/introdb/i, /\/segments\/submit/i, /skipIntrosOutros/i, /introdb_cache/i],
+    title: 'Intro skipping powered by IntroDB',
+    highlight:
+      'TV playback can now surface skip controls for intros, recaps, and outros using IntroDB segment data.',
+    summary:
+      'Zentrio now fetches episode segment timings from IntroDB, caches them server-side, and feeds them into the player so users can skip intros, recaps, and outros more cleanly. Streaming settings also expose controls for unconfirmed segments, and contributors can submit better timings directly from the app with an IntroDB API key.',
+    bucket:
+      'Added IntroDB-backed segment support so TV episodes can offer skip intro, recap, and outro controls, with caching and in-app contribution support.',
+  },
+];
+
 function sh(cmd, fallback = '') {
   try {
-    return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    return execSync(cmd, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 20 * 1024 * 1024,
+    })
+      .toString()
+      .trim();
   } catch {
     return fallback;
   }
@@ -151,7 +170,7 @@ function sentenceCase(text) {
 }
 
 function escapeMarkdown(value) {
-  return String(value || '').replace(/`/g, '\\`');
+  return String(value || '').replace(/[\\`]/g, '\\$&');
 }
 
 function listToSentence(items) {
@@ -171,6 +190,94 @@ function normalizeToken(token) {
   const lower = String(token || '').toLowerCase();
   if (!lower) return '';
   return TOKEN_ALIASES.get(lower) || lower;
+}
+
+function normalizePath(path) {
+  return String(path || '').replace(/\\/g, '/');
+}
+
+function isStoryNoiseFile(path) {
+  const normalized = normalizePath(path);
+  return (
+    normalized.startsWith('app/src-tauri/gen/') ||
+    normalized.endsWith('/bun.lock') ||
+    normalized.endsWith('/package-lock.json') ||
+    normalized.endsWith('/pnpm-lock.yaml') ||
+    normalized.endsWith('/yarn.lock')
+  );
+}
+
+function getStoryChangedFiles(changedFiles) {
+  const filtered = changedFiles.filter((file) => !isStoryNoiseFile(file.path));
+  return filtered.length ? filtered : changedFiles;
+}
+
+function dedupeStrings(items, maxItems) {
+  const seen = new Set();
+  const output = [];
+
+  for (const item of items) {
+    const value = String(item || '').trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(value);
+    if (maxItems && output.length >= maxItems) break;
+  }
+
+  return output;
+}
+
+function dedupeSpotlights(items, maxItems) {
+  const seen = new Set();
+  const output = [];
+
+  for (const item of items) {
+    if (!item?.title || !item?.summary) continue;
+    const key = item.title.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push({
+      title: item.title.trim(),
+      summary: item.summary.trim(),
+    });
+    if (maxItems && output.length >= maxItems) break;
+  }
+
+  return output;
+}
+
+function extractFeatureCandidates(changedFiles, featurePatch) {
+  const fileEvidence = changedFiles
+    .slice(0, 24)
+    .map((file) => {
+      try {
+        const path = file.path;
+        if (!existsSync(path)) return '';
+        return readFileSync(path, 'utf8');
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
+
+  const evidence = [featurePatch, ...changedFiles.map((file) => file.path), fileEvidence].join('\n');
+  const candidates = [];
+
+  for (const rule of FEATURE_RULES) {
+    const hits = rule.patterns.filter((pattern) => pattern.test(evidence)).length;
+    if (hits === 0) continue;
+    candidates.push({
+      id: rule.id,
+      title: rule.title,
+      highlight: rule.highlight,
+      summary: rule.summary,
+      bucket: rule.bucket,
+    });
+  }
+
+  return candidates;
 }
 
 function getVersion() {
@@ -816,24 +923,110 @@ function getRepositoryUrl() {
   return FALLBACK_REPOSITORY_URL;
 }
 
-function getContributors(rangeSpec) {
-  const raw = sh(`git shortlog -sne ${rangeSpec}`, '');
+function parseGitHubRepo(repoUrl) {
+  const httpsMatch = repoUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (httpsMatch) {
+    return {
+      owner: httpsMatch[1],
+      repo: httpsMatch[2],
+    };
+  }
+
+  const sshMatch = repoUrl.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (sshMatch) {
+    return {
+      owner: sshMatch[1],
+      repo: sshMatch[2],
+    };
+  }
+
+  return null;
+}
+
+function sanitizeHandleCandidate(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  const withoutAt = trimmed.replace(/^@+/, '');
+  const handle = withoutAt
+    .replace(/\+.*$/, '')
+    .replace(/[^a-zA-Z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return handle ? `@${handle}` : '';
+}
+
+function handleFromEmail(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return '';
+
+  const noreplyWithId = normalized.match(/^\d+\+([^@]+)@users\.noreply\.github\.com$/);
+  if (noreplyWithId) return sanitizeHandleCandidate(noreplyWithId[1]);
+
+  const noreply = normalized.match(/^([^@]+)@users\.noreply\.github\.com$/);
+  if (noreply) return sanitizeHandleCandidate(noreply[1]);
+
+  const localPart = normalized.split('@')[0] || '';
+  return sanitizeHandleCandidate(localPart);
+}
+
+function formatContributorHandle(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized) return '';
+  if (normalized.startsWith('@')) return normalized;
+  return sanitizeHandleCandidate(normalized);
+}
+
+async function resolveGitHubLogin(owner, repo, sha, token) {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${sha}`, {
+      headers: {
+        'User-Agent': 'zentrio-release-notes',
+        Accept: 'application/vnd.github+json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!response.ok) return '';
+    const data = await response.json();
+    const login = data?.author?.login || data?.committer?.login || '';
+    return sanitizeHandleCandidate(login);
+  } catch {
+    return '';
+  }
+}
+
+async function getContributors(rangeSpec, repoUrl) {
+  const raw = sh(`git log ${rangeSpec} --pretty=format:%H%x09%an%x09%ae`, '');
   if (!raw) return [];
 
+  const repo = parseGitHubRepo(repoUrl);
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
   const seen = new Set();
   const contributors = [];
 
   for (const line of raw.split('\n')) {
-    const match = line.trim().match(/^\d+\s+(.+?)\s+<.+>$/);
-    const name = (match?.[1] || '').trim();
-    if (!name || /\[bot\]$/i.test(name)) continue;
-    const key = name.toLowerCase();
+    const [sha, name, email] = line.split('\t');
+    if (!sha) continue;
+    if (/\[bot\]$/i.test(name || '') || /\[bot\]@/i.test(email || '')) continue;
+
+    let handle = '';
+    if (repo) {
+      handle = await resolveGitHubLogin(repo.owner, repo.repo, sha, token);
+    }
+    if (!handle) {
+      handle = handleFromEmail(email);
+    }
+
+    if (!handle) continue;
+    const key = handle.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    contributors.push(name);
+    contributors.push(handle);
+    if (contributors.length >= MAX_CONTRIBUTORS) break;
   }
 
-  return contributors.slice(0, MAX_CONTRIBUTORS);
+  return contributors;
 }
 
 async function generateWithNanoGPT(prompt, apiKey) {
@@ -942,6 +1135,7 @@ function buildStructuredAIPrompt(input) {
     prevTag,
     releaseType,
     releaseTypeContext,
+    featureCandidates,
     architectureContext,
     subsystemEvidence,
     changedFilesEvidence,
@@ -968,6 +1162,7 @@ function buildStructuredAIPrompt(input) {
     '- If evidence is weak, omit the claim instead of guessing.',
     '- Keep the tone like Immich release notes: warm, informative, concise, and user-facing.',
     '- Prefer explaining impact such as faster, clearer, more stable, easier to manage, safer, smoother playback, better downloads, etc.',
+    '- High-priority feature candidates listed below should be included when the patch evidence supports them.',
     '',
     'Return strict JSON only, with this exact shape:',
     '{',
@@ -994,6 +1189,11 @@ function buildStructuredAIPrompt(input) {
     'Architecture context:',
     architectureContext || '(not available)',
     '',
+    'High-priority feature candidates:',
+    featureCandidates?.length
+      ? featureCandidates.map((candidate) => `- ${candidate.title}: ${candidate.summary}`).join('\n')
+      : '(none detected)',
+    '',
     'Subsystem summary:',
     subsystemEvidence || '(none)',
     '',
@@ -1011,16 +1211,27 @@ function buildStructuredAIPrompt(input) {
   ].join('\n');
 }
 
-function buildIntro(tag, releaseType, highlightAreas, intentCounts) {
+function buildIntro(tag, releaseType, highlightAreas, intentCounts, featureCandidates = []) {
   const focusAreas = highlightAreas.slice(0, 3).map((area) => area.focusPhrase);
   const focusLine = focusAreas.length ? ` across ${listToSentence(focusAreas)}` : '';
+  const headlineFeature = featureCandidates[0];
+  const headlineFeatureLabel = headlineFeature
+    ? sentenceCase(headlineFeature.title).replace(/\bintrodb\b/g, 'IntroDB')
+    : '';
 
   if (releaseType === 'major') {
     return `Welcome to release \`${tag}\` of Zentrio. This is a broader milestone release with meaningful work${focusLine}, plus the kind of cleanup we want in place before the next stretch of development.`;
   }
 
   if (releaseType === 'minor') {
+    if (headlineFeature) {
+      return `Welcome to release \`${tag}\` of Zentrio. The headline addition in this release is ${headlineFeatureLabel}, alongside polish${focusLine} to round out the overall experience.`;
+    }
     return `Welcome to release \`${tag}\` of Zentrio. This release leans into new capabilities and polish${focusLine}, while still tightening a few rough edges along the way.`;
+  }
+
+  if (headlineFeature) {
+    return `Welcome to release \`${tag}\` of Zentrio. This patch is headlined by ${headlineFeatureLabel}, with supporting improvements${focusLine} that make playback and day-to-day usage feel more complete.`;
   }
 
   if (intentCounts.fix >= intentCounts.feature && intentCounts.fix >= intentCounts.ui) {
@@ -1137,7 +1348,8 @@ function renderReleaseNotes(input) {
 
   if (contributors.length) {
     lines.push('## Contributors');
-    lines.push(`Thanks to ${listToSentence(contributors)}.`);
+    const contributorHandles = contributors.map((contributor) => formatContributorHandle(contributor)).filter(Boolean);
+    lines.push(`Thanks to ${listToSentence(contributorHandles)}.`);
     lines.push('');
   }
 
@@ -1173,6 +1385,7 @@ async function main() {
 
   const commits = parseCommits(getCommitLog(prevTag, rangeSpec));
   const changedFiles = getChangedFiles(rangeSpec);
+  const storyChangedFiles = getStoryChangedFiles(changedFiles);
 
   if (!commits.length && !changedFiles.length) {
     writeFileSync('RELEASE_NOTES.md', basicFallback(tag, prevTag, repoUrl), 'utf8');
@@ -1180,27 +1393,41 @@ async function main() {
   }
 
   const { type: releaseType } = getReleaseTypeContext(version, prevTag, tag);
-  const subsystems = summarizeSubsystems(changedFiles);
-  const areaDetails = mergeAreas(getAreaDetails(subsystems, changedFiles, releaseType));
+  const subsystems = summarizeSubsystems(storyChangedFiles);
+  const areaDetails = mergeAreas(getAreaDetails(subsystems, storyChangedFiles, releaseType));
   const highlightAreas = pickHighlightAreas(areaDetails);
   const intentCounts = summarizeCommitIntents(commits);
-  const breakingChanges = collectBreakingChanges(commits, changedFiles);
-  const contributors = getContributors(rangeSpec);
+  const breakingChanges = collectBreakingChanges(commits, storyChangedFiles);
+  const contributors = await getContributors(rangeSpec, repoUrl);
   const buckets = buildBuckets(areaDetails);
-  const architectureContext = getArchitectureContext(changedFiles);
+  const architectureContext = getArchitectureContext(storyChangedFiles);
   const commitEvidence = formatCommitEvidence(commits);
-  const changedFilesEvidence = formatChangedFilesEvidence(changedFiles);
+  const changedFilesEvidence = formatChangedFilesEvidence(storyChangedFiles);
   const subsystemEvidence = formatSubsystemEvidence(subsystems);
   const diffStat = getDiffStat(rangeSpec);
-  const focusedPatch = getFocusedPatch(rangeSpec, changedFiles);
+  const focusedPatch = getFocusedPatch(rangeSpec, storyChangedFiles);
+  const featurePatch = sh(`git diff --unified=0 --no-color ${rangeSpec}`, '');
   const releaseTypeContext = buildReleaseTypeContext(tag, prevTag, releaseType);
+  const featureCandidates = extractFeatureCandidates(storyChangedFiles, featurePatch);
 
   const fallbackNotes = {
-    intro: buildIntro(tag, releaseType, highlightAreas, intentCounts),
-    highlights: highlightAreas.map((area) => area.bullet),
+    intro: buildIntro(tag, releaseType, highlightAreas, intentCounts, featureCandidates),
+    highlights: dedupeStrings(
+      [...featureCandidates.map((candidate) => candidate.highlight), ...highlightAreas.map((area) => area.bullet)],
+      MAX_HIGHLIGHTS,
+    ),
     breakingChanges,
-    spotlights: highlightAreas.slice(0, MAX_SPOTLIGHTS),
-    buckets,
+    spotlights: dedupeSpotlights(
+      [...featureCandidates.map((candidate) => ({ title: candidate.title, summary: candidate.summary })), ...highlightAreas],
+      MAX_SPOTLIGHTS,
+    ),
+    buckets: {
+      ...buckets,
+      feature: dedupeStrings(
+        [...featureCandidates.map((candidate) => candidate.bucket), ...buckets.feature],
+        MAX_BUCKET_ITEMS,
+      ),
+    },
   };
 
   let content = fallbackNotes;
@@ -1212,6 +1439,7 @@ async function main() {
         prevTag,
         releaseType,
         releaseTypeContext,
+        featureCandidates,
         architectureContext,
         subsystemEvidence,
         changedFilesEvidence,
