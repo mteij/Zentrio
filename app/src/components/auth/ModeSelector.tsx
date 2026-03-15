@@ -51,7 +51,7 @@ export function ModeSelector({ onModeSelected }: ModeSelectorProps) {
               Welcome to Zentrio
             </h1>
             <p className="text-zinc-400 text-sm">
-              Stream your way, on your terms
+              Stream anything. Own everything.
             </p>
           </div>
 

@@ -1,146 +1,173 @@
-# Development Guide
+# Development
 
-[API Documentation](https://app.zentrio.eu/api/docs)
+Zentrio is a monorepo with three main surfaces:
 
-Welcome to the Zentrio developer documentation. Zentrio is a modern streaming platform utilizing a unique architecture to deliver seamless experiences across Web, Desktop, and Mobile.
+- `app/`: the product codebase
+- `docs/`: the VitePress docs site
+- `landing/`: the marketing website
 
-## Technology Stack
+If you are working on the actual app, you will spend nearly all of your time in `app/`.
 
-- **Frontend**: React 19, Vite, Tailwind CSS (v4), Zustand
-- **Backend (API)**: Hono, SQLite (`bun:sqlite`), Better Auth
-- **Native Shell**: Tauri v2, Rust
-- **Runtime & Tooling**: Bun, TypeScript
+## Stack
 
-## Application Architecture
+- Frontend: React 19, React Router 7, TanStack Query, Zustand, Vite
+- Backend: Bun, Hono, SQLite, Better Auth
+- Native shell: Tauri v2 with Rust
+- Tooling: TypeScript, Vitest, ESLint, Knip
 
-Zentrio's architecture separates the React frontend from the Hono API backend. How these two pieces interact depends on the environment you are running in:
+## Architecture Overview
 
-### 1. The Web Environment
+Zentrio has three runtime contexts:
 
-When hosted as a standard web application, Zentrio runs a Node/Bun server. The compiled React frontend (the `dist/` output from Vite) is statically served by the Hono API server, which simultaneously handles all `/api/*` data requests.
+| Context | Entry point | Notes |
+| --- | --- | --- |
+| Bun server | `app/src/index.ts` | Serves the API and the SPA |
+| Client app | `app/src/main.tsx` | Runs in the browser or Tauri WebView |
+| Native shell | `app/src-tauri/src/lib.rs` | Owns Tauri plugins, commands, and downloads |
 
-```mermaid
-flowchart TD
-    Browser("Web Browser")
+Current streaming split:
 
-    subgraph Server["Node / Bun Server"]
-        API("Hono API Server")
-        ReactApp("React App (dist/)")
-    end
+- first-party app state stays on the backend
+- third-party addon requests increasingly happen on the client
+- native clients can also use a local gateway for selected remote read routes
+- the older server-side SSE stream endpoint still exists for compatibility
 
-    DB[("SQLite")]
+For the full repository map, read `llm/ARCHITECTURE.md`.
 
-    Browser -->|"Request Site"| ReactApp
-    Browser -->|"API Calls (/api/*)"| API
-    API <--> DB
-```
-
-### 2. The Native App Environment (Tauri v2)
-
-For Desktop and Mobile apps, Zentrio uses **Tauri v2**.
-
-- **The UI**: The React frontend is compiled locally and injected directly into Tauri's native webview.
-- **The API sidecar**: Tauri launches the backend API as a native external binary (sidecar) packaged within the app installer (e.g., `bin/zentrio-server`). The frontend then communicates with this local server over localhost.
-
-```mermaid
-flowchart TD
-    subgraph OS["Operating System"]
-        subgraph App["Zentrio Native App"]
-            Webview["Tauri Webview (React Frontend)"]
-            Sidecar("zentrio-server (Binary Sidecar)")
-        end
-        LocalDB[("Local SQLite")]
-    end
-
-    RemoteServer("Remote Zentrio Server")
-
-    Webview -->|"API Calls"| Sidecar
-    Sidecar <--> LocalDB
-    Sidecar <-->|"Syncs State"| RemoteServer
-```
-
----
-
-## Local Development Setup
+## Local Setup
 
 ### Prerequisites
 
-Before diving in, ensure you have the following installed on your machine:
+- [Bun](https://bun.sh)
+- Optional native tooling if you want to run Tauri:
+  - [Rust](https://rustup.rs)
+  - Android Studio for Android builds
+  - Xcode for iOS-related work
 
-- **[Bun](https://bun.sh)**: Used as the package manager and javascript runtime.
-- **Native Tooling** (Optional): [Rust](https://rustup.rs/), [Android Studio](https://developer.android.com/studio), or [Xcode](https://developer.apple.com/xcode/) if you plan to build Tauri apps.
+### Install dependencies
 
-### 1. Clone and Install
-
-Begin by grabbing the code and installing the application dependencies.
+From `app/`:
 
 ```bash
-git clone https://github.com/mteij/Zentrio.git
-cd Zentrio/app
 bun install
 ```
 
-### 2. Environment Variables
+From `docs/` if you want to work on the docs site:
 
-Copy the example config and fill in your values. The `.env` file lives in the **repository root** (not `app/`):
+```bash
+bun install
+```
+
+### Environment
+
+Copy `.env.example` to `.env` in the repository root:
 
 ```bash
 cp .env.example .env
 ```
 
-At minimum you need:
+Minimum useful local config:
 
-```bash
-AUTH_SECRET=dev-secret-change-in-production
+```txt
+AUTH_SECRET=dev-secret
 ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 TMDB_API_KEY=your-tmdb-api-key
 DATABASE_URL=./data/zentrio.db
+APP_URL=http://localhost:3000
+CLIENT_URL=http://localhost:5173
 ```
 
-See [`.env.example`](../.env.example) for all available options.
+## Running the Web App
 
-### 3. Start Development Servers (Web)
+Run these from `app/` in separate terminals.
 
-Because Zentrio splits the frontend and backend, you must run both concurrently during local development.
-
-Open two separate terminal windows in the `app` directory:
-
-**Terminal 1: Start the Frontend (Vite)**
+### Frontend
 
 ```bash
 bun run dev
 ```
 
-_The React UI runs at `http://localhost:5173`._
+Vite serves the frontend on `http://localhost:5173`.
 
-**Terminal 2: Start the Backend (Hono)**
+### Backend
 
 ```bash
 bun run dev:server
 ```
 
-_Vite automatically proxies API requests to this backend instance._
+The Bun/Hono server listens on `http://localhost:3000`.
 
----
+In development, the frontend talks to the backend through Vite/dev routing and the shared root `.env`.
 
-## Building Native Apps (Tauri v2)
+## Running Native Builds
 
-To run the native GUI applications locally, use the Tauri CLI commands configured in our `package.json`.
+From `app/`:
 
-**Desktop (Windows / macOS / Linux):**
-
-```bash
-bun run tauri dev
-```
-
-**Mobile Development:**
+### Desktop
 
 ```bash
-# Android
-bun run tauri:android:init  # Run once to setup Android Studio project
-bun run tauri:android:dev   # Start Android development
-
-# iOS
-bun run tauri ios init      # Run once to setup Xcode project
-bun run tauri ios dev       # Start iOS development
+bun run tauri:dev
 ```
+
+### Android
+
+```bash
+bun run tauri:android:init
+bun run tauri:android:dev
+```
+
+Notes:
+
+- the app has active Android support
+- iOS artifacts exist in the repo, but support is not the primary active path right now
+- native downloads and some deep-link flows are only visible in Tauri builds
+
+## Useful Commands
+
+From `app/`:
+
+```bash
+bun run type-check
+bun run test
+bun run lint
+bun run knip
+bun run build
+```
+
+From `docs/`:
+
+```bash
+bun run dev
+bun run build
+```
+
+## Working Conventions
+
+- Keep route handlers thin and move reusable logic into `app/src/services/`.
+- Use `apiFetch` for internal API calls from client code.
+- Use `addon-client.ts` and `addon-fetch.ts` for third-party addon URLs.
+- Do not import Bun-only modules into client code.
+- Prefer existing hooks, stores, and UI primitives before creating new ones.
+- Keep schema changes inside the database layer and migrations.
+
+## Important Files
+
+| Path | Why it matters |
+| --- | --- |
+| `app/src/index.ts` | Bun server bootstrap |
+| `app/src/App.tsx` | Main client route tree and app orchestration |
+| `app/src/routes/api/index.ts` | API mount point |
+| `app/src/routes/api/streaming.ts` | Streaming dashboard, metadata, progress, and IntroDB endpoints |
+| `app/src/lib/stream-resolver.ts` | Client-side progressive stream resolution |
+| `app/src/routes/api/gateway.ts` | Local-only remote read gateway for native connected mode |
+| `app/src-tauri/src/lib.rs` | Native entry point and command registration |
+| `app/src-tauri/src/downloads/` | Native download engine |
+
+## Docs and Landing Site
+
+Other workspaces in the repo:
+
+- `docs/` is the product documentation site.
+- `landing/` is the separate marketing/release website.
+
+Those are intentionally separate from the main app and may have different dependencies and build pipelines.

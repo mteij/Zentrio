@@ -1,8 +1,8 @@
 {
   "name": "zentrio",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "license": "MIT",
-  "description": "Zentrio - Stream Your Way",
+  "description": "Zentrio - Stream anything. Own everything.",
   "scripts": {
     "dev": "vite",
     "dev:server": "bun run --hot src/index.ts",

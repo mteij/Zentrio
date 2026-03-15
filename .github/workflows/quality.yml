@@ -21,12 +21,14 @@ jobs:
       eslint_warnings: ${{ steps.eslint.outputs.warnings }}
       ts_errors: ${{ steps.typecheck.outputs.errors }}
       tests_passed: ${{ steps.tests.outputs.passed }}
+      server_build_ok: ${{ steps.server_build.outputs.ok }}
       rustfmt_ok: ${{ steps.rustfmt.outputs.fmt_ok }}
       clippy_errors: ${{ steps.clippy.outputs.errors }}
       clippy_warnings: ${{ steps.clippy.outputs.warnings }}
       knip_unused_files: ${{ steps.knip.outputs.unused_files }}
       score: ${{ steps.score.outputs.score }}
       grade: ${{ steps.score.outputs.grade }}
+      status: ${{ steps.score.outputs.status }}
       color: ${{ steps.score.outputs.color }}
 
     steps:
@@ -124,7 +126,19 @@ jobs:
 
       # ── Server Build ────────────────────────────────────────────────────────
       - name: Build Server Binary (Linux host)
-        run: cd app && bun build src/index.ts --compile --target bun-linux-x64 --outfile src-tauri/bin/zentrio-server-x86_64-unknown-linux-gnu
+        id: server_build
+        run: |
+          set +e
+          cd app
+          bun build src/index.ts --compile --target bun-linux-x64 --outfile src-tauri/bin/zentrio-server-x86_64-unknown-linux-gnu
+          exit_code=$?
+          if [ $exit_code -eq 0 ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "Server build passed"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "Server build failed (score will be affected)"
+          fi
 
       # ── Rust ────────────────────────────────────────────────────────────────
       - name: Setup Rust
@@ -182,6 +196,7 @@ jobs:
           ESLINT_ERRORS="${{ steps.eslint.outputs.errors || '0' }}"
           ESLINT_WARNINGS="${{ steps.eslint.outputs.warnings || '0' }}"
           TESTS_PASSED="${{ steps.tests.outputs.passed || 'false' }}"
+          SERVER_BUILD_OK="${{ steps.server_build.outputs.ok || 'false' }}"
           KNIP_UNUSED="${{ steps.knip.outputs.unused_files || '0' }}"
           CLIPPY_ERRORS="${{ steps.clippy.outputs.errors || '0' }}"
           CLIPPY_WARNINGS="${{ steps.clippy.outputs.warnings || '0' }}"
@@ -193,6 +208,7 @@ jobs:
           #   ESLint errors:       -10 per error (max -50)
           #   ESLint warnings:     -3 per warning (max -30)
           #   Tests failed:        -25
+          #   Server build failed: -25
           #   Unused files (knip): -3 per file (max -15)
           #   Rust fmt issues:     -10
           #   Clippy errors:       -10 per error (max -30)
@@ -205,6 +221,7 @@ jobs:
           esl_err  = int(os.environ.get('ESLINT_ERRORS', '0'))
           esl_warn = int(os.environ.get('ESLINT_WARNINGS', '0'))
           tests_ok = os.environ.get('TESTS_PASSED', 'false') == 'true'
+          build_ok = os.environ.get('SERVER_BUILD_OK', 'false') == 'true'
           knip_files = int(os.environ.get('KNIP_UNUSED', '0'))
           clip_err = int(os.environ.get('CLIPPY_ERRORS', '0'))
           clip_w   = int(os.environ.get('CLIPPY_WARNINGS', '0'))
@@ -216,6 +233,8 @@ jobs:
           score -= min(esl_warn * 3,  30)
           if not tests_ok:
               score -= 25
+          if not build_ok:
+              score -= 25
           score -= min(knip_files * 3, 15)
           if not rustfmt_ok:
               score -= 10
@@ -223,26 +242,30 @@ jobs:
           score -= min(clip_w   * 3,  20)
 
           score = max(0, score)
+          critical_failures = ts_err > 0 or esl_err > 0 or esl_warn > 0 or not tests_ok or not build_ok
 
-          if score >= 90:
-              grade, color = "A", "brightgreen"
+          if critical_failures:
+              grade, status, color = "Failing", "Failing", "red"
+          elif score >= 90:
+              grade, status, color = "A", "Passing", "brightgreen"
           elif score >= 80:
-              grade, color = "B", "green"
+              grade, status, color = "B", "Passing", "green"
           elif score >= 70:
-              grade, color = "C", "yellowgreen"
+              grade, status, color = "C", "Passing", "yellowgreen"
           elif score >= 60:
-              grade, color = "D", "yellow"
+              grade, status, color = "D", "Passing", "yellow"
           elif score >= 40:
-              grade, color = "E", "orange"
+              grade, status, color = "E", "Passing", "orange"
           else:
-              grade, color = "F", "red"
+              grade, status, color = "F", "Passing", "red"
 
-          print(f"Score: {score}/100  Grade: {grade}  Color: {color}")
+          print(f"Score: {score}/100  Grade: {grade}  Status: {status}  Color: {color}")
 
           # Write to GITHUB_OUTPUT
           with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
               fh.write(f"score={score}\n")
               fh.write(f"grade={grade}\n")
+              fh.write(f"status={status}\n")
               fh.write(f"color={color}\n")
           PYEOF
 
@@ -254,11 +277,13 @@ jobs:
           {
             "score": "${{ steps.score.outputs.score }}",
             "grade": "${{ steps.score.outputs.grade }}",
+            "status": "${{ steps.score.outputs.status }}",
             "color": "${{ steps.score.outputs.color }}",
             "ts_errors": "${{ steps.typecheck.outputs.errors }}",
             "eslint_errors": "${{ steps.eslint.outputs.errors }}",
             "eslint_warnings": "${{ steps.eslint.outputs.warnings }}",
             "tests_passed": "${{ steps.tests.outputs.passed }}",
+            "server_build_ok": "${{ steps.server_build.outputs.ok }}",
             "knip_unused_files": "${{ steps.knip.outputs.unused_files }}",
             "rustfmt_ok": "${{ steps.rustfmt.outputs.fmt_ok }}",
             "clippy_errors": "${{ steps.clippy.outputs.errors }}",
@@ -285,11 +310,13 @@ jobs:
           echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
           echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
           echo "| **Score** | **${{ steps.score.outputs.score }}/100** |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Status** | **${{ steps.score.outputs.status }}** |" >> "$GITHUB_STEP_SUMMARY"
           echo "| **Grade** | **${{ steps.score.outputs.grade }}** |" >> "$GITHUB_STEP_SUMMARY"
           echo "| TypeScript errors | ${{ steps.typecheck.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| ESLint errors | ${{ steps.eslint.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| ESLint warnings | ${{ steps.eslint.outputs.warnings }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Tests | ${{ steps.tests.outputs.passed == 'true' && '✅ passed' || '❌ failed' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Server build | ${{ steps.server_build.outputs.ok == 'true' && 'passed' || 'failed' }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Unused files (knip) | ${{ steps.knip.outputs.unused_files }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Rust fmt | ${{ steps.rustfmt.outputs.fmt_ok == 'true' && '✅ OK' || '❌ issues' }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Clippy errors | ${{ steps.clippy.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"

@@ -1,531 +1,646 @@
-# Zentrio — Architecture Reference
+# Zentrio - Architecture Reference
 
-**This document is the authoritative map of the codebase.**
-Before creating a new file or utility, check here first — the thing you need probably already exists.
-This file is tool-agnostic and applies to all AI assistants (Claude Code, GitHub Copilot, Cursor, Kilo Code, etc.) and human contributors.
+This file is the current source-of-truth map of the repository.
+Read it before adding new files, helpers, routes, or platform abstractions.
 
----
+It is written for both humans and coding assistants.
 
 ## What Zentrio Is
 
-A self-hosted streaming platform with a Stremio-compatible addon system. It targets three environments:
-- **Web** — React SPA served by the Hono backend
-- **Desktop** — Tauri v2 (Windows, macOS, Linux) with the backend as a sidecar binary
-- **Mobile** — Tauri v2 Android/iOS
+Zentrio is a self-hosted streaming platform built around:
 
-The codebase lives entirely in `app/src/`. All commands run from `app/` using Bun.
+- a React frontend
+- a Bun + Hono backend
+- a Tauri v2 native shell for desktop and mobile
+- a Stremio-compatible addon ecosystem
 
----
+The project currently supports three product shapes:
 
-## Streaming Boundary
+- Web: React SPA served by the Bun/Hono server
+- Desktop: Tauri app with a Rust shell and a bundled Bun sidecar in production
+- Mobile: Tauri Android/iOS shell plus the same React app and Rust command layer
 
-Zentrio is in a transition state.
+## Current Architecture Snapshot
 
-- **Target architecture:** the hosted backend owns auth, profiles, settings, history, sync, enrichment, and trusted first-party integrations. Third-party addon stream resolution happens on the client, and media playback goes directly from client to the final media URL.
-- **Phase 1 current state:** third-party stream resolution now runs client-side for the main playback flow. Web may still fall back to `/api/addon-proxy` as a temporary hosted compatibility bridge for non-CORS addons. Metadata/catalog/details remain mixed between backend and client paths for now.
-- **Alpha rule:** client and server are expected to be updated together. Stable-version compatibility work can be added later, but the alpha codepath stays optimized for the current stack.
+Zentrio is in a hybrid phase. The important boundaries are:
 
-## Runtime Environments
+- First-party state stays trusted on the backend: auth, profiles, settings, history, admin, sync, analytics, filtering, and secret-backed integrations.
+- Third-party addon fetching increasingly happens on the client:
+  - Tauri uses direct HTTP for external addon URLs.
+  - Web tries direct fetch first and falls back to `/api/addon-proxy` when CORS blocks the addon.
+- Stream resolution for the main playback flow is now client-side through `src/lib/stream-resolver.ts`.
+- The legacy server-driven SSE endpoint `/api/streaming/streams-live` still exists for compatibility and gateway forwarding.
+- Native connected mode also has a local-only read gateway at `/api/gateway/*` so the sidecar can proxy selected read routes to a remote server.
 
-Two distinct runtime contexts exist in this project. Always know which one you are writing code for.
+Alpha rule: the client, Bun server, and native shell are expected to move together. Do not optimize for backward compatibility over code clarity unless the task explicitly requires it.
 
-| Context | Where it runs | Entry point | Logging |
-|---|---|---|---|
-| **Server** | Bun process (Node-like) | `src/index.ts` | `src/services/logger.ts` |
-| **Client** | Browser / Tauri WebView | `src/main.tsx` | `src/utils/client-logger.ts` |
+## Repo Layout
 
-Server code may **never** import browser APIs (`window`, `document`, `localStorage`, `import.meta.env`).
-Client code may **never** import `bun:sqlite`, `src/services/envParser.ts`, or any server-only service.
+Top-level directories:
 
----
+| Path | Purpose |
+| --- | --- |
+| `app/` | Main product code: frontend, backend, native shell |
+| `docs/` | Public VitePress documentation site |
+| `landing/` | Marketing/landing site |
+| `llm/` | Internal contributor/assistant reference docs |
 
-## Directory Map
+Operational rules:
 
-### `src/index.ts` — Backend entry point
-Sets up the Hono app: applies middleware (CORS, security headers, rate limiter), mounts all API routers, serves the compiled `dist/` SPA in production, and handles the SPA fallback route. **Do not add business logic here.** Route logic belongs in `src/routes/`, services in `src/services/`.
+- App commands run from `app/`.
+- The root `.env` file lives in the repository root, not `app/`.
+- Docker and repo-level orchestration live at the repository root.
 
-### `src/main.tsx` + `src/renderer.tsx` — Frontend entry points
-`main.tsx` bootstraps React and mounts the app. `renderer.tsx` wraps the `<App>` tree with providers. Do not add routing or page logic here.
+## Runtime Boundaries
 
-### `src/App.tsx` — React router + lazy loading
-Defines all client-side routes using React Router v7. All pages are lazy-loaded (`React.lazy`) for code splitting. Add new page routes here.
+There are three real execution contexts in this repo.
 
----
+| Context | Runs where | Main entry point | Logging |
+| --- | --- | --- | --- |
+| Server | Bun process | `app/src/index.ts` | `app/src/services/logger.ts` |
+| Client | Browser or Tauri WebView | `app/src/main.tsx` | `app/src/utils/client-logger.ts` |
+| Native | Rust/Tauri host | `app/src-tauri/src/lib.rs` | Rust `println!` / Tauri event flow |
 
-### `src/routes/api/` — Hono API route handlers
+Hard boundary rules:
 
-Each file is a self-contained Hono router mounted under `/api/*`.
+- Server code must not depend on browser globals like `window`, `document`, `localStorage`, or `import.meta.env`.
+- Client code must not import Bun-only modules like `bun:sqlite` or server-only services like `src/services/envParser.ts`.
+- Native Rust code owns Tauri commands, OS integration, downloads, and plugin registration. Do not reimplement those concerns in TypeScript.
 
-| File | Mounted at | Purpose |
-|---|---|---|
-| `index.ts` | `/api` | Mounts all sub-routers |
-| `auth.ts` | `/api/auth` | Better Auth (email, magic link, OTP, 2FA, SSO) |
-| `profiles.ts` | `/api/profiles` | User profiles CRUD |
-| `user.ts` | `/api/user` | User settings, TMDB API key |
-| `streaming.ts` | `/api/streaming` | Stream URL resolution. Also exposes `POST /api/streaming/filter-enrich` — accepts `{ items: MetaPreview[], profileId: number }`, applies server-side parental filtering + watch history enrichment, returns `{ items: MetaPreview[] }`. Call this after any client-side addon fetch. Also exposes `GET /api/streaming/segments?imdbId=tt...&season=X&episode=X` — fetches intro/recap/outro timestamps from IntroDB, caches in `introdb_cache`, and falls back to cached data when offline. |
-| `addons.ts` | `/api/addons` | Stremio-compatible addon management |
-| `lists.ts` | `/api/lists` | Watchlists with sharing |
-| `appearance.ts` | `/api/appearance` | Theme/appearance settings |
-| `sync.ts` | `/api/sync` | Cloud sync |
-| `trakt.ts` | `/api/trakt` | Trakt.tv integration |
-| `gateway.ts` | `/api/gateway` | Proxy gateway |
-| `admin.ts` | `/api/admin` | Admin panel (RBAC + step-up auth) |
+## App Entry Points
+
+### `app/src/index.ts`
+
+Backend bootstrap.
+
+Responsibilities:
+
+- loads env from the repo root via `initEnv()`
+- initializes IMDb and background sync services
+- applies middleware for CORS, security headers, body limits, rate limiting, and optional request logging
+- records client platform hints for admin analytics using the `X-Zentrio-Client` header
+- serves built assets and SPA fallbacks
+- mounts `/api/*` routers and non-API view routes
+
+Non-goal:
+
+- business logic does not belong here
+
+### `app/src/main.tsx` and `app/src/renderer.tsx`
+
+Frontend bootstrapping only.
+
+- `main.tsx` mounts React
+- `renderer.tsx` wires providers around the app tree
+
+Do not put app-specific data flow or route behavior here.
+
+### `app/src/App.tsx`
+
+Client router and high-level app orchestration.
+
+Key responsibilities:
+
+- React Router route tree
+- lazy loading for page-level code splitting
+- TanStack Query client setup
+- Tauri onboarding and connected-vs-guest mode flow
+- deep link handling for native auth flows
+- route protection via auth/admin guards
+
+## Route Layer
+
+All Bun API routers live in `app/src/routes/api/`.
+Each file should validate input, call services, and return a response.
+Do not bury business rules directly in route handlers if a reusable service is the better home.
+
+### `app/src/routes/api/index.ts`
+
+Mounts the API surface and also owns:
+
+- `GET /api`
+- `GET /api/health`
+- OpenAPI generation
+- Scalar docs at `/api/docs`
+
+### Route Map
+
+| File | Mount | Purpose |
+| --- | --- | --- |
+| `auth.ts` | `/api/auth` | Better Auth flows plus native/mobile helper endpoints like provider discovery, identify, link proxy, and mobile callback handling |
+| `profiles.ts` | `/api/profiles` | Profile CRUD plus per-profile proxy/filter settings |
+| `user.ts` | `/api/user` | Settings profiles, user settings, linked accounts, TMDB key, email/password/username/account management |
+| `streaming.ts` | `/api/streaming` | Streaming settings, dashboard data, details, catalog/search, progress/history, subtitles, stream endpoints, IntroDB segment fetch/submit, filter-enrich |
+| `addons.ts` | `/api/addons` | Addon install/remove/list, enable/disable/reorder per settings profile |
+| `lists.ts` | `/api/lists` | Watchlists and sharing |
+| `appearance.ts` | `/api/appearance` | Appearance settings |
+| `sync.ts` | `/api/sync` | Native/cloud sync config plus sync token, push, and pull endpoints |
+| `trakt.ts` | `/api/trakt` | Trakt availability, auth flows, sync, recommendations, scrobble, and check-in |
+| `gateway.ts` | `/api/gateway` | Local-sidecar-only read gateway that forwards selected remote read routes for connected Tauri mode |
+| `admin.ts` | `/api/admin` | Admin status/setup, stats, charts, platform analytics, users, audit log, and step-up verification |
 | `avatar.ts` | `/api/avatar` | Avatar generation |
-| `proxy.ts` | `/api/addon-proxy` | Thin CORS proxy for external addon URLs (web only — Tauri fetches directly). Accepts `?url=<encoded>`, validates against SSRF, passes response through unchanged. |
-| `tmdb-proxy.ts` | `/api/tmdb` | TMDB API proxy — injects the API key server-side so it never reaches the client. Endpoints: `GET /trending`, `GET /trending/:type`, `GET /catalog/:type/:id`, `GET /meta/:type/:id`. |
-| `openapi.ts` | `/api/openapi.json` | OpenAPI spec generator (Zod → OpenAPI schema) |
-| `openapi-route.ts` | `/api/docs` | Scalar UI + spec endpoint mounting |
-| `views.ts` | (non-API) | Server-side redirect routes (e.g. deep link redirects) |
+| `proxy.ts` | `/api/addon-proxy` | Thin SSRF-guarded compatibility proxy for external addon URLs |
+| `tmdb-proxy.ts` | `/api/tmdb` | Internal TMDB-addon facade; keeps API keys server-side |
+| `openapi.ts` | `/api/openapi.json` support | OpenAPI schema definitions and generation helpers |
+| `openapi-route.ts` | shared helper | Route tagging and OpenAPI helper utilities |
 
-Route handlers call services — they do not contain business logic directly. A route handler should: validate input (Zod), call a service, return a response.
-
----
-
-### `src/services/` — All backend business logic
-
-#### `src/services/logger.ts`
-**The only logging utility for server-side code.** Uses ANSI color codes for terminal output. Import as:
-```ts
-import { logger } from '@/services/logger'
-const log = logger.scope('MyService')
-log.info('...') | log.warn('...') | log.error('...')
-```
-Never use `console.log` in server code.
-
-#### `src/services/auth.ts`
-Better Auth configuration and instance. The single place that configures all auth plugins (twoFactor, magicLink, emailOTP, oidcProvider, etc.). Do not add auth logic elsewhere.
-
-#### `src/services/envParser.ts`
-Reads and validates environment variables from the `.env` file at `../` (repo root). The only place that touches `process.env` for config. All other code that needs env vars should call `getConfig()` from here.
-
-#### `src/services/encryption.ts`
-Encryption/decryption utilities using the `ENCRYPTION_KEY` env var. Use for any sensitive data storage.
-
-#### `src/services/email.ts` + `src/services/email/templates.ts`
-`email.ts` — email sending service (Resend or SMTP, configured via env). Use for all outbound email.
-`email/templates.ts` — HTML email template definitions. Add new templates here.
-
-#### `src/services/imdb.ts`
-IMDb ratings and metadata fetching. Provides supplementary rating data beyond TMDB.
-
-#### `src/services/database.ts`
-Standalone barrel-style re-export of the `database/` directory. Prefer importing directly from `@/services/database/connection` or specific files rather than this file.
-
-#### `src/services/sync.ts`
-Background sync service. Manages periodic sync jobs.
-
-#### `src/services/avatar.ts`
-Avatar generation using DiceBear. Called by the avatar route.
-
-#### `src/services/database/`
-SQLite database layer via `bun:sqlite`.
+### Non-API routes
 
 | File | Purpose |
-|---|---|
-| `connection.ts` | DB initialization, all `CREATE TABLE IF NOT EXISTS` schema definitions, seed data. Includes `introdb_cache` table for IntroDB segment caching. |
-| `migrations.ts` | Incremental schema migrations run at startup |
-| `addons.ts` | Addon CRUD operations |
-| `appearance.ts` | Appearance settings read/write |
-| `lists.ts` | Watchlist CRUD + sharing |
-| `profile.ts` | User profile CRUD |
-| `user.ts` | User-level settings |
-| `settings-profile.ts` | Settings profile CRUD |
-| `proxy.ts` | Proxy session storage |
-| `stream.ts` | Stream cache/history |
-| `trakt.ts` | Trakt token storage |
-| `watch-history.ts` | Watch history read/write |
-| `utils.ts` | Shared DB query helpers |
-| `types.ts` | DB row type definitions |
+| --- | --- |
+| `app/src/routes/views.ts` | Redirect-style view routes and deep-link oriented server responses |
+
+### Important Streaming Endpoints
+
+`streaming.ts` is one of the most important files in the backend. It currently exposes:
+
+- `/settings`
+- `/streams/:type/:id`
+- `/streams-live/:type/:id`
+- `/subtitles/:type/:id`
+- `/search`
+- `/search-catalogs`
+- `/catalog`
+- `/catalog-items`
+- `/progress`
+- `/progress/:type/:id`
+- `/series-progress/:id`
+- `/mark-watched`
+- `/mark-season-watched`
+- `/mark-series-watched`
+- `/mark-episodes-before`
+- `/details/:type/:id`
+- `/filters`
+- `/dashboard`
+- `/filter-enrich`
+- `/segments`
+- `/segments/submit`
+
+Notes:
+
+- `/streams-live` is a compatibility path, not the preferred new client architecture.
+- `/filter-enrich` is the server-side parental-filter and watch-history enrichment pass for client-fetched catalog data.
+- `/segments` fetches IntroDB data server-side and caches it in SQLite.
+- `/segments/submit` submits IntroDB segments with the API key stored in streaming settings.
+
+### Important Admin Endpoints
+
+`admin.ts` currently includes:
+
+- `/status`
+- `/setup`
+- `/me`
+- `/stats`
+- `/activity/live`
+- `/dashboard/charts`
+- `/stats/platforms`
+- `/system/health`
+- `/users`
+- `/users/:id`
+- `/users/:id/role`
+- `/users/:id/ban`
+- `/users/:id/unban`
+- `/audit`
+- `/audit/stats`
+- `/audit/verify`
+- `/stepup/request`
+- `/stepup/verify`
+- `/stepup/status`
+
+Admin route rule:
+
+- every protected admin route should go through `adminSessionMiddleware`
+- permission-gated routes should also use `requirePermission(...)`
+- sensitive mutations should additionally require `adminStepUpMiddleware`
+
+## Middleware
+
+`app/src/middleware/`
+
+| File | Purpose |
+| --- | --- |
+| `security.ts` | CORS, security headers, body limit, and global rate limiter |
+| `session.ts` | Regular session and guest-mode middleware |
+| `admin.ts` | Admin session, RBAC enforcement, and step-up checks |
+
+## Service Layer
+
+Server-side business logic lives in `app/src/services/`.
+
+### Core Services
+
+| File | Purpose |
+| --- | --- |
+| `logger.ts` | Canonical Bun/server logger. Never use `console.log` in server code. |
+| `envParser.ts` | Canonical env loader and typed config reader. The only place that should interpret `process.env`. |
+| `auth.ts` | Better Auth server configuration and plugin wiring |
+| `email.ts` | Outbound email sending |
+| `email/templates.ts` | Email HTML templates |
+| `encryption.ts` | Secret-backed encryption/decryption helpers |
+| `imdb.ts` | IMDb dataset ingest/update logic |
+| `sync.ts` | Background sync orchestration |
+| `avatar.ts` | DiceBear avatar generation |
+
+### Database Layer
+
+`app/src/services/database/` is the canonical SQLite access layer.
+
+| File | Purpose |
+| --- | --- |
+| `connection.ts` | DB bootstrap, schema creation, and seed/setup logic |
+| `migrations.ts` | Incremental schema migrations |
+| `addons.ts` | Addon persistence |
+| `appearance.ts` | Appearance settings persistence |
+| `lists.ts` | Watchlist persistence |
+| `profile.ts` | Profile persistence |
+| `settings-profile.ts` | Settings-profile persistence |
+| `proxy.ts` | Proxy session persistence |
+| `stream.ts` | Streaming settings/cache/history persistence |
+| `trakt.ts` | Trakt account and sync-state persistence |
+| `watch-history.ts` | Watch history persistence |
+| `user.ts` | User/account persistence |
+| `utils.ts` | DB helpers |
+| `types.ts` | DB row types |
 | `index.ts` | Re-exports |
 
-**Schema rule:** All table definitions live in `connection.ts`. Never define a table in a service file. New columns go through `migrations.ts`.
+Schema rule:
 
-#### `src/services/addons/`
-Stremio-compatible addon system.
+- tables and indexes belong in `connection.ts`
+- schema changes should go through `migrations.ts`
 
-| File | Purpose |
-|---|---|
-| `addon-manager.ts` | Addon lifecycle: install, remove, enable/disable, ordering |
-| `client.ts` | Fetches catalog/meta/stream responses from addon URLs |
-| `zentrio-client.ts` | Client for the Zentrio addon hub |
-| `stream-processor.ts` | Normalizes and ranks stream results from multiple addons |
-| `stream-cache.ts` | Caches stream results to avoid redundant addon calls |
-| `stream-service.ts` | Orchestrates addon calls for stream resolution |
-| `meta-service.ts` | Fetches metadata via addons |
-| `meta-normalizer.ts` | Normalizes metadata from different addon formats |
-| `content-filter.ts` | Filters content based on user preferences |
-| `types.ts` | Shared addon type definitions |
+### Addon Services
 
-#### `src/services/admin/`
-Admin-only backend logic.
+`app/src/services/addons/`
 
 | File | Purpose |
-|---|---|
-| `rbac.ts` | RBAC: roles, permissions, role assignment |
-| `stepup.ts` | Step-up OTP: generate, verify, invalidate challenges |
-| `audit.ts` | Audit log: write and query audit events |
+| --- | --- |
+| `addon-manager.ts` | High-level orchestration for catalog/meta/stream/subtitle queries and addon lifecycle |
+| `client.ts` | Server-side Stremio addon client |
+| `zentrio-client.ts` | Zentrio addon hub client |
+| `stream-service.ts` | Server-side stream orchestration |
+| `stream-processor.ts` | Filtering, scoring, dedupe, and ordering logic for streams |
+| `stream-cache.ts` | Stream cache used by legacy server-side flow |
+| `meta-service.ts` | Metadata fetching |
+| `meta-normalizer.ts` | Metadata normalization |
+| `content-filter.ts` | Parental filtering and content enrichment |
+| `types.ts` | Shared addon types |
 
-#### `src/services/hybrid-media/`
-In-browser media transcoding pipeline using ffmpeg.wasm.
+### TMDB Services
 
-| File | Purpose |
-|---|---|
-| `HybridEngine.ts` | Orchestrates the full pipeline |
-| `Demuxer.ts` | Splits container into A/V streams |
-| `VideoRemuxer.ts` | Remuxes video to browser-compatible container |
-| `AudioStreamTranscoder.ts` | Transcodes audio stream |
-| `ChunkedAudioTranscoder.ts` | Chunked audio transcoding for long files |
-| `StreamingAudioTranscoder.ts` | Streaming audio transcoding |
-| `TranscoderService.ts` | High-level transcoder API |
-| `NetworkReader.ts` | Reads media data from network URLs |
-| `types.ts` + `index.ts` | Types and re-exports |
+`app/src/services/tmdb/`
 
-#### `src/services/tmdb/`
-TMDB API integration. All TMDB calls go through here.
+These back Zentrio's internal TMDB addon and related metadata helpers.
 
 | File | Purpose |
-|---|---|
-| `client.ts` | Authenticated TMDB HTTP client (uses per-user API keys) |
-| `catalog.ts` | Catalog/list queries |
-| `meta.ts` | Movie/show metadata |
-| `trending.ts` | Trending content |
+| --- | --- |
+| `client.ts` | TMDB HTTP client and key validation |
+| `catalog.ts` | Catalog queries |
+| `meta.ts` | Detailed metadata |
+| `trending.ts` | Trending feeds |
 | `search.ts` | Search |
-| `episodes.ts` | Episode data |
-| `genres.ts` / `languages.ts` / `age-ratings.ts` | Reference data |
-| `logo.ts` | Content logo fetching |
-| `mdblist.ts` | MDBList integration for curated lists |
-| `cache.ts` | Response caching layer |
-| `utils.ts` + `index.ts` | Utilities and re-exports |
+| `episodes.ts` | Episode metadata |
+| `genres.ts`, `languages.ts`, `age-ratings.ts` | Reference data |
+| `logo.ts` | Logo/artwork helpers |
+| `mdblist.ts` | MDBList-backed curated feeds |
+| `cache.ts` | TMDB cache layer |
+| `utils.ts`, `index.ts` | Utilities and exports |
 
-#### `src/services/trakt/`
-Trakt.tv integration.
+### Trakt Services
 
-| File | Purpose |
-|---|---|
-| `client.ts` | Trakt API HTTP client |
-| `sync.ts` | Two-way watch history sync |
-| `types.ts` + `index.ts` | Types and re-exports |
-
-#### `src/services/downloads/`
-| File | Purpose |
-|---|---|
-| `download-service.ts` | Download queue management (Tauri only) |
-
----
-
-### `src/middleware/` — Hono middleware
+`app/src/services/trakt/`
 
 | File | Purpose |
-|---|---|
-| `security.ts` | CORS, security headers (CSP, HSTS, etc.), rate limiter |
-| `admin.ts` | `adminSessionMiddleware`: verifies admin session; `adminStepUpMiddleware`: enforces OTP challenge; `requirePermission(...)`: RBAC check |
-| `session.ts` | Session validation for regular user routes |
+| --- | --- |
+| `client.ts` | Trakt API client |
+| `sync.ts` | Pull/push watch history synchronization |
+| `types.ts`, `index.ts` | Types and exports |
 
-All admin routes must use: `adminSessionMiddleware` → `requirePermission(...)`. Sensitive admin mutations must also use `adminStepUpMiddleware`.
+### Admin Services
 
----
-
-### `src/lib/` — Frontend singletons and core utilities
-
-These are the canonical client-side utilities. Do not duplicate them.
+`app/src/services/admin/`
 
 | File | Purpose |
-|---|---|
-| `auth-client.ts` | Better Auth client singleton with Tauri-aware `safeFetch` (injects Bearer tokens, routes through Tauri HTTP plugin). **The only place that calls Better Auth client methods.** |
-| `apiFetch.ts` | Authenticated `fetch` wrapper for backend API calls. Injects Bearer token from auth store. Use this for all `/api/*` calls from client code. |
-| `adminApi.ts` | Typed client for all `/api/admin/*` endpoints. Use this for all admin API calls. |
-| `app-mode.ts` | Tracks guest vs. connected mode, stored in localStorage. |
-| `app-lifecycle.tsx` | App startup logic: version checks, migration, splash screen. |
-| `secure-storage.ts` | Abstraction over localStorage/Tauri store for sensitive data. |
-| `url.ts` | URL construction utilities. |
-| `addon-fetch.ts` | Platform-aware fetch for **external addon URLs**: Tauri → direct HTTP via `@tauri-apps/plugin-http` (no CORS), Web → routes through `/api/addon-proxy`. Use this instead of `apiFetch` when fetching from third-party Stremio addon URLs. |
-| `addon-client.ts` | Client-side Stremio addon client (`ClientAddonClient`) with in-memory TTL cache. Use `getAddonClient(manifestUrl)` for a cached instance. `ZENTRIO_TMDB_ADDON = 'zentrio://tmdb-addon'` identifies the built-in TMDB addon — route it to `/api/tmdb/*` instead of fetching directly. |
+| --- | --- |
+| `rbac.ts` | Roles, permissions, and permission caching |
+| `stepup.ts` | OTP challenge lifecycle |
+| `audit.ts` | Audit log write/query/verification |
 
-`stream-resolver.ts` is the client-side third-party stream resolver. It loads enabled addons and stream settings from the backend, resolves streams progressively on the client, and applies the shared `StreamProcessor` without relying on `/api/streaming/streams-live` for the main playback flow.
+### Client-Side Media Pipeline
 
-**Rule:** Never call `fetch('/api/...')` directly in components or hooks. Use `apiFetch` or a typed client.
-
-**Addon boundary note:** Use `addon-client.ts` / `addon-fetch.ts` for third-party addon URLs. Do not use `apiFetch` for those external requests. After fetching addon metadata or catalog results, call `POST /api/streaming/filter-enrich` for server-side parental filtering and watch history enrichment.
-
-**Rule for addon fetching:** Use `addon-client.ts` / `addon-fetch.ts` for external Stremio addon URL calls. Never use raw `fetch()` for addon URLs on the client — CORS will block it in the browser. After fetching, call `POST /api/streaming/filter-enrich` to apply server-side parental filtering and watch history enrichment.
-
----
-
-### `src/stores/` — Zustand global state
+These live under `app/src/services/hybrid-media/` but run in the client bundle.
+They are not Bun server services.
 
 | File | Purpose |
-|---|---|
-| `authStore.ts` | Auth state: current user, session token, auth status. Persisted via localStorage. Source of truth for auth. |
-| `downloadStore.ts` | Download queue and progress state (Tauri only). |
+| --- | --- |
+| `HybridEngine.ts` | Orchestrates in-browser fallback playback/transcoding |
+| `Demuxer.ts` | Splits source streams |
+| `VideoRemuxer.ts` | Browser-compatible video remuxing |
+| `AudioStreamTranscoder.ts` | Audio transcoding |
+| `ChunkedAudioTranscoder.ts` | Chunked long-form audio transcoding |
+| `StreamingAudioTranscoder.ts` | Progressive audio transcoding |
+| `TranscoderService.ts` | Higher-level transcoder interface |
+| `NetworkReader.ts` | Fetch/stream media data |
+| `types.ts`, `index.ts` | Shared types and exports |
 
-Use Zustand only for global client state that multiple unrelated components need. Do not create new stores without a clear need — check if an existing store can be extended.
+### Frontend-Only Download Service
 
----
+`app/src/services/downloads/download-service.ts`
 
-### `src/hooks/` — React hooks
+- client adapter around native Tauri download commands
+- does not own the actual download engine
 
-| File | Purpose |
-|---|---|
-| `usePlayer.ts` | Primary player state hook. Controls playback, volume, seek. |
-| `useHybridPlayer.ts` | Manages the hybrid (ffmpeg.wasm) player engine. |
-| `useExternalPlayer.ts` | Launches external player apps (VLC, Infuse, etc.) via Tauri. |
-| `useSubtitles.ts` | Subtitle track loading and selection. |
-| `useStreamLoader.ts` | Fetches and ranks stream sources from addons. |
-| `useStreamDisplaySettings.ts` | User preferences for stream display (quality, lang filters). |
-| `useLibraryData.ts` | Fetches and caches library (watchlist) data. |
-| `useCatalog.ts` | Fetches catalog rows from TMDB/addons. |
-| `useMeta.ts` | Fetches content metadata (movie/show details). |
-| `useDownloads.ts` | Download queue state and actions. |
-| `useAppearanceSettings.ts` | Reads/writes appearance settings. |
-| `useLoginBehavior.ts` | Controls login redirect behavior. |
-| `useAutoPlay.ts` | Auto-play next episode logic. |
-| `useOfflineMode.ts` | Detects and reacts to offline state (Tauri). |
-| `useSessionDuration.ts` | Tracks active session duration for analytics. |
-| `useContextMenu.ts` | Context menu open/close state. |
-| `useScrollRow.ts` | Horizontal scroll behavior for content rows. |
-| `useLongPress.ts` | Long-press gesture detection. |
+## Frontend Canonical Layers
 
-Before creating a new hook, check this list. If a hook with related functionality exists, extend it or compose it.
+### `app/src/lib/`
 
----
-
-### `src/contexts/` — React contexts
+Shared client singletons and transport utilities.
 
 | File | Purpose |
-|---|---|
-| `CastContext.tsx` | Chromecast session state and controls. |
+| --- | --- |
+| `auth-client.ts` | Better Auth client singleton, Tauri-aware fetch behavior, auth/session helpers, `isTauri()` |
+| `apiFetch.ts` | Canonical client wrapper for `/api/*` requests |
+| `adminApi.ts` | Typed admin API wrapper and step-up UI integration |
+| `addon-fetch.ts` | External addon fetch transport: Tauri direct HTTP, web direct fetch first, proxy fallback second |
+| `addon-client.ts` | Cached client-side addon client and `ZENTRIO_TMDB_ADDON` routing |
+| `stream-resolver.ts` | Canonical client-side progressive stream resolver |
+| `secure-storage.ts` | Sensitive storage abstraction |
+| `app-mode.ts` | Guest vs connected mode state |
+| `app-lifecycle.tsx` | App startup and lifecycle wrappers |
+| `url.ts` | API URL helpers and allowlisted route helpers |
+| `topStreamCache.ts` | Top-stream caching helpers |
+| `tauri-player-mode.ts` | Tauri playback mode helpers |
 
----
+Rules:
 
-### `src/utils/` — Frontend utility functions
+- do not call `/api/*` with raw `fetch()` from components or hooks
+- use `apiFetch`/`apiFetchJson` for internal API routes
+- use `addon-client.ts` or `addon-fetch.ts` for third-party addon URLs
 
-| File | Purpose |
-|---|---|
-| `api.ts` | API response helpers (`ok()`, `err()`), request metadata extraction. |
-| `client-logger.ts` | **The only logging utility for browser/client code.** Uses CSS devtools badge styling. Import as `createLogger('ScopeName')`. Never use `console.log` directly in component/hook code. |
-| `performance.ts` | Performance measurement helpers. |
-| `toast.ts` | Toast notification helpers (wraps sonner). Use for all user-facing notifications. |
-| `route-preloader.ts` | Preloads lazy route chunks on hover/focus. |
+### `app/src/stores/`
 
----
-
-### `src/pages/` — Page-level React components
-
-Pages are lazy-loaded via `src/App.tsx`. They own layout and data-fetching orchestration for a route, but delegate UI to components and data to hooks.
-
-| Directory | Pages |
-|---|---|
-| `/` root | `LandingPage`, `SettingsPage`, `ProfilesPage`, `ExploreAddonsPage`, `ShareInvitePage`, `ResetPasswordPage`, `TauriEntryPage` |
-| `auth/` | `SignInPage`, `SignUpPage`, `TwoFactorPage` |
-| `streaming/` | `Home`, `Explore`, `Catalog`, `Search`, `Details`, `Player`, `Library`, `Downloads`, `StreamingLayout` |
-| `admin/` | `AdminLayout`, `DashboardPage`, `UsersPage`, `AuditPage`, `SystemPage` |
-
----
-
-### `src/components/` — Reusable UI components
-
-#### `auth/`
-Auth flow components. `AuthGuards.tsx` contains `ProtectedRoute`, `PublicRoute`, `AdminGuard` — use these for all route protection.
-
-#### `admin/`
-`StepUpModal.tsx` — OTP challenge modal for step-up auth. Used inside `StepUpProvider` from `adminApi.ts`.
-
-#### `details/`
-Content detail page components: `DetailsHeader`, `EpisodeList`, `StreamSelector`.
-
-#### `downloads/`
-Download UI: `DownloadCard`, `DownloadProgress`, `StoragePanel`, `QualityPicker`, `OfflineBanner`, `SeriesGroup` (groups completed series episodes under an expandable show row).
-
-#### `features/`
-Reusable streaming feature components: `ContentCard`, `StreamingRow`, `Hero`, `InfoModal`, `ListSelectionModal`, `ProfileModal`, `SettingsProfileSelector`, `ShareListModal`, `CompactStreamItem`, `LazyCatalogRow`, `SearchCatalogRow`, `StreamRefreshButton`.
-
-#### `layout/`
-App shell: `Layout` (main wrapper), `Navbar`, `TitleBar` (Tauri custom title bar), `ErrorBoundary`.
-
-#### `ScrollToTop.tsx` (components root)
-Scroll-to-top utility rendered in the router. Not a page or layout component — do not move it into a subdirectory.
-
-#### `library/`
-Library (watchlist) UI components.
-
-#### `onboarding/`
-`OnboardingWizard` — first-run setup flow.
-
-#### `player/`
-Player UI and engine abstraction.
+Global client state via Zustand.
 
 | File | Purpose |
-|---|---|
-| `ZentrioPlayer.tsx` | Main player component with controls UI. Accepts `segments` (IntroDB intro/recap/outro timestamps) and `skipIntrosOutros` (from streaming settings, default `true`) props. Shows a "Skip Intro/Recap/Outro" button when playback enters a segment range. |
-| `engines/factory.ts` | Creates the correct engine based on platform/stream type |
-| `engines/WebPlayerEngine.ts` | HLS.js-based web player |
-| `engines/TauriPlayerEngine.ts` | Native Tauri player via shell commands |
-| `engines/HybridPlayerEngine.ts` | ffmpeg.wasm hybrid engine |
-| `engines/types.ts` | `PlayerEngine` interface — all engines must implement this |
-| `hooks/usePlayerEngine.ts` | Manages engine lifecycle |
+| --- | --- |
+| `authStore.ts` | Auth/session state |
+| `downloadStore.ts` | Native download queue/progress state |
 
-To add a new player engine: implement `PlayerEngine` interface, add detection logic to `factory.ts`.
+### `app/src/hooks/`
 
-#### `settings/`
-Settings tab components. Each file corresponds to one settings section tab. Modals for email/password/username changes live in `settings/modals/`.
+Key hooks already exist for most reusable concerns.
 
-#### `ui/`
-Generic design-system components. Check here before creating any new UI primitive.
+Important ones:
 
-- **Buttons/inputs:** `Button`, `Input`, `Toggle`, `DropdownMenu`, `ContextMenu`
-- **Overlays:** `Modal`, `ConfirmDialog`, `InputDialog`
-- **Loading states:** `LoadingSpinner`, `SkeletonRow`, `SkeletonHero`, `SkeletonDetails`, `SkeletonPlayer`, `SkeletonProfile`, `SkeletonStreamList`
-- **Display:** `LazyImage`, `RatingBadge`, `Message`, `BackButton`, `LoadErrorState`, `SplashScreen`
-
-#### `streaming/`
-`StreamingLoaders.tsx` (loading skeletons for streaming pages), `TraktRecommendationsRow`.
-
----
-
-### `src/components/auth/` — Auth components
 | File | Purpose |
-|---|---|
-| `AuthForms.tsx` | Sign-in and sign-up form components |
-| `AuthGuards.tsx` | `ProtectedRoute`, `PublicRoute`, `AdminGuard` — route-level access control |
-| `ServerSelector.tsx` | Tauri server URL configuration UI |
-| `MagicLinkModal.tsx` | Magic link login flow |
-| `TwoFactorModal.tsx` / `TwoFactorSetupModal.tsx` | 2FA verification and setup |
-| `PasswordResetModal.tsx` | Password reset flow |
-| `EmailVerificationModal.tsx` | Email verification prompt (auth flow version — see also `settings/modals/EmailVerificationModal.tsx`) |
-| `ModeSelector.tsx` | Guest vs. connected mode selection |
-| `ServerConnectionIndicator.tsx` | Shows Tauri backend connection status |
+| --- | --- |
+| `useStreamLoader.ts` | Progressive stream loading UI state using the client resolver |
+| `useCatalog.ts` | Catalog fetching for internal TMDB and external addons |
+| `useMeta.ts` | Detailed metadata loading |
+| `useDownloads.ts` | Native download state/actions |
+| `usePlayer.ts` | Main player state |
+| `useHybridPlayer.ts` | Hybrid playback pipeline |
+| `useExternalPlayer.ts` | External player launch |
+| `useSubtitles.ts` | Subtitle loading/selection |
+| `useLibraryData.ts` | Library/watchlist data |
+| `useAppearanceSettings.ts` | Appearance settings |
+| `useLoginBehavior.ts` | Login redirect behavior |
+| `useOfflineMode.ts` | Native offline-state handling |
 
----
+Before adding a new hook, check whether one of these should be extended instead.
+
+### `app/src/utils/`
+
+| File | Purpose |
+| --- | --- |
+| `client-logger.ts` | Canonical client logger |
+| `toast.ts` | Canonical toast wrapper |
+| `performance.ts` | Perf event recording helpers |
+| `route-preloader.ts` | Route-chunk preloading |
+| `api.ts` | Shared API response helpers used on the server side |
+
+### `app/src/pages/`
+
+Route-level React components.
+
+Groups:
+
+- root: landing/settings/profiles/share/reset/explore-addons/native entry
+- `auth/`: sign in, sign up, two-factor
+- `streaming/`: home, explore, catalog, search, details, player, library, downloads, shared layout
+- `admin/`: dashboard, users, audit, system, shared layout
+
+### `app/src/components/`
+
+Reusable UI and feature components.
+
+Important areas:
+
+| Directory | Purpose |
+| --- | --- |
+| `auth/` | Auth forms, guards, native server selector, 2FA, magic link, auth mode UI |
+| `admin/` | Admin step-up modal |
+| `details/` | Details page building blocks |
+| `downloads/` | Native download UI |
+| `features/` | Catalog rows, cards, hero, profile/list modals |
+| `layout/` | Navbar, title bar, app shell, error boundary |
+| `library/` | Watchlist/library UI |
+| `onboarding/` | Native first-run setup |
+| `player/` | Zentrio player UI, engines, and player hooks |
+| `settings/` | Settings sections and settings modals |
+| `streaming/` | Streaming-page specific helpers/loaders |
+| `ui/` | Generic primitives and skeleton/loading components |
+
+## Native Layer
+
+Everything under `app/src-tauri/` is the native shell.
+
+### `app/src-tauri/src/lib.rs`
+
+Main Tauri entry point.
+
+Responsibilities:
+
+- registers plugins
+- initializes native download storage and queue manager
+- exposes Tauri commands
+- registers deep-link behavior
+- spawns the Bun sidecar in desktop production builds
+
+### `app/src-tauri/src/downloads/`
+
+Native offline download implementation.
+
+| File | Purpose |
+| --- | --- |
+| `manager.rs` | Queue orchestration |
+| `db.rs` | Native download DB access |
+| `file_store.rs` | Download directory resolution and storage layout |
+| `hls.rs` | HLS download handling |
+| `subtitles.rs` | Subtitle persistence/helpers |
+| `events.rs` | Download event payloads |
+| `notifier.rs` | Native notifications |
+| `mod.rs` | Module exports |
+
+This is the real download engine. The TypeScript app only drives it.
+
+### `app/src-tauri/src/plugins/`
+
+Custom native plugins.
+
+Notable file:
+
+- `immersive_mode.rs`: native fullscreen/orientation behavior used on Android
 
 ## Canonical Patterns
 
 ### Logging
 
-**Server code:**
+Server:
+
 ```ts
 import { logger } from '@/services/logger'
-const log = logger.scope('FeatureName')
+
+const log = logger.scope('Feature')
 log.info('message')
-log.error('failed', error)
+log.warn('warning')
+log.error('failure', error)
 ```
 
-**Client code:**
+Client:
+
 ```ts
 import { createLogger } from '@/utils/client-logger'
-const log = createLogger('ComponentName')
+
+const log = createLogger('Feature')
 log.info('message')
 ```
 
-Never use `console.log`, `console.warn`, or `console.error` directly.
+Do not add new logger abstractions.
 
-### Server state (data fetching)
-Always use **TanStack Query** (`useQuery`, `useMutation`). Never use `useState` + `useEffect` to fetch data.
+### Client API Calls
+
+Internal backend API:
 
 ```ts
-const { data, isLoading } = useQuery({
-  queryKey: ['key', id],
-  queryFn: () => apiFetch(`/api/resource/${id}`),
-})
+import { apiFetchJson } from '@/lib/apiFetch'
+
+const data = await apiFetchJson('/api/streaming/dashboard?profileId=1')
 ```
 
-### Global client state
-Use **Zustand** stores in `src/stores/`. Check existing stores before creating a new one.
+Admin API:
 
-### API calls from client
-Always use `apiFetch` from `src/lib/apiFetch.ts` for authenticated requests.
-Use `adminApi` from `src/lib/adminApi.ts` for admin endpoints.
-Never call `fetch` directly in components or hooks.
-
-### Toast notifications
 ```ts
-import { toast } from '@/utils/toast'
-toast.success('Saved')
-toast.error('Failed to save')
+import { adminApi } from '@/lib/adminApi'
 ```
 
-### Tauri detection
+External addon URL:
+
 ```ts
-import { isTauri } from '@/lib/auth-client'
-if (isTauri()) { /* native-only code */ }
+import { getAddonClient } from '@/lib/addon-client'
 ```
 
-### Adding a new API route
-1. Create or extend a file in `src/routes/api/`
-2. Add business logic to `src/services/`
-3. Mount the router in `src/routes/api/index.ts`
-4. Add types/validation with Zod in the route handler
+Do not mix these layers.
 
-### Adding a new page
-1. Create the page in `src/pages/`
-2. Add a lazy route in `src/App.tsx`
-3. Add a route guard if authentication is required
+### Data Fetching
 
-### Adding a new settings section
-1. Create a component in `src/components/settings/`
-2. Add the tab to `src/pages/SettingsPage.tsx`
+Use TanStack Query for server state.
+Do not build new `useEffect` + `useState` fetch loops unless there is a clear reason.
 
----
+### Global State
 
-## What NOT to Do
+Use Zustand only for truly cross-cutting client state like auth or downloads.
 
-- **Do not create a new logger or logging wrapper.** Both server and client loggers already exist and are complete.
-- **Do not use `fetch()` directly.** Use `apiFetch` or a typed client from `src/lib/`.
-- **Do not put schema/table definitions anywhere except `src/services/database/connection.ts`.**
-- **Do not add auth logic outside `src/services/auth.ts` and `src/lib/auth-client.ts`.**
-- **Do not create helper files for one-off operations.** Inline the logic or extend an existing utility.
-- **Do not use `useState` + `useEffect` for data fetching.** Use TanStack Query.
-- **Do not create new Zustand stores without checking existing ones first.**
-- **Do not import server-only code in client code and vice versa.** (No `envParser`, `bun:sqlite`, or `services/` imports in components/hooks.)
-- **Do not add `console.log` calls.** Use the appropriate logger.
-- **Do not add error handling for states that cannot occur.** Trust internal invariants.
-- **Do not add comments explaining what the code does.** Only comment *why* when the reason is non-obvious.
+### Database Changes
 
----
+When you need schema changes:
 
-## Environment Variables
+1. update `services/database/connection.ts` if it is part of the baseline schema
+2. add the migration logic in `services/database/migrations.ts`
+3. keep query logic inside the database service layer
 
-The `.env` file lives in the **repository root** (not `app/`). `src/services/envParser.ts` reads it via `../` relative to `process.cwd()`. Never hardcode secrets or configuration values — always go through `getConfig()`.
+### New API Routes
 
-See `.env.example` for the full reference.
+When adding a route:
 
----
+1. add or extend the router under `app/src/routes/api/`
+2. keep validation in the route
+3. move reusable logic to `app/src/services/`
+4. mount it in `app/src/routes/api/index.ts` if it is a new router
+5. update OpenAPI helpers if needed
 
-## Third-Party Integrations
+### Addon Boundary
 
-| Service | Purpose | Auth | Caching |
-|---|---|---|---|
-| [IntroDB](https://introdb.app) | Intro/recap/outro timestamps for TV episodes | None (read is public) | `introdb_cache` SQLite table — always try live, fall back to cache |
-| TMDB | Movie/TV metadata, posters, trending | Per-user API key via `TMDB_API_KEY` env or user settings | `src/services/tmdb/cache.ts` |
-| Trakt.tv | Watch history sync, scrobbling | OAuth tokens stored in `trakt_accounts` table | Per-profile |
-| MDBList | Curated content lists surfaced as TMDB addon catalogs | None (public lists) | Via TMDB cache layer |
-| [Fanart.tv](https://fanart.tv) | High-quality content logos and artwork | Optional `FANART_API_KEY` | Via TMDB cache layer |
-| [IMDb](https://developer.imdb.com/non-commercial-datasets/) | Title ratings from public `imdbws.com` dataset | None | Downloaded to local SQLite, refreshed on configurable interval (default 24h) |
-| [DiceBear](https://www.dicebear.com) | Profile avatar generation | None (local library) | N/A — generated on demand |
-| [Better Auth](https://www.better-auth.com) | Auth framework (email, magic link, OTP, 2FA, SSO) | N/A — is the auth system | Session tokens in `session` table |
+Rules for third-party addons:
 
-**IntroDB:** Fetched server-side via `GET /api/streaming/segments`, cached in `introdb_cache`. The client never calls IntroDB directly. Non-IMDB content (IDs not starting with `tt`) is silently skipped.
+- client-side addon requests should go through `addon-client.ts` / `addon-fetch.ts`
+- web may fetch direct if CORS permits, otherwise use `/api/addon-proxy`
+- after client-side catalog fetches, call `/api/streaming/filter-enrich` when server-side enrichment/filtering is required
+- the internal TMDB addon is special: `zentrio://tmdb-addon` maps to `/api/tmdb/*`
 
-**TMDB addon origin:** Zentrio's internal TMDB addon (`src/services/tmdb/`) is substantially derived from [mrcanelas/tmdb-addon](https://github.com/mrcanelas/tmdb-addon) (Apache 2.0). The source files carry the original attribution. The key architectural difference is that Zentrio embeds it as an internal service behind `zentrio://tmdb-addon` rather than a standalone HTTP addon server.
+## What Not To Do
 
----
+- Do not create new logging wrappers.
+- Do not import server-only modules into client code.
+- Do not call raw `fetch('/api/...')` from components or hooks.
+- Do not add new DB schema in arbitrary service files.
+- Do not put auth configuration outside `services/auth.ts` and `lib/auth-client.ts`.
+- Do not duplicate addon transport helpers.
+- Do not create new Zustand stores unless existing ones are clearly insufficient.
+- Do not treat `/api/gateway` as a general-purpose proxy; it is intentionally local-only and allowlisted.
+- Do not assume `/api/streaming/streams-live` is the long-term primary flow.
 
-## Known Duplication / Debt
+## Environment and Secrets
 
-These are known issues in the codebase that should be resolved, not replicated:
+The env file lives at the repository root:
 
-| Issue | Files | Action |
-|---|---|---|
-| Duplicate component | `src/components/auth/EmailVerificationModal.tsx` and `src/components/settings/modals/EmailVerificationModal.tsx` | Consolidate into one |
+- `.env`
+- `.env.example`
 
-Run `bun run knip` from `app/` at any time to surface unused files and exports. The CI quality workflow runs knip automatically on every push/PR.
+`app/src/services/envParser.ts` is the only canonical env interpreter.
 
----
+Important live config groups:
 
-## Multi-Platform Notes
+- server: `PORT`, `APP_URL`, `CLIENT_URL`, `DATABASE_URL`
+- security: `AUTH_SECRET`, `ENCRYPTION_KEY`, `HEALTH_TOKEN`
+- admin: `ADMIN_ENABLED`, `ADMIN_SETUP_TOKEN`, `ANALYTICS_ENABLED`
+- email: SMTP/Resend vars plus timeout/backoff tuning
+- integrations: `TMDB_API_KEY`, `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`, `FANART_API_KEY`, `IMDB_UPDATE_INTERVAL_HOURS`
+- tuning: `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_LIMIT`, `PROXY_LOGS`, `LOG_LEVEL`
 
-- `isTauri()` — use to gate any native-only behavior
-- Tauri backend runs as a sidecar binary; the frontend connects via localhost
-- Deep links (`zentrio://`) handle magic link and OAuth callbacks in native apps
-- iOS support exists but is currently disabled in Tauri config
-- Downloads feature is Tauri-only; web builds hide download UI
-- **Android `ImmersiveModePlugin`** (`src-tauri/gen/android/.../ImmersiveModePlugin.kt`): custom Tauri plugin for fullscreen (`setImmersiveMode`) and orientation lock (`setOrientation`). **`@TauriPlugin` does NOT auto-register in Tauri v2** — on Tauri `2.9.x`, the plugin is registered in `MainActivity.kt` via `pluginManager.load(null, "immersive-mode", ImmersiveModePlugin(this), "{}")` before `super.onCreate()`. Frontend invokes it via `invoke('plugin:immersive-mode|setImmersiveMode', { enabled })` and `invoke('plugin:immersive-mode|setOrientation', { orientation: 'portrait' | 'landscape' | 'auto' })`.
+## External Integrations
+
+| Service | Purpose | Notes |
+| --- | --- | --- |
+| TMDB | Metadata and catalog foundation | Global env key plus optional per-user override |
+| Trakt | Sync, recommendations, scrobble, check-in | Per-profile account storage |
+| IntroDB | Intro/recap/outro timestamps | Read via backend, cached in SQLite; submit via stored API key |
+| MDBList | Curated lists for TMDB-backed catalogs | Routed through TMDB service layer |
+| Fanart.tv | Artwork/logos | Optional API key |
+| IMDb dataset | Ratings | Downloaded/updated locally |
+| DiceBear | Avatar generation | Local library |
+| Better Auth | Authentication | Core auth system across web and native |
+
+## Known Debt / Watchouts
+
+These are current realities. Do not copy them blindly into new code.
+
+| Issue | Notes |
+| --- | --- |
+| Mixed streaming architecture | Client-side stream resolution is primary, but server SSE and gateway compatibility paths still exist |
+| Duplicate email verification modal concepts | Auth flow and settings flow still have separate components |
+| Some user-route behavior is legacy-shaped | `user.ts` still carries a broad compatibility surface for older frontend expectations |
+| Native and hosted flows are tightly coupled | Connected Tauri mode, sidecar gateway, and remote sync all assume coordinated changes |
+
+## Quick Decision Guide
+
+If you are deciding where code belongs:
+
+- New Bun API behavior: `app/src/routes/api/` + `app/src/services/`
+- New client transport helper: probably `app/src/lib/`
+- New reusable UI: `app/src/components/`
+- New route screen: `app/src/pages/` + `app/src/App.tsx`
+- New native capability: `app/src-tauri/src/`
+- Public docs: `docs/`
+- Internal assistant/contributor reference: `llm/`
+
+When in doubt, extend an existing layer instead of inventing a new one.

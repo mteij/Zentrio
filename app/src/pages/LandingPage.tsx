@@ -165,7 +165,7 @@ export function LandingPage({ version }: LandingPageProps) {
             
             {/* Branding */}
             <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight mb-2">Zentrio</h1>
-            <p className="text-zinc-500 text-sm mb-10">Stream your way</p>
+            <p className="text-zinc-500 text-sm mb-10">Stream anything. Own everything.</p>
             
             {/* Social login buttons */}
             <motion.div

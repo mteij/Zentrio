@@ -1,153 +1,182 @@
-# Self-Hosting
+# Self Hosting
 
-## Docker
+Zentrio ships as a single Bun server that serves both the API and the web app.
 
-```bash
-docker run -d --name zentrio \
-  -e AUTH_SECRET=$(openssl rand -base64 32) \
-  -e ENCRYPTION_KEY=$(openssl rand -hex 32) \
-  -e TMDB_API_KEY="your-tmdb-api-key" \
-  -e DATABASE_URL="./data/zentrio.db" \
-  -e ADMIN_ENABLED=true \
-  -p 3000:3000 \
-  -v ./data:/app/data \
-  ghcr.io/mteij/zentrio:latest
-```
+The repository already contains a root-level `docker-compose.yml` that matches the current image layout and volume paths, so that is the easiest starting point.
 
-## Docker Compose
+## Recommended: Docker Compose
+
+From the repository root:
+
+1. Copy `.env.example` to `.env`.
+2. Fill in your secrets and API keys.
+3. Start the stack with `docker compose up -d`.
+
+Current compose file:
 
 ```yaml
 services:
   zentrio:
-    image: ghcr.io/mteij/zentrio:latest
-    container_name: zentrio
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
+    image: ${IMAGE_NAME:-ghcr.io/michieleijpe/zentrio:latest}
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
-      - AUTH_SECRET=change_me          # openssl rand -base64 32
-      - ENCRYPTION_KEY=change_me       # openssl rand -hex 32
-      - TMDB_API_KEY=your-tmdb-api-key
-      - DATABASE_URL=./data/zentrio.db
-      - ADMIN_ENABLED=true
+      - PORT=${PORT:-3000}
+      - DATABASE_URL=/data/zentrio.db
+    ports:
+      - "${HOST_PORT:-3000}:${PORT:-3000}"
     volumes:
-      - ./data:/app/data
+      - zentrio_data:/data
+    restart: unless-stopped
 ```
 
----
+This stores the SQLite database in the named Docker volume `zentrio_data`.
 
-## Environment Variables
+## Direct Docker Run
 
-> See [`.env.example`](../.env.example) for a ready-to-copy template with all options.
+If you prefer a single container command:
 
-### Required
+```bash
+docker run -d \
+  --name zentrio \
+  -p 3000:3000 \
+  -e AUTH_SECRET="$(openssl rand -base64 32)" \
+  -e ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+  -e TMDB_API_KEY="your-tmdb-api-key" \
+  -e DATABASE_URL="/data/zentrio.db" \
+  -v zentrio_data:/data \
+  ghcr.io/michieleijpe/zentrio:latest
+```
+
+## Required Configuration
+
+The `.env` file lives in the repository root, not `app/`.
+
+At minimum, configure:
 
 | Variable | Description |
-|---|---|
-| `AUTH_SECRET` | Secret for signing session tokens. Generate: `openssl rand -base64 32` |
-| `ENCRYPTION_KEY` | 32+ char key for data encryption. Generate: `openssl rand -hex 32` |
-| `TMDB_API_KEY` | TMDB API key for media metadata ([get one here](https://www.themoviedb.org/settings/api)) |
+| --- | --- |
+| `AUTH_SECRET` | Secret used by Better Auth for session signing |
+| `ENCRYPTION_KEY` | Secret used to encrypt sensitive data at rest |
+| `TMDB_API_KEY` | Required for TMDB-backed metadata and catalogs |
 
-### Server
+Recommended production values:
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `3000` | Server port |
-| `APP_URL` | `http://localhost:3000` | Public-facing URL of the server |
-| `CLIENT_URL` | `http://localhost:5173` | Frontend URL (used for CORS and OAuth redirects) |
-| `DATABASE_URL` | `./data/zentrio.db` | SQLite database path |
-| `NODE_ENV` | — | Set to `production` for production deployments |
+```bash
+openssl rand -base64 32
+openssl rand -hex 32
+```
 
-### Email
-
-Pick **one** provider. Leave all unconfigured to disable email.
-
-**SMTP:**
+## Core Server Settings
 
 | Variable | Default | Description |
-|---|---|---|
-| `EMAIL_HOST` | — | SMTP hostname |
+| --- | --- | --- |
+| `PORT` | `3000` | HTTP port inside the container or process |
+| `APP_URL` | `http://localhost:3000` | Public URL of your Zentrio server |
+| `CLIENT_URL` | `http://localhost:5173` | Trusted frontend origin for local dev and auth redirects |
+| `DATABASE_URL` | `./data/zentrio.db` | SQLite path. In Docker, map this to a persistent volume. |
+| `NODE_ENV` | `development` | Set to `production` outside local dev |
+
+## Email
+
+Email is optional, but features like magic links, verification, password flows, and admin step-up work better with it configured.
+
+Choose one provider path:
+
+### SMTP
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `EMAIL_HOST` | - | SMTP host |
 | `EMAIL_PORT` | `587` | SMTP port |
-| `EMAIL_SECURE` | `false` | Use TLS (`true` for port 465) |
-| `EMAIL_USER` | — | SMTP username |
-| `EMAIL_PASS` | — | SMTP password |
+| `EMAIL_SECURE` | `false` | Use `true` for implicit TLS, usually port 465 |
+| `EMAIL_USER` | - | SMTP username |
+| `EMAIL_PASS` | - | SMTP password |
 | `EMAIL_FROM` | `noreply@zentrio.app` | Sender address |
 
-**SMTP URL** (alternative to individual fields):
+### SMTP URL
 
 | Variable | Description |
-|---|---|
-| `SMTP_URL` | Full SMTP connection URL, e.g. `smtp://user:pass@host:587` |
+| --- | --- |
+| `SMTP_URL` | Full SMTP connection string, for example `smtp://user:pass@host:587` |
 
-**Resend:**
+### Resend
 
 | Variable | Description |
-|---|---|
-| `RESEND_API_KEY` | [Resend](https://resend.com) API key (free tier: 3 000 emails/month) |
+| --- | --- |
+| `RESEND_API_KEY` | Resend API key |
+
+Shared email tuning:
 
 | Variable | Default | Description |
-|---|---|---|
-| `EMAIL_PROVIDER` | `auto` | Force provider: `auto`, `smtp`, or `resend` |
+| --- | --- | --- |
+| `EMAIL_PROVIDER` | `auto` | `auto`, `smtp`, or `resend` |
+| `EMAIL_SMTP_TIMEOUT_MS` | `8000` | SMTP connect/request timeout |
+| `EMAIL_SEND_TIMEOUT_MS` | `10000` | Overall send timeout |
+| `EMAIL_PROVIDER_BACKOFF_MS` | `300000` | Backoff after provider failures |
 
-### Social Login / SSO
-
-| Provider | Variables | Setup Guide |
-|---|---|---|
-| Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | [Guide](./self-hosting/sso/google.md) |
-| GitHub | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | [Guide](./self-hosting/sso/github.md) |
-| Discord | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | [Guide](./self-hosting/sso/discord.md) |
-| OIDC | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ISSUER`, `OIDC_DISPLAY_NAME` | [Guide](./self-hosting/sso/openid.md) |
-
-### Admin Console
+## Admin and Health
 
 | Variable | Default | Description |
-|---|---|---|
-| `ADMIN_ENABLED` | `false` | Enable the admin console |
-| `ADMIN_SETUP_TOKEN` | — | Optional token required to claim initial superadmin. If unset, any user can claim on a fresh instance. Generate: `openssl rand -hex 24` |
-| `STEP_UP_MAX_AGE_MINUTES` | `10` | How long a step-up verification is valid for sensitive actions |
+| --- | --- | --- |
+| `ADMIN_ENABLED` | `false` | Enables the admin console |
+| `ADMIN_SETUP_TOKEN` | - | Optional claim token for the first superadmin |
+| `ANALYTICS_ENABLED` | `true` when admin is enabled | Aggregate platform/browser analytics in admin |
+| `HEALTH_TOKEN` | - | Bearer token that unlocks internal health stats |
 
-#### First-time setup
+### First-time admin setup
 
-1. Set `ADMIN_ENABLED=true` and restart.
-2. Sign in to your account, then navigate to `/admin`.
-3. Click **Claim Admin Access** to become the superadmin.
-4. The setup endpoint closes permanently — no other user can claim it after you.
+1. Set `ADMIN_ENABLED=true`.
+2. Restart the server.
+3. Sign in.
+4. Open `/admin`.
+5. Claim superadmin access.
 
-Once set up, you can promote other users to `admin`, `moderator`, or `readonly` roles from the admin panel. Each role has different permissions enforced server-side.
+If `ADMIN_SETUP_TOKEN` is set, the setup flow also requires that token.
 
-### Integrations
+### Health endpoint
 
-| Variable | Default | Description |
-|---|---|---|
-| `TRAKT_CLIENT_ID` | — | [Trakt](https://trakt.tv/oauth/applications) client ID |
-| `TRAKT_CLIENT_SECRET` | — | Trakt client secret |
-| `FANART_API_KEY` | — | [Fanart.tv](https://fanart.tv/get-an-api-key/) API key for artwork |
-| `IMDB_UPDATE_INTERVAL_HOURS` | `24` | IMDB ratings refresh interval in hours |
+`GET /api/health` always returns safe public stats.
 
-### Health Endpoint
+If you send:
 
-`GET /api/health` always returns basic public stats (user count, addon count) — safe for use on a landing page or in Docker healthchecks.
-
-Full internal stats (active sessions, memory usage, watched items) are only included when the request carries a valid token:
-
-```
+```http
 Authorization: Bearer <HEALTH_TOKEN>
 ```
 
+the response also includes internal details like memory and active-session stats.
+
+## Social Login / SSO
+
+| Provider | Variables | Guide |
+| --- | --- | --- |
+| Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | [Google guide](./self-hosting/sso/google.md) |
+| GitHub | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | [GitHub guide](./self-hosting/sso/github.md) |
+| Discord | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | [Discord guide](./self-hosting/sso/discord.md) |
+| OpenID Connect | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ISSUER`, `OIDC_DISPLAY_NAME` | [OIDC guide](./self-hosting/sso/openid.md) |
+
+## Integrations
+
 | Variable | Default | Description |
-|---|---|---|
-| `HEALTH_TOKEN` | — | Bearer token that unlocks full internal stats. Generate: `openssl rand -hex 24` |
+| --- | --- | --- |
+| `TRAKT_CLIENT_ID` | - | Enables Trakt auth and sync |
+| `TRAKT_CLIENT_SECRET` | - | Trakt secret |
+| `FANART_API_KEY` | - | Optional artwork/logos |
+| `IMDB_UPDATE_INTERVAL_HOURS` | `24` | IMDb ratings refresh interval |
 
-### Logging & Tuning
+## Logging and Rate Limiting
 
 | Variable | Default | Description |
-|---|---|---|
-| `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error` |
-| `PROXY_LOGS` | `true` | Enable Hono request logger (`-->` / `<--` lines) |
-| `RATE_LIMIT_WINDOW_MS` | `900000` | Rate limit window (15 min). Set to `0` to disable |
-| `RATE_LIMIT_LIMIT` | `500` | Max requests per window per IP. Set to `0` to disable |
+| --- | --- | --- |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `PROXY_LOGS` | `true` | Enables the Hono request logger |
+| `RATE_LIMIT_WINDOW_MS` | `900000` | Rate limit window in milliseconds |
+| `RATE_LIMIT_LIMIT` | `500` | Max requests per window per IP |
 
----
+Set both rate-limit variables to `0` to disable the global limiter.
 
 ## Reverse Proxy
 
@@ -166,8 +195,14 @@ location / {
 
 ### Caddy
 
-```caddyfile
+```txt
 zentrio.example.com {
     reverse_proxy localhost:3000
 }
 ```
+
+## Notes for Native Clients
+
+- Native Tauri clients can connect to a hosted Zentrio server in connected mode.
+- Some native-only features, especially downloads, are not available from the web build.
+- The local sidecar gateway is intentionally local-only; do not try to expose `/api/gateway` publicly behind your proxy.

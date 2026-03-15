@@ -1,26 +1,52 @@
-# Welcome to Zentrio
+# Using Zentrio
 
-[Public Instance](https://app.zentrio.eu)
+Zentrio is a self-hosted streaming app built around profiles, addons, and multi-platform access.
 
-Zentrio is designed to be your all-in-one streaming hub, offering a personalized and highly customizable experience across all your devices. Whether you are managing multiple users under one roof or tuning your streaming setup to perfection, Zentrio provides the tools you need in a modern, clean interface.
+## What It Does
 
-## Core Features
+Zentrio gives you:
+
+- separate profiles with their own history and settings
+- Stremio-compatible addons for catalogs, metadata, streams, and subtitles
+- web, desktop, and mobile clients from the same server
+- optional Trakt sync and native downloads on Tauri apps
+
+## How People Usually Use It
+
+### Connected mode
+
+Sign in to a Zentrio server and use your account, profiles, synced settings, and optional integrations like Trakt.
+
+This is the normal web experience.
+
+### Guest mode
+
+Native clients can also run in a lighter local-first mode without a signed-in server account.
+
+## The Main Pieces
 
 ### Profiles
 
-Keep everyone's watch history and preferences strictly separated. Just like major streaming services, you can create multiple profiles under a single account. Each profile maintains its own "Continue Watching" list, visual preferences (like showing IMDb or age ratings), and streaming settings.
+Each profile keeps its own:
+
+- continue watching
+- content filters
+- streaming preferences
+- addon setup through its settings profile
 
 ### Addons
 
-Zentrio's content library is powered by the community. You can easily install addons to extend your streaming sources and discover new media. Simply drop an addon manifest URL into your settings, and Zentrio handles the rest, allowing you to reorder sources to prioritize your preferred streams.
+Zentrio includes a built-in TMDB addon and also supports third-party Stremio-compatible addons by manifest URL.
 
-### Settings & Customization
+### Playback
 
-Take full control over your experience. You can tweak everything from your default streaming quality and subtitle preferences to proxy settings and debrid service integrations. Zentrio also supports secure account management, including Two-Factor Authentication (2FA) and social logins (SSO) via Google, GitHub, or Discord.
+Zentrio can rank streams, load subtitles, remember progress, and show intro/recap/outro skip buttons when segment data is available.
 
-### Multi-Platform Access
+### Native extras
 
-Zentrio is built to go wherever you go:
+Desktop and mobile Tauri builds add native flows like downloads, deep links, and other platform-specific behavior.
 
-- **Web & PWA**: Access your library from any browser, or install the Progressive Web App (PWA) on iOS/Android for a native app-like experience without needing an app store.
-- **Native Apps**: Dedicated applications are available for both Desktop and Android, which you can find on our [Releases page](https://zentrio.eu/releases).
+## Next Steps
+
+- Want to host your own instance? See [Self Hosting](/self-hosting).
+- Want to work on the app? See [Development](/development).
