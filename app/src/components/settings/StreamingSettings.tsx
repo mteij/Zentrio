@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { ChevronDown, Monitor, Disc } from 'lucide-react'
+import { ChevronDown, Monitor, Disc, Eye, EyeOff } from 'lucide-react'
 import { Button, Toggle } from '../index'
 import styles from '../../styles/Settings.module.css'
 import { apiFetch } from '../../lib/apiFetch'
@@ -29,6 +29,9 @@ interface StreamingSettingsData {
   sortingEnabled: boolean
   // Playback settings
   autoPlayWaitSeconds: number  // 5-30, default 10
+  skipIntrosOutros: boolean         // skip intro/recap/outro via IntroDB
+  showUnvalidatedSegments: boolean  // also show low-confidence/few-vote segments
+  introDbApiKey: string             // user's IntroDB API key for contributions
   // Stream display settings
   showAddonName: boolean
   showDescription: boolean
@@ -55,6 +58,9 @@ const DEFAULT_SETTINGS: StreamingSettingsData = {
   },
   sortingEnabled: true,
   autoPlayWaitSeconds: 10,
+  skipIntrosOutros: true,
+  showUnvalidatedSegments: true,
+  introDbApiKey: '',
   showAddonName: true,
   showDescription: true,
   streamDisplayMode: 'compact-simple'
@@ -80,6 +86,8 @@ export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) 
   const [languageToAdd, setLanguageToAdd] = useState('')
   const [draggedItem, setDraggedItem] = useState<{ type: string, index: number } | null>(null)
   
+  const [showIntroDbKey, setShowIntroDbKey] = useState(false)
+
   // Local state for slider to prevent API spam/lag
   const [localAutoPlayWait, setLocalAutoPlayWait] = useState<number>(10)
 
@@ -202,6 +210,15 @@ export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) 
           if (loaded.playback?.autoPlayMaxWaitMs) {
             merged.autoPlayWaitSeconds = Math.round(loaded.playback.autoPlayMaxWaitMs / 1000)
           }
+          if (loaded.playback?.skipIntrosOutros !== undefined) {
+            merged.skipIntrosOutros = loaded.playback.skipIntrosOutros
+          }
+          if (loaded.playback?.showUnvalidatedSegments !== undefined) {
+            merged.showUnvalidatedSegments = loaded.playback.showUnvalidatedSegments
+          }
+          if (loaded.introdb?.apiKey !== undefined) {
+            merged.introDbApiKey = loaded.introdb.apiKey
+          }
           
           // Load stream display settings
           if (loaded.streamDisplay) {
@@ -256,7 +273,12 @@ export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) 
         qualities: newSettings.qualities,
         // Playback and display settings
         playback: {
-          autoPlayMaxWaitMs: newSettings.autoPlayWaitSeconds * 1000
+          autoPlayMaxWaitMs: newSettings.autoPlayWaitSeconds * 1000,
+          skipIntrosOutros: newSettings.skipIntrosOutros,
+          showUnvalidatedSegments: newSettings.showUnvalidatedSegments,
+        },
+        introdb: {
+          apiKey: newSettings.introDbApiKey,
         },
         streamDisplay: {
           showAddonName: newSettings.showAddonName,
@@ -565,6 +587,75 @@ export function StreamingSettings({ currentProfileId }: StreamingSettingsProps) 
                     <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>
                         How long to wait for streams before auto-selecting the best one
                     </p>
+                </div>
+
+                {/* Skip Intros & Outros */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div>
+                        <label style={{ color: '#ccc', fontWeight: 500 }}>Skip Intros & Outros</label>
+                        <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>
+                            Show a skip button during intros, recaps, and outros (powered by IntroDB)
+                        </p>
+                    </div>
+                    <Toggle
+                        checked={settings.skipIntrosOutros}
+                        onChange={(checked) => updateSetting('skipIntrosOutros', checked)}
+                        title="Enable/Disable skip intro & outro buttons"
+                    />
+                </div>
+
+                {/* Show unvalidated segments */}
+                {settings.skipIntrosOutros && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingLeft: '16px', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                      <div>
+                          <label style={{ color: '#bbb', fontWeight: 500, fontSize: '0.9rem' }}>Show Unconfirmed Segments</label>
+                          <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>
+                              Include segments with few community votes. Marked as "Unconfirmed" in the player.
+                          </p>
+                      </div>
+                      <Toggle
+                          checked={settings.showUnvalidatedSegments}
+                          onChange={(checked) => updateSetting('showUnvalidatedSegments', checked)}
+                      />
+                  </div>
+                )}
+
+                {/* IntroDB Contribution API Key */}
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', color: '#ccc', fontWeight: 500 }}>
+                        IntroDB API Key
+                    </label>
+                    <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0', marginBottom: '10px' }}>
+                        Optional. Lets you submit intro/recap/outro timestamps directly from the player.{' '}
+                        <a href="https://introdb.app" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent, #e50914)' }}>
+                            Get a key at introdb.app →
+                        </a>
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                            type={showIntroDbKey ? 'text' : 'password'}
+                            placeholder="idb_..."
+                            value={settings.introDbApiKey}
+                            onChange={(e) => updateSetting('introDbApiKey', e.target.value.trim())}
+                            style={{
+                                flex: 1,
+                                padding: '10px 14px',
+                                borderRadius: '8px',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#fff',
+                                fontSize: '0.9rem',
+                                fontFamily: settings.introDbApiKey ? 'monospace' : 'inherit',
+                            }}
+                        />
+                        <button
+                            onClick={() => setShowIntroDbKey(v => !v)}
+                            style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '8px', flexShrink: 0 }}
+                            title={showIntroDbKey ? 'Hide key' : 'Show key'}
+                        >
+                            {showIntroDbKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Stream Display Mode */}

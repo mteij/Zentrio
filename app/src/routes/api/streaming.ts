@@ -1685,4 +1685,142 @@ streaming.post('/filter-enrich', optionalSessionMiddleware, async (c) => {
   }
 })
 
+// POST /api/streaming/segments/submit
+// Submits an intro/recap/outro segment to IntroDB using the user's stored API key.
+// The key is read server-side so it is never exposed to the client.
+streaming.post('/segments/submit', sessionMiddleware, async (c) => {
+  const user = c.get('user')
+  if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
+
+  const body = await c.req.json<{
+    profileId: number
+    imdbId: string
+    season: number
+    episode: number
+    type: 'intro' | 'recap' | 'outro'
+    startSec: number
+    endSec: number
+  }>().catch(() => null)
+
+  if (!body) return err(c, 400, 'INVALID_INPUT', 'Invalid request body')
+  const { profileId, imdbId, season, episode, type, startSec, endSec } = body
+
+  if (!imdbId?.startsWith('tt')) return err(c, 400, 'INVALID_INPUT', 'imdbId must be a valid IMDB ID')
+  if (!['intro', 'recap', 'outro'].includes(type)) return err(c, 400, 'INVALID_INPUT', 'type must be intro, recap, or outro')
+  if (season < 1 || episode < 1) return err(c, 400, 'INVALID_INPUT', 'season and episode must be ≥ 1')
+  if (startSec >= endSec) return err(c, 400, 'INVALID_INPUT', 'startSec must be less than endSec')
+
+  // Resolve settings profile and read IntroDB API key
+  const settingsProfileId = profileDb.getSettingsProfileId(profileId)
+  if (!settingsProfileId) return err(c, 404, 'PROFILE_NOT_FOUND', 'Profile not found')
+  const settings = streamDb.getSettings(settingsProfileId) as any
+  const apiKey: string | undefined = settings?.introdb?.apiKey
+
+  if (!apiKey?.startsWith('idb_')) {
+    return err(c, 403, 'NO_API_KEY', 'No IntroDB API key configured. Add one in Streaming settings.')
+  }
+
+  try {
+    const res = await fetch('https://api.introdb.app/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify({
+        imdb_id: imdbId,
+        season,
+        episode,
+        segment_type: type,
+        start_sec: startSec,
+        end_sec: endSec,
+      }),
+      signal: AbortSignal.timeout(8000),
+    })
+
+    const data = await res.json() as any
+
+    if (!res.ok) {
+      if (res.status === 401) return err(c, 403, 'INVALID_API_KEY', 'IntroDB rejected the API key')
+      if (res.status === 429) return err(c, 429, 'RATE_LIMITED', 'IntroDB rate limit reached (one submission per segment type per 5 minutes)')
+      return err(c, 400, 'INTRODB_ERROR', data?.message ?? 'Submission rejected by IntroDB')
+    }
+
+    return c.json({ ok: true, submission: data.submission })
+  } catch (e) {
+    log.error('IntroDB submit failed', e)
+    return err(c, 502, 'UPSTREAM_ERROR', 'Failed to reach IntroDB')
+  }
+})
+
+// GET /api/streaming/segments?imdbId=tt0903747&season=1&episode=1
+// Fetches intro/recap/outro segment timestamps from IntroDB (https://introdb.app).
+// Always tries the live API first; falls back to cached DB result for offline use.
+streaming.get('/segments', optionalSessionMiddleware, async (c) => {
+  const imdbId = c.req.query('imdbId')
+  const season = c.req.query('season') ? parseInt(c.req.query('season')!) : null
+  const episode = c.req.query('episode') ? parseInt(c.req.query('episode')!) : null
+
+  if (!imdbId || !imdbId.startsWith('tt')) {
+    return err(c, 400, 'INVALID_INPUT', 'imdbId is required and must be a valid IMDB ID (tt...)')
+  }
+
+  const { db } = await import('../../services/database/connection')
+
+  const getCached = () => {
+    const stmt = db.prepare(
+      'SELECT segments FROM introdb_cache WHERE imdb_id = ? AND season IS ? AND episode IS ?'
+    )
+    const row = stmt.get(imdbId, season, episode) as { segments: string } | undefined
+    if (!row) return null
+    try { return JSON.parse(row.segments) } catch { return null }
+  }
+
+  const saveCache = (segments: any[]) => {
+    db.prepare(`
+      INSERT INTO introdb_cache (imdb_id, season, episode, segments, fetched_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(imdb_id, season, episode)
+      DO UPDATE SET segments = excluded.segments, fetched_at = excluded.fetched_at
+    `).run(imdbId, season, episode, JSON.stringify(segments))
+  }
+
+  // Try live fetch first
+  try {
+    const params = new URLSearchParams({ imdb_id: imdbId })
+    if (season !== null) params.set('season', String(season))
+    if (episode !== null) params.set('episode', String(episode))
+
+    const res = await fetch(`https://api.introdb.app/segments?${params}`, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    })
+
+    if (res.ok) {
+      const data = await res.json() as any
+      // IntroDB returns { intro, recap, outro } as top-level keys (each null or a segment object)
+      const segments: any[] = []
+      for (const type of ['intro', 'recap', 'outro'] as const) {
+        const s = data[type]
+        if (!s) continue
+        segments.push({
+          type,
+          start: s.start_sec,
+          end: s.end_sec,
+          confidence: s.confidence ?? 1,
+          submissionCount: s.submission_count ?? 1,
+        })
+      }
+
+      saveCache(segments)
+      return c.json({ segments, source: 'live' })
+    }
+  } catch (e) {
+    log.debug('IntroDB fetch failed, falling back to cache', e)
+  }
+
+  // Fall back to cache (works offline)
+  const cached = getCached()
+  if (cached) return c.json({ segments: cached, source: 'cache' })
+
+  return c.json({ segments: [], source: 'none' })
+})
+
 export default streaming

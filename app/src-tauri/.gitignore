@@ -1,6 +1,13 @@
 target
 bin/
 gen/
+!gen/
+!gen/android/
+!gen/android/app/
+!gen/android/app/src/
+!gen/android/app/src/main/
+!gen/android/app/src/main/java/
+!gen/android/app/src/main/java/**/
 # Preserve hand-written Android files
 !gen/android/app/src/main/java/**/MainActivity.kt
 !gen/android/app/src/main/java/**/ImmersiveModePlugin.kt

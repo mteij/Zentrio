@@ -50,6 +50,22 @@ Zentrio was made possible by todays modern technologies and AI tools, insinuatin
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
+## 🙏 Acknowledgements
+
+Zentrio builds on the work of the following open-source projects and services:
+
+- [**tmdb-addon**](https://github.com/mrcanelas/tmdb-addon) by mrcanelas — Zentrio's internal TMDB addon service (`zentrio://tmdb-addon`) is substantially derived from this project. Core logic for catalog construction, metadata mapping, age-rating normalization, logo fetching, and search with person-credits fallback was adapted from tmdb-addon. Licensed under Apache 2.0.
+
+- [**IntroDB**](https://introdb.app) — Free, community-driven database of TV intro, recap, and outro timestamps. Powers the skip intro/outro feature in the video player. No API key required for read access.
+
+- [**Fanart.tv**](https://fanart.tv) — Provides high-quality content logos and artwork used throughout the UI.
+
+- [**IMDb**](https://developer.imdb.com/non-commercial-datasets/) — Public title ratings dataset (`imdbws.com`) downloaded and processed locally to display IMDb ratings.
+
+- [**DiceBear**](https://www.dicebear.com) — Open-source avatar generation library powering Zentrio's profile avatars.
+
+- [**Better Auth**](https://www.better-auth.com) — Open-source authentication framework that powers Zentrio's entire auth system (email/password, magic link, OTP, 2FA, and SSO).
+
 ## ℹ️ Trademark Notice
 
 Zentrio is an independent project. While it supports Stremio-compatible addons, it is not affiliated with, endorsed by, or sponsored by Stremio. "Stremio" and associated trademarks are the property of their respective owners.

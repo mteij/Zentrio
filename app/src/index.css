@@ -124,6 +124,10 @@ body.is-mobile {
   --titlebar-height: 0px;
   --app-content-top-offset: 0px;
   --app-content-top-spacing: 8px;
+  /* Fix --app-height to match #root's actual height (viewport minus safe area padding).
+     Without this, pages using height: var(--app-height) are 100vh tall while #root is
+     100vh - safe-areas tall, causing #root (overflow-y: auto) to scroll. */
+  --app-height: calc(100svh - var(--app-safe-top) - var(--app-safe-bottom));
   
   /* LOCK BODY SCROLL - Critical for preventing rubber banding */
   position: fixed;
@@ -144,6 +148,11 @@ body.is-mobile #root {
   overflow-x: hidden;
   overscroll-behavior: none; /* Prevent rubber-banding in both axes */
   -webkit-overflow-scrolling: touch; /* Smooth momentum scrolling on iOS/Android */
+}
+
+/* Profiles page is a fixed-height non-scrolling page — lock #root scroll */
+body.is-mobile:has([data-page="profiles"]) #root {
+  overflow: hidden !important;
 }
 
 /* When player is active on mobile, disable scrolling on #root to prevent conflicts */

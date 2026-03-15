@@ -16,15 +16,17 @@ import {
   PictureInPicture2, Cast,
   SkipForward as NextEpIcon,
   AlertTriangle, RefreshCw, X,
-  Sun, Moon
+  Sun, Moon,
+  Flag, Crosshair, Check, Loader2
 } from 'lucide-react'
 import { usePlayerEngine } from './hooks/usePlayerEngine'
+import { getStoredPlayerOrientation, setTauriPlayerMode, type PlayerOrientationMode } from '../../lib/tauri-player-mode'
 import type { MediaSource, SubtitleTrack, AudioTrack, QualityLevel } from './engines/types'
 import styles from '../../styles/ZentrioPlayer.module.css'
 
 /* ─────────────────────── Types ─────────────────────── */
 
-type OrientationMode = 'auto' | 'landscape' | 'portrait'
+type OrientationMode = PlayerOrientationMode
 
 export interface EpisodeInfo {
   season: number
@@ -58,6 +60,17 @@ interface ZentrioPlayerProps {
   onFindNewStream?: () => void
 
   onOpenExternal?: () => Promise<{ success: boolean; message: string }>
+
+  /** IntroDB segments for skip intro/recap/outro */
+  segments?: { type: string; start: number; end: number; confidence?: number; submissionCount?: number }[]
+  /** Whether to show skip buttons (from streaming settings, default true) */
+  skipIntrosOutros?: boolean
+  /** Whether to show segments with low confidence/few votes (marked as Unconfirmed) */
+  showUnvalidatedSegments?: boolean
+  /** Whether the user has an IntroDB API key — shows the contribute button */
+  canContributeSegments?: boolean
+  /** Called when user submits a new segment via the contribute panel */
+  onSubmitSegment?: (type: string, startSec: number, endSec: number) => Promise<{ ok: boolean; error?: string }>
 
   /* Callbacks */
   onTimeUpdate?: (currentTime: number, duration: number) => void
@@ -122,6 +135,11 @@ export function ZentrioPlayer({
   subtitles = [],
   startTime = 0,
   autoPlay = true,
+  segments = [],
+  skipIntrosOutros = true,
+  showUnvalidatedSegments = true,
+  canContributeSegments = false,
+  onSubmitSegment,
   onBack,
   prevEpisode,
   nextEpisode,
@@ -159,15 +177,7 @@ export function ZentrioPlayer({
   const volumeOSDTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /* Orientation */
-  const [orientationMode, setOrientationMode] = useState<OrientationMode>(() => {
-    try {
-      const saved = localStorage.getItem('zentrio_orientation')
-      if (saved === 'auto' || saved === 'landscape' || saved === 'portrait') {
-        return saved as OrientationMode
-      }
-    } catch (e) {}
-    return 'landscape'
-  })
+  const [orientationMode, setOrientationMode] = useState<OrientationMode>(() => getStoredPlayerOrientation())
 
   /* Progress hover */
   const [hoverTime, setHoverTime] = useState<{ time: number; pct: number } | null>(null)
@@ -181,6 +191,19 @@ export function ZentrioPlayer({
   /* Short video / find new stream */
   const [showShortVideo, setShowShortVideo] = useState(false)
   const shortDismissedRef = useRef(false)
+
+  /* Skip segment (IntroDB) */
+  const [activeSegment, setActiveSegment] = useState<{ type: string; start: number; end: number; validated: boolean } | null>(null)
+  const dismissedSegmentsRef = useRef<Set<number>>(new Set()) // dismissed by start time
+  const CONFIDENCE_THRESHOLD = 0.5
+
+  /* Contribute panel (IntroDB submission) */
+  const [showContribute, setShowContribute] = useState(false)
+  const [contributeType, setContributeType] = useState<'intro' | 'recap' | 'outro'>('intro')
+  const [contributeStart, setContributeStart] = useState(0)
+  const [contributeEnd, setContributeEnd] = useState(0)
+  const [contributeSubmitting, setContributeSubmitting] = useState(false)
+  const [contributeResult, setContributeResult] = useState<'success' | 'error' | null>(null)
 
   /* ── Engine ── */
   const {
@@ -249,12 +272,7 @@ export function ZentrioPlayer({
 
     const applyOrientation = async () => {
       if (isTauriMobile()) {
-        try {
-          const { invoke } = await import('@tauri-apps/api/core')
-          await invoke('plugin:immersive-mode|setOrientation', { orientation: orientationMode })
-        } catch (e) {
-          // Plugin unavailable — silently ignore
-        }
+        await setTauriPlayerMode(true, orientationMode)
         return
       }
       try {
@@ -275,12 +293,7 @@ export function ZentrioPlayer({
 
     // Reset to auto on unmount
     return () => {
-      if (isTauriMobile()) {
-        import('@tauri-apps/api/core').then(({ invoke }) => {
-          invoke('plugin:immersive-mode|setOrientation', { orientation: 'auto' }).catch(() => {})
-        })
-        return
-      }
+      if (isTauriMobile()) return
       try {
         const so = screen.orientation as any
         so?.unlock?.()
@@ -327,7 +340,19 @@ export function ZentrioPlayer({
         })
       }, 1000)
     }
-  }, [nextEpisode, nextEpisodeAt, onNavigateEpisode])
+
+    // Segment detection (IntroDB skip intro/recap/outro)
+    if (skipIntrosOutros && segments.length > 0) {
+      const hit = segments.find(s => {
+        if (t < s.start || t >= s.end) return false
+        if (dismissedSegmentsRef.current.has(s.start)) return false
+        const isValidated = (s.confidence ?? 1) >= CONFIDENCE_THRESHOLD
+        if (!isValidated && !showUnvalidatedSegments) return false
+        return true
+      })
+      setActiveSegment(hit ? { ...hit, validated: (hit.confidence ?? 1) >= CONFIDENCE_THRESHOLD } : null)
+    }
+  }, [nextEpisode, nextEpisodeAt, onNavigateEpisode, skipIntrosOutros, showUnvalidatedSegments, segments])
 
   /* Reset next episode tracking when video/episode changes */
   useEffect(() => {
@@ -341,6 +366,10 @@ export function ZentrioPlayer({
       clearInterval(countdownRef.current)
       countdownRef.current = null
     }
+    dismissedSegmentsRef.current = new Set()
+    setActiveSegment(null)
+    setShowContribute(false)
+    setContributeResult(null)
   }, [src, nextEpisodeAt])
 
   /* ── Controls auto-hide ── */
@@ -1052,6 +1081,25 @@ export function ZentrioPlayer({
                 )}
               </div>
 
+              {/* IntroDB contribute button */}
+              {canContributeSegments && (
+                <button
+                  className={`${styles.ctrlBtn} ${showContribute ? styles.active : ''}`}
+                  onClick={() => {
+                    setShowContribute(v => !v)
+                    if (!showContribute) {
+                      setContributeStart(state.currentTime)
+                      setContributeEnd(Math.min(state.duration, state.currentTime + 30))
+                      setContributeResult(null)
+                    }
+                  }}
+                  aria-label="Report segment"
+                  title="Contribute to IntroDB"
+                >
+                  <Flag size={18} />
+                </button>
+              )}
+
               {/* Fullscreen (hidden on mobile) */}
               {!isMobile && (
                 <button className={styles.ctrlBtn} onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
@@ -1062,6 +1110,118 @@ export function ZentrioPlayer({
           </div>
         </div>
       </div>
+
+      {/* ═════════════ SKIP SEGMENT BUTTON (IntroDB) ═════════════ */}
+      {activeSegment && skipIntrosOutros && (
+        <div className={`${styles.skipSegmentWrap} ${controlsVisible ? styles.skipSegmentWithControls : ''}`} data-controls>
+          <button
+            className={`${styles.skipSegmentBtn} ${!activeSegment.validated ? styles.skipSegmentUnconfirmed : ''}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              seek(activeSegment.end)
+              dismissedSegmentsRef.current.add(activeSegment.start)
+              setActiveSegment(null)
+            }}
+          >
+            Skip {activeSegment.type === 'intro' ? 'Intro' : activeSegment.type === 'recap' ? 'Recap' : 'Outro'}
+            {!activeSegment.validated && <span className={styles.skipSegmentBadge}>Unconfirmed</span>}
+          </button>
+          <button
+            className={styles.skipSegmentDismiss}
+            onClick={(e) => {
+              e.stopPropagation()
+              dismissedSegmentsRef.current.add(activeSegment.start)
+              setActiveSegment(null)
+            }}
+            aria-label="Dismiss"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* ═════════════ INTRODB CONTRIBUTE PANEL ═════════════ */}
+      {showContribute && canContributeSegments && (
+        <div className={`${styles.contributePanel} ${styles.slideIn}`} data-controls onClick={e => e.stopPropagation()}>
+          <div className={styles.contributePanelHeader}>
+            <span className={styles.contributePanelTitle}>
+              <Flag size={14} />
+              Report Segment
+            </span>
+            <button className={styles.nextEpCancel} onClick={() => setShowContribute(false)}>
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* Segment type */}
+          <div className={styles.contributeTypeRow}>
+            {(['intro', 'recap', 'outro'] as const).map(t => (
+              <button
+                key={t}
+                className={`${styles.contributeTypeBtn} ${contributeType === t ? styles.contributeTypeActive : ''}`}
+                onClick={() => setContributeType(t)}
+              >
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Time setters */}
+          <div className={styles.contributeTimeRow}>
+            <div className={styles.contributeTimeField}>
+              <span className={styles.contributeTimeLabel}>Start</span>
+              <span className={styles.contributeTimeValue}>{formatTime(contributeStart)}</span>
+              <button
+                className={styles.contributeCapture}
+                onClick={() => setContributeStart(state.currentTime)}
+                title="Set to current time"
+              >
+                <Crosshair size={13} />
+              </button>
+            </div>
+            <div className={styles.contributeTimeField}>
+              <span className={styles.contributeTimeLabel}>End</span>
+              <span className={styles.contributeTimeValue}>{formatTime(contributeEnd)}</span>
+              <button
+                className={styles.contributeCapture}
+                onClick={() => setContributeEnd(state.currentTime)}
+                title="Set to current time"
+              >
+                <Crosshair size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Submit */}
+          {contributeResult === 'success' ? (
+            <div className={styles.contributeSuccess}>
+              <Check size={15} /> Submitted — thanks for contributing!
+            </div>
+          ) : (
+            <button
+              className={styles.contributeSubmitBtn}
+              disabled={contributeSubmitting || contributeStart >= contributeEnd}
+              onClick={async () => {
+                setContributeSubmitting(true)
+                setContributeResult(null)
+                const result = await onSubmitSegment?.(contributeType, contributeStart, contributeEnd)
+                setContributeSubmitting(false)
+                if (result?.ok) {
+                  setContributeResult('success')
+                } else {
+                  setContributeResult('error')
+                }
+              }}
+            >
+              {contributeSubmitting
+                ? <><Loader2 size={14} className={styles.spin} /> Submitting…</>
+                : contributeResult === 'error'
+                  ? 'Failed — try again'
+                  : 'Submit to IntroDB'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ═════════════ NEXT EPISODE POPUP ═════════════ */}
       {showNextEp && nextEpisode && (

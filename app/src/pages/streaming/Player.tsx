@@ -7,7 +7,7 @@
  * All player UI is handled by <ZentrioPlayer />.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, SkeletonPlayer } from '../../components'
 import { ZentrioPlayer, type EpisodeInfo } from '../../components/player/ZentrioPlayer'
@@ -16,23 +16,13 @@ import { toast } from 'sonner'
 import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import styles from '../../styles/Player.module.css'
 import { apiFetch } from '../../lib/apiFetch'
+import { getStoredPlayerOrientation, setTauriPlayerMode } from '../../lib/tauri-player-mode'
 import { resolveBeaconUrl } from '../../lib/url'
 import type { FlatStream } from '../../hooks/useStreamLoader'
 import { resolveStreamsProgressive, type StreamResolveHandle } from '../../lib/stream-resolver'
 import { createLogger } from '../../utils/client-logger'
 
 const log = createLogger('PlayerPage')
-
-/* ─── Immersive mode (Android only) ─── */
-const setImmersiveMode = async (enabled: boolean) => {
-  if (!(window as any).__TAURI_INTERNALS__) return
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('plugin:immersive-mode|setImmersiveMode', { enabled })
-  } catch {
-    // Not on Android or plugin unavailable — silently ignore
-  }
-}
 
 /* ─── Constants ─── */
 const SHORT_VIDEO_THRESHOLD = 120   // seconds — show "find new stream"
@@ -201,6 +191,10 @@ export const StreamingPlayer = () => {
   const [pageError, setPageError] = useState('')
 
   const [subtitleTracks, setSubtitleTracks] = useState<PlayerSubtitleTrack[]>([])
+  const [segments, setSegments] = useState<{ type: string; start: number; end: number }[]>([])
+  const [skipIntrosOutros, setSkipIntrosOutros] = useState(true)
+  const [showUnvalidatedSegments, setShowUnvalidatedSegments] = useState(true)
+  const [hasIntroDbKey, setHasIntroDbKey] = useState(false)
 
   const [prevEpisode, setPrevEpisode] = useState<EpisodeInfo | null>(null)
   const [nextEpisode, setNextEpisode] = useState<EpisodeInfo | null>(null)
@@ -288,6 +282,38 @@ export const StreamingPlayer = () => {
         setLoading(false)
 
         void subPromise
+
+        // Fetch IntroDB segments and streaming settings in parallel (non-blocking)
+        void (async () => {
+          const [settingsRes, segmentRes] = await Promise.allSettled([
+            apiFetch(`/api/streaming/settings?profileId=${profileId}`),
+            (async () => {
+              if (!parsedMeta.id.startsWith('tt')) return null
+              const params = new URLSearchParams({ imdbId: parsedMeta.id })
+              if (parsedMeta.season !== undefined) params.set('season', String(parsedMeta.season))
+              if (parsedMeta.episode !== undefined) params.set('episode', String(parsedMeta.episode))
+              return apiFetch(`/api/streaming/segments?${params}`)
+            })(),
+          ])
+
+          if (settingsRes.status === 'fulfilled' && settingsRes.value.ok) {
+            const data = await settingsRes.value.json()
+            if (data?.data?.playback?.skipIntrosOutros !== undefined) {
+              setSkipIntrosOutros(data.data.playback.skipIntrosOutros)
+            }
+            if (data?.data?.playback?.showUnvalidatedSegments !== undefined) {
+              setShowUnvalidatedSegments(data.data.playback.showUnvalidatedSegments)
+            }
+            if (data?.data?.introdb?.apiKey) {
+              setHasIntroDbKey(true)
+            }
+          }
+
+          if (segmentRes.status === 'fulfilled' && segmentRes.value?.ok) {
+            const data = await segmentRes.value.json()
+            if (!cancelled && Array.isArray(data.segments)) setSegments(data.segments)
+          }
+        })()
       } catch (e) {
         log.error('Failed to init player', e)
         if (cancelled) return
@@ -442,13 +468,37 @@ export const StreamingPlayer = () => {
     return result
   }, [openExternal, stream, meta])
 
-  /* ─── Immersive mode: enable on mount, restore on unmount ─── */
-  useEffect(() => {
-    setImmersiveMode(true)
+  const handleSubmitSegment = useCallback(async (type: string, startSec: number, endSec: number) => {
+    if (!meta || !profileId) return { ok: false, error: 'No content loaded' }
+    try {
+      const res = await apiFetch('/api/streaming/segments/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: parseInt(profileId),
+          imdbId: meta.id,
+          season: meta.season,
+          episode: meta.episode,
+          type,
+          startSec,
+          endSec,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) return { ok: false, error: data?.error?.message ?? 'Submission failed' }
+      return { ok: true }
+    } catch {
+      return { ok: false, error: 'Network error' }
+    }
+  }, [meta, profileId])
+
+  /* ─── Player mode: enable on mount, restore on unmount ─── */
+  useLayoutEffect(() => {
+    void setTauriPlayerMode(true, getStoredPlayerOrientation())
     // Add player-active class to body for CSS targeting (fallback for browsers without :has() support)
     document.body.classList.add('player-active')
     return () => { 
-      setImmersiveMode(false) 
+      void setTauriPlayerMode(false, 'auto')
       document.body.classList.remove('player-active')
     }
   }, [])
@@ -518,6 +568,11 @@ export const StreamingPlayer = () => {
           }))}
           startTime={startTime}
           autoPlay={true}
+          segments={segments}
+          skipIntrosOutros={skipIntrosOutros}
+          showUnvalidatedSegments={showUnvalidatedSegments}
+          canContributeSegments={hasIntroDbKey && !!meta?.id.startsWith('tt') && meta?.season !== undefined}
+          onSubmitSegment={handleSubmitSegment}
           onBack={() => navigate(-1)}
           prevEpisode={prevEpisode}
           nextEpisode={nextEpisode}

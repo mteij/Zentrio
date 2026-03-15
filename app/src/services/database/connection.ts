@@ -563,4 +563,16 @@ db.exec(`
     expires_at INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  -- IntroDB segment cache (intro/recap/outro timestamps from introdb.app)
+  CREATE TABLE IF NOT EXISTS introdb_cache (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    imdb_id    TEXT NOT NULL,
+    season     INTEGER,
+    episode    INTEGER,
+    segments   TEXT NOT NULL, -- JSON array of { type, start_sec, end_sec }
+    fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(imdb_id, season, episode)
+  );
+  CREATE INDEX IF NOT EXISTS idx_introdb_cache_lookup ON introdb_cache(imdb_id, season, episode);
  `)

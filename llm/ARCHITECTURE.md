@@ -62,7 +62,7 @@ Each file is a self-contained Hono router mounted under `/api/*`.
 | `auth.ts` | `/api/auth` | Better Auth (email, magic link, OTP, 2FA, SSO) |
 | `profiles.ts` | `/api/profiles` | User profiles CRUD |
 | `user.ts` | `/api/user` | User settings, TMDB API key |
-| `streaming.ts` | `/api/streaming` | Stream URL resolution. Also exposes `POST /api/streaming/filter-enrich` — accepts `{ items: MetaPreview[], profileId: number }`, applies server-side parental filtering + watch history enrichment, returns `{ items: MetaPreview[] }`. Call this after any client-side addon fetch. |
+| `streaming.ts` | `/api/streaming` | Stream URL resolution. Also exposes `POST /api/streaming/filter-enrich` — accepts `{ items: MetaPreview[], profileId: number }`, applies server-side parental filtering + watch history enrichment, returns `{ items: MetaPreview[] }`. Call this after any client-side addon fetch. Also exposes `GET /api/streaming/segments?imdbId=tt...&season=X&episode=X` — fetches intro/recap/outro timestamps from IntroDB, caches in `introdb_cache`, and falls back to cached data when offline. |
 | `addons.ts` | `/api/addons` | Stremio-compatible addon management |
 | `lists.ts` | `/api/lists` | Watchlists with sharing |
 | `appearance.ts` | `/api/appearance` | Theme/appearance settings |
@@ -122,7 +122,7 @@ SQLite database layer via `bun:sqlite`.
 
 | File | Purpose |
 |---|---|
-| `connection.ts` | DB initialization, all `CREATE TABLE IF NOT EXISTS` schema definitions, seed data |
+| `connection.ts` | DB initialization, all `CREATE TABLE IF NOT EXISTS` schema definitions, seed data. Includes `introdb_cache` table for IntroDB segment caching. |
 | `migrations.ts` | Incremental schema migrations run at startup |
 | `addons.ts` | Addon CRUD operations |
 | `appearance.ts` | Appearance settings read/write |
@@ -356,7 +356,7 @@ Player UI and engine abstraction.
 
 | File | Purpose |
 |---|---|
-| `ZentrioPlayer.tsx` | Main player component with controls UI |
+| `ZentrioPlayer.tsx` | Main player component with controls UI. Accepts `segments` (IntroDB intro/recap/outro timestamps) and `skipIntrosOutros` (from streaming settings, default `true`) props. Shows a "Skip Intro/Recap/Outro" button when playback enters a segment range. |
 | `engines/factory.ts` | Creates the correct engine based on platform/stream type |
 | `engines/WebPlayerEngine.ts` | HLS.js-based web player |
 | `engines/TauriPlayerEngine.ts` | Native Tauri player via shell commands |
@@ -490,6 +490,25 @@ See `.env.example` for the full reference.
 
 ---
 
+## Third-Party Integrations
+
+| Service | Purpose | Auth | Caching |
+|---|---|---|---|
+| [IntroDB](https://introdb.app) | Intro/recap/outro timestamps for TV episodes | None (read is public) | `introdb_cache` SQLite table — always try live, fall back to cache |
+| TMDB | Movie/TV metadata, posters, trending | Per-user API key via `TMDB_API_KEY` env or user settings | `src/services/tmdb/cache.ts` |
+| Trakt.tv | Watch history sync, scrobbling | OAuth tokens stored in `trakt_accounts` table | Per-profile |
+| MDBList | Curated content lists surfaced as TMDB addon catalogs | None (public lists) | Via TMDB cache layer |
+| [Fanart.tv](https://fanart.tv) | High-quality content logos and artwork | Optional `FANART_API_KEY` | Via TMDB cache layer |
+| [IMDb](https://developer.imdb.com/non-commercial-datasets/) | Title ratings from public `imdbws.com` dataset | None | Downloaded to local SQLite, refreshed on configurable interval (default 24h) |
+| [DiceBear](https://www.dicebear.com) | Profile avatar generation | None (local library) | N/A — generated on demand |
+| [Better Auth](https://www.better-auth.com) | Auth framework (email, magic link, OTP, 2FA, SSO) | N/A — is the auth system | Session tokens in `session` table |
+
+**IntroDB:** Fetched server-side via `GET /api/streaming/segments`, cached in `introdb_cache`. The client never calls IntroDB directly. Non-IMDB content (IDs not starting with `tt`) is silently skipped.
+
+**TMDB addon origin:** Zentrio's internal TMDB addon (`src/services/tmdb/`) is substantially derived from [mrcanelas/tmdb-addon](https://github.com/mrcanelas/tmdb-addon) (Apache 2.0). The source files carry the original attribution. The key architectural difference is that Zentrio embeds it as an internal service behind `zentrio://tmdb-addon` rather than a standalone HTTP addon server.
+
+---
+
 ## Known Duplication / Debt
 
 These are known issues in the codebase that should be resolved, not replicated:
@@ -509,4 +528,4 @@ Run `bun run knip` from `app/` at any time to surface unused files and exports. 
 - Deep links (`zentrio://`) handle magic link and OAuth callbacks in native apps
 - iOS support exists but is currently disabled in Tauri config
 - Downloads feature is Tauri-only; web builds hide download UI
-- **Android `ImmersiveModePlugin`** (`src-tauri/gen/android/.../ImmersiveModePlugin.kt`): custom Tauri plugin for fullscreen (`setImmersiveMode`) and orientation lock (`setOrientation`). **`@TauriPlugin` does NOT auto-register in Tauri v2** — the plugin must be explicitly registered via `registerPlugin(ImmersiveModePlugin::class.java)` in `MainActivity.kt` before `super.onCreate()`. Frontend invokes it via `invoke('plugin:immersive-mode|setImmersiveMode', { enabled })` and `invoke('plugin:immersive-mode|setOrientation', { orientation: 'portrait' | 'landscape' | 'auto' })`.
+- **Android `ImmersiveModePlugin`** (`src-tauri/gen/android/.../ImmersiveModePlugin.kt`): custom Tauri plugin for fullscreen (`setImmersiveMode`) and orientation lock (`setOrientation`). **`@TauriPlugin` does NOT auto-register in Tauri v2** — on Tauri `2.9.x`, the plugin is registered in `MainActivity.kt` via `pluginManager.load(null, "immersive-mode", ImmersiveModePlugin(this), "{}")` before `super.onCreate()`. Frontend invokes it via `invoke('plugin:immersive-mode|setImmersiveMode', { enabled })` and `invoke('plugin:immersive-mode|setOrientation', { orientation: 'portrait' | 'landscape' | 'auto' })`.

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Settings, LogOut, Edit, X, Plus, Check, LogIn, Shield } from 'lucide-react'
@@ -49,6 +49,30 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const navigate = useNavigate()
+
+  // Track grid overflow for the fade affordance
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [gridFade, setGridFade] = useState(false)
+
+  useEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+
+    const update = () => {
+      const overflows = el.scrollHeight > el.clientHeight + 1
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4
+      setGridFade(overflows && !atBottom)
+    }
+
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    el.addEventListener('scroll', update, { passive: true })
+    return () => {
+      ro.disconnect()
+      el.removeEventListener('scroll', update)
+    }
+  }, [profiles])
 
   // Check if in guest mode
   const isGuestMode = appMode.isGuest()
@@ -251,7 +275,7 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
     <SimpleLayout title="Profiles">
       <AnimatedBackground />
 
-      <main className={styles.profilesPage} style={{ position: 'relative', zIndex: 1 }}>
+      <main className={styles.profilesPage} data-page="profiles" style={{ position: 'relative', zIndex: 1 }}>
         <h1 className="sr-only">Profiles</h1>
         <div className={styles.profilesMain}>
           <section className={styles.profilesSection}>
@@ -266,7 +290,11 @@ export function ProfilesPage({ user }: ProfilesPageProps) {
                 ))}
               </div>
             ) : (
-              <div className={styles.profilesGrid} id="profilesGrid">
+              <div
+                ref={gridRef}
+                className={`${styles.profilesGrid}${gridFade ? ` ${styles.profilesGridFade}` : ''}`}
+                id="profilesGrid"
+              >
                 {profiles.map(profile => (
                   <ProfileCard 
                     key={profile.id} 

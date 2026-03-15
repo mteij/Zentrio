@@ -71,6 +71,12 @@
   display: none;
 }
 
+/* Fade applied only when grid content overflows and isn't scrolled to the bottom */
+.profilesGridFade {
+  mask-image: linear-gradient(to bottom, black calc(100% - 52px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 52px), transparent 100%);
+}
+
 /* Profile card */
 .profileCard {
   text-align: center;
@@ -301,6 +307,10 @@
   .profilesPage {
     padding-block: 1.25rem;
     padding-bottom: calc(104px + var(--safe-area-inset-bottom, 0px));
+  }
+
+  .profilesSection {
+    min-height: 0;
   }
 
   .sectionTitle {
