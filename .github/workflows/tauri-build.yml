@@ -108,7 +108,11 @@ jobs:
             args: "--target aarch64-apple-darwin"
             name: "macos"
           - platform: "ubuntu-22.04" # for Linux
-            args: ""
+            # AppImage bundling is currently failing in GitHub Actions during the
+            # upstream linuxdeploy step, even after the app binary, deb, and rpm
+            # are built successfully. Limit CI Linux bundles to the stable
+            # package formats so desktop releases stay green.
+            args: "--bundles deb,rpm"
             name: "linux"
           - platform: "windows-latest" # for Windows
             args: ""
@@ -225,23 +229,6 @@ jobs:
         run: |
           bun build src/index.ts --compile --target bun-darwin-arm64 --outfile src-tauri/bin/zentrio-server-aarch64-apple-darwin
 
-      # AppImage requires FUSE or extract-and-run mode; set globally so linuxdeploy and its plugin inherit it
-      - name: Configure AppImage environment (Linux only)
-        if: matrix.name == 'linux'
-        run: |
-          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
-          echo "LINUXDEPLOY_PLUGIN_APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
-
-      # Fix linuxdeploy in Tauri action by downloading manually, as AppImage bundling fails on GitHub Actions
-      - name: Setup linuxdeploy (Linux only)
-        if: matrix.name == 'linux'
-        run: |
-          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
-          chmod +x linuxdeploy*.AppImage
-          sudo cp linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
-          sudo cp linuxdeploy-plugin-appimage-x86_64.AppImage /usr/local/bin/linuxdeploy-plugin-appimage
-
       # Desktop Build (Linux, Windows, macOS Desktop)
       - name: Build Tauri App (Desktop)
         if: matrix.name != 'android' && matrix.name != 'ios'
@@ -251,8 +238,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           NO_STRIP: 1
-          APPIMAGE_EXTRACT_AND_RUN: 1
-          LINUXDEPLOY_PLUGIN_APPIMAGE_EXTRACT_AND_RUN: 1
         with:
           projectPath: ./app
           tagName: ${{ needs.create-release.outputs.tag_name }}
