@@ -1020,7 +1020,8 @@ streaming.post('/mark-season-watched', optionalSessionMiddleware, async (c) => {
 streaming.post('/mark-series-watched', optionalSessionMiddleware, async (c) => {
   try {
     const body = await c.req.json()
-    const { profileId, metaId, watched, allEpisodes } = body
+    const { profileId, metaId, watched, allEpisodes: providedEpisodes } = body
+    let allEpisodes = providedEpisodes
 
     if (!profileId || !metaId || watched === undefined) {
       return c.json({ error: 'Missing required fields' }, 400)
