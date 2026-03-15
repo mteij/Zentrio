@@ -43,7 +43,6 @@ const StreamingLibrary = lazy(() => import('./pages/streaming/Library').then(m =
 const StreamingSearch = lazy(() => import('./pages/streaming/Search').then(m => ({ default: m.StreamingSearch })))
 const StreamingCatalog = lazy(() => import('./pages/streaming/Catalog').then(m => ({ default: m.StreamingCatalog })))
 const StreamingDownloads = lazy(() => import('./pages/streaming/Downloads').then(m => ({ default: m.StreamingDownloads })))
-
 // Share invite page
 const ShareInvitePage = lazy(() => import('./pages/ShareInvitePage').then(m => ({ default: m.ShareInvitePage })))
 

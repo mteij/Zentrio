@@ -91,6 +91,10 @@ pub struct DownloadRecord {
     pub smart_download: bool,
     /// Smart Downloads: delete this file after watching
     pub auto_delete: bool,
+    /// JSON array of {url, lang} — original subtitle URLs from the stream response
+    pub subtitle_urls: Option<String>,
+    /// JSON array of {lang, path} — locally downloaded subtitle file paths
+    pub subtitle_paths: Option<String>,
 }
 
 pub struct DownloadDb {
@@ -132,7 +136,9 @@ impl DownloadDb {
                 addon_id TEXT NOT NULL DEFAULT '',
                 error_message TEXT,
                 smart_download INTEGER NOT NULL DEFAULT 0,
-                auto_delete INTEGER NOT NULL DEFAULT 0
+                auto_delete INTEGER NOT NULL DEFAULT 0,
+                subtitle_urls TEXT,
+                subtitle_paths TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_downloads_profile ON downloads(profile_id);
             CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
@@ -149,6 +155,8 @@ impl DownloadDb {
         // Idempotent schema migrations for existing databases
         let _ = self.conn.execute("ALTER TABLE downloads ADD COLUMN smart_download INTEGER NOT NULL DEFAULT 0", []);
         let _ = self.conn.execute("ALTER TABLE downloads ADD COLUMN auto_delete INTEGER NOT NULL DEFAULT 0", []);
+        let _ = self.conn.execute("ALTER TABLE downloads ADD COLUMN subtitle_urls TEXT", []);
+        let _ = self.conn.execute("ALTER TABLE downloads ADD COLUMN subtitle_paths TEXT", []);
 
         Ok(())
     }
@@ -158,15 +166,16 @@ impl DownloadDb {
             "INSERT INTO downloads (id, profile_id, media_type, media_id, episode_id, title, episode_title,
              season, episode, poster_path, status, progress, quality, file_path, file_size, downloaded_bytes,
              added_at, completed_at, last_watched_at, watched_percent, stream_url, addon_id, error_message,
-             smart_download, auto_delete)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)",
+             smart_download, auto_delete, subtitle_urls, subtitle_paths)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27)",
             params![
                 rec.id, rec.profile_id, rec.media_type, rec.media_id, rec.episode_id,
                 rec.title, rec.episode_title, rec.season, rec.episode, rec.poster_path,
                 rec.status.as_str(), rec.progress, rec.quality.as_str(), rec.file_path,
                 rec.file_size, rec.downloaded_bytes, rec.added_at, rec.completed_at,
                 rec.last_watched_at, rec.watched_percent, rec.stream_url, rec.addon_id,
-                rec.error_message, rec.smart_download as i64, rec.auto_delete as i64
+                rec.error_message, rec.smart_download as i64, rec.auto_delete as i64,
+                rec.subtitle_urls, rec.subtitle_paths
             ],
         )?;
         Ok(())
@@ -177,7 +186,8 @@ impl DownloadDb {
             "SELECT id, profile_id, media_type, media_id, episode_id, title, episode_title,
              season, episode, poster_path, status, progress, quality, file_path, file_size,
              downloaded_bytes, added_at, completed_at, last_watched_at, watched_percent,
-             stream_url, addon_id, error_message, smart_download, auto_delete
+             stream_url, addon_id, error_message, smart_download, auto_delete,
+             subtitle_urls, subtitle_paths
              FROM downloads WHERE profile_id = ?1 ORDER BY added_at DESC"
         )?;
         let rows = stmt.query_map([profile_id], |row| {
@@ -207,6 +217,8 @@ impl DownloadDb {
                 error_message: row.get(22)?,
                 smart_download: row.get::<_, i64>(23)? != 0,
                 auto_delete: row.get::<_, i64>(24)? != 0,
+                subtitle_urls: row.get(25)?,
+                subtitle_paths: row.get(26)?,
             })
         })?;
         let mut records = Vec::new();
@@ -221,7 +233,8 @@ impl DownloadDb {
             "SELECT id, profile_id, media_type, media_id, episode_id, title, episode_title,
              season, episode, poster_path, status, progress, quality, file_path, file_size,
              downloaded_bytes, added_at, completed_at, last_watched_at, watched_percent,
-             stream_url, addon_id, error_message, smart_download, auto_delete
+             stream_url, addon_id, error_message, smart_download, auto_delete,
+             subtitle_urls, subtitle_paths
              FROM downloads WHERE id = ?1"
         )?;
         let mut rows = stmt.query_map([id], |row| {
@@ -251,6 +264,8 @@ impl DownloadDb {
                 error_message: row.get(22)?,
                 smart_download: row.get::<_, i64>(23)? != 0,
                 auto_delete: row.get::<_, i64>(24)? != 0,
+                subtitle_urls: row.get(25)?,
+                subtitle_paths: row.get(26)?,
             })
         })?;
         if let Some(row) = rows.next() {
@@ -296,8 +311,75 @@ impl DownloadDb {
         Ok(())
     }
 
+    pub fn update_subtitle_paths(&self, id: &str, paths_json: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE downloads SET subtitle_paths = ?1 WHERE id = ?2",
+            params![paths_json, id],
+        )?;
+        Ok(())
+    }
+
     pub fn delete(&self, id: &str) -> Result<()> {
         self.conn.execute("DELETE FROM downloads WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    /// Returns all downloads that were queued or in-progress at shutdown, across all profiles.
+    /// Used on startup to restore the download queue.
+    pub fn get_all_pending(&self) -> Result<Vec<DownloadRecord>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, profile_id, media_type, media_id, episode_id, title, episode_title,
+             season, episode, poster_path, status, progress, quality, file_path, file_size,
+             downloaded_bytes, added_at, completed_at, last_watched_at, watched_percent,
+             stream_url, addon_id, error_message, smart_download, auto_delete,
+             subtitle_urls, subtitle_paths
+             FROM downloads WHERE status IN ('queued','downloading') ORDER BY added_at ASC"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(DownloadRecord {
+                id: row.get(0)?,
+                profile_id: row.get(1)?,
+                media_type: row.get(2)?,
+                media_id: row.get(3)?,
+                episode_id: row.get(4)?,
+                title: row.get(5)?,
+                episode_title: row.get(6)?,
+                season: row.get(7)?,
+                episode: row.get(8)?,
+                poster_path: row.get(9)?,
+                status: DownloadStatus::from_str(&row.get::<_, String>(10)?),
+                progress: row.get(11)?,
+                quality: DownloadQuality::from_str(&row.get::<_, String>(12)?),
+                file_path: row.get(13)?,
+                file_size: row.get(14)?,
+                downloaded_bytes: row.get(15)?,
+                added_at: row.get(16)?,
+                completed_at: row.get(17)?,
+                last_watched_at: row.get(18)?,
+                watched_percent: row.get(19)?,
+                stream_url: row.get(20)?,
+                addon_id: row.get(21)?,
+                error_message: row.get(22)?,
+                smart_download: row.get::<_, i64>(23)? != 0,
+                auto_delete: row.get::<_, i64>(24)? != 0,
+                subtitle_urls: row.get(25)?,
+                subtitle_paths: row.get(26)?,
+            })
+        })?;
+        let mut records = Vec::new();
+        for row in rows {
+            records.push(row?);
+        }
+        Ok(records)
+    }
+
+    /// Resets any 'downloading' records back to 'queued' — called on startup so
+    /// downloads interrupted by a crash or shutdown don't appear stuck mid-flight.
+    pub fn reset_interrupted(&self) -> Result<()> {
+        self.conn.execute(
+            "UPDATE downloads SET status = 'queued', progress = 0, downloaded_bytes = 0 WHERE status = 'downloading'",
+            [],
+        )?;
         Ok(())
     }
 
@@ -382,6 +464,8 @@ impl DownloadDb {
             error_message: None,
             smart_download: true,
             auto_delete: rec.auto_delete,
+            subtitle_urls: None,
+            subtitle_paths: None,
         };
 
         Ok(Some(next))

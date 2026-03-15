@@ -1,8 +1,6 @@
-// Details Header Component
-// Extracted from Details.tsx
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Youtube, Check, List, Info, Eye, EyeOff, Download, CheckCircle, Loader } from 'lucide-react'
+import { Play, Youtube, Check, List, Eye, EyeOff, Download, CheckCircle, Loader, ChevronLeft, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { QualityPicker } from '../downloads/QualityPicker'
@@ -10,8 +8,7 @@ import { downloadService, DownloadQuality } from '../../services/downloads/downl
 import { useDownloadForMedia } from '../../hooks/useDownloads'
 import { useDownloadStore } from '../../stores/downloadStore'
 import { getTopStream, readCachedTopStream, resolveTopStream } from '../../lib/topStreamCache'
-import dlStyles from '../downloads/Downloads.module.css'
-import styles from '../../styles/Streaming.module.css'
+import styles from './Details.module.css'
 import type { MetaDetail } from '../../services/addons/types'
 import { createLogger } from '../../utils/client-logger'
 
@@ -19,7 +16,7 @@ const log = createLogger('DetailsHeader')
 
 interface DetailsHeaderProps {
   meta: MetaDetail
-  data: any // Using specific type would be better if exported from Details.tsx
+  data: any
   profileId: string
   view: 'details' | 'episodes' | 'streams'
   showImdbRatings: boolean
@@ -30,6 +27,8 @@ interface DetailsHeaderProps {
   onShowInfoModal: () => void
   onToggleWatched: () => void
   onMarkSeriesWatched: (watched: boolean) => void
+  /** Called when back is tapped while in series stream view — goes back to episode list */
+  onBackFromStreams?: () => void
   children?: React.ReactNode
 }
 
@@ -46,7 +45,8 @@ export function DetailsHeader({
   onShowInfoModal,
   onToggleWatched,
   onMarkSeriesWatched,
-  children
+  onBackFromStreams,
+  children,
 }: DetailsHeaderProps) {
   const navigate = useNavigate()
   const [showQualityPicker, setShowQualityPicker] = useState(false)
@@ -92,8 +92,8 @@ export function DetailsHeader({
         streamUrl: stream.url || '',
         addonId: stream.addonId || '',
         quality,
+        subtitleUrls: stream.subtitles,
       })
-      // Optimistically add to store so queued state is visible immediately
       addDownload({
         id,
         profileId: profileId.toString(),
@@ -123,100 +123,151 @@ export function DetailsHeader({
     }
   }
 
+  const handleBack = () => {
+    if (meta.type === 'series' && view === 'streams' && onBackFromStreams) {
+      onBackFromStreams()
+    } else {
+      navigate(-1)
+    }
+  }
+
+  // Season / episode counts for series
+  const seasonCount = meta.type === 'series' && meta.videos
+    ? new Set(meta.videos.map((v: any) => v.season).filter(Boolean)).size
+    : 0
+  const episodeCount = meta.type === 'series' && meta.videos ? meta.videos.length : 0
+
+  // Filter out age-rating genres that creep into the genre list
+  const genres = meta.genres
+    ?.filter(g => !['PG', 'PG-13', 'R', 'NC-17', 'G', 'TV-Y', 'TV-Y7', 'TV-G', 'TV-PG',
+      'TV-14', 'TV-MA', 'NR', 'UR', '12', '12A', '15', '18', 'U', 'R13', 'R16',
+      'R18', 'M', 'MA15+', 'R18+', '6', '9', '16'].includes(g))
+    .slice(0, 4)
+    .join(' · ')
+
+  const dlStatus = existingDownload?.status
+
   return (
     <>
-      <div className={styles.pageAmbientBackground} style={{
-        backgroundImage: `url(${meta.background || meta.poster})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }}></div>
+      {/* Full-page ambient background */}
+      <div className={styles.page}>
+        <div
+          className={styles.backdrop}
+          style={{ backgroundImage: `url(${meta.background || meta.poster})` }}
+        />
+        <div className={styles.backdropScrim} />
 
-      <div className={styles.detailsContent}>
-        <div className={styles.detailsPoster}>
-          {meta.poster ? (
-            <img src={meta.poster} alt={meta.name} />
-          ) : (
-            <div style={{ width: '100%', height: '100%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {meta.name}
-            </div>
-          )}
-        </div>
+        <div className={styles.content}>
+          {/* Top bar */}
+          <div className={styles.topBar}>
+            <button className={styles.backBtn} onClick={handleBack}>
+              <ChevronLeft size={20} />
+              {meta.type === 'series' && view === 'streams' ? 'Episodes' : 'Back'}
+            </button>
+          </div>
 
-        <div className={styles.detailsInfo}>
-          {/* Hide metadata only for series when viewing streams (since movies show streams as main page) */}
-          {!(meta.type === 'series' && view === 'streams') && (
-            <>
-              {/* TMDB styled title banner (logo) when available, otherwise text title */}
-              {meta.logo ? (
-                <img 
-                  src={meta.logo} 
-                  alt={meta.name} 
-                  className={styles.detailsLogo}
-                />
+          {/* Compact header — always visible */}
+          <div className={styles.header}>
+            {/* Small poster */}
+            <div className={styles.posterWrap}>
+              {meta.poster ? (
+                <img src={meta.poster} alt={meta.name} className={styles.poster} />
               ) : (
-                <h1 className={styles.detailsTitle}>{meta.name}</h1>
+                <div className={styles.posterFallback}>{meta.name[0]}</div>
               )}
-              
-              <div className={styles.detailsMetaRow}>
-                {meta.released && <span className={styles.metaBadge}>{String(meta.released).split('-')[0]}</span>}
-                {meta.runtime && <span className={styles.metaBadge}>{meta.runtime}</span>}
-                {showImdbRatings && meta.imdbRating && <span className={styles.metaBadge} style={{ background: '#f5c518', color: '#000' }}>IMDb {meta.imdbRating}</span>}
+            </div>
+
+            {/* Info */}
+            <div className={styles.headerInfo}>
+              {meta.logo ? (
+                <img src={meta.logo} alt={meta.name} className={styles.logo} />
+              ) : (
+                <h1 className={styles.title}>{meta.name}</h1>
+              )}
+
+              {/* Metadata badges */}
+              <div className={styles.metaRow}>
+                {meta.released && (
+                  <span className={styles.metaBadge}>{String(meta.released).split('-')[0]}</span>
+                )}
+                {meta.runtime && (
+                  <span className={styles.metaBadge}>{meta.runtime}</span>
+                )}
+                {showImdbRatings && meta.imdbRating && (
+                  <span className={`${styles.metaBadge} ${styles.metaBadgeImdb}`}>
+                    IMDb {meta.imdbRating}
+                  </span>
+                )}
                 {/* @ts-expect-error */}
-                {showAgeRatings && (meta.certification || meta.rating || meta.contentRating) && <span className={styles.metaBadge} style={{ border: '1px solid #fff' }}>{(meta.certification || meta.rating || meta.contentRating)}</span>}
+                {showAgeRatings && (meta.certification || meta.rating || meta.contentRating) && (
+                  <span className={`${styles.metaBadge} ${styles.metaBadgeRating}`}>
+                    {/* @ts-expect-error */}
+                    {meta.certification || meta.rating || meta.contentRating}
+                  </span>
+                )}
+                {seasonCount > 0 && (
+                  <span className={styles.metaBadge}>
+                    {seasonCount} Season{seasonCount !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {episodeCount > 0 && (
+                  <span className={styles.metaBadge}>
+                    {episodeCount} Episode{episodeCount !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
 
-              <div className={styles.detailsActions}>
-                {/* Primary Play button */}
+              {/* Action buttons */}
+              <div className={styles.actions}>
+                {/* Play — movies only (series uses EpisodeList quick-play) */}
                 {meta.type === 'movie' && (
-                    <button className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`} onClick={onMoviePlay}>
-                      <Play size={20} fill="currentColor" />
-                      Play
-                    </button>
+                  <button className={styles.playBtn} onClick={onMoviePlay}>
+                    <Play size={17} fill="currentColor" />
+                    Play
+                  </button>
                 )}
 
-                {/* Download button — movies only in Phase 1 */}
+                {/* Download — movies only in Phase 1 */}
                 {meta.type === 'movie' && (() => {
-                  const dlStatus = existingDownload?.status
                   if (dlStatus === 'completed') {
                     return (
-                      <button className={`${dlStyles.downloadBtn} ${dlStyles.downloadBtnDownloaded}`} disabled>
-                        <CheckCircle size={16} />
+                      <button className={`${styles.downloadBtn} ${styles.downloadBtnDone}`} disabled>
+                        <CheckCircle size={15} />
                         Downloaded
                       </button>
                     )
                   }
                   if (dlStatus === 'downloading' || dlStatus === 'queued') {
                     return (
-                      <button className={`${dlStyles.downloadBtn} ${dlStyles.downloadBtnActive}`} disabled>
-                        <Loader size={16} className="animate-spin" />
+                      <button className={`${styles.downloadBtn} ${styles.downloadBtnActive}`} disabled>
+                        <Loader size={15} className="animate-spin" />
                         Downloading…
                       </button>
                     )
                   }
                   if (resolvingDownloadStream) {
                     return (
-                      <button className={`${dlStyles.downloadBtn} ${dlStyles.downloadBtnActive}`} disabled>
-                        <Loader size={16} className="animate-spin" />
-                        Resolving source...
+                      <button className={`${styles.downloadBtn} ${styles.downloadBtnActive}`} disabled>
+                        <Loader size={15} className="animate-spin" />
+                        Resolving…
                       </button>
                     )
                   }
                   return (
                     <button
-                      className={dlStyles.downloadBtn}
+                      className={styles.downloadBtn}
                       onClick={() => setShowQualityPicker(true)}
                       title="Download for offline viewing"
                     >
-                      <Download size={16} />
+                      <Download size={15} />
                       Download
                     </button>
                   )
                 })()}
-                
-                {/* Icon buttons for secondary actions */}
+
+                {/* Trailer */}
                 {meta.trailerStreams && meta.trailerStreams.length > 0 && (
-                  <button 
+                  <button
                     className={styles.iconBtn}
                     onClick={() => {
                       const trailer = meta.trailerStreams![0]
@@ -224,71 +275,59 @@ export function DetailsHeader({
                       const trailerMeta = {
                         id: meta.id,
                         type: meta.type,
-                        name: `${meta.name} - Trailer`,
-                        poster: meta.poster
+                        name: `${meta.name} — Trailer`,
+                        poster: meta.poster,
                       }
-                      navigate(`/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(trailerMeta))}`)
+                      navigate(
+                        `/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(stream))}&meta=${encodeURIComponent(JSON.stringify(trailerMeta))}`
+                      )
                     }}
                     title="Watch Trailer"
                   >
-                    <Youtube size={20} />
+                    <Youtube size={17} />
                   </button>
                 )}
-                
+
+                {/* Add to list */}
                 <button
-                  className={styles.iconBtn}
+                  className={`${styles.iconBtn} ${inList ? styles.iconBtnActive : ''}`}
                   onClick={onShowListModal}
-                  title={inList ? "Manage Lists (Added)" : "Add to List"}
+                  title={inList ? 'Manage Lists (Added)' : 'Add to List'}
                 >
-                  {inList ? <Check size={20} className="text-green-500" /> : <List size={20} />}
+                  {inList ? <Check size={17} /> : <List size={17} />}
                 </button>
-                
-                {/* Three-dot menu for additional actions */}
+
+                {/* Three-dot menu */}
                 <DropdownMenu
                   items={[
-                    // Cast & Crew option (if available)
-                    ...(meta.app_extras?.cast || meta.director ? [{
-                      label: 'Cast & Crew',
-                      icon: Info,
-                      onClick: onShowInfoModal
-                    }] : []),
-                    // Watch status options
-                    ...(meta.type === 'movie' ? [
-                      {
-                        label: data.watchProgress?.isWatched ? 'Mark as unwatched' : 'Mark as watched',
-                        icon: data.watchProgress?.isWatched ? EyeOff : Eye,
-                        onClick: onToggleWatched
-                      }
-                    ] : [
-                      {
-                        label: 'Mark series as watched',
-                        icon: Eye,
-                        onClick: () => onMarkSeriesWatched(true)
-                      },
-                      {
-                        label: 'Mark series as unwatched',
-                        icon: EyeOff,
-                        onClick: () => onMarkSeriesWatched(false)
-                      }
-                    ])
+                    ...(meta.app_extras?.cast || meta.director
+                      ? [{ label: 'Cast & Crew', icon: Info, onClick: onShowInfoModal }]
+                      : []),
+                    ...(meta.type === 'movie'
+                      ? [{
+                          label: data.watchProgress?.isWatched ? 'Mark as unwatched' : 'Mark as watched',
+                          icon: data.watchProgress?.isWatched ? EyeOff : Eye,
+                          onClick: onToggleWatched,
+                        }]
+                      : [
+                          { label: 'Mark series as watched', icon: Eye, onClick: () => onMarkSeriesWatched(true) },
+                          { label: 'Mark series as unwatched', icon: EyeOff, onClick: () => onMarkSeriesWatched(false) },
+                        ]),
                   ]}
                 />
               </div>
 
-              {/* Genres inline with description */}
-              {meta.genres && meta.genres.length > 0 && (
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', marginBottom: '12px' }}>
-                  {meta.genres
-                    .filter(genre => !['PG', 'PG-13', 'R', 'NC-17', 'G', 'TV-Y', 'TV-Y7', 'TV-G', 'TV-PG', 'TV-14', 'TV-MA', 'NR', 'UR', '12', '12A', '15', '18', 'U', 'R13', 'R16', 'R18', 'M', 'MA15+', 'R18+', '6', '9', '16'].includes(genre))
-                    .slice(0, 4)
-                    .join(' • ')}
-                </p>
+              {/* Genres */}
+              {genres && <p className={styles.genres}>{genres}</p>}
+
+              {/* Description */}
+              {meta.description && (
+                <p className={styles.description}>{meta.description}</p>
               )}
+            </div>
+          </div>
 
-              <p className={styles.detailsDescription}>{meta.description}</p>
-            </>
-          )}
-
+          {/* Children: EpisodeList or StreamSelector */}
           {children}
         </div>
       </div>

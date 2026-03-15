@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Shield, BarChart3, Users, ScrollText, ArrowLeft, Loader2, Activity } from 'lucide-react'
+import { Shield, BarChart3, Users, ScrollText, ChevronLeft, Loader2, Activity } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { SimpleLayout, AnimatedBackground } from '../../components'
 import { StepUpProvider } from '../../components/admin/StepUpModal'
@@ -30,7 +30,7 @@ function SetupScreen({ requiresSetupToken }: { requiresSetupToken: boolean }) {
 
   if (claimed) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[100dvh] flex items-center justify-center px-4 py-6">
         <div className="text-center space-y-4">
           <Shield className="w-12 h-12 text-green-400 mx-auto" />
           <h1 className="text-2xl font-bold text-white">Setup Complete</h1>
@@ -47,7 +47,7 @@ function SetupScreen({ requiresSetupToken }: { requiresSetupToken: boolean }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-[100dvh] flex items-center justify-center px-4 py-6">
       <div className="max-w-md w-full mx-4 space-y-6">
         <div className="text-center space-y-2">
           <Shield className="w-12 h-12 text-red-400 mx-auto" />
@@ -100,6 +100,9 @@ function SetupScreen({ requiresSetupToken }: { requiresSetupToken: boolean }) {
 
 export function AdminLayout() {
   const navigate = useNavigate()
+  const shellStyle = { paddingTop: 'var(--app-content-top-offset, 0px)' } as const
+  const headerStyle = { top: '0px' } as const
+  const navStyle = { top: 'calc(56px + 16px)' } as const
 
   const { data: status } = useQuery({
     queryKey: ['admin-status'],
@@ -126,7 +129,7 @@ export function AdminLayout() {
     return (
       <SimpleLayout title="Admin Setup">
         <AnimatedBackground />
-        <div className="relative min-h-screen text-white">
+        <div className="relative min-h-[100dvh] text-white" style={shellStyle}>
           <SetupScreen requiresSetupToken={!!status.requiresSetupToken} />
         </div>
       </SimpleLayout>
@@ -136,15 +139,15 @@ export function AdminLayout() {
   return (
     <SimpleLayout title="Admin Console">
       <AnimatedBackground />
-      <div className="relative min-h-screen text-white">
+      <div className="relative min-h-[100dvh] text-white" style={shellStyle}>
         {/* Header */}
-        <header className="border-b border-white/10 bg-black/40 backdrop-blur-md sticky top-0 z-20">
-          <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
+        <header className="border-b border-white/10 bg-black/40 backdrop-blur-md sticky z-20" style={headerStyle}>
+          <div className="max-w-7xl mx-auto px-4 py-3 sm:h-14 sm:py-0 flex flex-wrap items-center gap-3 sm:gap-4">
             <button
               onClick={() => navigate('/profiles')}
               className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors text-sm"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" />
               Back
             </button>
             <div className="flex items-center gap-2 flex-1">
@@ -164,16 +167,19 @@ export function AdminLayout() {
           </div>
         </header>
 
-        <div className="max-w-7xl mx-auto px-4 py-6 flex gap-6">
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6 flex flex-col gap-4 lg:flex-row lg:gap-6">
           {/* Sidebar */}
-          <nav className="w-44 shrink-0 space-y-1">
+          <nav
+            className="sticky z-10 flex gap-2 overflow-x-auto pb-1 lg:w-44 lg:shrink-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0"
+            style={navStyle}
+          >
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  `shrink-0 inline-flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                     isActive
                       ? 'bg-white/10 text-white'
                       : 'text-zinc-400 hover:text-white hover:bg-white/5'

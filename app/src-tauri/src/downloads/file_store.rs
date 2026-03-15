@@ -56,10 +56,33 @@ pub fn set_custom_dir(app: &tauri::AppHandle, new_path: &Path) -> std::io::Resul
     std::fs::write(dir.join("download_dir.txt"), new_path.to_string_lossy().as_bytes())
 }
 
+/// Returns the path for a downloaded subtitle file.
+pub fn subtitle_file_path(app: &tauri::AppHandle, profile_id: &str, id: &str, lang: &str) -> PathBuf {
+    // Sanitize lang to avoid path traversal
+    let safe_lang: String = lang.chars().filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_').collect();
+    let safe_lang = if safe_lang.is_empty() { "und".to_string() } else { safe_lang };
+    downloads_dir(app, profile_id).join(format!("{}_{}.vtt", id, safe_lang))
+}
+
 /// Deletes the download file (and any .zentrio-part) for a given ID.
 pub fn delete_files(app: &tauri::AppHandle, profile_id: &str, id: &str) {
     let _ = std::fs::remove_file(download_file_path(app, profile_id, id));
     let _ = std::fs::remove_file(part_file_path(app, profile_id, id));
+}
+
+/// Deletes subtitle files listed in a JSON subtitle_paths string.
+pub fn delete_subtitle_files(paths_json: Option<&str>) {
+    let json = match paths_json {
+        Some(s) if !s.is_empty() => s,
+        _ => return,
+    };
+    if let Ok(entries) = serde_json::from_str::<Vec<serde_json::Value>>(json) {
+        for entry in entries {
+            if let Some(path) = entry.get("path").and_then(|p| p.as_str()) {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
 }
 
 /// Returns file size in bytes if the file exists.

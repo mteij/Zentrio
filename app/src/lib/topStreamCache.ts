@@ -18,6 +18,7 @@ const autoPlayWaitInFlight = new Map<string, Promise<number>>()
 export interface CachedTopStream {
   url: string
   addonId: string
+  subtitles?: Array<{ url: string; lang: string }>
   cachedAt?: number
 }
 
@@ -99,11 +100,12 @@ function fallbackCacheKey(mediaId: string): string {
 export function parseCachedTopStream(raw: string | null): CachedTopStream | null {
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as { url?: unknown; addonId?: unknown; cachedAt?: unknown }
+    const parsed = JSON.parse(raw) as { url?: unknown; addonId?: unknown; subtitles?: unknown; cachedAt?: unknown }
     if (!parsed || typeof parsed.url !== 'string' || parsed.url.length === 0) return null
     return {
       url: parsed.url,
       addonId: typeof parsed.addonId === 'string' ? parsed.addonId : '',
+      subtitles: Array.isArray(parsed.subtitles) ? parsed.subtitles as Array<{ url: string; lang: string }> : undefined,
       cachedAt: typeof parsed.cachedAt === 'number' ? parsed.cachedAt : undefined,
     }
   } catch {
@@ -118,13 +120,14 @@ export function isFreshCachedTopStream(stream: CachedTopStream): boolean {
 
 export function cacheTopStream(
   mediaId: string,
-  stream: Pick<CachedTopStream, 'url' | 'addonId'>,
+  stream: Pick<CachedTopStream, 'url' | 'addonId' | 'subtitles'>,
   season?: number,
   episode?: number
 ): void {
   const payload = JSON.stringify({
     url: stream.url,
     addonId: stream.addonId || '',
+    subtitles: stream.subtitles,
     cachedAt: Date.now(),
   })
 
@@ -153,9 +156,11 @@ function readFromEvent(eventData: any): CachedTopStream | null {
   const first = eventData?.allStreams?.[0] || eventData?.stream
   const streamUrl = first?.stream?.url || first?.url
   if (!streamUrl || typeof streamUrl !== 'string') return null
+  const subtitles = first?.stream?.subtitles || first?.subtitles
   return {
     url: streamUrl,
     addonId: first?.addon?.id || first?.stream?.addonId || first?.addonId || '',
+    subtitles: Array.isArray(subtitles) ? subtitles : undefined,
   }
 }
 

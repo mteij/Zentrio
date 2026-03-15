@@ -1,11 +1,12 @@
-// Episode List Component
-// Extracted from Details.tsx
 import { useEffect, useState } from 'react'
-import { Play, Eye, EyeOff, ChevronUp, Check, Download } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Play, Eye, EyeOff, ChevronUp, Check, Download, Pause, X, Trash2, RefreshCw, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { LazyImage } from '../../components'
 import { ContextMenu } from '../../components/ui/ContextMenu'
+import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { QualityPicker } from '../downloads/QualityPicker'
+import { CircularProgress } from '../../components/ui/CircularProgress'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadStore } from '../../stores/downloadStore'
 import {
@@ -13,12 +14,45 @@ import {
   readCachedTopStream,
   resolveTopStream,
 } from '../../lib/topStreamCache'
-import styles from '../../styles/Streaming.module.css'
+import styles from './Details.module.css'
 import type { MetaDetail } from '../../services/addons/types'
 import { createLogger } from '../../utils/client-logger'
 import { isTauri } from '../../lib/auth-client'
 
 const log = createLogger('EpisodeList')
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return ''
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function formatSpeed(bytesPerSec: number): string {
+  if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return ''
+  return `${formatBytes(bytesPerSec)}/s`
+}
+
+function formatEta(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return ''
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.round(seconds % 60)
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+function inferMimeType(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  if (ext === 'webm') return 'video/webm'
+  if (ext === 'mkv') return 'video/x-matroska'
+  return 'video/mp4'
+}
+
+// ── Props ────────────────────────────────────────────────────────────────────
 
 interface EpisodeListProps {
   meta: MetaDetail
@@ -35,6 +69,8 @@ interface EpisodeListProps {
   profileId: string
 }
 
+// ── Main EpisodeList ─────────────────────────────────────────────────────────
+
 export function EpisodeList({
   meta,
   seriesProgress,
@@ -47,12 +83,21 @@ export function EpisodeList({
   onSelect,
   showImdbRatings,
   showAgeRatings,
-  profileId
+  profileId,
 }: EpisodeListProps) {
-  const [pickerEpisode, setPickerEpisode] = useState<{ season: number; episode: number; title: string; episodeId: string } | null>(null)
+  const navigate = useNavigate()
+  const [pickerEpisode, setPickerEpisode] = useState<{
+    season: number
+    episode: number
+    title: string
+    episodeId: string
+    thumbnailUrl?: string
+  } | null>(null)
+  const [seasonPickerOpen, setSeasonPickerOpen] = useState(false)
   const addDownload = useDownloadStore((s) => s.addDownload)
+  const downloads = useDownloadStore((s) => s.downloads)
 
-  // Warm stream resolution while quality picker is open.
+  // Warm stream while quality picker is open
   useEffect(() => {
     if (!pickerEpisode || !profileId) return
     const cached = readCachedTopStream(meta.id, pickerEpisode.season, pickerEpisode.episode)
@@ -67,26 +112,24 @@ export function EpisodeList({
     })
   }, [meta.id, meta.type, pickerEpisode, profileId])
 
-  // Background prefetch: keep one stream warmed for the current season.
+  // Background prefetch for the first episode of the current season
   useEffect(() => {
     if (!meta.videos || !profileId) return
-    const seasonEpisodes = meta.videos
+    const seasonEps = meta.videos
       .filter((v: any) => v.season === selectedSeason)
       .sort((a: any, b: any) => (a.episode ?? a.number) - (b.episode ?? b.number))
-    const firstEpisode = seasonEpisodes[0]
-    if (!firstEpisode) return
-
-    const episodeNumber = (firstEpisode as any).episode ?? (firstEpisode as any).number
-    if (typeof episodeNumber !== 'number') return
-
-    const cached = readCachedTopStream(meta.id, selectedSeason, episodeNumber)
+    const first = seasonEps[0]
+    if (!first) return
+    const epNum = (first as any).episode ?? (first as any).number
+    if (typeof epNum !== 'number') return
+    const cached = readCachedTopStream(meta.id, selectedSeason, epNum)
     if (cached && !cached.stale) return
     void resolveTopStream({
       profileId,
       mediaType: meta.type,
       mediaId: meta.id,
       season: selectedSeason,
-      episode: episodeNumber,
+      episode: epNum,
       forceRefresh: Boolean(cached),
     })
   }, [meta.id, meta.type, meta.videos, profileId, selectedSeason])
@@ -95,11 +138,7 @@ export function EpisodeList({
     if (!pickerEpisode) return
     const selected = pickerEpisode
     setPickerEpisode(null)
-
-    if (!profileId) {
-      toast.error('Missing profile context for download')
-      return
-    }
+    if (!profileId) { toast.error('Missing profile context'); return }
 
     try {
       const stream = await getTopStream({
@@ -124,11 +163,11 @@ export function EpisodeList({
         season: selected.season,
         episode: selected.episode,
         posterPath: meta.poster || '',
+        thumbnailUrl: selected.thumbnailUrl,
         streamUrl: stream.url,
         addonId: stream.addonId || '',
         quality,
       })
-      // Optimistically add to store so queued state is visible immediately
       addDownload({
         id,
         profileId,
@@ -159,197 +198,506 @@ export function EpisodeList({
       toast.error('Failed to start download')
     }
   }
-  
+
+  const handleDownloadSeason = async (quality: DownloadQuality) => {
+    setSeasonPickerOpen(false)
+    if (!profileId) return
+
+    // Episodes in the current season that haven't been downloaded yet (or failed)
+    const toDownload = currentEpisodes.filter((ep: any) => {
+      const epNum = ep.episode ?? ep.number
+      const dl = downloads.find(
+        (d) => d.mediaId === meta.id && d.season === ep.season && d.episode === epNum && d.profileId === profileId
+      )
+      return !dl || dl.status === 'failed' || dl.status === 'cancelled'
+    })
+
+    if (toDownload.length === 0) {
+      toast.info('All episodes in this season are already downloaded or queued')
+      return
+    }
+
+    toast.loading(`Queuing ${toDownload.length} episode${toDownload.length !== 1 ? 's' : ''}…`, { id: 'season-dl' })
+
+    let succeeded = 0
+    for (const ep of toDownload) {
+      const epNum = ep.episode ?? (ep as any).number
+      const epTitle = ep.title ?? (ep as any).name ?? `Episode ${epNum}`
+      try {
+        const stream = await getTopStream({
+          profileId,
+          mediaType: meta.type,
+          mediaId: meta.id,
+          season: ep.season,
+          episode: epNum,
+        })
+        if (!stream) continue
+
+        const id = await downloadService.start({
+          profileId,
+          mediaType: 'series',
+          mediaId: meta.id,
+          episodeId: ep.id || `${ep.season}:${epNum}`,
+          title: meta.name,
+          episodeTitle: epTitle,
+          season: ep.season,
+          episode: epNum,
+          posterPath: meta.poster || '',
+          thumbnailUrl: ep.thumbnail,
+          streamUrl: stream.url,
+          addonId: stream.addonId || '',
+          quality,
+        })
+        addDownload({
+          id,
+          profileId,
+          mediaType: 'series',
+          mediaId: meta.id,
+          episodeId: ep.id || `${ep.season}:${epNum}`,
+          title: meta.name,
+          episodeTitle: epTitle,
+          season: ep.season,
+          episode: epNum,
+          posterPath: meta.poster || '',
+          status: 'queued',
+          progress: 0,
+          quality,
+          filePath: '',
+          fileSize: 0,
+          downloadedBytes: 0,
+          addedAt: Date.now(),
+          watchedPercent: 0,
+          streamUrl: stream.url || '',
+          addonId: stream.addonId || '',
+          smartDownload: false,
+          autoDelete: false,
+        })
+        succeeded++
+      } catch (e) {
+        log.error('season dl error ep', epNum, e)
+      }
+    }
+
+    toast.dismiss('season-dl')
+    if (succeeded > 0) {
+      toast.success(`Queued ${succeeded} episode${succeeded !== 1 ? 's' : ''} for download`)
+    } else {
+      toast.error('Could not resolve streams for this season')
+    }
+  }
+
+  const handlePlayOffline = async (dl: ReturnType<typeof useDownloadStore.getState>['downloads'][number]) => {
+    try {
+      let url = `file://${dl.filePath}`
+      let subtitles: Array<{ url: string; lang: string }> = []
+      if (isTauri()) {
+        const { convertFileSrc } = await import('@tauri-apps/api/core')
+        url = convertFileSrc(dl.filePath)
+        if (dl.subtitlePaths?.length) {
+          subtitles = dl.subtitlePaths.map((s) => ({ url: convertFileSrc(s.path), lang: s.lang }))
+        }
+      }
+      navigate(`/streaming/${profileId}/player`, {
+        state: {
+          stream: {
+            url,
+            ytId: '',
+            type: inferMimeType(dl.filePath),
+            subtitles: subtitles.length ? subtitles : undefined,
+          },
+          meta: {
+            id: dl.mediaId,
+            type: 'series',
+            name: meta.name,
+            poster: meta.poster,
+            season: dl.season,
+            episode: dl.episode,
+          },
+        },
+      })
+    } catch (e) {
+      log.error('offline play error', e)
+      toast.error('Failed to open downloaded file')
+    }
+  }
+
+  const handleDeleteDownload = async (dlId: string) => {
+    const removeDownload = useDownloadStore.getState().removeDownload
+    try {
+      await downloadService.delete(dlId)
+      removeDownload(dlId)
+    } catch (e) {
+      log.error('delete error', e)
+      toast.error('Failed to delete download')
+    }
+  }
+
+  const handlePauseResume = async (dlId: string, isActive: boolean) => {
+    try {
+      if (isActive) await downloadService.pause(dlId)
+      else await downloadService.resume(dlId)
+    } catch (e) {
+      log.error('pause/resume error', e)
+    }
+  }
+
+  const handleCancel = async (dlId: string) => {
+    const removeDownload = useDownloadStore.getState().removeDownload
+    try {
+      await downloadService.cancel(dlId)
+      removeDownload(dlId)
+    } catch (e) {
+      log.error('cancel error', e)
+    }
+  }
+
+  // Build season list (needed by handleDownloadSeason above — must be before handlers)
+  const allSeasons = meta.videos
+    ? (Array.from(new Set(meta.videos.map((v: any) => v.season || 0))).sort((a: any, b: any) => a - b) as number[])
+    : []
+  const seasons = allSeasons.length > 1 ? allSeasons.filter((s) => s !== 0) : allSeasons
+
+  // Episodes for the currently selected season, sorted by episode number
+  const currentEpisodes = meta.videos
+    ? meta.videos
+        .filter((v: any) => v.season === selectedSeason)
+        .sort((a: any, b: any) => (a.episode ?? a.number ?? 0) - (b.episode ?? b.number ?? 0))
+    : []
+
   if (!meta.videos) return null
+
+  // Check if current season is all watched (for the watch button label)
+  const allWatched = currentEpisodes.every((ep: any) => {
+    const epNum = ep.episode ?? ep.number
+    return seriesProgress?.[`${ep.season}-${epNum}`]?.isWatched
+  })
+
+  // Count downloaded episodes per season (for the dot indicator on tabs)
+  const downloadedBySeason = new Map<number, number>()
+  for (const dl of downloads) {
+    if (dl.mediaId === meta.id && dl.profileId === profileId && dl.status === 'completed' && dl.season != null) {
+      downloadedBySeason.set(dl.season, (downloadedBySeason.get(dl.season) ?? 0) + 1)
+    }
+  }
 
   return (
     <>
-    <div className="series-episodes-container">
-      <div className="season-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-        <select 
-          value={selectedSeason || ''} 
-          onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
-          style={{ color: '#fff', background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '6px 12px', borderRadius: '8px', outline: 'none', fontSize: '0.85rem', lineHeight: 1.2 }}
-        >
-          {(() => {
-            const seasons = Array.from(new Set(meta.videos.map((v: any) => v.season || 0))).sort((a: any, b: any) => a - b);
-            const filteredSeasons = seasons.length > 1 ? seasons.filter((s: any) => s !== 0) : seasons;
-            return filteredSeasons.map((season: any) => (
-              <option key={season} value={season} style={{ color: '#000' }}>Season {season}</option>
-            ));
-          })()}
-        </select>
-        {/* Mark Season Watched Button */}
-        {selectedSeason && (() => {
-          const seasonEps = meta.videos.filter((v: any) => v.season === selectedSeason)
-          const allWatched = seasonEps.every((ep: any) => {
-            const epNum = ep.episode ?? ep.number
-            return seriesProgress?.[`${ep.season}-${epNum}`]?.isWatched
-          })
-          return (
-            <button
-              onClick={() => onToggleSeasonWatched(selectedSeason, !allWatched)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 10px',
-                background: allWatched ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                border: `1px solid ${allWatched ? 'rgba(34, 197, 94, 0.4)' : 'rgba(255, 255, 255, 0.2)'}`,
-                borderRadius: '8px',
-                color: allWatched ? '#22c55e' : '#fff',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                lineHeight: 1.2
-              }}
-              title={allWatched ? 'Mark season as unwatched' : 'Mark season as watched'}
-            >
-              {allWatched ? <EyeOff size={14} /> : <Eye size={14} />}
-              {allWatched ? 'Unwatch Season' : 'Watch Season'}
-            </button>
-          )
-        })()}
+      {/* Season tabs */}
+      <div className={styles.seasonTabsRow}>
+        {seasons.map((season) => (
+          <button
+            key={season}
+            className={`${styles.seasonTab} ${season === selectedSeason ? styles.seasonTabActive : ''}`}
+            onClick={() => setSelectedSeason(season)}
+          >
+            Season {season}
+            {(downloadedBySeason.get(season) ?? 0) > 0 && (
+              <span className={styles.seasonTabDot} />
+            )}
+          </button>
+        ))}
       </div>
-      <div className={styles.episodeList}>
-        {meta.videos.filter((v: any) => v.season === selectedSeason).map((ep: any) => {
+
+      {/* Season actions row */}
+      <div className={styles.seasonActions}>
+        <button
+          className={`${styles.seasonWatchBtn} ${allWatched ? styles.seasonWatchBtnWatched : ''}`}
+          onClick={() => onToggleSeasonWatched(selectedSeason, !allWatched)}
+          title={allWatched ? 'Mark season as unwatched' : 'Mark season as watched'}
+        >
+          {allWatched ? <EyeOff size={13} /> : <Eye size={13} />}
+          {allWatched ? 'Unwatch Season' : 'Watch Season'}
+        </button>
+        {isTauri() && (
+          <DropdownMenu
+            compact
+            items={[
+              {
+                label: 'Download Season',
+                icon: Download,
+                onClick: () => setSeasonPickerOpen(true),
+              },
+            ]}
+          />
+        )}
+      </div>
+
+      {/* Episode list in a glass card */}
+      <div className={styles.episodeCard}>
+        {currentEpisodes.map((ep: any) => {
           const epNum = ep.episode ?? ep.number
           const epProgress = seriesProgress?.[`${ep.season}-${epNum}`]
           const isWatched = epProgress?.isWatched ?? false
           const progressPercent = epProgress?.progressPercent ?? 0
-          
+
+          // Find matching download record
+          const dl = downloads.find(
+            (d) =>
+              d.mediaId === meta.id &&
+              d.season === ep.season &&
+              d.episode === epNum &&
+              d.profileId === profileId
+          )
+
+          const isCompleted = dl?.status === 'completed'
+          const isActive = dl?.status === 'downloading'
+          const isPaused = dl?.status === 'paused'
+          const isQueued = dl?.status === 'queued'
+          const isFailed = dl?.status === 'failed'
+          const isInProgress = isActive || isPaused || isQueued
+
+          const speed = dl?.speed ?? 0
+          const dlProgress = Math.max(0, Math.min(100, dl?.progress ?? 0))
+          const inferredTotal =
+            dl && dl.fileSize > 0
+              ? dl.fileSize
+              : dlProgress > 0 && dl
+              ? Math.round(dl.downloadedBytes / (dlProgress / 100))
+              : 0
+          const remainingBytes = Math.max(0, inferredTotal - (dl?.downloadedBytes ?? 0))
+          const etaSeconds =
+            isActive && speed > 0 && remainingBytes > 0 ? Math.ceil(remainingBytes / speed) : 0
+
+          const epTitle = ep.title || ep.name || `Episode ${epNum}`
+
           return (
             <ContextMenu
               key={ep.id || `${ep.season}-${epNum}`}
               items={[
                 {
-                  label: 'Play',
+                  label: 'Stream online',
                   icon: Play,
-                  onClick: () => onPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
+                  onClick: () => onSelect(ep.season, epNum, epTitle, false),
                 },
-                ...(isTauri() ? [{
-                  label: 'Download episode',
-                  icon: Download,
-                  onClick: () => setPickerEpisode({
-                    season: ep.season,
-                    episode: epNum,
-                    title: ep.title || ep.name || `Episode ${epNum}`,
-                    episodeId: ep.id || `${ep.season}:${epNum}`,
-                  })
-                }] : []),
-                { type: 'separator' },
+                {
+                  label: 'Quick play',
+                  icon: Play,
+                  onClick: () => onPlay(ep.season, epNum, epTitle),
+                },
+                ...(isTauri() && !isCompleted && !isInProgress
+                  ? [{
+                      label: 'Download episode',
+                      icon: Download,
+                      onClick: () =>
+                        setPickerEpisode({
+                          season: ep.season,
+                          episode: epNum,
+                          title: epTitle,
+                          episodeId: ep.id || `${ep.season}:${epNum}`,
+                          thumbnailUrl: ep.thumbnail,
+                        }),
+                    }]
+                  : []),
+                ...(isCompleted && dl
+                  ? [
+                      { label: 'Play offline', icon: Play, onClick: () => handlePlayOffline(dl) },
+                      { label: 'Delete download', icon: Trash2, onClick: () => handleDeleteDownload(dl.id) },
+                    ]
+                  : []),
+                { type: 'separator' as const },
                 {
                   label: isWatched ? 'Mark as unwatched' : 'Mark as watched',
                   icon: isWatched ? EyeOff : Eye,
-                  onClick: () => onToggleWatched(ep.season, epNum)
+                  onClick: () => onToggleWatched(ep.season, epNum),
                 },
                 {
                   label: 'Mark all before this as watched',
                   icon: ChevronUp,
-                  onClick: () => onMarkEpisodesBefore(ep.season, epNum, true)
-                }
+                  onClick: () => onMarkEpisodesBefore(ep.season, epNum, true),
+                },
               ]}
             >
               <div
-                className={styles.episodeItem}
-                onClick={() => onSelect(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`, false)}
-                style={{ position: 'relative' }}
+                className={styles.episodeRow}
+                onClick={() => onSelect(ep.season, epNum, epTitle, false)}
               >
-                <div className={styles.episodeThumbnail}>
+                {/* Thumbnail */}
+                <div className={styles.epThumb}>
                   {ep.thumbnail ? (
-                    <LazyImage src={ep.thumbnail} alt={ep.title || ep.name || `Episode ${epNum}`} />
+                    <LazyImage src={ep.thumbnail} alt={epTitle} className={styles.epThumbImg} style={{ height: '100%', minHeight: 0 }} />
                   ) : (
-                    <div className={styles.episodeThumbnailPlaceholder}>
-                      <Play size={24} />
+                    <div className={styles.epThumbFallback}>
+                      <Play size={20} />
                     </div>
                   )}
-                  <span className={styles.episodeNumber}>{epNum}</span>
-                  {/* Watched badge on thumbnail */}
-                  {isWatched && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '6px',
-                      right: '6px',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      background: 'rgba(34, 197, 94, 0.9)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <Check size={12} color="#fff" />
-                    </div>
-                  )}
-                  {/* Progress bar on thumbnail */}
+                  <span className={styles.epThumbNum}>{epNum}</span>
                   {progressPercent > 0 && !isWatched && (
-                    <div style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: '3px',
-                      background: 'rgba(0, 0, 0, 0.6)'
-                    }}>
-                      <div style={{
-                        width: `${progressPercent}%`,
-                        height: '100%',
-                        background: 'linear-gradient(90deg, #8b5cf6, #a855f7)'
-                      }} />
+                    <div className={styles.epThumbProgress}>
+                      <div
+                        className={styles.epThumbProgressFill}
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  )}
+                  {isWatched && (
+                    <div className={styles.epThumbWatched}>
+                      <Check size={10} color="#fff" />
                     </div>
                   )}
                 </div>
-                <div className={styles.episodeContent}>
-                  <div className={styles.episodeHeader}>
-                    <span className={styles.episodeTitle} style={{ opacity: isWatched ? 0.7 : 1 }}>
-                      {ep.title || ep.name || `Episode ${epNum}`}
-                    </span>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      {isTauri() && (
-                        <button
-                            className={styles.episodePlayBtn}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                setPickerEpisode({
-                                  season: ep.season,
-                                  episode: epNum,
-                                  title: ep.title || ep.name || `Episode ${epNum}`,
-                                  episodeId: ep.id || `${ep.season}:${epNum}`,
-                                })
-                            }}
-                            title="Download"
-                        >
-                          <Download size={18} fill="currentColor" strokeWidth={1} />
-                        </button>
-                      )}
-                      <button 
-                          className={styles.episodePlayBtn}
-                          onClick={(e) => {
-                              e.stopPropagation()
-                              onPlay(ep.season, epNum, ep.title || ep.name || `Episode ${epNum}`)
-                          }}
-                          title="Quick play"
-                      >
-                        <Play size={18} fill="currentColor" />
-                      </button>
-                    </div>
+
+                {/* Info */}
+                <div className={styles.epInfo}>
+                  <div className={`${styles.epTitle} ${isWatched ? styles.epTitleWatched : ''}`}>
+                    {epTitle}
                   </div>
-                  <div className={styles.episodeMeta}>
+
+                  <div className={styles.epMeta}>
                     {showImdbRatings && ep.rating && (
-                      <span className={styles.episodeRating}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#f5c518"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                      <span className={styles.epRating}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="#f5c518">
+                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                        </svg>
                         {Number(ep.rating).toFixed(1)}
                       </span>
                     )}
                     {showAgeRatings && (ep.certification || ep.contentRating) && (
-                      <span className={styles.episodeAge}>{ep.certification || ep.contentRating}</span>
+                      <span>{ep.certification || ep.contentRating}</span>
                     )}
-                    {ep.runtime && <span className={styles.episodeRuntime}>{ep.runtime}</span>}
+                    {ep.runtime && <span>{ep.runtime}</span>}
                     {progressPercent > 0 && !isWatched && (
-                      <span style={{ fontSize: '0.75rem', color: '#a855f7' }}>{progressPercent}% watched</span>
+                      <span style={{ color: '#a855f7' }}>{progressPercent}%</span>
+                    )}
+                    {isCompleted && dl && (
+                      <span className={`${styles.dlBadge} ${styles.dlBadgeOffline}`}>
+                        {formatBytes(dl.fileSize || dl.downloadedBytes) || dl.quality}
+                      </span>
+                    )}
+                    {isActive && (
+                      <span className={`${styles.dlBadge} ${styles.dlBadgeDownloading}`}>
+                        downloading
+                      </span>
+                    )}
+                    {isQueued && (
+                      <span className={`${styles.dlBadge} ${styles.dlBadgeQueued}`}>queued</span>
+                    )}
+                    {isPaused && (
+                      <span className={`${styles.dlBadge} ${styles.dlBadgeQueued}`}>paused</span>
+                    )}
+                    {isFailed && (
+                      <span className={`${styles.dlBadge} ${styles.dlBadgeFailed}`}>
+                        <AlertCircle size={9} /> failed
+                      </span>
                     )}
                   </div>
-                  {ep.overview && (
-                    <p className={styles.episodeDescription}>{ep.overview}</p>
+
+                  {/* In-progress download detail */}
+                  {isInProgress && dl && (
+                    <div
+                      className={styles.epDlProgress}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <CircularProgress
+                        progress={dlProgress}
+                        showText
+                        size={28}
+                        strokeWidth={2.5}
+                        color={isPaused ? 'rgba(255,255,255,0.4)' : '#a855f7'}
+                      />
+                      <div className={styles.epDlProgressStats}>
+                        <span>
+                          {formatBytes(dl.downloadedBytes)}
+                          {inferredTotal > 0 ? ` / ${formatBytes(inferredTotal)}` : ''}
+                        </span>
+                        {isActive && speed > 0 && (
+                          <span className={styles.epDlSpeed}>
+                            {formatSpeed(speed)}
+                            {etaSeconds > 0 ? ` · ${formatEta(etaSeconds)}` : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Episode overview */}
+                  {ep.overview && !isInProgress && (
+                    <p className={styles.epOverview}>{ep.overview}</p>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div
+                  className={styles.epActions}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isCompleted && dl ? (
+                    <>
+                      <button
+                        className={`${styles.epBtn} ${styles.epBtnDelete}`}
+                        onClick={() => handleDeleteDownload(dl.id)}
+                        title="Delete download"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <button
+                        className={`${styles.epBtn} ${styles.epBtnPrimary}`}
+                        onClick={() => handlePlayOffline(dl)}
+                        title="Play offline"
+                      >
+                        <Play size={14} fill="currentColor" />
+                      </button>
+                    </>
+                  ) : isInProgress && dl ? (
+                    <>
+                      <button
+                        className={styles.epBtn}
+                        onClick={() => handlePauseResume(dl.id, isActive)}
+                        title={isActive ? 'Pause' : 'Resume'}
+                      >
+                        {isActive ? <Pause size={14} /> : <Play size={14} />}
+                      </button>
+                      <button
+                        className={`${styles.epBtn} ${styles.epBtnDelete}`}
+                        onClick={() => handleCancel(dl.id)}
+                        title="Cancel"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : isFailed && dl ? (
+                    <>
+                      <button
+                        className={`${styles.epBtn} ${styles.epBtnDelete}`}
+                        onClick={() => handleDeleteDownload(dl.id)}
+                        title="Remove"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <button
+                        className={styles.epBtn}
+                        onClick={() => downloadService.resume(dl.id).catch(() => {})}
+                        title="Retry"
+                      >
+                        <RefreshCw size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {isTauri() && (
+                        <button
+                          className={styles.epBtn}
+                          onClick={() =>
+                            setPickerEpisode({
+                              season: ep.season,
+                              episode: epNum,
+                              title: epTitle,
+                              episodeId: ep.id || `${ep.season}:${epNum}`,
+                              thumbnailUrl: ep.thumbnail,
+                            })
+                          }
+                          title="Download"
+                        >
+                          <Download size={14} />
+                        </button>
+                      )}
+                      <button
+                        className={`${styles.epBtn} ${styles.epBtnPrimary}`}
+                        onClick={() => onPlay(ep.season, epNum, epTitle)}
+                        title="Quick play"
+                      >
+                        <Play size={14} fill="currentColor" />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -357,16 +705,22 @@ export function EpisodeList({
           )
         })}
       </div>
-    </div>
 
-    {/* Quality picker for episode downloads */}
-    {pickerEpisode && (
-      <QualityPicker
-        title={`${meta.name} — ${pickerEpisode.title}`}
-        onConfirm={handleDownloadEpisode}
-        onClose={() => setPickerEpisode(null)}
-      />
-    )}
+      {pickerEpisode && (
+        <QualityPicker
+          title={`${meta.name} — ${pickerEpisode.title}`}
+          onConfirm={handleDownloadEpisode}
+          onClose={() => setPickerEpisode(null)}
+        />
+      )}
+
+      {seasonPickerOpen && (
+        <QualityPicker
+          title={`Season ${selectedSeason} — all episodes`}
+          onConfirm={handleDownloadSeason}
+          onClose={() => setSeasonPickerOpen(false)}
+        />
+      )}
     </>
   )
 }

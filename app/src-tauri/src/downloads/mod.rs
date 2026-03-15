@@ -4,3 +4,4 @@ pub mod file_store;
 pub mod hls;
 pub mod manager;
 pub mod notifier;
+pub mod subtitles;

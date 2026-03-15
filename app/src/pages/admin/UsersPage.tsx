@@ -254,7 +254,7 @@ export function UsersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-xl font-semibold text-white">Users</h1>
         <span className="text-sm text-zinc-500">{total} total</span>
       </div>
@@ -286,7 +286,8 @@ export function UsersPage() {
             <p className="text-xs text-zinc-500">Try adjusting your search query.</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left">
                 <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">User</th>
@@ -327,7 +328,8 @@ export function UsersPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
 

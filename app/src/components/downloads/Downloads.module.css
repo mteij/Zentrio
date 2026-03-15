@@ -2,12 +2,23 @@
 
 /* ── Downloads Page Layout ── */
 .downloadsPage {
-  padding-top: 16px;
-  padding-right: 16px;
-  padding-bottom: 100px;
-  min-height: 100vh;
+  position: relative;
+  min-height: 100%;
+  box-sizing: border-box;
   color: #fff;
+  /* Adds breathing room on top of the titlebar offset already set by streamingLayout */
+  padding-top: calc(var(--app-content-top-offset, 0px) + 24px);
+  padding-right: 16px;
+  padding-bottom: 60px;
 }
+
+@media (max-width: 768px) {
+  .downloadsPage {
+    /* Mobile: clear the floating bottom nav */
+    padding-bottom: calc(var(--nav-height-mobile, 70px) + 24px);
+  }
+}
+
 
 .downloadsHeader {
   display: flex;
@@ -54,7 +65,7 @@
   gap: 12px;
   padding: 60px 20px;
   text-align: center;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.45);
 }
 
 .emptyIcon {
@@ -85,7 +96,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
   padding: 12px;
@@ -134,7 +145,7 @@
 
 .progressQuality {
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.45);
   text-transform: capitalize;
   flex-shrink: 0;
 }
@@ -149,7 +160,7 @@
 
 .progressBarFill {
   height: 100%;
-  background: linear-gradient(90deg, #6c63ff, #a78bfa);
+  background: linear-gradient(90deg, #8b5cf6, #a855f7);
   border-radius: 4px;
   transition: width 0.5s ease;
 }
@@ -210,6 +221,168 @@
   border-color: rgba(255, 100, 100, 0.4);
 }
 
+/* ─── Series Group ────────────────────────────────────────────────────────── */
+.seriesGroup {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.seriesGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.seriesGroupHeader:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.seriesGroupPosterWrap {
+  width: 44px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.seriesGroupPoster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.seriesGroupPosterFallback {
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.seriesGroupInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.seriesGroupTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.seriesGroupMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.45);
+}
+
+.seriesGroupDot {
+  color: rgba(255,255,255,0.25);
+}
+
+.seriesGroupSeasons {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.3);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seriesGroupChevron {
+  color: rgba(255,255,255,0.35);
+  flex-shrink: 0;
+}
+
+.seriesEpisodeList {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Compact Card (episode inside series group) ──────────────────────────── */
+.cardCompact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.15s;
+}
+
+.cardCompact:last-child {
+  border-bottom: none;
+}
+
+.cardCompact:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.cardCompactInfo {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.cardCompactTitle {
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.cardCompactMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.45);
+  text-transform: capitalize;
+}
+
+/* ─── Watched Progress Bar ────────────────────────────────────────────────── */
+.watchedBarTrack {
+  height: 2px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.watchedBarFill {
+  height: 100%;
+  background: #a855f7;
+  border-radius: 2px;
+}
+
+/* ─── Subtitle badge ──────────────────────────────────────────────────────── */
+.cardSubtitleBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.18);
+  color: #c084fc;
+  letter-spacing: 0.03em;
+}
+
 /* ─── Completed Download Card ─────────────────────────────────────────────── */
 .cardList {
   display: flex;
@@ -222,7 +395,7 @@
   align-items: center;
   gap: 12px;
   background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
   padding: 10px;
   cursor: default;
@@ -302,7 +475,7 @@
   align-items: center;
   gap: 6px;
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.45);
   margin-top: 6px;
   text-transform: capitalize;
 }
@@ -321,8 +494,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid rgba(255,255,255,0.15);
   background: rgba(255,255,255,0.07);
@@ -369,7 +542,7 @@
   max-width: 420px;
   max-height: 90vh;
   overflow-y: auto;
-  background: rgba(18, 18, 18, 0.95);
+  background: rgba(20, 20, 20, 0.95);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 20px;
@@ -420,7 +593,7 @@
 
 .pickerMediaTitle {
   font-size: 0.85rem;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.45);
   margin: 0 0 24px;
   white-space: nowrap;
   overflow: hidden;
@@ -488,7 +661,7 @@
 
 .qualityDesc {
   font-size: 0.8rem;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.45);
 }
 
 .qualityRadio {
@@ -661,7 +834,7 @@
 
 .storageDirLabel {
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.45);
 }
 
 .storageDirPath {
@@ -729,8 +902,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.06);
@@ -796,7 +969,7 @@
 
 .smartToggleDesc {
   font-size: 0.74rem;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.45);
 }
 
 /* Toggle switch */
@@ -887,4 +1060,126 @@
   animation: spin 0.8s linear infinite;
 }
 
+/* ─── Bulk Selection ─────────────────────────────────────────────────────────── */
 
+/* Checkbox that appears to the left of a card/group when in selection mode */
+.selectionCheck {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+  color: #fff;
+}
+
+.selectionCheckSelected {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.selectionCheckPartial {
+  background: rgba(139, 92, 246, 0.45);
+  border-color: #8b5cf6;
+}
+
+/* Selected state for movie card */
+.cardSelected {
+  border-color: rgba(139, 92, 246, 0.5) !important;
+  background: rgba(139, 92, 246, 0.07) !important;
+}
+
+/* Selected state for compact card (inside series group — not used from this page, kept for completeness) */
+.cardCompactSelected {
+  background: rgba(139, 92, 246, 0.07);
+}
+
+/* Selected state for series group */
+.seriesGroupSelected {
+  border-color: rgba(139, 92, 246, 0.5) !important;
+  background: rgba(139, 92, 246, 0.07) !important;
+}
+
+/* ── Header selection controls ── */
+.downloadsSelectionCount {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.downloadsSelectionActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.downloadsSelectAllBtn {
+  background: none;
+  border: none;
+  color: #a78bfa;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+
+.downloadsSelectAllBtn:hover {
+  color: #c4b5fd;
+}
+
+.downloadsDoneBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.downloadsDoneBtn:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: #fff;
+}
+
+
+.bulkDeleteBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: rgba(255, 80, 80, 0.1);
+  border: 1px solid rgba(255, 80, 80, 0.25);
+  border-radius: 8px;
+  color: #f87171;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.bulkDeleteBtn:hover:not(:disabled) {
+  background: rgba(255, 80, 80, 0.18);
+  border-color: rgba(255, 80, 80, 0.4);
+}
+
+.bulkDeleteBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bulkDeleteBtnConfirm {
+  background: rgba(255, 80, 80, 0.22);
+  border-color: rgba(255, 80, 80, 0.55);
+  color: #fca5a5;
+}

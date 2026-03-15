@@ -7,6 +7,7 @@ import { SearchCatalogRow } from '../../components/features/SearchCatalogRow'
 import styles from '../../styles/Streaming.module.css'
 import { apiFetch } from '../../lib/apiFetch'
 import { createLogger } from '../../utils/client-logger'
+import { useRootScrollPinned } from '../../hooks/useRootScrollPinned'
 
 const log = createLogger('SearchPage')
 
@@ -24,6 +25,7 @@ export const StreamingSearch = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  const stickyHeader = useRootScrollPinned({ extraTopPx: 10 })
   const inputRef = useRef<HTMLInputElement>(null)
   const hasAutoFocused = useRef(false)
   
@@ -193,52 +195,58 @@ export const StreamingSearch = () => {
       />
       <div className={`${styles.streamingLayout} ${styles.searchLayout}`}>
         {/* Search Header - Matches Explore page styling */}
-        <div className={`${styles.exploreHeader} ${styles.searchTopBar}`}>
-          {/* Search Input with glassmorphic styling */}
-          <div className={styles.searchInputShell}>
-            <Search 
-              size={18} 
-              className={styles.searchInputIcon}
-            />
-            <form onSubmit={handleSearch} id="searchForm" className={styles.searchInputForm}>
-              <input
-                ref={inputRef}
-                type="text"
-                name="q"
-                id="searchInput"
-                placeholder="Search movies & series..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                autoComplete="off"
-                className={styles.searchInputField}
+        <div ref={stickyHeader.sentinelRef} className={styles.stickySentinel} aria-hidden="true" />
+        <div className={styles.stickyHeaderShell} style={stickyHeader.spacerStyle}>
+          <div
+            ref={stickyHeader.headerRef}
+            className={`${styles.exploreHeader} ${styles.searchTopBar} ${stickyHeader.isPinned ? styles.exploreHeaderPinned : ''}`}
+          >
+            {/* Search Input with glassmorphic styling */}
+            <div className={styles.searchInputShell}>
+              <Search 
+                size={18} 
+                className={styles.searchInputIcon}
               />
-            </form>
-          </div>
-
-          {/* Right side: Type toggles */}
-          <div className={styles.searchFilterWrap}>
-            {/* Type Filter - Same as Explore toggles */}
-            <div className={styles.exploreToggleGroup}>
-              {(['all', 'movie', 'series'] as const).map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => handleFilterChange('type', type)}
-                  className={`${styles.exploreToggleBtn} ${typeParam === type ? styles.exploreToggleBtnActive : ''}`}
-                >
-                  {type === 'all' ? 'All' : type === 'movie' ? 'Movies' : 'Series'}
-                </button>
-              ))}
+              <form onSubmit={handleSearch} id="searchForm" className={styles.searchInputForm}>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  name="q"
+                  id="searchInput"
+                  placeholder="Search movies & series..."
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  autoComplete="off"
+                  className={styles.searchInputField}
+                />
+              </form>
             </div>
 
-            <button
-              type="button"
-              className={styles.searchMobileFilterBtn}
-              aria-label="Open type filter"
-              onClick={() => setMobileFilterOpen(v => !v)}
-            >
-              <Filter size={16} />
-            </button>
+            {/* Right side: Type toggles */}
+            <div className={styles.searchFilterWrap}>
+              {/* Type Filter - Same as Explore toggles */}
+              <div className={styles.exploreToggleGroup}>
+                {(['all', 'movie', 'series'] as const).map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => handleFilterChange('type', type)}
+                    className={`${styles.exploreToggleBtn} ${typeParam === type ? styles.exploreToggleBtnActive : ''}`}
+                  >
+                    {type === 'all' ? 'All' : type === 'movie' ? 'Movies' : 'Series'}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                className={styles.searchMobileFilterBtn}
+                aria-label="Open type filter"
+                onClick={() => setMobileFilterOpen(v => !v)}
+              >
+                <Filter size={16} />
+              </button>
+            </div>
           </div>
         </div>
 

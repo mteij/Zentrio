@@ -202,8 +202,8 @@ export const adminApi = {
   getSystemHealth: () =>
     adminFetch<AdminSystemHealth>('/api/admin/system/health'),
 
-  getPlatformStats: () =>
-    adminFetch<PlatformStats>('/api/admin/stats/platforms'),
+  getPlatformStats: (range: string = '30d') =>
+    adminFetch<PlatformStats>(`/api/admin/stats/platforms?range=${range}`),
 
 
   listUsers: (params?: { q?: string; limit?: number; offset?: number }) => {

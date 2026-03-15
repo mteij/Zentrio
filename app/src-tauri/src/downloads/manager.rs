@@ -16,6 +16,7 @@ use super::events::{
 use super::file_store;
 use super::hls;
 use super::notifier;
+use super::subtitles::SubtitleEntry;
 
 /// Payload sent from the frontend to start a new download.
 #[derive(Debug, Deserialize, Serialize)]
@@ -37,6 +38,8 @@ pub struct StartDownloadPayload {
     pub smart_download: Option<bool>,
     /// Override auto-delete flag (None = use profile default)
     pub auto_delete: Option<bool>,
+    /// Subtitle tracks from the stream response — downloaded alongside the video
+    pub subtitle_urls: Option<Vec<SubtitleEntry>>,
 }
 
 /// Lightweight queue item held in memory.
@@ -49,6 +52,8 @@ struct QueueItem {
     quality: String,
     smart_download: bool,
     auto_delete: bool,
+    /// JSON string of subtitle URLs (serialized for cheap cloning)
+    subtitle_urls_json: Option<String>,
 }
 
 /// Shared state managed across Tauri commands.
@@ -69,6 +74,56 @@ impl DownloadManager {
             paused: Arc::new(Mutex::new(Vec::new())),
             max_concurrent: 2,
         }
+    }
+
+    /// Re-queues any downloads that were interrupted by a crash or clean shutdown.
+    /// Call once after construction, before the app is fully running.
+    pub fn restore(&self, app: AppHandle) {
+        let db = match self.db.lock() {
+            Ok(d) => d,
+            Err(_) => return,
+        };
+
+        // Reset any stuck 'downloading' rows back to 'queued' with zeroed progress
+        // so they restart cleanly rather than resuming from a potentially corrupt offset.
+        if let Err(e) = db.reset_interrupted() {
+            log::warn!("[Downloads] Failed to reset interrupted downloads: {e}");
+        }
+
+        let pending = match db.get_all_pending() {
+            Ok(p) => p,
+            Err(e) => {
+                log::warn!("[Downloads] Failed to load pending downloads on restore: {e}");
+                return;
+            }
+        };
+        drop(db);
+
+        if pending.is_empty() {
+            return;
+        }
+
+        log::info!("[Downloads] Restoring {} pending download(s) from previous session", pending.len());
+
+        let mut queue = match self.queue.lock() {
+            Ok(q) => q,
+            Err(_) => return,
+        };
+        for rec in pending {
+            queue.push_back(QueueItem {
+                id: rec.id,
+                profile_id: rec.profile_id,
+                title: rec.title,
+                stream_url: rec.stream_url,
+                quality: rec.quality.as_str().to_string(),
+                smart_download: rec.smart_download,
+                auto_delete: rec.auto_delete,
+                subtitle_urls_json: rec.subtitle_urls,
+            });
+        }
+        drop(queue);
+
+        self.try_start_next(app);
     }
 
     /// Enqueues a download and starts it if capacity is available.
@@ -107,6 +162,11 @@ impl DownloadManager {
         let smart_download = payload.smart_download.unwrap_or(profile_smart);
         let auto_delete = payload.auto_delete.unwrap_or(profile_auto_delete);
 
+        // Serialize subtitle URLs for storage
+        let subtitle_urls_json = payload.subtitle_urls.as_ref()
+            .filter(|v| !v.is_empty())
+            .and_then(|v| serde_json::to_string(v).ok());
+
         let record = DownloadRecord {
             id: id.clone(),
             profile_id: payload.profile_id.clone(),
@@ -133,6 +193,8 @@ impl DownloadManager {
             error_message: None,
             smart_download,
             auto_delete,
+            subtitle_urls: subtitle_urls_json.clone(),
+            subtitle_paths: None,
         };
 
         db.insert(&record).map_err(|e| e.to_string())?;
@@ -146,6 +208,7 @@ impl DownloadManager {
             quality: payload.quality.clone(),
             smart_download,
             auto_delete,
+            subtitle_urls_json,
         };
 
         self.queue
@@ -218,6 +281,7 @@ impl DownloadManager {
             quality: rec.quality.as_str().to_string(),
             smart_download: rec.smart_download,
             auto_delete: rec.auto_delete,
+            subtitle_urls_json: rec.subtitle_urls.clone(),
         };
         self.queue
             .lock()
@@ -263,6 +327,7 @@ impl DownloadManager {
 
         if let Some(rec) = rec {
             file_store::delete_files(&app, &rec.profile_id, id);
+            file_store::delete_subtitle_files(rec.subtitle_paths.as_deref());
         }
         self.queue
             .lock()
@@ -398,6 +463,8 @@ fn dispatch_pending(
         let id = item.id.clone();
         let smart = item.smart_download;
         let auto_del = item.auto_delete;
+        let subtitle_urls_json = item.subtitle_urls_json.clone();
+        let profile_id = item.profile_id.clone();
 
         tauri::async_runtime::spawn(async move {
             let result = run_download(
@@ -416,8 +483,30 @@ fn dispatch_pending(
                 a.retain(|a| a != &id);
             }
 
-            if result.is_ok() && smart {
-                smart_download_hook(app2.clone(), db2.clone(), &id, auto_del).await;
+            if result.is_ok() {
+                // Download subtitles if provided and not already downloaded
+                if let Some(urls_json) = subtitle_urls_json.as_deref() {
+                    // Only download if subtitle_paths not yet set
+                    let already_done = db2.lock().ok()
+                        .and_then(|d| d.get_by_id(&id).ok().flatten())
+                        .and_then(|r| r.subtitle_paths)
+                        .map(|p| !p.is_empty())
+                        .unwrap_or(false);
+
+                    if !already_done {
+                        if let Some(paths_json) = super::subtitles::download_subtitles(
+                            &app2, &profile_id, &id, urls_json
+                        ).await {
+                            if let Ok(d) = db2.lock() {
+                                d.update_subtitle_paths(&id, &paths_json).ok();
+                            }
+                        }
+                    }
+                }
+
+                if smart {
+                    smart_download_hook(app2.clone(), db2.clone(), &id, auto_del).await;
+                }
             }
 
             // Continue draining the queue

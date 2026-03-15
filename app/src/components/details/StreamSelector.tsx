@@ -1,7 +1,7 @@
 // Stream Selector Component
 // Extracted from Details.tsx
 import { useEffect } from 'react'
-import { Play, Check, ArrowLeft, Zap, HardDrive, Wifi } from 'lucide-react'
+import { Play, Check, Zap, HardDrive, Wifi } from 'lucide-react'
 import { SkeletonStreamList } from '../../components'
 import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
 import { CompactStreamItem } from '../../components/features/CompactStreamItem'
@@ -114,16 +114,10 @@ export function StreamSelector({
 
   return (
     <div className={styles.streamsContainer}>
-        {meta.type === 'series' && (
-            <div className="flex items-center gap-4 mb-5">
-                <button onClick={onBack} className={`${styles.actionBtn} ${styles.btnSecondaryGlass}`} style={{ padding: '8px 16px' }}>
-                    <ArrowLeft size={16} />
-                    Back
-                </button>
-                <h2 style={{ margin: 0, fontSize: '1.2rem' }}>
-                    {selectedEpisode ? `S${selectedEpisode.season}:E${selectedEpisode.number} - ${selectedEpisode.title}` : 'Streams'}
-                </h2>
-            </div>
+        {meta.type === 'series' && selectedEpisode && (
+            <h2 style={{ margin: '0 0 20px', fontSize: '1.1rem', color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>
+                S{selectedEpisode.season}:E{selectedEpisode.number} — {selectedEpisode.title}
+            </h2>
         )}
 
         {/* Unified Addon Status + Controls Bar */}

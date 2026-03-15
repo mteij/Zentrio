@@ -6,6 +6,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { Layout, StreamingRow, SkeletonRow, Hero, SkeletonHero, LazyImage, RatingBadge, SkeletonCard } from '../../components'
 import { TraktRecommendationsRow } from '../../components/streaming/TraktRecommendationsRow'
+import { useRootScrollPinned } from '../../hooks/useRootScrollPinned'
 
 import { MetaPreview } from '../../services/addons/types'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
@@ -113,6 +114,7 @@ export const StreamingExplore = () => {
   // State for view toggle
   const [viewMode, setViewMode] = useState<'all' | 'movie' | 'series'>('all')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const stickyHeader = useRootScrollPinned({ extraTopPx: 10 })
 
 
   // If a genre is selected via URL, we show the filtered grid view.
@@ -309,49 +311,55 @@ export const StreamingExplore = () => {
             )}
 
             {/* Fixed Header / View Toggles / Filter Bar */}
-            <div className={styles.exploreHeader}>
-                 {isFilteredView ? (
-                    <div className={styles.exploreFilteredHeader}>
-                        <button 
-                            onClick={() => { setSearchParams({}); setViewMode('all'); }}
-                            className={styles.exploreBackBtn}
-                            aria-label="Go Back"
-                        >
-                            <ArrowLeft size={20} />
-                        </button>
-                        <h1 className={styles.exploreFilteredTitle}>
-                            {activeGenre || (activeType ? (activeType === 'movie' ? 'Movies' : 'Series') : 'Explore')}
-                        </h1>
-                    </div>
-                 ) : (
-                     <div className={styles.exploreToggleGroup}>
-                        {(['all', 'movie', 'series'] as const).map(mode => (
-                            <button
-                                key={mode}
-                                onClick={() => setViewMode(mode)}
-                                className={`${styles.exploreToggleBtn} ${viewMode === mode ? styles.exploreToggleBtnActive : ''}`}
-                            >
-                                {mode === 'all' ? 'All' : mode === 'movie' ? 'Movies' : 'TV Shows'}
-                            </button>
-                        ))}
-                     </div>
-                 )}
+            <div ref={stickyHeader.sentinelRef} className={styles.stickySentinel} aria-hidden="true" />
+            <div className={styles.stickyHeaderShell} style={stickyHeader.spacerStyle}>
+              <div
+                ref={stickyHeader.headerRef}
+                className={`${styles.exploreHeader} ${stickyHeader.isPinned ? styles.exploreHeaderPinned : ''}`}
+              >
+                   {isFilteredView ? (
+                      <div className={styles.exploreFilteredHeader}>
+                          <button 
+                              onClick={() => { setSearchParams({}); setViewMode('all'); }}
+                              className={styles.exploreBackBtn}
+                              aria-label="Go Back"
+                          >
+                              <ArrowLeft size={20} />
+                          </button>
+                          <h1 className={styles.exploreFilteredTitle}>
+                              {activeGenre || (activeType ? (activeType === 'movie' ? 'Movies' : 'Series') : 'Explore')}
+                          </h1>
+                      </div>
+                   ) : (
+                       <div className={styles.exploreToggleGroup}>
+                          {(['all', 'movie', 'series'] as const).map(mode => (
+                              <button
+                                  key={mode}
+                                  onClick={() => setViewMode(mode)}
+                                  className={`${styles.exploreToggleBtn} ${viewMode === mode ? styles.exploreToggleBtnActive : ''}`}
+                              >
+                                  {mode === 'all' ? 'All' : mode === 'movie' ? 'Movies' : 'TV Shows'}
+                              </button>
+                          ))}
+                       </div>
+                   )}
 
-                 {!isFilteredView && (
-                     <div className={styles.exploreGenreSelect}>
-                        <select 
-                            className={styles.exploreGenreSelectInput}
-                            onChange={(e) => updateFilter('genre', e.target.value)}
-                            value=""
-                        >
-                            <option value="" disabled>Genres</option>
-                            {genres.map(g => (
-                                <option key={g} value={g}>{g}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className={styles.exploreGenreIcon} />
-                     </div>
-                 )}
+                   {!isFilteredView && (
+                       <div className={styles.exploreGenreSelect}>
+                          <select 
+                              className={styles.exploreGenreSelectInput}
+                              onChange={(e) => updateFilter('genre', e.target.value)}
+                              value=""
+                          >
+                              <option value="" disabled>Genres</option>
+                              {genres.map(g => (
+                                  <option key={g} value={g}>{g}</option>
+                              ))}
+                          </select>
+                          <ChevronDown className={styles.exploreGenreIcon} />
+                       </div>
+                   )}
+              </div>
             </div>
 
             {/* Mobile Floating Filter Button (Dashboard Only) */}

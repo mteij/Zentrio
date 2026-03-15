@@ -14,6 +14,8 @@ export interface DownloadRecord {
   season?: number
   episode?: number
   posterPath: string
+  /** Local path to downloaded episode thumbnail/still image */
+  thumbnailPath?: string
   status: DownloadStatus
   progress: number
   quality: DownloadQuality
@@ -31,6 +33,10 @@ export interface DownloadRecord {
   errorMessage?: string
   smartDownload: boolean
   autoDelete: boolean
+  /** Original subtitle URLs from the stream response (stored for re-download on resume) */
+  subtitleUrls?: Array<{ url: string; lang: string }>
+  /** Locally downloaded subtitle file paths */
+  subtitlePaths?: Array<{ lang: string; path: string }>
 }
 
 export interface StartDownloadPayload {
@@ -43,6 +49,8 @@ export interface StartDownloadPayload {
   season?: number
   episode?: number
   posterPath: string
+  /** Episode still / thumbnail URL — downloaded alongside the video */
+  thumbnailUrl?: string
   streamUrl: string
   addonId: string
   quality: DownloadQuality
@@ -50,6 +58,8 @@ export interface StartDownloadPayload {
   smartDownload?: boolean
   /** Override per-download auto-delete flag (undefined = use profile default) */
   autoDelete?: boolean
+  /** Subtitle tracks from the stream — downloaded alongside the video for offline use */
+  subtitleUrls?: Array<{ url: string; lang: string }>
 }
 
 export interface StorageStats {

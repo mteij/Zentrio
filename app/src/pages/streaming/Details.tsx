@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import { Layout, SkeletonDetails, LoadErrorState } from '../../components'
 import { InfoModal } from '../../components/features/InfoModal'
 import { ListSelectionModal } from '../../components/features/ListSelectionModal'
@@ -535,9 +536,7 @@ export const StreamingDetails = () => {
     return (
       <Layout title="Loading..." showHeader={false} showFooter={false}>
         <button onClick={() => navigate(-1)} className={styles.backBtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-          </svg>
+          <ChevronLeft size={20} />
           Back
         </button>
         <SkeletonDetails />
@@ -573,18 +572,7 @@ export const StreamingDetails = () => {
 
   return (
     <Layout title={meta.name} showHeader={false} showFooter={false}>
-      {!(meta.type === 'series' && view === 'streams') && (
-        <button onClick={() => navigate(-1)} className={styles.backBtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-          </svg>
-          Back
-        </button>
-      )}
-
-
-      <div className={styles.detailsContainer}>
-        <DetailsHeader
+      <DetailsHeader
           meta={meta}
           data={data}
           profileId={profileId!}
@@ -597,6 +585,7 @@ export const StreamingDetails = () => {
           onShowInfoModal={() => setShowInfoModal(true)}
           onToggleWatched={() => toggleWatched()}
           onMarkSeriesWatched={markSeriesWatched}
+          onBackFromStreams={() => setView('episodes')}
         >
           {meta.type === 'series' && view === 'episodes' && (
             <EpisodeList
@@ -634,7 +623,6 @@ export const StreamingDetails = () => {
             />
           )}
         </DetailsHeader>
-      </div>
 
       {/* Info Modal for cast, director, etc. */}
       <InfoModal

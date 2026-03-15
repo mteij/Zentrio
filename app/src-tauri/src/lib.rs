@@ -208,6 +208,8 @@ pub fn run() {
             }
             let db = DownloadDb::open(&db_path).expect("Failed to open downloads DB");
             let manager = Arc::new(DownloadManager::new(db));
+            // Re-queue any downloads interrupted by crash or clean shutdown
+            manager.restore(app.handle().clone());
             app.manage(manager);
             // ──────────────────────────────────────────────────────────────
 

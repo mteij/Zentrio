@@ -383,6 +383,7 @@
 .streamingLayout {
   min-height: 100vh;
   min-height: var(--app-height, 100vh);
+  box-sizing: border-box;
   padding-left: 80px; /* Fixed width matching navbar */
   padding-bottom: 40px;
   padding-top: var(--app-content-top-offset, 0px);
@@ -510,8 +511,8 @@
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  filter: blur(80px) brightness(0.4) saturate(1.2);
-  transform: scale(1.2);
+  filter: blur(60px) brightness(0.4) saturate(1.2);
+  transform: scale(1.1);
   pointer-events: none;
   transition:
     background-image 0.5s ease-in-out,
@@ -522,7 +523,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.6) 50%, #000 100%);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, rgba(8, 8, 8, 0.92) 40%, rgba(8, 8, 8, 1) 65%);
   z-index: 1;
 }
 
@@ -918,7 +919,6 @@
 }
 
 .mediaCard:hover {
-  transform: scale(1.05);
   z-index: 100;
 }
 
@@ -929,7 +929,7 @@
   position: relative;
   background: #222;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1743,7 +1743,7 @@
   /* Reduce content overlap on mobile - hero is shorter so less overlap is needed */
   .contentContainer {
     margin-top: 0 !important;
-    padding-bottom: calc(var(--nav-height-mobile, 80px) + 40px);
+    padding-bottom: calc(var(--nav-height-mobile, 70px) + 40px);
   }
 
   .contentRow {
@@ -1975,6 +1975,7 @@
 
 .libraryMain {
   overflow-x: hidden;
+  box-sizing: border-box;
   padding: 20px 40px 40px;
   min-height: calc(100vh - var(--app-content-top-offset, 0px) - 40px);
 }
@@ -1992,6 +1993,7 @@
   .libraryLayout {
     padding-left: 0 !important;
     flex-direction: column;
+    padding-bottom: calc(var(--nav-height-mobile, 70px) + 20px);
   }
 }
 
@@ -2000,7 +2002,11 @@
 }
 
 .searchTopBar {
-  margin-bottom: 0;
+  margin-bottom: 22px;
+}
+
+.searchLayout .contentContainer {
+  padding-top: 6px;
 }
 
 .searchInputShell {
@@ -2067,7 +2073,7 @@
 
 .searchResultsHeading {
   padding: 0 60px;
-  margin: 0 0 12px;
+  margin: 0 0 20px;
   font-size: 1.5rem;
   font-weight: 600;
   color: #fff;
@@ -2138,6 +2144,7 @@
     width: 100% !important;
     padding: 16px !important;
     margin-left: 0;
+    min-height: auto;
   }
 }
 
@@ -2255,19 +2262,42 @@
 /* ======================= */
 /* Explore Sticky Header   */
 /* ======================= */
+.stickySentinel {
+  width: 100%;
+  height: 1px;
+  margin-top: -1px;
+}
+
+.stickyHeaderShell {
+  position: relative;
+  z-index: 50;
+}
+
 .exploreHeader {
   position: sticky;
-  top: 0;
+  top: calc(var(--app-content-top-offset, 0px) + 10px);
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(16px + var(--app-content-top-offset, 0px)) 60px 16px;
-  margin-bottom: -40px; /* Reduced negative margin to prevent overlap with content */
-  /* Always transparent - controls have their own backgrounds */
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px 60px 18px;
+  margin-bottom: 18px;
   background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   pointer-events: none; /* Allow clicking through empty space */
   transition: all 0.3s ease;
+}
+
+.exploreHeaderPinned {
+  position: fixed;
+  left: 80px;
+  right: 0;
+  top: calc(var(--app-content-top-offset, 0px) + 10px);
+  width: auto;
+  z-index: 70;
 }
 
 /* Make the interactive elements clickable */
@@ -2400,17 +2430,21 @@
 }
 
 @media (max-width: 768px) {
+  .exploreHeaderPinned {
+    left: 0;
+    top: calc(var(--app-content-top-offset, 0px) + 8px);
+  }
+
   .exploreHeader {
     left: 0;
     position: sticky;
-    top: 0;
-    margin-bottom: 0;
-    padding: calc(12px + var(--app-content-top-offset, 0px)) 16px 12px;
+    top: calc(var(--app-content-top-offset, 0px) + 6px);
+    margin-bottom: 14px;
+    padding: 12px 16px 14px;
     flex-direction: column; /* Reset to column for filtered view logic or keeping existing */
     /* We are hiding this on mobile dashboard anyway, so this mainly affects filtered view if we don't hide it */
     gap: 12px;
-    background: transparent; /* Remove background on mobile to let Filter button float? No, keep it for filtered view */
-    background: #141414;
+    background: transparent;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     pointer-events: auto;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
@@ -2582,14 +2616,15 @@
     flex-direction: row !important;
     align-items: center;
     gap: 12px;
-    padding-top: calc(20px + var(--app-content-top-offset, 0px)) !important;
+    top: calc(var(--app-content-top-offset, 0px) + 8px) !important;
+    padding-top: 14px !important;
     padding-right: 24px !important;
-    padding-bottom: 20px !important;
+    padding-bottom: 16px !important;
     padding-left: 24px !important;
-    margin-bottom: 0;
-    background: transparent;
-    border-bottom: none;
-    box-shadow: none;
+    margin-bottom: 16px;
+    background: linear-gradient(180deg, rgba(10, 10, 10, 0.94) 0%, rgba(10, 10, 10, 0.84) 72%, rgba(10, 10, 10, 0) 100%);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.3);
   }
 
   .searchTopBar.exploreHeader .searchInputShell {
@@ -2621,7 +2656,7 @@
 
   .searchResultsHeading {
     padding: 0 20px;
-    margin-bottom: 8px;
+    margin-bottom: 14px;
     font-size: 1.25rem;
     line-height: 1.25;
   }

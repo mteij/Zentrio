@@ -33,10 +33,24 @@ const BROWSER_COLORS: Record<string, string> = {
 const platformColor = (name: string) => PLATFORM_COLORS[name] ?? '#3f3f46'
 const browserColor  = (name: string) => BROWSER_COLORS[name]  ?? '#3f3f46'
 const isTauriPlatform = (name: string) => name.startsWith('Tauri')
+const TIME_RANGE_LABELS = {
+  '24h': 'Last 24 hours',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  'all': 'All time',
+} as const
 
 // ── ClientDistribution widget ─────────────────────────────────────────────────
 
-function ClientDistribution({ data, loading }: { data: PlatformStats | undefined; loading: boolean }) {
+function ClientDistribution({
+  data,
+  loading,
+  rangeLabel,
+}: {
+  data: PlatformStats | undefined
+  loading: boolean
+  rangeLabel: string
+}) {
   if (loading && !data) {
     return (
       <div className="bg-black/30 border border-white/10 rounded-xl p-6 flex items-center justify-center">
@@ -77,6 +91,7 @@ function ClientDistribution({ data, loading }: { data: PlatformStats | undefined
 
       {/* Native vs Web segmented bar */}
       <div className="px-4 pt-3 pb-1">
+        <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-zinc-600">{rangeLabel}</p>
         <div className="flex rounded-full overflow-hidden h-1.5 mb-2">
           {nativePct > 0 && (
             <div
@@ -108,14 +123,14 @@ function ClientDistribution({ data, loading }: { data: PlatformStats | undefined
       </div>
 
       {/* Body */}
-      <div className="p-4 grid lg:grid-cols-2 gap-6">
+      <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-5">
 
         {/* Left: donut + platform legend */}
         <div>
           <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-3">Platforms</p>
 
           {/* Donut chart */}
-          <div className="relative h-44">
+          <div className="relative h-40 sm:h-44">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -298,8 +313,8 @@ export function DashboardPage() {
   })
 
   const { data: platformStats, isLoading: platformLoading } = useQuery({
-    queryKey: ['admin-platform-stats'],
-    queryFn: () => adminApi.getPlatformStats(),
+    queryKey: ['admin-platform-stats', timeRange],
+    queryFn: () => adminApi.getPlatformStats(timeRange),
     refetchInterval: 60_000,
   })
 
@@ -314,13 +329,13 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold text-white">Dashboard</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-4">
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value as any)}
-            className="bg-black/30 border border-white/10 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+            className="min-w-0 flex-1 bg-black/30 border border-white/10 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 sm:flex-none"
           >
             <option value="24h">Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
@@ -339,7 +354,7 @@ export function DashboardPage() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         <StatCard label="Total Users" value={stats?.users} icon={Users} loading={statsLoading} />
         <StatCard label="Admins" value={stats?.admins} icon={ShieldCheck} color="text-amber-400" loading={statsLoading} />
         <StatCard label="Banned" value={stats?.bannedUsers} icon={Ban} color="text-red-400" loading={statsLoading} />
@@ -353,7 +368,7 @@ export function DashboardPage() {
         {/* User Growth Chart */}
         <div className="bg-black/30 border border-white/10 rounded-xl p-4">
           <h2 className="text-sm font-medium text-white mb-4">New Users</h2>
-          <div className="h-64 w-full">
+          <div className="h-56 sm:h-64 w-full">
             {chartsLoading ? (
               <div className="w-full h-full flex items-center justify-center">
                 <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
@@ -386,7 +401,7 @@ export function DashboardPage() {
         {/* Watch Events Chart */}
         <div className="bg-black/30 border border-white/10 rounded-xl p-4">
           <h2 className="text-sm font-medium text-white mb-4">Watch Events</h2>
-          <div className="h-64 w-full">
+          <div className="h-56 sm:h-64 w-full">
             {chartsLoading ? (
                <div className="w-full h-full flex items-center justify-center">
                  <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
@@ -418,7 +433,11 @@ export function DashboardPage() {
       </div>
 
       {/* Platform / client distribution */}
-      <ClientDistribution data={platformStats} loading={platformLoading} />
+      <ClientDistribution
+        data={platformStats}
+        loading={platformLoading}
+        rangeLabel={TIME_RANGE_LABELS[timeRange]}
+      />
 
       {/* Activity tables */}
       <div className="grid lg:grid-cols-2 gap-4">

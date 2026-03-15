@@ -7,6 +7,7 @@
   min-height: 100svh;
   min-height: var(--app-height, 100svh);
   height: var(--app-height, 100svh);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -297,6 +298,11 @@
 
 /* Responsive: Mobile */
 @media (max-width: 480px) {
+  .profilesPage {
+    padding-block: 1.25rem;
+    padding-bottom: calc(104px + var(--safe-area-inset-bottom, 0px));
+  }
+
   .sectionTitle {
     font-size: 28px;
   }
@@ -305,6 +311,7 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
     max-height: 70vh;
+    min-height: 0;
   }
 
   .profileCard {

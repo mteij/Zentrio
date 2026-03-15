@@ -10,7 +10,7 @@ import { useRef, useEffect, useCallback, useState } from 'react'
 import {
   Play, Pause, Volume2, VolumeX, Volume1,
   Maximize, Minimize, Settings, Subtitles,
-  RotateCcw, RotateCw, ArrowLeft,
+  RotateCcw, RotateCw,
   ChevronLeft, ChevronRight,
   ExternalLink,
   PictureInPicture2, Cast,
@@ -247,10 +247,16 @@ export function ZentrioPlayer({
   useEffect(() => {
     if (!isMobile) return
 
-    // Skip web orientation API in Tauri mobile - native code handles it
-    if (isTauriMobile()) return
-
     const applyOrientation = async () => {
+      if (isTauriMobile()) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core')
+          await invoke('plugin:immersive-mode|setOrientation', { orientation: orientationMode })
+        } catch (e) {
+          // Plugin unavailable — silently ignore
+        }
+        return
+      }
       try {
         const so = screen.orientation as any // ts workaround
         if (orientationMode === 'landscape') {
@@ -262,14 +268,19 @@ export function ZentrioPlayer({
         }
       } catch (e) {
         // Silently ignore - lock() requires fullscreen and user gesture
-        // This is expected to fail in most mobile web contexts
       }
     }
 
     applyOrientation()
 
-    // Unlock on unmount
+    // Reset to auto on unmount
     return () => {
+      if (isTauriMobile()) {
+        import('@tauri-apps/api/core').then(({ invoke }) => {
+          invoke('plugin:immersive-mode|setOrientation', { orientation: 'auto' }).catch(() => {})
+        })
+        return
+      }
       try {
         const so = screen.orientation as any
         so?.unlock?.()
@@ -373,6 +384,18 @@ export function ZentrioPlayer({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
+
+  /* ── Menu click-outside (desktop + mobile) ── */
+  useEffect(() => {
+    if (!openMenu) return
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-menu]')) {
+        setOpenMenu(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openMenu])
 
   /* ── Seek feedback flash ── */
   const flashSeek = useCallback((dir: 'left' | 'right', secs: number) => {
@@ -547,11 +570,11 @@ export function ZentrioPlayer({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onClick={(e) => {
-        // Toggle play/pause on bare click (not on controls)
+        // Clicks on the control bars are blocked by data-controls on topBar/bottomBar
         if ((e.target as HTMLElement).closest('[data-controls]')) return
-        if (openMenu) { setOpenMenu(null); return }
         resetControlsTimeout()
-        togglePlayPause()
+        // Desktop only — mobile uses touch gestures (double-tap) for play/pause
+        if (!isMobile) togglePlayPause()
       }}
     >
       {/* Video */}
@@ -614,14 +637,14 @@ export function ZentrioPlayer({
       )}
 
       {/* ═══════════════ Controls Overlay ═══════════════ */}
-      <div className={`${styles.controlsOverlay} ${controlsVisible ? styles.visible : ''}`} data-controls>
+      <div className={`${styles.controlsOverlay} ${controlsVisible ? styles.visible : ''}`}>
 
         {/* Gradient backgrounds */}
         <div className={styles.gradientTop} />
         <div className={styles.gradientBottom} />
 
         {/* ── TOP BAR ── */}
-        <div className={styles.topBar}>
+        <div className={styles.topBar} data-controls>
           <div className={styles.topLeft}>
             {onBack && (
               <button
@@ -629,7 +652,7 @@ export function ZentrioPlayer({
                 onClick={(e) => { e.stopPropagation(); onBack() }}
                 aria-label="Go back"
               >
-                <ArrowLeft size={22} />
+                <ChevronLeft size={22} />
               </button>
             )}
             {title && (
@@ -663,7 +686,7 @@ export function ZentrioPlayer({
 
             {/* Combined external / PiP / Cast dropdown */}
             {(onOpenExternal || document.pictureInPictureEnabled) && (
-              <div className={styles.menuWrap}>
+              <div className={styles.menuWrap} data-menu>
                 <button
                   className={`${styles.iconBtn} ${openMenu === 'external' ? styles.active : ''}`}
                   onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === 'external' ? null : 'external') }}
@@ -742,7 +765,7 @@ export function ZentrioPlayer({
         )}
 
         {/* ── BOTTOM CONTROLS ── */}
-        <div className={styles.bottomBar}>
+        <div className={styles.bottomBar} data-controls>
           {/* Progress bar */}
           <div
             ref={progressRef}
@@ -838,7 +861,7 @@ export function ZentrioPlayer({
             <div className={styles.controlGroup}>
               {/* Subtitles */}
               {subtitleTracks.length > 0 && (
-                <div className={styles.menuWrap}>
+                <div className={styles.menuWrap} data-menu>
                   <button
                     className={`${styles.ctrlBtn} ${openMenu === 'subtitles' ? styles.active : ''}`}
                     onClick={() => {
@@ -926,7 +949,7 @@ export function ZentrioPlayer({
               )}
 
               {/* Settings */}
-              <div className={styles.menuWrap}>
+              <div className={styles.menuWrap} data-menu>
                 <button
                   className={`${styles.ctrlBtn} ${openMenu === 'settings' ? styles.active : ''}`}
                   onClick={() => { setOpenMenu(openMenu === 'settings' ? null : 'settings'); setSettingsPage('main') }}

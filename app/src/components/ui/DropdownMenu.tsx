@@ -20,9 +20,10 @@ interface DropdownMenuProps {
   items: MenuItemOrSeparator[]
   triggerIcon?: React.ReactNode
   className?: string
+  compact?: boolean
 }
 
-export const DropdownMenu = ({ items, triggerIcon, className = '' }: DropdownMenuProps) => {
+export const DropdownMenu = ({ items, triggerIcon, className = '', compact = false }: DropdownMenuProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -91,8 +92,8 @@ export const DropdownMenu = ({ items, triggerIcon, className = '' }: DropdownMen
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: '44px',
-          height: '44px',
+          width: compact ? '30px' : '44px',
+          height: compact ? '30px' : '44px',
           padding: '0',
           background: 'rgba(255, 255, 255, 0.08)',
           border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -103,7 +104,7 @@ export const DropdownMenu = ({ items, triggerIcon, className = '' }: DropdownMen
           flexShrink: 0
         }}
       >
-        {triggerIcon || <MoreVertical size={20} />}
+        {triggerIcon || <MoreVertical size={compact ? 15 : 20} />}
       </button>
 
       {isOpen && createPortal(

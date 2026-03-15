@@ -176,7 +176,7 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
         <div className={styles.smartSection}>
           <span className={styles.smartSectionLabel}>
             <Zap size={14} />
-            Smart Downloads (default for new downloads)
+            Smart Downloads
           </span>
 
           <div className={styles.smartToggleRow}>

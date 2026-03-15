@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import styles from '../../styles/Settings.module.css'
 
 interface BackButtonProps {
@@ -31,9 +32,7 @@ export function BackButton({ to, onClick, label = 'Back', className = '', varian
       onClick={handleClick}
       className={`${variant === 'floating' ? styles.backBtn : styles.backBtnStatic} ${className}`}
     >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-      </svg>
+      <ChevronLeft size={18} />
       {label}
     </button>
   )

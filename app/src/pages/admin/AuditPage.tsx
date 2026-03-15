@@ -190,7 +190,8 @@ export function AuditPage() {
             <p className="text-xs text-zinc-500">There is no recorded activity matching these filters.</p>
           </div>
         ) : (
-          <table className="w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px]">
             <thead>
               <tr className="border-b border-white/10 text-left">
                 <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Time</th>
@@ -206,7 +207,8 @@ export function AuditPage() {
                 <AuditRow key={entry.id} entry={entry} />
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
 

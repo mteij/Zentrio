@@ -433,11 +433,17 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
       if (cancelled) return null
 
       const candidateBaseIds = buildCandidateBaseIds(params.id, meta)
-      const rawResults: RawAddonResult[] = []
+      const thirdPartyAddons = enabledAddons.filter(isThirdPartyAddon)
+      const rawResultsByManifestUrl = new Map<string, RawAddonResult>()
       let firstPlayableSent = false
 
+      const getOrderedResults = (): RawAddonResult[] =>
+        thirdPartyAddons
+          .map((addon) => rawResultsByManifestUrl.get(addon.manifest_url))
+          .filter((result): result is RawAddonResult => Boolean(result))
+
       const emitProcessedResults = (addon: ResolverAddon, count: number): ResolvedFlatStream[] => {
-        const allStreams = processResults(rawResults, settings, meta)
+        const allStreams = processResults(getOrderedResults(), settings, meta)
 
         callbacks.onAddonResult?.({
           addon,
@@ -456,15 +462,15 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
         return allStreams
       }
 
-      for (const addon of enabledAddons.filter(isThirdPartyAddon)) {
-        if (cancelled) return null
-
+      const resolveAddonStreams = async (addon: EnabledAddon): Promise<void> => {
+        if (cancelled) return
         const client = getAddonClient(addon.manifest_url)
         let manifest: Manifest
 
         try {
           manifest = await client.init()
         } catch (error) {
+          if (cancelled) return
           callbacks.onAddonError?.({
             addon: {
               id: addon.manifest_url,
@@ -473,16 +479,18 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
             },
             error: error instanceof Error ? error.message : String(error),
           })
-          continue
+          return
         }
 
+        if (cancelled) return
+
         if (!supportsResource(manifest, 'stream', params.type)) {
-          continue
+          return
         }
 
         const baseId = candidateBaseIds.find((candidateId) => canHandleId(manifest, 'stream', candidateId))
         if (!baseId) {
-          continue
+          return
         }
 
         const resolverAddon = toResolverAddon(manifest)
@@ -499,12 +507,15 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
         while (attempt < maxRetries && !cancelled) {
           try {
             let streams = await client.getStreams(params.type, resolvedVideoId)
+            if (cancelled) return
 
             if (params.type === 'movie' && (!streams || streams.length === 0)) {
               const altVideoIds = await getMovieVideoIdsFromAddonMeta(manifest, baseId, client)
               for (const videoId of altVideoIds) {
+                if (cancelled) return
                 try {
                   const extraStreams = await client.getStreams('movie', videoId)
+                  if (cancelled) return
                   if (extraStreams && extraStreams.length > 0) {
                     streams = [...(streams || []), ...extraStreams]
                   }
@@ -521,11 +532,11 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
             }
 
             if (streams && streams.length > 0) {
-              rawResults.push({ addon: manifest, streams })
+              rawResultsByManifestUrl.set(addon.manifest_url, { addon: manifest, streams })
             }
 
             emitProcessedResults(resolverAddon, streams?.length || 0)
-            break
+            return
           } catch (error) {
             attempt += 1
             if (attempt < maxRetries) {
@@ -541,9 +552,11 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
         }
       }
 
+      await Promise.allSettled(thirdPartyAddons.map((addon) => resolveAddonStreams(addon)))
+
       if (cancelled) return null
 
-      const allStreams = processResults(rawResults, settings, meta)
+      const allStreams = processResults(getOrderedResults(), settings, meta)
       const payload = {
         allStreams,
         totalCount: allStreams.length,

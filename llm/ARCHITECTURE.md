@@ -334,7 +334,7 @@ Auth flow components. `AuthGuards.tsx` contains `ProtectedRoute`, `PublicRoute`,
 Content detail page components: `DetailsHeader`, `EpisodeList`, `StreamSelector`.
 
 #### `downloads/`
-Download UI: `DownloadCard`, `DownloadProgress`, `StoragePanel`, `QualityPicker`, `OfflineBanner`.
+Download UI: `DownloadCard`, `DownloadProgress`, `StoragePanel`, `QualityPicker`, `OfflineBanner`, `SeriesGroup` (groups completed series episodes under an expandable show row).
 
 #### `features/`
 Reusable streaming feature components: `ContentCard`, `StreamingRow`, `Hero`, `InfoModal`, `ListSelectionModal`, `ProfileModal`, `SettingsProfileSelector`, `ShareListModal`, `CompactStreamItem`, `LazyCatalogRow`, `SearchCatalogRow`, `StreamRefreshButton`.
@@ -509,3 +509,4 @@ Run `bun run knip` from `app/` at any time to surface unused files and exports. 
 - Deep links (`zentrio://`) handle magic link and OAuth callbacks in native apps
 - iOS support exists but is currently disabled in Tauri config
 - Downloads feature is Tauri-only; web builds hide download UI
+- **Android `ImmersiveModePlugin`** (`src-tauri/gen/android/.../ImmersiveModePlugin.kt`): custom Tauri plugin for fullscreen (`setImmersiveMode`) and orientation lock (`setOrientation`). **`@TauriPlugin` does NOT auto-register in Tauri v2** — the plugin must be explicitly registered via `registerPlugin(ImmersiveModePlugin::class.java)` in `MainActivity.kt` before `super.onCreate()`. Frontend invokes it via `invoke('plugin:immersive-mode|setImmersiveMode', { enabled })` and `invoke('plugin:immersive-mode|setOrientation', { orientation: 'portrait' | 'landscape' | 'auto' })`.

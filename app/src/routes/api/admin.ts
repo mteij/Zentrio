@@ -172,6 +172,13 @@ const CHART_RANGE_QUERIES = {
   },
 } as const
 
+const SESSION_RANGE_WHERE = {
+  '24h': `WHERE COALESCE(s.lastActivity, s.updatedAt, s.createdAt) >= datetime('now', '-24 hours')`,
+  '7d': `WHERE COALESCE(s.lastActivity, s.updatedAt, s.createdAt) >= datetime('now', '-7 days')`,
+  '30d': `WHERE COALESCE(s.lastActivity, s.updatedAt, s.createdAt) >= datetime('now', '-30 days')`,
+  'all': '',
+} as const
+
 app.get('/dashboard/charts', adminSessionMiddleware, requirePermission(Permissions.STATS_READ), async (c) => {
   try {
     const rangeParam = c.req.query('range') || '30d'
@@ -249,6 +256,10 @@ app.get('/stats/platforms', adminSessionMiddleware, requirePermission(Permission
     return ok(c, { total: 0, platforms: [], browsers: [], disabled: true })
   }
   try {
+    const rangeParam = c.req.query('range') || '30d'
+    const rangeKey = (rangeParam in SESSION_RANGE_WHERE ? rangeParam : '30d') as keyof typeof SESSION_RANGE_WHERE
+    const whereClause = SESSION_RANGE_WHERE[rangeKey]
+
     // Join with client hints so Tauri Desktop sessions aren't misclassified
     // as Windows/macOS/Linux based on their WebView user-agent.
     // Include all sessions regardless of userAgent. Sessions created by the Tauri
@@ -258,6 +269,7 @@ app.get('/stats/platforms', adminSessionMiddleware, requirePermission(Permission
       SELECT s.userAgent, sch.client_type
       FROM session s
       LEFT JOIN session_client_hints sch ON sch.session_token = s.token
+      ${whereClause}
     `).all() as { userAgent: string | null; client_type: string | null }[]
 
     const platforms: Record<string, number> = {}

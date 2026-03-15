@@ -159,3 +159,5 @@ jspm_packages/
 temp/
 CLAUDE.md
 .claude
+.tauri
+app/~/.tauri
