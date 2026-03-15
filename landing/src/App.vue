@@ -473,7 +473,8 @@ h6 {
 .footer-description {
   color: var(--text-muted);
   font-size: 1rem;
-  max-width: 300px;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .footer-right {
@@ -609,6 +610,10 @@ h6 {
 
   .footer-links {
     flex-wrap: wrap;
+  }
+
+  .footer-description {
+    white-space: normal;
   }
 }
 </style>
