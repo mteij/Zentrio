@@ -358,6 +358,13 @@ jobs:
           rm -rf src-tauri/gen/android
           bun tauri android init
 
+          # Inject REQUEST_INSTALL_PACKAGES permission (required for sideloading APK updates on Android 8+)
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          if ! grep -q "REQUEST_INSTALL_PACKAGES" "$MANIFEST"; then
+            sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />|' "$MANIFEST"
+            echo "✅ Injected REQUEST_INSTALL_PACKAGES permission"
+          fi
+
           # Generate icons - MUST run after android init to overwrite default icons
           # Use android-icon.png (has black background) instead of icon.png (transparent, desktop-only)
           echo "📱 Generating app icons from src-tauri/icons/android-icon.png..."

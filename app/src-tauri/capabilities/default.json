@@ -36,11 +36,13 @@
     "dialog:default",
     "fs:default",
     "fs:allow-read-file",
+    "fs:allow-write-file",
     {
       "identifier": "fs:scope",
       "allow": [
         { "path": "$APPDATA/zentrio/downloads/**/*" },
-        { "path": "$APPLOCALDATA/zentrio/downloads/**/*" }
+        { "path": "$APPLOCALDATA/zentrio/downloads/**/*" },
+        { "path": "$TEMP/**/*" }
       ]
     },
     {
