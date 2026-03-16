@@ -16,7 +16,7 @@ import './utils/toast'
 import { CastProvider } from './contexts/CastContext'
 import { StreamingHomeSkeleton } from './components/streaming/StreamingLoaders'
 import { appMode, AppMode } from './lib/app-mode'
-import { OnboardingWizard } from './components/onboarding'
+const OnboardingWizard = lazy(() => import('./components/onboarding').then(m => ({ default: m.OnboardingWizard })))
 import { AppLifecycleProvider } from './lib/app-lifecycle'
 // Import safe area insets CSS plugin for mobile safe area support
 import '@saurl/tauri-plugin-safe-area-insets-css-api'
@@ -468,7 +468,7 @@ function AppRoutes() {
   // First launch in Tauri - show onboarding wizard
   // Skip if we are on the 2FA page (which happens during login flow)
   if (shouldShowOnboarding) {
-    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
+    return <Suspense fallback={<SplashScreen />}><OnboardingWizard onComplete={handleOnboardingComplete} /></Suspense>;
   }
 
   // Tauri loading gate: Wait for auth state before rendering routes

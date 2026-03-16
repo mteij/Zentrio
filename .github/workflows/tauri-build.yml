@@ -112,7 +112,10 @@ jobs:
             # upstream linuxdeploy step, even after the app binary, deb, and rpm
             # are built successfully. Limit CI Linux bundles to the stable
             # package formats so desktop releases stay green.
-            args: "--bundles deb,rpm"
+            # createUpdaterArtifacts is disabled here because Linux deb/rpm bundles
+            # do not use the Tauri updater and passing an empty signing key causes
+            # "Missing comment in secret key" even when the env var is set to ''.
+            args: "--bundles deb,rpm --config '{\"bundle\":{\"createUpdaterArtifacts\":false}}'"
             name: "linux"
           - platform: "windows-latest" # for Windows
             args: ""

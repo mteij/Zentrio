@@ -37,38 +37,59 @@ export default defineConfig({
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'react-vendor'
           }
-          
+
           // Split React Router
           if (id.includes('node_modules/react-router')) {
             return 'router-vendor'
           }
-          
-          // Split Vidstack and media libraries
-          if (id.includes('node_modules/@vidstack') || id.includes('node_modules/media-icons')) {
+
+          // Split Recharts and D3 (used only in admin DashboardPage - ~360 kB)
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-') || id.includes('node_modules/victory-')) {
+            return 'charts-vendor'
+          }
+
+          // Split Vidstack and media libraries (HLS.js, dash.js share this chunk)
+          if (
+            id.includes('node_modules/@vidstack') ||
+            id.includes('node_modules/media-icons') ||
+            id.includes('node_modules/hls.js') ||
+            id.includes('node_modules/dashjs')
+          ) {
             return 'media-vendor'
           }
-          
+
           // Split FFmpeg WASM and libav.js - these are huge
           // EXCLUDE from Tauri builds - not needed for native playback
           if (!isTauriBuild && (id.includes('node_modules/@ffmpeg') || id.includes('node_modules/@libav'))) {
             return 'ffmpeg-vendor'
           }
-          
+
           // Split TanStack Query
           if (id.includes('node_modules/@tanstack/react-query')) {
             return 'query-vendor'
           }
-          
+
           // Split UI libraries
           if (id.includes('node_modules/lucide') || id.includes('node_modules/framer-motion')) {
             return 'ui-vendor'
           }
-          
-          // Split other utilities
-          if (id.includes('node_modules/zod') || id.includes('node_modules/lz-string')) {
+
+          // Split state management
+          if (id.includes('node_modules/zustand') || id.includes('node_modules/immer')) {
+            return 'state-vendor'
+          }
+
+          // Split notification / small utilities
+          if (
+            id.includes('node_modules/sonner') ||
+            id.includes('node_modules/zod') ||
+            id.includes('node_modules/lz-string') ||
+            id.includes('node_modules/clsx') ||
+            id.includes('node_modules/tailwind-merge')
+          ) {
             return 'utils-vendor'
           }
-          
+
           // Auth libraries
           if (id.includes('node_modules/better-auth') || id.includes('node_modules/bcryptjs')) {
             return 'auth-vendor'
