@@ -9,6 +9,7 @@ import { ZentrioAddonClient } from './zentrio-client'
 import { logger } from '../logger'
 import { enrichContent, filterContent, getParentalSettings } from './content-filter'
 import { normalizeMetaVideos } from './meta-normalizer'
+import { buildSearchQueryVariants, scoreSearchMatch } from '../../utils/search'
 
 const log = logger.scope('AddonManager')
 
@@ -28,6 +29,17 @@ type ProfileContext = {
     userId?: string
 }
 
+type SearchCatalogMetadata = {
+    addon: { id: string; name: string; logo?: string }
+    manifestUrl: string
+    catalog: { type: string; id: string; name?: string }
+    title: string
+}
+
+type SearchCatalogResult = SearchCatalogMetadata & {
+    items: MetaPreview[]
+}
+
 export class AddonManager {
     private clientCache = new Map<string, AddonClient>()
     private tmdbToImdbCache = new Map<string, string>() // Cache for TMDB -> IMDB ID resolution
@@ -37,6 +49,77 @@ export class AddonManager {
             return url
         }
         return `${url.replace(/\/$/, '')}/manifest.json`
+    }
+
+    private buildSearchCatalogTitle(addonName: string, catalogType: string, catalogName?: string): string {
+        const typeLabel = catalogType === 'movie' ? 'Movies' : catalogType === 'series' ? 'Series' : catalogType
+        return catalogName ? `${addonName} - ${catalogName}` : `${addonName} - ${typeLabel}`
+    }
+
+    private sortSearchItems(items: MetaPreview[], query: string): MetaPreview[] {
+        return [...items].sort((a, b) => {
+            const scoreDelta = scoreSearchMatch(b.name, query) - scoreSearchMatch(a.name, query)
+            if (scoreDelta !== 0) return scoreDelta
+
+            const popularityA = typeof a.popularity === 'number' ? a.popularity : 0
+            const popularityB = typeof b.popularity === 'number' ? b.popularity : 0
+            if (popularityB !== popularityA) return popularityB - popularityA
+
+            const voteCountA = typeof a.voteCount === 'number' ? a.voteCount : 0
+            const voteCountB = typeof b.voteCount === 'number' ? b.voteCount : 0
+            if (voteCountB !== voteCountA) return voteCountB - voteCountA
+
+            const ratingA = a.imdbRating ? parseFloat(a.imdbRating) : 0
+            const ratingB = b.imdbRating ? parseFloat(b.imdbRating) : 0
+            if (ratingB !== ratingA) return ratingB - ratingA
+
+            const yearA = a.released ? new Date(a.released).getTime() : 0
+            const yearB = b.released ? new Date(b.released).getTime() : 0
+            return yearB - yearA
+        })
+    }
+
+    private async searchCatalogWithVariants(
+        client: AddonClient,
+        catalog: { type: string; id: string; name?: string },
+        query: string,
+        context: ProfileContext
+    ): Promise<MetaPreview[]> {
+        const variants = buildSearchQueryVariants(query)
+        const deduped = new Map<string, MetaPreview>()
+
+        for (let index = 0; index < variants.length; index++) {
+            const variant = variants[index]
+            let items: MetaPreview[] = []
+            try {
+                items = await client.getCatalog(catalog.type, catalog.id, { search: variant }, context.appearanceConfig)
+            } catch (e) {
+                log.warn(`Search variant failed for ${client.manifest?.name}/${catalog.id} (${variant})`, e)
+                continue
+            }
+
+            for (const item of items) {
+                const existing = deduped.get(item.id)
+                if (!existing || scoreSearchMatch(item.name, query) > scoreSearchMatch(existing.name, query)) {
+                    deduped.set(item.id, item)
+                }
+            }
+
+            if (deduped.size > 0) {
+                const hasStrongMatch = Array.from(deduped.values()).some(item => scoreSearchMatch(item.name, query) >= 850)
+                if (hasStrongMatch || index >= 1) {
+                    break
+                }
+            }
+        }
+
+        if (deduped.size === 0) return []
+
+        const filtered = await this.applyParentalFilter(Array.from(deduped.values()), context)
+        if (filtered.length === 0) return []
+
+        const enriched = await this.enrichItems(filtered, context)
+        return this.sortSearchItems(enriched, query)
     }
 
     constructor() {
@@ -836,73 +919,95 @@ export class AddonManager {
      * Queries all addons with search-enabled catalogs in parallel and returns results grouped by catalog.
      * This provides a cleaner UX by showing where each result comes from.
      */
-    async searchByCatalog(query: string, profileId: number, filters?: { type?: string }): Promise<{
-        addon: { id: string; name: string; logo?: string };
-        catalog: { type: string; id: string; name?: string };
-        items: MetaPreview[];
-    }[]> {
+    async getSearchCatalogMetadata(profileId: number, filters?: { type?: string }): Promise<SearchCatalogMetadata[]> {
         const clients = await this.getClientsForProfile(profileId)
-        const context = this.getProfileContext(profileId)
-
-        // Collect all search promises from all catalogs that support search
-        const searchPromises: Promise<{
-            addon: { id: string; name: string; logo?: string };
-            catalog: { type: string; id: string; name?: string };
-            items: MetaPreview[];
-        } | null>[] = []
+        const results: SearchCatalogMetadata[] = []
 
         for (const client of clients) {
             if (!client.manifest) continue
 
             for (const cat of client.manifest.catalogs) {
-                // Skip if type filter doesn't match
                 if (filters?.type && filters.type !== 'all' && cat.type !== filters.type) continue
+                if (!cat.extra?.some(e => e.name === 'search')) continue
+                if (cat.extra?.some(e => e.isRequired && e.name !== 'search')) continue
 
-                // Check if catalog supports search
-                const searchExtra = cat.extra?.find(e => e.name === 'search')
-                if (!searchExtra) continue
-
-                // Create a promise for this catalog search
-                const searchPromise = (async () => {
-                    try {
-                        const items = await client.getCatalog(cat.type, cat.id, { search: query }, context.appearanceConfig)
-                        if (items.length === 0) return null
-
-                        // Apply parental filtering
-                        const filtered = await this.applyParentalFilter(items, context)
-                        if (filtered.length === 0) return null
-
-                        // Enrich with watch status
-                        const enriched = await this.enrichItems(filtered, context)
-
-                        return {
-                            addon: {
-                                id: client.manifest!.id,
-                                name: client.manifest!.name,
-                                logo: client.manifest!.logo || client.manifest!.logo_url
-                            },
-                            catalog: {
-                                type: cat.type,
-                                id: cat.id,
-                                name: cat.name
-                            },
-                            items: enriched
-                        }
-                    } catch (e) {
-                        log.warn(`Failed for ${client.manifest?.name}/${cat.id}:`, e)
-                        return null
-                    }
-                })()
-
-                searchPromises.push(searchPromise)
+                results.push({
+                    addon: {
+                        id: client.manifest.id,
+                        name: client.manifest.name,
+                        logo: client.manifest.logo || client.manifest.logo_url
+                    },
+                    manifestUrl: client.manifestUrl,
+                    catalog: {
+                        type: cat.type,
+                        id: cat.id,
+                        name: cat.name
+                    },
+                    title: this.buildSearchCatalogTitle(client.manifest.name, cat.type, cat.name)
+                })
             }
         }
 
-        // Execute all searches in parallel
-        const results = await Promise.all(searchPromises)
+        results.sort((a, b) => {
+            const isZentrioA = a.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || a.addon.id === 'org.zentrio.tmdb'
+            const isZentrioB = b.manifestUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON) || b.addon.id === 'org.zentrio.tmdb'
+            if (isZentrioA && !isZentrioB) return -1
+            if (!isZentrioA && isZentrioB) return 1
+            return 0
+        })
 
-        // Filter out null results and return
-        return results.filter((r): r is NonNullable<typeof r> => r !== null)
+        return results
+    }
+
+    async searchSingleCatalog(
+        query: string,
+        profileId: number,
+        manifestUrl: string,
+        catalogType: string,
+        catalogId: string
+    ): Promise<MetaPreview[]> {
+        await this.getClientsForProfile(profileId)
+        const context = this.getProfileContext(profileId)
+
+        const normalizedUrl = this.normalizeUrl(manifestUrl)
+        const client = this.clientCache.get(normalizedUrl)
+
+        if (!client || !client.manifest) {
+            log.warn(`Client not found for ${manifestUrl} (normalized: ${normalizedUrl})`)
+            return []
+        }
+
+        const catalog = client.manifest.catalogs.find(c => c.type === catalogType && c.id === catalogId)
+        if (!catalog || !catalog.extra?.some(e => e.name === 'search')) {
+            return []
+        }
+
+        try {
+            return await this.searchCatalogWithVariants(client, catalog, query, context)
+        } catch (e) {
+            log.warn(`Failed search for ${client.manifest.name}/${catalogId}:`, e)
+            return []
+        }
+    }
+
+    async searchByCatalog(query: string, profileId: number, filters?: { type?: string }): Promise<SearchCatalogResult[]> {
+        const metadata = await this.getSearchCatalogMetadata(profileId, filters)
+        const results = await Promise.all(
+            metadata.map(async (entry) => {
+                const items = await this.searchSingleCatalog(
+                    query,
+                    profileId,
+                    entry.manifestUrl,
+                    entry.catalog.type,
+                    entry.catalog.id
+                )
+
+                if (items.length === 0) return null
+                return { ...entry, items }
+            })
+        )
+
+        return results.filter((entry): entry is SearchCatalogResult => entry !== null)
     }
 
     async getCatalogItems(profileId: number, manifestUrl: string, type: string, id: string, skip?: number): Promise<{ title: string, items: MetaPreview[] } | null> {

@@ -22,6 +22,8 @@ const FORWARDABLE_READ_PREFIXES = [
   '/api/streaming/details',
   '/api/streaming/catalog',
   '/api/streaming/catalog-items',
+  '/api/streaming/search-catalog-metadata',
+  '/api/streaming/search-catalog-items',
   '/api/streaming/streams-live'
 ]
 

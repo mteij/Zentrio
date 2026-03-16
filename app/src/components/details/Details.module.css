@@ -2,10 +2,15 @@
 
 .page {
   position: relative;
-  min-height: 100vh;
+  min-height: var(--app-height, 100vh);
+  height: var(--app-height, 100vh);
   color: #fff;
+  overflow-y: auto;
   /* clip (not hidden) so position:sticky on child .topBar still works */
   overflow-x: clip;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pinch-zoom;
 }
 
 /* Desktop: offset the fixed left sidebar */

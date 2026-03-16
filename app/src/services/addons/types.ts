@@ -38,9 +38,12 @@ export interface MetaPreview {
   logo?: string
   description?: string
   releaseInfo?: string
-  imdbRating?: string
   released?: string
+  year?: string
+  imdbRating?: string
   ageRating?: string
+  popularity?: number
+  voteCount?: number
   posterShape?: 'regular' | 'square' | 'landscape'
   links?: {
     name: string

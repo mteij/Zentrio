@@ -1,45 +1,110 @@
-import { memo } from 'react'
+import { memo, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { MetaPreview } from '../../services/addons/types'
 import { ContentCard, ContentItem } from './ContentCard'
+import { SkeletonCard } from '../ui/SkeletonCard'
 import { useScrollRow } from '../../hooks/useScrollRow'
+import { apiFetchJson } from '../../lib/apiFetch'
 import styles from '../../styles/Streaming.module.css'
+
+export interface SearchCatalogRowStatus {
+  itemCount: number
+  previewImage?: string
+  state: 'loading' | 'success' | 'error'
+}
 
 interface SearchCatalogRowProps {
   addon: { id: string; name: string; logo?: string }
+  manifestUrl: string
   catalog: { type: string; id: string; name?: string }
-  items: MetaPreview[]
+  title: string
+  query: string
   profileId: string
   showImdbRatings?: boolean
   showAgeRatings?: boolean
+  onStatusChange?: (rowKey: string, status: SearchCatalogRowStatus) => void
 }
 
-/**
- * Search result row component for catalog-based search.
- * Displays items from a single catalog in a horizontal scrollable row.
- * Unlike LazyCatalogRow, items are already loaded.
- */
+const buildRowKey = (manifestUrl: string, type: string, id: string) => `${manifestUrl}::${type}::${id}`
+
+const fetchSearchCatalogItems = async (
+  profileId: string,
+  manifestUrl: string,
+  type: string,
+  id: string,
+  query: string
+): Promise<MetaPreview[]> => {
+  const params = new URLSearchParams({
+    profileId,
+    manifestUrl,
+    type,
+    id,
+    q: query,
+  })
+
+  const data = await apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/search-catalog-items?${params.toString()}`)
+  return data.items || []
+}
+
 export const SearchCatalogRow = memo(function SearchCatalogRow({
   addon,
+  manifestUrl,
   catalog,
-  items,
+  title,
+  query,
   profileId,
   showImdbRatings = true,
-  showAgeRatings = true
+  showAgeRatings = true,
+  onStatusChange,
 }: SearchCatalogRowProps) {
-  // Use the shared scroll hook
-  const { 
-    containerRef, 
-    showLeftArrow, 
-    showRightArrow, 
-    isDown, 
-    scroll, 
+  const rowKey = buildRowKey(manifestUrl, catalog.type, catalog.id)
+
+  const {
+    data: items = [],
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ['search-catalog-items', profileId, manifestUrl, catalog.type, catalog.id, query],
+    queryFn: () => fetchSearchCatalogItems(profileId, manifestUrl, catalog.type, catalog.id, query),
+    enabled: Boolean(profileId && query.trim()),
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  })
+
+  useEffect(() => {
+    if (!query.trim()) return
+
+    if (isLoading) {
+      onStatusChange?.(rowKey, { state: 'loading', itemCount: 0 })
+      return
+    }
+
+    if (isError) {
+      onStatusChange?.(rowKey, { state: 'error', itemCount: 0 })
+      return
+    }
+
+    onStatusChange?.(rowKey, {
+      state: 'success',
+      itemCount: items.length,
+      previewImage: items[0]?.background || items[0]?.poster,
+    })
+  }, [isError, isLoading, items, onStatusChange, query, rowKey])
+
+  const {
+    containerRef,
+    showLeftArrow,
+    showRightArrow,
+    isDown,
+    scroll,
     handlers,
-    isDragging 
+    isDragging
   } = useScrollRow({ items })
 
-  // Handle item click - prevent if dragging
   const handleItemClick = (e: React.MouseEvent, _item: ContentItem) => {
     if (isDragging()) {
       e.preventDefault()
@@ -48,65 +113,69 @@ export const SearchCatalogRow = memo(function SearchCatalogRow({
     }
   }
 
-  // Don't render if no items
-  if (items.length === 0) return null
-
-  // Build title: "{Addon} - {Catalog Type}"
-  const typeLabel = catalog.type === 'movie' ? 'Movies' : catalog.type === 'series' ? 'Series' : catalog.type
-  const title = catalog.name || `${addon.name} - ${typeLabel}`
+  if (!query.trim()) return null
+  if (isError || (!isLoading && items.length === 0)) return null
 
   return (
     <div className={styles.contentRow}>
       <div className={styles.rowHeader}>
-        <h2 className={styles.rowTitle}>{title}</h2>
+        <h2 className={styles.rowTitle}>{title || `${addon.name} - ${catalog.type}`}</h2>
       </div>
       <div className={styles.rowWrapper}>
-        <button 
-          className={`${styles.scrollBtn} ${styles.scrollBtnLeft} ${!showLeftArrow ? styles.scrollBtnHidden : ''}`} 
+        <button
+          className={`${styles.scrollBtn} ${styles.scrollBtnLeft} ${!showLeftArrow ? styles.scrollBtnHidden : ''}`}
           onClick={() => scroll('left')}
         >
           <ChevronLeft size={24} />
         </button>
-        
-        <div 
-          className={styles.rowScrollContainer} 
+
+        <div
+          className={styles.rowScrollContainer}
           ref={containerRef}
           {...handlers}
-          style={{ cursor: isDown ? 'grabbing' : 'grab', userSelect: 'none' }}
+          style={{ cursor: isLoading ? 'default' : (isDown ? 'grabbing' : 'grab'), userSelect: 'none' }}
         >
-          <motion.div
-            key="items"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            style={{ display: 'flex', gap: '20px' }}
-          >
-            {items.map((item, index) => (
-              <motion.div
-                key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.3,
-                  delay: Math.min(index * 0.03, 0.2)
-                }}
-                className={styles.cardWrapper}
-              >
-                <ContentCard 
-                  item={item as ContentItem}
-                  profileId={profileId}
-                  showImdbRatings={showImdbRatings}
-                  showAgeRatings={showAgeRatings}
-                  onDragStart={handlers.onDragStart}
-                  onClick={handleItemClick}
-                />
-              </motion.div>
-            ))}
-          </motion.div>
+          {isLoading ? (
+            <motion.div initial={{ opacity: 1 }} style={{ display: 'flex', gap: '20px' }}>
+              {Array.from({ length: 7 }).map((_, index) => (
+                <SkeletonCard key={`${rowKey}-skeleton-${index}`} />
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="items"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.25 }}
+              style={{ display: 'flex', gap: '20px' }}
+            >
+              {items.map((item, index) => (
+                <motion.div
+                  key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.25,
+                    delay: Math.min(index * 0.02, 0.14)
+                  }}
+                  className={styles.cardWrapper}
+                >
+                  <ContentCard
+                    item={item as ContentItem}
+                    profileId={profileId}
+                    showImdbRatings={showImdbRatings}
+                    showAgeRatings={showAgeRatings}
+                    onDragStart={handlers.onDragStart}
+                    onClick={handleItemClick}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
         </div>
 
-        <button 
-          className={`${styles.scrollBtn} ${styles.scrollBtnRight} ${!showRightArrow ? styles.scrollBtnHidden : ''}`} 
+        <button
+          className={`${styles.scrollBtn} ${styles.scrollBtnRight} ${!showRightArrow ? styles.scrollBtnHidden : ''}`}
           onClick={() => scroll('right')}
         >
           <ChevronRight size={24} />
@@ -115,13 +184,16 @@ export const SearchCatalogRow = memo(function SearchCatalogRow({
     </div>
   )
 }, (prevProps, nextProps) => {
-  // Custom comparison: only re-render if props change
   return (
     prevProps.addon.id === nextProps.addon.id &&
+    prevProps.manifestUrl === nextProps.manifestUrl &&
     prevProps.catalog.id === nextProps.catalog.id &&
-    prevProps.items === nextProps.items &&
+    prevProps.catalog.type === nextProps.catalog.type &&
+    prevProps.title === nextProps.title &&
+    prevProps.query === nextProps.query &&
     prevProps.profileId === nextProps.profileId &&
     prevProps.showImdbRatings === nextProps.showImdbRatings &&
-    prevProps.showAgeRatings === nextProps.showAgeRatings
+    prevProps.showAgeRatings === nextProps.showAgeRatings &&
+    prevProps.onStatusChange === nextProps.onStatusChange
   )
 })

@@ -2098,6 +2098,20 @@
   color: #fff;
 }
 
+.searchStatusText {
+  padding: 0 60px;
+  margin: -6px 0 24px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.98rem;
+}
+
+.searchEmptyState {
+  padding: 60px;
+  color: #aaa;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
 .searchMobileFilterBtn {
   display: none;
   align-items: center;
@@ -2678,6 +2692,17 @@
     margin-bottom: 14px;
     font-size: 1.25rem;
     line-height: 1.25;
+  }
+
+  .searchStatusText {
+    padding: 0 20px;
+    margin: -2px 0 18px;
+    font-size: 0.95rem;
+  }
+
+  .searchEmptyState {
+    padding: 40px 20px 56px;
+    font-size: 1.05rem;
   }
 
   .searchTopBar.exploreHeader .searchFilterWrap {

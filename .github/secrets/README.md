@@ -31,6 +31,36 @@ These variables are read by:
 
 > Note: Debug builds use the default Android debug keystore provided by the Android Gradle Plugin and do **not** require secrets.
 
+### Tauri Desktop Updater Signing Secrets
+
+Desktop release builds for macOS and Windows use Tauri updater signing in [`.github/workflows/tauri-build.yml`](../workflows/tauri-build.yml).
+
+1. **TAURI_SIGNING_PRIVATE_KEY**
+   - Exact contents of the generated Tauri updater `.key` file.
+   - This must be the one-line base64 string from the file.
+   - Do **not** base64-decode it before saving it as a GitHub secret.
+   - If the secret starts with `untrusted comment:`, it is in the wrong format.
+
+2. **TAURI_SIGNING_PRIVATE_KEY_PASSWORD**
+   - Optional password used when the updater key was generated with a password.
+   - Omit this secret only if the key was created without a password.
+
+3. **Updater public key**
+   - The matching public key must be configured in [`app/src-tauri/tauri.conf.json`](../../app/src-tauri/tauri.conf.json).
+   - Zentrio currently stores this in `plugins.updater.pubkey`.
+
+Generate a new updater keypair locally with:
+
+```bash
+bunx tauri signer generate -w zentrio.key -p "your-password"
+```
+
+Then:
+
+- Save the contents of `zentrio.key` as `TAURI_SIGNING_PRIVATE_KEY`.
+- Save the password as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if you used one.
+- Copy the contents of `zentrio.key.pub` into `plugins.updater.pubkey` in [`app/src-tauri/tauri.conf.json`](../../app/src-tauri/tauri.conf.json).
+
 ### iOS Build Secrets
 
 iOS build/signing is currently disabled in CI, but when re-enabled, the following secrets are expected:

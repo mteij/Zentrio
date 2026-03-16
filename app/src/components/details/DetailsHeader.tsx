@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadForMedia } from '../../hooks/useDownloads'
+import { isTauri } from '../../lib/auth-client'
 import { useDownloadStore } from '../../stores/downloadStore'
 import { getTopStream, readCachedTopStream, resolveTopStream } from '../../lib/topStreamCache'
 import styles from './Details.module.css'
@@ -48,13 +49,14 @@ export function DetailsHeader({
   children,
 }: DetailsHeaderProps) {
   const navigate = useNavigate()
+  const inTauri = isTauri()
   const [resolvingDownloadStream, setResolvingDownloadStream] = useState(false)
   const existingDownload = useDownloadForMedia(meta.id)
   const addDownload = useDownloadStore((s) => s.addDownload)
 
   // Warm a fresh top stream for movie downloads in the background.
   useEffect(() => {
-    if (meta.type !== 'movie' || !profileId) return
+    if (!inTauri || meta.type !== 'movie' || !profileId) return
     const cached = readCachedTopStream(meta.id)
     if (cached && !cached.stale) return
     void resolveTopStream({
@@ -63,9 +65,10 @@ export function DetailsHeader({
       mediaId: meta.id,
       forceRefresh: Boolean(cached),
     })
-  }, [meta.id, meta.type, profileId])
+  }, [inTauri, meta.id, meta.type, profileId])
 
   const handleDownload = async (quality?: DownloadQuality) => {
+    if (!inTauri) return
     if (!meta || !profileId) return
     const resolvedQuality: DownloadQuality = quality ?? ((localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality)
 
@@ -226,10 +229,10 @@ export function DetailsHeader({
                 )}
 
                 {/* Download — movies only in Phase 1 */}
-                {meta.type === 'movie' && (() => {
-                  if (dlStatus === 'completed') {
-                    return (
-                      <button className={`${styles.downloadBtn} ${styles.downloadBtnDone}`} disabled>
+                  {inTauri && meta.type === 'movie' && (() => {
+                    if (dlStatus === 'completed') {
+                      return (
+                        <button className={`${styles.downloadBtn} ${styles.downloadBtnDone}`} disabled>
                         <CheckCircle size={15} />
                         Downloaded
                       </button>

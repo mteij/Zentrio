@@ -1,152 +1,173 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=E50914&height=120&section=header" />
-
-  <img src="app/public/static/logo/icon-512.png" alt="Zentrio" width="128" height="128" />
+  <img src="app/public/static/logo/icon-512.png" alt="Zentrio logo" width="120" height="120" />
 
   <h1>Zentrio</h1>
 
-  <h3>Stream anything. Own everything.</h3>
+  <p><strong>Stream anything. Own everything.</strong></p>
 
-  [![Typing SVG](https://readme-typing-svg.demolab.com?font=Inter&size=18&pause=2000&color=E50914&center=true&vCenter=true&width=500&lines=Multi-profile+streaming%2C+self-hosted.;Stremio-compatible+addon+ecosystem.;Native+apps+for+desktop+and+mobile.;Your+data%2C+your+server.)](https://git.io/typing-svg)
+  <p>
+    Self-hosted streaming across web and native clients with profiles,
+    Stremio-compatible addons, Trakt sync, admin tooling, and offline-capable apps.
+  </p>
 
   <p>
     <a href="https://zentrio.eu"><strong>Website</strong></a> |
     <a href="https://app.zentrio.eu"><strong>Public Instance</strong></a> |
-    <a href="https://zentrio.eu/releases"><strong>Download</strong></a> |
+    <a href="https://zentrio.eu/releases"><strong>Downloads</strong></a> |
     <a href="https://docs.zentrio.eu"><strong>Docs</strong></a> |
     <a href="https://github.com/Mteij/Zentrio/issues"><strong>Issues</strong></a>
   </p>
 
   <p>
-    <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
-    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
-    <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-FF6A00?style=for-the-badge&logo=hono&logoColor=white" alt="Hono"></a>
-    <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black" alt="Tauri"></a>
-    <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"></a>
-    <a href="https://github.com/MichielEijpe/Zentrio/actions/workflows/quality.yml"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mteij/92598bd8ebd40beb60c71b870c3933d7/raw/zentrio-quality-badge.json&style=for-the-badge" alt="Code Quality"></a>
-    <a href="https://github.com/Mteij/Zentrio/stargazers"><img src="https://img.shields.io/github/stars/mteij/Zentrio?style=for-the-badge&color=E50914&labelColor=1a1a1a" alt="Stars"></a>
-    <a href="https://github.com/Mteij/Zentrio/releases"><img src="https://img.shields.io/github/downloads/mteij/Zentrio/total?style=for-the-badge&color=E50914&labelColor=1a1a1a" alt="Downloads"></a>
+    <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=flat-square&logo=bun&logoColor=white" alt="Bun"></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript"></a>
+    <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="Tauri"></a>
+    <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-07405E?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite"></a>
+    <a href="https://github.com/MichielEijpe/Zentrio/actions/workflows/quality.yml"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mteij/92598bd8ebd40beb60c71b870c3933d7/raw/zentrio-quality-badge.json&style=flat-square" alt="Code Quality"></a>
+    <a href="https://github.com/Mteij/Zentrio/stargazers"><img src="https://img.shields.io/github/stars/mteij/Zentrio?style=flat-square&color=E50914&labelColor=1a1a1a" alt="Stars"></a>
+    <a href="https://github.com/Mteij/Zentrio/releases"><img src="https://img.shields.io/github/downloads/mteij/Zentrio/total?style=flat-square&color=E50914&labelColor=1a1a1a" alt="Downloads"></a>
   </p>
-
-  <img src="landing/public/app-screenshot-1000.png" alt="Zentrio App Screenshot" width="800" style="border-radius: 8px; margin-top: 16px;" />
 </div>
 
-<br />
+> Try it before you self-host: use the [public instance](https://app.zentrio.eu).
 
-<details>
-<summary>A note on how this project was built</summary>
+## What Zentrio Is
 
-Zentrio was developed with significant AI assistance. Much of the code, architecture, and documentation was written or shaped with the help of large language models. The project is functional and actively maintained, but this context is worth knowing if you're evaluating it for production use.
+Zentrio is a self-hosted streaming platform that combines a Bun + Hono backend, a React web app, and native Tauri clients in one project. It is designed for people who want a polished personal streaming setup without giving up control of their data, server, or addon stack.
 
-</details>
+## Why It Stands Out
 
-> **Not ready to self-host?** Use the [public instance](https://app.zentrio.eu) — no setup required.
-
-## Why Zentrio?
-
-**Multi-profile by design.** Watch history, streaming preferences, and appearance are all per-profile. Switch in one click — ideal for households or shared servers.
-
-**Stremio-compatible addon ecosystem.** Install any Stremio-compatible addon by URL, reorder sources, and mix the built-in TMDB addon with third-party manifests.
-
-**Native apps for desktop and mobile.** Zentrio ships as a Tauri app for Windows, macOS, Linux, and Android — with native auth flows, local-first reads, and offline downloads.
-
-**Your data, your server.** One `.env`, SQLite, and a single `docker compose up`. No external databases, no cloud dependencies, no account required to self-host.
+- Multi-profile by design: watch history, streaming preferences, filters, and appearance stay separate per profile.
+- Stremio-compatible addon ecosystem: install addons by URL, reorder sources, and mix the built-in TMDB addon with third-party manifests.
+- Native apps where it matters: desktop and Android builds support native auth flows, local-first reads, and offline downloads.
+- Self-hosting without sprawl: one `.env`, SQLite, and a single `docker compose up -d` are enough to get started.
 
 ## Quick Start
 
-The fastest way to run Zentrio is with Docker Compose.
+The fastest way to run Zentrio is with Docker Compose from the repository root.
 
-**1. Copy the example env file:**
+1. Copy the example environment file.
+
 ```bash
 cp .env.example .env
 ```
 
-**2. Fill in the required values:**
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+2. Fill in the required values.
+
 ```env
 AUTH_SECRET=replace-me
-ENCRYPTION_KEY=replace-me          # 64 hex characters
+ENCRYPTION_KEY=replace-me
 TMDB_API_KEY=your-tmdb-api-key
 ```
 
-**3. Start:**
+Recommended secrets:
+
+```bash
+openssl rand -base64 32
+openssl rand -hex 32
+```
+
+3. Start the stack.
+
 ```bash
 docker compose up -d
 ```
 
-Zentrio will be available at `http://localhost:3000`. The first user to register can claim the superadmin role via `BOOTSTRAP_ADMIN_TOKEN` in the env file.
+4. Open `http://localhost:3000`.
 
-> Full setup guide: [docs/self-hosting.md](docs/self-hosting.md)
+If you want to protect the first superadmin claim, set `ADMIN_SETUP_TOKEN` in `.env` before the first sign-in. Full setup details live in [docs/self-hosting.md](docs/self-hosting.md).
 
-## Download
+![Zentrio app screenshot](landing/public/app-screenshot-1000.png)
 
-Native desktop and mobile apps are available from the releases page.
+## Download Native Apps
 
-**[→ zentrio.eu/releases](https://zentrio.eu/releases)** — Windows, macOS, Linux, Android
+Native builds are available for Windows, macOS, Linux, and Android.
 
-Or grab the latest from [GitHub Releases](https://github.com/Mteij/Zentrio/releases).
+- Release site: [zentrio.eu/releases](https://zentrio.eu/releases)
+- GitHub Releases: [github.com/Mteij/Zentrio/releases](https://github.com/Mteij/Zentrio/releases)
 
-## Features
+## Highlights
 
-| Feature | Details |
-|---|---|
-| **Profiles** | Separate history, filters, settings, and appearance per profile |
-| **Stremio Addons** | Install by URL, reorder sources, built-in TMDB addon included |
-| **Native Apps** | Desktop (Win/Mac/Linux) and Android via Tauri v2 |
-| **Offline Downloads** | Queue downloads on native clients with storage stats and quotas |
-| **Trakt Integration** | Sync, scrobbling, recommendations, and check-ins |
-| **Flexible Auth** | Email/password, magic links, OTP, 2FA, SSO (Google, GitHub, Discord, OIDC) |
-| **Admin Dashboard** | Audit logs, platform analytics, user management, step-up verification |
-| **API-first** | Full OpenAPI spec at `/api/docs`, Stremio-compatible addon endpoints |
+| Area | What you get |
+| --- | --- |
+| Profiles | Separate history, filters, settings, and appearance per profile |
+| Streaming | Stremio-compatible addons, source ordering, and a built-in TMDB addon |
+| Native clients | Desktop and Android apps through Tauri v2 |
+| Offline support | Native download queue, quotas, and storage stats |
+| Trakt | Sync, scrobbling, recommendations, and check-ins |
+| Auth | Email/password, magic links, OTP, 2FA, and SSO providers |
+| Admin | User management, audit logs, analytics, and step-up verification |
+| API | OpenAPI docs at `/api/docs` and Stremio-compatible addon endpoints |
 
 ## Local Development
+
+Zentrio is a monorepo with three main workspaces:
+
+- `app/` for the product codebase
+- `docs/` for the VitePress documentation site
+- `landing/` for the marketing site
+
+If you are working on the app itself:
 
 ```bash
 cd app
 bun install
 ```
 
-Run both servers concurrently in separate terminals:
+Run the frontend and backend in separate terminals:
 
 ```bash
-# Terminal 1 — Frontend (Vite at http://localhost:5173)
+# Terminal 1: frontend at http://localhost:5173
 bun run dev
+```
 
-# Terminal 2 — Backend (Hono at http://localhost:3000)
+```bash
+# Terminal 2: backend at http://localhost:3000
 bun run dev:server
 ```
 
-Other useful commands:
+Useful commands from `app/`:
 
 ```bash
-bun run type-check   # TypeScript check
-bun run test         # Run tests
-bun run lint         # ESLint
-bun run tauri:dev    # Desktop app
+bun run type-check
+bun run test
+bun run lint
+bun run tauri:dev
 ```
 
-The `.env` file lives in the **repository root** (not `app/`). See `.env.example` for all options.
+The shared `.env` file lives in the repository root, not inside `app/`. For deeper setup details, see [docs/development.md](docs/development.md).
 
 ## Architecture
 
-- **Frontend:** React 19 + React Router v7 + TanStack Query + Zustand
-- **Backend:** Bun + Hono + SQLite (schema-first, no migration files)
-- **Native:** Tauri v2 + Rust sidecar model
-- **Auth:** Better Auth with email, magic link, OTP, 2FA, and SSO plugins
+- Frontend: React 19, React Router v7, TanStack Query, Zustand
+- Backend: Bun, Hono, SQLite
+- Native: Tauri v2 with a Rust sidecar model
+- Auth: Better Auth with email, magic links, OTP, 2FA, and SSO plugins
 
-Full contributor map: [llm/ARCHITECTURE.md](llm/ARCHITECTURE.md)
+Repository map: [llm/ARCHITECTURE.md](llm/ARCHITECTURE.md)
 
 ## Contributing
 
-Contributions are welcome. Please open an issue before starting significant work so we can discuss direction. See [docs/contributing.md](docs/contributing.md) for guidelines.
+Contributions are welcome. Open an issue before starting significant work so direction stays aligned. Guidelines live in [docs/contributing.md](docs/contributing.md).
 
 ## Acknowledgements
 
-- [tmdb-addon](https://github.com/mrcanelas/tmdb-addon) by mrcanelas — Zentrio's internal TMDB addon is substantially derived from this project (Apache 2.0 attributed in source).
-- [IntroDB](https://introdb.app) — intro, recap, and outro timestamps.
-- [Fanart.tv](https://fanart.tv) — artwork and logos.
-- [IMDb datasets](https://developer.imdb.com/non-commercial-datasets/) — ratings data.
-- [DiceBear](https://www.dicebear.com) — profile avatar generation.
-- [Better Auth](https://www.better-auth.com) — authentication.
+- [tmdb-addon](https://github.com/mrcanelas/tmdb-addon) by mrcanelas. Zentrio's internal TMDB addon is substantially derived from this project.
+- [IntroDB](https://introdb.app) for intro, recap, and outro timestamps
+- [Fanart.tv](https://fanart.tv) for artwork and logos
+- [IMDb datasets](https://developer.imdb.com/non-commercial-datasets/) for ratings data
+- [DiceBear](https://www.dicebear.com) for profile avatar generation
+- [Better Auth](https://www.better-auth.com) for authentication
+
+## Project Note
+
+Zentrio was developed with significant AI assistance. Large language models helped shape parts of the code, architecture, and documentation. The project is functional and actively maintained, but that context is useful if you are evaluating it for production use.
 
 ## Trademark Notice
 
@@ -154,8 +175,4 @@ Zentrio is an independent project. It supports Stremio-compatible addons but is 
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-<div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=E50914&height=120&section=footer" />
-</div>
+MIT. See [LICENSE](LICENSE).

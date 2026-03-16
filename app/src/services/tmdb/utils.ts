@@ -223,6 +223,9 @@ export const Utils = {
       posterShape: "regular",
       imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
       year: type === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+      released: type === 'movie' ? (el.release_date || '') : (el.first_air_date || ''),
+      popularity: typeof el.popularity === 'number' ? el.popularity : 0,
+      voteCount: typeof el.vote_count === 'number' ? el.vote_count : 0,
       type: type === 'movie' ? type : 'series',
       description: el.overview,
     }

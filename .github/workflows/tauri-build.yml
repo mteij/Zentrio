@@ -230,18 +230,114 @@ jobs:
           bun build src/index.ts --compile --target bun-darwin-arm64 --outfile src-tauri/bin/zentrio-server-aarch64-apple-darwin
 
       # Desktop Build (Linux, Windows, macOS Desktop)
+      - name: Validate Tauri updater signing key
+        id: validate_tauri_signing
+        if: matrix.name != 'android' && matrix.name != 'ios' && matrix.name != 'linux'
+        shell: bash
+        continue-on-error: true
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          node <<'NODE'
+          const key = (process.env.TAURI_SIGNING_PRIVATE_KEY || "").trim();
+          const fs = require("fs");
+
+          const setOutput = (name, value) => {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${value}\n`);
+          };
+
+          if (!key) {
+            console.error("TAURI_SIGNING_PRIVATE_KEY is empty. Desktop updater artifacts cannot be signed.");
+            setOutput("signing_available", "false");
+            process.exit(1);
+          }
+
+          if (key.startsWith("untrusted comment:")) {
+            console.error("TAURI_SIGNING_PRIVATE_KEY appears to be the decoded minisign key.");
+            console.error("Store the exact one-line base64 contents of the generated .key file instead.");
+            setOutput("signing_available", "false");
+            process.exit(1);
+          }
+
+          if (/\s/.test(key)) {
+            console.error("TAURI_SIGNING_PRIVATE_KEY contains whitespace.");
+            console.error("Paste the .key file contents as a single uninterrupted base64 string.");
+            setOutput("signing_available", "false");
+            process.exit(1);
+          }
+
+          if (!/^[A-Za-z0-9+/=]+$/.test(key)) {
+            console.error("TAURI_SIGNING_PRIVATE_KEY contains characters that are not valid base64.");
+            setOutput("signing_available", "false");
+            process.exit(1);
+          }
+
+          const decoded = Buffer.from(key, "base64").toString("utf8");
+          if (!decoded.startsWith("untrusted comment: rsign encrypted secret key")) {
+            console.error("TAURI_SIGNING_PRIVATE_KEY decoded successfully, but it does not look like a Tauri updater private key.");
+            setOutput("signing_available", "false");
+            process.exit(1);
+          }
+
+          setOutput("signing_available", "true");
+          console.log("TAURI_SIGNING_PRIVATE_KEY format looks valid.");
+          NODE
+
       - name: Build Tauri App (Desktop)
+        id: build_tauri_desktop
         if: matrix.name != 'android' && matrix.name != 'ios'
+        continue-on-error: ${{ matrix.name != 'linux' }}
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ matrix.name != 'linux' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ matrix.name != 'linux' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
           NO_STRIP: 1
         with:
           projectPath: ./app
           tagName: ${{ needs.create-release.outputs.tag_name }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+      - name: Warn about desktop signing fallback
+        if: matrix.name != 'android' && matrix.name != 'ios' && matrix.name != 'linux' && (steps.validate_tauri_signing.outcome == 'failure' || steps.build_tauri_desktop.outcome == 'failure')
+        shell: bash
+        run: |
+          echo "::warning::Desktop updater signing failed for ${{ matrix.name }}. CI will retry without updater artifacts and will publish unsigned desktop bundles only."
+          {
+            echo "## Desktop signing fallback"
+            echo ""
+            echo "- Platform: \`${{ matrix.name }}\`"
+            echo "- Signed updater artifacts: unavailable"
+            echo "- Fallback: rebuilding desktop bundles without updater artifacts/signatures"
+            echo "- Impact: release continues, but automatic updater packages are not published for this platform"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build Tauri App (Desktop fallback without updater signing)
+        id: build_tauri_desktop_fallback
+        if: matrix.name != 'android' && matrix.name != 'ios' && matrix.name != 'linux' && (steps.validate_tauri_signing.outcome == 'failure' || steps.build_tauri_desktop.outcome == 'failure')
+        working-directory: ./app
+        shell: bash
+        run: |
+          bun run tauri build ${{ matrix.args }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Upload unsigned desktop artifacts to Release
+        if: matrix.name != 'android' && matrix.name != 'ios' && matrix.name != 'linux' && steps.build_tauri_desktop_fallback.outcome == 'success'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.tag_name }}
+          fail_on_unmatched_files: false
+          files: |
+            app/src-tauri/target/*/release/bundle/dmg/*.dmg
+            app/src-tauri/target/*/release/bundle/nsis/*.exe
+            app/src-tauri/target/*/release/bundle/msi/*.msi
+
+      - name: Fail if desktop fallback build also failed
+        if: matrix.name != 'android' && matrix.name != 'ios' && matrix.name != 'linux' && (steps.validate_tauri_signing.outcome == 'failure' || steps.build_tauri_desktop.outcome == 'failure') && steps.build_tauri_desktop_fallback.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "Fallback desktop build failed after updater signing failed." >&2
+          exit 1
 
       # Android Build
       - name: Build Android

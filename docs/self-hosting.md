@@ -122,7 +122,7 @@ Shared email tuning:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `ADMIN_ENABLED` | `false` | Enables the admin console |
+| `ADMIN_ENABLED` | `false` in code | Enables the admin console. The provided `.env.example` turns this on for easier first-time setup. |
 | `ADMIN_SETUP_TOKEN` | - | Optional claim token for the first superadmin |
 | `ANALYTICS_ENABLED` | `true` when admin is enabled | Aggregate platform/browser analytics in admin |
 | `HEALTH_TOKEN` | - | Bearer token that unlocks internal health stats |

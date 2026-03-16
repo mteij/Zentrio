@@ -3,26 +3,21 @@
  * Original source: https://github.com/mrcanelas/tmdb-addon
  * Licensed under Apache License 2.0
  */
-import { transliterate } from 'transliteration'
+import { buildSearchQueryVariants, scoreSearchMatch } from '../../utils/search'
 import { TMDBClient } from './client'
 import { getGenreList } from './genres'
 import { Utils } from './utils'
 
-function isNonLatin(text: string) {
-  // eslint-disable-next-line no-control-regex
-  return /[^\u0000-\u007F]/.test(text)
+function hasStrongSearchMatch(items: any[], query: string): boolean {
+  return items.some((item) => scoreSearchMatch(item?.name, query) >= 900)
 }
 
 export async function getSearch(tmdbClient: TMDBClient, id: string, type: string, language: string, query: string, config: any) {
-  let searchQuery = query
-  if (isNonLatin(searchQuery)) {
-    searchQuery = transliterate(searchQuery)
-  }
-
   // AI Search skipped as per plan (requires gemini service)
-  
+
   const searchResults: any[] = []
   const genreList = await getGenreList(tmdbClient, language, type)
+  const queryVariants = buildSearchQueryVariants(query)
 
   const parameters: any = {
     query: query,
@@ -66,20 +61,15 @@ export async function getSearch(tmdbClient: TMDBClient, id: string, type: string
   }
 
   if (type === "movie") {
-    await tmdbClient
-      .searchMovie(parameters)
-      .then((res: any) => {
-        res.results.map((el: any) => {searchResults.push(Utils.parseMedia(el, 'movie', genreList))})
-      })
-      .catch(console.error)
-
-    if (searchResults.length === 0) {
+    for (const queryVariant of queryVariants) {
       await tmdbClient
-        .searchMovie({ query: searchQuery, language, include_adult: config.includeAdult })
+        .searchMovie({ ...parameters, query: queryVariant })
         .then((res: any) => {
           res.results.map((el: any) => {searchResults.push(Utils.parseMedia(el, 'movie', genreList))})
         })
         .catch(console.error)
+
+      if (hasStrongSearchMatch(searchResults, query)) break
     }
 
     await tmdbClient.searchPerson({ query: query, language }).then(async (res: any) => {
@@ -103,20 +93,15 @@ export async function getSearch(tmdbClient: TMDBClient, id: string, type: string
       }
     })
   } else {
-    await tmdbClient
-      .searchTv(parameters)
-      .then((res: any) => {
-        res.results.map((el: any) => {searchResults.push(Utils.parseMedia(el, 'tv', genreList))})
-      })
-      .catch(console.error)
-
-    if (searchResults.length === 0) {
+    for (const queryVariant of queryVariants) {
       await tmdbClient
-        .searchTv({ query: searchQuery, language, include_adult: config.includeAdult })
+        .searchTv({ ...parameters, query: queryVariant })
         .then((res: any) => {
           res.results.map((el: any) => {searchResults.push(Utils.parseMedia(el, 'tv', genreList))})
         })
         .catch(console.error)
+
+      if (hasStrongSearchMatch(searchResults, query)) break
     }
 
     await tmdbClient.searchPerson({ query: query, language }).then(async (res: any) => {

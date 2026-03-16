@@ -32,6 +32,7 @@ const MAX_DIFFSTAT_CHARS = 6000;
 const MAX_PATCH_CONTEXT_CHARS = 28000;
 const MAX_COMMIT_LINES = 120;
 const MAX_FILES_EVIDENCE = 180;
+const MAX_FEATURE_EVIDENCE_FILES = 24;
 
 const SUBSYSTEM_RULES = [
   ['.github/workflows/', 'CI / Workflows'],
@@ -130,6 +131,14 @@ const TOKEN_ALIASES = new Map([
 const FEATURE_RULES = [
   {
     id: 'introdb',
+    paths: [
+      'app/src/components/player/',
+      'app/src/components/settings/',
+      'app/src/pages/streaming/',
+      'app/src/routes/api/streaming.ts',
+      'app/src/services/database/connection.ts',
+      'app/src/styles/',
+    ],
     patterns: [/introdb/i, /\/segments\/submit/i, /skipIntrosOutros/i, /introdb_cache/i],
     title: 'Intro skipping powered by IntroDB',
     highlight:
@@ -196,6 +205,29 @@ function normalizePath(path) {
   return String(path || '').replace(/\\/g, '/');
 }
 
+function isFeatureEvidenceFile(path) {
+  const normalized = normalizePath(path);
+  return (
+    normalized.startsWith('app/src/') ||
+    normalized.startsWith('app/src-tauri/src/') ||
+    normalized.startsWith('landing/src/')
+  );
+}
+
+function ruleMatchesPath(rule, path) {
+  const normalized = normalizePath(path);
+  if (!Array.isArray(rule?.paths) || !rule.paths.length) return true;
+  return rule.paths.some((prefix) => normalized.startsWith(prefix));
+}
+
+function extractAddedPatchEvidence(patch) {
+  return String(patch || '')
+    .split('\n')
+    .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
+    .map((line) => line.slice(1))
+    .join('\n');
+}
+
 function isStoryNoiseFile(path) {
   const normalized = normalizePath(path);
   return (
@@ -248,24 +280,23 @@ function dedupeSpotlights(items, maxItems) {
   return output;
 }
 
-function extractFeatureCandidates(changedFiles, featurePatch) {
-  const fileEvidence = changedFiles
-    .slice(0, 24)
-    .map((file) => {
-      try {
-        const path = file.path;
-        if (!existsSync(path)) return '';
-        return readFileSync(path, 'utf8');
-      } catch {
-        return '';
-      }
-    })
-    .join('\n');
-
-  const evidence = [featurePatch, ...changedFiles.map((file) => file.path), fileEvidence].join('\n');
+function extractFeatureCandidates(changedFiles, rangeSpec) {
+  const implementationFiles = changedFiles.filter((file) => isFeatureEvidenceFile(file.path));
   const candidates = [];
 
   for (const rule of FEATURE_RULES) {
+    const ruleFiles = implementationFiles.filter((file) => ruleMatchesPath(rule, file.path));
+    if (!ruleFiles.length) continue;
+
+    const fileArgs = ruleFiles
+      .slice(0, MAX_FEATURE_EVIDENCE_FILES)
+      .map((file) => shellEscape(file.path))
+      .join(' ');
+    const patchEvidence = fileArgs ? sh(`git diff --unified=0 --no-color ${rangeSpec} -- ${fileArgs}`, '') : '';
+    const evidence = [
+      extractAddedPatchEvidence(patchEvidence),
+      ...ruleFiles.map((file) => `${file.status} ${file.path}`),
+    ].join('\n');
     const hits = rule.patterns.filter((pattern) => pattern.test(evidence)).length;
     if (hits === 0) continue;
     candidates.push({
@@ -1406,9 +1437,8 @@ async function main() {
   const subsystemEvidence = formatSubsystemEvidence(subsystems);
   const diffStat = getDiffStat(rangeSpec);
   const focusedPatch = getFocusedPatch(rangeSpec, storyChangedFiles);
-  const featurePatch = sh(`git diff --unified=0 --no-color ${rangeSpec}`, '');
   const releaseTypeContext = buildReleaseTypeContext(tag, prevTag, releaseType);
-  const featureCandidates = extractFeatureCandidates(storyChangedFiles, featurePatch);
+  const featureCandidates = extractFeatureCandidates(storyChangedFiles, rangeSpec);
 
   const fallbackNotes = {
     intro: buildIntro(tag, releaseType, highlightAreas, intentCounts, featureCandidates),

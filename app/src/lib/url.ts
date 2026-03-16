@@ -6,6 +6,8 @@ type GatewayRoute =
   | '/api/streaming/details'
   | '/api/streaming/catalog'
   | '/api/streaming/catalog-items'
+  | '/api/streaming/search-catalog-metadata'
+  | '/api/streaming/search-catalog-items'
   | '/api/streaming/streams-live'
 
 const GATEWAY_READ_ROUTES: GatewayRoute[] = [
@@ -14,6 +16,8 @@ const GATEWAY_READ_ROUTES: GatewayRoute[] = [
   '/api/streaming/details',
   '/api/streaming/catalog',
   '/api/streaming/catalog-items',
+  '/api/streaming/search-catalog-metadata',
+  '/api/streaming/search-catalog-items',
   '/api/streaming/streams-live'
 ]
 

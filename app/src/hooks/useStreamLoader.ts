@@ -279,6 +279,16 @@ export function useStreamLoader(): UseStreamLoaderResult {
     }
   }, [loadStreams])
 
+  const loadStreamsPublic = useCallback((
+    type: string,
+    id: string,
+    profileId: string,
+    season?: number,
+    episode?: number
+  ) => {
+    loadStreams(type, id, profileId, season, episode, false)
+  }, [loadStreams])
+
   return {
     streams,
     filteredStreams,
@@ -289,8 +299,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
     isComplete,
     totalCount,
     cacheStatus,
-    loadStreams: (type, id, profileId, season?, episode?) => 
-      loadStreams(type, id, profileId, season, episode, false),
+    loadStreams: loadStreamsPublic,
     refreshStreams,
     reset
   }

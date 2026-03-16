@@ -7,6 +7,7 @@ import { ContentCard, ContentItem } from './ContentCard'
 import { SkeletonCard } from '../ui/SkeletonCard'
 import { useScrollRow } from '../../hooks/useScrollRow'
 import { apiFetchJson } from '../../lib/apiFetch'
+import { filterAndEnrichItems } from '../../lib/filter-enrich'
 import { getAddonClient, ZENTRIO_TMDB_ADDON } from '../../lib/addon-client'
 import styles from '../../styles/Streaming.module.css'
 
@@ -49,12 +50,7 @@ const fetchCatalogItems = async (
   // Apply server-side parental filtering + watch history enrichment
   if (items.length > 0) {
     try {
-      const enriched = await apiFetchJson<{ items: MetaPreview[] }>('/api/streaming/filter-enrich', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, profileId: parseInt(profileId) }),
-      })
-      return enriched.items || items
+      return await filterAndEnrichItems(items, profileId)
     } catch {
       return items
     }

@@ -14,6 +14,7 @@ import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { useStreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
 import { useStreamLoader } from '../../hooks/useStreamLoader'
 import { apiFetch } from '../../lib/apiFetch'
+import { isTauri } from '../../lib/auth-client'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadStore } from '../../stores/downloadStore'
 import { MetaDetail, Stream } from '../../services/addons/types'
@@ -51,6 +52,7 @@ export const StreamingDetails = () => {
   const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
   const streamDisplaySettings = useStreamDisplaySettings(profileId)
   const downloadStore = useDownloadStore()
+  const canDownload = isTauri()
   const [data, setData] = useState<StreamingDetailsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -289,6 +291,7 @@ export const StreamingDetails = () => {
   }, [handlePlay, streams, streamsComplete])
 
   const handleDownloadStream = useCallback(async (stream: Stream) => {
+    if (!isTauri()) return
     if (!profileId || !data?.meta) return
     const meta = data.meta
     const quality = (localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality
@@ -706,14 +709,14 @@ export const StreamingDetails = () => {
               totalStreamCount={totalStreamCount}
               streamsLoading={streamsLoading}
               cacheStatus={cacheStatus}
-              streamDisplaySettings={streamDisplaySettings}
-              profileId={profileId || ''}
-              onRefresh={refreshStreams}
-              onPlay={handlePlay}
-              onDownload={handleDownloadStream}
-              onBack={() => setView('episodes')}
-            />
-          )}
+                streamDisplaySettings={streamDisplaySettings}
+                profileId={profileId || ''}
+                onRefresh={refreshStreams}
+                onPlay={handlePlay}
+                onDownload={canDownload ? handleDownloadStream : undefined}
+                onBack={() => setView('episodes')}
+              />
+            )}
         </DetailsHeader>
 
       {/* Info Modal for cast, director, etc. */}

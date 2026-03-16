@@ -193,9 +193,10 @@ if (PROXY_LOGS) {
 }
 app.use('*', securityHeaders)
 app.use('*', rateLimiter({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_LIMIT }))
-// Reject oversized request bodies before they reach route handlers (1 MB limit).
-// Streaming/upload routes that legitimately need larger payloads should override locally.
-app.use('/api/*', bodyLimit(1 * 1024 * 1024))
+// Reject oversized request bodies before they reach route handlers.
+// Keep this high enough for metadata enrichment payloads from web clients while still
+// guarding against trivial oversized-body abuse.
+app.use('/api/*', bodyLimit(4 * 1024 * 1024))
 
 // Lazily record the client platform when the app sends X-Zentrio-Client header.
 // Only runs when analytics are enabled (requires ADMIN_ENABLED=true and ANALYTICS_ENABLED!=false).

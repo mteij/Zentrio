@@ -557,6 +557,41 @@ streaming.get('/search', async (c) => {
  * Catalog-based search endpoint (Stremio-style).
  * Returns results grouped by catalog source for row-based display.
  */
+streaming.get('/search-catalog-metadata', async (c) => {
+  const { profileId, type } = c.req.query()
+  if (!profileId) return c.json({ catalogs: [] })
+
+  try {
+    const filters = {
+      type: type !== 'undefined' ? type : undefined
+    }
+    const catalogs = await addonManager.getSearchCatalogMetadata(parseInt(profileId), filters)
+    return c.json({ catalogs })
+  } catch (e) {
+    log.error('Catalog metadata search API error:', e)
+    return c.json({ catalogs: [] })
+  }
+})
+
+streaming.get('/search-catalog-items', async (c) => {
+  const { q, profileId, manifestUrl, type, id } = c.req.query()
+  if (!q || !profileId || !manifestUrl || !type || !id) return c.json({ items: [] })
+
+  try {
+    const items = await addonManager.searchSingleCatalog(
+      q,
+      parseInt(profileId),
+      manifestUrl,
+      type,
+      id
+    )
+    return c.json({ items })
+  } catch (e) {
+    log.error('Catalog search items API error:', e)
+    return c.json({ items: [] })
+  }
+})
+
 streaming.get('/search-catalogs', async (c) => {
   const { q, profileId, type } = c.req.query()
   if (!q || !profileId) return c.json({ catalogs: [] })
