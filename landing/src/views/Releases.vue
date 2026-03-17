@@ -15,20 +15,21 @@
         </div>
 
         <div v-else-if="latestRelease" class="downloads-grid">
-          <div class="platform-card">
-            <Monitor class="platform-icon-svg" />
-            <h3>Windows</h3>
-            <p>Windows 10/11 (64-bit)</p>
-            <a
-              v-if="getAsset(latestRelease, 'windows')"
-              :href="getDownloadUrl('windows')"
-              class="btn btn-primary w-full mt-4"
-            >
-              Download .exe
-            </a>
-            <span v-else class="btn btn-secondary disabled w-full mt-4"
-              >Not Available Yet</span
-            >
+           <div class="platform-card">
+             <Monitor class="platform-icon-svg" />
+             <h3>Windows</h3>
+             <p>Windows 10/11 (64-bit)</p>
+             <a
+               v-if="getAsset(latestRelease, 'windows')"
+               :href="getDownloadUrl('windows')"
+               rel="external"
+               class="btn btn-primary w-full mt-4"
+             >
+               Download .exe
+             </a>
+             <span v-else class="btn btn-secondary disabled w-full mt-4"
+               >Not Available Yet</span
+             >
 
             <div class="install-script-container">
               <span class="install-script-label">Or use PowerShell:</span>

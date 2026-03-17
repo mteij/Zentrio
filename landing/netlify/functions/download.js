@@ -21,22 +21,22 @@ export default async (req) => {
       );
     }
 
-    // Create an AbortController for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased timeout
-
-    const res = await fetch(
+    // Fetch with timeout using Promise.race
+    const fetchPromise = fetch(
       "https://api.github.com/repos/mteij/Zentrio/releases/latest",
       { 
         headers: { 
           "User-Agent": "zentrio-download-redirect",
           "Accept": "application/vnd.github.v3+json"
-        },
-        signal: controller.signal
-      },
+        }
+      }
+    );
+    
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout')), 15000)
     );
 
-    clearTimeout(timeoutId);
+    const res = await Promise.race([fetchPromise, timeoutPromise]);
 
     if (!res.ok) {
       // Provide more specific error messages based on status code
@@ -79,8 +79,7 @@ export default async (req) => {
   } catch (error) {
     // Handle network errors, timeouts, etc.
     console.error("Download function error:", error);
-    // Check if it's a timeout error
-    if (error.name === 'AbortError') {
+    if (error.message === 'Request timeout') {
       return new Response(
         "Request timeout: GitHub API took too long to respond",
         { status: 504 }
