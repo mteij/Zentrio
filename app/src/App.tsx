@@ -454,11 +454,22 @@ function AppRoutes() {
   // 3. Mode is connected, server URL is set, initial auth check done, but user is NOT authenticated (session expired)
   //    This ensures Tauri users get the native OnboardingWizard instead of web LandingPage
   // Exception: Don't show during 2FA flow
-  const shouldShowOnboarding = isTauriApp && (
+  const shouldShowTvBrowserOnboarding =
+    platform.canUseRemoteNavigation &&
+    !isTauriApp &&
+    initialAuthCheckDone &&
+    !isAuthenticated &&
+    (location.pathname === '/' || location.pathname === '/signin' || location.pathname === '/register')
+
+  const shouldShowOnboarding = (
+    isTauriApp && (
     mode === null ||
     (mode === 'connected' && !serverUrl) ||
     (mode === 'connected' && serverUrl && initialAuthCheckDone && !isAuthenticated && !isGuestMode)
-  ) && location.pathname !== '/two-factor';
+    )
+  ) || shouldShowTvBrowserOnboarding
+
+  const shouldBlockOnboardingForPath = location.pathname === '/two-factor' || location.pathname === '/activate'
 
   // Tauri apps: Show splash screen while auth is loading or waiting for initial check
   // This prevents the landing page from ever flashing
@@ -482,7 +493,7 @@ function AppRoutes() {
 
   // First launch in Tauri - show onboarding wizard
   // Skip if we are on the 2FA page (which happens during login flow)
-  if (shouldShowOnboarding) {
+  if (shouldShowOnboarding && !shouldBlockOnboardingForPath) {
     return <Suspense fallback={<SplashScreen />}><OnboardingWizard onComplete={handleOnboardingComplete} /></Suspense>;
   }
 

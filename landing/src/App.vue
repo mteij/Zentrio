@@ -7,22 +7,14 @@
         <router-link to="/" class="logo-area">
           <picture>
             <source srcset="/icon-72.webp" type="image/webp" />
-            <img
-              src="/icon-72.png"
-              alt="Zentrio"
-              class="nav-logo"
-              width="36"
-              height="36"
-            />
+             <img src="/icon-72.png" alt="Zentrio" class="nav-logo" width="36" height="36" />
           </picture>
           <span class="nav-title">Zentrio</span>
         </router-link>
 
         <div class="nav-right">
           <div class="nav-links">
-            <a href="https://app.zentrio.eu" class="nav-link highlight"
-              >Zentrio Web</a
-            >
+             <a href="https://app.zentrio.eu" class="nav-link highlight">Zentrio Web</a>
             <router-link to="/releases" class="nav-link">Releases</router-link>
             <a href="https://docs.zentrio.eu" class="nav-link">Documentation</a>
           </div>

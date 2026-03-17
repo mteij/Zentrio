@@ -6,6 +6,7 @@ export {
   TvFocusItem,
   useTvFocus,
   resolveNextItemId,
+  resolveFallbackFocusIndex,
 } from './TvFocusContext'
 export { TvPageScaffold, TvSection, TvShelf, TvGrid, TvActionStrip, TvDialog, type TvPageScaffoldProps } from './TvPageScaffold'
 export { TvMediaShelf } from './TvMediaShelf'

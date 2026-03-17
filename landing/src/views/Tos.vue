@@ -39,17 +39,17 @@
           </p>
         </div>
 
-        <div class="tos-section">
-          <h2>4. User Responsibilities</h2>
-          <p>
-            As a user of Zentrio, you are responsible for:
-            <ul>
-              <li>Ensuring that your use of the Services, including any third-party addons you install, complies with the laws and regulations of your country of residence.</li>
-              <li>Maintaining the security and confidentiality of your Zentrio profiles and server instances (if self-hosting).</li>
-              <li>Not using the Services for any unlawful, infringing, or fraudulent activities.</li>
-            </ul>
-          </p>
-        </div>
+         <div class="tos-section">
+           <h2>4. User Responsibilities</h2>
+           <p>
+             As a user of Zentrio, you are responsible for:
+           </p>
+           <ul>
+             <li>Ensuring that your use of the Services, including any third-party addons you install, complies with the laws and regulations of your country of residence.</li>
+             <li>Maintaining the security and confidentiality of your Zentrio profiles and server instances (if self-hosting).</li>
+             <li>Not using the Services for any unlawful, infringing, or fraudulent activities.</li>
+           </ul>
+         </div>
 
         <div class="tos-section">
           <h2>5. Privacy and Security</h2>

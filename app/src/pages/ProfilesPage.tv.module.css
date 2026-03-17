@@ -38,6 +38,7 @@
   object-fit: cover;
 }
 
+.profileCard:focus,
 .profileCard[data-tv-active='true'],
 .profileCard:focus-visible {
   border-color: transparent;
@@ -45,6 +46,7 @@
   transform: none;
 }
 
+.profileCard:focus .profileAvatar,
 .profileCard[data-tv-active='true'] .profileAvatar,
 .profileCard:focus-visible .profileAvatar {
   border-color: rgba(255, 255, 255, 0.96);

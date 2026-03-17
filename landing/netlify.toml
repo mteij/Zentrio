@@ -6,6 +6,12 @@
 [dev]
   command = "bun run dev"
 
+# Redirect download paths to Netlify functions
+[[redirects]]
+  from = "/download/*"
+  to = "/.netlify/functions/download/:splat"
+  status = 200
+
 # SPA fallback - all other routes go to index.html
 # Note: static files in dist/ (sitemap.xml, robots.txt, etc.) are served directly by Netlify before this rule
 [[redirects]]

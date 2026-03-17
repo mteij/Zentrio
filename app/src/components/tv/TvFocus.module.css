@@ -26,6 +26,7 @@
   pointer-events: none;
 }
 
+.item:focus,
 .item:focus-visible,
 .item[data-tv-active='true'] {
   outline: none;

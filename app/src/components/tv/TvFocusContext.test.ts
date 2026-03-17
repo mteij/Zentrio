@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeTvRemoteKey, resolveNextItemId } from './TvFocusContext'
+import { normalizeTvRemoteKey, resolveFallbackFocusIndex, resolveNextItemId } from './TvFocusContext'
 
 describe('resolveNextItemId', () => {
   it('moves left and right in horizontal zones', () => {
@@ -43,5 +43,15 @@ describe('resolveNextItemId', () => {
     expect(normalizeTvRemoteKey({ key: 'Unidentified', code: '', keyCode: 20 })).toBe('down')
     expect(normalizeTvRemoteKey({ key: 'Unidentified', code: '', keyCode: 23 })).toBe('activate')
     expect(normalizeTvRemoteKey({ key: 'Unidentified', code: '', keyCode: 4 })).toBe('back')
+  })
+
+  it('resolves fallback focus order for screens without explicit tv zones', () => {
+    expect(resolveFallbackFocusIndex(4, -1, 'down')).toBe(0)
+    expect(resolveFallbackFocusIndex(4, -1, 'up')).toBe(3)
+    expect(resolveFallbackFocusIndex(4, 1, 'down')).toBe(2)
+    expect(resolveFallbackFocusIndex(4, 1, 'up')).toBe(0)
+    expect(resolveFallbackFocusIndex(4, 0, 'up')).toBe(0)
+    expect(resolveFallbackFocusIndex(4, 3, 'down')).toBe(3)
+    expect(resolveFallbackFocusIndex(0, -1, 'down')).toBe(-1)
   })
 })
