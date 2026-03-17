@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, Puzzle, Settings, Share2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
 import { isTauri } from '../../lib/auth-client'
@@ -122,6 +123,7 @@ interface AddonManagerProps {
 }
 
 export function AddonManager({ currentProfileId }: AddonManagerProps) {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [addons, setAddons] = useState<Addon[]>([])
   const [configAddon, setConfigAddon] = useState<Addon | null>(null)
@@ -356,7 +358,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
                     <Button variant="primary" onClick={handleInstallAddon} disabled={installing}>
                         {installing ? 'Installing...' : 'Install'}
                     </Button>
-                    <Button variant="secondary" onClick={() => window.location.href = '/settings/explore-addons'}>
+                    <Button variant="secondary" onClick={() => navigate('/settings/explore-addons', { state: { from: '/settings?tab=addons', fromLabel: 'Back to Settings' } })}>
                         Explore
                     </Button>
                 </div>
@@ -439,16 +441,25 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
                             </div>
 
                             <div className={styles.addonActions}>
-                                {(addon.behavior_hints?.configurable || addon.behavior_hints?.configurationRequired) && (
-                                    <Button 
-                                        variant="secondary" 
-                                        size="small" 
+                                {isZentrio ? (
+                                    <Button
+                                        variant="secondary"
+                                        size="small"
+                                        onClick={() => navigate(`/settings/addons/tmdb-config?profileId=${currentProfileId}`)}
+                                        title="Configure catalogs"
+                                    >
+                                        <Settings size={18} />
+                                    </Button>
+                                ) : (addon.behavior_hints?.configurable || addon.behavior_hints?.configurationRequired) ? (
+                                    <Button
+                                        variant="secondary"
+                                        size="small"
                                         onClick={() => handleConfigureAddon(addon)}
                                         title="Configure"
                                     >
                                         <Settings size={18} />
                                     </Button>
-                                )}
+                                ) : null}
                                 
                                 {!addon.manifest_url.startsWith('zentrio://') && (
                                     <Button 

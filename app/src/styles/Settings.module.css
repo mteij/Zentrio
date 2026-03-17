@@ -1494,6 +1494,24 @@
 /* ============================================
    Download Settings
    ============================================ */
+.settingsProfileBadge {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(229, 9, 20, 0.12);
+  border: 1px solid rgba(229, 9, 20, 0.25);
+  color: var(--accent, #e50914);
+  letter-spacing: 0.02em;
+  margin-left: 4px;
+}
+
+.dlStorageDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 20px 0;
+}
+
 .dlSettingDesc {
   color: var(--text-muted, rgba(255, 255, 255, 0.5));
   font-size: var(--text-sm, 0.875rem);

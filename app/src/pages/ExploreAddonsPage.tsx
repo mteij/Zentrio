@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, Download, Filter, Search, Settings, Star, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AnimatedBackground, Button, LoadingSpinner, SimpleLayout, SkeletonAddonCard } from '../components'
@@ -171,6 +171,7 @@ export function ExploreAddonsPage() {
   const [activeProfileId, setActiveProfileId] = useState<string>('')
   const [processingAddonId, setProcessingAddonId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
 
   // Derive categories from addons
@@ -330,10 +331,21 @@ export function ExploreAddonsPage() {
   const pagedAddons = filteredAddons.slice(0, page * PAGE_SIZE);
   const hasMore = pagedAddons.length < filteredAddons.length;
 
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting && hasMore) setPage(p => p + 1); },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore]);
+
   const backLabel = (location.state as any)?.fromLabel ?? 'Back to Settings';
   const handleBack = () => {
     if ((location.state as any)?.from) navigate((location.state as any).from);
-    else navigate('/settings');
+    else navigate('/settings?tab=addons');
   };
 
   return (
@@ -441,13 +453,7 @@ export function ExploreAddonsPage() {
                             />
                         ))}
                     </div>
-                    {hasMore && (
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-                            <Button variant="secondary" onClick={() => setPage(p => p + 1)}>
-                                Load More ({filteredAddons.length - pagedAddons.length} remaining)
-                            </Button>
-                        </div>
-                    )}
+                    <div ref={sentinelRef} style={{ height: 1 }} />
                 </>
             ) : (
                 <div className={styles.emptyState}>

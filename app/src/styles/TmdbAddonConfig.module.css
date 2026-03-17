@@ -1,0 +1,306 @@
+/* TMDB Addon Catalog Configuration Page */
+
+.configPage {
+  height: 100vh;
+  height: var(--app-height, 100vh);
+  position: relative;
+  z-index: 1;
+  overflow-y: auto;
+  padding-top: calc(100px + var(--app-content-top-offset, 0px));
+  padding-bottom: 60px;
+}
+
+.configContainer {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ─── Header ─────────────────────────────── */
+.header {
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-xl, 24px);
+  padding: 28px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.headerLogo {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.headerLogo img {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.headerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.headerTitle {
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 700;
+  color: var(--text, white);
+  margin: 0;
+}
+
+.headerDescription {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ─── Loading ─────────────────────────────── */
+.loadingState {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 0;
+}
+
+/* ─── Column headers ──────────────────────── */
+.tableHeader {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  gap: 0;
+}
+
+/* aligns with reorderControls width — kept in sync with .reorderControls width */
+
+.tableHeaderCatalog {
+  flex: 1;
+}
+
+.tableHeaderToggle {
+  width: 72px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ─── Section ─────────────────────────────── */
+.section {
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-xl, 24px);
+  overflow: hidden;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sectionIcon {
+  color: var(--accent, #e50914);
+}
+
+.sectionTitle {
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  color: var(--text, white);
+  margin: 0;
+}
+
+/* ─── Catalog rows ────────────────────────── */
+.catalogList {
+  display: flex;
+  flex-direction: column;
+}
+
+.catalogRow {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: grab;
+  gap: 4px;
+}
+
+.catalogRow:last-child {
+  border-bottom: none;
+}
+
+.catalogRow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.catalogRowDragOver {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+}
+
+.catalogRowDragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* ─── Reorder controls (handle + arrows) ─── */
+.reorderControls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 60px;
+}
+
+.tableHeaderSpacer {
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.dragHandle {
+  color: var(--text-muted, rgba(255, 255, 255, 0.25));
+  cursor: grab;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.catalogRow:hover .dragHandle {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.arrowButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.arrowBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.arrowBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+.arrowBtn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* ─── Catalog info ────────────────────────── */
+.catalogInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.catalogName {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  color: var(--text, white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Toggle cells ────────────────────────── */
+.catalogToggles {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.toggleCell {
+  width: 72px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ─── Actions ─────────────────────────────── */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+
+/* ─── Mobile ──────────────────────────────── */
+@media (max-width: 640px) {
+  .configContainer {
+    padding: 0 12px;
+    gap: 16px;
+  }
+
+  .header {
+    padding: 18px 16px;
+    gap: 14px;
+  }
+
+  .headerLogo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .headerTitle {
+    font-size: var(--text-base, 1rem);
+  }
+
+  .dragHandle {
+    display: none;
+  }
+
+  .reorderControls {
+    width: 40px;
+    justify-content: center;
+  }
+
+  .tableHeaderSpacer {
+    width: 40px;
+  }
+
+  .tableHeaderToggle {
+    width: 56px;
+  }
+
+  .toggleCell {
+    width: 56px;
+  }
+
+  .catalogRow {
+    padding: 10px 12px;
+    /* disable dragging on touch */
+    cursor: default;
+  }
+}

@@ -1,5 +1,7 @@
 import { addonDb, db, profileDb, userDb, type User } from '../../services/database'
 import { AddonClient } from '../../services/addons/client'
+import { addonManager } from '../../services/addons/addon-manager'
+import { DEFAULT_TMDB_CATALOG_CONFIG, type TmdbCatalogEntry } from '../../services/addons/zentrio-client'
 import { sessionMiddleware, optionalSessionMiddleware } from '../../middleware/session'
 import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
@@ -151,6 +153,46 @@ app.post('/settings-profile/:settingsProfileId/reorder', optionalSessionMiddlewa
   }
 
   addonDb.updateProfileAddonOrder(settingsProfileId, addonIds)
+  return c.json({ success: true })
+})
+
+// Get TMDB catalog config for a settings profile
+app.get('/tmdb-config/:settingsProfileId', (c) => {
+  const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
+  const row = db.prepare('SELECT tmdb_catalog_config FROM settings_profiles WHERE id = ?').get(settingsProfileId) as { tmdb_catalog_config: string | null } | null
+  if (!row) return c.json({ error: 'Settings profile not found' }, 404)
+
+  let config: TmdbCatalogEntry[]
+  try {
+    const parsed = row.tmdb_catalog_config ? JSON.parse(row.tmdb_catalog_config) : null
+    config = (Array.isArray(parsed) && parsed.length > 0) ? parsed : DEFAULT_TMDB_CATALOG_CONFIG
+  } catch {
+    config = DEFAULT_TMDB_CATALOG_CONFIG
+  }
+  return c.json(config)
+})
+
+// Update TMDB catalog config for a settings profile
+app.put('/tmdb-config/:settingsProfileId', optionalSessionMiddleware, async (c) => {
+  const settingsProfileId = parseInt(c.req.param('settingsProfileId'))
+  const isGuestMode = c.get('guestMode') as boolean
+  const sessionUser = c.get('user')
+
+  if (!isGuestMode && sessionUser) {
+    const ownerId = getSettingsProfileOwner(settingsProfileId)
+    if (ownerId !== sessionUser.id) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+  }
+
+  const config: TmdbCatalogEntry[] = await c.req.json()
+  if (!Array.isArray(config) || config.length === 0) {
+    return c.json({ error: 'Invalid config: must be a non-empty array' }, 400)
+  }
+  db.prepare('UPDATE settings_profiles SET tmdb_catalog_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(JSON.stringify(config), settingsProfileId)
+  // Invalidate the cached Zentrio client so the next request uses the updated config
+  addonManager.invalidateZentrioClient(settingsProfileId)
   return c.json({ success: true })
 })
 

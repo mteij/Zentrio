@@ -286,6 +286,19 @@ async function buildParameters(tmdbClient: TMDBClient, type: string, language: s
         }
         break
       }
+      case "tmdb.new": {
+        const threeMonthsAgo = new Date()
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+        const dateStr = threeMonthsAgo.toISOString().split('T')[0]
+        if (type === "movie") {
+          parameters['primary_release_date.gte'] = dateStr
+          parameters.sort_by = 'release_date.desc'
+        } else {
+          parameters['first_air_date.gte'] = dateStr
+          parameters.sort_by = 'first_air_date.desc'
+        }
+        break
+      }
       case "tmdb.year": {
         const year = genre ? parseInt(genre) : new Date().getFullYear()
         if (type === "movie") {

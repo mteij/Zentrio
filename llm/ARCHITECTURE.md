@@ -485,6 +485,23 @@ import { createLogger } from '@/utils/client-logger'
 
 Do not add new logger abstractions.
 
+### Streaming UI buttons
+
+Three tiers. Do not invent new shapes outside these.
+
+| Tier | Radius | Classes | Used for |
+| --- | --- | --- | --- |
+| Primary | pill (50px+) | per-page `.playBtn`, `.backBtn` | Play, Back — the one main CTA on a page |
+| Secondary | 8px rounded rect | `.actionBtn` (+ `.actionBtnDanger` modifier) in `Streaming.module.css` | Download, Share, Leave, Storage & Settings — utility actions with a label |
+| Icon-only | circle (50%) | per-page `.iconBtn` | Compact auxiliary actions with no label |
+
+Rules:
+
+- Import `styles` from `../../styles/Streaming.module.css` and use `styles.actionBtn` / `styles.actionBtnDanger` for secondary buttons.
+- Do not use inline `style` props for buttons visible at the page level.
+- Primary pill buttons stay per-page because their sizing and weight vary by context.
+- The secondary class sets the visual language (8px radius, muted background, labeled). State modifiers (active, done) are added per-page via additional classes.
+
 ### Client API calls
 
 Internal backend API:

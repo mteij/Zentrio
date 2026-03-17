@@ -6,13 +6,35 @@ import { Manifest, MetaDetail, MetaPreview, Stream } from './types'
 
 const log = logger.scope('Zentrio')
 
+export interface TmdbCatalogEntry {
+  id: string
+  type: 'movie' | 'series'
+  enabled: boolean
+  showOnHome: boolean
+}
+
+export const DEFAULT_TMDB_CATALOG_CONFIG: TmdbCatalogEntry[] = [
+  { id: 'tmdb.trending', type: 'movie',  enabled: true, showOnHome: true  },
+  { id: 'tmdb.top',      type: 'movie',  enabled: true, showOnHome: true  },
+  { id: 'tmdb.new',      type: 'movie',  enabled: true, showOnHome: false },
+  { id: 'tmdb.year',     type: 'movie',  enabled: true, showOnHome: false },
+  { id: 'tmdb.language', type: 'movie',  enabled: false, showOnHome: false },
+  { id: 'tmdb.trending', type: 'series', enabled: true,  showOnHome: true  },
+  { id: 'tmdb.top',      type: 'series', enabled: true,  showOnHome: true  },
+  { id: 'tmdb.new',      type: 'series', enabled: true,  showOnHome: false },
+  { id: 'tmdb.year',     type: 'series', enabled: true,  showOnHome: false },
+  { id: 'tmdb.language', type: 'series', enabled: false, showOnHome: false },
+]
+
 export class ZentrioAddonClient extends AddonClient {
   private userId: string | null = null
   private idCache = new Map<string, string>()
+  private catalogConfig: TmdbCatalogEntry[]
 
-  constructor(url: string, userId?: string) {
+  constructor(url: string, userId?: string, catalogConfig?: TmdbCatalogEntry[]) {
     super(url)
     this.userId = userId || null
+    this.catalogConfig = catalogConfig || DEFAULT_TMDB_CATALOG_CONFIG
   }
 
   async init(): Promise<Manifest> {
@@ -20,21 +42,95 @@ export class ZentrioAddonClient extends AddonClient {
     let movieGenres: any[] = []
     let seriesGenres: any[] = []
 
+    let languageOptions: string[] = []
+
     if (client) {
       try {
-        const [mGenres, sGenres] = await Promise.all([
+        const [mGenres, sGenres, langs] = await Promise.all([
           tmdbService.getGenreList(client, 'en-US', 'movie'),
-          tmdbService.getGenreList(client, 'en-US', 'series')
+          tmdbService.getGenreList(client, 'en-US', 'series'),
+          tmdbService.getLanguages(client),
         ])
         movieGenres = mGenres || []
         seriesGenres = sGenres || []
+        languageOptions = (langs || []).map((l: any) => l.name).filter(Boolean)
       } catch (e) {
-        log.warn('Failed to load genres for manifest', e)
+        log.warn('Failed to load genres/languages for manifest', e)
       }
     }
 
     const movieGenreOptions = movieGenres.map((g: any) => g.name)
     const seriesGenreOptions = seriesGenres.map((g: any) => g.name)
+
+    // Build all possible catalogs
+    const ALL_CATALOG_DEFS: Array<{ id: string; type: 'movie' | 'series'; name: string; extra: any[] }> = [
+      {
+        type: 'movie',
+        id: 'tmdb.new',
+        name: 'Latest Releases',
+        extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }]
+      },
+      {
+        type: 'series',
+        id: 'tmdb.new',
+        name: 'Latest Releases',
+        extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }]
+      },
+      {
+        type: 'movie',
+        id: 'tmdb.trending',
+        name: 'Trending',
+        extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }]
+      },
+      {
+        type: 'series',
+        id: 'tmdb.trending',
+        name: 'Trending',
+        extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }]
+      },
+      {
+        type: 'movie',
+        id: 'tmdb.top',
+        name: 'Popular',
+        extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }, { name: 'search' }]
+      },
+      {
+        type: 'series',
+        id: 'tmdb.top',
+        name: 'Popular',
+        extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }, { name: 'search' }]
+      },
+      {
+        type: 'movie',
+        id: 'tmdb.year',
+        name: 'Year',
+        extra: [{ name: 'genre', isRequired: true, options: movieGenreOptions }, { name: 'skip' }]
+      },
+      {
+        type: 'series',
+        id: 'tmdb.year',
+        name: 'Year',
+        extra: [{ name: 'genre', isRequired: true, options: seriesGenreOptions }, { name: 'skip' }]
+      },
+      {
+        type: 'movie',
+        id: 'tmdb.language',
+        name: 'Language',
+        extra: [{ name: 'genre', isRequired: true, options: languageOptions }, { name: 'skip' }]
+      },
+      {
+        type: 'series',
+        id: 'tmdb.language',
+        name: 'Language',
+        extra: [{ name: 'genre', isRequired: true, options: languageOptions }, { name: 'skip' }]
+      },
+    ]
+
+    // Filter catalogs based on config
+    const enabledCatalogs = ALL_CATALOG_DEFS.filter(def => {
+      const entry = this.catalogConfig.find(c => c.id === def.id && c.type === def.type)
+      return entry ? entry.enabled : true
+    })
 
     this.manifest = {
       id: 'org.zentrio.tmdb',
@@ -44,56 +140,7 @@ export class ZentrioAddonClient extends AddonClient {
       logo: 'https://app.zentrio.eu/static/logo/icon-192.png',
       resources: ['catalog', 'meta'],
       types: ['movie', 'series'],
-      catalogs: [
-        {
-          type: 'movie',
-          id: 'tmdb.top',
-          name: 'Popular Movies',
-          extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }, { name: 'search' }]
-        },
-        {
-          type: 'series',
-          id: 'tmdb.top',
-          name: 'Popular Series',
-          extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }, { name: 'search' }]
-        },
-        {
-            type: 'movie',
-            id: 'tmdb.year',
-            name: 'Movies by Year',
-            extra: [{ name: 'genre', isRequired: true, options: movieGenreOptions }, { name: 'skip' }]
-        },
-        {
-            type: 'series',
-            id: 'tmdb.year',
-            name: 'Series by Year',
-            extra: [{ name: 'genre', isRequired: true, options: seriesGenreOptions }, { name: 'skip' }]
-        },
-        {
-            type: 'movie',
-            id: 'tmdb.language',
-            name: 'Movies by Language',
-            extra: [{ name: 'genre', isRequired: true }, { name: 'skip' }]
-        },
-        {
-            type: 'series',
-            id: 'tmdb.language',
-            name: 'Series by Language',
-            extra: [{ name: 'genre', isRequired: true }, { name: 'skip' }]
-        },
-        {
-            type: 'movie',
-            id: 'tmdb.trending',
-            name: 'Trending Movies',
-            extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }]
-        },
-        {
-            type: 'series',
-            id: 'tmdb.trending',
-            name: 'Trending Series',
-            extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }]
-        }
-      ],
+      catalogs: enabledCatalogs,
       idPrefixes: ['tmdb:', 'tt']
     }
     return this.manifest
@@ -211,6 +258,12 @@ export class ZentrioAddonClient extends AddonClient {
 
     const res = await tmdbService.getMeta(client, type, 'en-US', tmdbId, mergedConfig)
     return res.meta
+  }
+
+  isCatalogOnHome(id: string, type: string): boolean {
+    const config = this.catalogConfig.length > 0 ? this.catalogConfig : DEFAULT_TMDB_CATALOG_CONFIG
+    const entry = config.find(c => c.id === id && c.type === type)
+    return entry ? entry.showOnHome : false
   }
 
   async getStreams(_type: string, _id: string): Promise<Stream[]> {

@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react'
+import { Download, Settings2 } from 'lucide-react'
 import { DownloadCard } from '../../components/downloads/DownloadCard'
 import { DownloadProgress } from '../../components/downloads/DownloadProgress'
 import { SeriesGroup } from '../../components/downloads/SeriesGroup'
@@ -36,9 +36,9 @@ export function StreamingDownloadsStandardView({ model }: { model: DownloadsScre
           <button
             className={styles.downloadsGearBtn}
             onClick={() => model.actions.setShowStorage(true)}
-            title="Storage settings"
           >
-            <Download size={18} />
+            <Settings2 size={15} />
+            Storage &amp; Settings
           </button>
         </div>
 

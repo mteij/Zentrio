@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { LazyImage } from '../../components'
 import { ContextMenu } from '../../components/ui/ContextMenu'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
-import { QualityPicker } from '../downloads/QualityPicker'
 import { CircularProgress } from '../../components/ui/CircularProgress'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadStore } from '../../stores/downloadStore'
@@ -88,31 +87,8 @@ export function EpisodeList({
   canDownload,
 }: EpisodeListProps) {
   const navigate = useNavigate()
-  const [pickerEpisode, setPickerEpisode] = useState<{
-    season: number
-    episode: number
-    title: string
-    episodeId: string
-    thumbnailUrl?: string
-  } | null>(null)
-  const [seasonPickerOpen, setSeasonPickerOpen] = useState(false)
   const addDownload = useDownloadStore((s) => s.addDownload)
   const downloads = useDownloadStore((s) => s.downloads)
-
-  // Warm stream while quality picker is open
-  useEffect(() => {
-    if (!pickerEpisode || !profileId) return
-    const cached = readCachedTopStream(meta.id, pickerEpisode.season, pickerEpisode.episode)
-    if (cached && !cached.stale) return
-    void resolveTopStream({
-      profileId,
-      mediaType: meta.type,
-      mediaId: meta.id,
-      season: pickerEpisode.season,
-      episode: pickerEpisode.episode,
-      forceRefresh: Boolean(cached),
-    })
-  }, [meta.id, meta.type, pickerEpisode, profileId])
 
   // Background prefetch for the first episode of the current season
   useEffect(() => {
@@ -136,11 +112,10 @@ export function EpisodeList({
     })
   }, [meta.id, meta.type, meta.videos, profileId, selectedSeason])
 
-  const handleDownloadEpisode = async (quality: DownloadQuality) => {
-    if (!pickerEpisode) return
-    const selected = pickerEpisode
-    setPickerEpisode(null)
+  const handleDownloadEpisode = async (ep: { season: number; episode: number; title: string; episodeId: string; thumbnailUrl?: string }) => {
     if (!profileId) { toast.error('Missing profile context'); return }
+    const quality = (localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality
+    const selected = ep
 
     try {
       const stream = await getTopStream({
@@ -201,9 +176,9 @@ export function EpisodeList({
     }
   }
 
-  const handleDownloadSeason = async (quality: DownloadQuality) => {
-    setSeasonPickerOpen(false)
+  const handleDownloadSeason = async () => {
     if (!profileId) return
+    const quality = (localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality
 
     // Episodes in the current season that haven't been downloaded yet (or failed)
     const toDownload = currentEpisodes.filter((ep: any) => {
@@ -417,7 +392,7 @@ export function EpisodeList({
               {
                 label: 'Download Season',
                 icon: Download,
-                onClick: () => setSeasonPickerOpen(true),
+                onClick: () => void handleDownloadSeason(),
               },
             ]}
           />
@@ -481,7 +456,7 @@ export function EpisodeList({
                       label: 'Download episode',
                       icon: Download,
                       onClick: () =>
-                        setPickerEpisode({
+                        void handleDownloadEpisode({
                           season: ep.season,
                           episode: epNum,
                           title: epTitle,
@@ -679,7 +654,7 @@ export function EpisodeList({
                         <button
                           className={styles.epBtn}
                           onClick={() =>
-                            setPickerEpisode({
+                            void handleDownloadEpisode({
                               season: ep.season,
                               episode: epNum,
                               title: epTitle,
@@ -708,21 +683,6 @@ export function EpisodeList({
         })}
       </div>
 
-      {pickerEpisode && (
-        <QualityPicker
-          title={`${meta.name} — ${pickerEpisode.title}`}
-          onConfirm={handleDownloadEpisode}
-          onClose={() => setPickerEpisode(null)}
-        />
-      )}
-
-      {seasonPickerOpen && (
-        <QualityPicker
-          title={`Season ${selectedSeason} — all episodes`}
-          onConfirm={handleDownloadSeason}
-          onClose={() => setSeasonPickerOpen(false)}
-        />
-      )}
     </>
   )
 }

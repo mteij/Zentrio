@@ -1,9 +1,9 @@
-import { addonDb, appearanceDb, profileDb, streamDb } from '../database'
+import { addonDb, appearanceDb, db, profileDb, streamDb } from '../database'
 import { type AgeRating } from '../tmdb/age-ratings'
 import { tmdbService } from '../tmdb/index'
 import { AddonClient, RetryableError } from './client'
 import { Manifest, MetaDetail, MetaPreview, Stream, Subtitle } from './types'
-import { ZentrioAddonClient } from './zentrio-client'
+import { DEFAULT_TMDB_CATALOG_CONFIG, type TmdbCatalogEntry, ZentrioAddonClient } from './zentrio-client'
 // Extracted helper modules
 import { logger } from '../logger'
 import { enrichContent, filterContent, getParentalSettings } from './content-filter'
@@ -240,6 +240,19 @@ export class AddonManager {
         return enrichContent(items, context.profileId)
     }
 
+    private loadTmdbCatalogConfig(settingsProfileId: number): TmdbCatalogEntry[] {
+        try {
+            const row = db.prepare('SELECT tmdb_catalog_config FROM settings_profiles WHERE id = ?').get(settingsProfileId) as { tmdb_catalog_config: string | null } | null
+            if (row?.tmdb_catalog_config) {
+                const parsed = JSON.parse(row.tmdb_catalog_config) as TmdbCatalogEntry[]
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed
+            }
+        } catch {
+            // fall through to defaults
+        }
+        return DEFAULT_TMDB_CATALOG_CONFIG
+    }
+
     private async getClientsForProfile(profileId: number): Promise<AddonClient[]> {
         // Resolve settings profile ID
         const settingsProfileId = profileDb.getSettingsProfileId(profileId);
@@ -270,14 +283,17 @@ export class AddonManager {
         for (const addon of addons) {
 
             const normalizedUrl = this.normalizeUrl(addon.manifest_url)
-            let client = this.clientCache.get(normalizedUrl)
+            // Use settings-profile-scoped cache key for Zentrio so each profile gets its own catalog config
+            const cacheKey = addon.manifest_url === DEFAULT_TMDB_ADDON ? `${normalizedUrl}:${settingsProfileId}` : normalizedUrl
+            let client = this.clientCache.get(cacheKey)
             if (!client) {
                 if (addon.manifest_url === DEFAULT_TMDB_ADDON) {
-                    client = new ZentrioAddonClient(addon.manifest_url, userId)
+                    const catalogConfig = this.loadTmdbCatalogConfig(settingsProfileId)
+                    client = new ZentrioAddonClient(addon.manifest_url, userId, catalogConfig)
                 } else {
                     client = new AddonClient(addon.manifest_url)
                 }
-                this.clientCache.set(normalizedUrl, client)
+                this.clientCache.set(cacheKey, client)
                 // Only init if new or not ready
                 initPromises.push(client.init().then(() => { }).catch(e => log.warn(`Failed to init ${addon.name}`, e)))
             } else if (!client.manifest) {
@@ -406,10 +422,12 @@ export class AddonManager {
         if (results.length === 0) {
             log.debug(`No catalogs found. Falling back to default TMDB addon.`);
             const normalizedDefaultUrl = this.normalizeUrl(DEFAULT_TMDB_ADDON)
-            let defaultClient = this.clientCache.get(normalizedDefaultUrl);
+            const fallbackCacheKey = context.settingsProfileId ? `${normalizedDefaultUrl}:${context.settingsProfileId}` : normalizedDefaultUrl
+            let defaultClient = this.clientCache.get(fallbackCacheKey);
             if (!defaultClient) {
-                defaultClient = new ZentrioAddonClient(DEFAULT_TMDB_ADDON, context.userId)
-                this.clientCache.set(normalizedDefaultUrl, defaultClient);
+                const catalogConfig = context.settingsProfileId ? this.loadTmdbCatalogConfig(context.settingsProfileId) : DEFAULT_TMDB_CATALOG_CONFIG
+                defaultClient = new ZentrioAddonClient(DEFAULT_TMDB_ADDON, context.userId, catalogConfig)
+                this.clientCache.set(fallbackCacheKey, defaultClient);
             }
 
             try {
@@ -763,13 +781,13 @@ export class AddonManager {
         if (primaryId.startsWith('tmdb:')) {
             log.debug(`TMDB ID ${primaryId} not resolved by enabled addons. Attempting fallback to Zentrio Client.`);
 
-            const _profile = context.profile
             // Use a dedicated cache key to avoid conflicts with the main client if it exists but is disabled
-            const fallbackKey = `fallback:${DEFAULT_TMDB_ADDON}`;
+            const fallbackKey = context.settingsProfileId ? `fallback:${DEFAULT_TMDB_ADDON}:${context.settingsProfileId}` : `fallback:${DEFAULT_TMDB_ADDON}`;
             let zentrioClient = this.clientCache.get(fallbackKey);
 
             if (!zentrioClient) {
-                zentrioClient = new ZentrioAddonClient(DEFAULT_TMDB_ADDON, context.userId);
+                const catalogConfig = context.settingsProfileId ? this.loadTmdbCatalogConfig(context.settingsProfileId) : DEFAULT_TMDB_CATALOG_CONFIG
+                zentrioClient = new ZentrioAddonClient(DEFAULT_TMDB_ADDON, context.userId, catalogConfig);
                 this.clientCache.set(fallbackKey, zentrioClient);
             }
 
@@ -1344,6 +1362,9 @@ export class AddonManager {
                 // Skip catalogs that require extra params
                 if (cat.extra?.some(e => e.isRequired)) continue
 
+                // For the native Zentrio addon, respect the showOnHome setting
+                if (client instanceof ZentrioAddonClient && !client.isCatalogOnHome(cat.id, cat.type)) continue
+
                 const typeName = cat.type === 'movie' ? 'Movies' : (cat.type === 'series' ? 'Series' : 'Other')
                 const manifestUrl = client.manifestUrl
 
@@ -1387,7 +1408,12 @@ export class AddonManager {
         const context = this.getProfileContext(profileId)
 
         const normalizedUrl = this.normalizeUrl(manifestUrl)
-        const client = this.clientCache.get(normalizedUrl)
+        // Zentrio client is cached with a settings-profile-scoped key; fall back to bare URL for other addons
+        const settingsProfileId = context.settingsProfileId
+        const cacheKey = (manifestUrl === DEFAULT_TMDB_ADDON || normalizedUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON)) && settingsProfileId
+            ? `${normalizedUrl}:${settingsProfileId}`
+            : normalizedUrl
+        const client = this.clientCache.get(cacheKey) ?? this.clientCache.get(normalizedUrl)
 
         if (!client || !client.manifest) {
             log.warn(`Client not found for ${manifestUrl}`)
@@ -1430,6 +1456,21 @@ export class AddonManager {
             const _errorMsg = e instanceof Error ? e.message : String(e)
             log.error(`Failed to fetch catalog ${catalogId} from ${manifestUrl}`, e)
             return []
+        }
+    }
+
+    /**
+     * Invalidate the cached Zentrio client for a settings profile so the next request
+     * picks up the updated catalog config.
+     */
+    invalidateZentrioClient(settingsProfileId: number): void {
+        const normalizedUrl = this.normalizeUrl(DEFAULT_TMDB_ADDON)
+        const keys = [
+            `${normalizedUrl}:${settingsProfileId}`,
+            `fallback:${DEFAULT_TMDB_ADDON}:${settingsProfileId}`,
+        ]
+        for (const key of keys) {
+            this.clientCache.delete(key)
         }
     }
 }

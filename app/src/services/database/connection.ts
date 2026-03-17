@@ -104,6 +104,7 @@ db.exec(`
     remote_id TEXT,
     dirty BOOLEAN DEFAULT FALSE,
     deleted_at DATETIME,
+    tmdb_catalog_config TEXT,
     FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
   );
 
@@ -576,3 +577,6 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_introdb_cache_lookup ON introdb_cache(imdb_id, season, episode);
  `)
+
+// Add tmdb_catalog_config column to existing databases (ALTER TABLE is idempotent via try/catch)
+try { db.exec(`ALTER TABLE settings_profiles ADD COLUMN tmdb_catalog_config TEXT`) } catch (_) { /* column already exists */ }

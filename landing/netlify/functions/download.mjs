@@ -26,7 +26,7 @@ export const handler = async (event) => {
     let res;
     try {
       res = await fetch(
-        "https://api.github.com/repos/mteij/Zentrio/releases/latest",
+        "https://api.github.com/repos/mteij/Zentrio/releases?per_page=1",
         {
           headers: {
             "User-Agent": "zentrio-download-redirect",
@@ -48,8 +48,9 @@ export const handler = async (event) => {
       return { statusCode: 502, body: `Failed to fetch latest release: ${res.status} ${res.statusText}` };
     }
 
-    const release = await res.json();
-    const asset = release.assets?.find((a) => matcher(a.name));
+    const releases = await res.json();
+    const release = Array.isArray(releases) ? releases[0] : releases;
+    const asset = release?.assets?.find((a) => matcher(a.name));
 
     if (!asset) {
       return { statusCode: 404, body: `No asset found for platform "${platform}" in latest release` };

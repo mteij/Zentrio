@@ -1,9 +1,5 @@
-function resolvePublicAsset(path: string) {
-  const base = import.meta.env.BASE_URL || '/'
-  const normalizedBase = base.endsWith('/') ? base : `${base}/`
-  const normalizedPath = path.replace(/^\/+/, '')
-  return `${normalizedBase}${normalizedPath}`
-}
+import logo192 from '../assets/logo/icon-192.png'
+import logo512 from '../assets/logo/icon-512.png'
 
-export const ZENTRIO_LOGO_192_URL = resolvePublicAsset('static/logo/icon-192.png')
-export const ZENTRIO_LOGO_512_URL = resolvePublicAsset('static/logo/icon-512.png')
+export const ZENTRIO_LOGO_192_URL = logo192
+export const ZENTRIO_LOGO_512_URL = logo512

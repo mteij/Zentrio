@@ -37,7 +37,12 @@ function renderActiveSection(model: SettingsScreenModel) {
     )
   }
   if (model.effectiveTab === 'downloads') {
-    return <DownloadSettings currentProfileId={model.currentProfileId} />
+    return (
+      <DownloadSettings
+        currentProfileId={model.currentProfileId}
+        onProfileChange={model.actions.handleProfileChange}
+      />
+    )
   }
   if (model.effectiveTab === 'danger') return <DangerZoneSettings />
   return <GeneralSettings />

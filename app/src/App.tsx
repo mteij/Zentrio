@@ -34,6 +34,7 @@ const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ defaul
 const ProfilesPage = lazy(() => import('./pages/ProfilesPage').then(m => ({ default: m.ProfilesPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 const ExploreAddonsPage = lazy(() => import('./pages/ExploreAddonsRoute').then(m => ({ default: m.ExploreAddonsRoute })))
+const TmdbAddonConfigPage = lazy(() => import('./pages/TmdbAddonConfigPage').then(m => ({ default: m.TmdbAddonConfigPage })))
 const SignInPage = lazy(() => import('./pages/auth/SignInPage').then(m => ({ default: m.SignInPage })))
 const SignUpPage = lazy(() => import('./pages/auth/SignUpPage').then(m => ({ default: m.SignUpPage })))
 const TwoFactorPage = lazy(() => import('./pages/auth/TwoFactorPage').then(m => ({ default: m.TwoFactorPage })))
@@ -521,6 +522,7 @@ function AppRoutes() {
       <Route path="/profiles" element={<Suspense fallback={<SplashScreen />}><ProtectedRoute><ProfilesPage /></ProtectedRoute></Suspense>} />
       <Route path="/settings" element={<Suspense fallback={<SplashScreen />}><ProtectedRoute><SettingsPage /></ProtectedRoute></Suspense>} />
       <Route path="/settings/explore-addons" element={<Suspense fallback={<SplashScreen />}><ProtectedRoute><ExploreAddonsPage /></ProtectedRoute></Suspense>} />
+      <Route path="/settings/addons/tmdb-config" element={<Suspense fallback={<SplashScreen />}><ProtectedRoute><TmdbAddonConfigPage /></ProtectedRoute></Suspense>} />
       
       {/* Admin routes - requires admin privileges */}
       <Route path="/admin" element={

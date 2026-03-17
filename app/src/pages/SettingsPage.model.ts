@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Download, Palette, Play, Puzzle, Settings as SettingsIcon, type LucideIcon } from 'lucide-react'
 import { appMode } from '../lib/app-mode'
 
@@ -33,7 +33,9 @@ export interface SettingsScreenModel {
 
 export function useSettingsScreenModel(): SettingsScreenModel {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<SettingsTabKey>('general')
+  const [searchParams] = useSearchParams()
+  const initialTab = (searchParams.get('tab') as SettingsTabKey | null) ?? 'general'
+  const [activeTab, setActiveTab] = useState<SettingsTabKey>(initialTab)
   const mobileTabsRef = useRef<HTMLDivElement>(null)
   const [canScrollMobileLeft, setCanScrollMobileLeft] = useState(false)
   const [canScrollMobileRight, setCanScrollMobileRight] = useState(false)

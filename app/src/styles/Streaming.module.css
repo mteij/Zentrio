@@ -1,6 +1,47 @@
 /* Streaming Area CSS Module - Scoped styles for streaming pages */
 /* Design tokens are imported from design-system.css */
 
+/* ─── Button system ──────────────────────────────────────────────────────────
+   Three tiers:
+   1. Primary (pill, 50px+ radius)  — Play, Back. Per-page CSS.
+   2. Secondary (.actionBtn)        — Download, Share, Storage & Settings, etc.
+   3. Icon-only (circle)            — Add to list, etc. Per-page CSS.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.actionBtn:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.actionBtnDanger {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
+.actionBtnDanger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
 /* Back Button */
 .backBtn {
   position: fixed;

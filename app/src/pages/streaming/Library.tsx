@@ -838,12 +838,7 @@ export const StreamingLibrary = () => {
                     <>
                       <button
                         onClick={() => handleOpenShareModal(activeList.id)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '6px',
-                          background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-                          color: '#fff', padding: '8px 14px', borderRadius: '8px',
-                          cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500'
-                        }}
+                        className={styles.actionBtn}
                       >
                         <Share2 size={16} />
                         Share
@@ -853,12 +848,7 @@ export const StreamingLibrary = () => {
                   {'share' in activeList && (
                     <button
                       onClick={() => handleLeaveSharedList((activeList as SharedList).share.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: '#f87171', padding: '8px 14px', borderRadius: '8px',
-                        cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500'
-                      }}
+                      className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                     >
                       <LogOut size={16} />
                       Leave

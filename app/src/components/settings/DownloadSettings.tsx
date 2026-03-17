@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, FolderOpen, HardDrive, Monitor, RotateCcw, Smartphone, Sparkles, Trash2 } from 'lucide-react'
+import { CheckCircle, FolderOpen, HardDrive, RotateCcw, Trash2 } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
 import { getAppTarget } from '../../lib/app-target'
 import { readOfflineDownloadsSettings, type OfflineDownloadsSettings } from '../../lib/offline-downloads'
 import { isTauri } from '../../lib/auth-client'
-import { downloadService, DownloadQuality, StorageStats } from '../../services/downloads/download-service'
+import { downloadService, StorageStats } from '../../services/downloads/download-service'
 import styles from '../../styles/Settings.module.css'
 import { createLogger } from '../../utils/client-logger'
 import { Toggle } from '../ui/Toggle'
@@ -23,19 +23,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / GB).toFixed(2)} GB`
 }
 
-interface QualityOption {
-  value: DownloadQuality
-  label: string
-  description: string
-  Icon: React.FC<{ size?: number }>
-}
-
-const QUALITY_OPTIONS: QualityOption[] = [
-  { value: 'standard', label: 'Standard', description: '~720p · Smaller files, downloads faster', Icon: Smartphone },
-  { value: 'higher', label: 'Higher', description: '~1080p · Best for most screens', Icon: Monitor },
-  { value: 'best', label: 'Best Available', description: 'Source quality · Largest file', Icon: Sparkles },
-]
-
 interface Profile {
   id: number
   name: string
@@ -49,13 +36,10 @@ interface ProfileEntry {
 
 interface DownloadSettingsProps {
   currentProfileId: string
+  onProfileChange: (id: string) => void
 }
 
 export function DownloadSettings({ currentProfileId }: DownloadSettingsProps) {
-  const [quality, setQuality] = useState<DownloadQuality>(
-    () => (localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality
-  )
-  const [qualitySaved, setQualitySaved] = useState(false)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [profileStats, setProfileStats] = useState<Record<number, ProfileEntry>>({})
   const [dir, setDir] = useState('')
@@ -157,13 +141,6 @@ export function DownloadSettings({ currentProfileId }: DownloadSettingsProps) {
     setLoadingStats(false)
   }
 
-  const handleQualityChange = (q: DownloadQuality) => {
-    setQuality(q)
-    localStorage.setItem('download_quality_pref', q)
-    setQualitySaved(true)
-    setTimeout(() => setQualitySaved(false), 2000)
-  }
-
   const handleChangeDir = async () => {
     try {
       const selected = await open({ directory: true, multiple: false, title: 'Select Download Folder' })
@@ -244,46 +221,23 @@ export function DownloadSettings({ currentProfileId }: DownloadSettingsProps) {
 
   return (
     <div className={styles.tabContent}>
+      {/* ── Settings profile: Android TV Policy ── */}
       <div className={styles.settingsCard}>
-        <h2 className={styles.sectionTitle}>Default Quality</h2>
+        <h2 className={styles.sectionTitle}>
+          Android TV
+          <span className={styles.settingsProfileBadge}>Settings profile</span>
+        </h2>
         <p className={styles.dlSettingDesc}>
-          Applied automatically when you tap Download - no prompt on each item.
-          {qualitySaved && <span className={styles.dlSavedBadge}> Saved</span>}
-        </p>
-        <div className={styles.dlQualityList}>
-          {QUALITY_OPTIONS.map((opt) => {
-            const Icon = opt.Icon
-            const active = quality === opt.value
-
-            return (
-              <button
-                key={opt.value}
-                className={`${styles.dlQualityRow} ${active ? styles.dlQualityRowActive : ''}`}
-                onClick={() => handleQualityChange(opt.value)}
-              >
-                <span className={styles.dlQualityIcon}><Icon size={17} /></span>
-                <div className={styles.dlQualityText}>
-                  <span className={styles.dlQualityLabel}>{opt.label}</span>
-                  <span className={styles.dlQualityDesc}>{opt.description}</span>
-                </div>
-                <div className={`${styles.dlQualityRadio} ${active ? styles.dlQualityRadioActive : ''}`} />
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className={styles.settingsCard}>
-        <h2 className={styles.sectionTitle}>Android TV Policy</h2>
-        <p className={styles.dlSettingDesc}>
-          Downloads stay disabled by default on Android TV and Google TV because many devices have very limited internal storage.
-          This toggle is shared through the active settings profile, so TV behavior stays consistent across profiles that use it.
+          Downloads are disabled on Android TV by default due to limited internal storage on most devices.
+          {target.isTv && !offlineDownloads.allowOnTv && (
+            <> This TV currently follows that default: streaming only.</>
+          )}
         </p>
 
         <div className={styles.settingItem}>
           <div>
             <h3>Enable downloads on Android TV</h3>
-            <p>Show download actions and the Downloads screen on TV devices for this shared settings profile.</p>
+            <p>Show download actions and the Downloads screen on TV devices.</p>
           </div>
           <Toggle
             checked={offlineDownloads.allowOnTv}
@@ -294,86 +248,76 @@ export function DownloadSettings({ currentProfileId }: DownloadSettingsProps) {
             title="Enable downloads on Android TV"
           />
         </div>
-
-        <p className={styles.dlSettingDesc}>
-          External USB and adopted storage are not fully integrated yet. The folder picker can work when Android exposes a writable path,
-          but a dedicated Android TV external-storage flow still needs native work.
-        </p>
-
-        {target.isTv && !offlineDownloads.allowOnTv && (
-          <p className={styles.dlSettingDesc}>
-            This TV currently follows the safe default: streaming only, no offline downloads.
-          </p>
-        )}
       </div>
 
+      {/* ── Storage (Tauri only) ── */}
       {inTauri && (
-        <>
-          <div className={styles.settingsCard}>
-            <h2 className={styles.sectionTitle}>Download Folder</h2>
-            <p className={styles.dlSettingDesc}>Where downloaded files are stored on this device.</p>
-            <div className={styles.dlFolderRow}>
-              <span className={styles.dlFolderPath}>{dir || '-'}</span>
-              <button className={styles.dlFolderBtn} onClick={handleChangeDir}>
-                <FolderOpen size={14} />
-                Change
-              </button>
+        <div className={styles.settingsCard}>
+          <h2 className={styles.sectionTitle}>Storage</h2>
+
+          {/* Download folder */}
+          <p className={styles.dlSettingDesc}>Where downloaded files are stored on this device.</p>
+          <div className={styles.dlFolderRow}>
+            <span className={styles.dlFolderPath}>{dir || '-'}</span>
+            <button className={styles.dlFolderBtn} onClick={handleChangeDir}>
+              <FolderOpen size={14} />
+              Change
+            </button>
+          </div>
+
+          {/* Per-profile storage breakdown */}
+          <div className={styles.dlStorageDivider} />
+
+          {totalCount > 0 && (
+            <p className={styles.dlSettingDesc} style={{ marginTop: 0 }}>
+              <HardDrive size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+              {formatBytes(totalBytes)} total · {totalCount} download{totalCount !== 1 ? 's' : ''}
+            </p>
+          )}
+
+          {loadingStats ? (
+            <div className={styles.dlStatsLoading}>
+              <RotateCcw size={14} className={styles.spin} />
+              Loading...
             </div>
-          </div>
+          ) : (
+            <div className={styles.dlProfileList}>
+              {profiles.map((p) => {
+                const entry = profileStats[p.id]
+                const used = entry?.stats.totalBytes ?? 0
+                const count = entry?.stats.count ?? 0
 
-          <div className={styles.settingsCard}>
-            <h2 className={styles.sectionTitle}>Storage by Profile</h2>
-            {totalCount > 0 && (
-              <p className={styles.dlSettingDesc}>
-                <HardDrive size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-                {formatBytes(totalBytes)} total · {totalCount} download{totalCount !== 1 ? 's' : ''}
-              </p>
-            )}
-
-            {loadingStats ? (
-              <div className={styles.dlStatsLoading}>
-                <RotateCcw size={14} className={styles.spin} />
-                Loading...
-              </div>
-            ) : (
-              <div className={styles.dlProfileList}>
-                {profiles.map((p) => {
-                  const entry = profileStats[p.id]
-                  const used = entry?.stats.totalBytes ?? 0
-                  const count = entry?.stats.count ?? 0
-
-                  return (
-                    <div key={p.id} className={styles.dlProfileRow}>
-                      <div className={styles.dlProfileInfo}>
-                        <span className={styles.dlProfileName}>{p.name}</span>
-                        <span className={styles.dlProfileUsage}>
-                          {count > 0
-                            ? `${formatBytes(used)} · ${count} item${count !== 1 ? 's' : ''}`
-                            : 'No downloads'}
-                        </span>
-                      </div>
-                      {count > 0 && (
-                        <button
-                          className={`${styles.dlClearBtn} ${entry?.confirmed ? styles.dlClearBtnConfirm : ''}`}
-                          onClick={() => void handleClearProfile(p.id)}
-                          disabled={entry?.clearing}
-                        >
-                          {entry?.clearing ? (
-                            <RotateCcw size={13} className={styles.spin} />
-                          ) : entry?.confirmed ? (
-                            <><CheckCircle size={13} /> Confirm</>
-                          ) : (
-                            <><Trash2 size={13} /> Clear</>
-                          )}
-                        </button>
-                      )}
+                return (
+                  <div key={p.id} className={styles.dlProfileRow}>
+                    <div className={styles.dlProfileInfo}>
+                      <span className={styles.dlProfileName}>{p.name}</span>
+                      <span className={styles.dlProfileUsage}>
+                        {count > 0
+                          ? `${formatBytes(used)} · ${count} item${count !== 1 ? 's' : ''}`
+                          : 'No downloads'}
+                      </span>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </>
+                    {count > 0 && (
+                      <button
+                        className={`${styles.dlClearBtn} ${entry?.confirmed ? styles.dlClearBtnConfirm : ''}`}
+                        onClick={() => void handleClearProfile(p.id)}
+                        disabled={entry?.clearing}
+                      >
+                        {entry?.clearing ? (
+                          <RotateCcw size={13} className={styles.spin} />
+                        ) : entry?.confirmed ? (
+                          <><CheckCircle size={13} /> Confirm</>
+                        ) : (
+                          <><Trash2 size={13} /> Clear</>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
