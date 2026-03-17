@@ -21,6 +21,10 @@ export default async (req) => {
       );
     }
 
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased timeout
+
     const res = await fetch(
       "https://api.github.com/repos/mteij/Zentrio/releases/latest",
       { 
@@ -28,9 +32,11 @@ export default async (req) => {
           "User-Agent": "zentrio-download-redirect",
           "Accept": "application/vnd.github.v3+json"
         },
-        timeout: 10000
+        signal: controller.signal
       },
     );
+
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       // Provide more specific error messages based on status code
@@ -53,9 +59,19 @@ export default async (req) => {
     }
 
     const release = await res.json();
+    
+    // Debug: Log the release data to see what we're working with
+    console.log("Release data:", { 
+      assetCount: release.assets?.length || 0,
+      assets: release.assets?.map(a => ({ name: a.name, url: a.browser_download_url })) || []
+    });
+
     const asset = release.assets?.find((a) => matcher(a.name));
 
     if (!asset) {
+      // Debug: Log what we're looking for
+      console.log(`No asset found for platform "${platform}"`);
+      console.log("Available assets:", release.assets?.map(a => a.name) || []);
       return new Response(`No asset found for platform "${platform}" in latest release`, { status: 404 });
     }
 
@@ -63,6 +79,13 @@ export default async (req) => {
   } catch (error) {
     // Handle network errors, timeouts, etc.
     console.error("Download function error:", error);
+    // Check if it's a timeout error
+    if (error.name === 'AbortError') {
+      return new Response(
+        "Request timeout: GitHub API took too long to respond",
+        { status: 504 }
+      );
+    }
     return new Response(
       `Internal server error: ${error.message}`,
       { status: 502 }
