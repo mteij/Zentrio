@@ -1,6 +1,5 @@
 const PLATFORM_PATTERNS = {
-  android: (name) => /android-arm64.*\.apk$/i.test(name),
-  "android-universal": (name) => /android-universal.*\.apk$/i.test(name),
+  android: (name) => /android-universal.*\.apk$/i.test(name),
   windows: (name) => /\.exe$/i.test(name),
   mac: (name) => /\.dmg$/i.test(name),
   "linux-deb": (name) => /\.deb$/i.test(name),
@@ -9,87 +8,62 @@ const PLATFORM_PATTERNS = {
   ios: (name) => /\.ipa$/i.test(name),
 };
 
-export default async (req) => {
-  try {
-    const platform = new URL(req.url).pathname.split("/").pop();
+export const handler = async (event) => {
+  const platform = event.queryStringParameters?.platform;
 
-    const matcher = PLATFORM_PATTERNS[platform];
-    if (!matcher) {
-      return new Response(
-        `Unknown platform "${platform}". Valid options: ${Object.keys(PLATFORM_PATTERNS).join(", ")}`,
-        { status: 400 },
+  const matcher = PLATFORM_PATTERNS[platform];
+  if (!matcher) {
+    return {
+      statusCode: 400,
+      body: `Unknown platform "${platform}". Valid options: ${Object.keys(PLATFORM_PATTERNS).join(", ")}`,
+    };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    let res;
+    try {
+      res = await fetch(
+        "https://api.github.com/repos/mteij/Zentrio/releases/latest",
+        {
+          headers: {
+            "User-Agent": "zentrio-download-redirect",
+            Accept: "application/vnd.github.v3+json",
+          },
+          signal: controller.signal,
+        }
       );
+    } finally {
+      clearTimeout(timeout);
     }
 
-    // Fetch with timeout using Promise.race
-    const fetchPromise = fetch(
-      "https://api.github.com/repos/mteij/Zentrio/releases/latest",
-      { 
-        headers: { 
-          "User-Agent": "zentrio-download-redirect",
-          "Accept": "application/vnd.github.v3+json"
-        }
-      }
-    );
-    
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Request timeout')), 15000)
-    );
-
-    const res = await Promise.race([fetchPromise, timeoutPromise]);
-
     if (!res.ok) {
-      // Provide more specific error messages based on status code
       if (res.status === 403) {
-        return new Response(
-          "GitHub API rate limit exceeded. Please try again later.",
-          { status: 502 }
-        );
+        return { statusCode: 502, body: "GitHub API rate limit exceeded. Please try again later." };
       } else if (res.status === 404) {
-        return new Response(
-          "Repository not found or no releases available",
-          { status: 502 }
-        );
-      } else {
-        return new Response(
-          `Failed to fetch latest release: ${res.status} ${res.statusText}`,
-          { status: 502 }
-        );
+        return { statusCode: 502, body: "Repository not found or no releases available" };
       }
+      return { statusCode: 502, body: `Failed to fetch latest release: ${res.status} ${res.statusText}` };
     }
 
     const release = await res.json();
-    
-    // Debug: Log the release data to see what we're working with
-    console.log("Release data:", { 
-      assetCount: release.assets?.length || 0,
-      assets: release.assets?.map(a => ({ name: a.name, url: a.browser_download_url })) || []
-    });
-
     const asset = release.assets?.find((a) => matcher(a.name));
 
     if (!asset) {
-      // Debug: Log what we're looking for
-      console.log(`No asset found for platform "${platform}"`);
-      console.log("Available assets:", release.assets?.map(a => a.name) || []);
-      return new Response(`No asset found for platform "${platform}" in latest release`, { status: 404 });
+      return { statusCode: 404, body: `No asset found for platform "${platform}" in latest release` };
     }
 
-    return Response.redirect(asset.browser_download_url, 302);
+    return {
+      statusCode: 302,
+      headers: { Location: asset.browser_download_url },
+    };
   } catch (error) {
-    // Handle network errors, timeouts, etc.
     console.error("Download function error:", error);
-    if (error.message === 'Request timeout') {
-      return new Response(
-        "Request timeout: GitHub API took too long to respond",
-        { status: 504 }
-      );
+    if (error.name === "AbortError") {
+      return { statusCode: 504, body: "Request timeout: GitHub API took too long to respond" };
     }
-    return new Response(
-      `Internal server error: ${error.message}`,
-      { status: 502 }
-    );
+    return { statusCode: 502, body: `Internal server error: ${error.message}` };
   }
 };
-
-export const config = { path: "/download/:platform" };
