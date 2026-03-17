@@ -1,6 +1,6 @@
 import { ArrowLeft, Check, Download, Filter, Search, Settings, Star, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AnimatedBackground, Button, LoadingSpinner, SimpleLayout, SkeletonAddonCard } from '../components'
 import { apiFetch } from '../lib/apiFetch'
@@ -29,57 +29,15 @@ interface InstalledAddon {
     enabled: boolean
 }
 
-// Recommended addons configuration
-const RECOMMENDED_ADDONS: Addon[] = [
-    {
-        transportName: "TMDB",
-        transportUrl: "https://tmdb.zentrio.eu/manifest.json",
-        manifest: {
-            id: "org.stremio.tmdb",
-            name: "TMDB",
-            version: "1.0.0",
-            description: "The Movie Database addon for metadata.",
-            logo: "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.svg",
-            types: ["movie", "series"]
-        }
-    },
-    {
-        transportName: "Comet",
-        transportUrl: "https://comet.zentrio.eu/manifest.json",
-        manifest: {
-            id: "org.stremio.comet",
-            name: "Comet",
-            version: "2.0.0",
-            description: "Stremio's fastest torrent/debrid search add-on.",
-            logo: "https://i.imgur.com/jmVoVMu.jpeg",
-            types: ["movie", "series"]
-        }
-    },
-    {
-        transportName: "Torz",
-        transportUrl: "https://stremthru.zentrio.eu/manifest.json",
-        manifest: {
-            id: "org.stremio.torz",
-            name: "StremThru Torz",
-            version: "0.94.5",
-            description: "Stremio Addon to access crowdsourced Torz.",
-            logo: "https://emojiapi.dev/api/v1/sparkles/256.png",
-            types: ["movie", "series"]
-        }
-    },
-    {
-        transportName: "OpenSubtitles v3",
-        transportUrl: "https://opensubtitles-v3.strem.io/manifest.json",
-        manifest: {
-            id: "org.stremio.opensubtitles-v3",
-            name: "OpenSubtitles v3",
-            version: "1.0.0",
-            description: "OpenSubtitles v3 Addon for Stremio",
-            logo: "https://www.strem.io/images/addons/opensubtitles-logo.png",
-            types: ["movie", "series"]
-        }
-    }
+// Seed list — only transport info needed; manifests are fetched dynamically at runtime
+const RECOMMENDED_ADDON_SEEDS = [
+    { transportName: "Comet",            transportUrl: "https://comet.zentrio.eu/manifest.json" },
+    { transportName: "Torz",             transportUrl: "https://stremthru.zentrio.eu/stremio/torz/manifest.json" },
+    { transportName: "OpenSubtitles v3", transportUrl: "https://opensubtitles-v3.strem.io/manifest.json" },
+    { transportName: "SubDL",            transportUrl: "https://subdl.strem.top/manifest.json" },
 ];
+
+const PAGE_SIZE = 24;
 
 interface AddonCardProps {
     addon: Addon
@@ -202,7 +160,9 @@ const AddonCard = ({
 
 export function ExploreAddonsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [addons, setAddons] = useState<Addon[]>([])
+  const [recommendedAddons, setRecommendedAddons] = useState<Addon[]>([])
   const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([])
   const [loading, setLoading] = useState(true)
   const [_error, setError] = useState('')
@@ -210,6 +170,7 @@ export function ExploreAddonsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [activeProfileId, setActiveProfileId] = useState<string>('')
   const [processingAddonId, setProcessingAddonId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
 
   // Derive categories from addons
@@ -228,8 +189,20 @@ export function ExploreAddonsPage() {
   const initialize = async () => {
       setLoading(true)
       try {
-          // 1. Fetch available addons
+          // 1. Fetch available addons + recommended manifests in parallel
           const addonsPromise = fetch('https://api.strem.io/addonscollection.json').then(r => r.json());
+          const recommendedPromise = Promise.all(
+              RECOMMENDED_ADDON_SEEDS.map(async seed => {
+                  try {
+                      const res = await fetch(seed.transportUrl);
+                      if (!res.ok) return null;
+                      const manifest = await res.json();
+                      return { transportName: seed.transportName, transportUrl: seed.transportUrl, manifest } as Addon;
+                  } catch {
+                      return null;
+                  }
+              })
+          ).then(results => results.filter(Boolean) as Addon[]);
           
           // 2. Fetch profiles to get the active one
           const profilesRes = await apiFetch('/api/user/settings-profiles');
@@ -259,8 +232,9 @@ export function ExploreAddonsPage() {
               }
           }
 
-          const [addonsData] = await Promise.all([addonsPromise]);
+          const [addonsData, recommended] = await Promise.all([addonsPromise, recommendedPromise]);
           setAddons(addonsData);
+          setRecommendedAddons(recommended);
           setInstalledAddons(installed);
 
       } catch (err) {
@@ -343,27 +317,36 @@ export function ExploreAddonsPage() {
   }
 
   const filteredAddons = useMemo(() => {
+      setPage(1);
       return addons.filter(addon => {
-          const matchesSearch = 
+          const matchesSearch =
             addon.manifest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             addon.manifest.description.toLowerCase().includes(searchQuery.toLowerCase());
           const matchesCategory = selectedCategory === 'all' || addon.manifest.types.includes(selectedCategory);
-          
           return matchesSearch && matchesCategory;
       });
   }, [addons, searchQuery, selectedCategory]);
 
+  const pagedAddons = filteredAddons.slice(0, page * PAGE_SIZE);
+  const hasMore = pagedAddons.length < filteredAddons.length;
+
+  const backLabel = (location.state as any)?.fromLabel ?? 'Back to Settings';
+  const handleBack = () => {
+    if ((location.state as any)?.from) navigate((location.state as any).from);
+    else navigate('/settings');
+  };
+
   return (
     <SimpleLayout title="Explore Addons">
       <AnimatedBackground />
-      
+
       {/* Back Button */}
       <button
         className={settingsStyles.backBtn}
-        onClick={() => navigate('/settings')}
+        onClick={handleBack}
       >
         <ArrowLeft size={18} />
-        Back to Settings
+        {backLabel}
       </button>
 
       <div className={styles.addonsPage}>
@@ -416,7 +399,7 @@ export function ExploreAddonsPage() {
               <h2 className={styles.sectionTitle}>Recommended</h2>
             </div>
             <div className={styles.addonsGrid}>
-              {RECOMMENDED_ADDONS.map((addon, idx) => (
+              {recommendedAddons.map((addon, idx) => (
                   <AddonCard 
                       key={`rec-${idx}`} 
                       addon={addon} 
@@ -444,19 +427,28 @@ export function ExploreAddonsPage() {
                     ))}
                 </div>
             ) : filteredAddons.length > 0 ? (
-                <div className={styles.addonsGrid}>
-                    {filteredAddons.map((addon, idx) => (
-                        <AddonCard 
-                            key={idx} 
-                            addon={addon} 
-                            installedAddons={installedAddons}
-                            processingAddonId={processingAddonId}
-                            onInstall={installAddon}
-                            onUninstall={uninstallAddon}
-                            onConfigure={configureAddon}
-                        />
-                    ))}
-                </div>
+                <>
+                    <div className={styles.addonsGrid}>
+                        {pagedAddons.map((addon, idx) => (
+                            <AddonCard
+                                key={idx}
+                                addon={addon}
+                                installedAddons={installedAddons}
+                                processingAddonId={processingAddonId}
+                                onInstall={installAddon}
+                                onUninstall={uninstallAddon}
+                                onConfigure={configureAddon}
+                            />
+                        ))}
+                    </div>
+                    {hasMore && (
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+                            <Button variant="secondary" onClick={() => setPage(p => p + 1)}>
+                                Load More ({filteredAddons.length - pagedAddons.length} remaining)
+                            </Button>
+                        </div>
+                    )}
+                </>
             ) : (
                 <div className={styles.emptyState}>
                     <p>No addons found matching your criteria.</p>

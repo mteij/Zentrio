@@ -2,6 +2,7 @@
 // Extracted from Details.tsx
 import { Check, Download, HardDrive, Play, Wifi, Zap } from 'lucide-react'
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { SkeletonStreamList } from '../../components'
 import { CompactStreamItem } from '../../components/features/CompactStreamItem'
 import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
@@ -92,10 +93,12 @@ export function StreamSelector({
   streamsLoading,
   cacheStatus,
   streamDisplaySettings,
+  profileId,
   onRefresh,
   onPlay,
   onDownload,
 }: StreamSelectorProps) {
+  const navigate = useNavigate()
 
   // Cache the top stream in sessionStorage so the download button can pick up
   // the resolved URL without re-requesting streams.
@@ -315,15 +318,26 @@ export function StreamSelector({
                 </div>
                 <h3 className="text-lg font-medium text-white mb-2">No streams found</h3>
                 <p className="text-sm text-gray-400 max-w-md mb-5">
-                    We couldn&apos;t find any streams for this content. Try adjusting your filters or checking your installed addons.
+                    No addons returned streams for this content. Install addons to start streaming.
                 </p>
-                <button
-                    onClick={onRefresh}
-                    className={`${styles.actionBtn} ${styles.btnSecondaryGlass}`}
-                    style={{ padding: '8px 20px' }}
-                >
-                    Try Again
-                </button>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button
+                        onClick={onRefresh}
+                        className={`${styles.actionBtn} ${styles.btnSecondaryGlass}`}
+                        style={{ padding: '8px 20px' }}
+                    >
+                        Try Again
+                    </button>
+                    <button
+                        onClick={() => navigate('/settings/explore-addons', {
+                            state: { from: window.location.pathname + window.location.search, fromLabel: 'Back to Streaming' }
+                        })}
+                        className={`${styles.actionBtn} ${styles.btnSecondaryGlass}`}
+                        style={{ padding: '8px 20px' }}
+                    >
+                        Get Addons
+                    </button>
+                </div>
             </div>
         ) : null}
     </div>

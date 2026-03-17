@@ -25,55 +25,11 @@ interface InstalledAddon {
   enabled: boolean
 }
 
-const RECOMMENDED_ADDONS: AddonRecord[] = [
-  {
-    transportName: 'TMDB',
-    transportUrl: 'https://tmdb.zentrio.eu/manifest.json',
-    manifest: {
-      id: 'org.stremio.tmdb',
-      name: 'TMDB',
-      version: '1.0.0',
-      description: 'The Movie Database addon for metadata.',
-      logo: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.svg',
-      types: ['movie', 'series'],
-    },
-  },
-  {
-    transportName: 'Comet',
-    transportUrl: 'https://comet.zentrio.eu/manifest.json',
-    manifest: {
-      id: 'org.stremio.comet',
-      name: 'Comet',
-      version: '2.0.0',
-      description: "Stremio's fastest torrent/debrid search add-on.",
-      logo: 'https://i.imgur.com/jmVoVMu.jpeg',
-      types: ['movie', 'series'],
-    },
-  },
-  {
-    transportName: 'Torz',
-    transportUrl: 'https://stremthru.zentrio.eu/manifest.json',
-    manifest: {
-      id: 'org.stremio.torz',
-      name: 'StremThru Torz',
-      version: '0.94.5',
-      description: 'Stremio Addon to access crowdsourced Torz.',
-      logo: 'https://emojiapi.dev/api/v1/sparkles/256.png',
-      types: ['movie', 'series'],
-    },
-  },
-  {
-    transportName: 'OpenSubtitles v3',
-    transportUrl: 'https://opensubtitles-v3.strem.io/manifest.json',
-    manifest: {
-      id: 'org.stremio.opensubtitles-v3',
-      name: 'OpenSubtitles v3',
-      version: '1.0.0',
-      description: 'OpenSubtitles v3 Addon for Stremio',
-      logo: 'https://www.strem.io/images/addons/opensubtitles-logo.png',
-      types: ['movie', 'series'],
-    },
-  },
+const RECOMMENDED_ADDON_SEEDS = [
+  { transportName: 'Comet',            transportUrl: 'https://comet.zentrio.eu/manifest.json' },
+  { transportName: 'Torz',             transportUrl: 'https://stremthru.zentrio.eu/stremio/torz/manifest.json' },
+  { transportName: 'OpenSubtitles v3', transportUrl: 'https://opensubtitles-v3.strem.io/manifest.json' },
+  { transportName: 'SubDL',            transportUrl: 'https://subdl.strem.top/manifest.json' },
 ]
 
 export interface ExploreAddonsScreenModel {
@@ -103,6 +59,7 @@ export interface ExploreAddonsScreenModel {
 export function useExploreAddonsScreenModel(): ExploreAddonsScreenModel {
   const navigate = useNavigate()
   const [addons, setAddons] = useState<AddonRecord[]>([])
+  const [recommendedAddons, setRecommendedAddons] = useState<AddonRecord[]>([])
   const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [errorMessage, setErrorMessage] = useState('')
@@ -124,6 +81,18 @@ export function useExploreAddonsScreenModel(): ExploreAddonsScreenModel {
     setErrorMessage('')
     try {
       const addonsPromise = fetch('https://api.strem.io/addonscollection.json').then((response) => response.json())
+      const recommendedPromise = Promise.all(
+        RECOMMENDED_ADDON_SEEDS.map(async (seed) => {
+          try {
+            const res = await fetch(seed.transportUrl)
+            if (!res.ok) return null
+            const manifest = await res.json()
+            return { transportName: seed.transportName, transportUrl: seed.transportUrl, manifest } as AddonRecord
+          } catch {
+            return null
+          }
+        })
+      ).then((results) => results.filter(Boolean) as AddonRecord[])
 
       const profilesResponse = await apiFetch('/api/user/settings-profiles')
       let profileId = ''
@@ -147,8 +116,9 @@ export function useExploreAddonsScreenModel(): ExploreAddonsScreenModel {
         }
       }
 
-      const addonsData = await addonsPromise
+      const [addonsData, recommended] = await Promise.all([addonsPromise, recommendedPromise])
       setAddons(addonsData)
+      setRecommendedAddons(recommended)
       setInstalledAddons(installed)
       setStatus('ready')
     } catch (error) {
@@ -252,7 +222,7 @@ export function useExploreAddonsScreenModel(): ExploreAddonsScreenModel {
     searchQuery,
     selectedCategory,
     categories,
-    recommendedAddons: RECOMMENDED_ADDONS,
+    recommendedAddons,
     filteredAddons,
     installedAddons,
     processingAddonId,

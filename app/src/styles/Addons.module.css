@@ -6,10 +6,11 @@
    Page Layout
    ============================================ */
 .addonsPage {
-  min-height: 100vh;
-  min-height: var(--app-height, 100vh);
+  height: 100vh;
+  height: var(--app-height, 100vh);
   position: relative;
   z-index: 1;
+  overflow-y: auto;
   padding-top: calc(100px + var(--app-content-top-offset, 0px));
   padding-bottom: 60px;
 }
@@ -713,6 +714,7 @@
 
 @media (max-width: 768px) {
   .addonsPage {
+    height: var(--app-height, 100svh);
     padding-top: calc(80px + var(--app-content-top-offset, 0px));
   }
   
