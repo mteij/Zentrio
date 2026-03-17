@@ -8,8 +8,8 @@
 
 # Route /download/:platform to the function via query param
 [[redirects]]
-  from = "/download/*"
-  to = "/.netlify/functions/download?platform=:splat"
+  from = "/download/:platform"
+  to = "/.netlify/functions/download?platform=:platform"
   status = 200
 
 # SPA fallback - all other routes go to index.html
