@@ -1,0 +1,112 @@
+.filterCard {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.filterActive {
+  background: rgba(229, 9, 20, 0.16);
+  color: #fff;
+}
+
+.genreChip {
+  min-width: 220px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  text-align: left;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.card {
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 17, 21, 0.94);
+  color: #fff;
+}
+
+.posterShell {
+  position: relative;
+}
+
+.poster {
+  width: 100%;
+  aspect-ratio: 0.72;
+  display: block;
+  object-fit: cover;
+  object-position: center top;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.posterBadges {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 60px);
+}
+
+.posterBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: rgba(5, 7, 10, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  backdrop-filter: blur(6px);
+}
+
+.watchedBadge {
+  color: #4ade80;
+}
+
+.ratingBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #f5c518;
+}
+
+.body {
+  padding: 14px 16px 16px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.35;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.meta {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.82rem;
+}

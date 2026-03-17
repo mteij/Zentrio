@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
 import { isTauri } from '../../lib/auth-client'
+import { ZENTRIO_LOGO_192_URL } from '../../lib/brand-assets'
 import styles from '../../styles/Settings.module.css'
 import { createLogger } from '../../utils/client-logger'
 import { Button, Input, Toggle } from '../index'
@@ -418,7 +419,7 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
                             </div>
                             <div className={styles.addonInfo}>
                                 {isZentrio ? (
-                                    <img className={styles.addonLogo} src="/static/logo/icon-192.png" alt="Zentrio" />
+                                    <img className={styles.addonLogo} src={ZENTRIO_LOGO_192_URL} alt="Zentrio" />
                                 ) : addon.logo ? (
                                     <img className={styles.addonLogo} src={addon.logo} alt={addon.name} />
                                 ) : (

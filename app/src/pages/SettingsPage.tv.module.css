@@ -1,0 +1,241 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.railItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 0.3rem;
+  padding: 15px 16px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.railActive {
+  background: linear-gradient(180deg, rgba(229, 9, 20, 0.18), rgba(229, 9, 20, 0.08));
+  color: #fff;
+}
+
+.railIcon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.railActive .railIcon {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.railLabel {
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 12, 16, 0.78);
+}
+
+.profileLabel {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.profileSelectorWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.sectionTitleRow {
+  padding: 4px 2px 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+
+.tvSettingsContent {
+  min-width: 0;
+}
+
+.tvSettingsContent :global(.tabContent) {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tvSettingsContent :global(.settingsCard) {
+  margin-bottom: 0;
+  padding: 24px 26px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 14, 18, 0.84);
+  box-shadow: none;
+}
+
+.tvSettingsContent :global(.settingsCard:hover) {
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.tvSettingsContent :global(.sectionTitle) {
+  margin-bottom: 18px;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.tvSettingsContent :global(.sectionTitle::before) {
+  width: 5px;
+  height: 24px;
+}
+
+.tvSettingsContent :global(.settingItem) {
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.tvSettingsContent :global(.settingInfo h3),
+.tvSettingsContent :global(.settingItem h3) {
+  font-size: 1.04rem;
+  font-weight: 700;
+}
+
+.tvSettingsContent :global(.settingInfo p),
+.tvSettingsContent :global(.settingItem p),
+.tvSettingsContent :global(.dlSettingDesc),
+.tvSettingsContent :global(.addonDescription) {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.tvSettingsContent :global(button),
+.tvSettingsContent :global(select),
+.tvSettingsContent :global(input[type="text"]),
+.tvSettingsContent :global(input[type="password"]),
+.tvSettingsContent :global(input[type="range"]) {
+  font-size: 0.97rem;
+}
+
+.tvSettingsContent :global(button),
+.profileSelectorWrap :global(button) {
+  min-height: 46px;
+}
+
+.tvSettingsContent :global(select),
+.profileSelectorWrap :global(select),
+.tvSettingsContent :global(input[type="text"]),
+.tvSettingsContent :global(input[type="password"]) {
+  min-height: 50px;
+  border-radius: 14px;
+  padding: 12px 16px;
+}
+
+.tvSettingsContent :global([role='switch']) {
+  width: 62px !important;
+  height: 34px !important;
+  border-radius: 999px !important;
+}
+
+.tvSettingsContent :global([role='switch'] > div) {
+  width: 26px !important;
+  height: 26px !important;
+  top: 3px !important;
+}
+
+.profileSelectorWrap :global(h3),
+.profileSelectorWrap :global(p) {
+  display: none;
+}
+
+.profileSelectorWrap :global(select) {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.profileSelectorWrap :global(button) {
+  border-radius: 12px;
+}
+
+.tvSettingsContent :global(.dlQualityList),
+.tvSettingsContent :global(.dlProfileList),
+.tvSettingsContent :global(.sortableList) {
+  gap: 12px;
+}
+
+.tvSettingsContent :global(.dlQualityRow),
+.tvSettingsContent :global(.dlFolderRow),
+.tvSettingsContent :global(.languageItem),
+.tvSettingsContent :global(.sortableItem),
+.tvSettingsContent :global(.addonItem) {
+  border-radius: 16px;
+}
+
+.tvSettingsContent :global(.gridOptions) {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.tvSettingsContent :global(.sortableGrid) {
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.tvSettingsContent :global(.optionCard),
+.tvSettingsContent :global(.sortableItem),
+.tvSettingsContent :global(.languageItem) {
+  min-height: 56px;
+}
+
+.tvSettingsContent :global(.dlFolderBtn),
+.tvSettingsContent :global(.dlClearBtn),
+.tvSettingsContent :global(.sortDirectionBtn) {
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 0.84rem;
+}
+
+.tvSettingsContent :global(.dropdownToggle) {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+@media (max-width: 1500px) {
+  .profileRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

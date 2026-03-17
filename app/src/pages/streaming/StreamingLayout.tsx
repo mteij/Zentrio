@@ -7,6 +7,7 @@ import { useOfflineMode } from '../../hooks/useOfflineMode'
 import { useDownloads } from '../../hooks/useDownloads'
 import { useEffect } from 'react'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
+import { getPlatformCapabilities } from '../../lib/platform-capabilities'
 import { shouldPreload } from '../../utils/route-preloader'
 import { useAuthStore } from '../../stores/authStore'
 import { createLogger } from '../../utils/client-logger'
@@ -39,6 +40,7 @@ export const StreamingLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
+  const platform = getPlatformCapabilities()
 
   // Initialize download store + event listeners for this profile
   useDownloads(profileId)
@@ -169,13 +171,12 @@ export const StreamingLayout = () => {
   const isCatalog = firstSegment === 'catalog'
   const searchParams = new URLSearchParams(location.search)
   const isExploreSeeAll = firstSegment === 'explore' && (searchParams.has('genre') || searchParams.has('type'))
-  
   // If we have a first segment matching a type (e.g. 'movie', 'series') and it's not a reserved route,
   // then it's a details page.
   // Note: Home page has empty pathParts or firstSegment undefined
   const isDetails = firstSegment && !mainRoutes.includes(firstSegment) && !isPlayer
 
-  const shouldHideNavbar = isPlayer || isDetails || isCatalog || isExploreSeeAll
+  const shouldHideNavbar = platform.canUseRemoteNavigation || isPlayer || isDetails || isCatalog || isExploreSeeAll
 
   return (
     <>

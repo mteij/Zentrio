@@ -1,0 +1,35 @@
+.scope {
+  min-height: 100%;
+}
+
+.item {
+  appearance: none;
+  border: 1px solid transparent;
+  background: none;
+  color: inherit;
+  text-align: inherit;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition:
+    transform var(--transition-smooth),
+    box-shadow var(--transition-smooth),
+    border-color var(--transition-smooth),
+    background-color var(--transition-smooth);
+}
+
+.item[data-tv-disabled='true'] {
+  cursor: default;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.item:focus-visible,
+.item[data-tv-active='true'] {
+  outline: none;
+  border-color: var(--tv-focus-ring);
+  box-shadow: var(--tv-focus-shadow), 0 20px 48px rgba(0, 0, 0, 0.35);
+  transform: scale(var(--tv-focus-scale));
+}

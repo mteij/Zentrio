@@ -7,6 +7,7 @@ import { BackButton } from "../../components/ui/BackButton";
 import { useAuthStore } from "../../stores/authStore";
 import { appMode } from "../../lib/app-mode";
 import { useNavigate } from "react-router-dom";
+import { getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
 
 export function SignInPage() {
   // Force reload removed to prevent infinite loop
@@ -17,7 +18,7 @@ export function SignInPage() {
 
   useEffect(() => {
     if (!isLoading && (isAuthenticated || appMode.isGuest())) {
-      navigate('/profiles', { replace: true });
+      navigate(appMode.isGuest() ? '/profiles' : getLoginBehaviorRedirectPath(), { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate]);
 

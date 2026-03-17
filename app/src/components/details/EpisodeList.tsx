@@ -67,6 +67,7 @@ interface EpisodeListProps {
   showImdbRatings: boolean
   showAgeRatings: boolean
   profileId: string
+  canDownload: boolean
 }
 
 // ── Main EpisodeList ─────────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ export function EpisodeList({
   showImdbRatings,
   showAgeRatings,
   profileId,
+  canDownload,
 }: EpisodeListProps) {
   const navigate = useNavigate()
   const [pickerEpisode, setPickerEpisode] = useState<{
@@ -408,7 +410,7 @@ export function EpisodeList({
           {allWatched ? <EyeOff size={13} /> : <Eye size={13} />}
           {allWatched ? 'Unwatch Season' : 'Watch Season'}
         </button>
-        {isTauri() && (
+        {canDownload && (
           <DropdownMenu
             compact
             items={[
@@ -474,7 +476,7 @@ export function EpisodeList({
                   icon: Play,
                   onClick: () => onPlay(ep.season, epNum, epTitle),
                 },
-                ...(isTauri() && !isCompleted && !isInProgress
+                ...(canDownload && !isCompleted && !isInProgress
                   ? [{
                       label: 'Download episode',
                       icon: Download,
@@ -673,7 +675,7 @@ export function EpisodeList({
                     </>
                   ) : (
                     <>
-                      {isTauri() && (
+                      {canDownload && (
                         <button
                           className={styles.epBtn}
                           onClick={() =>

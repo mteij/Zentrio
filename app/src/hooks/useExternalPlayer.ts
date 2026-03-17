@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { isTauri } from '../lib/auth-client'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('useExtPlayer')
@@ -9,13 +10,13 @@ interface ExternalPlayerOptions {
 }
 
 export function useExternalPlayer() {
-  const isTauri = !!(window as any).__TAURI__
+  const inTauri = isTauri()
 
   /** Open the URL with whatever the device's default handler is. */
   const openExternal = useCallback(async (options: ExternalPlayerOptions) => {
     const { url } = options
 
-    if (isTauri) {
+    if (inTauri) {
       try {
         const { openUrl } = await import('@tauri-apps/plugin-opener')
         await openUrl(url)
@@ -29,7 +30,7 @@ export function useExternalPlayer() {
     // Web fallback — let the browser / OS decide
     window.open(url, '_blank', 'noopener,noreferrer')
     return { success: true, message: 'Opened in external player' }
-  }, [isTauri])
+  }, [inTauri])
 
-  return { openExternal, isTauri }
+  return { openExternal, isTauri: inTauri }
 }

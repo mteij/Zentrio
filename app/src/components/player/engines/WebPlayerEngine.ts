@@ -6,6 +6,7 @@
  */
 
 import Hls from 'hls.js'
+import { isTauriRuntime } from '../../../lib/runtime-env'
 import type {
   IPlayerEngine,
   PlayerState,
@@ -51,8 +52,7 @@ interface AudioTrackList {
  * Check if running in Tauri environment
  */
 function isTauriEnvironment(): boolean {
-  return typeof window !== 'undefined' &&
-    ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+  return isTauriRuntime()
 }
 
 /**
@@ -544,7 +544,7 @@ export class WebPlayerEngine implements IPlayerEngine {
   // ============================================
 
   async canPlay(source: MediaSource): Promise<boolean> {
-    // Don't use WebPlayerEngine in Tauri
+    // Tauri uses native playback engines instead of the web engine.
     if (isTauriEnvironment()) {
       return false
     }

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Youtube, Check, List, Eye, EyeOff, Download, CheckCircle, Loader, ChevronLeft, Info } from 'lucide-react'
+import { Check, CheckCircle, ChevronLeft, Download, Eye, EyeOff, Info, List, Loader, Play, Youtube } from 'lucide-react'
 import { toast } from 'sonner'
 import { DropdownMenu } from '../../components/ui/DropdownMenu'
-import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadForMedia } from '../../hooks/useDownloads'
-import { isTauri } from '../../lib/auth-client'
+import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadStore } from '../../stores/downloadStore'
 import { getTopStream, readCachedTopStream, resolveTopStream } from '../../lib/topStreamCache'
 import styles from './Details.module.css'
@@ -27,7 +26,7 @@ interface DetailsHeaderProps {
   onShowInfoModal: () => void
   onToggleWatched: () => void
   onMarkSeriesWatched: (watched: boolean) => void
-  /** Called when back is tapped while in series stream view — goes back to episode list */
+  canDownload: boolean
   onBackFromStreams?: () => void
   children?: React.ReactNode
 }
@@ -45,31 +44,30 @@ export function DetailsHeader({
   onShowInfoModal,
   onToggleWatched,
   onMarkSeriesWatched,
+  canDownload,
   onBackFromStreams,
   children,
 }: DetailsHeaderProps) {
   const navigate = useNavigate()
-  const inTauri = isTauri()
   const [resolvingDownloadStream, setResolvingDownloadStream] = useState(false)
   const existingDownload = useDownloadForMedia(meta.id)
   const addDownload = useDownloadStore((s) => s.addDownload)
 
-  // Warm a fresh top stream for movie downloads in the background.
   useEffect(() => {
-    if (!inTauri || meta.type !== 'movie' || !profileId) return
+    if (!canDownload || meta.type !== 'movie' || !profileId) return
     const cached = readCachedTopStream(meta.id)
     if (cached && !cached.stale) return
+
     void resolveTopStream({
       profileId,
       mediaType: meta.type,
       mediaId: meta.id,
       forceRefresh: Boolean(cached),
     })
-  }, [inTauri, meta.id, meta.type, profileId])
+  }, [canDownload, meta.id, meta.type, profileId])
 
   const handleDownload = async (quality?: DownloadQuality) => {
-    if (!inTauri) return
-    if (!meta || !profileId) return
+    if (!canDownload || !profileId) return
     const resolvedQuality: DownloadQuality = quality ?? ((localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality)
 
     try {
@@ -79,6 +77,7 @@ export function DetailsHeader({
         mediaType: meta.type,
         mediaId: meta.id,
       })
+
       if (!stream) {
         toast.error('Could not resolve a stream yet. Please try again in a moment.')
         return
@@ -95,6 +94,7 @@ export function DetailsHeader({
         quality: resolvedQuality,
         subtitleUrls: stream.subtitles,
       })
+
       addDownload({
         id,
         profileId: profileId.toString(),
@@ -132,13 +132,11 @@ export function DetailsHeader({
     }
   }
 
-  // Season / episode counts for series
   const seasonCount = meta.type === 'series' && meta.videos
     ? new Set(meta.videos.map((v: any) => v.season).filter(Boolean)).size
     : 0
   const episodeCount = meta.type === 'series' && meta.videos ? meta.videos.length : 0
 
-  // Filter out age-rating genres that creep into the genre list
   const genres = meta.genres
     ?.filter(g => !['PG', 'PG-13', 'R', 'NC-17', 'G', 'TV-Y', 'TV-Y7', 'TV-G', 'TV-PG',
       'TV-14', 'TV-MA', 'NR', 'UR', '12', '12A', '15', '18', 'U', 'R13', 'R16',
@@ -147,10 +145,10 @@ export function DetailsHeader({
     .join(' · ')
 
   const dlStatus = existingDownload?.status
+  const ageRating = (meta as any).certification || (meta as any).rating || (meta as any).contentRating
 
   return (
     <>
-      {/* Full-page ambient background */}
       <div className={styles.page}>
         <div
           className={styles.backdrop}
@@ -159,7 +157,6 @@ export function DetailsHeader({
         <div className={styles.backdropScrim} />
 
         <div className={styles.content}>
-          {/* Top bar */}
           <div className={styles.topBar}>
             <button className={styles.backBtn} onClick={handleBack}>
               <ChevronLeft size={20} />
@@ -167,9 +164,7 @@ export function DetailsHeader({
             </button>
           </div>
 
-          {/* Compact header — always visible */}
           <div className={styles.header}>
-            {/* Small poster */}
             <div className={styles.posterWrap}>
               {meta.poster ? (
                 <img src={meta.poster} alt={meta.name} className={styles.poster} />
@@ -178,7 +173,6 @@ export function DetailsHeader({
               )}
             </div>
 
-            {/* Info */}
             <div className={styles.headerInfo}>
               {meta.logo ? (
                 <img src={meta.logo} alt={meta.name} className={styles.logo} />
@@ -186,7 +180,6 @@ export function DetailsHeader({
                 <h1 className={styles.title}>{meta.name}</h1>
               )}
 
-              {/* Metadata badges */}
               <div className={styles.metaRow}>
                 {meta.released && (
                   <span className={styles.metaBadge}>{String(meta.released).split('-')[0]}</span>
@@ -199,11 +192,9 @@ export function DetailsHeader({
                     IMDb {meta.imdbRating}
                   </span>
                 )}
-                {/* @ts-expect-error: intentional type mismatch */}
-                {showAgeRatings && (meta.certification || meta.rating || meta.contentRating) && (
+                {showAgeRatings && ageRating && (
                   <span className={`${styles.metaBadge} ${styles.metaBadgeRating}`}>
-                    {/* @ts-expect-error: intentional type mismatch */}
-                    {meta.certification || meta.rating || meta.contentRating}
+                    {ageRating}
                   </span>
                 )}
                 {seasonCount > 0 && (
@@ -218,9 +209,7 @@ export function DetailsHeader({
                 )}
               </div>
 
-              {/* Action buttons */}
               <div className={styles.actions}>
-                {/* Play — movies only (series uses EpisodeList quick-play) */}
                 {meta.type === 'movie' && (
                   <button className={styles.playBtn} onClick={onMoviePlay}>
                     <Play size={17} fill="currentColor" />
@@ -228,32 +217,34 @@ export function DetailsHeader({
                   </button>
                 )}
 
-                {/* Download — movies only in Phase 1 */}
-                  {inTauri && meta.type === 'movie' && (() => {
-                    if (dlStatus === 'completed') {
-                      return (
-                        <button className={`${styles.downloadBtn} ${styles.downloadBtnDone}`} disabled>
+                {canDownload && meta.type === 'movie' && (() => {
+                  if (dlStatus === 'completed') {
+                    return (
+                      <button className={`${styles.downloadBtn} ${styles.downloadBtnDone}`} disabled>
                         <CheckCircle size={15} />
                         Downloaded
                       </button>
                     )
                   }
+
                   if (dlStatus === 'downloading' || dlStatus === 'queued') {
                     return (
                       <button className={`${styles.downloadBtn} ${styles.downloadBtnActive}`} disabled>
                         <Loader size={15} className="animate-spin" />
-                        Downloading…
+                        Downloading...
                       </button>
                     )
                   }
+
                   if (resolvingDownloadStream) {
                     return (
                       <button className={`${styles.downloadBtn} ${styles.downloadBtnActive}`} disabled>
                         <Loader size={15} className="animate-spin" />
-                        Resolving…
+                        Resolving...
                       </button>
                     )
                   }
+
                   return (
                     <button
                       className={styles.downloadBtn}
@@ -266,7 +257,6 @@ export function DetailsHeader({
                   )
                 })()}
 
-                {/* Trailer */}
                 {meta.trailerStreams && meta.trailerStreams.length > 0 && (
                   <button
                     className={styles.iconBtn}
@@ -276,7 +266,7 @@ export function DetailsHeader({
                       const trailerMeta = {
                         id: meta.id,
                         type: meta.type,
-                        name: `${meta.name} — Trailer`,
+                        name: `${meta.name} - Trailer`,
                         poster: meta.poster,
                       }
                       navigate(
@@ -289,7 +279,6 @@ export function DetailsHeader({
                   </button>
                 )}
 
-                {/* Add to list */}
                 <button
                   className={`${styles.iconBtn} ${inList ? styles.iconBtnActive : ''}`}
                   onClick={onShowListModal}
@@ -298,7 +287,6 @@ export function DetailsHeader({
                   {inList ? <Check size={17} /> : <List size={17} />}
                 </button>
 
-                {/* Three-dot menu */}
                 <DropdownMenu
                   items={[
                     ...(meta.app_extras?.cast || meta.director
@@ -318,21 +306,16 @@ export function DetailsHeader({
                 />
               </div>
 
-              {/* Genres */}
               {genres && <p className={styles.genres}>{genres}</p>}
-
-              {/* Description */}
               {meta.description && (
                 <p className={styles.description}>{meta.description}</p>
               )}
             </div>
           </div>
 
-          {/* Children: EpisodeList or StreamSelector */}
           {children}
         </div>
       </div>
-
     </>
   )
 }

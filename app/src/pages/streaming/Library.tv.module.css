@@ -1,0 +1,77 @@
+.railGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.railLabel {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.65);
+}
+
+.listChip {
+  min-width: 13rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 18, 27, 0.92);
+  color: white;
+  text-align: left;
+}
+
+.listChipTitle {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.listChipMeta {
+  font-size: 0.84rem;
+  color: rgba(203, 213, 225, 0.7);
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 18, 27, 0.92);
+  color: white;
+  text-align: left;
+}
+
+.poster {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 0.9rem;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.cardTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.cardMeta {
+  font-size: 0.82rem;
+  color: rgba(203, 213, 225, 0.7);
+}
+
+.inviteCard {
+  width: min(100%, 24rem);
+}
+
+.emptyCard {
+  max-width: 32rem;
+}

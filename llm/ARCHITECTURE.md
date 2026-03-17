@@ -14,11 +14,12 @@ Zentrio is a self-hosted streaming platform built around:
 - a Tauri v2 native shell for desktop and mobile
 - a Stremio-compatible addon ecosystem
 
-The project currently supports three product shapes:
+The project currently supports four product shapes:
 
 - Web: React SPA served by the Bun/Hono server
 - Desktop: Tauri app with a Rust shell and a bundled Bun sidecar in production
 - Mobile: Tauri Android/iOS shell plus the same React app and Rust command layer
+- TV: Android TV / Chromecast with Google TV - the same Tauri Android app with TV-specific UI and remote-navigation primitives; not a separate product
 
 ## Current Architecture Snapshot
 
@@ -28,15 +29,171 @@ Zentrio is in a hybrid phase. The important boundaries are:
 - Third-party addon fetching increasingly happens on the client:
   - Tauri uses direct HTTP for external addon URLs.
   - Web tries direct fetch first and falls back to `/api/addon-proxy` when CORS blocks the addon.
-- Stream resolution for the main playback flow is now client-side through `src/lib/stream-resolver.ts`.
+- Stream resolution for the main playback flow is now client-side through `app/src/lib/stream-resolver.ts`.
 - The legacy server-driven SSE endpoint `/api/streaming/streams-live` still exists for compatibility and gateway forwarding.
 - Native connected mode also has a local-only read gateway at `/api/gateway/*` so the sidecar can proxy selected read routes to a remote server.
 
 Alpha rule: the client, Bun server, and native shell are expected to move together. Do not optimize for backward compatibility over code clarity unless the task explicitly requires it.
 
-## Repo Layout
+## Platform Targets
 
-Top-level directories:
+All target classification is owned by `app/src/lib/app-target.ts`. Nothing else should replicate platform detection logic.
+
+| Target | `AppTargetKind` | How detected | Primary input |
+| --- | --- | --- | --- |
+| Web | `web` | Not Tauri, not TV UA | `mouse` |
+| Desktop | `desktop` | Tauri + not Android/iOS | `mouse` |
+| Mobile | `mobile` | Tauri + Android or iOS | `touch` |
+| TV | `tv` | Tauri + native `getEnvironment` -> `isTv: true`; fallback: TV UA or Tauri+Android+no-hover+wide viewport | `remote` |
+
+The native `plugin:tv-launcher|getEnvironment` command is invoked at startup in `hydrateNativeAppTarget()` from `app/src/main.tsx`. It returns `{ isTv: boolean }`. All target heuristics are overridden by this value when available.
+
+Derived capability questions belong in `app/src/lib/platform-capabilities.ts`.
+Examples:
+
+- `shouldShowTitleBar`
+- `shouldUseTvHome`
+- `canUseRemoteNavigation`
+- `supportsTouchGestures`
+
+Components should ask capability questions instead of composing raw target checks inline.
+
+### Google TV development environment
+
+- Emulator: AVD named `ZentrioGoogleTV` running Android TV image
+- Logical CSS viewport: about `960x540px` (`1920x1080` at `2x` device pixel ratio)
+- Key consequence: Tailwind `xl:` breakpoints never activate on TV; TV layouts need explicit TV CSS, not desktop breakpoint assumptions
+- Dev script: `app/scripts/google-tv.ps1 -Action dev|build|install|logcat`
+- In dev mode the onboarding defaults to `http://localhost:3000` and `/activate` points to `http://localhost:5173/activate`
+
+## Platform Request Flow Matrix
+
+### Authentication
+
+| Platform | Flow |
+| --- | --- |
+| Web | Better Auth cookie/session; browser handles OAuth redirects natively |
+| Desktop | Better Auth with Bearer token persisted in localStorage; deep links (`zentrio://`) receive OAuth callbacks |
+| Mobile | Same as Desktop |
+| TV | Device-link pairing only - user visits `/activate` on any browser, signs in, receives a 6-digit code; TV onboarding redeems that code. No browser OAuth in the TV WebView. |
+
+### API calls
+
+| Platform | Route | Notes |
+| --- | --- | --- |
+| Web (dev) | `/api/*` -> Vite proxy -> Hono :3000 | Two-server dev model |
+| Web (prod) | `/api/*` -> same Hono process | Hono serves `dist/` and API from one process |
+| Desktop (dev) | direct to Hono sidecar on localhost | `apiFetch` resolves base URL from local state |
+| Desktop (prod) | same, Bun sidecar bundled inside `.app`/`.exe` | sidecar spawned by `lib.rs` |
+| Mobile | same as Desktop | |
+| TV | same as Desktop; remote reads may use `/api/gateway/*` | gateway is local-only and allowlisted |
+
+### Addon fetching
+
+| Platform | Strategy |
+| --- | --- |
+| Web | Direct fetch first; fall back to `/api/addon-proxy` when CORS blocks the addon |
+| Desktop | Direct HTTP via Tauri HTTP plugin |
+| Mobile | Same as Desktop |
+| TV | Same as Desktop |
+
+All external addon requests go through `app/src/lib/addon-fetch.ts`.
+Do not call addon URLs with raw `fetch()`.
+
+### Static assets
+
+| Platform | Behavior |
+| --- | --- |
+| Web | Served from `public/` by Vite (dev) or Hono static handler (prod) |
+| Desktop / Mobile / TV | Shared client assets should resolve through canonical helpers such as `app/src/lib/brand-assets.ts`, which build URLs from `import.meta.env.BASE_URL`. Do not scatter hardcoded `"/static/..."` strings through the client. |
+
+### Playback engine
+
+Engine selection lives in `app/src/components/player/engines/factory.ts`.
+
+| Platform | Source type | Engine | Reason |
+| --- | --- | --- | --- |
+| Web | HLS `.m3u8` | `WebPlayerEngine` -> HLS.js | Browsers lack native HLS |
+| Web | MP4 / WebM | `WebPlayerEngine` -> native `<video>` | |
+| Web | MKV / unknown | `HybridPlayerEngine` | Browser fallback/transcoding path |
+| Desktop | Any | `TauriPlayerEngine` | System decoders |
+| Mobile iOS | Any | `TauriPlayerEngine` | AVFoundation |
+| Mobile Android | Any | `AndroidNativePlayerEngine` | ExoPlayer overlay |
+| TV | Any | `AndroidNativePlayerEngine` | Same ExoPlayer path; TV vs phone is a UI/control concern, not a separate playback stack |
+
+Important player contract notes:
+
+- Android playback is delegated through the native `plugin:exo-player` bridge.
+- Native player back is surfaced to TypeScript as `close`, not `ended`.
+- `ZentrioPlayer` disables the React transport UI on Tauri Android because the native ExoPlayer overlay owns the visible control surface there.
+
+## Adaptive Screen Architecture
+
+The current frontend direction is:
+
+- one route URL per feature
+- one shared screen-model hook per route
+- one standard renderer for web/desktop/mobile
+- one TV renderer for Android TV
+
+Canonical file pattern:
+
+- `<Page>.tsx` or `<Page>Route.tsx` = route wrapper only
+- `<Page>.model.ts` = shared data, derived state, and route actions
+- `<Page>.standard.tsx` = web/desktop/mobile renderer
+- `<Page>.tv.tsx` = Android TV renderer
+
+Route wrapper rule:
+
+- call the shared `use<Page>ScreenModel()`
+- render `AdaptiveScreen`
+- do not bury large `isTv` branches inside the page body
+
+This keeps fetching, mutations, navigation rules, and derived state shared while letting composition differ by surface.
+
+### Standard vs TV design split
+
+Treat the UI as two design families, not four:
+
+- Standard family: web browser, desktop Tauri, phone, and tablet
+- TV family: Android TV / Google TV when `canUseRemoteNavigation === true`
+
+Standard-family rules:
+
+- desktop, mobile web, and Tauri mobile share the `StandardView`
+- differences inside the standard family should usually be responsive layout, touch affordances, safe-area handling, or titlebar behavior
+- do not fork separate route trees for web vs desktop vs mobile unless the product flow truly differs
+
+TV-family rules:
+
+- TV gets its own `TvView`
+- TV composition is remote-first: explicit focus zones, large targets, deterministic back behavior, and readable spacing at distance
+- TV owns its shell through `TvPageScaffold` rather than inheriting the standard navbar/layout
+- TV pages should use `TvFocusScope`, `TvFocusZone`, `TvFocusItem`, `TvShelf`, `TvGrid`, `TvActionStrip`, and `TvDialog`
+
+Design-boundary rule:
+
+- use shared models and shared backend contracts
+- separate the renderers
+- avoid making every shared component "TV-aware"
+
+If a page starts accumulating many `isTv` branches, stop and split it into `.standard.tsx` and `.tv.tsx` instead.
+
+### Adaptive UI layer
+
+| File | Purpose |
+| --- | --- |
+| `app/src/components/tv/AdaptiveScreen.tsx` | Route boundary that selects `StandardView` vs `TvView` |
+| `app/src/components/tv/TvFocusContext.tsx` | TV focus provider, scopes, zones, items, D-pad movement, and back-key handling |
+| `app/src/components/tv/TvPageScaffold.tsx` | Shared Android TV shell: sticky rail, header, content area, shelves, grids, dialogs |
+| `app/src/pages/streaming/Home.tsx` + `Home.model.ts` + `Home.standard.tsx` + `Home.tv.tsx` | Canonical adaptive split for a streaming page |
+| `app/src/pages/ProfilesPage.tsx` + `ProfilesPage.model.ts` + `ProfilesPage.standard.tsx` + `ProfilesPage.tv.tsx` | Canonical adaptive split for a non-streaming page |
+| `app/src/pages/SettingsPage.tsx` + `SettingsPage.model.ts` + `SettingsPage.standard.tsx` + `SettingsPage.tv.tsx` | Adaptive settings surface |
+| `app/src/pages/ActivateDevicePage.tsx` | Web page at `/activate` used by TV pairing |
+| `app/src-tauri/gen/android/app/src/main/java/com/zentrio/mteij/TvLauncherPlugin.kt` | Native Android plugin exposing `getEnvironment` and launcher integration |
+| `app/src-tauri/gen/android/app/src/main/java/com/zentrio/mteij/ExoPlayerPlugin.kt` | Native Android ExoPlayer plugin |
+
+## Repo Layout
 
 | Path | Purpose |
 | --- | --- |
@@ -65,7 +222,8 @@ Hard boundary rules:
 
 - Server code must not depend on browser globals like `window`, `document`, `localStorage`, or `import.meta.env`.
 - Client code must not import Bun-only modules like `bun:sqlite` or server-only services like `src/services/envParser.ts`.
-- Native Rust code owns Tauri commands, OS integration, downloads, and plugin registration. Do not reimplement those concerns in TypeScript.
+- Native Rust code owns Tauri commands, OS integration, downloads, and plugin registration.
+- Android TV launcher integrations such as Watch Next / Continue Watching are OS integration and stay in the native layer.
 
 ## App Entry Points
 
@@ -82,9 +240,7 @@ Responsibilities:
 - serves built assets and SPA fallbacks
 - mounts `/api/*` routers and non-API view routes
 
-Non-goal:
-
-- business logic does not belong here
+Business logic does not belong here.
 
 ### `app/src/main.tsx` and `app/src/renderer.tsx`
 
@@ -104,7 +260,7 @@ Key responsibilities:
 - React Router route tree
 - lazy loading for page-level code splitting
 - TanStack Query client setup
-- Tauri onboarding and connected-vs-guest mode flow
+- Tauri onboarding and connected-vs-guest flow
 - deep link handling for native auth flows
 - route protection via auth/admin guards
 
@@ -114,241 +270,83 @@ All Bun API routers live in `app/src/routes/api/`.
 Each file should validate input, call services, and return a response.
 Do not bury business rules directly in route handlers if a reusable service is the better home.
 
-### `app/src/routes/api/index.ts`
-
-Mounts the API surface and also owns:
-
-- `GET /api`
-- `GET /api/health`
-- OpenAPI generation
-- Scalar docs at `/api/docs`
-
-### Route Map
+### Route map
 
 | File | Mount | Purpose |
 | --- | --- | --- |
-| `auth.ts` | `/api/auth` | Better Auth flows plus native/mobile helper endpoints like provider discovery, identify, link proxy, and mobile callback handling. `/providers` returns `oidcProviders[]` for multi-OIDC. OIDC login/link goes through `signInWithOAuth2`/`oauth2/link` (genericOAuth); social providers still use `signInSocial`/`link-social`. |
+| `auth.ts` | `/api/auth` | Better Auth flows plus native/mobile/TV helper endpoints |
 | `profiles.ts` | `/api/profiles` | Profile CRUD plus per-profile proxy/filter settings |
-| `user.ts` | `/api/user` | Settings profiles, user settings, linked accounts, TMDB key, email/password/username/account management |
-| `streaming.ts` | `/api/streaming` | Streaming settings, dashboard data, details, catalog/search, progress/history, subtitles, stream endpoints, IntroDB segment fetch/submit, filter-enrich |
+| `user.ts` | `/api/user` | Settings profiles, user settings, account management |
+| `streaming.ts` | `/api/streaming` | Streaming settings, dashboard, details, catalog/search, progress/history, subtitles, streams, IntroDB endpoints, filter-enrich |
 | `addons.ts` | `/api/addons` | Addon install/remove/list, enable/disable/reorder per settings profile |
 | `lists.ts` | `/api/lists` | Watchlists and sharing |
 | `appearance.ts` | `/api/appearance` | Appearance settings |
 | `sync.ts` | `/api/sync` | Native/cloud sync config plus sync token, push, and pull endpoints |
-| `trakt.ts` | `/api/trakt` | Trakt availability, auth flows, sync, recommendations, scrobble, and check-in |
-| `gateway.ts` | `/api/gateway` | Local-sidecar-only read gateway that forwards selected remote read routes for connected Tauri mode |
-| `admin.ts` | `/api/admin` | Admin status/setup, stats, charts, platform analytics, users, audit log, and step-up verification |
+| `trakt.ts` | `/api/trakt` | Trakt availability, auth flows, sync, recommendations, scrobble, check-in |
+| `gateway.ts` | `/api/gateway` | Local-sidecar-only read gateway |
+| `admin.ts` | `/api/admin` | Admin status/setup, stats, charts, users, audit log, step-up verification |
 | `avatar.ts` | `/api/avatar` | Avatar generation |
-| `proxy.ts` | `/api/addon-proxy` | Thin SSRF-guarded compatibility proxy for external addon URLs |
-| `tmdb-proxy.ts` | `/api/tmdb` | Internal TMDB-addon facade; keeps API keys server-side |
-| `openapi.ts` | `/api/openapi.json` support | OpenAPI schema definitions and generation helpers |
-| `openapi-route.ts` | shared helper | Route tagging and OpenAPI helper utilities |
+| `proxy.ts` | `/api/addon-proxy` | Thin SSRF-guarded compatibility proxy |
+| `tmdb-proxy.ts` | `/api/tmdb` | Internal TMDB-addon facade |
 
-### Non-API routes
+### TV authentication rule
 
-| File | Purpose |
-| --- | --- |
-| `app/src/routes/views.ts` | Redirect-style view routes and deep-link oriented server responses |
-
-### Important Streaming Endpoints
-
-`streaming.ts` is one of the most important files in the backend. It currently exposes:
-
-- `/settings`
-- `/streams/:type/:id`
-- `/streams-live/:type/:id`
-- `/subtitles/:type/:id`
-- `/search`
-- `/search-catalogs`
-- `/catalog`
-- `/catalog-items`
-- `/progress`
-- `/progress/:type/:id`
-- `/series-progress/:id`
-- `/mark-watched`
-- `/mark-season-watched`
-- `/mark-series-watched`
-- `/mark-episodes-before`
-- `/details/:type/:id`
-- `/filters`
-- `/dashboard`
-- `/filter-enrich`
-- `/segments`
-- `/segments/submit`
-
-Notes:
-
-- `/streams-live` is a compatibility path, not the preferred new client architecture.
-- `/filter-enrich` is the server-side parental-filter and watch-history enrichment pass for client-fetched catalog data.
-- `/segments` fetches IntroDB data server-side and caches it in SQLite.
-- `/segments/submit` submits IntroDB segments with the API key stored in streaming settings.
-
-### Important Admin Endpoints
-
-`admin.ts` currently includes:
-
-- `/status`
-- `/setup`
-- `/me`
-- `/stats`
-- `/activity/live`
-- `/dashboard/charts`
-- `/stats/platforms`
-- `/system/health`
-- `/users`
-- `/users/:id`
-- `/users/:id/role`
-- `/users/:id/ban`
-- `/users/:id/unban`
-- `/audit`
-- `/audit/stats`
-- `/audit/verify`
-- `/stepup/request`
-- `/stepup/verify`
-- `/stepup/status`
-
-Admin route rule:
-
-- every protected admin route should go through `adminSessionMiddleware`
-- permission-gated routes should also use `requirePermission(...)`
-- sensitive mutations should additionally require `adminStepUpMiddleware`
-
-## Middleware
-
-`app/src/middleware/`
-
-| File | Purpose |
-| --- | --- |
-| `security.ts` | CORS, security headers, body limit, and global rate limiter |
-| `session.ts` | Regular session and guest-mode middleware |
-| `admin.ts` | Admin session, RBAC enforcement, and step-up checks |
+- Android TV should not own full OAuth or SSO browser flows in the WebView
+- the browser/web app handles sign-in at `/activate`
+- the backend issues and redeems short-lived pairing codes in `/api/auth`
+- the TV onboarding screen redeems a code instead of launching provider-specific browser flows directly
 
 ## Service Layer
 
 Server-side business logic lives in `app/src/services/`.
 
-### Core Services
+### Core services
 
 | File | Purpose |
 | --- | --- |
-| `logger.ts` | Canonical Bun/server logger. Never use `console.log` in server code. |
-| `envParser.ts` | Canonical env loader and typed config reader. The only place that should interpret `process.env`. |
-| `auth.ts` | Better Auth server configuration and plugin wiring. Uses `genericOAuth` for multi-OIDC support. |
-| `email.ts` | Outbound email sending with ordered provider fallback (SMTP / Resend). Exports `resolveConfiguredProviderOrder` for testable priority logic. |
-| `email/templates.ts` | Email HTML templates |
-| `email.test.ts` | Unit tests for email provider ordering and fallback logic |
+| `logger.ts` | Canonical Bun/server logger |
+| `envParser.ts` | Canonical env loader and typed config reader |
+| `auth.ts` | Better Auth server configuration and plugin wiring |
+| `email.ts` | Outbound email sending with provider fallback |
 | `encryption.ts` | Secret-backed encryption/decryption helpers |
 | `imdb.ts` | IMDb dataset ingest/update logic |
 | `sync.ts` | Background sync orchestration |
 | `avatar.ts` | DiceBear avatar generation |
 
-### Database Layer
+### Database layer
 
 `app/src/services/database/` is the canonical SQLite access layer.
 
-| File | Purpose |
-| --- | --- |
-| `connection.ts` | DB bootstrap, schema creation, and seed/setup logic |
-| `migrations.ts` | Incremental schema migrations |
-| `addons.ts` | Addon persistence |
-| `appearance.ts` | Appearance settings persistence |
-| `lists.ts` | Watchlist persistence |
-| `profile.ts` | Profile persistence |
-| `settings-profile.ts` | Settings-profile persistence |
-| `proxy.ts` | Proxy session persistence |
-| `stream.ts` | Streaming settings/cache/history persistence |
-| `trakt.ts` | Trakt account and sync-state persistence |
-| `watch-history.ts` | Watch history persistence |
-| `user.ts` | User/account persistence |
-| `utils.ts` | DB helpers |
-| `types.ts` | DB row types |
-| `index.ts` | Re-exports |
-
-Schema rule:
+Rules:
 
 - tables and indexes belong in `connection.ts`
-- schema changes should go through `migrations.ts`
+- schema changes go through `migrations.ts`
+- query logic stays in the database service layer
 
-### Addon Services
+### Addon services
 
 `app/src/services/addons/`
 
-| File | Purpose |
-| --- | --- |
-| `addon-manager.ts` | High-level orchestration for catalog/meta/stream/subtitle queries and addon lifecycle |
-| `client.ts` | Server-side Stremio addon client |
-| `zentrio-client.ts` | Zentrio addon hub client |
-| `stream-service.ts` | Server-side stream orchestration |
-| `stream-processor.ts` | Filtering, scoring, dedupe, and ordering logic for streams |
-| `stream-cache.ts` | Stream cache used by legacy server-side flow |
-| `meta-service.ts` | Metadata fetching |
-| `meta-normalizer.ts` | Metadata normalization |
-| `content-filter.ts` | Parental filtering and content enrichment |
-| `types.ts` | Shared addon types |
+Important files:
 
-### TMDB Services
+- `addon-manager.ts`
+- `client.ts`
+- `zentrio-client.ts`
+- `stream-service.ts`
+- `stream-processor.ts`
+- `meta-service.ts`
+- `meta-normalizer.ts`
+- `content-filter.ts`
 
-`app/src/services/tmdb/`
-
-These back Zentrio's internal TMDB addon and related metadata helpers.
-
-| File | Purpose |
-| --- | --- |
-| `client.ts` | TMDB HTTP client and key validation |
-| `catalog.ts` | Catalog queries |
-| `meta.ts` | Detailed metadata |
-| `trending.ts` | Trending feeds |
-| `search.ts` | Search |
-| `episodes.ts` | Episode metadata |
-| `genres.ts`, `languages.ts`, `age-ratings.ts` | Reference data |
-| `logo.ts` | Logo/artwork helpers |
-| `mdblist.ts` | MDBList-backed curated feeds |
-| `cache.ts` | TMDB cache layer |
-| `utils.ts`, `index.ts` | Utilities and exports |
-
-### Trakt Services
-
-`app/src/services/trakt/`
-
-| File | Purpose |
-| --- | --- |
-| `client.ts` | Trakt API client |
-| `sync.ts` | Pull/push watch history synchronization |
-| `types.ts`, `index.ts` | Types and exports |
-
-### Admin Services
-
-`app/src/services/admin/`
-
-| File | Purpose |
-| --- | --- |
-| `rbac.ts` | Roles, permissions, and permission caching |
-| `stepup.ts` | OTP challenge lifecycle |
-| `audit.ts` | Audit log write/query/verification |
-
-### Client-Side Media Pipeline
+### Client-side media pipeline
 
 These live under `app/src/services/hybrid-media/` but run in the client bundle.
 They are not Bun server services.
 
-| File | Purpose |
-| --- | --- |
-| `HybridEngine.ts` | Orchestrates in-browser fallback playback/transcoding |
-| `Demuxer.ts` | Splits source streams |
-| `VideoRemuxer.ts` | Browser-compatible video remuxing |
-| `AudioStreamTranscoder.ts` | Audio transcoding |
-| `ChunkedAudioTranscoder.ts` | Chunked long-form audio transcoding |
-| `StreamingAudioTranscoder.ts` | Progressive audio transcoding |
-| `TranscoderService.ts` | Higher-level transcoder interface |
-| `NetworkReader.ts` | Fetch/stream media data |
-| `types.ts`, `index.ts` | Shared types and exports |
+### Native download engine
 
-### Frontend-Only Download Service
-
-`app/src/services/downloads/download-service.ts`
-
-- client adapter around native Tauri download commands
-- does not own the actual download engine
+The real download engine lives under `app/src-tauri/src/downloads/`.
+The TypeScript app only drives it.
 
 ## Frontend Canonical Layers
 
@@ -356,68 +354,57 @@ They are not Bun server services.
 
 Shared client singletons and transport utilities.
 
-| File | Purpose |
-| --- | --- |
-| `auth-client.ts` | Better Auth client singleton, Tauri-aware fetch behavior, auth/session helpers, `isTauri()`. Includes `genericOAuthClient` plugin for multi-OIDC flows. |
-| `apiFetch.ts` | Canonical client wrapper for `/api/*` requests |
-| `adminApi.ts` | Typed admin API wrapper and step-up UI integration |
-| `addon-fetch.ts` | External addon fetch transport: Tauri direct HTTP, web direct fetch first, proxy fallback second |
-| `addon-client.ts` | Cached client-side addon client and `ZENTRIO_TMDB_ADDON` routing |
-| `stream-resolver.ts` | Canonical client-side progressive stream resolver |
-| `secure-storage.ts` | Sensitive storage abstraction |
-| `app-mode.ts` | Guest vs connected mode state |
-| `app-lifecycle.tsx` | App startup and lifecycle wrappers |
-| `url.ts` | API URL helpers and allowlisted route helpers |
-| `topStreamCache.ts` | Top-stream caching helpers |
-| `tauri-player-mode.ts` | Tauri playback mode helpers |
+Important files:
+
+- `auth-client.ts`
+- `apiFetch.ts`
+- `adminApi.ts`
+- `addon-fetch.ts`
+- `addon-client.ts`
+- `stream-resolver.ts`
+- `secure-storage.ts`
+- `app-mode.ts`
+- `runtime-env.ts`
+- `app-target.ts`
+- `platform-capabilities.ts`
+- `offline-downloads.ts`
+- `tv-launcher.ts`
+- `brand-assets.ts`
+- `url.ts`
 
 Rules:
 
 - do not call `/api/*` with raw `fetch()` from components or hooks
-- use `apiFetch`/`apiFetchJson` for internal API routes
+- use `apiFetch` / `apiFetchJson` for internal API routes
 - use `addon-client.ts` or `addon-fetch.ts` for third-party addon URLs
+- platform or target detection helpers belong here when they influence app composition across multiple screens
 
 ### `app/src/stores/`
 
 Global client state via Zustand.
 
-| File | Purpose |
-| --- | --- |
-| `authStore.ts` | Auth/session state |
-| `downloadStore.ts` | Native download queue/progress state |
+Current real stores:
+
+- `authStore.ts`
+- `downloadStore.ts`
 
 ### `app/src/hooks/`
 
-Key hooks already exist for most reusable concerns.
+Check existing hooks before adding a new one.
+Important ones include:
 
-Important ones:
-
-| File | Purpose |
-| --- | --- |
-| `useStreamLoader.ts` | Progressive stream loading UI state using the client resolver |
-| `useCatalog.ts` | Catalog fetching for internal TMDB and external addons |
-| `useMeta.ts` | Detailed metadata loading |
-| `useDownloads.ts` | Native download state/actions |
-| `usePlayer.ts` | Main player state |
-| `useHybridPlayer.ts` | Hybrid playback pipeline |
-| `useExternalPlayer.ts` | External player launch |
-| `useSubtitles.ts` | Subtitle loading/selection |
-| `useLibraryData.ts` | Library/watchlist data |
-| `useAppearanceSettings.ts` | Appearance settings |
-| `useLoginBehavior.ts` | Login redirect behavior |
-| `useOfflineMode.ts` | Native offline-state handling |
-
-Before adding a new hook, check whether one of these should be extended instead.
-
-### `app/src/utils/`
-
-| File | Purpose |
-| --- | --- |
-| `client-logger.ts` | Canonical client logger |
-| `toast.ts` | Canonical toast wrapper |
-| `performance.ts` | Perf event recording helpers |
-| `route-preloader.ts` | Route-chunk preloading |
-| `api.ts` | Shared API response helpers used on the server side |
+- `useStreamLoader.ts`
+- `useCatalog.ts`
+- `useMeta.ts`
+- `useDownloads.ts`
+- `usePlayer.ts`
+- `useHybridPlayer.ts`
+- `useExternalPlayer.ts`
+- `useSubtitles.ts`
+- `useLibraryData.ts`
+- `useAppearanceSettings.ts`
+- `useLoginBehavior.ts`
+- `useOfflineMode.ts`
 
 ### `app/src/pages/`
 
@@ -425,10 +412,17 @@ Route-level React components.
 
 Groups:
 
-- root: landing/settings/profiles/share/reset/explore-addons/native entry
-- `auth/`: sign in, sign up, two-factor
-- `streaming/`: home, explore, catalog, search, details, player, library, downloads, shared layout
-- `admin/`: dashboard, users, audit, system, shared layout
+- root pages such as landing, profiles, settings, native entry, addon explore
+- `auth/`
+- `streaming/`
+- `admin/`
+
+Adaptive route rule:
+
+- route-specific TV renderers live next to their route files as `.tv.tsx`
+- standard renderers live next to them as `.standard.tsx`
+- shared models live next to them as `.model.ts`
+- avoid reviving a separate `/tv/*` route tree for main app screens
 
 ### `app/src/components/`
 
@@ -436,20 +430,18 @@ Reusable UI and feature components.
 
 Important areas:
 
-| Directory | Purpose |
-| --- | --- |
-| `auth/` | Auth forms, guards, native server selector, 2FA, magic link, auth mode UI |
-| `admin/` | Admin step-up modal |
-| `details/` | Details page building blocks |
-| `downloads/` | Native download UI |
-| `features/` | Catalog rows, cards, hero, profile/list modals |
-| `layout/` | Navbar, title bar, app shell, error boundary |
-| `library/` | Watchlist/library UI |
-| `onboarding/` | Native first-run setup |
-| `player/` | Zentrio player UI, engines, and player hooks |
-| `settings/` | Settings sections and settings modals. `DownloadSettings.tsx` handles native download quality and storage path configuration. |
-| `streaming/` | Streaming-page specific helpers/loaders |
-| `ui/` | Generic primitives and skeleton/loading components |
+- `auth/`
+- `details/`
+- `downloads/`
+- `features/`
+- `layout/`
+- `library/`
+- `onboarding/`
+- `player/`
+- `settings/`
+- `streaming/`
+- `tv/`
+- `ui/`
 
 ## Native Layer
 
@@ -467,30 +459,13 @@ Responsibilities:
 - registers deep-link behavior
 - spawns the Bun sidecar in desktop production builds
 
-### `app/src-tauri/src/downloads/`
+### Native plugin boundaries
 
-Native offline download implementation.
+- Android TV launcher publishing belongs in the Android launcher plugin
+- Android playback belongs in the ExoPlayer plugin
+- downloads belong in native Rust
 
-| File | Purpose |
-| --- | --- |
-| `manager.rs` | Queue orchestration |
-| `db.rs` | Native download DB access |
-| `file_store.rs` | Download directory resolution and storage layout |
-| `hls.rs` | HLS download handling |
-| `subtitles.rs` | Subtitle persistence/helpers |
-| `events.rs` | Download event payloads |
-| `notifier.rs` | Native notifications |
-| `mod.rs` | Module exports |
-
-This is the real download engine. The TypeScript app only drives it.
-
-### `app/src-tauri/src/plugins/`
-
-Custom native plugins.
-
-Notable file:
-
-- `immersive_mode.rs`: native fullscreen/orientation behavior used on Android
+Do not reimplement those concerns in TypeScript.
 
 ## Canonical Patterns
 
@@ -500,38 +475,22 @@ Server:
 
 ```ts
 import { logger } from '@/services/logger'
-
-const log = logger.scope('Feature')
-log.info('message')
-log.warn('warning')
-log.error('failure', error)
 ```
 
 Client:
 
 ```ts
 import { createLogger } from '@/utils/client-logger'
-
-const log = createLogger('Feature')
-log.info('message')
 ```
 
 Do not add new logger abstractions.
 
-### Client API Calls
+### Client API calls
 
 Internal backend API:
 
 ```ts
 import { apiFetchJson } from '@/lib/apiFetch'
-
-const data = await apiFetchJson('/api/streaming/dashboard?profileId=1')
-```
-
-Admin API:
-
-```ts
-import { adminApi } from '@/lib/adminApi'
 ```
 
 External addon URL:
@@ -542,24 +501,45 @@ import { getAddonClient } from '@/lib/addon-client'
 
 Do not mix these layers.
 
-### Data Fetching
+### Target-specific UI
 
-Use TanStack Query for server state.
-Do not build new `useEffect` + `useState` fetch loops unless there is a clear reason.
+When supporting a new surface such as Android TV:
 
-### Global State
+- keep services, routes, and data hooks shared unless the backend contract truly changes
+- add one canonical target/capability helper in `app/src/lib/` instead of repeated environment checks
+- prefer target-specific shells and renderers over forking entire feature flows
+- keep styling differences token-driven where possible; do not spread one-off target overrides through many files
+- if storage or download behavior differs by target, put the policy in shared helpers and let screens consume that capability
 
-Use Zustand only for truly cross-cutting client state like auth or downloads.
+Design rule of thumb:
 
-### Database Changes
+- if the difference is mouse vs touch vs desktop chrome, keep it in the `StandardView`
+- if the difference is remote-first navigation and TV-distance readability, move it into a `TvView`
+
+Practical rule:
+
+- `runtime-env.ts` owns raw runtime/container detection
+- `app-target.ts` owns canonical target classification
+- `platform-capabilities.ts` owns derived UI/product capability decisions
+- feature policy helpers such as `offline-downloads.ts` should sit on top of those layers instead of re-checking globals in screens
+
+### Launcher integrations
+
+For Android TV launcher surfaces such as Continue Watching / Watch Next:
+
+- keep underlying progress/history state in shared app services
+- publish to Android TV home surfaces through one native Android bridge/plugin
+- treat compatibility with alternate launchers as a consequence of supporting Android TV standard discovery APIs, not as separate custom integrations
+
+### Database changes
 
 When you need schema changes:
 
 1. update `services/database/connection.ts` if it is part of the baseline schema
-2. add the migration logic in `services/database/migrations.ts`
+2. add migration logic in `services/database/migrations.ts`
 3. keep query logic inside the database service layer
 
-### New API Routes
+### New API routes
 
 When adding a route:
 
@@ -567,13 +547,12 @@ When adding a route:
 2. keep validation in the route
 3. move reusable logic to `app/src/services/`
 4. mount it in `app/src/routes/api/index.ts` if it is a new router
-5. update OpenAPI helpers if needed
 
-### Addon Boundary
+### Addon boundary
 
 Rules for third-party addons:
 
-- client-side addon requests should go through `addon-client.ts` / `addon-fetch.ts`
+- client-side addon requests go through `addon-client.ts` / `addon-fetch.ts`
 - web may fetch direct if CORS permits, otherwise use `/api/addon-proxy`
 - after client-side catalog fetches, call `/api/streaming/filter-enrich` when server-side enrichment/filtering is required
 - the internal TMDB addon is special: `zentrio://tmdb-addon` maps to `/api/tmdb/*`
@@ -583,12 +562,11 @@ Rules for third-party addons:
 - Do not create new logging wrappers.
 - Do not import server-only modules into client code.
 - Do not call raw `fetch('/api/...')` from components or hooks.
-- Do not add new DB schema in arbitrary service files.
-- Do not put auth configuration outside `services/auth.ts` and `lib/auth-client.ts`.
+- Do not add DB schema in arbitrary service files.
 - Do not duplicate addon transport helpers.
 - Do not create new Zustand stores unless existing ones are clearly insufficient.
-- Do not treat `/api/gateway` as a general-purpose proxy; it is intentionally local-only and allowlisted.
-- Do not assume `/api/streaming/streams-live` is the long-term primary flow.
+- Do not treat `/api/gateway` as a general-purpose proxy.
+- Do not turn every shared component into a TV-aware component.
 
 ## Environment and Secrets
 
@@ -597,41 +575,30 @@ The env file lives at the repository root:
 - `.env`
 - `.env.example`
 
-`app/src/services/envParser.ts` is the only canonical env interpreter.
+`app/src/services/envParser.ts` is the canonical env interpreter.
 
 Important live config groups:
 
 - server: `PORT`, `APP_URL`, `CLIENT_URL`, `DATABASE_URL`
 - security: `AUTH_SECRET`, `ENCRYPTION_KEY`, `HEALTH_TOKEN`
 - admin: `ADMIN_ENABLED`, `ADMIN_SETUP_TOKEN`, `ANALYTICS_ENABLED`
-- email: `EMAIL_PROVIDER` (smtp|resend|auto, default auto = SMTP first then Resend), SMTP vars (`SMTP_URL` or `EMAIL_HOST`/`EMAIL_USER`/`EMAIL_PASS`/`EMAIL_PORT`/`EMAIL_SECURE`), `RESEND_API_KEY`, timeout/backoff tuning
-- SSO: `GOOGLE_CLIENT_ID`/`SECRET`, `GITHUB_CLIENT_ID`/`SECRET`, `DISCORD_CLIENT_ID`/`SECRET`; multi-OIDC via `OIDC_1_CLIENT_ID`, `OIDC_1_CLIENT_SECRET`, `OIDC_1_ISSUER`, `OIDC_1_NAME`, `OIDC_1_ID` (repeat for `OIDC_2_*`, etc., up to 20); legacy single-OIDC vars (`OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ISSUER`, `OIDC_DISPLAY_NAME`) still accepted
+- email: SMTP / Resend provider config
+- SSO: Google, GitHub, Discord, and multi-OIDC provider config
 - integrations: `TMDB_API_KEY`, `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`, `FANART_API_KEY`, `IMDB_UPDATE_INTERVAL_HOURS`
-- tuning: `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_LIMIT`, `PROXY_LOGS`, `LOG_LEVEL`
+- tuning: rate limits, proxy logs, log level
 
 ## External Integrations
 
-| Service | Purpose | Notes |
-| --- | --- | --- |
-| TMDB | Metadata and catalog foundation | Global env key plus optional per-user override |
-| Trakt | Sync, recommendations, scrobble, check-in | Per-profile account storage |
-| IntroDB | Intro/recap/outro timestamps | Read via backend, cached in SQLite; submit via stored API key |
-| MDBList | Curated lists for TMDB-backed catalogs | Routed through TMDB service layer |
-| Fanart.tv | Artwork/logos | Optional API key |
-| IMDb dataset | Ratings | Downloaded/updated locally |
-| DiceBear | Avatar generation | Local library |
-| Better Auth | Authentication | Core auth system across web and native |
-
-## Known Debt / Watchouts
-
-These are current realities. Do not copy them blindly into new code.
-
-| Issue | Notes |
+| Service | Purpose |
 | --- | --- |
-| Mixed streaming architecture | Client-side stream resolution is primary, but server SSE and gateway compatibility paths still exist |
-| Duplicate email verification modal concepts | Auth flow and settings flow still have separate components |
-| Some user-route behavior is legacy-shaped | `user.ts` still carries a broad compatibility surface for older frontend expectations |
-| Native and hosted flows are tightly coupled | Connected Tauri mode, sidecar gateway, and remote sync all assume coordinated changes |
+| TMDB | Metadata and catalog foundation |
+| Trakt | Sync, recommendations, scrobble, check-in |
+| IntroDB | Intro/recap/outro timestamps |
+| MDBList | Curated lists for TMDB-backed catalogs |
+| Fanart.tv | Artwork/logos |
+| IMDb dataset | Ratings |
+| DiceBear | Avatar generation |
+| Better Auth | Authentication |
 
 ## Quick Decision Guide
 
@@ -643,6 +610,6 @@ If you are deciding where code belongs:
 - New route screen: `app/src/pages/` + `app/src/App.tsx`
 - New native capability: `app/src-tauri/src/`
 - Public docs: `docs/`
-- Internal assistant/contributor reference: `llm/`
+- Internal contributor/assistant reference: `llm/`
 
 When in doubt, extend an existing layer instead of inventing a new one.

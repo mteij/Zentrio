@@ -15,10 +15,13 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { apiFetchJson } from '../../lib/apiFetch';
 import { appMode } from '../../lib/app-mode';
+import { ZENTRIO_LOGO_192_URL } from '../../lib/brand-assets';
 import { authClient, getClientUrl, getServerUrl, isTauri, resetAuthClient } from '../../lib/auth-client';
+import { getPlatformCapabilities } from '../../lib/platform-capabilities';
 import { useAuthStore } from '../../stores/authStore';
 import { createLogger } from '../../utils/client-logger';
 import { ParticleBackground } from '../ui/ParticleBackground';
+import { TvFocusable } from '../tv/TvFocusable';
 
 const log = createLogger('Onboarding')
 
@@ -52,6 +55,8 @@ interface OnboardingWizardProps {
 type OnboardingStep = 'main' | 'email-signin' | 'email-signup' | 'server';
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+  const platform = getPlatformCapabilities();
+  const isTv = platform.canUseRemoteNavigation;
   const [step, setStep] = useState<OnboardingStep>('main');
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
@@ -61,12 +66,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   
   // Server state
   const [serverUrl, setServerUrl] = useState(() => {
+    if (import.meta.env.DEV) {
+      localStorage.setItem('zentrio_server_url', 'http://localhost:3000');
+      resetAuthClient();
+      return 'http://localhost:3000';
+    }
     const saved = localStorage.getItem('zentrio_server_url');
     if (saved) return saved;
-    const defaultServer = 'https://app.zentrio.eu';
-    localStorage.setItem('zentrio_server_url', defaultServer);
+    localStorage.setItem('zentrio_server_url', 'https://app.zentrio.eu');
     resetAuthClient();
-    return defaultServer;
+    return 'https://app.zentrio.eu';
   });
   const [customUrl, setCustomUrl] = useState('');
   const [checking, setChecking] = useState(false);
@@ -78,6 +87,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [emailMethod, setEmailMethod] = useState<'password' | 'magic-link' | 'otp'>('password');
   const [otp, setOtp] = useState('');
   const [showOtpInput, setShowOtpInput] = useState(false);
+  const [deviceLinkInput, setDeviceLinkInput] = useState('');
+  const [deviceLinkLoading, setDeviceLinkLoading] = useState(false);
   
   
   // Auth store
@@ -95,10 +106,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   
   // Fetch available providers
   useEffect(() => {
+    if (isTv) {
+      return;
+    }
+
     apiFetchJson<any>('/api/auth/providers')
       .then(data => setProviders(data))
       .catch(err => log.error('Failed to fetch providers', err));
-  }, []);
+  }, [isTv]);
   
   // Check if already authenticated
   useEffect(() => {
@@ -184,6 +199,43 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (!completedRef.current) {
       completedRef.current = true;
       onComplete('connected', serverUrl);
+    }
+  };
+
+  const handleDeviceCodeSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const cleanedCode = deviceLinkInput.replace(/\D/g, '').slice(0, 6);
+    if (cleanedCode.length !== 6) {
+      toast.error('Enter a 6-digit code', { description: 'Open /activate on your browser and generate a pairing code first.' });
+      return;
+    }
+
+    setDeviceLinkLoading(true);
+    try {
+      const data = await apiFetchJson<{ user?: any; token?: string }>('/api/auth/device-link/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userCode: cleanedCode }),
+      });
+
+      if (!data?.user) {
+        throw new Error('No user was returned for this code')
+      }
+
+      useAuthStore.getState().login(data.user, {
+        user: data.user,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        token: data.token,
+      });
+
+      await waitForTokenAndComplete(data.token);
+    } catch (e: any) {
+      toast.error('Code sign-in failed', {
+        description: e?.message || 'The code is invalid or expired. Generate a new one in your browser.',
+      });
+    } finally {
+      setDeviceLinkLoading(false);
     }
   };
   
@@ -325,6 +377,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   };
   
   const hasSocialProviders = providers.google || providers.github || providers.discord || providers.oidcProviders.length > 0;
+  const activationUrl = import.meta.env.DEV
+    ? `${window.location.protocol}//${window.location.hostname}:5173/activate`
+    : `${serverUrl.replace(/\/$/, '')}/activate`;
   
   return (
     <div 
@@ -336,15 +391,165 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         paddingRight: 'var(--safe-area-inset-right)',
       }}
     >
-      <ParticleBackground />
+      {!isTv && <ParticleBackground />}
       
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-full px-6 py-8">
+      <div className={`relative z-10 flex min-h-full flex-col items-center px-6 ${isTv ? 'justify-start py-4 lg:px-8' : 'justify-center py-8'}`}>
         <AnimatePresence mode="wait">
           
           {/* ============================================================
               MAIN SCREEN - Logo + Social Buttons + Email Option
               ============================================================ */}
-          {step === 'main' && (
+          {step === 'main' && (isTv ? (
+            <motion.div
+              key="main-tv"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.28 }}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                background: '#080809',
+                color: '#fff',
+                fontFamily: 'inherit',
+                zIndex: 20,
+              }}
+            >
+              {/* Left: how to sign in */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                padding: '40px 52px',
+                borderRight: '1px solid rgba(255,255,255,0.06)',
+                background: 'radial-gradient(ellipse 120% 80% at -10% 50%, rgba(229,9,20,0.07), transparent)',
+                gap: 20,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img src={ZENTRIO_LOGO_192_URL} alt="Zentrio" style={{ width: 30, height: 30 }} />
+                  <span style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.01em' }}>Zentrio</span>
+                </div>
+
+                <div style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10,
+                  padding: '16px 20px',
+                }}>
+                  <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>Open in any browser</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: 600, color: '#fff' }}>{activationUrl}</div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGuestMode}
+                  style={{
+                    alignSelf: 'flex-start',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    color: 'rgba(255,255,255,0.28)',
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Skip — continue without an account
+                </button>
+              </div>
+
+              {/* Right: code entry */}
+              <motion.form
+                onSubmit={handleDeviceCodeSignIn}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  padding: '40px 52px',
+                  gap: 14,
+                }}
+              >
+                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.02em', color: '#fff' }}>
+                  Enter your 6-digit code
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
+                  Generated on the activation page after sign-in.
+                </p>
+
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={deviceLinkInput}
+                  onChange={(e) => setDeviceLinkInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  style={{
+                    width: '100%',
+                    textAlign: 'center',
+                    fontFamily: 'monospace',
+                    fontSize: '2.8rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.25em',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 12,
+                    padding: '14px 16px',
+                    color: '#fff',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.2s',
+                  }}
+                  placeholder="000000"
+                />
+
+                <button
+                  type="submit"
+                  disabled={deviceLinkLoading}
+                  style={{
+                    width: '100%',
+                    background: '#e50914',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '14px',
+                    color: '#fff',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    cursor: deviceLinkLoading ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    opacity: deviceLinkLoading ? 0.65 : 1,
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {deviceLinkLoading ? (
+                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <>Sign in on this TV <ArrowRight size={16} /></>
+                  )}
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>
+                    {serverUrl.replace(/\/$/, '')}
+                  </span>
+                  <TvFocusable
+                    autoFocus
+                    onActivate={() => setStep('server')}
+                    ariaLabel="Change server"
+                  >
+                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.38)', padding: '4px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.06)' }}>
+                      Change server
+                    </span>
+                  </TvFocusable>
+                </div>
+              </motion.form>
+            </motion.div>
+          ) : (
             <motion.div
               key="main"
               initial={{ opacity: 0, y: 20 }}
@@ -417,7 +622,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 
                 {/* Logo with float animation */}
                 <motion.img
-                  src="/static/logo/icon-192.png"
+                  src={ZENTRIO_LOGO_192_URL}
                   alt="Zentrio"
                   animate={{ y: [0, -5, 0] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
@@ -564,7 +769,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </button>
               </motion.div>
             </motion.div>
-          )}
+          ))}
           
           {/* ============================================================
               EMAIL SIGN IN
@@ -859,7 +1064,105 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           {/* ============================================================
               SERVER SELECTION
               ============================================================ */}
-          {step === 'server' && (
+          {step === 'server' && (isTv ? (
+            <motion.div
+              key="server-tv"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="w-full max-w-4xl"
+            >
+              <div className="rounded-[36px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(220,38,38,0.16),transparent_32%),linear-gradient(180deg,rgba(18,18,20,0.98),rgba(8,8,8,0.98))] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.45)] lg:p-10">
+                <div className="mb-8 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                      <Server className="h-6 w-6 text-red-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.3em] text-zinc-500">Connection</div>
+                      <h3 className="mt-1 text-3xl font-semibold tracking-tight text-white">Choose your server</h3>
+                    </div>
+                  </div>
+                  <TvFocusable
+                    onActivate={() => setStep('main')}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-200"
+                    ariaLabel="Back to pairing"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <ArrowLeft className="h-4 w-4" />
+                      Back
+                    </span>
+                  </TvFocusable>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
+                  <div className="text-[11px] uppercase tracking-[0.28em] text-zinc-500">Current server</div>
+                  <div className="mt-2 font-mono text-base text-zinc-100">{serverUrl.replace(/\/$/, '')}</div>
+                </div>
+
+                <div className="mt-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                  <TvFocusable
+                    autoFocus
+                    onActivate={() => handleServerSelected('https://app.zentrio.eu')}
+                    className="rounded-[28px] border border-white/10 bg-gradient-to-br from-red-600 to-red-800 p-6 text-left text-white disabled:opacity-50"
+                    ariaLabel="Use official server"
+                  >
+                    <div className="text-xs uppercase tracking-[0.28em] text-red-100/80">Recommended</div>
+                    <div className="mt-3 text-2xl font-semibold">Official server</div>
+                    <div className="mt-2 font-mono text-sm text-red-50/90">https://app.zentrio.eu</div>
+                    <div className="mt-4 text-sm leading-6 text-red-50/85">
+                      Use the hosted Zentrio backend. Best when you want the stable default setup.
+                    </div>
+                    {checking && serverUrl !== 'https://app.zentrio.eu' && (
+                      <div className="mt-4 inline-flex items-center gap-2 text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Connecting...
+                      </div>
+                    )}
+                  </TvFocusable>
+
+                  <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+                    <div className="text-xs uppercase tracking-[0.28em] text-zinc-500">Custom server</div>
+                    <h4 className="mt-3 text-2xl font-semibold text-white">Connect to your own backend</h4>
+                    <p className="mt-3 text-sm leading-6 text-zinc-400">
+                      Use this for local testing or a self-hosted instance. Enter the full URL, then connect.
+                    </p>
+
+                    <div className="mt-5">
+                      <input
+                        type="text"
+                        placeholder="http://192.168.1.10:3000"
+                        value={customUrl}
+                        onChange={(e) => setCustomUrl(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && customUrl && handleServerSelected(customUrl)}
+                        className="w-full rounded-2xl border border-white/10 bg-black/60 px-4 py-4 text-base text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                      />
+                    </div>
+
+                    <TvFocusable
+                      onActivate={() => handleServerSelected(customUrl)}
+                      className="mt-4 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 text-left text-sm font-medium text-zinc-100"
+                      ariaLabel="Connect custom server"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        {checking && serverUrl !== 'https://app.zentrio.eu' ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArrowRight className="h-4 w-4" />
+                        )}
+                        Connect custom server
+                      </span>
+                    </TvFocusable>
+
+                    <p className="mt-4 text-xs uppercase tracking-[0.22em] text-zinc-600">
+                      Tip: your computer and TV emulator must reach the same server URL.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
             <motion.div
               key="server"
               initial={{ opacity: 0, scale: 0.95 }}
@@ -923,7 +1226,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               </div>
             </motion.div>
-          )}
+          ))}
           
         </AnimatePresence>
       </div>

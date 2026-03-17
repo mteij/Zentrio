@@ -9,6 +9,7 @@ export type {
   IPlayerEngine,
   PlayerState,
   PlayerEventHandlers,
+  PlayerCloseReason,
   MediaSource,
   EngineCapabilities,
   SubtitleTrack,
@@ -27,6 +28,7 @@ export {
 // Engine implementations
 export { WebPlayerEngine } from './WebPlayerEngine'
 export { TauriPlayerEngine } from './TauriPlayerEngine'
+export { AndroidNativePlayerEngine } from './AndroidNativePlayerEngine'
 
 // Factory functions
 export {

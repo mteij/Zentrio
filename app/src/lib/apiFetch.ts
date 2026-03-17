@@ -7,6 +7,16 @@ import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('ApiFetch')
 
+function getTauriClientHint(): string {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  if (/android/i.test(ua)) return 'tauri-android'
+  if (/iphone|ipad/i.test(ua)) return 'tauri-ios'
+  if (/windows nt/i.test(ua)) return 'tauri-windows'
+  if (/macintosh|mac os x/i.test(ua)) return 'tauri-macos'
+  if (/linux/i.test(ua)) return 'tauri-linux'
+  return 'tauri-desktop'
+}
+
 function buildJsonParseError(sourceLabel: string, rawText: string, contentType: string | null): Error {
   const trimmed = rawText.trim()
   const preview = trimmed.slice(0, 160).replace(/\s+/g, ' ')
@@ -66,19 +76,6 @@ export async function apiFetch(
     headers.set('X-Guest-Mode', 'true');
   }
 
-  // Identify Tauri platform on every request so the analytics middleware can
-  // record the client hint regardless of which fetch path is used.
-  if (isTauri() && !headers.has('X-Zentrio-Client')) {
-    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
-    let tauriPlatform = 'tauri-desktop'
-    if (/android/i.test(ua))            tauriPlatform = 'tauri-android'
-    else if (/iphone|ipad/i.test(ua))   tauriPlatform = 'tauri-ios'
-    else if (/windows nt/i.test(ua))    tauriPlatform = 'tauri-windows'
-    else if (/macintosh|mac os x/i.test(ua)) tauriPlatform = 'tauri-macos'
-    else if (/linux/i.test(ua))         tauriPlatform = 'tauri-linux'
-    headers.set('X-Zentrio-Client', tauriPlatform)
-  }
-  
   // Inject Bearer token if available (for Tauri cross-origin auth)
   if (isTauri()) {
       const state = useAuthStore.getState();
@@ -116,6 +113,10 @@ export async function apiFetch(
         }
         
         if (isSessionRequest) {
+            // Browser/WebView fetches are subject to server CORS allow-lists.
+            // Keep the Tauri client hint on native-plugin requests, but avoid
+            // forcing a preflight failure during session bootstrap.
+            headers.delete('X-Zentrio-Client')
             log.debug('Using WebView fetch for session:', url);
             
             // Must use window.fetch here to ensure it uses the browser's native fetch
@@ -137,6 +138,9 @@ export async function apiFetch(
         }
 
         const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+        if (!headers.has('X-Zentrio-Client')) {
+          headers.set('X-Zentrio-Client', getTauriClientHint())
+        }
         
         const res = await tauriFetch(url, {
           ...init,

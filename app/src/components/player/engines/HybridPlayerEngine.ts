@@ -13,6 +13,7 @@
  * Tauri uses native system decoders which support more codecs.
  */
 
+import { isTauriRuntime } from '../../../lib/runtime-env'
 import type {
   IPlayerEngine,
   PlayerState,
@@ -36,8 +37,7 @@ const TranscoderServicePromise = import('../../../services/hybrid-media/Transcod
  * Check if running in Tauri environment
  */
 function isTauriEnvironment(): boolean {
-  return typeof window !== 'undefined' &&
-    ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+  return isTauriRuntime()
 }
 
 /**

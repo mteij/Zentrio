@@ -28,6 +28,7 @@ import {
     X
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { getAppTarget } from '../../lib/app-target'
 import { getStoredPlayerOrientation, setTauriPlayerMode, type PlayerOrientationMode } from '../../lib/tauri-player-mode'
 import styles from '../../styles/ZentrioPlayer.module.css'
 import type { SubtitleTrack } from './engines/types'
@@ -99,14 +100,10 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-const isMobileDevice = () =>
-  typeof window !== 'undefined' &&
-  (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth <= 1024))
-
 /** Check if running in Tauri mobile context */
 const isTauriMobile = () => {
-  if (typeof window === 'undefined') return false
-  return !!(window.__TAURI__ || window.__TAURI_INTERNALS__)
+  const target = getAppTarget()
+  return target.isTauri && (target.isMobile || target.isTv)
 }
 
 /* ─────────────────────── Countdown Ring ─────────────────────── */
@@ -169,6 +166,8 @@ export function ZentrioPlayer({
   const shortVideoTriggeredRef = useRef(false)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const durationRef = useRef(0)
+  const appTarget = getAppTarget()
+  const usesNativePlaybackUi = appTarget.isTauri && appTarget.os === 'android'
 
   /* UI state */
   const [controlsVisible, setControlsVisible] = useState(true)
@@ -240,15 +239,21 @@ export function ZentrioPlayer({
     onTimeUpdate: (t, d) => {
       durationRef.current = d
       onTimeUpdate?.(t, d)
-      handlePlaybackProgress(t, d)
+      if (!usesNativePlaybackUi) {
+        handlePlaybackProgress(t, d)
+      }
     },
     onEnded,
+    onClose: (reason) => {
+      if (reason === 'back') {
+        onBack?.()
+      }
+    },
     onError,
     onMetadataLoad: (d) => {
       durationRef.current = d
       onMetadataLoad?.(d)
-      // Detect short video (< threshold)
-      if (d > 0 && d < shortVideoThreshold && !shortDismissedRef.current) {
+      if (!usesNativePlaybackUi && d > 0 && d < shortVideoThreshold && !shortDismissedRef.current) {
         setShowShortVideo(true)
         shortVideoTriggeredRef.current = true
       }
@@ -267,7 +272,10 @@ export function ZentrioPlayer({
 
   /* ── Mobile detect ── */
   useEffect(() => {
-    const check = () => setIsMobile(isMobileDevice())
+    const check = () => {
+      const target = getAppTarget()
+      setIsMobile(target.isMobile)
+    }
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
@@ -402,6 +410,8 @@ export function ZentrioPlayer({
 
   /* ── Keyboard shortcuts ── */
   useEffect(() => {
+    if (usesNativePlaybackUi) return
+
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
@@ -429,7 +439,7 @@ export function ZentrioPlayer({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
+  }, [usesNativePlaybackUi, togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
 
   /* ── Menu click-outside (desktop + mobile) ── */
   useEffect(() => {
@@ -490,13 +500,15 @@ export function ZentrioPlayer({
 
   /* ── Touch gestures ── */
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (usesNativePlaybackUi) return
     if (e.touches.length !== 1) return
     const t = e.touches[0]
     gestureRef.current = { ...gestureRef.current, startX: t.clientX, startY: t.clientY, startTime: state.currentTime, seeking: false, voluming: false }
     resetControlsTimeout()
-  }, [state.currentTime, resetControlsTimeout])
+  }, [usesNativePlaybackUi, state.currentTime, resetControlsTimeout])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (usesNativePlaybackUi) return
     if (e.touches.length !== 1) return
     const t = e.touches[0]
     const g = gestureRef.current
@@ -522,9 +534,10 @@ export function ZentrioPlayer({
         g.startY = t.clientY
       }
     }
-  }, [state.duration, state.volume, setVolume, showVolumeOSD])
+  }, [usesNativePlaybackUi, state.duration, state.volume, setVolume, showVolumeOSD])
 
   const handleTouchEnd = useCallback((_e: React.TouchEvent) => {
+    if (usesNativePlaybackUi) return
     const g = gestureRef.current
     if (g.seeking && hoverTime) {
       seek(hoverTime.time)
@@ -557,7 +570,7 @@ export function ZentrioPlayer({
 
     g.seeking = false
     g.voluming = false
-  }, [hoverTime, seek, state.currentTime, state.duration, togglePlayPause])
+  }, [usesNativePlaybackUi, hoverTime, seek, state.currentTime, state.duration, togglePlayPause])
 
   /* ── PiP ── */
   const togglePip = useCallback(async () => {
@@ -608,11 +621,12 @@ export function ZentrioPlayer({
     <div
       ref={containerRef}
       className={styles.playerContainer}
-      onMouseMove={resetControlsTimeout}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onMouseMove={usesNativePlaybackUi ? undefined : resetControlsTimeout}
+      onTouchStart={usesNativePlaybackUi ? undefined : handleTouchStart}
+      onTouchMove={usesNativePlaybackUi ? undefined : handleTouchMove}
+      onTouchEnd={usesNativePlaybackUi ? undefined : handleTouchEnd}
       onClick={(e) => {
+        if (usesNativePlaybackUi) return
         // Clicks on the control bars are blocked by data-controls on topBar/bottomBar
         if ((e.target as HTMLElement).closest('[data-controls]')) return
         resetControlsTimeout()
@@ -673,14 +687,14 @@ export function ZentrioPlayer({
       )}
 
       {/* Seek time preview (touch scrub) */}
-      {hoverTime && !isDraggingProgress && isMobile && (
+      {!usesNativePlaybackUi && hoverTime && !isDraggingProgress && isMobile && (
         <div className={styles.touchSeekPreview}>
           <span className={styles.touchSeekTime}>{formatTime(hoverTime.time)}</span>
         </div>
       )}
 
       {/* ═══════════════ Controls Overlay ═══════════════ */}
-      <div className={`${styles.controlsOverlay} ${controlsVisible ? styles.visible : ''}`}>
+      {!usesNativePlaybackUi && <div className={`${styles.controlsOverlay} ${controlsVisible ? styles.visible : ''}`}>
 
         {/* Gradient backgrounds */}
         <div className={styles.gradientTop} />
@@ -1123,10 +1137,10 @@ export function ZentrioPlayer({
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* ═════════════ SKIP SEGMENT BUTTON (IntroDB) ═════════════ */}
-      {activeSegment && skipIntrosOutros && (
+      {!usesNativePlaybackUi && activeSegment && skipIntrosOutros && (
         <div className={`${styles.skipSegmentWrap} ${controlsVisible ? styles.skipSegmentWithControls : ''}`} data-controls>
           <button
             className={`${styles.skipSegmentBtn} ${!activeSegment.validated ? styles.skipSegmentUnconfirmed : ''}`}
@@ -1155,7 +1169,7 @@ export function ZentrioPlayer({
       )}
 
       {/* ═════════════ INTRODB CONTRIBUTE PANEL ═════════════ */}
-      {showContribute && canContributeSegments && (
+      {!usesNativePlaybackUi && showContribute && canContributeSegments && (
         <div className={`${styles.contributePanel} ${styles.slideIn}`} data-controls onClick={e => e.stopPropagation()}>
           <div className={styles.contributePanelHeader}>
             <span className={styles.contributePanelTitle}>
@@ -1238,7 +1252,7 @@ export function ZentrioPlayer({
       )}
 
       {/* ═════════════ NEXT EPISODE POPUP ═════════════ */}
-      {showNextEp && nextEpisode && (
+      {!usesNativePlaybackUi && showNextEp && nextEpisode && (
         <div className={`${styles.nextEpCard} ${styles.slideIn}`}>
           <div className={styles.nextEpHeader}>Up Next</div>
           <div className={styles.nextEpTitle}>
@@ -1273,7 +1287,7 @@ export function ZentrioPlayer({
       )}
 
       {/* ═════════════ SHORT VIDEO / FIND NEW STREAM ═════════════ */}
-      {showShortVideo && (
+      {!usesNativePlaybackUi && showShortVideo && (
         <div className={`${styles.shortVideoCard} ${styles.slideIn}`}>
           <button
             className={styles.shortVideoClose}

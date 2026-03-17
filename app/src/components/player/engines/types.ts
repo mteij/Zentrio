@@ -83,6 +83,8 @@ export interface QualityLevel {
   selected: boolean
 }
 
+export type PlayerCloseReason = 'back' | 'unknown'
+
 /**
  * Event handler types
  */
@@ -91,6 +93,8 @@ export interface PlayerEventHandlers {
   timeupdate: (time: number, duration: number) => void
   /** Fired when playback ends */
   ended: () => void
+  /** Fired when the player session closes without natural media completion */
+  close: (reason: PlayerCloseReason) => void
   /** Fired when an error occurs */
   error: (error: Error) => void
   /** Fired when player state changes */
@@ -292,8 +296,13 @@ export interface IPlayerEngine {
 
 /**
  * Engine type identifier
+ *
+ * - web    — WebPlayerEngine: HLS.js + native <video> for web browsers
+ * - tauri  — TauriPlayerEngine: system decoders via Tauri WebView (desktop, iOS)
+ * - hybrid — HybridPlayerEngine: MSE-based transcoding for rare codecs in browsers
+ * - tv     — TvPlayerEngine: ExoPlayer native overlay for Android devices
  */
-export type EngineType = 'web' | 'tauri' | 'hybrid'
+export type EngineType = 'web' | 'tauri' | 'hybrid' | 'android-native'
 
 /**
  * Engine factory configuration

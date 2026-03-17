@@ -1,3 +1,4 @@
+import { isTauriRuntime } from '../../lib/runtime-env'
 /**
  * Hybrid Media Provider
  *
@@ -17,8 +18,7 @@
  * Check if running in Tauri environment
  */
 export function isTauriEnvironment(): boolean {
-  return typeof window !== 'undefined' &&
-         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+  return isTauriRuntime()
 }
 
 // Core types

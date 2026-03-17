@@ -1,0 +1,57 @@
+.card {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(14, 15, 19, 0.94);
+  color: #fff;
+}
+
+.poster {
+  width: 100%;
+  aspect-ratio: 0.72;
+  background-size: cover;
+  background-position: center top;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.body {
+  padding: 14px 16px 18px;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.meta {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.82rem;
+}
+
+.statusCard {
+  min-width: 260px;
+  padding: 22px 24px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  text-align: left;
+}
+
+.statusTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.statusMeta {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.82rem;
+}

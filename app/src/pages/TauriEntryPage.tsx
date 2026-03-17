@@ -1,4 +1,5 @@
 import { SimpleLayout, Button } from '../components/index'
+import { ZENTRIO_LOGO_512_URL } from '../lib/brand-assets'
 
 export function TauriEntryPage() {
   return (
@@ -16,7 +17,7 @@ export function TauriEntryPage() {
         <div className="container text-center">
           <div className="flex flex-col items-center" data-tauri-drag-region>
             <div className="mb-8">
-              <img src="/static/logo/icon-512.png" alt="Zentrio Logo" style={{ width: '120px', height: '120px', borderRadius: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
+              <img src={ZENTRIO_LOGO_512_URL} alt="Zentrio Logo" style={{ width: '120px', height: '120px', borderRadius: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
             </div>
             <h1 className="text-5xl mb-4 font-bold">Zentrio</h1>
             <p className="text-xl text-zinc-400 mb-12">Your personal streaming hub</p>

@@ -4,6 +4,7 @@ declare global {
   interface Window {
     addToast?: (type: 'message' | 'warning' | 'error' | 'success' | 'info', title: string, message?: string) => void;
     __TAURI__?: any;
+    __TAURI_INTERNALS__?: any;
     __ZENTRIO_PERF__?: Array<{
       name: string;
       at: string;

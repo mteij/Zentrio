@@ -92,6 +92,8 @@ Native builds are available for Windows, macOS, Linux, and Android.
 - Release site: [zentrio.eu/releases](https://zentrio.eu/releases)
 - GitHub Releases: [github.com/Mteij/Zentrio/releases](https://github.com/Mteij/Zentrio/releases)
 
+**Android TV / Fire TV:** Install via the [Downloader app by AFTVnews](https://www.aftvnews.com/downloader/) — enter code **3250288** or use the direct URL `https://zentrio.eu/download/android`.
+
 ## Highlights
 
 | Area | What you get |

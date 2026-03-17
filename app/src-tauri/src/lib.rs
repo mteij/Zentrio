@@ -184,7 +184,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_safe_area_insets_css::init())
-        .plugin(tauri_plugin_haptics::init());
+        .plugin(tauri_plugin_haptics::init())
+        .plugin(plugins::mobile_bridge::init_exo_player())
+        .plugin(plugins::mobile_bridge::init_tv_launcher())
+        .plugin(plugins::mobile_bridge::init_immersive_mode());
 
     #[cfg(not(mobile))]
     {
@@ -258,6 +261,35 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_server_port,
             plugins::immersive_mode::set_immersive_mode,
+            plugins::mobile_bridge::exo_player_play,
+            plugins::mobile_bridge::exo_player_player,
+            plugins::mobile_bridge::command_exo_player_play,
+            plugins::mobile_bridge::command_exo_player_player,
+            plugins::mobile_bridge::exo_player_pause,
+            plugins::mobile_bridge::command_exo_player_pause,
+            plugins::mobile_bridge::exo_player_resume,
+            plugins::mobile_bridge::command_exo_player_resume,
+            plugins::mobile_bridge::exo_player_seek,
+            plugins::mobile_bridge::command_exo_player_seek,
+            plugins::mobile_bridge::exo_player_stop,
+            plugins::mobile_bridge::command_exo_player_stop,
+            plugins::mobile_bridge::exo_player_set_volume,
+            plugins::mobile_bridge::command_exo_player_set_volume,
+            plugins::mobile_bridge::exo_player_set_playback_speed,
+            plugins::mobile_bridge::exo_player_set_audio_track,
+            plugins::mobile_bridge::command_exo_player_set_audio_track,
+            plugins::mobile_bridge::exo_player_set_subtitle_track,
+            plugins::mobile_bridge::command_exo_player_set_subtitle_track,
+            plugins::mobile_bridge::exo_player_get_state,
+            plugins::mobile_bridge::command_exo_player_get_state,
+            plugins::mobile_bridge::tv_launcher_get_environment,
+            plugins::mobile_bridge::command_tv_launcher_get_environment,
+            plugins::mobile_bridge::tv_launcher_upsert_watch_next,
+            plugins::mobile_bridge::command_tv_launcher_upsert_watch_next,
+            plugins::mobile_bridge::tv_launcher_remove_watch_next,
+            plugins::mobile_bridge::command_tv_launcher_remove_watch_next,
+            plugins::mobile_bridge::immersive_mode_set_player_mode,
+            plugins::mobile_bridge::command_immersive_mode_set_player_mode,
             // Download commands
             download_start,
             download_pause,

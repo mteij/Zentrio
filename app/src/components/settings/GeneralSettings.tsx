@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
 import { appMode } from '../../lib/app-mode'
-import { authClient, getClientUrl } from '../../lib/auth-client'
+import { authClient, getClientUrl, isTauri } from '../../lib/auth-client'
 import { Button } from '../index'
 
 import styles from '../../styles/Settings.module.css'
@@ -164,7 +164,7 @@ export function GeneralSettings() {
     try {
       // In Tauri, we need to use the system browser for OAuth, just like login
       // The callback will go through native-redirect and deep link back
-      if ((window as any).__TAURI__) {
+      if (isTauri()) {
         const { openUrl } = await import('@tauri-apps/plugin-opener')
         const serverUrl = localStorage.getItem('zentrio_server_url') || 'https://app.zentrio.eu'
         

@@ -8,7 +8,6 @@ type GatewayRoute =
   | '/api/streaming/catalog-items'
   | '/api/streaming/search-catalog-metadata'
   | '/api/streaming/search-catalog-items'
-  | '/api/streaming/streams-live'
 
 const GATEWAY_READ_ROUTES: GatewayRoute[] = [
   '/api/streaming/dashboard',
@@ -17,8 +16,7 @@ const GATEWAY_READ_ROUTES: GatewayRoute[] = [
   '/api/streaming/catalog',
   '/api/streaming/catalog-items',
   '/api/streaming/search-catalog-metadata',
-  '/api/streaming/search-catalog-items',
-  '/api/streaming/streams-live'
+  '/api/streaming/search-catalog-items'
 ]
 
 const getLocalGatewayBase = (): string => {
@@ -126,13 +124,6 @@ export const resolveAppUrl = (url: string): string => {
   }
 
   return url
-}
-
-/**
- * Creates EventSource with Tauri-safe URL resolution.
- */
-export const createApiEventSource = (url: string, init?: EventSourceInit): EventSource => {
-  return new EventSource(resolveAppUrl(url), init)
 }
 
 /**

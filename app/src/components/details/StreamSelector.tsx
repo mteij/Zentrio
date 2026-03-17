@@ -123,7 +123,7 @@ export function StreamSelector({
         )}
 
         {/* Unified Addon Status + Controls Bar */}
-        {(addonStatuses.size > 0 || streams.length > 0) && (
+        {(streamsLoading || addonStatuses.size > 0 || streams.length > 0) && (
             <div style={{
                 display: 'flex',
                 alignItems: 'center',

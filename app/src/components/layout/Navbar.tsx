@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Compass, Download, Home, Library, Search, User, X } from 'lucide-react'
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { isTauri } from '../../lib/auth-client'
+import { useOfflineDownloadCapability } from '../../hooks/useOfflineDownloadCapability'
 import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 import styles from '../../styles/Streaming.module.css'
 import { createHoverPreloader } from '../../utils/route-preloader'
@@ -40,6 +40,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
   const searchPreloader = useMemo(() => createHoverPreloader('streaming-search'), [])
   const profilesPreloader = useMemo(() => createHoverPreloader('/profiles'), [])
   const searchPath = `/streaming/${profileId}/search`
+  const { isAvailable: canUseOfflineDownloads } = useOfflineDownloadCapability(profileId)
 
   const buildSearchHref = useCallback((query: string, includeOverlayMarker: boolean) => {
     const params = new URLSearchParams()
@@ -250,7 +251,7 @@ export const Navbar = ({ profileId, profile }: NavbarProps) => {
     { to: `/streaming/${profileId}`, icon: Home, label: 'Home', path: '', exact: true, ...homePreloader },
     { to: `/streaming/${profileId}/explore`, icon: Compass, label: 'Explore', path: '/explore', ...explorePreloader },
     { to: `/streaming/${profileId}/library`, icon: Library, label: 'Library', path: '/library', ...libraryPreloader },
-    ...(isTauri() ? [{ to: `/streaming/${profileId}/downloads`, icon: Download, label: 'Downloads', path: '/downloads', ...downloadsPreloader }] : []),
+    ...(canUseOfflineDownloads ? [{ to: `/streaming/${profileId}/downloads`, icon: Download, label: 'Downloads', path: '/downloads', ...downloadsPreloader }] : []),
     { to: `/streaming/${profileId}/search`, icon: Search, label: 'Search', path: '/search', id: 'navSearchBtn', onClick: handleSearchClick, ...searchPreloader }
   ]
 

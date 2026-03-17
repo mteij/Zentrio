@@ -1,8 +1,9 @@
+import { isTauriRuntime } from './runtime-env'
+
 export type PlayerOrientationMode = 'auto' | 'landscape' | 'portrait'
 
 const isTauriMobile = () => {
-  if (typeof window === 'undefined') return false
-  return !!(window.__TAURI__ || window.__TAURI_INTERNALS__)
+  return isTauriRuntime()
 }
 
 export const getStoredPlayerOrientation = (): PlayerOrientationMode => {
@@ -24,7 +25,7 @@ export const setTauriPlayerMode = async (
 
   try {
     const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('plugin:immersive-mode|setPlayerMode', { enabled, orientation })
+    await invoke('immersive_mode_set_player_mode', { enabled, orientation })
   } catch (_e) {
     // Plugin unavailable - silently ignore on non-Android or older builds
   }

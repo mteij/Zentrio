@@ -8,8 +8,11 @@
  */
 
 import type { IPlayerEngine, MediaSource, EngineConfig, EngineType } from './types'
+import { isTauriRuntime } from '../../../lib/runtime-env'
+import { getAppTarget } from '../../../lib/app-target'
 import { WebPlayerEngine } from './WebPlayerEngine'
 import { TauriPlayerEngine } from './TauriPlayerEngine'
+import { AndroidNativePlayerEngine } from './AndroidNativePlayerEngine'
 import { createLogger } from '../../../utils/client-logger'
 
 const log = createLogger('PlayerFactory')
@@ -21,8 +24,7 @@ let HybridPlayerEngine: typeof import('./HybridPlayerEngine').HybridPlayerEngine
  * Check if running in Tauri environment
  */
 export function isTauriEnvironment(): boolean {
-  return typeof window !== 'undefined' &&
-    ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+  return isTauriRuntime()
 }
 
 /**
@@ -30,7 +32,8 @@ export function isTauriEnvironment(): boolean {
  * This is a quick check - actual probing happens in the hybrid engine
  */
 function mightNeedHybridPlayback(url: string): boolean {
-  // In Tauri, we never need hybrid playback - system decoders handle everything
+  // Tauri (desktop/iOS) system decoders handle everything natively.
+  // Android uses ExoPlayer, so hybrid playback is only relevant on the web.
   if (isTauriEnvironment()) {
     return false
   }
@@ -64,8 +67,18 @@ export async function detectEngineType(
   source: MediaSource,
   config: EngineConfig = {}
 ): Promise<EngineType> {
-  // Tauri always uses native engine
   if (isTauriEnvironment()) {
+    const target = getAppTarget()
+
+    // Android TV → ExoPlayer (hardware-accelerated, native HLS/DASH)
+    if (target.isTv) return 'android-native'
+
+    // Android phone/tablet → ExoPlayer (hardware-accelerated, native HLS/DASH).
+    // ExoPlayer handles HLS without a .m3u8 extension, rare codecs, and Dolby audio
+    // far better than the Android WebView (which doesn't support HLS natively).
+    if (target.os === 'android') return 'android-native'
+
+    // Desktop (Windows/macOS/Linux) and iOS → system decoders via Tauri WebView
     return 'tauri'
   }
 
@@ -113,8 +126,13 @@ export async function createEngine(
     return createEngineByType(engineType)
   }
 
-  // No source - create engine based on environment
+  // No source — create the default engine for this environment so it's ready
+  // for the first loadSource() call. TV gets TvPlayerEngine from the start to
+  // avoid an unnecessary engine-switch on first load.
   if (isTauriEnvironment()) {
+    const target = getAppTarget()
+    if (target.isTv) return createEngineByType('android-native')
+    if (target.os === 'android') return createEngineByType('android-native')
     return createEngineByType('tauri')
   }
 
@@ -126,6 +144,9 @@ export async function createEngine(
  */
 export async function createEngineByType(type: EngineType): Promise<IPlayerEngine> {
   switch (type) {
+    case 'android-native':
+      return new AndroidNativePlayerEngine()
+
     case 'tauri':
       if (!isTauriEnvironment()) {
         log.warn('Creating TauriPlayerEngine outside of Tauri environment')
@@ -137,8 +158,6 @@ export async function createEngineByType(type: EngineType): Promise<IPlayerEngin
         log.warn('Hybrid engine not supported in Tauri, using native engine')
         return new TauriPlayerEngine()
       }
-      
-      // Lazy load hybrid engine
       if (!HybridPlayerEngine) {
         const module = await import('./HybridPlayerEngine')
         HybridPlayerEngine = module.HybridPlayerEngine
@@ -147,10 +166,11 @@ export async function createEngineByType(type: EngineType): Promise<IPlayerEngin
 
     case 'web':
     default:
+      // Tauri targets should always resolve to native engines even if 'web' is
+      // requested explicitly somewhere higher up.
       if (isTauriEnvironment()) {
-        // In Tauri, prefer native engine
-        log.debug('Using TauriPlayerEngine for Tauri environment')
-        return new TauriPlayerEngine()
+        const target = getAppTarget()
+        return target.os === 'android' ? new AndroidNativePlayerEngine() : new TauriPlayerEngine()
       }
       return new WebPlayerEngine()
   }
@@ -161,6 +181,9 @@ export async function createEngineByType(type: EngineType): Promise<IPlayerEngin
  */
 export function getDefaultEngineType(): EngineType {
   if (isTauriEnvironment()) {
+    const target = getAppTarget()
+    if (target.isTv) return 'android-native'
+    if (target.os === 'android') return 'android-native'
     return 'tauri'
   }
   return 'web'

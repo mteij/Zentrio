@@ -21,7 +21,7 @@
             <p>Windows 10/11 (64-bit)</p>
             <a
               v-if="getAsset(latestRelease, 'windows')"
-              :href="getAsset(latestRelease, 'windows').browser_download_url"
+              :href="getDownloadUrl('windows')"
               class="btn btn-primary w-full mt-4"
             >
               Download .exe
@@ -44,7 +44,7 @@
             <p>macOS 11.0 or later</p>
             <a
               v-if="getAsset(latestRelease, 'mac')"
-              :href="getAsset(latestRelease, 'mac').browser_download_url"
+              :href="getDownloadUrl('mac')"
               class="btn btn-primary w-full mt-4"
             >
               Download .dmg
@@ -67,7 +67,7 @@
             <p>Android 8.0 or later</p>
             <a
               v-if="getAsset(latestRelease, 'android')"
-              :href="getAsset(latestRelease, 'android').browser_download_url"
+              :href="getDownloadUrl('android')"
               class="btn btn-primary w-full mt-4"
             >
               Download .apk
@@ -75,6 +75,11 @@
             <span v-else class="btn btn-secondary disabled w-full mt-4"
               >Not Available Yet</span
             >
+
+            <div class="install-script-container">
+              <span class="install-script-label">Android TV / Fire TV — use the <a href="https://www.aftvnews.com/downloader/" target="_blank" rel="noopener noreferrer" class="inline-link">Downloader app</a> and enter code:</span>
+              <code class="install-script-code">3250288</code>
+            </div>
           </div>
 
           <div class="platform-card">
@@ -84,27 +89,21 @@
             <div class="linux-downloads">
               <a
                 v-if="getAsset(latestRelease, 'linux-deb')"
-                :href="
-                  getAsset(latestRelease, 'linux-deb').browser_download_url
-                "
+                :href="getDownloadUrl('linux-deb')"
                 class="btn btn-primary btn-sm mt-4 w-full"
               >
                 Download .deb
               </a>
               <a
                 v-if="getAsset(latestRelease, 'linux-rpm')"
-                :href="
-                  getAsset(latestRelease, 'linux-rpm').browser_download_url
-                "
+                :href="getDownloadUrl('linux-rpm')"
                 class="btn btn-primary btn-sm mt-2 w-full"
               >
                 Download .rpm
               </a>
               <a
                 v-if="getAsset(latestRelease, 'linux-appimage')"
-                :href="
-                  getAsset(latestRelease, 'linux-appimage').browser_download_url
-                "
+                :href="getDownloadUrl('linux-appimage')"
                 class="btn btn-primary btn-sm mt-2 w-full"
               >
                 Download AppImage
@@ -239,6 +238,33 @@ import { ref, computed, onMounted } from "vue";
 import { marked } from "marked";
 import { Monitor, Apple, Smartphone, Terminal } from "lucide-vue-next";
 
+const PLATFORM_DOWNLOADS = {
+  android: {
+    url: "https://zentrio.eu/download/android",
+    matcher: (name) => /android-arm64.*\.apk$/i.test(name),
+  },
+  windows: {
+    url: "https://zentrio.eu/download/windows",
+    matcher: (name) => /\.exe$/i.test(name),
+  },
+  mac: {
+    url: "https://zentrio.eu/download/mac",
+    matcher: (name) => /\.dmg$/i.test(name),
+  },
+  "linux-deb": {
+    url: "https://zentrio.eu/download/linux-deb",
+    matcher: (name) => /\.deb$/i.test(name),
+  },
+  "linux-rpm": {
+    url: "https://zentrio.eu/download/linux-rpm",
+    matcher: (name) => /\.rpm$/i.test(name),
+  },
+  "linux-appimage": {
+    url: "https://zentrio.eu/download/linux-appimage",
+    matcher: (name) => /\.AppImage$/i.test(name),
+  },
+};
+
 const releases = ref([]);
 const loading = ref(true);
 const error = ref(null);
@@ -313,20 +339,13 @@ const renderMarkdown = (text) => {
   return marked(filteredText);
 };
 
+const getDownloadUrl = (platform) => PLATFORM_DOWNLOADS[platform]?.url ?? "#";
+
 const getAsset = (release, platform) => {
   if (!release || !release.assets) return null;
-
-  const patterns = {
-    android: /\.apk$/i,
-    ios: /\.ipa$/i,
-    windows: /\.exe$/i,
-    mac: /\.dmg$/i,
-    "linux-deb": /\.deb$/i,
-    "linux-rpm": /\.rpm$/i,
-    "linux-appimage": /\.AppImage$/i,
-  };
-
-  return release.assets.find((asset) => patterns[platform].test(asset.name));
+  const matcher = PLATFORM_DOWNLOADS[platform]?.matcher;
+  if (!matcher) return null;
+  return release.assets.find((asset) => matcher(asset.name));
 };
 
 onMounted(() => {
@@ -422,6 +441,15 @@ onMounted(() => {
 .install-script-label {
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.inline-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.inline-link:hover {
+  text-decoration: underline;
 }
 
 .install-script-code {

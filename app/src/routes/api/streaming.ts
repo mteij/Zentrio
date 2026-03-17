@@ -1,8 +1,6 @@
 import { optionalSessionMiddleware, sessionMiddleware } from '../../middleware/session'
 import { addonManager } from '../../services/addons/addon-manager'
 import { enrichContent, filterContent, getParentalSettings } from '../../services/addons/content-filter'
-import { streamCache, StreamCache } from '../../services/addons/stream-cache'
-import { StreamProcessor } from '../../services/addons/stream-processor'
 import { addonDb, listDb, profileDb, streamDb, userDb, watchHistoryDb, type User } from '../../services/database'
 import { logger } from '../../services/logger'
 import { err } from '../../utils/api'
@@ -183,299 +181,6 @@ streaming.put('/settings', optionalSessionMiddleware, async (c) => {
   }
 })
 
-streaming.get('/streams/:type/:id', async (c) => {
-  const { type, id } = c.req.param()
-  const { profileId, season, episode } = c.req.query()
-  const userAgent = c.req.header('user-agent') || ''
-  const isApp = userAgent.includes('Tauri') || userAgent.includes('Capacitor') || userAgent.includes('ZentrioApp')
-  const platform = isApp ? 'app' : 'web'
-  
-  const streams = await addonManager.getStreams(type, id, parseInt(profileId), season ? parseInt(season) : undefined, episode ? parseInt(episode) : undefined, platform)
-  return c.json({ streams })
-})
-
-/**
- * Transitional SSE endpoint for progressive stream loading.
- * Phase 1 moves the main third-party client flow to the client-side stream
- * resolver, but this route remains for backward compatibility.
- * 
- * Events:
- * - addon-start: { addon: { id, name, logo } } - Addon started loading
- * - addon-result: { addon: { id, name, logo }, count, allStreams: [...] } - Addon returned streams
- * - addon-error: { addon: { id, name, logo }, error: string } - Addon failed
- * - complete: { allStreams: [...], totalCount } - All addons finished
- */
-streaming.get('/streams-live/:type/:id', async (c) => {
-  const startedAt = Date.now()
-  const { type, id } = c.req.param()
-  const { profileId, season, episode, refresh } = c.req.query()
-  const userAgent = c.req.header('user-agent') || ''
-  const isApp = userAgent.includes('Tauri') || userAgent.includes('Capacitor') || userAgent.includes('ZentrioApp')
-  const platform = isApp ? 'app' : 'web'
-
-  // Set SSE headers
-  c.header('Content-Type', 'text/event-stream')
-  c.header('Cache-Control', 'no-cache')
-  c.header('Connection', 'keep-alive')
-  c.header('X-Accel-Buffering', 'no') // Disable nginx buffering
-
-  // Resolve guest profileId → real numeric ID (mirrors /details, /filters, etc.)
-  let pId: number
-  if (profileId === 'guest') {
-    const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
-    pId = guestDefaultProfile.id
-  } else {
-    pId = parseInt(profileId)
-  }
-
-  // Get stream processor settings for this profile
-  const settingsProfileId = profileDb.getSettingsProfileId(pId)
-  const settings = settingsProfileId ? streamDb.getSettings(settingsProfileId) : undefined
-  
-  // Build cache key
-  const cacheKey = StreamCache.buildKey(
-    type,
-    id,
-    pId,
-    season ? parseInt(season) : undefined,
-    episode ? parseInt(episode) : undefined
-  )
-  
-  // Check cache unless refresh=true
-  const forceRefresh = refresh === 'true'
-  if (forceRefresh) {
-    streamCache.invalidate(cacheKey)
-  }
-
-  // Create a streaming response
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder()
-      let isClosed = false
-      
-      const sendEvent = (event: string, data: any) => {
-        if (isClosed) return
-        try {
-          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
-        } catch (_e) {
-          isClosed = true
-        }
-      }
-      
-      const closeController = () => {
-        if (isClosed) return
-        isClosed = true
-        try {
-          controller.close()
-        } catch (_e) {
-          // Already closed
-        }
-      }
-      
-      // Check for cached results first
-      const cached = streamCache.get(cacheKey)
-      if (cached && cached.isComplete) {
-        const cacheAge = streamCache.getAge(cacheKey) || 0
-        sendEvent('server-timing', {
-          phase: 'cache-hit',
-          durationMs: Date.now() - startedAt
-        })
-        sendEvent('cache-status', { fromCache: true, cacheAgeMs: cacheAge })
-
-        // When serving from cache, emit per-addon events so the UI can show provider chips.
-        // Also include allStreams in the final addon-result so the frontend can render streams
-        // progressively rather than waiting for the 'complete' event.
-        const addonCounts = new Map<string, { addon: { id: string; name: string; logo?: string }, count: number }>()
-        for (const item of cached.streams || []) {
-          const addon = item?.addon
-          if (!addon?.id) continue
-          const existing = addonCounts.get(addon.id)
-          if (existing) existing.count += 1
-          else addonCounts.set(addon.id, { addon, count: 1 })
-        }
-
-        const addonEntries = Array.from(addonCounts.values())
-        for (let i = 0; i < addonEntries.length; i++) {
-          const { addon, count } = addonEntries[i]
-          sendEvent('addon-start', { addon })
-          // On the last addon-result, include allStreams so the UI updates immediately
-          sendEvent('addon-result', {
-            addon,
-            count,
-            allStreams: i === addonEntries.length - 1 ? cached.streams : undefined
-          })
-        }
-
-        sendEvent('complete', {
-          allStreams: cached.streams,
-          totalCount: cached.streams.length,
-          fromCache: true
-        })
-        closeController()
-        return
-      }
-      
-      // Collect all raw results as they come in
-      const rawResults: { addon: { id: string, name: string, logo?: string }, streams: any[] }[] = []
-      let firstPlayableSent = false
-      
-      // Meta for processing
-      let meta: any = null
-      try {
-        meta = await addonManager.getMeta(type, id, pId)
-      } catch (_e) {
-        // Fallback minimal meta
-        meta = { id, type, name: 'Unknown' }
-      }
-      
-      // Send cache-status event for fresh fetch
-      sendEvent('cache-status', { fromCache: false, cacheAgeMs: 0 })
-      
-      // Process all collected streams using StreamProcessor
-      const processStreams = () => {
-        if (!settings) {
-          // No settings - just flatten and assign sortIndex
-          const allStreams: any[] = []
-          rawResults.forEach(r => {
-            r.streams.forEach(s => {
-              allStreams.push({ stream: s, addon: r.addon })
-            })
-          })
-          return allStreams.map((item, index) => {
-            if (!item.stream.behaviorHints) item.stream.behaviorHints = {}
-            item.stream.behaviorHints.sortIndex = index
-            return { stream: item.stream, addon: item.addon }
-          })
-        }
-
-        // Use StreamProcessor for proper filtering, sorting, deduplication
-        const processor = new StreamProcessor(settings, platform)
-        
-        // Flatten all streams for processing
-        const flatStreams = rawResults.flatMap(r => 
-          r.streams.map(s => ({ 
-            stream: s, 
-            addon: { id: r.addon.id, name: r.addon.name, logo: r.addon.logo, version: '', description: '', resources: [], types: [], catalogs: [] }
-          }))
-        )
-        
-        // Process through StreamProcessor (filter, sort, dedupe, limit)
-        const processed = processor.process(flatStreams, meta)
-        
-        // Assign sortIndex and format for frontend with parsed metadata
-        return processed.map((p: any, index: number) => {
-          if (!p.original.behaviorHints) p.original.behaviorHints = {}
-          p.original.behaviorHints.sortIndex = index
-          return {
-            stream: p.original,
-            addon: { id: p.addon.id, name: p.addon.name, logo: p.addon.logo || p.addon.logo_url },
-            parsed: {
-              resolution: p.parsed.resolution,
-              encode: p.parsed.encode,
-              audioTags: p.parsed.audioTags,
-              audioChannels: p.parsed.audioChannels,
-              visualTags: p.parsed.visualTags,
-              sourceType: p.parsed.sourceType,
-              seeders: p.parsed.seeders,
-              size: p.parsed.size,
-              languages: p.parsed.languages,
-              isCached: p.parsed.isCached
-            }
-          }
-        })
-      }
-
-      try {
-        await addonManager.getStreamsProgressive(
-          type,
-          id,
-          pId,
-          season ? parseInt(season) : undefined,
-          episode ? parseInt(episode) : undefined,
-          platform,
-          {
-            onAddonStart: (addon) => {
-              sendEvent('addon-start', {
-                addon: { id: addon.id, name: addon.name, logo: addon.logo || addon.logo_url }
-              })
-            },
-            onAddonResult: (addon, streams) => {
-              // Add to collected results
-              rawResults.push({
-                addon: { id: addon.id, name: addon.name, logo: addon.logo || addon.logo_url },
-                streams
-              })
-              
-              // Process ALL collected streams using StreamProcessor
-              const sortedStreams = processStreams()
-              
-              sendEvent('addon-result', {
-                addon: { id: addon.id, name: addon.name, logo: addon.logo || addon.logo_url },
-                count: streams.length,
-                // Send the full sorted stream list
-                allStreams: sortedStreams
-              })
-
-              // Early playable hint for faster perceived readiness in UI
-              if (!firstPlayableSent && sortedStreams.length > 0) {
-                firstPlayableSent = true
-                sendEvent('server-timing', {
-                  phase: 'first-playable',
-                  durationMs: Date.now() - startedAt
-                })
-                sendEvent('first-playable', {
-                  stream: sortedStreams[0],
-                  totalCount: sortedStreams.length
-                })
-              }
-            },
-            onAddonError: (addon, error) => {
-              sendEvent('addon-error', {
-                addon: { id: addon.id, name: addon.name, logo: addon.logo || addon.logo_url },
-                error
-              })
-            }
-          }
-        )
-
-        // All addons finished - send final processed list
-        const finalStreams = processStreams()
-        
-        // Store in cache
-        streamCache.set(
-          cacheKey, 
-          finalStreams, 
-          true, 
-          rawResults.map(r => r.addon.id)
-        )
-        
-        sendEvent('complete', { 
-          allStreams: finalStreams,
-          totalCount: finalStreams.length,
-          fromCache: false
-        })
-        sendEvent('server-timing', {
-          phase: 'complete',
-          durationMs: Date.now() - startedAt,
-          totalCount: finalStreams.length
-        })
-        closeController()
-      } catch (e) {
-        log.error('SSE stream error:', e)
-        sendEvent('error', { message: e instanceof Error ? e.message : 'Unknown error' })
-        closeController()
-      }
-    }
-  })
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    }
-  })
-})
 
 streaming.get('/subtitles/:type/:id', async (c) => {
   const { type, id } = c.req.param()
@@ -1517,8 +1222,8 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
             id: (meta as any).id,
             type: (meta as any).type,
             name: (meta as any).name,
-            poster: (meta as any).poster,
-            background: (meta as any).background,
+            poster: (meta as any).poster || h.poster,
+            background: (meta as any).background || (meta as any).poster || h.poster,
             logo: (meta as any).logo,
             description: (meta as any).description,
             releaseInfo: (meta as any).releaseInfo,
@@ -1536,6 +1241,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
             type: h.meta_type,
             name: h.title || 'Unknown',
             poster: h.poster,
+            background: h.poster,
             season,
             episode,
             episodeDisplay,
@@ -1715,8 +1421,8 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           id: (meta as any).id,
           type: (meta as any).type,
           name: (meta as any).name,
-          poster: (meta as any).poster,
-          background: (meta as any).background,
+          poster: (meta as any).poster || h.poster,
+          background: (meta as any).background || (meta as any).poster || h.poster,
           logo: (meta as any).logo,
           description: (meta as any).description,
           releaseInfo: (meta as any).releaseInfo,
@@ -1734,6 +1440,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           type: h.meta_type,
           name: h.title || 'Unknown',
           poster: h.poster,
+          background: h.poster,
           season,
           episode,
           episodeDisplay,

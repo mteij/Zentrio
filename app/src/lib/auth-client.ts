@@ -6,6 +6,7 @@ import {
     twoFactorClient,
 } from "better-auth/client/plugins";
 import { createLogger } from '../utils/client-logger';
+import { isTauriRuntime } from './runtime-env';
 
 const log = createLogger('AuthClient')
 
@@ -16,12 +17,17 @@ declare global {
   }
 }
 
-export const isTauri = () => {
-  return (
-    typeof window !== "undefined" && 
-    ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
-  );
-};
+export const isTauri = isTauriRuntime;
+
+function getTauriClientHint(): string {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  if (/android/i.test(ua)) return 'tauri-android'
+  if (/iphone|ipad/i.test(ua)) return 'tauri-ios'
+  if (/windows nt/i.test(ua)) return 'tauri-windows'
+  if (/macintosh|mac os x/i.test(ua)) return 'tauri-macos'
+  if (/linux/i.test(ua)) return 'tauri-linux'
+  return 'tauri-desktop'
+}
 
 /**
  * Get the server URL for API requests.
@@ -82,20 +88,6 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
     }
 
     const headers = new Headers(init?.headers);
-
-    // Identify the Tauri platform so the server can distinguish native app sessions
-    // from regular web browser sessions (they share the same WebView user-agent).
-    // We combine isTauri() with the WebView UA to tell apart desktop OSes and mobile.
-    if (isTauri()) {
-      const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
-      let tauriPlatform = 'tauri-desktop'
-      if (/android/i.test(ua))        tauriPlatform = 'tauri-android'
-      else if (/iphone|ipad/i.test(ua)) tauriPlatform = 'tauri-ios'
-      else if (/windows nt/i.test(ua))  tauriPlatform = 'tauri-windows'
-      else if (/macintosh|mac os x/i.test(ua)) tauriPlatform = 'tauri-macos'
-      else if (/linux/i.test(ua))       tauriPlatform = 'tauri-linux'
-      headers.set('X-Zentrio-Client', tauriPlatform)
-    }
 
     let overrideMethod: any = init ? init.method : undefined;
     
@@ -168,6 +160,10 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
             }
             
             if (isSessionRequest) {
+                // WebView/browser fetches obey remote CORS policy. Avoid sending
+                // the native-only analytics hint on this path so auth bootstrap
+                // does not fail its preflight from tauri.localhost.
+                headers.delete('X-Zentrio-Client')
                 log.debug('Using WebView fetch for session:', url);
                 
                 // --- DEBUG TRACING ---
@@ -189,6 +185,9 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
             }
 
             const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+            if (!headers.has('X-Zentrio-Client')) {
+                headers.set('X-Zentrio-Client', getTauriClientHint())
+            }
             
             return await tauriFetch(url, {
                 ...finalInit,

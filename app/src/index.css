@@ -77,6 +77,7 @@ body {
   min-height: var(--app-height);
   width: 100%;
   height: 100%;
+  overscroll-behavior: none;
 }
 
 /* ==========================================================================
@@ -97,6 +98,7 @@ body.has-titlebar #root {
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: none;
 }
 
 /* Utility class for full-height elements that respect titlebar */
@@ -194,5 +196,26 @@ body.is-mobile .fixed-header {
 
 body.is-mobile .fixed-bottom {
   bottom: var(--app-safe-bottom);
+}
+
+/* ==========================================================================
+   TV Platform Support (Android TV / Google TV)
+   ========================================================================== */
+
+body.is-tv {
+  --titlebar-height: 0px;
+  --app-safe-top: 0px;
+  --app-safe-bottom: 0px;
+  --app-content-top-offset: 0px;
+  --app-content-top-spacing: 0px;
+  --app-height: 100vh;
+  background-color: #000000;
+}
+
+body.is-tv #root {
+  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 

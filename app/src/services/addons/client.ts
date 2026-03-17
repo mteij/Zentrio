@@ -71,7 +71,7 @@ export class AddonClient {
       this.manifest = await res.json()
       return this.manifest!
     } catch (e) {
-      log.error(`Failed to init ${this.baseUrl}`, e)
+      log.warn(`Failed to init addon at ${this.baseUrl}: ${e instanceof Error ? e.message : String(e)}`)
       throw e
     }
   }
@@ -125,14 +125,9 @@ export class AddonClient {
     const addonName = this.manifest?.name || 'Unknown'
     log.debug(`${addonName} fetching subtitles from: ${url}`)
     
-    try {
-      const result = await this.fetchResource<Subtitle[]>(url, 'subtitles', RESOURCE_TIMEOUTS.subtitles)
-      log.debug(`${addonName} returned ${Array.isArray(result) ? result.length : 0} subtitles`)
-      return result
-    } catch (e) {
-      log.error(`${addonName} failed to fetch subtitles:`, e)
-      throw e
-    }
+    const result = await this.fetchResource<Subtitle[]>(url, 'subtitles', RESOURCE_TIMEOUTS.subtitles)
+    log.debug(`${addonName} returned ${Array.isArray(result) ? result.length : 0} subtitles`)
+    return result
   }
 
   private async fetchResource<T>(

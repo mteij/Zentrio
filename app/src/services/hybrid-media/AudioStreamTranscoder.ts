@@ -15,6 +15,7 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
+import { isTauriRuntime } from '../../lib/runtime-env'
 import { createLogger } from '../../utils/client-logger'
 
 const log = createLogger('AudioStream')
@@ -23,8 +24,7 @@ const log = createLogger('AudioStream')
  * Check if running in Tauri environment
  */
 function isTauriEnvironment(): boolean {
-  return typeof window !== 'undefined' &&
-         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+  return isTauriRuntime()
 }
 
 export interface AudioTranscoderConfig {

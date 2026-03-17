@@ -23,8 +23,7 @@ const FORWARDABLE_READ_PREFIXES = [
   '/api/streaming/catalog',
   '/api/streaming/catalog-items',
   '/api/streaming/search-catalog-metadata',
-  '/api/streaming/search-catalog-items',
-  '/api/streaming/streams-live'
+  '/api/streaming/search-catalog-items'
 ]
 
 const isProductionEnv = () => (process.env.NODE_ENV || '').trim().toLowerCase() === 'production'

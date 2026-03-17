@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { ErrorBoundary, TitleBar, ScrollToTop } from './components'
@@ -11,11 +11,16 @@ import { toast } from 'sonner'
 import { apiFetch } from './lib/apiFetch'
 import { useAuthStore } from './stores/authStore'
 import { preloadCommonRoutes } from './utils/route-preloader'
+import { getLoginBehaviorRedirectPath } from './hooks/useLoginBehavior'
 // Initialize toast bridge for legacy window.addToast calls
 import './utils/toast'
 import { CastProvider } from './contexts/CastContext'
 import { StreamingHomeSkeleton } from './components/streaming/StreamingLoaders'
 import { appMode, AppMode } from './lib/app-mode'
+import { getPlatformCapabilities } from './lib/platform-capabilities'
+import { isTauriRuntime, waitForTauriRuntime } from './lib/runtime-env'
+import { TvFocusProvider } from './components/tv'
+import { useOfflineDownloadCapability } from './hooks/useOfflineDownloadCapability'
 const OnboardingWizard = lazy(() => import('./components/onboarding').then(m => ({ default: m.OnboardingWizard })))
 import { AppLifecycleProvider } from './lib/app-lifecycle'
 // Import safe area insets CSS plugin for mobile safe area support
@@ -28,21 +33,23 @@ const log = createLogger('App')
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage as React.ComponentType<{version?: string}> })))
 const ProfilesPage = lazy(() => import('./pages/ProfilesPage').then(m => ({ default: m.ProfilesPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
-const ExploreAddonsPage = lazy(() => import('./pages/ExploreAddonsPage').then(m => ({ default: m.ExploreAddonsPage })))
+const ExploreAddonsPage = lazy(() => import('./pages/ExploreAddonsRoute').then(m => ({ default: m.ExploreAddonsRoute })))
 const SignInPage = lazy(() => import('./pages/auth/SignInPage').then(m => ({ default: m.SignInPage })))
 const SignUpPage = lazy(() => import('./pages/auth/SignUpPage').then(m => ({ default: m.SignUpPage })))
 const TwoFactorPage = lazy(() => import('./pages/auth/TwoFactorPage').then(m => ({ default: m.TwoFactorPage })))
+const ActivateDevicePage = lazy(() => import('./pages/ActivateDevicePage').then(m => ({ default: m.ActivateDevicePage })))
 
 // Streaming pages
 const StreamingLayout = lazy(() => import('./pages/streaming/StreamingLayout').then(m => ({ default: m.StreamingLayout })))
 const StreamingHome = lazy(() => import('./pages/streaming/Home').then(m => ({ default: m.StreamingHome })))
-const StreamingDetails = lazy(() => import('./pages/streaming/Details').then(m => ({ default: m.StreamingDetails })))
-const StreamingPlayer = lazy(() => import('./pages/streaming/Player').then(m => ({ default: m.StreamingPlayer })))
-const StreamingExplore = lazy(() => import('./pages/streaming/Explore').then(m => ({ default: m.StreamingExplore })))
-const StreamingLibrary = lazy(() => import('./pages/streaming/Library').then(m => ({ default: m.StreamingLibrary })))
+const StreamingDetails = lazy(() => import('./pages/streaming/DetailsRoute').then(m => ({ default: m.StreamingDetailsRoute })))
+const StreamingPlayer = lazy(() => import('./pages/streaming/PlayerRoute').then(m => ({ default: m.StreamingPlayerRoute })))
+const StreamingExplore = lazy(() => import('./pages/streaming/ExploreRoute').then(m => ({ default: m.StreamingExploreRoute })))
+const StreamingLibrary = lazy(() => import('./pages/streaming/LibraryRoute').then(m => ({ default: m.StreamingLibraryRoute })))
 const StreamingSearch = lazy(() => import('./pages/streaming/Search').then(m => ({ default: m.StreamingSearch })))
 const StreamingCatalog = lazy(() => import('./pages/streaming/Catalog').then(m => ({ default: m.StreamingCatalog })))
 const StreamingDownloads = lazy(() => import('./pages/streaming/Downloads').then(m => ({ default: m.StreamingDownloads })))
+const SeriesDownloadsPage = lazy(() => import('./pages/streaming/SeriesDownloadsPage').then(m => ({ default: m.SeriesDownloadsPage })))
 // Share invite page
 const ShareInvitePage = lazy(() => import('./pages/ShareInvitePage').then(m => ({ default: m.ShareInvitePage })))
 
@@ -78,35 +85,13 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Check for Tauri injection
-      // On Android, this might take a few milliseconds
-      let attempts = 0;
-      const checkTauri = () => {
-        // Check standard Tauri injection points
-        const isTauriRequest = 
-          (window as any).__TAURI_INTERNALS__ !== undefined || 
-          (window as any).__TAURI__ !== undefined ||
-          (window as any).__TAURI_IPC__ !== undefined;
-
-        if (isTauriRequest) {
-          log.debug('Tauri detected!');
-          setReady(true);
-          return;
-        }
-
-        // If not detected yet, and we are locally potentially in a WebView (heuristic?)
-        // Actually, just wait a short burst to see if it appears. 
-        // If it's a browser, it will never appear, so we timeout.
-        if (attempts < 5) { // Wait up to 250ms
-          attempts++;
-          setTimeout(checkTauri, 50);
-        } else {
-          log.debug('Tauri not detected, assuming Web Mode.');
-          setReady(true);
-        }
-      };
-
-      checkTauri();
+      const tauriDetected = await waitForTauriRuntime()
+      if (tauriDetected) {
+        log.debug('Tauri detected!')
+      } else {
+        log.debug('Tauri not detected, assuming Web Mode.')
+      }
+      setReady(true)
     };
 
     init();
@@ -122,6 +107,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   const location = useLocation()
   const navigate = useNavigate()
+  const platform = getPlatformCapabilities()
   
   // App mode state (guest vs connected)
   const [mode, setMode] = useState<AppMode | null | 'web'>(() => {
@@ -206,8 +192,12 @@ function AppRoutes() {
               expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
             });
             
-            // Clean URL and redirect to profiles
-            window.history.replaceState({}, '', '/profiles');
+            // Device activation needs to stay on its setup page after browser auth.
+            if (window.location.pathname === '/activate') {
+              window.history.replaceState({}, '', '/activate');
+            } else {
+              window.history.replaceState({}, '', '/profiles');
+            }
             return true;
           } else {
             log.debug('Browser OAuth: No session found after callback');
@@ -257,12 +247,35 @@ function AppRoutes() {
                      const currentServer = localStorage.getItem('zentrio_server_url') || 'https://app.zentrio.eu';
                      setServerUrl(currentServer);
                      
-                     navigate('/profiles')
+                     navigate(getLoginBehaviorRedirectPath())
                  }
              }
           } catch(e) {
             log.error('Failed to handle magic link', e)
             toast.error('Failed to sign in with magic link')
+          }
+        } else if (url.startsWith('zentrio://launcher/open')) {
+          try {
+            const urlObj = new URL(url)
+            const profileId = urlObj.searchParams.get('profileId')
+            const type = urlObj.searchParams.get('type')
+            const id = urlObj.searchParams.get('id')
+            const season = urlObj.searchParams.get('season')
+            const episode = urlObj.searchParams.get('episode')
+
+            if (!profileId || !type || !id) {
+              return
+            }
+
+            navigate(`/streaming/${encodeURIComponent(profileId)}/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, {
+              state: {
+                autoPlay: true,
+                season: season ? parseInt(season, 10) : undefined,
+                episode: episode ? parseInt(episode, 10) : undefined,
+              },
+            })
+          } catch (e) {
+            log.error('Failed to handle launcher deep link', e)
           }
         } else if (url.includes('auth_code') || url.includes('code=')) {
           // Handle social login callback with auth code
@@ -339,10 +352,11 @@ function AppRoutes() {
                   setServerUrl(currentServer);
                   log.debug('ServerUrl persisted:', currentServer);
                   
-                  // Force a hard reload to /profiles to ensure fresh state
+                  // Force a hard reload to ensure fresh state
                   // This is safer than navigate() when changing auth state deeply
-                  log.debug('Hard redirecting to /profiles');
-                  window.location.href = '/profiles';
+                  const postLoginPath = getLoginBehaviorRedirectPath();
+                  log.debug('Hard redirecting to', postLoginPath);
+                  window.location.href = postLoginPath;
                 } else {
                    log.error('No user data in callback response');
                    throw new Error('No user data returned');
@@ -415,7 +429,7 @@ function AppRoutes() {
   const { isLoading: authLoading, isAuthenticated } = useAuthStore();
 
   // Calculate if we should show onboarding (needs to be before hooks for consistent order)
-  const isTauriApp = isTauri();
+  const isTauriApp = platform.canUseNativeShell;
   const isGuestMode = appMode.isGuest();
   
   // Track if we've completed the initial auth check to prevent race conditions
@@ -459,8 +473,9 @@ function AppRoutes() {
        // Only redirect to profiles if explicitly authenticated
        // Otherwise let the router handle it (LandingPage -> SignIn)
        if (isAuthenticated || isGuestMode) {
-          log.debug('Tauri app at root (authenticated/guest), redirecting to /profiles');
-          navigate('/profiles', { replace: true });
+          const dest = isGuestMode ? '/profiles' : getLoginBehaviorRedirectPath();
+          log.debug('Tauri app at root (authenticated/guest), redirecting to', dest);
+          navigate(dest, { replace: true });
        }
     }
   }, [location.pathname, mode, navigate, shouldShowOnboarding, isAuthenticated, isGuestMode, isTauriApp, initialAuthCheckDone]);
@@ -486,6 +501,7 @@ function AppRoutes() {
       <Route path="/signin" element={<Suspense fallback={<SplashScreen />}><PublicRoute><SignInPage /></PublicRoute></Suspense>} />
       <Route path="/register" element={<Suspense fallback={<SplashScreen />}><PublicRoute><SignUpPage /></PublicRoute></Suspense>} />
       <Route path="/two-factor" element={<Suspense fallback={<SplashScreen />}><TwoFactorPage /></Suspense>} />
+      <Route path="/activate" element={<Suspense fallback={<SplashScreen />}><ActivateDevicePage /></Suspense>} />
       
       {/* Share invitation page (accessible without auth, but accept requires auth) */}
       <Route path="/share/:token" element={<Suspense fallback={<SplashScreen />}><ShareInvitePage /></Suspense>} />
@@ -522,7 +538,8 @@ function AppRoutes() {
         <Route path="library" element={<StreamingLibrary />} />
         <Route path="library/:listId" element={<StreamingLibrary />} />
         <Route path="search" element={<StreamingSearch />} />
-        <Route path="downloads" element={isTauri() ? <StreamingDownloads /> : <Navigate to=".." replace />} />
+        <Route path="downloads" element={platform.canUseNativeShell ? <RequireOfflineDownloads><StreamingDownloads /></RequireOfflineDownloads> : <Navigate to=".." replace />} />
+        <Route path="downloads/:mediaId" element={platform.canUseNativeShell ? <RequireOfflineDownloads><SeriesDownloadsPage /></RequireOfflineDownloads> : <Navigate to=".." replace />} />
         <Route path="catalog/:manifestUrl/:type/:id" element={<StreamingCatalog />} />
         <Route path=":type/:id" element={<StreamingDetails />} />
         <Route path="player" element={
@@ -536,10 +553,32 @@ function AppRoutes() {
   )
 }
 
+function RequireOfflineDownloads({ children }: { children: React.ReactNode }) {
+  const { profileId } = useParams<{ profileId: string }>()
+  const platform = getPlatformCapabilities()
+  const { isAvailable, isLoading, isTv } = useOfflineDownloadCapability(profileId)
+
+  if (!platform.canUseNativeShell) {
+    return <Navigate to=".." replace />
+  }
+
+  if (isTv && isLoading) {
+    return <StreamingHomeSkeleton />
+  }
+
+  if (!isAvailable) {
+    return <Navigate to={profileId ? `/streaming/${profileId}` : '/profiles'} replace />
+  }
+
+  return <>{children}</>
+}
+
 export default function App() {
+  const platform = getPlatformCapabilities()
+
   // Initialize Tauri overrides if environment matches
   useEffect(() => {
-    if (isTauri()) {
+    if (platform.canUseNativeShell) {
       // Prevent default context menu in Tauri for a native app feel
       const handleContextMenu = (e: MouseEvent) => {
         // Check if the target or any parent has data-native-context-menu attribute
@@ -553,7 +592,7 @@ export default function App() {
       document.addEventListener('contextmenu', handleContextMenu);
       return () => document.removeEventListener('contextmenu', handleContextMenu);
     }
-  }, []);
+  }, [platform.canUseNativeShell]);
 
   return (
     <ErrorBoundary>
@@ -561,24 +600,26 @@ export default function App() {
         <CastProvider>
           <AppLifecycleProvider>
              <AppInitializer>
-                <BrowserRouter>
-                  <ScrollToTop />
-                  <TitleBar />
-                  <AppRoutes />
-                  <Toaster 
-                    theme="dark"
-                    position="top-right"
-                    richColors
-                    closeButton
-                    toastOptions={{
-                      style: {
-                        background: 'rgba(20, 20, 20, 0.95)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        backdropFilter: 'blur(12px)',
-                      },
-                    }}
-                  />
-                </BrowserRouter>
+                <TvFocusProvider>
+                  <BrowserRouter>
+                    <ScrollToTop />
+                    <TitleBar />
+                    <AppRoutes />
+                    <Toaster 
+                      theme="dark"
+                      position="top-right"
+                      richColors
+                      closeButton
+                      toastOptions={{
+                        style: {
+                          background: 'rgba(20, 20, 20, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          backdropFilter: 'blur(12px)',
+                        },
+                      }}
+                    />
+                  </BrowserRouter>
+                </TvFocusProvider>
              </AppInitializer>
           </AppLifecycleProvider>
         </CastProvider>

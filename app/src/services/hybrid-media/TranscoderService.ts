@@ -16,6 +16,7 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
+import { isTauriRuntime } from '../../lib/runtime-env'
 import { createLogger } from '../../utils/client-logger'
 import type { MediaFormat, MediaMetadata, MediaStream } from './types'
 
@@ -25,8 +26,7 @@ const log = createLogger('Transcoder')
  * Check if running in Tauri environment
  */
 function isTauriEnvironment(): boolean {
-  return typeof window !== 'undefined' &&
-         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+  return isTauriRuntime()
 }
 
 // Codec ID constants matching HybridEngine

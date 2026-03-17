@@ -53,9 +53,10 @@ type EmailMethod = "password" | "magic-link" | "otp";
 interface AuthFormsProps {
   mode: AuthMode;
   onSuccess?: () => void;
+  redirectPathOverride?: string;
 }
 
-export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
+export function AuthForms({ mode, onSuccess, redirectPathOverride }: AuthFormsProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { getRedirectPath } = useLoginBehavior();
@@ -118,7 +119,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
   const handleSocialLogin = async (provider: "google" | "github" | "discord") => {
     try {
       setSocialLoading(provider);
-      const redirectPath = getLoginBehaviorRedirectPath();
+      const redirectPath = redirectPathOverride || getLoginBehaviorRedirectPath();
       
       const callbackURL = isTauri() 
         ? "zentrio://auth/callback" 
@@ -151,7 +152,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
   const handleOidcLogin = async (providerId: string) => {
     try {
       setSocialLoading(providerId);
-      const redirectPath = getLoginBehaviorRedirectPath();
+      const redirectPath = redirectPathOverride || getLoginBehaviorRedirectPath();
 
       if (isTauri()) {
         const { openUrl } = await import('@tauri-apps/plugin-opener');
@@ -196,11 +197,10 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       }
 
       if (isTauri()) {
-        // For Tauri apps, ensure connected mode is set and navigate to profiles
+        // For Tauri apps, ensure connected mode is set and navigate per login behavior
         // Don't clear state - preserve server URL that was set during onboarding
         appMode.set('connected');
-        // Navigate to profiles
-        window.location.href = '/profiles';
+        window.location.href = getLoginBehaviorRedirectPath();
         return true;
       }
     }
@@ -213,7 +213,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
 
     try {
       if (mode === "signup") {
-        const redirectPath = getLoginBehaviorRedirectPath();
+        const redirectPath = redirectPathOverride || getLoginBehaviorRedirectPath();
         const { error } = await authClient.signUp.email({
           email,
           password,
@@ -230,7 +230,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         });
         setShowVerificationModal(true);
       } else if (emailMethod === "password") {
-        const redirectPath = getRedirectPath();
+        const redirectPath = redirectPathOverride || getRedirectPath();
         const { data, error } = await authClient.signIn.email({
           email,
           password,
@@ -239,7 +239,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         if (error) throw error;
         if (!handleLoginSuccess(data)) navigate(redirectPath);
       } else if (emailMethod === "magic-link") {
-        const redirectPath = getLoginBehaviorRedirectPath();
+        const redirectPath = redirectPathOverride || getLoginBehaviorRedirectPath();
         const callbackURL = isTauri()
           ? "zentrio://auth/magic-link"
           : `${getClientUrl()}${redirectPath}`;
@@ -253,7 +253,7 @@ export function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           setShowOtpInput(true);
           toast.success('Code Sent', { description: 'Check your email for the 6-digit code.' });
         } else if (otp) {
-          const redirectPath = getRedirectPath();
+          const redirectPath = redirectPathOverride || getRedirectPath();
           const { data, error } = await authClient.signIn.emailOtp({ email, otp });
           if (error) throw error;
           if (!handleLoginSuccess(data)) navigate(redirectPath);

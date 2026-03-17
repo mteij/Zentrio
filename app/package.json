@@ -1,6 +1,6 @@
 {
   "name": "zentrio",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "license": "MIT",
   "description": "Zentrio - Stream anything. Own everything.",
   "scripts": {
@@ -18,6 +18,11 @@
     "tauri:android:init": "tauri android init",
     "tauri:android:dev": "bun run android:ports && tauri android dev",
     "tauri:android:build": "tauri android build",
+    "googletv:remote": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell -ArgumentList '-NoProfile','-STA','-ExecutionPolicy','Bypass','-File','scripts/google-tv-remote.ps1' -WorkingDirectory .\"",
+    "tauri:googletv:build": "bun run scripts/google-tv-runner.ts build",
+    "tauri:googletv:install": "bun run scripts/google-tv-runner.ts install",
+    "tauri:googletv:dev": "bun run scripts/google-tv-runner.ts dev",
+    "tauri:googletv:logcat": "bun run scripts/google-tv-runner.ts logcat",
     "android:setup": "powershell -ExecutionPolicy Bypass -File scripts/android-setup.ps1",
     "android:ports": "bun run scripts/android-ports.ts",
     "sync:version": "bun run scripts/sync-version.ts",

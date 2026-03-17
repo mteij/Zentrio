@@ -1,49 +1,5 @@
-/**
- * Stream Service - Utilities for stream aggregation and processing.
- * Provides helpers for video ID construction, stream sorting, and addon filtering.
- */
+import { Stream } from './types'
 
-import { Stream, Manifest } from './types'
-
-/**
- * Construct a video ID for stream requests
- * For series: id:season:episode
- * For movies: id
- */
-export function buildVideoId(
-  type: string, 
-  id: string, 
-  season?: number, 
-  episode?: number
-): string {
-  if (type === 'series' && season !== undefined && episode !== undefined) {
-    return `${id}:${season}:${episode}`
-  }
-  return id
-}
-
-/**
- * Parse a video ID back into components
- */
-export function parseVideoId(videoId: string): { id: string, season?: number, episode?: number } {
-  const parts = videoId.split(':')
-  
-  if (parts.length >= 3) {
-    const season = parseInt(parts[parts.length - 2])
-    const episode = parseInt(parts[parts.length - 1])
-    const id = parts.slice(0, -2).join(':')
-    
-    if (!isNaN(season) && !isNaN(episode)) {
-      return { id, season, episode }
-    }
-  }
-  
-  return { id: videoId }
-}
-
-/**
- * Check if a stream is cached/instant
- */
 export function isStreamCached(stream: Stream): boolean {
   const combined = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase()
   
@@ -65,10 +21,7 @@ export function isStreamCached(stream: Stream): boolean {
   )
 }
 
-/**
- * Parse resolution from stream metadata
- */
-export function parseResolution(stream: Stream): string | null {
+function parseResolution(stream: Stream): string | null {
   const combined = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase()
   
   if (combined.includes('4k') || combined.includes('2160p')) return '4K'
@@ -79,10 +32,7 @@ export function parseResolution(stream: Stream): string | null {
   return null
 }
 
-/**
- * Parse file size from stream metadata
- */
-export function parseFileSize(stream: Stream): string | null {
+function parseFileSize(stream: Stream): string | null {
   const combined = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`
   const sizeMatch = combined.match(/(\d+(?:\.\d+)?)\s*(gb|mb)/i)
   
@@ -95,26 +45,17 @@ export function parseFileSize(stream: Stream): string | null {
   return null
 }
 
-/**
- * Check if stream has HDR
- */
-export function hasHDR(stream: Stream): boolean {
+function hasHDR(stream: Stream): boolean {
   const combined = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase()
   return combined.includes('hdr')
 }
 
-/**
- * Check if stream has Dolby Vision
- */
-export function hasDolbyVision(stream: Stream): boolean {
+function hasDolbyVision(stream: Stream): boolean {
   const combined = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase()
   return combined.includes('dv') || combined.includes('dolby vision')
 }
 
-/**
- * Parsed stream info for UI display
- */
-export interface ParsedStreamInfo {
+interface ParsedStreamInfo {
   resolution: string | null
   size: string | null
   isCached: boolean
@@ -122,10 +63,7 @@ export interface ParsedStreamInfo {
   hasDV: boolean
 }
 
-/**
- * Parse all display info from a stream
- */
-export function parseStreamInfo(stream: Stream): ParsedStreamInfo {
+function parseStreamInfo(stream: Stream): ParsedStreamInfo {
   return {
     resolution: parseResolution(stream),
     size: parseFileSize(stream),
@@ -133,36 +71,6 @@ export function parseStreamInfo(stream: Stream): ParsedStreamInfo {
     hasHDR: hasHDR(stream),
     hasDV: hasDolbyVision(stream)
   }
-}
-
-/**
- * Flatten stream results from multiple addons into a single list
- */
-export function flattenStreamResults(
-  results: { addon: Manifest, streams: Stream[] }[]
-): { stream: Stream, addon: Manifest }[] {
-  return results.flatMap(r => 
-    r.streams.map(s => ({ stream: s, addon: r.addon }))
-  )
-}
-
-/**
- * Group flat streams back by addon
- */
-export function groupStreamsByAddon(
-  flatStreams: { stream: Stream, addon: Manifest }[]
-): { addon: Manifest, streams: Stream[] }[] {
-  const addonMap = new Map<string, { addon: Manifest, streams: Stream[] }>()
-  
-  for (const { stream, addon } of flatStreams) {
-    const key = addon.id
-    if (!addonMap.has(key)) {
-      addonMap.set(key, { addon, streams: [] })
-    }
-    addonMap.get(key)!.streams.push(stream)
-  }
-  
-  return Array.from(addonMap.values())
 }
 
 /**
@@ -192,10 +100,7 @@ const RESOLUTION_PRIORITY: Record<string, number> = {
   'unknown': 0
 }
 
-/**
- * Check if a stream meets minimum quality requirements
- */
-export function isStreamAcceptable(
+function isStreamAcceptable(
   stream: Stream,
   config: AutoPlayConfig
 ): boolean {
@@ -214,11 +119,7 @@ export function isStreamAcceptable(
   return streamPriority >= minPriority
 }
 
-/**
- * Select the best stream for auto-play
- * Prioritizes: cached > uncached, then by resolution
- */
-export function selectBestStream(
+function selectBestStream(
   streams: { stream: Stream, addon: { id: string, name: string, logo?: string } }[],
   config: AutoPlayConfig
 ): { stream: Stream, addon: { id: string, name: string, logo?: string } } | null {
@@ -256,11 +157,7 @@ export function selectBestStream(
   return scored[0] || null
 }
 
-/**
- * Check if we have a "good enough" stream for early auto-play
- * Returns true if we have a cached stream that meets quality requirements
- */
-export function hasGoodStream(
+function hasGoodStream(
   streams: { stream: Stream, addon: { id: string, name: string, logo?: string } }[],
   config: AutoPlayConfig
 ): boolean {

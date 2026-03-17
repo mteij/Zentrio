@@ -9,21 +9,13 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { isTauri } from '../lib/auth-client'
 import { HybridEngine } from '../services/hybrid-media/HybridEngine'
 import { TranscoderService } from '../services/hybrid-media/TranscoderService'
 import type { StreamInfo, EngineState, HybridEngineConfig, StreamType, CodecInfo, MediaMetadata } from '../services/hybrid-media/types'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('useHybridPlayer')
-
-/**
- * Check if running in Tauri environment
- * Hybrid playback is disabled in Tauri - uses native playback instead
- */
-function isTauri(): boolean {
-  return typeof window !== 'undefined' &&
-         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
-}
 
 export interface UseHybridPlayerOptions {
   /** Media URL to play */

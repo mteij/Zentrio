@@ -4,7 +4,13 @@ import path from 'path'
 import packageJson from './package.json'
 
 // Check if building for Tauri (native app)
-const isTauriBuild = process.env.TAURI === 'true' || process.argv.includes('--tauri')
+const isTauriBuild =
+  process.env.TAURI === 'true' ||
+  process.argv.includes('--tauri') ||
+  typeof process.env.TAURI_ENV_PLATFORM === 'string' ||
+  typeof process.env.TAURI_ENV_TARGET_TRIPLE === 'string'
+const isTauriDebugBuild = isTauriBuild && process.env.TAURI_ENV_DEBUG === 'true'
+const shouldUseManualVendorChunks = !isTauriBuild
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -28,11 +34,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: false,
+    sourcemap: isTauriDebugBuild,
+    minify: isTauriDebugBuild ? false : undefined,
     // Increase chunk size limit to reduce warnings (but we'll optimize)
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks: (id) => {
+          if (!shouldUseManualVendorChunks) {
+            return undefined
+          }
+
           // Split React ecosystem
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'react-vendor'

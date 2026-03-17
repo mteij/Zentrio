@@ -6,6 +6,7 @@
  * than web browsers (including HEVC, FLAC, AC3, DTS, etc.)
  */
 
+import { isTauriRuntime } from '../../../lib/runtime-env'
 import type {
   IPlayerEngine,
   PlayerState,
@@ -34,8 +35,7 @@ function isBenignPlayInterruption(error: unknown): boolean {
  * Check if running in Tauri environment
  */
 function isTauriEnvironment(): boolean {
-  return typeof window !== 'undefined' &&
-    ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+  return isTauriRuntime()
 }
 
 /**

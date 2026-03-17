@@ -5,8 +5,17 @@
  */
 
 import { useRef, useState, useEffect, useCallback } from 'react'
-import type { IPlayerEngine, PlayerState, MediaSource, SubtitleTrack, AudioTrack, QualityLevel } from '../engines/types'
-import { createEngine, createEngineByType, detectEngineType, isTauriEnvironment } from '../engines'
+import type {
+  IPlayerEngine,
+  PlayerState,
+  MediaSource,
+  SubtitleTrack,
+  AudioTrack,
+  QualityLevel,
+  EngineType,
+  PlayerCloseReason,
+} from '../engines/types'
+import { createEngine, createEngineByType, detectEngineType, getDefaultEngineType } from '../engines'
 import { createLogger } from '../../../utils/client-logger'
 
 const log = createLogger('usePlayerEngine')
@@ -30,6 +39,8 @@ interface UsePlayerEngineOptions {
   onTimeUpdate?: (currentTime: number, duration: number) => void
   /** Callback when playback ends */
   onEnded?: () => void
+  /** Callback when the player session closes without natural completion */
+  onClose?: (reason: PlayerCloseReason) => void
   /** Callback when error occurs */
   onError?: (error: Error) => void
   /** Callback when metadata loads */
@@ -97,6 +108,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     startTime = 0,
     onTimeUpdate,
     onEnded,
+    onClose,
     onError,
     onMetadataLoad,
     onCanPlay
@@ -105,9 +117,9 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
   // ── Stable callback refs ──────────────────────────────────────────────────
   // Store callbacks in refs so event listeners and loadSource never need them
   // in their dependency arrays — preventing the loadSource→render→loadSource loop.
-  const cbRefs = useRef({ onTimeUpdate, onEnded, onError, onMetadataLoad, onCanPlay })
+  const cbRefs = useRef({ onTimeUpdate, onEnded, onClose, onError, onMetadataLoad, onCanPlay })
   useEffect(() => {
-    cbRefs.current = { onTimeUpdate, onEnded, onError, onMetadataLoad, onCanPlay }
+    cbRefs.current = { onTimeUpdate, onEnded, onClose, onError, onMetadataLoad, onCanPlay }
   }) // runs after every render — keeps refs current without causing extra renders
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -116,7 +128,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pendingSourceRef = useRef<MediaSource | null>(null)
   const engineReadyRef = useRef(false)
-  const engineTypeRef = useRef<string>('web')
+  const engineTypeRef = useRef<EngineType>('web')
   const loadedSrcRef = useRef<string>('')  // guard against re-loading same URL
   const initPromiseRef = useRef<Promise<void> | null>(null)
   
@@ -137,6 +149,42 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
   const [error, setError] = useState<Error | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [engineReady, setEngineReady] = useState(false)
+
+  const attachEngineListeners = useCallback((engine: IPlayerEngine) => {
+    engine.addEventListener('timeupdate', (time, duration) => {
+      setState(prev => ({ ...prev, currentTime: time, duration }))
+      cbRefs.current.onTimeUpdate?.(time, duration)
+    })
+    engine.addEventListener('ended', () => {
+      setState(prev => ({ ...prev, ended: true, paused: true }))
+      cbRefs.current.onEnded?.()
+    })
+    engine.addEventListener('close', (reason) => {
+      setState(prev => ({ ...prev, paused: true, buffering: false }))
+      cbRefs.current.onClose?.(reason)
+    })
+    engine.addEventListener('error', (err) => {
+      setError(err)
+      cbRefs.current.onError?.(err)
+    })
+    engine.addEventListener('statechange', (newState) => {
+      setState(prev => ({ ...prev, ...newState }))
+    })
+    engine.addEventListener('loadedmetadata', (duration) => {
+      setState(prev => ({ ...prev, duration }))
+      cbRefs.current.onMetadataLoad?.(duration)
+    })
+    engine.addEventListener('canplay', () => {
+      setState(prev => ({ ...prev, ready: true, buffering: false }))
+      cbRefs.current.onCanPlay?.()
+    })
+    engine.addEventListener('waiting', () => {
+      setState(prev => ({ ...prev, buffering: true }))
+    })
+    engine.addEventListener('playing', () => {
+      setState(prev => ({ ...prev, buffering: false }))
+    })
+  }, [])
 
   // Initialize engine
   useEffect(() => {
@@ -172,43 +220,10 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
         }
         
         engineRef.current = engine
-        engineTypeRef.current = isTauriEnvironment() ? 'tauri' : 'web'
+        // Reflect the actual engine type so loadSource() doesn't needlessly switch on first load
+        engineTypeRef.current = getDefaultEngineType()
 
-        // Attach all event listeners to the active engine.
-        // Reads callbacks via cbRefs.current so no closure capture needed.
-        const attachListeners = (e: IPlayerEngine) => {
-          e.addEventListener('timeupdate', (time, duration) => {
-            setState(prev => ({ ...prev, currentTime: time, duration }))
-            cbRefs.current.onTimeUpdate?.(time, duration)
-          })
-          e.addEventListener('ended', () => {
-            setState(prev => ({ ...prev, ended: true, paused: true }))
-            cbRefs.current.onEnded?.()
-          })
-          e.addEventListener('error', (err) => {
-            setError(err)
-            cbRefs.current.onError?.(err)
-          })
-          e.addEventListener('statechange', (newState) => {
-            setState(prev => ({ ...prev, ...newState }))
-          })
-          e.addEventListener('loadedmetadata', (duration) => {
-            setState(prev => ({ ...prev, duration }))
-            cbRefs.current.onMetadataLoad?.(duration)
-          })
-          e.addEventListener('canplay', () => {
-            setState(prev => ({ ...prev, ready: true, buffering: false }))
-            cbRefs.current.onCanPlay?.()
-          })
-          e.addEventListener('waiting', () => {
-            setState(prev => ({ ...prev, buffering: true }))
-          })
-          e.addEventListener('playing', () => {
-            setState(prev => ({ ...prev, buffering: false }))
-          })
-        }
-
-        attachListeners(engine)
+        attachEngineListeners(engine)
 
         // Initialize engine with video element
         await engine.initialize(videoRef.current)
@@ -218,7 +233,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
         engineReadyRef.current = true
         setEngineReady(true)
         setIsLoading(false)
-        log.debug('Engine initialized:', isTauriEnvironment() ? 'Tauri' : 'Web')
+        log.debug('Engine initialized:', engineTypeRef.current)
 
         // Load pending source if any
         if (pendingSourceRef.current) {
@@ -231,8 +246,8 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
           if (neededType !== engineTypeRef.current && videoRef.current) {
             log.debug(`Switching engine: ${engineTypeRef.current} → ${neededType}`)
             const oldEngine = engineRef.current!
-            const newEngine = await createEngineByType(neededType as any)
-            attachListeners(newEngine)
+            const newEngine = await createEngineByType(neededType)
+            attachEngineListeners(newEngine)
             await newEngine.initialize(videoRef.current)
             oldEngine.destroy()
             engineRef.current = newEngine
@@ -277,7 +292,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
       engineReadyRef.current = false
       setEngineReady(false)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [attachEngineListeners]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fullscreen change listener
   useEffect(() => {
@@ -405,29 +420,8 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
       if (neededType !== engineTypeRef.current && videoRef.current) {
         log.debug(`Switching engine: ${engineTypeRef.current} → ${neededType}`)
         const oldEngine = engineRef.current
-        const newEngine = await createEngineByType(neededType as any)
-
-        // Re-attach listeners via refs (stable closure)
-        newEngine.addEventListener('timeupdate', (time, dur) => {
-          setState(prev => ({ ...prev, currentTime: time, duration: dur }))
-          cbRefs.current.onTimeUpdate?.(time, dur)
-        })
-        newEngine.addEventListener('ended', () => {
-          setState(prev => ({ ...prev, ended: true, paused: true }))
-          cbRefs.current.onEnded?.()
-        })
-        newEngine.addEventListener('error', (err) => { setError(err); cbRefs.current.onError?.(err) })
-        newEngine.addEventListener('statechange', (s) => { setState(prev => ({ ...prev, ...s })) })
-        newEngine.addEventListener('loadedmetadata', (d) => {
-          setState(prev => ({ ...prev, duration: d }))
-          cbRefs.current.onMetadataLoad?.(d)
-        })
-        newEngine.addEventListener('canplay', () => {
-          setState(prev => ({ ...prev, ready: true, buffering: false }))
-          cbRefs.current.onCanPlay?.()
-        })
-        newEngine.addEventListener('waiting', () => { setState(prev => ({ ...prev, buffering: true })) })
-        newEngine.addEventListener('playing', () => { setState(prev => ({ ...prev, buffering: false })) })
+        const newEngine = await createEngineByType(neededType)
+        attachEngineListeners(newEngine)
 
         await newEngine.initialize(videoRef.current)
         oldEngine.destroy()
@@ -463,7 +457,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
       setError(err instanceof Error ? err : new Error(String(err)))
       setIsLoading(false)
     }
-  }, [startTime, autoPlay])  // ← no callbacks in deps: they're accessed via cbRefs
+  }, [attachEngineListeners, startTime, autoPlay])  // ← no callbacks in deps: they're accessed via cbRefs
 
   // Add subtitle tracks
   const addSubtitleTracks = useCallback((tracks: SubtitleTrack[]) => {

@@ -5,6 +5,7 @@ import { ParticleBackground } from "../../components/ui/ParticleBackground";
 import { TwoFactorModal } from "../../components/auth/TwoFactorModal";
 import { authClient, isTauri } from "../../lib/auth-client";
 import { useAuthStore } from "../../stores/authStore";
+import { getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
 
 export function TwoFactorPage() {
   const navigate = useNavigate();
@@ -26,13 +27,14 @@ export function TwoFactorPage() {
       toast.success("Two-factor verification successful");
       
       // In Tauri, ensure app mode is set and reload to update AppRoutes state
+      const dest = getLoginBehaviorRedirectPath();
       if (isTauri()) {
         localStorage.setItem('zentrio_app_mode', 'connected');
-        window.location.href = '/profiles';
+        window.location.href = dest;
         return;
       }
-      
-      navigate("/profiles");
+
+      navigate(dest);
     } catch (err: any) {
       setError(err.message || "Verification failed");
       toast.error("Verification failed", { description: err.message });
@@ -73,13 +75,14 @@ export function TwoFactorPage() {
         toast.success("Backup code verified");
         
         // In Tauri, ensure app mode is set and reload to update AppRoutes state
+        const dest = getLoginBehaviorRedirectPath();
         if (isTauri()) {
           localStorage.setItem('zentrio_app_mode', 'connected');
-          window.location.href = '/profiles';
+          window.location.href = dest;
           return;
         }
-        
-        navigate("/profiles");
+
+        navigate(dest);
       }
     } catch (err: any) {
       setError(err.message || "Verification failed");

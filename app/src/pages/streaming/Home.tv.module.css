@@ -1,0 +1,174 @@
+.railItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.profileSwitchButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.72rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.railItemText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.railItemLabel {
+  color: #fff;
+}
+
+.railItemHint {
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.heroBanner {
+  position: relative;
+  min-height: 23rem;
+  margin: calc(var(--tv-safe-y) * -1) calc(var(--tv-safe-x) * -1) 1.6rem;
+  overflow: hidden;
+  background: #101115;
+}
+
+.heroBackdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transform: scale(1.02);
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(5, 7, 10, 0.92) 0%, rgba(5, 7, 10, 0.74) 40%, rgba(5, 7, 10, 0.25) 100%),
+    linear-gradient(180deg, rgba(5, 7, 10, 0.16) 0%, rgba(5, 7, 10, 0.7) 100%);
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  gap: 1.2rem;
+  min-height: 23rem;
+  padding: calc(var(--tv-safe-y) + 2rem) var(--tv-safe-x) 2rem;
+}
+
+.heroCopy {
+  max-width: 38rem;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(2.2rem, 4vw, 3.6rem);
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.heroDescription {
+  margin: 0.85rem 0 0;
+  max-width: 34rem;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.heroAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.95rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  color: #0c0d10;
+  font-weight: 700;
+}
+
+.heroActionSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.95rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.card {
+  width: 158px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: rgba(18, 19, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.poster {
+  width: 100%;
+  aspect-ratio: 0.68;
+  background-size: cover;
+  background-position: center top;
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.cardBody {
+  padding: 10px 12px 12px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.cardMeta {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.74rem;
+}
+
+.progressTrack {
+  margin-top: 8px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+}

@@ -11,6 +11,7 @@ import { EpisodeList } from '../../components/details/EpisodeList'
 import { StreamSelector } from '../../components/details/StreamSelector'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import { useAutoPlay } from '../../hooks/useAutoPlay'
+import { useOfflineDownloadCapability } from '../../hooks/useOfflineDownloadCapability'
 import { useStreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
 import { useStreamLoader } from '../../hooks/useStreamLoader'
 import { apiFetch } from '../../lib/apiFetch'
@@ -52,7 +53,7 @@ export const StreamingDetails = () => {
   const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
   const streamDisplaySettings = useStreamDisplaySettings(profileId)
   const downloadStore = useDownloadStore()
-  const canDownload = isTauri()
+  const { isAvailable: canDownload } = useOfflineDownloadCapability(profileId)
   const [data, setData] = useState<StreamingDetailsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -678,6 +679,7 @@ export const StreamingDetails = () => {
           onShowInfoModal={() => setShowInfoModal(true)}
           onToggleWatched={() => toggleWatched()}
           onMarkSeriesWatched={markSeriesWatched}
+          canDownload={canDownload}
           onBackFromStreams={() => setView('episodes')}
         >
           {meta.type === 'series' && view === 'episodes' && (
@@ -694,6 +696,7 @@ export const StreamingDetails = () => {
               showImdbRatings={showImdbRatings}
               showAgeRatings={showAgeRatings}
               profileId={profileId || ''}
+              canDownload={canDownload}
             />
           )}
 

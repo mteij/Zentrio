@@ -10,6 +10,7 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
+import { isTauriRuntime } from '../../lib/runtime-env'
 import { createLogger } from '../../utils/client-logger'
 import { NetworkReader } from './NetworkReader'
 import { StreamingAudioTranscoder } from './StreamingAudioTranscoder'
@@ -21,8 +22,7 @@ const log = createLogger('HybridEngine')
  * Check if running in Tauri environment
  */
 function isTauriEnvironment(): boolean {
-  return typeof window !== 'undefined' &&
-         ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined)
+  return isTauriRuntime()
 }
 
 const CORE_URL = new URL('/ffmpeg/ffmpeg-core.js', import.meta.url).href

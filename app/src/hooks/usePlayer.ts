@@ -1,5 +1,6 @@
 import Hls from 'hls.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { isTauri } from '../lib/auth-client'
 import { useCast } from '../contexts/CastContext'
 import { createLogger } from '../utils/client-logger'
 
@@ -73,7 +74,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
 
 
   // Detect if running in Tauri (native app) - use native video decoding
-  const isTauri = useMemo(() => !!(window as any).__TAURI__, [])
+  const isTauriRuntime = useMemo(() => isTauri(), [])
 
   // Main effect for video setup - only depends on url and videoRef
   useEffect(() => {
@@ -190,7 +191,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
 
     // In Tauri native app, always use native video decoding for better codec support
     // The native webview has access to system codecs (including HEVC, etc.)
-    if (isTauri) {
+    if (isTauriRuntime) {
       // Native Tauri: Use native video element with system decoders
       video.src = url
       if (autoPlay) {
@@ -296,7 +297,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
         hlsRef.current = null
       }
     }
-  }, [url, videoRef, autoPlay, isTauri])
+  }, [url, videoRef, autoPlay, isTauriRuntime])
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current
@@ -428,7 +429,7 @@ export function usePlayer({ url, videoRef, autoPlay = true, onEnded }: UsePlayer
     currentQuality,
     isFullscreen,
     isMetadataLoaded,
-    isTauri,
+    isTauri: isTauriRuntime,
     
     // Actions
     togglePlay,

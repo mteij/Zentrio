@@ -1,0 +1,24 @@
+.focusable {
+  appearance: none;
+  border: 1px solid transparent;
+  background: none;
+  color: inherit;
+  text-align: inherit;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition:
+    transform var(--transition-smooth),
+    box-shadow var(--transition-smooth),
+    border-color var(--transition-smooth),
+    background-color var(--transition-smooth);
+}
+
+.focusable:focus-visible {
+  outline: none;
+  border-color: var(--tv-focus-ring);
+  box-shadow: var(--tv-focus-shadow), 0 20px 48px rgba(0, 0, 0, 0.35);
+  transform: scale(var(--tv-focus-scale));
+}

@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import './toast.css'
+import { applyAppTargetAttributes, hydrateNativeAppTarget } from './lib/app-target'
+import { waitForTauriRuntime } from './lib/runtime-env'
 import { createLogger } from './utils/client-logger'
 
 const log = createLogger('App')
@@ -60,8 +62,25 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return originalFetch(input, finalInit);
 }) as any;
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+async function bootstrap() {
+  await waitForTauriRuntime()
+  await hydrateNativeAppTarget()
+  applyAppTargetAttributes()
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  )
+}
+
+bootstrap().catch((error) => {
+  log.error('Failed to bootstrap app target detection', error)
+  applyAppTargetAttributes()
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  )
+})

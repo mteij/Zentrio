@@ -97,6 +97,115 @@ function exchangeLinkCode(code: string): string | null {
     return data.sessionToken
 }
 
+// ============================================================================
+// Device Link Code Store (for TV / browser pairing)
+// Browser signs in, receives a short code, and the TV redeems it.
+// ============================================================================
+const DEVICE_LINK_TTL_MS = 10 * 60 * 1000
+const deviceLinkStore = new Map<string, { sessionToken: string; userId: string; expiresAt: number }>()
+const deviceLinkByUserId = new Map<string, string>()
+
+setInterval(() => {
+    const now = Date.now()
+    for (const [code, data] of deviceLinkStore.entries()) {
+        if (now > data.expiresAt) {
+            deviceLinkStore.delete(code)
+            if (deviceLinkByUserId.get(data.userId) === code) {
+                deviceLinkByUserId.delete(data.userId)
+            }
+        }
+    }
+}, 60 * 1000)
+
+function normalizeDeviceLinkCode(input: string): string {
+    return String(input || '').replace(/\D/g, '').slice(0, 6)
+}
+
+function generateDeviceLinkCode(): string {
+    for (let attempt = 0; attempt < 20; attempt++) {
+        const code = Math.floor(100000 + Math.random() * 900000).toString()
+        if (!deviceLinkStore.has(code)) {
+            return code
+        }
+    }
+
+    throw new Error('Failed to generate a unique device link code')
+}
+
+function createDeviceLinkCode(userId: string, sessionToken: string): { code: string; expiresAt: number } {
+    const existingCode = deviceLinkByUserId.get(userId)
+    if (existingCode) {
+        deviceLinkStore.delete(existingCode)
+        deviceLinkByUserId.delete(userId)
+    }
+
+    const code = generateDeviceLinkCode()
+    const expiresAt = Date.now() + DEVICE_LINK_TTL_MS
+
+    deviceLinkStore.set(code, {
+        sessionToken,
+        userId,
+        expiresAt,
+    })
+    deviceLinkByUserId.set(userId, code)
+
+    return { code, expiresAt }
+}
+
+function consumeDeviceLinkCode(inputCode: string): { sessionToken: string; userId: string } | null {
+    const code = normalizeDeviceLinkCode(inputCode)
+    if (!code) return null
+
+    const data = deviceLinkStore.get(code)
+    if (!data) return null
+
+    if (Date.now() > data.expiresAt) {
+        deviceLinkStore.delete(code)
+        if (deviceLinkByUserId.get(data.userId) === code) {
+            deviceLinkByUserId.delete(data.userId)
+        }
+        return null
+    }
+
+    deviceLinkStore.delete(code)
+    if (deviceLinkByUserId.get(data.userId) === code) {
+        deviceLinkByUserId.delete(data.userId)
+    }
+
+    return {
+        sessionToken: data.sessionToken,
+        userId: data.userId,
+    }
+}
+
+async function getSessionFromRequest(c: any) {
+    const authHeader = c.req.header('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7)
+        try {
+            const mockRequest = new Request('http://localhost/api/auth/get-session', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const session = await auth.api.getSession({ headers: mockRequest.headers })
+            if (session?.user && session?.session) {
+                return session
+            }
+        } catch (e) {
+            log.error('Failed to validate bearer session:', e)
+        }
+    }
+
+    const session = await auth.api.getSession({
+        headers: c.req.raw.headers
+    })
+
+    if (session?.user && session?.session) {
+        return session
+    }
+
+    return null
+}
+
 /**
  * Generate particle background CSS and JS for SSO pages
  * Matches the ParticleBackground React component
@@ -228,6 +337,65 @@ app.post('/identify', async (c) => {
         exists: !!user,
         nickname: user?.username || user?.name || null
     })
+})
+
+// [POST /device-link/create] Generate a short pairing code for TV login
+app.post('/device-link/create', async (c) => {
+    const session = await getSessionFromRequest(c)
+
+    if (!session?.user || !session?.session?.token) {
+        return c.json({ error: 'Not authenticated' }, 401)
+    }
+
+    try {
+        const { code, expiresAt } = createDeviceLinkCode(session.user.id, session.session.token)
+        const cfg = getConfig()
+        const baseUrl = (cfg.CLIENT_URL || cfg.APP_URL || 'http://localhost:5173').replace(/\/$/, '')
+
+        return c.json({
+            userCode: code,
+            expiresAt,
+            verificationUrl: `${baseUrl}/activate`,
+        })
+    } catch (e: any) {
+        log.error('Failed to create device link code:', e)
+        return c.json({ error: e?.message || 'Failed to create device link code' }, 500)
+    }
+})
+
+// [POST /device-link/exchange] Redeem a short pairing code on TV
+app.post('/device-link/exchange', async (c) => {
+    const body = await c.req.json().catch(() => ({}))
+    const userCode = normalizeDeviceLinkCode(body?.userCode)
+
+    if (!userCode) {
+        return c.json({ error: 'A valid 6-digit code is required' }, 400)
+    }
+
+    const linkedSession = consumeDeviceLinkCode(userCode)
+    if (!linkedSession) {
+        return c.json({ error: 'Invalid or expired device link code' }, 401)
+    }
+
+    try {
+        const mockRequest = new Request('http://localhost/api/auth/get-session', {
+            headers: { 'Authorization': `Bearer ${linkedSession.sessionToken}` }
+        })
+        const session = await auth.api.getSession({ headers: mockRequest.headers })
+
+        if (!session?.user || !session?.session?.token) {
+            return c.json({ error: 'Linked session is no longer valid' }, 401)
+        }
+
+        return c.json({
+            success: true,
+            user: session.user,
+            token: session.session.token,
+        })
+    } catch (e: any) {
+        log.error('Failed to redeem device link code:', e)
+        return c.json({ error: 'Failed to redeem device link code' }, 500)
+    }
 })
 
 // ============================================================================

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Loader2, ArrowRight, Mail } from "lucide-react";
 import { authClient, getClientUrl, getServerUrl, isTauri } from '../lib/auth-client';
 import { apiFetch, apiFetchJson } from '../lib/apiFetch';
+import { ZENTRIO_LOGO_192_URL } from '../lib/brand-assets';
 import { getLoginBehaviorRedirectPath } from '../hooks/useLoginBehavior';
 import { createLogger } from '../utils/client-logger'
 
@@ -152,7 +153,7 @@ export function LandingPage({ version }: LandingPageProps) {
                 style={{ margin: -15 }}
               />
               <img 
-                src="/static/logo/icon-192.png" 
+                src={ZENTRIO_LOGO_192_URL}
                 alt="Zentrio" 
                 className="relative w-20 h-20 drop-shadow-[0_0_30px_rgba(220,38,38,0.3)]"
                 fetchPriority="high"

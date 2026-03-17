@@ -15,8 +15,10 @@ import { ZentrioPlayer, type EpisodeInfo } from '../../components/player/Zentrio
 import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import type { FlatStream } from '../../hooks/useStreamLoader'
 import { apiFetch } from '../../lib/apiFetch'
+import { getAppTarget } from '../../lib/app-target'
 import { resolveStreamsProgressive, type StreamResolveHandle } from '../../lib/stream-resolver'
 import { getStoredPlayerOrientation, setTauriPlayerMode } from '../../lib/tauri-player-mode'
+import { removeContinueWatchingLauncher, syncContinueWatchingLauncher } from '../../lib/tv-launcher'
 import { resolveBeaconUrl } from '../../lib/url'
 import type { Stream } from '../../services/addons/types'
 import styles from '../../styles/Player.module.css'
@@ -27,6 +29,7 @@ const log = createLogger('PlayerPage')
 /* ─── Constants ─── */
 const SHORT_VIDEO_THRESHOLD = 120   // seconds — show "find new stream"
 const NEXT_EP_COUNTDOWN    = 30    // seconds before end — show next-ep popup
+const LAUNCHER_SYNC_INTERVAL_SECONDS = 30
 
 /* ─── Types ─── */
 interface MetaInfo {
@@ -49,6 +52,17 @@ function mergeSubtitleTracks(base: PlayerSubtitleTrack[], inc: PlayerSubtitleTra
   const map = new Map(base.map(t => [t.src, t]))
   inc.forEach(t => { if (t.src && !map.has(t.src)) map.set(t.src, t) })
   return Array.from(map.values())
+}
+
+function buildLauncherDescription(meta: MetaInfo): string | undefined {
+  if (meta.season !== undefined && meta.episode !== undefined) {
+    const episodeTitle = meta.videos?.find(v => v.season === meta.season && v.number === meta.episode)?.title
+    return episodeTitle
+      ? `S${meta.season}:E${meta.episode} - ${episodeTitle}`
+      : `S${meta.season}:E${meta.episode}`
+  }
+
+  return undefined
 }
 
 /* ─────────────────────────── FindNewStream hook ─────────────────────────── */
@@ -201,6 +215,7 @@ export const StreamingPlayer = () => {
 
   const [duration, setDuration] = useState(0)
   const lastSavedRef = useRef(0)
+  const lastLauncherSyncRef = useRef(0)
   const traktStartedRef = useRef(false)
   const blobUrlRef = useRef<string | null>(null)
 
@@ -375,6 +390,28 @@ export const StreamingPlayer = () => {
       }
     }
 
+    if (meta && profileId && d > 0) {
+      const pct = t / d
+      const isEligibleForLauncher = pct >= 0.05 && pct < 0.95 && t >= 60
+      const secondsSinceLastLauncherSync = Math.abs(t - lastLauncherSyncRef.current)
+
+      if (isEligibleForLauncher && secondsSinceLastLauncherSync >= LAUNCHER_SYNC_INTERVAL_SECONDS) {
+        lastLauncherSyncRef.current = t
+        void syncContinueWatchingLauncher({
+          profileId,
+          metaId: meta.id,
+          metaType: meta.type,
+          title: meta.name,
+          description: buildLauncherDescription(meta),
+          posterUrl: meta.poster,
+          season: meta.season,
+          episode: meta.episode,
+          playbackPositionSeconds: t,
+          durationSeconds: d,
+        })
+      }
+    }
+
     if (meta && profileId && d > 0 && !traktStartedRef.current) {
       traktStartedRef.current = true
       const isImdb = meta.id.startsWith('tt')
@@ -406,6 +443,15 @@ export const StreamingPlayer = () => {
         })
       }).catch(() => {})
       traktStartedRef.current = false
+    }
+
+    if (meta && profileId) {
+      void removeContinueWatchingLauncher({
+        profileId,
+        metaId: meta.id,
+        season: meta.season,
+        episode: meta.episode,
+      })
     }
 
     if (nextEpisode && meta) {
@@ -506,6 +552,31 @@ export const StreamingPlayer = () => {
   /* ─── Trakt stop on unmount ─── */
   useEffect(() => {
     return () => {
+      if (meta && profileId && duration > 0) {
+        const pct = lastSavedRef.current / duration
+        if (pct >= 0.95) {
+          void removeContinueWatchingLauncher({
+            profileId,
+            metaId: meta.id,
+            season: meta.season,
+            episode: meta.episode,
+          })
+        } else if (pct >= 0.05 && lastSavedRef.current >= 60) {
+          void syncContinueWatchingLauncher({
+            profileId,
+            metaId: meta.id,
+            metaType: meta.type,
+            title: meta.name,
+            description: buildLauncherDescription(meta),
+            posterUrl: meta.poster,
+            season: meta.season,
+            episode: meta.episode,
+            playbackPositionSeconds: lastSavedRef.current,
+            durationSeconds: duration,
+          })
+        }
+      }
+
       if (meta && profileId && traktStartedRef.current && duration > 0) {
         const pct = (lastSavedRef.current / duration) * 100
         const isImdb = meta.id.startsWith('tt')
@@ -545,10 +616,7 @@ export const StreamingPlayer = () => {
       }`
     : undefined
 
-  // Detect if we're on mobile (for immersive mode styling)
-  const isMobilePlatform = typeof window !== 'undefined' && 
-    (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || 
-     ('ontouchstart' in window && window.innerWidth <= 1024))
+  const isMobilePlatform = getAppTarget().isMobile
 
   return (
     <Layout title={`Playing: ${meta.name}`} showHeader={false} showFooter={false}>
