@@ -18,6 +18,10 @@ const routes = [
     path: '/tos',
     name: 'Tos',
     component: Tos
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
   }
 ]
 
