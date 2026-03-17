@@ -9,7 +9,7 @@ const PLATFORM_PATTERNS = {
 };
 
 export const handler = async (event) => {
-  const platform = event.queryStringParameters?.platform;
+  const platform = event.path.split("/").filter(Boolean).pop();
 
   const matcher = PLATFORM_PATTERNS[platform];
   if (!matcher) {
