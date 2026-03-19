@@ -19,3 +19,16 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep Tauri plugin framework classes (loaded via reflection at runtime)
+-keep class app.tauri.** { *; }
+-dontwarn app.tauri.**
+
+# Keep custom Tauri plugin classes and their @Command methods
+-keep @app.tauri.annotation.TauriPlugin class * { *; }
+-keep class com.zentrio.mteij.ExoPlayerPlugin { *; }
+-keep class com.zentrio.mteij.TvLauncherPlugin { *; }
+-keep class com.zentrio.mteij.ImmersiveModePlugin { *; }
+
+# Keep @InvokeArg classes (deserialized from JSON via reflection)
+-keep @app.tauri.annotation.InvokeArg class * { *; }

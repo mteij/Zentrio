@@ -242,7 +242,7 @@ import { Monitor, Apple, Smartphone, Terminal } from "lucide-vue-next";
 const PLATFORM_DOWNLOADS = {
   android: {
     url: "https://zentrio.eu/download/android",
-    matcher: (name) => /android-arm64.*\.apk$/i.test(name),
+    matcher: (name) => /android-universal.*\.apk$/i.test(name),
   },
   windows: {
     url: "https://zentrio.eu/download/windows",

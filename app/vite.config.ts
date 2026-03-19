@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import packageJson from './package.json'
 
@@ -14,7 +15,45 @@ const shouldUseManualVendorChunks = !isTauriBuild
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // PWA: web-only app shell caching. Disabled in Tauri builds (Tauri serves assets itself).
+    // Only caches the app shell (JS/CSS/fonts) — API responses are NOT cached here.
+    // The query persister in App.tsx handles stale API data across sessions.
+    VitePWA({
+      disable: isTauriBuild,
+      registerType: 'autoUpdate',
+      // Inline the SW registration so it works without a separate script tag
+      injectRegister: 'auto',
+      manifest: {
+        name: 'Zentrio',
+        short_name: 'Zentrio',
+        description: 'Stream anything. Own everything.',
+        theme_color: '#0a0a0a',
+        background_color: '#0a0a0a',
+        display: 'standalone',
+        icons: [
+          { src: '/static/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/static/icon-512.png', sizes: '512x512', type: 'image/png' },
+        ],
+      },
+      workbox: {
+        // Only precache the app shell — hashed JS/CSS/font assets.
+        // Never cache API routes or dynamic content.
+        globPatterns: ['**/*.{js,css,woff2}'],
+        // Exclude FFmpeg WASM and other large worker assets from precaching.
+        globIgnores: ['**/ffmpeg*', '**/libav*', '**/sw.js'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [
+          // Never intercept API routes — they must always hit the network.
+          /^\/api\//,
+          // Never intercept the old cleanup SW.
+          /^\/static\/sw\.js/,
+        ],
+        runtimeCaching: [], // No runtime API caching — query persister handles that.
+      },
+    }),
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
     __TAURI_BUILD__: JSON.stringify(isTauriBuild),

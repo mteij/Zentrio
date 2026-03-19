@@ -157,7 +157,7 @@ function selectBestStream(
   return scored[0] || null
 }
 
-function hasGoodStream(
+function _hasGoodStream(
   streams: { stream: Stream, addon: { id: string, name: string, logo?: string } }[],
   config: AutoPlayConfig
 ): boolean {

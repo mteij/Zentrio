@@ -159,6 +159,7 @@ export function TmdbAddonConfigPage() {
   useEffect(() => {
     if (!settingsProfileId) return
     loadConfig()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsProfileId])
 
   const loadConfig = async () => {

@@ -5,10 +5,12 @@ import { LazyImage } from '../ui/LazyImage'
 import { RatingBadge } from '../ui/RatingBadge'
 import { ContextMenu } from '../ui/ContextMenu'
 import { ListSelectionModal } from './ListSelectionModal'
-import { Plus, Play, Trash2, Eye, Check, X } from 'lucide-react'
+import { Plus, Play, Trash2, Eye, Check, X, HardDrive } from 'lucide-react'
 import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { getPackId } from '../../services/addons/stream-service'
 import { apiFetch } from '../../lib/apiFetch'
+import { isTauri } from '../../lib/auth-client'
+import { useDownloadStore } from '../../stores/downloadStore'
 import styles from '../../styles/Streaming.module.css'
 import { createLogger } from '../../utils/client-logger'
 
@@ -66,7 +68,16 @@ export const ContentCard = memo(function ContentCard({
   const navigate = useNavigate()
   const { startAutoPlay } = useAutoPlay()
   const [showListModal, setShowListModal] = useState(false)
-  
+
+  // Boolean selector: only re-renders when THIS item's download completion status changes.
+  // On web (isTauri() === false) this is always false and the store is never subscribed.
+  const isDownloaded = useDownloadStore(
+    useCallback(
+      (s) => isTauri() && s.downloads.some((d) => d.mediaId === item.id && d.status === 'completed'),
+      [item.id]
+    )
+  )
+
   // Local state for optimistic updates
   const [isWatched, setIsWatched] = useState(item.isWatched)
 
@@ -290,6 +301,29 @@ export const ContentCard = memo(function ContentCard({
                 zIndex: 10
               }}>
                 <Check size={14} strokeWidth={3} />
+              </div>
+            )}
+
+            {/* Downloaded Indicator (Tauri only) */}
+            {isDownloaded && (
+              <div
+                title="Downloaded"
+                style={{
+                  position: 'absolute',
+                  bottom: '8px',
+                  right: '8px',
+                  background: 'rgba(0, 0, 0, 0.75)',
+                  color: '#a78bfa',
+                  padding: '4px',
+                  borderRadius: '50%',
+                  backdropFilter: 'blur(4px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10,
+                }}
+              >
+                <HardDrive size={13} />
               </div>
             )}
 

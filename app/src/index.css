@@ -199,6 +199,30 @@ body.is-mobile .fixed-bottom {
 }
 
 /* ==========================================================================
+   Sonner Toast Positioning
+   ========================================================================== */
+
+/* Desktop with Tauri titlebar: push toasts below the drag region.
+   Fixed elements start at viewport top 0, bypassing the titlebar area. */
+body.has-titlebar [data-sonner-toaster] {
+  top: calc(var(--titlebar-height, 32px) + 8px) !important;
+}
+
+/* Mobile: Sonner is set to bottom-center in JS, but we still need to
+   push it above the floating pill navbar + home-indicator safe area.
+   The navbar sits at calc(20px + safe-area-inset-bottom) from the viewport
+   bottom and is ~52px tall, so we clear it with a 80px offset + safe area. */
+body.is-mobile [data-sonner-toaster] {
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + 84px) !important;
+  /* Stretch to near-full width (matching the pill navbar width range) */
+  left: 16px !important;
+  right: 16px !important;
+  width: auto !important;
+  max-width: none !important;
+  transform: none !important;
+}
+
+/* ==========================================================================
    TV Platform Support (Android TV / Google TV)
    ========================================================================== */
 

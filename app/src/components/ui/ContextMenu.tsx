@@ -34,12 +34,19 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
   const startPosition = useRef<{ x: number; y: number } | null>(null)
   const targetPosition = useRef<{ x: number; y: number } | null>(null)
   const isLongPressActive = useRef(false)
+  // Keep latest callbacks in refs so effects don't need to re-register on prop changes
+  const onOpenRef = useRef(onOpen)
+  const onCloseRef = useRef(onClose)
+  useLayoutEffect(() => {
+    onOpenRef.current = onOpen
+    onCloseRef.current = onClose
+  })
 
   const close = useCallback(() => {
     setIsOpen(false)
     setOpacity(0)
-    onClose?.()
-  }, [onClose])
+    onCloseRef.current?.()
+  }, [])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -73,7 +80,7 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
     if (isOpen && menuRef.current && targetPosition.current) {
       const { x, y } = targetPosition.current
       const rect = menuRef.current.getBoundingClientRect()
-      
+
       let top = y
       let left = x
 
@@ -93,7 +100,7 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
         // Not enough space down, try up
         // Position bottom of menu at cursor Y
         top = y - rect.height
-        
+
         // If not enough space up either, position at bottom of screen
         if (top < 8) {
           top = window.innerHeight - rect.height - 8
@@ -105,12 +112,12 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
     }
   }, [isOpen])
 
-  const openMenu = (x: number, y: number) => {
+  const openMenu = useCallback((x: number, y: number) => {
     targetPosition.current = { x, y }
     setIsOpen(true)
     setOpacity(0)
-    onOpen?.()
-  }
+    onOpenRef.current?.()
+  }, [])
 
   // Right-click handler
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -119,63 +126,87 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
     openMenu(e.clientX, e.clientY)
   }
 
-  // Long-press handlers for touch
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0]
-    startPosition.current = { x: touch.clientX, y: touch.clientY }
-    isLongPressActive.current = false
-    
-    longPressTimer.current = setTimeout(() => {
-      // Vibrate on supported devices
-      try {
-        vibrate(50).catch(() => {
-          if (navigator.vibrate) navigator.vibrate(50)
-        })
-      } catch (_err) {
-        if (navigator.vibrate) navigator.vibrate(50)
-      }
-      isLongPressActive.current = true
-      openMenu(touch.clientX, touch.clientY)
-    }, 500)
-  }
+  // Use native (non-React) touch listeners for reliable mobile long-press detection.
+  // React synthetic touch events can miss touchcancel on Android WebViews, and
+  // display:contents wrappers may not receive bubbled events in all WebView versions.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (startPosition.current && longPressTimer.current) {
-      const touch = e.touches[0]
-      const dx = Math.abs(touch.clientX - startPosition.current.x)
-      const dy = Math.abs(touch.clientY - startPosition.current.y)
-      
-      if (dx > 10 || dy > 10) {
+    const cancelTimer = () => {
+      if (longPressTimer.current) {
         clearTimeout(longPressTimer.current)
         longPressTimer.current = null
       }
     }
-  }
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
+    const onTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0]
+      startPosition.current = { x: touch.clientX, y: touch.clientY }
+      isLongPressActive.current = false
+
+      longPressTimer.current = setTimeout(() => {
+        try {
+          vibrate(50).catch(() => {
+            if (navigator.vibrate) navigator.vibrate(50)
+          })
+        } catch {
+          if (navigator.vibrate) navigator.vibrate(50)
+        }
+        isLongPressActive.current = true
+        openMenu(touch.clientX, touch.clientY)
+      }, 500)
     }
 
-    if (isLongPressActive.current) {
-      if (e.cancelable) e.preventDefault()
+    const onTouchMove = (e: TouchEvent) => {
+      if (!startPosition.current) return
+      const touch = e.touches[0]
+      const dx = Math.abs(touch.clientX - startPosition.current.x)
+      const dy = Math.abs(touch.clientY - startPosition.current.y)
+      if (dx > 10 || dy > 10) {
+        cancelTimer()
+      }
     }
 
-    startPosition.current = null
-  }
+    const onTouchEnd = (e: TouchEvent) => {
+      cancelTimer()
+      if (isLongPressActive.current) {
+        // Prevent the tap/click that would otherwise fire after lifting the finger
+        if (e.cancelable) e.preventDefault()
+      }
+      startPosition.current = null
+      isLongPressActive.current = false
+    }
+
+    const onTouchCancel = () => {
+      // Do NOT cancel the timer here. On Android WebViews, the browser fires
+      // touchcancel when its own long-press detection kicks in (e.g. for links),
+      // which would race our 500 ms timer and kill it before we open the menu.
+      // If the user was actually scrolling, onTouchMove already cancelled the
+      // timer (movement > 10 px), so ignoring cancel is safe.
+      startPosition.current = null
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: true })
+    container.addEventListener('touchend', onTouchEnd, { passive: false })
+    container.addEventListener('touchcancel', onTouchCancel, { passive: true })
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchCancel)
+    }
+  }, [openMenu])
 
   return (
     <>
       <div
         ref={containerRef}
         onContextMenu={handleContextMenu}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        style={{ 
-          display: 'contents',
+        style={{
+          display: 'block',
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
           userSelect: 'none'

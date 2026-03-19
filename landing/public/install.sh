@@ -4,7 +4,7 @@ set -e
 echo "=> Fetching latest Zentrio release..."
 
 # Get the latest release JSON from GitHub API
-LATEST_RELEASE=$(curl -s https://api.github.com/repos/mteij/Zentrio/releases/latest)
+LATEST_RELEASE=$(curl -s "https://api.github.com/repos/mteij/Zentrio/releases?per_page=1" | sed 's/^\[//;s/\]$//')
 
 # Extract asset download URLs
 DEB_URL=$(echo "$LATEST_RELEASE" | grep -o '"browser_download_url": "[^"]*\.deb"' | cut -d '"' -f 4 | head -n 1)

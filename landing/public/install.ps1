@@ -2,9 +2,10 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 Write-Host "=> Fetching latest Zentrio release..."
-$release = Invoke-RestMethod `
-  -Uri "https://api.github.com/repos/mteij/Zentrio/releases/latest" `
+$releases = Invoke-RestMethod `
+  -Uri "https://api.github.com/repos/mteij/Zentrio/releases?per_page=1" `
   -Headers @{ "User-Agent" = "ZentrioInstaller" }
+$release = $releases[0]
 
 $asset = $release.assets | Where-Object { $_.name -match "\.exe$" } | Select-Object -First 1
 if (-not $asset) {

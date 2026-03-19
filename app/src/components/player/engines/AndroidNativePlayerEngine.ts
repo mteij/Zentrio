@@ -96,7 +96,6 @@ export function normalizeCloseReason(reason: unknown): PlayerCloseReason {
 export class AndroidNativePlayerEngine implements IPlayerEngine {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   private eventHandlers: Map<keyof PlayerEventHandlers, Set<Function>> = new Map()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private _channel: Channel<ExoEvent> | null = null
   private audioTracks: AudioTrack[] = []
   private subtitleTracks: SubtitleTrack[] = []

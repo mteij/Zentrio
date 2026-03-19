@@ -1,6 +1,9 @@
 .banner {
   position: fixed;
-  top: 0;
+  /* Respect the mobile statusbar / iOS notch / Android status bar.
+     Fixed elements bypass body.is-mobile's padding-top, so we need the
+     safe-area-inset directly. Falls back to 0 on desktop. */
+  top: var(--safe-area-inset-top, 0px);
   left: 0;
   right: 0;
   z-index: 9999;

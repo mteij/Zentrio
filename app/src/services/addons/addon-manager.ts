@@ -1,8 +1,8 @@
-import { addonDb, appearanceDb, db, profileDb, streamDb } from '../database'
+import { addonDb, appearanceDb, db, profileDb } from '../database'
 import { type AgeRating } from '../tmdb/age-ratings'
 import { tmdbService } from '../tmdb/index'
-import { AddonClient, RetryableError } from './client'
-import { Manifest, MetaDetail, MetaPreview, Stream, Subtitle } from './types'
+import { AddonClient } from './client'
+import { Manifest, MetaDetail, MetaPreview, Subtitle } from './types'
 import { DEFAULT_TMDB_CATALOG_CONFIG, type TmdbCatalogEntry, ZentrioAddonClient } from './zentrio-client'
 // Extracted helper modules
 import { logger } from '../logger'

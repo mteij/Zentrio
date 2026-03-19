@@ -58,7 +58,7 @@ export const handler = async (event) => {
 
     return {
       statusCode: 302,
-      headers: { Location: asset.browser_download_url },
+      headers: { Location: `https://github.com/mteij/Zentrio/releases/download/${release.tag_name}/${asset.name}` },
     };
   } catch (error) {
     console.error("Download function error:", error);

@@ -8,7 +8,7 @@
 import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
-import { isTauri } from './auth-client';
+import { isTauri, getServerUrl } from './auth-client';
 import { useAuthStore } from '../stores/authStore';
 import { createLogger } from '../utils/client-logger'
 
@@ -30,11 +30,12 @@ export function useAppLifecycle() {
 
     const checkConnectivity = async () => {
       try {
-        // Try to reach the local dev server
+        // Try to reach the configured server (not localhost — on Android emulator
+        // localhost is the device itself, not the dev host machine).
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000);
-        
-        await fetch('http://localhost:3000/api/health', {
+
+        await fetch(`${getServerUrl()}/api/health`, {
           signal: controller.signal,
           mode: 'no-cors'
         });

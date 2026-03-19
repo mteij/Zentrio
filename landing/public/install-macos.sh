@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "=> Fetching latest Zentrio release..."
-LATEST_RELEASE=$(curl -fsSL https://api.github.com/repos/mteij/Zentrio/releases/latest)
+LATEST_RELEASE=$(curl -fsSL "https://api.github.com/repos/mteij/Zentrio/releases?per_page=1" | sed 's/^\[//;s/\]$//')
 DMG_URL=$(echo "$LATEST_RELEASE" | grep -o '"browser_download_url": "[^"]*\.dmg"' | cut -d '"' -f 4 | head -n 1)
 
 if [ -z "$DMG_URL" ]; then

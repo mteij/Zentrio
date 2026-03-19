@@ -1,11 +1,15 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import { compress, decompress } from 'lz-string'
 import { Toaster } from 'sonner'
 import { ErrorBoundary, TitleBar, ScrollToTop } from './components'
 import { SplashScreen } from './components'
 import { ProtectedRoute, PublicRoute, AdminGuard } from './components/auth/AuthGuards'
 import { isTauri, resetAuthClient, authClient } from './lib/auth-client'
+import { getAppTarget } from './lib/app-target'
 import { listen } from '@tauri-apps/api/event'
 import { toast } from 'sonner'
 import { apiFetch } from './lib/apiFetch'
@@ -18,7 +22,7 @@ import { CastProvider } from './contexts/CastContext'
 import { StreamingHomeSkeleton } from './components/streaming/StreamingLoaders'
 import { appMode, AppMode } from './lib/app-mode'
 import { getPlatformCapabilities } from './lib/platform-capabilities'
-import { isTauriRuntime, waitForTauriRuntime } from './lib/runtime-env'
+import { waitForTauriRuntime } from './lib/runtime-env'
 import { TvFocusProvider } from './components/tv'
 import { useOfflineDownloadCapability } from './hooks/useOfflineDownloadCapability'
 const OnboardingWizard = lazy(() => import('./components/onboarding').then(m => ({ default: m.OnboardingWizard })))
@@ -73,6 +77,17 @@ const queryClient = new QueryClient({
       refetchOnReconnect: true, // Only refetch on network reconnect
     },
   },
+})
+
+// Persist the query cache to localStorage with lz-string compression.
+// This lets all platforms (web, desktop, mobile, TV) show stale data immediately
+// on reconnect or cold-start instead of loading spinners.
+// Queries can opt out with meta: { persist: false } (e.g. auth session, admin endpoints).
+const queryPersister = createSyncStoragePersister({
+  storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  serialize: (client) => compress(JSON.stringify(client)),
+  deserialize: (str) => JSON.parse(decompress(str)),
+  key: 'zentrio-query-cache',
 })
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
@@ -609,7 +624,25 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister: queryPersister,
+          maxAge: 1000 * 60 * 60 * 24, // 24 hours
+          buster: __APP_VERSION__,
+          dehydrateOptions: {
+            shouldDehydrateQuery: (query) => {
+              if (query.state.status !== 'success') return false
+              // Opt-out via meta: { persist: false }
+              if (query.meta?.persist === false) return false
+              // Never persist admin queries — roles/permissions can change server-side
+              const firstKey = query.queryKey[0]
+              if (typeof firstKey === 'string' && firstKey.startsWith('admin')) return false
+              return true
+            },
+          },
+        }}
+      >
         <CastProvider>
           <AppLifecycleProvider>
              <AppInitializer>
@@ -618,25 +651,28 @@ export default function App() {
                     <ScrollToTop />
                     <TitleBar />
                     <AppRoutes />
-                    <Toaster 
-                      theme="dark"
-                      position="top-right"
-                      richColors
-                      closeButton
-                      toastOptions={{
-                        style: {
-                          background: 'rgba(20, 20, 20, 0.95)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          backdropFilter: 'blur(12px)',
-                        },
-                      }}
-                    />
                   </BrowserRouter>
+                  {/* Toaster is intentionally outside BrowserRouter so it is never
+                      unmounted by route transitions or Suspense boundaries. */}
+                  <Toaster
+                    theme="dark"
+                    position={getAppTarget().isMobile ? 'bottom-center' : 'top-right'}
+                    richColors
+                    closeButton
+                    duration={5000}
+                    toastOptions={{
+                      style: {
+                        background: 'rgba(20, 20, 20, 0.95)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)',
+                      },
+                    }}
+                  />
                 </TvFocusProvider>
              </AppInitializer>
           </AppLifecycleProvider>
         </CastProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </ErrorBoundary>
   )
 }

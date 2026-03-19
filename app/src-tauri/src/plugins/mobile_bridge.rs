@@ -7,7 +7,7 @@ use tauri::{
 };
 
 #[cfg(target_os = "android")]
-use tauri::{ipc::Channel, plugin::PluginApi, Manager};
+use tauri::{ipc::Channel, Manager};
 
 #[cfg(target_os = "android")]
 pub struct ExoPlayerMobilePlugin<R: Runtime>(pub tauri::plugin::PluginHandle<R>);
@@ -137,7 +137,8 @@ pub fn init_exo_player<R: Runtime>() -> TauriPlugin<R, Value> {
         .setup(|_app, _api| {
             #[cfg(target_os = "android")]
             {
-                let handle = _api.register_android_plugin("com.zentrio.mteij", "ExoPlayerPlugin")?;
+                let handle =
+                    _api.register_android_plugin("com.zentrio.mteij", "ExoPlayerPlugin")?;
                 _app.manage(ExoPlayerMobilePlugin(handle));
             }
             Ok(())
@@ -150,7 +151,8 @@ pub fn init_tv_launcher<R: Runtime>() -> TauriPlugin<R, Value> {
         .setup(|_app, _api| {
             #[cfg(target_os = "android")]
             {
-                let handle = _api.register_android_plugin("com.zentrio.mteij", "TvLauncherPlugin")?;
+                let handle =
+                    _api.register_android_plugin("com.zentrio.mteij", "TvLauncherPlugin")?;
                 _app.manage(TvLauncherMobilePlugin(handle));
             }
             Ok(())
@@ -163,7 +165,8 @@ pub fn init_immersive_mode<R: Runtime>() -> TauriPlugin<R, Value> {
         .setup(|_app, _api| {
             #[cfg(target_os = "android")]
             {
-                let handle = _api.register_android_plugin("com.zentrio.mteij", "ImmersiveModePlugin")?;
+                let handle =
+                    _api.register_android_plugin("com.zentrio.mteij", "ImmersiveModePlugin")?;
                 _app.manage(ImmersiveModeMobilePlugin(handle));
             }
             Ok(())
@@ -266,7 +269,10 @@ pub fn command_exo_player_resume<R: Runtime>(app: AppHandle<R>) -> Result<(), St
 }
 
 #[tauri::command]
-pub fn exo_player_seek<R: Runtime>(app: AppHandle<R>, args: ExoPlayerSeekArgs) -> Result<(), String> {
+pub fn exo_player_seek<R: Runtime>(
+    app: AppHandle<R>,
+    args: ExoPlayerSeekArgs,
+) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
         exo_handle(&app)?

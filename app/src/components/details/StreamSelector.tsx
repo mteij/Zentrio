@@ -1,13 +1,17 @@
 // Stream Selector Component
 // Extracted from Details.tsx
-import { Check, Download, HardDrive, Play, Wifi, Zap } from 'lucide-react'
+import { Check, Download, HardDrive, Play, WifiOff, Wifi, Zap } from 'lucide-react'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SkeletonStreamList } from '../../components'
 import { CompactStreamItem } from '../../components/features/CompactStreamItem'
 import { StreamRefreshButton } from '../../components/features/StreamRefreshButton'
 import type { AddonLoadingState } from '../../hooks/useStreamLoader'
+import { useOfflineMode } from '../../hooks/useOfflineMode'
+import { isTauri } from '../../lib/auth-client'
 import { cacheTopStream } from '../../lib/topStreamCache'
+import type { DownloadRecord } from '../../services/downloads/download-service'
+import { useDownloadStore } from '../../stores/downloadStore'
 import type { MetaDetail, Stream } from '../../services/addons/types'
 import styles from '../../styles/Streaming.module.css'
 
@@ -99,6 +103,50 @@ export function StreamSelector({
   onDownload,
 }: StreamSelectorProps) {
   const navigate = useNavigate()
+  const { isOnline } = useOfflineMode(profileId)
+  const downloads = useDownloadStore((s) => s.downloads)
+
+  // Find a completed download that matches the currently displayed content.
+  // For series, match by season + episode; for movies, match by mediaId only.
+  const matchedDownload: DownloadRecord | undefined = isTauri()
+    ? downloads.find((d) => {
+        if (d.status !== 'completed' || !d.filePath) return false
+        if (d.mediaId !== meta.id) return false
+        if (meta.type === 'series') {
+          if (!selectedEpisode) return false
+          return d.season === selectedEpisode.season && d.episode === selectedEpisode.number
+        }
+        return true
+      })
+    : undefined
+
+  // When offline on a Tauri device, replace the full stream list with a focused offline UI.
+  const showOfflineView = isTauri() && !isOnline
+
+  const handlePlayDownload = async (record: DownloadRecord) => {
+    try {
+      const { convertFileSrc } = await import('@tauri-apps/api/core')
+      const url = convertFileSrc(record.filePath!)
+      const subtitles = (record.subtitlePaths ?? []).map((s) => ({
+        url: convertFileSrc(s.path),
+        lang: s.lang,
+      }))
+      navigate(`/streaming/${profileId}/player`, {
+        state: {
+          stream: { url, type: 'video/mp4', subtitles: subtitles.length ? subtitles : undefined },
+          meta: { id: record.mediaId, type: record.mediaType, name: record.title, poster: record.posterPath, season: record.season, episode: record.episode },
+        },
+      })
+    } catch {
+      // Fallback: let it fail visibly rather than silently
+      navigate(`/streaming/${profileId}/player`, {
+        state: {
+          stream: { url: `file://${record.filePath}`, type: 'video/mp4' },
+          meta: { id: record.mediaId, type: record.mediaType, name: record.title, poster: record.posterPath },
+        },
+      })
+    }
+  }
 
   // Cache the top stream in sessionStorage so the download button can pick up
   // the resolved URL without re-requesting streams.
@@ -116,6 +164,57 @@ export function StreamSelector({
       }
     }
   }, [filteredStreams, meta.id, selectedEpisode])
+
+  if (showOfflineView) {
+    return (
+      <div className={styles.streamsContainer}>
+        {meta.type === 'series' && selectedEpisode && (
+          <h2 style={{ margin: '0 0 20px', fontSize: '1.1rem', color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>
+            S{selectedEpisode.season}:E{selectedEpisode.number} — {selectedEpisode.title}
+          </h2>
+        )}
+        {matchedDownload ? (
+          /* Content is downloaded — show a single play button */
+          <div className="flex flex-col items-center justify-center py-10 px-4 bg-white/5 rounded-xl border border-white/5 text-center gap-4">
+            <div className="bg-green-500/10 p-4 rounded-full">
+              <Play size={32} className="text-green-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-white mb-1">Downloaded &amp; ready</h3>
+              <p className="text-sm text-gray-400">You're offline, but this is available locally.</p>
+            </div>
+            <button
+              className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
+              style={{ padding: '10px 28px', display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => handlePlayDownload(matchedDownload)}
+            >
+              <Play size={16} fill="currentColor" />
+              Play Downloaded Version
+            </button>
+          </div>
+        ) : (
+          /* Not downloaded — guide user to Downloads */
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-white/5 rounded-xl border border-white/5 text-center">
+            <div className="bg-white/10 p-4 rounded-full mb-4">
+              <WifiOff size={32} className="text-gray-400 opacity-50" />
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">You're offline</h3>
+            <p className="text-sm text-gray-400 max-w-md mb-5">
+              Streaming requires a connection. Download this content while online to watch it offline.
+            </p>
+            <button
+              onClick={() => navigate(`/streaming/${profileId}/downloads`)}
+              className={`${styles.actionBtn} ${styles.btnSecondaryGlass}`}
+              style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Download size={15} />
+              Go to Downloads
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className={styles.streamsContainer}>

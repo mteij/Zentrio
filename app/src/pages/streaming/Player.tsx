@@ -16,6 +16,7 @@ import { useExternalPlayer } from '../../hooks/useExternalPlayer'
 import type { FlatStream } from '../../hooks/useStreamLoader'
 import { apiFetch } from '../../lib/apiFetch'
 import { getAppTarget } from '../../lib/app-target'
+import { queueProgress } from '../../lib/offline-progress-queue'
 import { resolveStreamsProgressive, type StreamResolveHandle } from '../../lib/stream-resolver'
 import { getStoredPlayerOrientation, setTauriPlayerMode } from '../../lib/tauri-player-mode'
 import { removeContinueWatchingLauncher, syncContinueWatchingLauncher } from '../../lib/tv-launcher'
@@ -377,16 +378,23 @@ export const StreamingPlayer = () => {
       lastSavedRef.current = t
       const pct = t / d
       if (pct > 0.02 && pct < 0.95) {
+        const progressPayload = {
+          profileId, metaId: meta.id, metaType: meta.type,
+          season: meta.season, episode: meta.episode,
+          position: t, duration: d,
+          title: meta.name, poster: meta.poster
+        }
         apiFetch('/api/streaming/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId, metaId: meta.id, metaType: meta.type,
-            season: meta.season, episode: meta.episode,
-            position: t, duration: d,
-            title: meta.name, poster: meta.poster
-          })
-        }).catch((e: any) => log.error('Error:', e))
+          body: JSON.stringify(progressPayload)
+        }).catch((e: any) => {
+          log.error('Error:', e)
+          // On Tauri (offline playback possible), queue the progress for when we reconnect
+          if (getAppTarget().isTauri) {
+            queueProgress(progressPayload)
+          }
+        })
       }
     }
 
@@ -465,7 +473,15 @@ export const StreamingPlayer = () => {
 
   const handleError = useCallback((err: Error) => {
     log.error('Playback error:', err)
-    toast.error('Playback error: ' + err.message)
+    const msg = err.message || ''
+    // Reqwest/network errors from the Tauri HTTP plugin or ExoPlayer contain these phrases.
+    // Show a user-friendly message rather than the raw URL + error string.
+    const isNetworkError = /failed to request|error sending request|failed to fetch|net::err|connection refused/i.test(msg)
+    if (isNetworkError) {
+      toast.error('Stream unavailable', { description: 'Could not load the stream. Check your connection or try another source.' })
+    } else {
+      toast.error('Playback error: ' + err.message)
+    }
   }, [])
 
   const handleNavigateEpisode = useCallback((ep: EpisodeInfo) => {

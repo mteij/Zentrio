@@ -36,7 +36,7 @@ interface ProfileEntry {
 
 interface DownloadSettingsProps {
   currentProfileId: string
-  onProfileChange: (id: string) => void
+  onProfileChange?: (id: string) => void
 }
 
 export function DownloadSettings({ currentProfileId }: DownloadSettingsProps) {
