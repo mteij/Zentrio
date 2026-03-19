@@ -1481,7 +1481,8 @@ async function main() {
       const aiNotes = normalizeAiNotesPayload(aiRaw);
       content = mergeAiNotesWithFallback(aiNotes, fallbackNotes);
     } catch (error) {
-      console.error('[release-notes] AI generation failed, falling back to deterministic notes:', error?.message || error);
+      console.error('[release-notes] AI generation failed:', error?.message || error);
+      process.exit(1);
     }
   } else {
     console.log('[release-notes] No NANOGPT_API_KEY found; using deterministic fallback.');
@@ -1505,12 +1506,5 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
-  try {
-    const version = getVersion();
-    const tag = version.startsWith('v') ? version : `v${version}`;
-    writeFileSync('RELEASE_NOTES.md', basicFallback(tag, '', getRepositoryUrl()), 'utf8');
-  } catch {
-    // no-op
-  }
-  process.exit(0);
+  process.exit(1);
 });
