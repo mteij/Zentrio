@@ -1272,7 +1272,34 @@ function buildIntro(tag, releaseType, highlightAreas, intentCounts, featureCandi
   return `Welcome to release \`${tag}\` of Zentrio. This patch keeps things focused${focusLine}, mixing targeted improvements with the maintenance work needed to keep the project moving cleanly.`;
 }
 
-function buildBuckets(areaDetails) {
+function groupCommitsByCategory(commits) {
+  const groups = {
+    feature: [],
+    fix: [],
+    ui: [],
+    maintenance: [],
+    breaking: [],
+    unknown: [],
+  };
+
+  for (const commit of commits) {
+    const category = classifyCommit(commit);
+    if (groups[category]) {
+      groups[category].push(commit);
+    }
+  }
+
+  return groups;
+}
+
+function formatCommitForBucket(commit, repoUrl) {
+  const subject = commit.subject || commit.body.split('\n')[0] || '(no subject)';
+  const cleaned = subject.replace(/^[a-z]+(\(.+\))?:\s*/i, '').trim();
+  const formatted = sentenceCase(cleaned);
+  return `${formatted} ([${commit.hash}](${repoUrl}/commit/${commit.hash}))`;
+}
+
+function buildBucketsFromCommits(commitsByCategory, repoUrl) {
   const buckets = {
     feature: [],
     fix: [],
@@ -1280,23 +1307,38 @@ function buildBuckets(areaDetails) {
     maintenance: [],
   };
 
-  for (const area of areaDetails) {
-    if (!buckets[area.category]) continue;
-    if (area.subsystem === 'Other' && area.title === 'Other updates') continue;
-
-    let bullet = '';
-    if (area.category === 'feature') {
-      bullet = `${area.title}: work concentrated around ${area.focusPhrase}.`;
-    } else if (area.category === 'fix') {
-      bullet = `${area.title}: reliability work landed around ${area.focusPhrase}.`;
-    } else if (area.category === 'ui') {
-      bullet = `${area.title}: visible polish touched ${area.focusPhrase}.`;
-    } else {
-      bullet = `${area.title}: internal work tightened up ${area.focusPhrase}.`;
-    }
-
-    buckets[area.category].push(bullet);
+  const featureCommits = commitsByCategory.feature || [];
+  for (const commit of featureCommits.slice(0, MAX_BUCKET_ITEMS)) {
+    buckets.feature.push(formatCommitForBucket(commit, repoUrl));
   }
+
+  const fixCommits = commitsByCategory.fix || [];
+  for (const commit of fixCommits.slice(0, MAX_BUCKET_ITEMS)) {
+    buckets.fix.push(formatCommitForBucket(commit, repoUrl));
+  }
+
+  const uiCommits = commitsByCategory.ui || [];
+  for (const commit of uiCommits.slice(0, MAX_BUCKET_ITEMS)) {
+    buckets.ui.push(formatCommitForBucket(commit, repoUrl));
+  }
+
+  const maintenanceCommits = commitsByCategory.maintenance || [];
+  for (const commit of maintenanceCommits.slice(0, MAX_BUCKET_ITEMS)) {
+    buckets.maintenance.push(formatCommitForBucket(commit, repoUrl));
+  }
+
+  return buckets;
+}
+
+function buildBuckets(areaDetails, commitsByCategory, repoUrl) {
+  const commitBuckets = buildBucketsFromCommits(commitsByCategory, repoUrl);
+
+  const buckets = {
+    feature: commitBuckets.feature,
+    fix: commitBuckets.fix,
+    ui: commitBuckets.ui,
+    maintenance: commitBuckets.maintenance,
+  };
 
   return buckets;
 }
@@ -1430,7 +1472,8 @@ async function main() {
   const intentCounts = summarizeCommitIntents(commits);
   const breakingChanges = collectBreakingChanges(commits, storyChangedFiles);
   const contributors = await getContributors(rangeSpec, repoUrl);
-  const buckets = buildBuckets(areaDetails);
+  const commitsByCategory = groupCommitsByCategory(commits);
+  const buckets = buildBuckets(areaDetails, commitsByCategory, repoUrl);
   const architectureContext = getArchitectureContext(storyChangedFiles);
   const commitEvidence = formatCommitEvidence(commits);
   const changedFilesEvidence = formatChangedFilesEvidence(storyChangedFiles);
