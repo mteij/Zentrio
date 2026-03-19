@@ -43,6 +43,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,woff2}'],
         // Exclude FFmpeg WASM and other large worker assets from precaching.
         globIgnores: ['**/ffmpeg*', '**/libav*', '**/sw.js'],
+        // Raise limit to 4 MiB to accommodate the main app bundle (~2.3 MB).
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
           // Never intercept API routes — they must always hit the network.
