@@ -1,10 +1,18 @@
-import { Edit, LogIn, LogOut, Plus, Settings, Shield } from 'lucide-react'
+import { Check, Edit, LogIn, LogOut, Plus, Settings, Shield } from 'lucide-react'
 import { ConfirmDialog, LoadingSpinner } from '../components'
 import { ProfileModal } from '../components/features/ProfileModal'
-import { TvFocusItem, TvGrid, TvPageScaffold, TvRailMenu, TvSection } from '../components/tv'
+import { TvActionStrip, TvFocusItem, TvFocusScope, TvFocusZone } from '../components/tv'
 import { buildAvatarUrl, sanitizeImgSrc } from '../lib/url'
 import type { Profile, ProfilesScreenModel } from './ProfilesPage.model'
 import styles from './ProfilesPage.tv.module.css'
+
+function getGridColumns(itemCount: number) {
+  if (itemCount <= 1) return 1
+  if (itemCount <= 4) return itemCount
+  if (itemCount <= 6) return 3
+  if (itemCount <= 9) return 4
+  return 5
+}
 
 function TvProfileCard({
   id,
@@ -26,7 +34,36 @@ function TvProfileCard({
         />
       </div>
       <div className={styles.profileName}>{profile.name}</div>
-      {profile.isDefault ? <div className={styles.profileStatus}>Default</div> : null}
+    </TvFocusItem>
+  )
+}
+
+function TvActionButton({
+  id,
+  icon: Icon,
+  index,
+  active = false,
+  ariaLabel,
+  onActivate,
+  danger = false,
+}: {
+  id: string
+  icon: typeof Settings
+  index: number
+  active?: boolean
+  ariaLabel: string
+  onActivate: () => void
+  danger?: boolean
+}) {
+  return (
+    <TvFocusItem
+      id={id}
+      index={index}
+      className={`${styles.actionButton} ${active ? styles.actionButtonActive : ''} ${danger ? styles.actionButtonDanger : ''}`}
+      aria-label={ariaLabel}
+      onActivate={onActivate}
+    >
+      <Icon size={20} />
     </TvFocusItem>
   )
 }
@@ -34,92 +71,100 @@ function TvProfileCard({
 export function ProfilesPageTvView({ model }: { model: ProfilesScreenModel }) {
   if (model.loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-black">
+      <div className={styles.loadingState}>
         <LoadingSpinner size="lg" />
       </div>
     )
   }
 
-  const actionItems = [
-    {
-      id: 'edit',
-      label: model.editMode ? 'Done' : 'Manage',
-      icon: Edit,
-      onActivate: model.actions.toggleEditMode,
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: Settings,
-      onActivate: model.navigation.goToSettings,
-    },
-    ...(model.isAdmin ? [{
-      id: 'admin',
-      label: 'Admin',
-      icon: Shield,
-      onActivate: model.navigation.goToAdmin,
-    }] : []),
-    {
-      id: 'logout',
-      label: model.isGuestMode ? 'Exit Local Mode' : 'Logout',
-      icon: model.isGuestMode ? LogIn : LogOut,
-      onActivate: model.actions.openLogoutConfirm,
-    },
-  ]
-
-  const initialZoneId = model.profiles.length > 0 || !model.editMode ? 'profiles-grid' : 'profile-add'
+  const showAddProfile = model.editMode || model.profiles.length === 0
+  const totalGridItems = model.profiles.length + (showAddProfile ? 1 : 0)
+  const gridColumns = getGridColumns(totalGridItems)
+  const initialZoneId = totalGridItems > 0 ? 'profiles-grid' : 'profiles-actions'
 
   return (
-    <TvPageScaffold
-      eyebrow={model.editMode ? 'Manage Profiles' : 'Choose a Profile'}
-      title={model.editMode ? 'Edit a profile' : "Who's Watching?"}
-      description={model.editMode ? 'Pick a profile to update it.' : undefined}
+    <TvFocusScope
       initialZoneId={initialZoneId}
       onBack={model.editMode ? () => model.actions.setEditMode(false) : model.navigation.goBack}
-      railMode="adaptive"
-      rail={(
-        <TvRailMenu
-          zoneId="profiles-actions"
-          nextRight="profiles-grid"
-          items={actionItems}
-        />
-      )}
+      className={styles.scope}
     >
-      <TvSection
-        title={model.editMode ? 'Profiles' : 'Profiles'}
-        subtitle={undefined}
-      >
-        <TvGrid
-          zoneId="profiles-grid"
-          columns={5}
-          nextLeft="profiles-actions"
-          initialItemId={model.profiles.length > 0 ? `profile-${model.profiles[0].id}` : 'profile-add'}
-        >
-          {model.profiles.map((profile, index) => (
-            <TvProfileCard
-              key={profile.id}
-              id={`profile-${profile.id}`}
-              index={index}
-              profile={profile}
-              onActivate={() => model.actions.handleProfileClick(profile)}
-            />
-          ))}
+      <main className={styles.page}>
+        <section className={styles.hero}>
+          <p className={styles.eyebrow}>{model.editMode ? 'Manage Profiles' : 'Profiles'}</p>
+          <h1 className={styles.title}>{model.editMode ? 'Choose a profile to edit' : "Who's Watching?"}</h1>
+        </section>
 
-          {model.editMode ? (
-            <TvFocusItem
-              id="profile-add"
-              index={model.profiles.length}
-              className={`${styles.profileCard} ${styles.addProfileCard}`}
-              onActivate={model.actions.handleCreateProfile}
-            >
-              <div className={`${styles.profileAvatar} ${styles.addProfileAvatar}`}>
-                <Plus size={40} />
-              </div>
-              <div className={styles.profileName}>Add Profile</div>
-            </TvFocusItem>
-          ) : null}
-        </TvGrid>
-      </TvSection>
+        <TvFocusZone
+          id="profiles-grid"
+          orientation="grid"
+          columns={gridColumns}
+          nextDown="profiles-actions"
+        >
+          <div className={styles.grid} style={{ ['--profiles-grid-columns' as string]: String(gridColumns) }}>
+            {model.profiles.map((profile, index) => (
+              <TvProfileCard
+                key={profile.id}
+                id={`profile-${profile.id}`}
+                index={index}
+                profile={profile}
+                onActivate={() => model.actions.handleProfileClick(profile)}
+              />
+            ))}
+
+            {showAddProfile ? (
+              <TvFocusItem
+                id="profile-add"
+                index={model.profiles.length}
+                className={`${styles.profileCard} ${styles.addProfileCard}`}
+                onActivate={model.actions.handleCreateProfile}
+                aria-label="Add profile"
+              >
+                <div className={`${styles.profileAvatar} ${styles.addProfileAvatar}`}>
+                  <Plus size={42} />
+                </div>
+                <div className={styles.profileName}>Add Profile</div>
+              </TvFocusItem>
+            ) : null}
+          </div>
+        </TvFocusZone>
+
+        <div className={styles.footerDock}>
+          <TvActionStrip zoneId="profiles-actions" nextUp="profiles-grid">
+            <TvActionButton
+              id="profiles-settings"
+              index={0}
+              icon={Settings}
+              ariaLabel="Settings"
+              onActivate={model.navigation.goToSettings}
+            />
+            <TvActionButton
+              id="profiles-manage"
+              index={1}
+              icon={model.editMode ? Check : Edit}
+              active={model.editMode}
+              ariaLabel={model.editMode ? 'Done editing profiles' : 'Manage profiles'}
+              onActivate={model.actions.toggleEditMode}
+            />
+            {model.isAdmin ? (
+              <TvActionButton
+                id="profiles-admin"
+                index={2}
+                icon={Shield}
+                ariaLabel="Admin panel"
+                onActivate={model.navigation.goToAdmin}
+              />
+            ) : null}
+            <TvActionButton
+              id="profiles-logout"
+              index={model.isAdmin ? 3 : 2}
+              icon={model.isGuestMode ? LogIn : LogOut}
+              ariaLabel={model.isGuestMode ? 'Exit local mode' : 'Logout'}
+              onActivate={model.actions.openLogoutConfirm}
+              danger
+            />
+          </TvActionStrip>
+        </div>
+      </main>
 
       {model.showModal ? (
         <ProfileModal
@@ -142,7 +187,7 @@ export function ProfilesPageTvView({ model }: { model: ProfilesScreenModel }) {
         cancelText="Cancel"
         variant="danger"
       />
-    </TvPageScaffold>
+    </TvFocusScope>
   )
 }
 

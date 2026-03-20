@@ -1,30 +1,85 @@
-.profileCard {
-  width: 182px;
-  min-height: 220px;
+.scope {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at top center, rgba(182, 25, 41, 0.18), transparent 30%),
+    linear-gradient(180deg, #09090b 0%, #111216 58%, #0a0b0e 100%);
+  color: #fff;
+}
+
+.page {
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 18px 10px;
-  border-radius: 24px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #fff;
+  gap: 2.25rem;
+  padding: calc(var(--tv-safe-y) + 1.5rem) max(3rem, var(--tv-safe-x)) calc(var(--tv-safe-y) + 2rem);
+}
+
+.hero {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
   text-align: center;
 }
 
+.eyebrow {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.44);
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(2.3rem, 4vw, 3.8rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--profiles-grid-columns, 4), minmax(0, 184px));
+  justify-content: center;
+  gap: 1.2rem 1.45rem;
+  width: 100%;
+}
+
+.profileCard {
+  width: 184px;
+  min-height: 228px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 1.1rem 0.9rem 1rem;
+  border-radius: 26px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  text-align: center;
+  transition:
+    background-color var(--transition-smooth),
+    border-color var(--transition-smooth),
+    transform var(--transition-smooth),
+    box-shadow var(--transition-smooth);
+}
+
 .profileAvatar {
-  width: 112px;
-  height: 112px;
+  width: 124px;
+  height: 124px;
   border-radius: 999px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 4px solid transparent;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  border: 3px solid transparent;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
   transition:
     transform var(--transition-smooth),
     border-color var(--transition-smooth),
@@ -38,105 +93,92 @@
   object-fit: cover;
 }
 
-.profileCard:focus,
-.profileCard[data-tv-active='true'],
-.profileCard:focus-visible {
-  border-color: transparent;
-  box-shadow: none;
-  transform: none;
+.profileCard[data-tv-active='true'] {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.32);
 }
 
-.profileCard:focus .profileAvatar,
-.profileCard[data-tv-active='true'] .profileAvatar,
-.profileCard:focus-visible .profileAvatar {
-  border-color: rgba(255, 255, 255, 0.96);
+.profileCard[data-tv-active='true'] .profileAvatar {
+  border-color: rgba(255, 255, 255, 0.95);
   box-shadow:
     0 0 0 10px rgba(255, 255, 255, 0.14),
     0 18px 42px rgba(0, 0, 0, 0.38);
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 .profileName {
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 700;
   line-height: 1.3;
+  color: rgba(255, 255, 255, 0.82);
 }
 
-.profileStatus {
-  font-size: 0.76rem;
-  color: rgba(255, 255, 255, 0.52);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.actionCard {
-  width: 100%;
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 0.3rem;
-  padding: 0.95rem;
-  border-radius: 16px;
-  border: 1px solid transparent;
-  color: rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.actionText {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-}
-
-.actionLabel {
+.profileCard[data-tv-active='true'] .profileName {
   color: #fff;
-  font-weight: 600;
-}
-
-.actionHint {
-  font-size: 0.76rem;
-  color: rgba(255, 255, 255, 0.42);
-}
-
-.modePill {
-  padding: 18px 20px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.modeLabel {
-  margin: 0 0 8px;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.modeValue {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-
-:global(.tvRailCompact) .actionCard {
-  justify-content: center;
-  padding: 0;
-}
-
-:global(.tvRailCompact) .actionText {
-  display: none;
 }
 
 .addProfileCard {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .addProfileAvatar {
   background: rgba(255, 255, 255, 0.02);
-  border-style: solid;
-  border-color: rgba(255, 255, 255, 0.18);
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.22);
   color: rgba(255, 255, 255, 0.92);
+}
+
+.footerDock {
+  margin-top: 0.5rem;
+  padding: 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 9, 12, 0.76);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.3);
+}
+
+.actionButton {
+  width: 56px;
+  min-width: 56px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.58);
+  transition:
+    background-color var(--transition-smooth),
+    color var(--transition-smooth),
+    transform var(--transition-smooth);
+}
+
+.actionButtonActive {
+  color: #fff;
+}
+
+.actionButtonDanger {
+  color: rgba(239, 68, 68, 0.78);
+}
+
+.actionButton[data-tv-active='true'] {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.actionButtonDanger[data-tv-active='true'] {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ffb3b3;
+}
+
+.loadingState {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #09090b;
 }

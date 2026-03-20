@@ -1061,7 +1061,7 @@ async function getContributors(rangeSpec, repoUrl) {
   return contributors;
 }
 
-async function generateWithNanoGPT(prompt, apiKey, retries = 3) {
+async function generateWithNanoGPT(prompt, apiKey) {
   const endpoint = 'https://nano-gpt.com/api/v1/chat/completions';
   const body = {
     model: 'zai-org/glm-5:thinking',
@@ -1070,52 +1070,73 @@ async function generateWithNanoGPT(prompt, apiKey, retries = 3) {
     max_tokens: 4096,
   };
 
-  let lastError = null;
-  
-  for (let attempt = 1; attempt <= retries; attempt += 1) {
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new Error(`NanoGPT API error ${res.status}: ${text}`);
-      }
-
-      const data = await res.json();
-      const text = data?.choices?.[0]?.message?.content || '';
-      if (!text) {
-        throw new Error('NanoGPT returned empty content');
-      }
-      return text.trim();
-    } catch (error) {
-      lastError = error;
-      if (attempt < retries) {
-        console.log(`[release-notes] AI generation attempt ${attempt}/${retries} failed, retrying...`);
-        // Wait a bit before retrying
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-    }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`NanoGPT API error ${res.status}: ${text}`);
   }
-  
-  throw lastError || new Error('NanoGPT failed after all retries');
+
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  if (!text) {
+    throw new Error('NanoGPT returned empty content');
+  }
+  return text.trim();
 }
 
 function extractJsonObject(text) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced?.[1] || text;
   const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) {
+  if (start === -1) {
     throw new Error('AI response did not contain a JSON object');
   }
-  return candidate.slice(start, end + 1);
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < candidate.length; index += 1) {
+    const char = candidate[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return candidate.slice(start, index + 1);
+      }
+    }
+  }
+
+  throw new Error('AI response contained an incomplete JSON object');
 }
 
 function coerceStringArray(value, maxItems) {
@@ -1126,8 +1147,185 @@ function coerceStringArray(value, maxItems) {
     .slice(0, maxItems);
 }
 
+function escapeLiteralNewlinesInJsonStrings(text) {
+  let output = '';
+  let inString = false;
+  let escaped = false;
+
+  for (const char of String(text || '')) {
+    if (inString) {
+      if (escaped) {
+        output += char;
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        output += char;
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        output += char;
+        inString = false;
+        continue;
+      }
+      if (char === '\r') {
+        output += '\\r';
+        continue;
+      }
+      if (char === '\n') {
+        output += '\\n';
+        continue;
+      }
+      output += char;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+    }
+    output += char;
+  }
+
+  return output;
+}
+
+function removeTrailingCommas(text) {
+  let output = '';
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (inString) {
+      output += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      output += char;
+      continue;
+    }
+
+    if (char === ',') {
+      let lookahead = index + 1;
+      while (lookahead < text.length && /\s/.test(text[lookahead])) {
+        lookahead += 1;
+      }
+      if (text[lookahead] === '}' || text[lookahead] === ']') {
+        continue;
+      }
+    }
+
+    output += char;
+  }
+
+  return output;
+}
+
+function repairMissingCommasBetweenEntries(text) {
+  const lines = String(text || '').split('\n');
+
+  const endsWithJsonValue = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.endsWith(',') || trimmed.endsWith(':')) return false;
+    if (trimmed.endsWith('{') || trimmed.endsWith('[')) return false;
+    return /("|\]|\}|true|false|null|-?\d(?:\.\d+)?(?:[eE][+-]?\d+)?)$/.test(trimmed);
+  };
+
+  const startsWithJsonEntry = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('}') || trimmed.startsWith(']')) return false;
+    return /^(?:"|{|\[|-?\d|true\b|false\b|null\b)/.test(trimmed);
+  };
+
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    if (endsWithJsonValue(lines[index]) && startsWithJsonEntry(lines[index + 1])) {
+      lines[index] = `${lines[index]},`;
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function repairJsonLikePayload(text) {
+  let repaired = String(text || '').replace(/^\uFEFF/, '').replace(/\u00A0/g, ' ');
+  repaired = repaired.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+  repaired = escapeLiteralNewlinesInJsonStrings(repaired);
+  repaired = repairMissingCommasBetweenEntries(repaired);
+  repaired = removeTrailingCommas(repaired);
+  return repaired;
+}
+
+function parseAiPayload(raw) {
+  const extracted = extractJsonObject(raw);
+
+  try {
+    return JSON.parse(extracted);
+  } catch (initialError) {
+    const repaired = repairJsonLikePayload(extracted);
+    try {
+      const parsed = JSON.parse(repaired);
+      console.warn(
+        `[release-notes] Repaired malformed AI JSON payload after parse failure: ${initialError.message}`,
+      );
+      return parsed;
+    } catch (repairError) {
+      throw new Error(
+        `Unable to parse AI JSON payload (${initialError.message}; repair also failed: ${repairError.message})`,
+      );
+    }
+  }
+}
+
+function validateAiNotesPayload(notes) {
+  const bucketCount = CATEGORY_ORDER.reduce((count, category) => count + (notes?.buckets?.[category]?.length || 0), 0);
+
+  if (!notes?.intro) {
+    throw new Error('AI notes payload is missing an intro');
+  }
+  if (!notes?.highlights?.length) {
+    throw new Error('AI notes payload is missing highlights');
+  }
+  if (!bucketCount) {
+    throw new Error('AI notes payload is missing change bucket entries');
+  }
+}
+
+async function generateStructuredAiNotes(prompt, apiKey, retries = 5) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      const raw = await generateWithNanoGPT(prompt, apiKey);
+      const notes = normalizeAiNotesPayload(raw);
+      validateAiNotesPayload(notes);
+      return notes;
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        console.log(
+          `[release-notes] AI notes attempt ${attempt}/${retries} failed: ${error?.message || error}. Retrying...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+  }
+
+  throw lastError || new Error(`AI release notes failed after ${retries} attempts`);
+}
+
 function normalizeAiNotesPayload(raw) {
-  const parsed = JSON.parse(extractJsonObject(raw));
+  const parsed = parseAiPayload(raw);
   const spotlights = Array.isArray(parsed?.spotlights)
     ? parsed.spotlights
         .map((item) => ({
@@ -1612,15 +1810,13 @@ async function main() {
         commitsByCategory,
         repoUrl,
       });
-      const aiRaw = await generateWithNanoGPT(aiPrompt, apiKey);
-      const aiNotes = normalizeAiNotesPayload(aiRaw);
-      content = mergeAiNotesWithFallback(aiNotes, fallbackNotes);
+      content = await generateStructuredAiNotes(aiPrompt, apiKey, 5);
     } catch (error) {
       console.error('[release-notes] AI generation failed:', error?.message || error);
       throw error;
     }
   } else {
-    console.log('[release-notes] No NANOGPT_API_KEY found; using deterministic fallback.');
+    throw new Error('NANOGPT_API_KEY is required to generate AI release notes');
   }
 
   const notes = renderReleaseNotes({
