@@ -15,6 +15,7 @@ export interface SettingsScreenModel {
   activeTab: SettingsTabKey
   effectiveTab: SettingsTabKey
   currentProfileId: string
+  currentProfileName: string
   isGuestMode: boolean
   tabItems: SettingsTabItem[]
   mobileTabsRef: React.RefObject<HTMLDivElement | null>
@@ -26,7 +27,7 @@ export interface SettingsScreenModel {
   actions: {
     setActiveTab: (tab: SettingsTabKey) => void
     handleProfileChange: (id: string) => void
-    handleProfilesLoaded: (profiles: Array<{ id: string | number }>) => void
+    handleProfilesLoaded: (profiles: Array<{ id: string | number; name?: string }>) => void
     updateMobileTabsOverflow: () => void
   }
 }
@@ -40,6 +41,7 @@ export function useSettingsScreenModel(): SettingsScreenModel {
   const [canScrollMobileLeft, setCanScrollMobileLeft] = useState(false)
   const [canScrollMobileRight, setCanScrollMobileRight] = useState(false)
   const [currentProfileId, setCurrentProfileId] = useState('')
+  const [profiles, setProfiles] = useState<Array<{ id: string | number; name?: string }>>([])
 
   const isGuestMode = appMode.isGuest()
   const effectiveTab = isGuestMode && activeTab === 'danger' ? 'general' : activeTab
@@ -72,16 +74,17 @@ export function useSettingsScreenModel(): SettingsScreenModel {
     }
   }, [effectiveTab, tabItems.length])
 
-  const handleProfilesLoaded = (profiles: Array<{ id: string | number }>) => {
+  const handleProfilesLoaded = (loadedProfiles: Array<{ id: string | number; name?: string }>) => {
+    setProfiles(loadedProfiles)
     if (currentProfileId) return
     const lastSelected = localStorage.getItem('lastSelectedSettingsProfile')
-    if (lastSelected && profiles.some((profile) => String(profile.id) === lastSelected)) {
+    if (lastSelected && loadedProfiles.some((profile) => String(profile.id) === lastSelected)) {
       setCurrentProfileId(lastSelected)
       return
     }
 
-    if (profiles.length > 0) {
-      setCurrentProfileId(String(profiles[0].id))
+    if (loadedProfiles.length > 0) {
+      setCurrentProfileId(String(loadedProfiles[0].id))
     }
   }
 
@@ -90,10 +93,13 @@ export function useSettingsScreenModel(): SettingsScreenModel {
     localStorage.setItem('lastSelectedSettingsProfile', id)
   }
 
+  const currentProfileName = profiles.find((profile) => String(profile.id) === currentProfileId)?.name || 'Default'
+
   return {
     activeTab,
     effectiveTab,
     currentProfileId,
+    currentProfileName,
     isGuestMode,
     tabItems,
     mobileTabsRef,

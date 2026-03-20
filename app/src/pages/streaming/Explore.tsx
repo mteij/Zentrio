@@ -1,7 +1,7 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ChevronDown, Filter, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Hero, Layout, LazyImage, RatingBadge, SkeletonCard, SkeletonHero, SkeletonRow, StreamingRow } from '../../components'
 import { TraktRecommendationsRow } from '../../components/streaming/TraktRecommendationsRow'
@@ -24,11 +24,24 @@ interface GenreRowProps {
   type?: 'movie' | 'series' | 'all'
 }
 
-const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: GenreRowProps) => {
+const GenreRow = memo(({ genre, profileId, showImdbRatings, showAgeRatings, type }: GenreRowProps) => {
   const rowRef = useRef<HTMLDivElement | null>(null)
-  const [isNearViewport, setIsNearViewport] = useState(false)
+  const queryClient = useQueryClient()
+
+  // Skip the IntersectionObserver delay if data is already in cache (e.g. navigation back)
+  const [isNearViewport, setIsNearViewport] = useState(() =>
+    !!queryClient.getQueryData(['explore-genre', profileId, genre, type])
+  )
+
+  // When type changes (viewMode toggle), re-enable immediately if new type is cached
+  useEffect(() => {
+    if (!isNearViewport && queryClient.getQueryData(['explore-genre', profileId, genre, type])) {
+      setIsNearViewport(true)
+    }
+  }, [type, genre, profileId, queryClient, isNearViewport])
 
   useEffect(() => {
+    if (isNearViewport) return // already enabled, no observer needed
     const el = rowRef.current
     if (!el) return
 
@@ -49,7 +62,7 @@ const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: G
 
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [isNearViewport])
 
   const { data, isLoading } = useQuery({
     queryKey: ['explore-genre', profileId, genre, type],
@@ -59,8 +72,8 @@ const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: G
       const typeParam = type && type !== 'all' ? type : 'movie,series'
       return apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genre)}&skip=0`)
     },
-    staleTime: 1000 * 60 * 60, // 1 hour - genre data rarely changes
-    gcTime: 1000 * 60 * 30,
+    staleTime: 1000 * 60 * 60,  // 1 hour - genre data rarely changes
+    gcTime: 1000 * 60 * 120,    // 2 hours — must be > staleTime
     refetchOnWindowFocus: false,
     enabled: isNearViewport
   })
@@ -89,7 +102,7 @@ const GenreRow = ({ genre, profileId, showImdbRatings, showAgeRatings, type }: G
       />
     </div>
   )
-}
+})
 
 // -- Main Explore Component --
 interface ExploreDashboardData {
@@ -557,10 +570,10 @@ export const StreamingExplore = () => {
 
                          {/* Genre Rows - Pass viewMode as type */}
                          {rowGenres.map(genre => (
-                             <GenreRow 
-                                key={`${genre}-${viewMode}`} 
-                                genre={genre} 
-                                profileId={profileId!} 
+                             <GenreRow
+                                key={genre}
+                                genre={genre}
+                                profileId={profileId!}
                                 showImdbRatings={showImdbRatings}
                                 showAgeRatings={showAgeRatings}
                                 type={viewMode === 'all' ? undefined : viewMode}

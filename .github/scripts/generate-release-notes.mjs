@@ -351,13 +351,14 @@ function getPrevTag(currentTag) {
   return '';
 }
 
-function getRangeSpec(prevTag) {
-  if (prevTag) return `${prevTag}..HEAD`;
+function getRangeSpec(prevTag, tag) {
+  const endRef = tag || 'HEAD';
+  if (prevTag) return `${prevTag}..${endRef}`;
   const root = sh('git rev-list --max-parents=0 HEAD', '')
     .split('\n')
     .map((s) => s.trim())
     .filter(Boolean)[0];
-  if (root) return `${root}..HEAD`;
+  if (root) return `${root}..${endRef}`;
   return 'HEAD~100..HEAD';
 }
 
@@ -1060,7 +1061,7 @@ async function getContributors(rangeSpec, repoUrl) {
   return contributors;
 }
 
-async function generateWithNanoGPT(prompt, apiKey) {
+async function generateWithNanoGPT(prompt, apiKey, retries = 3) {
   const endpoint = 'https://nano-gpt.com/api/v1/chat/completions';
   const body = {
     model: 'zai-org/glm-5:thinking',
@@ -1069,26 +1070,41 @@ async function generateWithNanoGPT(prompt, apiKey) {
     max_tokens: 4096,
   };
 
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`NanoGPT API error ${res.status}: ${text}`);
-  }
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`NanoGPT API error ${res.status}: ${text}`);
+      }
 
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content || '';
-  if (!text) {
-    throw new Error('NanoGPT returned empty content');
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      if (!text) {
+        throw new Error('NanoGPT returned empty content');
+      }
+      return text.trim();
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        console.log(`[release-notes] AI generation attempt ${attempt}/${retries} failed, retrying...`);
+        // Wait a bit before retrying
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
   }
-  return text.trim();
+  
+  throw lastError || new Error('NanoGPT failed after all retries');
 }
 
 function extractJsonObject(text) {
@@ -1160,6 +1176,52 @@ function buildReleaseTypeContext(tag, prevTag, releaseType) {
   return `This is a PATCH release (${prevTag || 'previous tag unavailable'} -> ${tag}). Focus on reliability, polish, bug fixes, and why the affected flows feel better after updating.`;
 }
 
+function formatCommitsByCategory(commitsByCategory, repoUrl, maxPerCategory = 8) {
+  const lines = [];
+  
+  const featureCommits = commitsByCategory.feature || [];
+  if (featureCommits.length) {
+    lines.push('## FEATURE COMMITS (for Features bucket):');
+    for (const commit of featureCommits.slice(0, maxPerCategory)) {
+      const subject = commit.subject || commit.body.split('\n')[0] || '(no subject)';
+      lines.push(`- ${commit.hash}: ${subject}`);
+    }
+    lines.push('');
+  }
+  
+  const fixCommits = commitsByCategory.fix || [];
+  if (fixCommits.length) {
+    lines.push('## FIX COMMITS (for Fixes bucket):');
+    for (const commit of fixCommits.slice(0, maxPerCategory)) {
+      const subject = commit.subject || commit.body.split('\n')[0] || '(no subject)';
+      lines.push(`- ${commit.hash}: ${subject}`);
+    }
+    lines.push('');
+  }
+  
+  const uiCommits = commitsByCategory.ui || [];
+  if (uiCommits.length) {
+    lines.push('## UI COMMITS (for UI/UX bucket):');
+    for (const commit of uiCommits.slice(0, maxPerCategory)) {
+      const subject = commit.subject || commit.body.split('\n')[0] || '(no subject)';
+      lines.push(`- ${commit.hash}: ${subject}`);
+    }
+    lines.push('');
+  }
+  
+  const maintenanceCommits = commitsByCategory.maintenance || [];
+  if (maintenanceCommits.length) {
+    lines.push('## MAINTENANCE COMMITS (for Under the Hood bucket):');
+    for (const commit of maintenanceCommits.slice(0, maxPerCategory)) {
+      const subject = commit.subject || commit.body.split('\n')[0] || '(no subject)';
+      lines.push(`- ${commit.hash}: ${subject}`);
+    }
+    lines.push('');
+  }
+  
+  return lines.join('\n');
+}
+
 function buildStructuredAIPrompt(input) {
   const {
     tag,
@@ -1173,7 +1235,13 @@ function buildStructuredAIPrompt(input) {
     diffStat,
     focusedPatch,
     commitEvidence,
+    commitsByCategory,
+    repoUrl,
   } = input;
+
+  const categorizedCommits = commitsByCategory
+    ? formatCommitsByCategory(commitsByCategory, repoUrl)
+    : '';
 
   return [
     'You are writing polished GitHub release notes for Zentrio.',
@@ -1182,6 +1250,7 @@ function buildStructuredAIPrompt(input) {
     `Target version: ${tag}`,
     prevTag ? `Previous version: ${prevTag}` : 'Previous version: unavailable',
     `Release type: ${releaseType}`,
+    `Repository URL: ${repoUrl}`,
     releaseTypeContext,
     '',
     'Important instructions:',
@@ -1194,6 +1263,14 @@ function buildStructuredAIPrompt(input) {
     '- Keep the tone like Immich release notes: warm, informative, concise, and user-facing.',
     '- Prefer explaining impact such as faster, clearer, more stable, easier to manage, safer, smoother playback, better downloads, etc.',
     '- High-priority feature candidates listed below should be included when the patch evidence supports them.',
+    '',
+    '**CRITICAL: Commit Linking Requirement**',
+    '- Every bucket item MUST end with the commit hash(es) that made the change, formatted as markdown links.',
+    '- Format: `description of the change ([abc1234](${repoUrl}/commit/abc1234))`',
+    '- If multiple commits relate to one change, include all of them: `description ([abc1234](${repoUrl}/commit/abc1234) [def5678](${repoUrl}/commit/def5678))`',
+    '- You can group related commits together into a single coherent bullet point.',
+    '- Use ONLY the commit hashes provided in the categorized commits section below.',
+    '- Each bucket section (Features/Fixes/UI/Maintenance) should use commits from the corresponding category.',
     '',
     'Return strict JSON only, with this exact shape:',
     '{',
@@ -1216,6 +1293,7 @@ function buildStructuredAIPrompt(input) {
     `- spotlights: up to ${MAX_SPOTLIGHTS} sections, each with a short title and a 2-4 sentence summary.`,
     `- buckets.feature/fix/ui/maintenance: up to ${MAX_BUCKET_ITEMS} bullets each.`,
     '- Every bullet must describe a real change and its impact, not just a vague area name.',
+    '- Every bullet MUST end with commit hash link(s) in the format shown above.',
     '',
     'Architecture context:',
     architectureContext || '(not available)',
@@ -1237,7 +1315,10 @@ function buildStructuredAIPrompt(input) {
     'Focused patch excerpts:',
     focusedPatch || '(none)',
     '',
-    'Commits (secondary evidence):',
+    'Categorized commits (USE THESE HASHES FOR LINKING):',
+    categorizedCommits || '(none)',
+    '',
+    'All commits (secondary reference):',
     commitEvidence || '(none)',
   ].join('\n');
 }
@@ -1432,6 +1513,11 @@ function renderReleaseNotes(input) {
     lines.push(`Full Changelog: ${repoUrl}/releases`);
   }
 
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  lines.push('> **Notice:** This project is developed with AI-assisted tooling. While maintained with care, releases may contain instabilities or security vulnerabilities; use at your own risk.');
+
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -1450,10 +1536,14 @@ function basicFallback(tag, prevTag, repoUrl) {
 }
 
 async function main() {
-  const version = getVersion();
+  // Allow overriding tag and prevTag via environment variables or command line args
+  const argTag = process.argv[2] || process.env.RELEASE_TAG || '';
+  const argPrevTag = process.argv[3] || process.env.PREV_TAG || '';
+  
+  const version = argTag || getVersion();
   const tag = version.startsWith('v') ? version : `v${version}`;
-  const prevTag = getPrevTag(tag);
-  const rangeSpec = getRangeSpec(prevTag);
+  const prevTag = argPrevTag || getPrevTag(tag);
+  const rangeSpec = getRangeSpec(prevTag, tag);
   const repoUrl = getRepositoryUrl();
 
   const commits = parseCommits(getCommitLog(prevTag, rangeSpec));
@@ -1519,13 +1609,15 @@ async function main() {
         diffStat,
         focusedPatch,
         commitEvidence,
+        commitsByCategory,
+        repoUrl,
       });
       const aiRaw = await generateWithNanoGPT(aiPrompt, apiKey);
       const aiNotes = normalizeAiNotesPayload(aiRaw);
       content = mergeAiNotesWithFallback(aiNotes, fallbackNotes);
     } catch (error) {
       console.error('[release-notes] AI generation failed:', error?.message || error);
-      process.exit(1);
+      throw error;
     }
   } else {
     console.log('[release-notes] No NANOGPT_API_KEY found; using deterministic fallback.');

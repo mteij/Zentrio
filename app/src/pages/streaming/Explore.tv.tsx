@@ -1,27 +1,40 @@
-import { Check, Star } from 'lucide-react'
-import { TvFocusItem, TvFocusZone, TvGrid, TvMediaShelf, TvSection } from '../../components/tv'
-import { apiFetchJson } from '../../lib/apiFetch'
+import { useQuery } from '@tanstack/react-query'
+import { Compass, Film, Info, Layers3, Sparkles, Tv } from 'lucide-react'
+import { TvActionStrip, TvFocusItem, TvGrid, TvMediaShelf, TvSection, TvShelf } from '../../components/tv'
+import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { sanitizeImgSrc } from '../../lib/url'
+import type { MetaPreview } from '../../services/addons/types'
 import type { ExploreScreenModel } from './Explore.model'
 import { StreamingTvScaffold } from './StreamingTvScaffold'
 import styles from './Explore.tv.module.css'
 
-function getAgeRating(item: any): string | null {
+interface TraktRecommendation {
+  id: string
+  type: 'movie' | 'series'
+  name: string
+  year?: number
+  imdb_id?: string
+  poster?: string
+  background?: string
+  imdbRating?: string
+  description?: string
+  ageRating?: string
+}
+
+function getAgeRating(item: MetaPreview & { certification?: string; rating?: string; contentRating?: string; info?: { certification?: unknown; rating?: unknown } }): string | null {
   const direct = item.ageRating || item.certification || item.rating || item.contentRating
   if (typeof direct === 'string') return direct
-
   if (typeof item.info?.certification === 'string') return item.info.certification
   if (typeof item.info?.rating === 'string') return item.info.rating
-
   return null
 }
 
-function getImdbRating(item: any): number | null {
-  const parsed = Number.parseFloat(item.imdbRating)
+function getImdbRating(item: MetaPreview): number | null {
+  const parsed = Number.parseFloat(item.imdbRating || '')
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
-function ExploreCard({
+function ExploreGridCard({
   id,
   index,
   item,
@@ -31,16 +44,16 @@ function ExploreCard({
 }: {
   id: string
   index: number
-  item: any
+  item: MetaPreview
   showImdbRatings: boolean
   showAgeRatings: boolean
   onActivate: () => void
 }) {
   const imdbRating = showImdbRatings ? getImdbRating(item) : null
-  const ageRating = showAgeRatings ? getAgeRating(item) : null
+  const ageRating = showAgeRatings ? getAgeRating(item as MetaPreview & { certification?: string; rating?: string; contentRating?: string; info?: { certification?: unknown; rating?: unknown } }) : null
 
   return (
-    <TvFocusItem id={id} index={index} className={styles.card} onActivate={onActivate} aria-label={item.name}>
+    <TvFocusItem id={id} index={index} className={styles.gridCard} onActivate={onActivate} aria-label={item.name}>
       <div className={styles.posterShell}>
         {item.poster ? (
           <img src={sanitizeImgSrc(item.poster)} alt={item.name} className={styles.poster} loading="lazy" />
@@ -48,156 +61,301 @@ function ExploreCard({
           <div className={styles.poster} aria-hidden="true" />
         )}
         <div className={styles.posterBadges}>
-          {item.isWatched ? (
-            <span className={`${styles.posterBadge} ${styles.watchedBadge}`} aria-label="Watched">
-              <Check size={13} strokeWidth={3} />
-            </span>
-          ) : null}
           {ageRating ? <span className={styles.posterBadge}>{ageRating}</span> : null}
         </div>
         {imdbRating ? (
           <span className={`${styles.posterBadge} ${styles.ratingBadge}`} aria-label={`IMDb ${imdbRating.toFixed(1)}`}>
-            <Star size={13} fill="currentColor" />
+            <Sparkles size={12} />
             <span>{imdbRating.toFixed(1)}</span>
           </span>
         ) : null}
+        <div className={styles.posterActionOverlay} aria-hidden="true">
+          <span className={`${styles.posterActionPill} ${styles.posterActionPrimary}`}>
+            <Info size={12} />
+            <span>Details</span>
+          </span>
+        </div>
       </div>
       <div className={styles.body}>
         <p className={styles.title}>{item.name}</p>
+        {item.releaseInfo || item.year ? <p className={styles.meta}>{item.releaseInfo || item.year}</p> : null}
       </div>
     </TvFocusItem>
   )
 }
 
 export function StreamingExploreTvView({ model }: { model: ExploreScreenModel }) {
-  const heading = model.isFilteredView
-    ? model.activeGenre || (model.activeType === 'movie' ? 'Movies' : model.activeType === 'series' ? 'Series' : 'Explore')
-    : 'Explore'
+  const activeBrowseMode = model.isFilteredView
+    ? (model.activeType === 'movie' || model.activeType === 'series' ? model.activeType : 'all')
+    : model.viewMode
 
-  const topRows = model.viewMode === 'all'
+  const { data: movieRecommendations } = useQuery({
+    queryKey: ['tv-trakt-recommendations', model.profileId, 'movies'],
+    queryFn: async () => {
+      const res = await apiFetch(`/api/trakt/recommendations?profileId=${model.profileId}&type=movies&limit=20`)
+      const json = await res.json()
+      return json.data as { items: TraktRecommendation[]; connected: boolean }
+    },
+    enabled: !model.isFilteredView && activeBrowseMode !== 'series',
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+  })
+
+  const { data: showRecommendations } = useQuery({
+    queryKey: ['tv-trakt-recommendations', model.profileId, 'shows'],
+    queryFn: async () => {
+      const res = await apiFetch(`/api/trakt/recommendations?profileId=${model.profileId}&type=shows&limit=20`)
+      const json = await res.json()
+      return json.data as { items: TraktRecommendation[]; connected: boolean }
+    },
+    enabled: !model.isFilteredView && activeBrowseMode !== 'movie',
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+  })
+
+  const recommendationRows = [
+    ...(movieRecommendations?.connected && movieRecommendations.items.length > 0
+      ? [{
+          zoneId: 'explore-rec-movies',
+          title: 'Recommended Movies',
+          items: movieRecommendations.items.map((item) => ({
+            id: item.imdb_id || item.id,
+            type: item.type,
+            name: item.name,
+            releaseInfo: item.year?.toString(),
+            poster: item.poster,
+            background: item.background,
+            imdbRating: item.imdbRating,
+            ageRating: item.ageRating,
+            description: item.description,
+          })),
+        }]
+      : []),
+    ...(showRecommendations?.connected && showRecommendations.items.length > 0
+      ? [{
+          zoneId: 'explore-rec-shows',
+          title: 'Recommended Shows',
+          items: showRecommendations.items.map((item) => ({
+            id: item.imdb_id || item.id,
+            type: item.type,
+            name: item.name,
+            releaseInfo: item.year?.toString(),
+            poster: item.poster,
+            background: item.background,
+            imdbRating: item.imdbRating,
+            ageRating: item.ageRating,
+            description: item.description,
+          })),
+        }]
+      : []),
+  ]
+
+  const topRows = activeBrowseMode === 'all'
     ? [
         { zoneId: 'explore-top-movies', title: 'Top 10 Movies Today', items: model.trendingMovies },
         { zoneId: 'explore-top-series', title: 'Top 10 Series Today', items: model.trendingSeries },
       ].filter((row) => row.items.length > 0)
-    : model.viewMode === 'movie'
+    : activeBrowseMode === 'movie'
       ? [{ zoneId: 'explore-top-movies', title: 'Top 10 Movies Today', items: model.trendingMovies }].filter((row) => row.items.length > 0)
       : [{ zoneId: 'explore-top-series', title: 'Top 10 Series Today', items: model.trendingSeries }].filter((row) => row.items.length > 0)
 
-  const firstRowZoneId = topRows[0]?.zoneId
-  const firstGenreZoneId = model.rowGenres[0] ? `explore-genre-row-${model.rowGenres[0].replace(/\s+/g, '-').toLowerCase()}` : undefined
-  const initialZoneId = model.isFilteredView ? 'explore-grid' : 'explore-filters'
+  const contentRows = [
+    ...topRows.map((row) => ({ ...row, kind: 'static' as const })),
+    ...recommendationRows.map((row) => ({ ...row, kind: 'static' as const })),
+    ...(!model.isFilteredView
+      ? model.rowGenres.map((genre, index) => ({
+          zoneId: `explore-genre-row-${genre.replace(/\s+/g, '-').toLowerCase()}`,
+          title: genre,
+          kind: 'query' as const,
+          genre,
+          priority: index < 2 && topRows.length === 0 ? 'eager' as const : 'lazy' as const,
+        }))
+      : []),
+  ]
+
+  const firstContentZoneId = model.isFilteredView ? 'explore-grid' : contentRows[0]?.zoneId
+
+  const handleModeActivate = (mode: 'all' | 'movie' | 'series') => {
+    if (model.isFilteredView) {
+      model.actions.updateFilter('type', mode === 'all' ? '' : mode)
+      return
+    }
+
+    model.actions.setViewMode(mode)
+  }
 
   return (
-    <StreamingTvScaffold
-      profileId={model.profileId}
-      activeNav="explore"
-      eyebrow="Explore"
-      title={heading}
-      initialZoneId={initialZoneId}
-      onBack={model.isFilteredView ? model.actions.clearFilters : () => window.history.back()}
-    >
-      <TvSection title="Type">
-        <TvFocusZone id="explore-filters" orientation="vertical" nextRight={model.isFilteredView ? 'explore-grid' : firstRowZoneId || firstGenreZoneId}>
-          {(['all', 'movie', 'series'] as const).map((mode, index) => (
-            <TvFocusItem
-              key={mode}
-              id={`explore-mode-${mode}`}
-              index={index}
-              className={`${styles.filterCard} ${model.viewMode === mode ? styles.filterActive : ''}`}
-              onActivate={() => model.actions.setViewMode(mode)}
+    <>
+      <StreamingTvScaffold
+        profileId={model.profileId}
+        activeNav="explore"
+        title={model.isFilteredView ? (model.activeGenre || (activeBrowseMode === 'movie' ? 'Movies' : activeBrowseMode === 'series' ? 'Series' : 'Explore')) : 'Explore'}
+        initialZoneId="explore-mode-strip"
+        hideHeader
+        onBack={model.isFilteredView ? model.actions.clearFilters : () => window.history.back()}
+      >
+        <div className={styles.exploreControls}>
+          <TvActionStrip
+            zoneId="explore-mode-strip"
+            nextLeft="streaming-rail"
+            nextDown={model.isFilteredView ? 'explore-filter-actions' : 'explore-genre-shortcuts'}
+          >
+            {([
+              { key: 'all' as const, label: 'All', icon: Layers3 },
+              { key: 'movie' as const, label: 'Movies', icon: Film },
+              { key: 'series' as const, label: 'Series', icon: Tv },
+            ]).map((mode) => {
+              const Icon = mode.icon
+              const isActive = activeBrowseMode === mode.key
+              return (
+                <TvFocusItem
+                  key={mode.key}
+                  id={`explore-mode-${mode.key}`}
+                  className={`${styles.modeChip} ${isActive ? styles.modeChipActive : ''}`}
+                  onActivate={() => handleModeActivate(mode.key)}
+                >
+                  <Icon size={16} />
+                  <span>{mode.label}</span>
+                </TvFocusItem>
+              )
+            })}
+          </TvActionStrip>
+
+          {model.isFilteredView ? (
+            <TvActionStrip
+              zoneId="explore-filter-actions"
+              nextLeft="streaming-rail"
+              nextUp="explore-mode-strip"
+              nextDown="explore-grid"
             >
-              <span>{mode === 'all' ? 'All Content' : mode === 'movie' ? 'Movies' : 'TV Shows'}</span>
-            </TvFocusItem>
-          ))}
-        </TvFocusZone>
-      </TvSection>
-
-      {!model.isFilteredView ? (
-        <>
-          {topRows.map((row, index) => {
-            const previousZoneId = index === 0 ? 'explore-filters' : topRows[index - 1]?.zoneId
-            const nextZoneId = index < topRows.length - 1
-              ? topRows[index + 1]?.zoneId
-              : firstGenreZoneId
-
-            return (
-              <TvMediaShelf
-                key={row.zoneId}
-                title={row.title}
-                zoneId={row.zoneId}
-                items={row.items}
-                showImdbRatings={model.showImdbRatings}
-                showAgeRatings={model.showAgeRatings}
-                nextLeft="streaming-rail"
-                nextUp={previousZoneId}
-                nextDown={nextZoneId}
-                priority={index === 0 ? 'eager' : 'lazy'}
-                onActivate={(item) => model.actions.openItem(item)}
-              />
-            )
-          })}
-
-          {model.rowGenres.map((genre, index) => {
-            const zoneId = `explore-genre-row-${genre.replace(/\s+/g, '-').toLowerCase()}`
-            const typeParam = model.viewMode === 'all' ? 'movie,series' : model.viewMode
-            const nextUp = index === 0
-              ? topRows[topRows.length - 1]?.zoneId || 'explore-filters'
-              : `explore-genre-row-${model.rowGenres[index - 1].replace(/\s+/g, '-').toLowerCase()}`
-            const nextDown = index < model.rowGenres.length - 1
-              ? `explore-genre-row-${model.rowGenres[index + 1].replace(/\s+/g, '-').toLowerCase()}`
-              : undefined
-
-            return (
-              <TvMediaShelf
-                key={zoneId}
-                title={genre}
-                zoneId={zoneId}
-                queryKey={['tv-explore-genre', model.profileId, model.viewMode, genre]}
-                queryFn={async () => {
-                  const data = await apiFetchJson<{ items: any[] }>(
-                    `/api/streaming/catalog?profileId=${model.profileId}&type=${typeParam}&genre=${encodeURIComponent(genre)}&skip=0`,
-                  )
-                  return data.items || []
-                }}
-                showImdbRatings={model.showImdbRatings}
-                showAgeRatings={model.showAgeRatings}
-                nextLeft="streaming-rail"
-                nextUp={nextUp}
-                nextDown={nextDown}
-                priority={index < 2 && topRows.length === 0 ? 'eager' : 'lazy'}
-                onActivate={(item) => model.actions.openItem(item)}
-              />
-            )
-          })}
-        </>
-      ) : (
-        <TvSection title="Results">
-          <TvGrid zoneId="explore-grid" columns={5} nextLeft="streaming-rail">
-            {model.filteredItems.map((item, index) => (
-              <ExploreCard
-                key={`${item.id}-${index}`}
-                id={`explore-grid-${item.id}-${index}`}
-                index={index}
-                item={item}
-                showImdbRatings={model.showImdbRatings}
-                showAgeRatings={model.showAgeRatings}
-                onActivate={() => model.actions.openItem(item)}
-              />
-            ))}
-            {model.hasMore ? (
-              <TvFocusItem
-                id="explore-load-more"
-                index={model.filteredItems.length}
-                className={styles.genreChip}
-                onActivate={() => void model.actions.loadMore()}
-              >
-                Load More
+              <TvFocusItem id="explore-clear-filters" className={styles.actionChip} onActivate={model.actions.clearFilters}>
+                <Compass size={16} />
+                <span>Back to Explore</span>
               </TvFocusItem>
-            ) : null}
-          </TvGrid>
-        </TvSection>
-      )}
-    </StreamingTvScaffold>
+              {model.activeGenre ? (
+                <TvFocusItem
+                  id="explore-clear-genre"
+                  className={styles.actionChip}
+                  onActivate={() => model.actions.updateFilter('genre', '')}
+                >
+                  <span>Clear Genre</span>
+                </TvFocusItem>
+              ) : null}
+            </TvActionStrip>
+          ) : (
+            <TvShelf
+              zoneId="explore-genre-shortcuts"
+              nextLeft="streaming-rail"
+              nextUp="explore-mode-strip"
+              nextDown={firstContentZoneId}
+            >
+              {model.rowGenres.map((genre, index) => (
+                <TvFocusItem
+                  key={genre}
+                  id={`explore-genre-shortcut-${genre.replace(/\s+/g, '-').toLowerCase()}`}
+                  index={index}
+                  className={styles.genreChip}
+                  onActivate={() => model.actions.updateFilter('genre', genre)}
+                >
+                  <span>{genre}</span>
+                </TvFocusItem>
+              ))}
+            </TvShelf>
+          )}
+        </div>
+
+        {model.isFilteredView ? (
+          <TvSection title={model.activeGenre || (activeBrowseMode === 'movie' ? 'Movies' : activeBrowseMode === 'series' ? 'Series' : 'Results')}>
+            {model.loading ? (
+              <TvShelf zoneId="explore-grid" nextLeft="streaming-rail" nextUp="explore-filter-actions">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <TvFocusItem key={`explore-grid-skeleton-${index}`} id={`explore-grid-skeleton-${index}`} index={index} className={styles.gridSkeletonCard}>
+                    <span className={styles.gridSkeletonPoster} aria-hidden="true" />
+                    <span className={styles.gridSkeletonLine} aria-hidden="true" />
+                  </TvFocusItem>
+                ))}
+              </TvShelf>
+            ) : model.filteredItems.length > 0 ? (
+              <TvGrid zoneId="explore-grid" columns={5} nextLeft="streaming-rail" nextUp="explore-filter-actions">
+                {model.filteredItems.map((item, index) => (
+                  <ExploreGridCard
+                    key={`${item.id}-${index}`}
+                  id={`explore-grid-${item.id}-${index}`}
+                  index={index}
+                  item={item}
+                  showImdbRatings={model.showImdbRatings}
+                  showAgeRatings={model.showAgeRatings}
+                  onActivate={() => model.actions.openItem(item)}
+                />
+              ))}
+              {model.hasMore ? (
+                  <TvFocusItem id="explore-load-more" index={model.filteredItems.length} className={styles.loadMoreCard} onActivate={() => void model.actions.loadMore()}>
+                    Load More
+                  </TvFocusItem>
+                ) : null}
+              </TvGrid>
+            ) : (
+              <TvShelf zoneId="explore-grid" nextLeft="streaming-rail" nextUp="explore-filter-actions">
+                <TvFocusItem id="explore-empty" className={styles.emptyStateCard} onActivate={model.actions.clearFilters}>
+                  <p className={styles.emptyStateTitle}>No titles found</p>
+                </TvFocusItem>
+              </TvShelf>
+            )}
+          </TvSection>
+        ) : (
+          <>
+            {contentRows.map((row, index) => {
+              const nextUp = index === 0 ? 'explore-genre-shortcuts' : contentRows[index - 1]?.zoneId
+              const nextDown = index < contentRows.length - 1 ? contentRows[index + 1]?.zoneId : undefined
+
+              if (row.kind === 'static') {
+                return (
+                  <TvMediaShelf
+                    key={row.zoneId}
+                    profileId={model.profileId}
+                    title={row.title}
+                    zoneId={row.zoneId}
+                    items={row.items}
+                    showImdbRatings={model.showImdbRatings}
+                    showAgeRatings={model.showAgeRatings}
+                    nextLeft="streaming-rail"
+                    nextUp={nextUp}
+                    nextDown={nextDown}
+                    onActivate={(item) => model.actions.openItem(item as MetaPreview)}
+                  />
+                )
+              }
+
+              const typeParam = activeBrowseMode === 'all' ? 'movie,series' : activeBrowseMode
+              return (
+                <TvMediaShelf
+                  key={row.zoneId}
+                  profileId={model.profileId}
+                  title={row.title}
+                  zoneId={row.zoneId}
+                  queryKey={['tv-explore-genre', model.profileId, activeBrowseMode, row.genre]}
+                  queryFn={async () => {
+                    const data = await apiFetchJson<{ items: MetaPreview[] }>(
+                      `/api/streaming/catalog?profileId=${model.profileId}&type=${typeParam}&genre=${encodeURIComponent(row.genre)}&skip=0`,
+                    )
+                    return data.items || []
+                  }}
+                  showImdbRatings={model.showImdbRatings}
+                  showAgeRatings={model.showAgeRatings}
+                  nextLeft="streaming-rail"
+                  nextUp={nextUp}
+                  nextDown={nextDown}
+                  priority={row.priority}
+                  onActivate={(item) => model.actions.openItem(item as MetaPreview)}
+                />
+              )
+            })}
+          </>
+        )}
+      </StreamingTvScaffold>
+    </>
   )
 }
 

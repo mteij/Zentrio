@@ -20,6 +20,7 @@ import { authClient, getClientUrl, getServerUrl, isTauri, resetAuthClient } from
 import { getPlatformCapabilities } from '../../lib/platform-capabilities';
 import { useAuthStore } from '../../stores/authStore';
 import { createLogger } from '../../utils/client-logger';
+import { HostedServiceLegalNotice } from '../legal/HostedServiceLegalNotice';
 import { ParticleBackground } from '../ui/ParticleBackground';
 import { TvFocusable } from '../tv/TvFocusable';
 
@@ -738,6 +739,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   <Mail className="w-5 h-5 text-zinc-400" />
                   Continue with Email
                 </button>
+
+                <HostedServiceLegalNotice className="mt-6" />
               </motion.div>
               
               {/* Guest mode */}
@@ -937,6 +940,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     )}
                   </button>
                 </form>
+
+                <HostedServiceLegalNotice className="mt-6" />
                 
                 <p className="text-center text-sm text-zinc-500 mt-6">
                   Don&apos;t have an account?{' '}
@@ -1047,6 +1052,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     )}
                   </button>
                 </form>
+
+                <HostedServiceLegalNotice className="mt-6" />
                 
                 <p className="text-center text-sm text-zinc-500 mt-6">
                   Already have an account?{' '}

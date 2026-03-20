@@ -354,9 +354,25 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
           KEYSTORE_PATH="$(pwd)/keystore.jks"
 
-          # Initialize Android project (creates fresh gen/android/ with default icons)
-          rm -rf src-tauri/gen/android
-          bun tauri android init
+          # This repo checks in src-tauri/gen/android because it contains custom
+          # Android sources, Gradle config, and ProGuard rules required at runtime.
+          # Re-initializing here replaces them with Tauri defaults, which can build
+          # successfully but crash immediately on launch.
+          REQUIRED_ANDROID_FILES=(
+            "src-tauri/gen/android/app/build.gradle.kts"
+            "src-tauri/gen/android/app/proguard-rules.pro"
+            "src-tauri/gen/android/app/src/main/java/com/zentrio/mteij/MainActivity.kt"
+            "src-tauri/gen/android/app/src/main/java/com/zentrio/mteij/ExoPlayerPlugin.kt"
+            "src-tauri/gen/android/app/src/main/java/com/zentrio/mteij/TvLauncherPlugin.kt"
+            "src-tauri/gen/android/app/src/main/java/com/zentrio/mteij/ImmersiveModePlugin.kt"
+          )
+
+          for required_file in "${REQUIRED_ANDROID_FILES[@]}"; do
+            if [ ! -f "$required_file" ]; then
+              echo "Expected checked-in Android runtime file missing: $required_file" >&2
+              exit 1
+            fi
+          done
 
           # Inject REQUEST_INSTALL_PACKAGES permission (required for sideloading APK updates on Android 8+)
           MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"

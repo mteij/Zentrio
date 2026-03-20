@@ -33,8 +33,8 @@ export default defineConfig({
         background_color: '#0a0a0a',
         display: 'standalone',
         icons: [
-          { src: '/static/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/static/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/static/logo/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/static/logo/icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
       workbox: {
@@ -96,10 +96,9 @@ export default defineConfig({
             return 'router-vendor'
           }
 
-          // Split Recharts and D3 (used only in admin DashboardPage - ~360 kB)
-          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-') || id.includes('node_modules/victory-')) {
-            return 'charts-vendor'
-          }
+          // Keep charting libraries with their lazy routes.
+          // Splitting them into a shared vendor chunk can create circular chunk
+          // dependencies with React/utils vendor chunks and break production startup.
 
           // Split Vidstack and media libraries (HLS.js, dash.js share this chunk)
           if (

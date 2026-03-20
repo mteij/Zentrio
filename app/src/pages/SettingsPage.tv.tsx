@@ -5,7 +5,7 @@ import { DangerZoneSettings } from '../components/settings/DangerZoneSettings'
 import { DownloadSettings } from '../components/settings/DownloadSettings'
 import { GeneralSettings } from '../components/settings/GeneralSettings'
 import { StreamingSettings } from '../components/settings/StreamingSettings'
-import { TvFocusItem, TvFocusZone, TvPageScaffold } from '../components/tv'
+import { TvFocusZone, TvPageScaffold, TvRailMenu } from '../components/tv'
 import type { SettingsScreenModel } from './SettingsPage.model'
 import styles from './SettingsPage.tv.module.css'
 
@@ -41,59 +41,51 @@ function renderTvSection(model: SettingsScreenModel) {
 }
 
 export function SettingsPageTvView({ model }: { model: SettingsScreenModel }) {
-  const activeTab = model.tabItems.find((item) => item.key === model.effectiveTab)
-
   return (
     <TvPageScaffold
-      eyebrow="Settings"
       title="Settings"
       initialZoneId="settings-tabs"
       onBack={model.navigation.goBack}
-      railMode="expanded"
+      hideHeader
+      railMode="adaptive"
+      railHeaderAction={(
+        <div className={styles.railProfileState} aria-label={`Active settings profile: ${model.currentProfileName}`}>
+          <span className={styles.railProfileLabel}>Editing</span>
+          <span className={styles.railProfileValue}>{model.currentProfileName}</span>
+        </div>
+      )}
       rail={(
-        <TvFocusZone id="settings-tabs" orientation="vertical" nextRight="settings-content">
-          {model.tabItems.map((tab, index) => {
-            const Icon = tab.icon
-            const isActive = model.effectiveTab === tab.key
-            return (
-              <TvFocusItem
-                key={tab.key}
-                id={`settings-tab-${tab.key}`}
-                index={index}
-                className={`${styles.railItem} ${isActive ? styles.railActive : ''}`}
-                onActivate={() => model.actions.setActiveTab(tab.key)}
-              >
-                <span className={styles.railIcon}>
-                  <Icon size={20} />
-                </span>
-                <span className={styles.railLabel}>{tab.label}</span>
-              </TvFocusItem>
-            )
-          })}
-        </TvFocusZone>
+        <TvRailMenu
+          zoneId="settings-tabs"
+          nextRight="settings-content"
+          items={model.tabItems.map((tab) => ({
+            id: tab.key,
+            label: tab.label,
+            icon: tab.icon,
+            active: model.effectiveTab === tab.key,
+            onActivate: () => model.actions.setActiveTab(tab.key),
+          }))}
+        />
       )}
     >
       <TvFocusZone id="settings-content" orientation="vertical" nextLeft="settings-tabs">
         <div className={styles.page}>
+          <div className={styles.tvSettingsContent}>
+            {renderTvSection(model)}
+          </div>
+
           <div className={styles.profileRow}>
-            <p className={styles.profileLabel}>Active Profile</p>
+            <p className={styles.profileLabel}>Settings Profile</p>
             <div className={styles.profileSelectorWrap}>
               <SettingsProfileSelector
                 currentProfileId={model.currentProfileId}
                 onProfileChange={model.actions.handleProfileChange}
                 onProfilesLoaded={model.actions.handleProfilesLoaded}
                 label={null}
-                layout="column"
+                layout="row"
+                compact
               />
             </div>
-          </div>
-
-          <div className={styles.sectionTitleRow}>
-            <h2 className={styles.sectionTitle}>{activeTab?.label || 'Settings'}</h2>
-          </div>
-
-          <div className={styles.tvSettingsContent}>
-            {renderTvSection(model)}
           </div>
         </div>
       </TvFocusZone>

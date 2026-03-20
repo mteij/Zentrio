@@ -25,8 +25,11 @@ function isTauriEnvironment(): boolean {
   return isTauriRuntime()
 }
 
-const CORE_URL = new URL('/ffmpeg/ffmpeg-core.js', import.meta.url).href
-const WASM_URL = new URL('/ffmpeg/ffmpeg-core.wasm', import.meta.url).href
+const appBasePath = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL.slice(0, -1)
+  : import.meta.env.BASE_URL
+const CORE_URL = `${appBasePath}/ffmpeg/ffmpeg-core.js`
+const WASM_URL = `${appBasePath}/ffmpeg/ffmpeg-core.wasm`
 
 export class HybridEngine extends EventTarget {
   private sourceUrl: string

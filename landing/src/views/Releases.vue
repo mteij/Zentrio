@@ -140,8 +140,8 @@
             directly in your browser.
           </p>
         </div>
-        <a href="https://app.zentrio.eu" class="btn btn-secondary"
-          >Launch Zentrio Web</a
+        <router-link to="/web" class="btn btn-secondary"
+          >Launch Zentrio Web</router-link
         >
       </section>
 

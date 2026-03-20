@@ -1,7 +1,7 @@
 import { Edit, LogIn, LogOut, Plus, Settings, Shield } from 'lucide-react'
 import { ConfirmDialog, LoadingSpinner } from '../components'
 import { ProfileModal } from '../components/features/ProfileModal'
-import { TvFocusItem, TvFocusZone, TvGrid, TvPageScaffold, TvSection } from '../components/tv'
+import { TvFocusItem, TvGrid, TvPageScaffold, TvRailMenu, TvSection } from '../components/tv'
 import { buildAvatarUrl, sanitizeImgSrc } from '../lib/url'
 import type { Profile, ProfilesScreenModel } from './ProfilesPage.model'
 import styles from './ProfilesPage.tv.module.css'
@@ -76,27 +76,13 @@ export function ProfilesPageTvView({ model }: { model: ProfilesScreenModel }) {
       description={model.editMode ? 'Pick a profile to update it.' : undefined}
       initialZoneId={initialZoneId}
       onBack={model.editMode ? () => model.actions.setEditMode(false) : model.navigation.goBack}
-      railMode="compact"
+      railMode="adaptive"
       rail={(
-        <TvFocusZone id="profiles-actions" orientation="vertical" nextRight="profiles-grid">
-          {actionItems.map((item, index) => {
-            const Icon = item.icon
-            return (
-              <TvFocusItem
-                key={item.id}
-                id={`profiles-action-${item.id}`}
-                index={index}
-                className={styles.actionCard}
-                onActivate={item.onActivate}
-              >
-                <Icon size={20} />
-                <span className={styles.actionText}>
-                  <span className={styles.actionLabel}>{item.label}</span>
-                </span>
-              </TvFocusItem>
-            )
-          })}
-        </TvFocusZone>
+        <TvRailMenu
+          zoneId="profiles-actions"
+          nextRight="profiles-grid"
+          items={actionItems}
+        />
       )}
     >
       <TvSection

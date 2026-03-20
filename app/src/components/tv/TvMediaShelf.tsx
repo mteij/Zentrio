@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Star } from 'lucide-react'
+import { Check, Info, Play, Star } from 'lucide-react'
 import { sanitizeImgSrc } from '../../lib/url'
 import { TvFocusItem } from './TvFocusContext'
 import { TvSection, TvShelf } from './TvPageScaffold'
 import styles from './TvMediaShelf.module.css'
+
+const TV_ZONE_PREFETCH_EVENT_NAME = 'zentrio:tv-zone-prefetch'
 
 export interface TvShelfItem {
   id: string
@@ -25,9 +27,14 @@ export interface TvShelfItem {
     certification?: unknown
     rating?: unknown
   }
+  season?: number
+  episode?: number
+  lastStream?: unknown
+  description?: string | null
 }
 
 interface TvMediaShelfProps<TItem extends TvShelfItem> {
+  profileId: string
   title: string
   zoneId: string
   queryKey?: readonly unknown[]
@@ -43,6 +50,7 @@ interface TvMediaShelfProps<TItem extends TvShelfItem> {
   hideWhenEmpty?: boolean
   showImdbRatings?: boolean
   showAgeRatings?: boolean
+  focusAction?: 'details' | 'play'
 }
 
 function getAgeRating(item: TvShelfItem): string | null {
@@ -74,6 +82,7 @@ function TvShelfCard<TItem extends TvShelfItem>({
   onActivate,
   showImdbRatings,
   showAgeRatings,
+  focusAction,
 }: {
   item: TItem
   id: string
@@ -81,11 +90,14 @@ function TvShelfCard<TItem extends TvShelfItem>({
   onActivate: (item: TItem) => void
   showImdbRatings: boolean
   showAgeRatings: boolean
+  focusAction: 'details' | 'play'
 }) {
   const title = item.title || item.name
   const meta = item.meta
   const ageRating = showAgeRatings ? getAgeRating(item) : null
   const imdbRating = showImdbRatings ? getImdbRating(item) : null
+  const FocusIcon = focusAction === 'play' ? Play : Info
+  const focusLabel = focusAction === 'play' ? 'Play' : 'Details'
 
   return (
     <TvFocusItem id={id} index={index} className={styles.card} onActivate={() => onActivate(item)} aria-label={title}>
@@ -109,6 +121,12 @@ function TvShelfCard<TItem extends TvShelfItem>({
             <span>{imdbRating.toFixed(1)}</span>
           </span>
         ) : null}
+        <div className={styles.posterActionOverlay} aria-hidden="true">
+          <span className={`${styles.posterActionPill} ${styles.posterActionPrimary}`}>
+            <FocusIcon size={12} fill={focusAction === 'play' ? 'currentColor' : 'none'} />
+            <span>{focusLabel}</span>
+          </span>
+        </div>
       </div>
       <div className={styles.body}>
         <p className={styles.cardTitle}>{title}</p>
@@ -139,6 +157,7 @@ export function TvMediaShelf<TItem extends TvShelfItem>({
   hideWhenEmpty = true,
   showImdbRatings = true,
   showAgeRatings = true,
+  focusAction = 'details',
 }: TvMediaShelfProps<TItem>) {
   const rowRef = useRef<HTMLDivElement | null>(null)
   const isObserverSupported = typeof IntersectionObserver !== 'undefined'
@@ -164,6 +183,21 @@ export function TvMediaShelf<TItem extends TvShelfItem>({
     observer.observe(element)
     return () => observer.disconnect()
   }, [isObserverSupported, priority, queryFn])
+
+  useEffect(() => {
+    if (!queryFn || isNearViewport) return
+
+    const handleZonePrefetch = (event: Event) => {
+      const zonePrefetchEvent = event as CustomEvent<{ zoneId?: string }>
+      if (zonePrefetchEvent.detail?.zoneId !== zoneId) return
+      setIsNearViewport(true)
+    }
+
+    window.addEventListener(TV_ZONE_PREFETCH_EVENT_NAME, handleZonePrefetch as EventListener)
+    return () => {
+      window.removeEventListener(TV_ZONE_PREFETCH_EVENT_NAME, handleZonePrefetch as EventListener)
+    }
+  }, [isNearViewport, queryFn, zoneId])
 
   const { data = [], isLoading, error } = useQuery({
     queryKey: queryKey || ['tv-media-shelf', title],
@@ -208,6 +242,7 @@ export function TvMediaShelf<TItem extends TvShelfItem>({
                 onActivate={onActivate}
                 showImdbRatings={showImdbRatings}
                 showAgeRatings={showAgeRatings}
+                focusAction={focusAction}
               />
             ))}
           </TvShelf>

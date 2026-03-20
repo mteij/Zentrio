@@ -2,6 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Home from './views/Home.vue'
 import Releases from './views/Releases.vue'
 import Tos from './views/Tos.vue'
+import Privacy from './views/Privacy.vue'
+import AccountDeletion from './views/AccountDeletion.vue'
+import HostedWebRedirect from './views/HostedWebRedirect.vue'
 
 const routes = [
   {
@@ -18,6 +21,21 @@ const routes = [
     path: '/tos',
     name: 'Tos',
     component: Tos
+  },
+  {
+    path: '/privacy',
+    name: 'Privacy',
+    component: Privacy
+  },
+  {
+    path: '/account-deletion',
+    name: 'AccountDeletion',
+    component: AccountDeletion
+  },
+  {
+    path: '/web',
+    name: 'HostedWebRedirect',
+    component: HostedWebRedirect
   },
   {
     path: '/:pathMatch(.*)*',

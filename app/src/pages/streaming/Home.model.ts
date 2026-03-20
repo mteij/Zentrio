@@ -81,6 +81,21 @@ function getGreeting(): string {
   return 'Good evening'
 }
 
+function formatEpisodeLabel(season: unknown, episode: unknown): string | null {
+  if (
+    typeof season !== 'number' ||
+    typeof episode !== 'number' ||
+    !Number.isFinite(season) ||
+    !Number.isFinite(episode) ||
+    season < 0 ||
+    episode < 0
+  ) {
+    return null
+  }
+
+  return `Season ${season}, Episode ${episode}`
+}
+
 export function useHomeScreenModel(): HomeScreenModel {
   const { profileId } = useParams<{ profileId: string }>()
   const navigate = useNavigate()
@@ -169,10 +184,7 @@ export function useHomeScreenModel(): HomeScreenModel {
     if (!data) return []
 
     return data.history.slice(0, 10).map((item) => {
-      const episodeLabel =
-        item.season !== undefined && item.episode !== undefined && item.season >= 0 && item.episode >= 0
-          ? `S${item.season} - E${item.episode}`
-          : null
+      const episodeLabel = formatEpisodeLabel(item.season, item.episode)
 
       return {
         key: `${item.meta_id}-${item.season ?? -1}-${item.episode ?? -1}`,

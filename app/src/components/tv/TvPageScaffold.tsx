@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { UserRound } from 'lucide-react'
 import { ZENTRIO_LOGO_192_URL } from '../../lib/brand-assets'
 import { TvFocusItem, TvFocusScope, TvFocusZone, type TvFocusScopeProps } from './TvFocusContext'
@@ -39,6 +39,7 @@ export interface TvPageScaffoldProps extends Pick<TvFocusScopeProps, 'initialZon
     zoneId: string
     itemId: string
     onActivate: () => void
+    nextUp?: string
     nextRight?: string
     nextDown?: string
     hint?: string
@@ -47,7 +48,7 @@ export interface TvPageScaffoldProps extends Pick<TvFocusScopeProps, 'initialZon
   children: ReactNode
   className?: string
   hideHeader?: boolean
-  railMode?: 'expanded' | 'compact'
+  railMode?: 'expanded' | 'compact' | 'adaptive'
 }
 
 export function TvPageScaffold({
@@ -65,12 +66,22 @@ export function TvPageScaffold({
   hideHeader = false,
   railMode = 'compact',
 }: TvPageScaffoldProps) {
+  const [isAdaptiveRailExpanded, setIsAdaptiveRailExpanded] = useState(false)
   const user = useAuthStore((state) => state.user)
   const selectedProfile = readSelectedProfile()
   const profileAvatar = selectedProfile?.avatar
     ? sanitizeImgSrc(buildAvatarUrl(selectedProfile.avatar, selectedProfile.avatar_style || 'bottts-neutral'))
     : ''
   const identityTitle = selectedProfile?.name || user?.name || user?.username || user?.email || 'Zentrio'
+  const effectiveRailMode = railMode === 'adaptive'
+    ? (isAdaptiveRailExpanded ? 'expanded' : 'compact')
+    : railMode
+  const handleRailFocusCapture = railMode === 'adaptive'
+    ? () => setIsAdaptiveRailExpanded(true)
+    : undefined
+  const handleMainFocusCapture = railMode === 'adaptive'
+    ? () => setIsAdaptiveRailExpanded(false)
+    : undefined
 
   return (
     <TvFocusScope
@@ -78,25 +89,50 @@ export function TvPageScaffold({
       onBack={onBack}
       className={mergeClassName(
         styles.root,
-        railMode === 'compact' ? styles.compactRail : styles.expandedRail,
-        railMode === 'compact' ? 'tvRailCompact' : 'tvRailExpanded',
+        effectiveRailMode === 'compact' ? styles.compactRail : styles.expandedRail,
+        railMode === 'adaptive' ? styles.adaptiveRail : null,
+        effectiveRailMode === 'compact' ? 'tvRailCompact' : 'tvRailExpanded',
         className,
       )}
     >
-      <aside className={styles.rail}>
-        {brandAction ? (
-          <TvFocusZone
-            id={brandAction.zoneId}
-            orientation="vertical"
-            nextRight={brandAction.nextRight}
-            nextDown={brandAction.nextDown}
-          >
-            <TvFocusItem
-              id={brandAction.itemId}
-              className={styles.brandButton}
-              onActivate={brandAction.onActivate}
-              aria-label={brandAction.hint ? `${identityTitle}, ${brandAction.hint}` : identityTitle}
+      <aside className={styles.rail} onFocusCapture={handleRailFocusCapture}>
+        <div className={styles.railTop}>
+          {railHeaderAction ? <div className={styles.railHeaderAction}>{railHeaderAction}</div> : null}
+          {rail ? <div className={styles.railContent}>{rail}</div> : null}
+        </div>
+
+        <div className={styles.railFooter}>
+          {brandAction ? (
+            <TvFocusZone
+              id={brandAction.zoneId}
+              orientation="vertical"
+              nextUp={brandAction.nextUp}
+              nextRight={brandAction.nextRight}
+              nextDown={brandAction.nextDown}
             >
+              <TvFocusItem
+                id={brandAction.itemId}
+                className={styles.brandButton}
+                onActivate={brandAction.onActivate}
+                aria-label={brandAction.hint ? `${identityTitle}, ${brandAction.hint}` : identityTitle}
+              >
+                {profileAvatar ? (
+                  <img src={profileAvatar} alt={identityTitle} className={styles.brandImage} />
+                ) : user || selectedProfile ? (
+                  <div className={styles.identityIcon} aria-hidden="true">
+                    <UserRound size={24} />
+                  </div>
+                ) : (
+                  <img src={ZENTRIO_LOGO_192_URL} alt="Zentrio" className={styles.brandImage} />
+                )}
+                <div className={styles.brandText}>
+                  <div className={styles.brandTitle}>{identityTitle}</div>
+                </div>
+                {brandAction.hint ? <span className={styles.brandHint}>{brandAction.hint}</span> : null}
+              </TvFocusItem>
+            </TvFocusZone>
+          ) : (
+            <div className={styles.brand}>
               {profileAvatar ? (
                 <img src={profileAvatar} alt={identityTitle} className={styles.brandImage} />
               ) : user || selectedProfile ? (
@@ -109,30 +145,12 @@ export function TvPageScaffold({
               <div className={styles.brandText}>
                 <div className={styles.brandTitle}>{identityTitle}</div>
               </div>
-              {brandAction.hint ? <span className={styles.brandHint}>{brandAction.hint}</span> : null}
-            </TvFocusItem>
-          </TvFocusZone>
-        ) : (
-          <div className={styles.brand}>
-            {profileAvatar ? (
-              <img src={profileAvatar} alt={identityTitle} className={styles.brandImage} />
-            ) : user || selectedProfile ? (
-              <div className={styles.identityIcon} aria-hidden="true">
-                <UserRound size={24} />
-              </div>
-            ) : (
-              <img src={ZENTRIO_LOGO_192_URL} alt="Zentrio" className={styles.brandImage} />
-            )}
-            <div className={styles.brandText}>
-              <div className={styles.brandTitle}>{identityTitle}</div>
             </div>
-          </div>
-        )}
-        {railHeaderAction ? <div className={styles.railHeaderAction}>{railHeaderAction}</div> : null}
-        {rail ? <div className={styles.railContent}>{rail}</div> : null}
+          )}
+        </div>
       </aside>
 
-      <main className={styles.main}>
+      <main className={styles.main} data-tv-page-main="true" onFocusCapture={handleMainFocusCapture}>
         {!hideHeader ? (
           <header className={styles.header}>
             <div className={styles.headerCopy}>

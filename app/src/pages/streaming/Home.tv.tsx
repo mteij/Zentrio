@@ -8,6 +8,15 @@ import type { HomeScreenModel, HomeTvItem } from './Home.model'
 import { StreamingTvScaffold } from './StreamingTvScaffold'
 import styles from './Home.tv.module.css'
 
+function scrollTvPageTop() {
+  if (typeof document === 'undefined') return
+
+  document.querySelector<HTMLElement>('[data-tv-page-main="true"]')?.scrollTo({
+    top: 0,
+    behavior: 'smooth',
+  })
+}
+
 export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
   if (model.status === 'loading') {
     return (
@@ -42,7 +51,6 @@ export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
     <StreamingTvScaffold
       profileId={model.profileId}
       activeNav="home"
-      expandedRail
       title={model.profileName}
       initialZoneId={initialZoneId}
       onBack={() => model.navigation.goToPath('/profiles')}
@@ -79,6 +87,7 @@ export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
                 <TvFocusItem
                   id="home-hero-play"
                   className={styles.heroAction}
+                  onFocus={scrollTvPageTop}
                   onActivate={() => {
                     if (model.showTrendingHero) {
                       model.navigation.openMeta(heroItem.type, heroItem.id)
@@ -100,6 +109,7 @@ export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
                 <TvFocusItem
                   id="home-hero-info"
                   className={styles.heroActionSecondary}
+                  onFocus={scrollTvPageTop}
                   onActivate={() => model.navigation.openMeta(heroItem.type, heroItem.id)}
                 >
                   <Info size={18} />
@@ -113,6 +123,7 @@ export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
 
       {hasContinueWatching ? (
         <TvMediaShelf<HomeTvItem>
+          profileId={model.profileId}
           title="Continue Watching"
           zoneId="home-continue"
           items={model.continueWatchingItems}
@@ -121,6 +132,7 @@ export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
           nextLeft="streaming-rail"
           nextUp={hasHero ? 'home-hero-actions' : 'streaming-rail'}
           nextDown={firstCatalogZoneId}
+          focusAction="play"
           onActivate={(item) => model.navigation.startContinueWatching(item)}
         />
       ) : null}
@@ -141,6 +153,7 @@ export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
         return (
           <TvMediaShelf
             key={`${metadata.manifestUrl}-${metadata.catalog.type}-${metadata.catalog.id}`}
+            profileId={model.profileId}
             title={metadata.title}
             zoneId={zoneId}
             queryKey={['tv-home-catalog', model.profileId, metadata.manifestUrl, metadata.catalog.type, metadata.catalog.id]}

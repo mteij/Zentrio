@@ -8,9 +8,10 @@ interface TmdbSettingsProps {
   apiKey: string
   isConfigured: boolean
   onUpdate: (clearKey?: boolean, keyValue?: string) => Promise<void>
+  usesSharedKeyByDefault?: boolean
 }
 
-export function TmdbSettings({ apiKey, isConfigured, onUpdate }: TmdbSettingsProps) {
+export function TmdbSettings({ apiKey, isConfigured, onUpdate, usesSharedKeyByDefault = true }: TmdbSettingsProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [keyInput, setKeyInput] = useState('')
 
@@ -29,7 +30,9 @@ export function TmdbSettings({ apiKey, isConfigured, onUpdate }: TmdbSettingsPro
       <div className="flex-1 pr-8">
         <h3 className="text-lg font-medium text-white mb-1">TMDB API Key (Optional)</h3>
         <p className="text-sm text-zinc-400 max-w-xl">
-          Zentrio uses a shared API key by default. Add your own key only if you experience rate limiting.{' '}
+          {usesSharedKeyByDefault
+            ? 'Zentrio uses a shared API key by default. Add your own key only if you experience rate limiting. '
+            : 'Add your own TMDB API key if this server does not provide one or if you want to use your own quota. '}
           <a 
             href="https://www.themoviedb.org/settings/api" 
             target="_blank" 
@@ -51,7 +54,7 @@ export function TmdbSettings({ apiKey, isConfigured, onUpdate }: TmdbSettingsPro
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-700/50 text-zinc-300 border border-white/10">
-                Using shared key
+                {usesSharedKeyByDefault ? 'Using shared key' : 'No personal key'}
               </span>
             )}
             <Button 

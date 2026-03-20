@@ -1,35 +1,47 @@
----
-layout: home
+# Overview
 
-hero:
-  name: Zentrio
-  text: Self-hosted streaming across web and native clients
-  tagline: Profiles, addons, Trakt sync, admin tools, and native downloads from one codebase.
-  image:
-    src: /icon-512.png
-    alt: Zentrio
-  actions:
-    - theme: brand
-      text: Start Self-Hosting
-      link: /self-hosting
-    - theme: alt
-      text: Using Zentrio
-      link: /usage
-    - theme: alt
-      text: GitHub
-      link: https://github.com/Mteij/Zentrio
+Zentrio is a self-hosted streaming platform. These docs are primarily for people running their own instance and for contributors working in the repository.
 
-features:
-  - title: Multi-profile by design
-    details: Keep watch history, filters, streaming settings, and appearance preferences separate per profile.
-  - title: Addon-first streaming
-    details: Use Stremio-compatible addons, reorder sources, and mix the built-in TMDB addon with third-party manifests.
-  - title: Native where it matters
-    details: Desktop and mobile builds use Tauri, including native auth flows, local-first reads, and offline downloads.
-  - title: Admin and observability
-    details: Claim a superadmin, review audit logs, inspect health stats, and track aggregate platform usage.
-  - title: Flexible auth
-    details: Email/password, magic links, OTP, 2FA, and optional SSO providers are all built into the same backend.
-  - title: Self-hosted friendly
-    details: Bun, SQLite, Docker, and a single root `.env` keep local and small-server deployments straightforward.
----
+## Recommended Path
+
+1. Start with [Self Hosting](/self-hosting/) to understand the deployment flow.
+2. Follow [Installation](/self-hosting/installation) to get your first instance online.
+3. Use [Configuration](/self-hosting/configuration) to set secrets, URLs, email, and integrations.
+4. Review [Operations](/self-hosting/operations) before inviting other users.
+5. Use the [User Guide](/guide/) to understand accounts, profiles, addons, and clients.
+6. Open [Development](/development/) if you are modifying the codebase.
+
+## What You Need To Self-Host
+
+- A machine that can run Docker or Bun
+- A TMDB API key
+- Secrets for `AUTH_SECRET` and `ENCRYPTION_KEY`
+- A public URL and reverse proxy for a production deployment
+
+## Main Guides
+
+### [Self Hosting](/self-hosting/)
+
+Deployment, configuration, operations, reverse proxy, and SSO guidance.
+
+### [User Guide](/guide/)
+
+Accounts, profiles, addons, connected mode, native clients, and downloads.
+
+### [Development](/development/)
+
+Monorepo structure, local setup, and application architecture.
+
+### [Contributing](/contributing)
+
+Contribution workflow and repository expectations.
+
+## Official Hosted Service
+
+If you want to evaluate Zentrio before deploying your own server, use [Zentrio Web](https://zentrio.eu/web). That handoff page makes it clear when you are leaving the docs and opening the official hosted service.
+
+The live API reference for the official hosted service is available at [app.zentrio.eu/api/docs](https://app.zentrio.eu/api/docs).
+
+## Note for Self-Hosters
+
+The official hosted-service legal pages do not automatically apply to independently operated self-hosted deployments. If you run Zentrio for other people, you may need your own terms, privacy notice, and account-deletion process.

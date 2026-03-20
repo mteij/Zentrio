@@ -45,6 +45,7 @@
 
 .posterShell {
   position: relative;
+  overflow: hidden;
 }
 
 .poster {
@@ -90,6 +91,43 @@
   top: 8px;
   right: 8px;
   color: #f5c518;
+}
+
+.posterActionOverlay {
+  position: absolute;
+  inset: auto 10px 10px 10px;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity var(--transition-smooth),
+    transform var(--transition-smooth);
+}
+
+.card[data-tv-active='true'] .posterActionOverlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.posterActionPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(5, 7, 10, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+}
+
+.posterActionPrimary {
+  background: rgba(255, 255, 255, 0.96);
+  color: #0d0f12;
 }
 
 .body {

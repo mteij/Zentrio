@@ -4,6 +4,7 @@ import { apiFetch } from '../../lib/apiFetch'
 import { useAuthStore } from '../../stores/authStore'
 import styles from '../../styles/Settings.module.css'
 import { createLogger } from '../../utils/client-logger'
+import { HostedServiceLegalNotice } from '../legal/HostedServiceLegalNotice'
 import { Button, ConfirmDialog, InputDialog } from '../index'
 
 const log = createLogger('DangerZone')
@@ -57,6 +58,7 @@ export function DangerZoneSettings() {
             <div className="flex-1 pr-4">
                 <h3 className="text-lg font-medium text-white mb-1">Delete Account</h3>
                 <p className="text-sm text-zinc-400">Permanently delete your account and all associated data. This action cannot be undone.</p>
+                <HostedServiceLegalNotice className="mt-3" align="left" showAccountDeletion />
             </div>
             <div className="flex items-center gap-4 shrink-0">
                 <Button variant="danger" onClick={handleDeleteRequest}>

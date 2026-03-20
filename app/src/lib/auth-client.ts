@@ -57,6 +57,14 @@ export const getServerUrl = () => {
   return window.location.origin;
 };
 
+export function isOfficialZentrioServer(serverUrl = getServerUrl()): boolean {
+  try {
+    return new URL(serverUrl).hostname === 'app.zentrio.eu';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Get the client URL for OAuth callback redirects.
  * This ensures SSO redirects back to the frontend, not the API server.

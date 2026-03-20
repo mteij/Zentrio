@@ -55,6 +55,11 @@ export function useStreamLoader(): UseStreamLoaderResult {
   const flushRafRef = useRef<number | null>(null)
   const firstPlayableAppliedRef = useRef(false)
   const loadIdRef = useRef(0)
+
+  // Batched addon status updates — accumulate changes in a ref, flush once per frame
+  const addonStatusesRef = useRef<Map<string, AddonLoadingState>>(new Map())
+  const statusDirtyRef = useRef(false)
+  const statusFlushRafRef = useRef<number | null>(null)
   
   // Store last request params for refresh
   const lastRequestRef = useRef<{
@@ -78,6 +83,10 @@ export function useStreamLoader(): UseStreamLoaderResult {
         cancelAnimationFrame(flushRafRef.current)
         flushRafRef.current = null
       }
+      if (statusFlushRafRef.current !== null) {
+        cancelAnimationFrame(statusFlushRafRef.current)
+        statusFlushRafRef.current = null
+      }
     }
   }, [])
 
@@ -96,13 +105,32 @@ export function useStreamLoader(): UseStreamLoaderResult {
     flushRafRef.current = requestAnimationFrame(flushPendingStreams)
   }, [flushPendingStreams])
 
+  // Flush accumulated addon status changes in one setState call
+  const flushPendingStatuses = useCallback(() => {
+    statusFlushRafRef.current = null
+    if (!statusDirtyRef.current) return
+    statusDirtyRef.current = false
+    setAddonStatuses(new Map(addonStatusesRef.current))
+  }, [])
+
+  const scheduleStatusFlush = useCallback(() => {
+    if (statusFlushRafRef.current !== null) return
+    statusFlushRafRef.current = requestAnimationFrame(flushPendingStatuses)
+  }, [flushPendingStatuses])
+
   const reset = useCallback(() => {
     resolverRef.current?.cancel()
     if (flushRafRef.current !== null) {
       cancelAnimationFrame(flushRafRef.current)
       flushRafRef.current = null
     }
+    if (statusFlushRafRef.current !== null) {
+      cancelAnimationFrame(statusFlushRafRef.current)
+      statusFlushRafRef.current = null
+    }
     pendingStreamsRef.current = null
+    addonStatusesRef.current = new Map()
+    statusDirtyRef.current = false
     firstPlayableAppliedRef.current = false
     setStreams([])
     setAddonStatuses(new Map())
@@ -131,7 +159,13 @@ export function useStreamLoader(): UseStreamLoaderResult {
       cancelAnimationFrame(flushRafRef.current)
       flushRafRef.current = null
     }
+    if (statusFlushRafRef.current !== null) {
+      cancelAnimationFrame(statusFlushRafRef.current)
+      statusFlushRafRef.current = null
+    }
     pendingStreamsRef.current = null
+    addonStatusesRef.current = new Map()
+    statusDirtyRef.current = false
     firstPlayableAppliedRef.current = false
     
     // Store request params for potential refresh
@@ -166,30 +200,26 @@ export function useStreamLoader(): UseStreamLoaderResult {
       },
       onAddonStart: ({ addon }) => {
         if (isStale()) return
-        setAddonStatuses(prev => {
-          const next = new Map(prev)
-          next.set(addon.id, {
-            id: addon.id,
-            name: addon.name,
-            logo: addon.logo,
-            status: 'loading'
-          })
-          return next
+        addonStatusesRef.current.set(addon.id, {
+          id: addon.id,
+          name: addon.name,
+          logo: addon.logo,
+          status: 'loading'
         })
+        statusDirtyRef.current = true
+        scheduleStatusFlush()
       },
       onAddonResult: (data) => {
         if (isStale()) return
-        setAddonStatuses(prev => {
-          const next = new Map(prev)
-          next.set(data.addon.id, {
-            id: data.addon.id,
-            name: data.addon.name,
-            logo: data.addon.logo,
-            status: 'done',
-            streamCount: data.count
-          })
-          return next
+        addonStatusesRef.current.set(data.addon.id, {
+          id: data.addon.id,
+          name: data.addon.name,
+          logo: data.addon.logo,
+          status: 'done',
+          streamCount: data.count
         })
+        statusDirtyRef.current = true
+        scheduleStatusFlush()
 
         if (data.allStreams) {
           firstPlayableAppliedRef.current = true
@@ -222,17 +252,15 @@ export function useStreamLoader(): UseStreamLoaderResult {
           description: isTimeout ? 'Request timed out' : errorMsg
         })
 
-        setAddonStatuses(prev => {
-          const next = new Map(prev)
-          next.set(data.addon.id, {
-            id: data.addon.id,
-            name: data.addon.name,
-            logo: data.addon.logo,
-            status: 'error',
-            error: data.error
-          })
-          return next
+        addonStatusesRef.current.set(data.addon.id, {
+          id: data.addon.id,
+          name: data.addon.name,
+          logo: data.addon.logo,
+          status: 'error',
+          error: data.error
         })
+        statusDirtyRef.current = true
+        scheduleStatusFlush()
       },
       onComplete: (data) => {
         if (isStale()) return
@@ -245,6 +273,16 @@ export function useStreamLoader(): UseStreamLoaderResult {
           pendingStreamsRef.current = null
           setStreams(data.allStreams)
           setTotalCount(data.totalCount || data.allStreams.length)
+        }
+
+        // Flush any pending status updates immediately rather than waiting for next frame
+        if (statusFlushRafRef.current !== null) {
+          cancelAnimationFrame(statusFlushRafRef.current)
+          statusFlushRafRef.current = null
+        }
+        if (statusDirtyRef.current) {
+          statusDirtyRef.current = false
+          setAddonStatuses(new Map(addonStatusesRef.current))
         }
 
         setCacheStatus(prev => prev ? { ...prev, fromCache: data.fromCache } : prev)
@@ -269,7 +307,7 @@ export function useStreamLoader(): UseStreamLoaderResult {
       setIsLoading(false)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheduleStreamsUpdate])
+  }, [scheduleStreamsUpdate, scheduleStatusFlush])
 
   // Refresh function - reloads with cache bypass
   const refreshStreams = useCallback(() => {

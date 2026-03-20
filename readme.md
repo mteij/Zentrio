@@ -12,7 +12,7 @@
 
   <p>
     <a href="https://zentrio.eu"><strong>Website</strong></a> |
-    <a href="https://app.zentrio.eu"><strong>Public Instance</strong></a> |
+    <a href="https://zentrio.eu/web"><strong>Zentrio Web</strong></a> |
     <a href="https://zentrio.eu/releases"><strong>Downloads</strong></a> |
     <a href="https://docs.zentrio.eu"><strong>Docs</strong></a> |
     <a href="https://github.com/Mteij/Zentrio/issues"><strong>Issues</strong></a>
@@ -29,7 +29,9 @@
   </p>
 </div>
 
-> Try it before you self-host: use the [public instance](https://app.zentrio.eu).
+> Try it before you self-host: open [Zentrio Web](https://zentrio.eu/web), which redirects to the official hosted service and links its terms and privacy policy.
+
+> Running a self-hosted Zentrio server for other people? The official hosted-service legal pages do not automatically apply to your deployment.
 
 ## What Zentrio Is
 
@@ -143,7 +145,7 @@ bun run lint
 bun run tauri:dev
 ```
 
-The shared `.env` file lives in the repository root, not inside `app/`. For deeper setup details, see [docs/development.md](docs/development.md).
+The shared `.env` file lives in the repository root, not inside `app/`. For deeper setup details, see [docs/development/local-setup.md](docs/development/local-setup.md).
 
 ## Architecture
 

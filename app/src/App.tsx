@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, usePa
 import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
-import { compress, decompress } from 'lz-string'
 import { Toaster } from 'sonner'
 import { ErrorBoundary, TitleBar, ScrollToTop } from './components'
 import { SplashScreen } from './components'
@@ -79,15 +78,18 @@ const queryClient = new QueryClient({
   },
 })
 
-// Persist the query cache to localStorage with lz-string compression.
+// Persist the query cache to localStorage.
 // This lets all platforms (web, desktop, mobile, TV) show stale data immediately
 // on reconnect or cold-start instead of loading spinners.
 // Queries can opt out with meta: { persist: false } (e.g. auth session, admin endpoints).
+//
+// Note: lz-string compression was removed — it ran synchronously on the main thread
+// on every cache write, causing noticeable jank on page loads.
+// The raw JSON is a few hundred KB at most, well within localStorage limits.
 const queryPersister = createSyncStoragePersister({
   storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-  serialize: (client) => compress(JSON.stringify(client)),
-  deserialize: (str) => JSON.parse(decompress(str)),
   key: 'zentrio-query-cache',
+  throttleTime: 3000, // write at most once per 3 s to reduce main-thread pressure
 })
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
@@ -628,7 +630,7 @@ export default function App() {
         client={queryClient}
         persistOptions={{
           persister: queryPersister,
-          maxAge: 1000 * 60 * 60 * 24, // 24 hours
+          maxAge: 1000 * 60 * 60 * 4, // 4 hours
           buster: __APP_VERSION__,
           dehydrateOptions: {
             shouldDehydrateQuery: (query) => {

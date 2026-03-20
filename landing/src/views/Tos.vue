@@ -1,192 +1,161 @@
 <template>
-  <div class="tos-view">
-    <div class="container">
-      <header class="page-header">
-        <h1 class="page-title">Terms of Service</h1>
-        <p class="page-subtitle">
-          Effective as of {{ currentDate }}.
-        </p>
-      </header>
-
-      <section class="tos-content">
-        <div class="tos-section">
-          <h2>1. Basic Concepts</h2>
-          <p>
-            Welcome to Zentrio. These General Terms and Conditions cover the Zentrio owned and operated websites, including <strong>zentrio.eu</strong>, our web application at <strong>app.zentrio.eu</strong>, our native applications, and any services offered by Zentrio (collectively, the “Services”).
-          </p>
-          <p>
-            By accessing or using our Services, you agree to be bound by these Terms. If you do not agree to these Terms, please do not use our Services.
-          </p>
-        </div>
-
-        <div class="tos-section">
-          <h2>2. Description of Service</h2>
-          <p>
-            Zentrio is a modern, self-hosted streaming platform. It allows users to manage multiple profiles, sync states across devices, and seamlessly install Stremio-compatible addons for accessing content. Zentrio acts as a metadata catalogue and platform; we do not host, provide, or upload any streamable content ourselves unless explicitly stated.
-          </p>
-          <p>
-            The addons used within Zentrio are developed either by the core team or by independent third-party developers (Community Addons). We are not responsible for the content provided by third-party addons.
-          </p>
-        </div>
-
-        <div class="tos-section">
-          <h2>3. Open Source & Licensing</h2>
-          <p>
-            Zentrio is open-source software. Our source code is publicly available on GitHub. You are free to view, modify, and contribute to the project in accordance with our open-source license.
-          </p>
-          <p>
-            However, the Zentrio brand, logos, and specific website designs remain the intellectual property of the Zentrio team. 
-          </p>
-        </div>
-
-         <div class="tos-section">
-           <h2>4. User Responsibilities</h2>
-           <p>
-             As a user of Zentrio, you are responsible for:
-           </p>
-           <ul>
-             <li>Ensuring that your use of the Services, including any third-party addons you install, complies with the laws and regulations of your country of residence.</li>
-             <li>Maintaining the security and confidentiality of your Zentrio profiles and server instances (if self-hosting).</li>
-             <li>Not using the Services for any unlawful, infringing, or fraudulent activities.</li>
-           </ul>
-         </div>
-
-        <div class="tos-section">
-          <h2>5. Privacy and Security</h2>
-          <p>
-            We take privacy and security seriously. For users on our public instances, we only store the minimum necessary data to provide functionality like profile synchronization and watch history. We do not sell your data.
-          </p>
-          <p>
-            Since Zentrio can be self-hosted, you have complete ownership and control over your data if you choose to host your own instance of the backend. 
-          </p>
-        </div>
-
-        <div class="tos-section">
-          <h2>6. Limitation of Liability</h2>
-          <p>
-            The Services are provided "as is" and "as available". Zentrio disclaims any warranties, express or implied, including warranties of merchantability, fitness for a particular purpose, and non-infringement.
-          </p>
-          <p>
-            In no event shall Zentrio, its developers, or contributors be liable for any direct, indirect, incidental, special, or consequential damages arising out of the use of or inability to use the Services.
-          </p>
-        </div>
-
-        <div class="tos-section">
-          <h2>7. Changes to the Terms</h2>
-          <p>
-            We reserve the right to modify these Terms at any time. Any changes will be effective immediately upon posting on this page. Your continued use of the Services after changes are posted constitutes your acceptance of the new Terms.
-          </p>
-        </div>
-        
-        <div class="tos-section">
-          <h2>8. Contact</h2>
-          <p>
-            If you have any questions or concerns about these Terms, you can reach out to us via our GitHub repository or community channels.
-          </p>
-        </div>
-      </section>
+  <LegalPageLayout title="Terms of Service">
+    <div class="legal-section">
+      <h2>1. Who These Terms Apply To</h2>
+      <p>
+        These Terms of Service apply to the official Zentrio websites operated by
+        <strong>{{ legalMeta.operatorName }}</strong>, including
+        <strong>{{ websiteHost }}</strong>, the hosted application at
+        <strong>{{ appHost }}</strong>, and the official companion apps when they
+        are used with those official services.
+      </p>
+      <p>
+        They do not automatically apply to self-hosted Zentrio deployments run by
+        you or by another third party. Operators of self-hosted instances are
+        responsible for publishing and enforcing their own terms.
+      </p>
     </div>
-  </div>
+
+    <div class="legal-section">
+      <h2>2. Description of the Hosted Service</h2>
+      <p>
+        Zentrio is software for organizing media libraries, profiles, playback
+        state, metadata, and related integrations across devices. The official
+        hosted service may provide account management, synchronization, profile
+        configuration, authentication, and access to app features that depend on
+        the official infrastructure.
+      </p>
+      <p>
+        Zentrio is also distributed as self-hostable software. Availability,
+        performance, and features may differ between the official hosted service
+        and self-hosted deployments.
+      </p>
+    </div>
+
+    <div class="legal-section">
+      <h2>3. Accounts and Access</h2>
+      <p>
+        You may need an account to use parts of the hosted service. You are
+        responsible for maintaining the security of your account credentials and
+        for activity that occurs through your account.
+      </p>
+      <p>
+        You must provide accurate information when creating an account and keep it
+        reasonably up to date. We may suspend or restrict access if we reasonably
+        believe an account is being used unlawfully, fraudulently, abusively, or
+        in a way that threatens the security or reliability of the service.
+      </p>
+    </div>
+
+    <div class="legal-section">
+      <h2>4. Acceptable Use</h2>
+      <p>
+        You may not use the hosted service to violate applicable law, infringe the
+        rights of others, interfere with the service, bypass technical
+        restrictions, or distribute malware or abusive traffic.
+      </p>
+      <ul>
+        <li>Do not use the service for unlawful, infringing, or fraudulent activity.</li>
+        <li>Do not attempt to reverse engineer, disrupt, overload, or probe the hosted infrastructure in a harmful way.</li>
+        <li>Do not use shared or third-party addons, integrations, or content sources in a way that violates the rights of others or the rules that govern those services.</li>
+      </ul>
+    </div>
+
+    <div class="legal-section">
+      <h2>5. Third-Party Services, Addons, and Content Sources</h2>
+      <p>
+        Zentrio can interoperate with third-party identity providers, metadata
+        providers, addons, integrations, and externally operated content sources.
+        Those services are independent from the official Zentrio hosted service.
+      </p>
+      <p>
+        We do not control and are not responsible for the availability, legality,
+        accuracy, security, or policies of third-party services or community-made
+        addons. Your use of them is at your own risk and may be subject to
+        separate terms and privacy policies.
+      </p>
+    </div>
+
+    <div class="legal-section">
+      <h2>6. Intellectual Property and Open Source</h2>
+      <p>
+        The Zentrio source code is made available under the open-source license
+        published in the repository. Those license terms govern your use of the
+        codebase itself.
+      </p>
+      <p>
+        These hosted-service Terms govern the official service experience, not the
+        underlying open-source license. Branding, hosted infrastructure, site
+        content, and service operations may be subject to additional rights
+        reserved by their respective owners.
+      </p>
+    </div>
+
+    <div class="legal-section">
+      <h2>7. Privacy</h2>
+      <p>
+        Our handling of personal data for the official hosted service is described
+        in the
+        <a :href="legalMeta.privacyUrl">Privacy Policy</a>. If you use a
+        self-hosted Zentrio server, the operator of that server is responsible for
+        its privacy practices.
+      </p>
+    </div>
+
+    <div class="legal-section">
+      <h2>8. Suspension, Termination, and Availability</h2>
+      <p>
+        We may suspend, restrict, or terminate access to the hosted service if
+        necessary to protect users, comply with law, address abuse, or maintain
+        the security and integrity of the service.
+      </p>
+      <p>
+        We do not guarantee uninterrupted availability of the hosted service or of
+        any third-party integration. Features may change, be discontinued, or be
+        unavailable in some regions, environments, or deployments.
+      </p>
+    </div>
+
+    <div class="legal-section">
+      <h2>9. Disclaimers and Limitation of Liability</h2>
+      <p>
+        The hosted service is provided on an "as is" and "as available" basis to
+        the maximum extent permitted by applicable law. We disclaim warranties of
+        merchantability, fitness for a particular purpose, and non-infringement.
+      </p>
+      <p>
+        To the maximum extent permitted by law, the Zentrio project maintainers
+        and contributors are not liable for indirect, incidental, consequential,
+        special, exemplary, or punitive damages, or for loss of data, profits,
+        goodwill, or business interruption arising from or related to the hosted
+        service.
+      </p>
+    </div>
+
+    <div class="legal-section">
+      <h2>10. Changes to These Terms</h2>
+      <p>
+        We may update these Terms from time to time. When we do, we will publish
+        the revised version on this page and update the effective date above.
+        Continued use of the hosted service after an update becomes effective means
+        you accept the revised Terms.
+      </p>
+    </div>
+
+    <div class="legal-section">
+      <h2>11. Contact</h2>
+      <p>
+        Questions about these Terms can be sent to
+        <a :href="legalMeta.contactEmailHref">{{ legalMeta.contactEmail }}</a>.
+      </p>
+    </div>
+  </LegalPageLayout>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import LegalPageLayout from "../components/LegalPageLayout.vue";
+import { legalMeta } from "../legal";
 
-const currentDate = computed(() => {
-  return new Date().toLocaleDateString('en-US', {
-    dateStyle: 'long'
-  });
-});
+const websiteHost = new URL(legalMeta.websiteUrl).host;
+const appHost = new URL(legalMeta.webAppUrl).host;
 </script>
-
-<style scoped>
-.tos-view {
-  padding-top: 120px;
-  padding-bottom: 80px;
-  min-height: 100vh;
-}
-
-.page-header {
-  text-align: center;
-  margin-bottom: 60px;
-}
-
-.page-title {
-  font-size: 3.5rem;
-  font-weight: 800;
-  margin-bottom: 16px;
-  letter-spacing: -0.03em;
-}
-
-.page-subtitle {
-  color: var(--text-muted);
-  font-size: 1.2rem;
-}
-
-.tos-content {
-  background: var(--bg-alt);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 40px;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.tos-section {
-  margin-bottom: 40px;
-}
-
-.tos-section:last-child {
-  margin-bottom: 0;
-}
-
-.tos-section h2 {
-  font-size: 1.8rem;
-  margin-bottom: 16px;
-  color: var(--text);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
-}
-
-.tos-section p {
-  color: var(--text-muted);
-  margin-bottom: 16px;
-  font-size: 1.05rem;
-  line-height: 1.7;
-}
-
-.tos-section p:last-child {
-  margin-bottom: 0;
-}
-
-.tos-section ul {
-  padding-left: 24px;
-  margin-top: 12px;
-  margin-bottom: 16px;
-  color: var(--text-muted);
-  font-size: 1.05rem;
-  line-height: 1.7;
-}
-
-.tos-section li {
-  margin-bottom: 8px;
-}
-
-.tos-section strong {
-  color: var(--text);
-}
-
-@media (max-width: 768px) {
-  .page-title {
-    font-size: 2.8rem;
-  }
-
-  .tos-content {
-    padding: 24px;
-  }
-
-  .tos-section h2 {
-    font-size: 1.5rem;
-  }
-}
-</style>

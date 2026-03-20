@@ -1,0 +1,68 @@
+.dialogContent {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.poster {
+  width: 150px;
+  aspect-ratio: 0.68;
+  border-radius: 22px;
+  background-size: cover;
+  background-position: center top;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.copy {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.44);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.7rem;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.description {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.actions {
+  margin-top: 0.25rem;
+}
+
+.actionButton {
+  min-width: 11rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.95rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-weight: 700;
+}
+
+.actionPrimary {
+  background: #fff;
+  color: #0d0f12;
+}

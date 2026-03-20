@@ -221,14 +221,89 @@ app.use('*', async (c, next) => {
   await next()
 })
 
+const rootStaticTypeMap: Record<string, string> = {
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.txt': 'text/plain; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.webp': 'image/webp',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.xml': 'application/xml; charset=utf-8',
+}
+
+async function resolveRootStaticPath(reqPath: string): Promise<string | null> {
+  const relativePath = reqPath.replace(/^\/+/, '')
+
+  if (!relativePath || relativePath.includes('..') || relativePath.includes('\\')) {
+    return null
+  }
+
+  const distPath = join(process.cwd(), 'dist', relativePath)
+  // @ts-ignore: runtime typing gap
+  if (await Bun.file(distPath).exists()) {
+    return distPath
+  }
+
+  const publicPath = join(process.cwd(), 'public', relativePath)
+  // @ts-ignore: runtime typing gap
+  if (await Bun.file(publicPath).exists()) {
+    return publicPath
+  }
+
+  return null
+}
+
+async function serveRootStaticAsset(reqPath: string, cacheControl = 'public, max-age=3600'): Promise<Response | null> {
+  const ext = extname(reqPath).toLowerCase()
+
+  if (!ext) {
+    return null
+  }
+
+  const filePath = await resolveRootStaticPath(reqPath)
+
+  if (!filePath) {
+    return null
+  }
+
+  // @ts-ignore: runtime typing gap
+  const file = Bun.file(filePath)
+  const contentType = rootStaticTypeMap[ext] || 'application/octet-stream'
+
+  return new Response(file, {
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': cacheControl,
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+      'Accept-Ranges': 'bytes',
+    },
+  })
+}
+
 
 
 // Serve bundled assets (JS/CSS) from Vite build
 app.get('/assets/*', async (c) => {
   const reqPath = c.req.path.replace(/^\/assets\//, '')
-  // @ts-ignore: runtime typing gap
-  const filePath = join(import.meta.dir, 'assets', reqPath)
   try {
+    const distPath = join(process.cwd(), 'dist', 'assets', reqPath)
+    const bundledPath = join(import.meta.dir, 'assets', reqPath)
+
+    let filePath = distPath
+
+    // @ts-ignore: runtime typing gap
+    if (!(await Bun.file(distPath).exists())) {
+      filePath = bundledPath
+    }
+
     // @ts-ignore: runtime typing gap
     const file = Bun.file(filePath)
     const typeMap: Record<string, string> = {
@@ -339,19 +414,28 @@ app.get('/favicon.ico', async (_c) => {
 })
 
 // Service worker (legacy clients may still request /sw.js?v=...)
-// Serve the unregistering SW from /static/sw.js and disable caching to speed up removal/updates.
+// Prefer the generated PWA worker in dist/, but fall back to the legacy cleanup worker.
 app.get('/sw.js', async () => {
   try {
-    // Try dist/static first (production/Docker), then public/static (development)
-    // @ts-ignore: runtime typing gap
-    const distPath = join(process.cwd(), 'dist', 'static', 'sw.js')
-    // @ts-ignore: runtime typing gap
-    const publicPath = join(process.cwd(), 'public', 'static', 'sw.js')
+    const candidatePaths = [
+      join(process.cwd(), 'dist', 'sw.js'),
+      join(process.cwd(), 'public', 'sw.js'),
+      join(process.cwd(), 'dist', 'static', 'sw.js'),
+      join(process.cwd(), 'public', 'static', 'sw.js'),
+    ]
 
-    let filePath = distPath
-    // @ts-ignore: runtime typing gap
-    if (!(await Bun.file(distPath).exists())) {
-      filePath = publicPath
+    let filePath: string | null = null
+
+    for (const candidatePath of candidatePaths) {
+      // @ts-ignore: runtime typing gap
+      if (await Bun.file(candidatePath).exists()) {
+        filePath = candidatePath
+        break
+      }
+    }
+
+    if (!filePath) {
+      return new Response('Not Found', { status: 404 })
     }
 
     // @ts-ignore: runtime typing gap
@@ -413,6 +497,16 @@ app.get('*', async (c) => {
   }
 
   try {
+    const rootStaticAsset = await serveRootStaticAsset(c.req.path)
+
+    if (rootStaticAsset) {
+      return rootStaticAsset
+    }
+
+    if (extname(c.req.path)) {
+      return new Response('Not Found', { status: 404 })
+    }
+
     // Check for production build first using CWD
     const distPath = join(process.cwd(), 'dist', 'index.html')
     // @ts-ignore: runtime typing gap

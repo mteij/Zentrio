@@ -1691,6 +1691,7 @@
     transparent 100%
   );
   animation: shimmer 1.5s infinite;
+  will-change: transform;
 }
 
 /* Skeleton Card */

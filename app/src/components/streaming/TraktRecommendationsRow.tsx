@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { memo } from 'react'
 import { apiFetch } from '../../lib/apiFetch'
 import { StreamingRow } from '../index'
 
@@ -24,13 +25,13 @@ interface TraktRecommendationsRowProps {
   showAgeRatings?: boolean
 }
 
-export const TraktRecommendationsRow = ({
+export const TraktRecommendationsRow = memo(function TraktRecommendationsRow({
   profileId,
   type,
   title,
   showImdbRatings = true,
   showAgeRatings = true
-}: TraktRecommendationsRowProps) => {
+}: TraktRecommendationsRowProps) {
   const { data } = useQuery({
     queryKey: ['trakt-recommendations', profileId, type],
     queryFn: async () => {
@@ -38,7 +39,8 @@ export const TraktRecommendationsRow = ({
       const json = await res.json()
       return json.data as { items: TraktRecommendation[]; connected: boolean }
     },
-    staleTime: 1000 * 60 * 10, // 10 minutes
+    staleTime: 1000 * 60 * 10,  // 10 minutes
+    gcTime: 1000 * 60 * 30,     // 30 minutes — must be > staleTime or cache is GC'd while still "fresh"
     refetchOnWindowFocus: false
   })
 
@@ -73,6 +75,6 @@ export const TraktRecommendationsRow = ({
       profileId={profileId.toString()}
     />
   )
-}
+})
 
 export default TraktRecommendationsRow

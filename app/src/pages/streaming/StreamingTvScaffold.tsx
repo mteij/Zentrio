@@ -1,23 +1,20 @@
 import type { ReactNode } from 'react'
 import { Compass, Download, Home, Library, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { TvFocusItem, TvFocusZone, TvPageScaffold, type TvPageScaffoldProps } from '../../components/tv'
+import { TvPageScaffold, TvRailMenu, type TvPageScaffoldProps } from '../../components/tv'
 import { useOfflineDownloadCapability } from '../../hooks/useOfflineDownloadCapability'
-import styles from './StreamingTvScaffold.module.css'
 
 export type StreamingTvNavKey = 'home' | 'search' | 'explore' | 'library' | 'downloads'
 
 interface StreamingTvScaffoldProps extends Omit<TvPageScaffoldProps, 'rail' | 'railHeaderAction'> {
   profileId: string
   activeNav?: StreamingTvNavKey
-  expandedRail?: boolean
   children: ReactNode
 }
 
 export function StreamingTvScaffold({
   profileId,
   activeNav,
-  expandedRail = false,
   initialZoneId,
   children,
   ...props
@@ -41,40 +38,27 @@ export function StreamingTvScaffold({
     <TvPageScaffold
       {...props}
       initialZoneId={initialZoneId}
-      railMode={expandedRail ? 'expanded' : 'compact'}
+      railMode="adaptive"
       brandAction={{
         zoneId: 'streaming-profile-switch',
         itemId: 'streaming-profile-switch-button',
         onActivate: () => navigate('/profiles'),
+        nextUp: 'streaming-rail',
         nextRight: firstContentZoneId,
-        nextDown: 'streaming-rail',
-        hint: expandedRail ? 'Switch' : undefined,
       }}
       rail={(
-        <TvFocusZone
-          id="streaming-rail"
-          orientation="vertical"
-          nextUp="streaming-profile-switch"
+        <TvRailMenu
+          zoneId="streaming-rail"
+          nextDown="streaming-profile-switch"
           nextRight={firstContentZoneId}
-        >
-          {navItems.map((item, index) => {
-            const Icon = item.icon
-            const isActive = item.id === activeNav
-            return (
-              <TvFocusItem
-                key={item.id}
-                id={`streaming-rail-${item.id}`}
-                index={index}
-                className={`${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
-                onActivate={() => navigate(item.path)}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon size={20} />
-                {expandedRail ? <span className={styles.navLabel}>{item.label}</span> : null}
-              </TvFocusItem>
-            )
-          })}
-        </TvFocusZone>
+          items={navItems.map((item) => ({
+            id: item.id,
+            label: item.label,
+            icon: item.icon,
+            active: item.id === activeNav,
+            onActivate: () => navigate(item.path),
+          }))}
+        />
       )}
     >
       {children}

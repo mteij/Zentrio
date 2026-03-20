@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
 import { appMode } from '../../lib/app-mode'
-import { authClient, getClientUrl, isTauri } from '../../lib/auth-client'
+import { authClient, getClientUrl, isOfficialZentrioServer, isTauri } from '../../lib/auth-client'
 import { Button } from '../index'
 
 import styles from '../../styles/Settings.module.css'
@@ -37,6 +37,7 @@ export function GeneralSettings() {
   
   // Check if in guest mode
   const isGuestMode = appMode.isGuest()
+  const isOfficialServer = isOfficialZentrioServer()
   
   // Modals state
   const [showUsernameModal, setShowUsernameModal] = useState(false)
@@ -256,10 +257,11 @@ export function GeneralSettings() {
 
   return (
     <div className={styles.tabContent}>
-        {/* Update / Version Info at the top */}
-        <div className="mb-8">
+        {isOfficialServer ? (
+          <div className="mb-8">
             <UpdateSettings />
-        </div>
+          </div>
+        ) : null}
 
         <div className={styles.settingsCard}>
             <h2 className={styles.sectionTitle}>Account</h2>
@@ -359,6 +361,7 @@ export function GeneralSettings() {
             apiKey={tmdbApiKey}
             isConfigured={tmdbKeyConfigured}
             onUpdate={handleUpdateTmdbApiKey}
+            usesSharedKeyByDefault={isOfficialServer}
             />
 
             {/* Server Connection - only shown in Tauri/mobile apps */}

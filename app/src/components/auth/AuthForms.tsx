@@ -21,6 +21,7 @@ import { getLoginBehaviorRedirectPath, useLoginBehavior } from "../../hooks/useL
 import { useSessionDuration } from "../../hooks/useSessionDuration";
 import { useAuthStore } from "../../stores/authStore";
 import { createLogger } from '../../utils/client-logger';
+import { HostedServiceLegalNotice } from "../legal/HostedServiceLegalNotice";
 
 const log = createLogger('AuthForms')
 
@@ -440,6 +441,8 @@ export function AuthForms({ mode, onSuccess, redirectPathOverride }: AuthFormsPr
                   </p>
                 )}
               </div>
+
+              <HostedServiceLegalNotice className="mt-6" />
             </motion.div>
           ) : (
             <motion.div
@@ -681,6 +684,8 @@ export function AuthForms({ mode, onSuccess, redirectPathOverride }: AuthFormsPr
                   </p>
                 )}
               </div>
+
+              <HostedServiceLegalNotice className="mt-6" />
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,27 +1,33 @@
 .root {
+  --tv-rail-width-expanded: 220px;
+  --tv-rail-width-compact: 108px;
   height: 100dvh;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: var(--tv-rail-width-expanded) minmax(0, 1fr);
   overflow: hidden;
   background:
     radial-gradient(circle at top right, rgba(182, 25, 41, 0.2), transparent 34%),
     linear-gradient(180deg, #0b0b0d 0%, #101115 58%, #09090b 100%);
   color: #f7f7f7;
+  transition: grid-template-columns 220ms ease;
 }
 
 .expandedRail {
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: var(--tv-rail-width-expanded) minmax(0, 1fr);
 }
 
 .compactRail {
-  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-columns: var(--tv-rail-width-compact) minmax(0, 1fr);
+}
+
+.adaptiveRail {
+  transition: grid-template-columns 220ms ease;
 }
 
 .rail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
   position: sticky;
   top: 0;
   align-self: start;
@@ -33,17 +39,46 @@
   backdrop-filter: blur(20px);
   scrollbar-width: none;
   overscroll-behavior: none;
+  transition:
+    padding 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease;
 }
 
 .rail::-webkit-scrollbar {
   display: none;
 }
 
+.railTop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 0;
+}
+
+.railFooter {
+  margin-top: auto;
+  padding-top: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .brand {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 0 var(--space-3);
+  min-height: 60px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  transition:
+    width 220ms ease,
+    min-height 220ms ease,
+    padding 220ms ease,
+    border-radius 220ms ease;
 }
 
 .brandButton {
@@ -51,16 +86,26 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: 0.2rem var(--space-3);
-  border-radius: 18px;
-  border: 1px solid transparent;
-  background: transparent;
+  min-height: 60px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.02);
   color: inherit;
   text-align: left;
+  overflow: hidden;
+  transition:
+    width 220ms ease,
+    min-height 220ms ease,
+    padding 220ms ease,
+    gap 220ms ease,
+    border-radius 220ms ease,
+    background-color var(--transition-smooth),
+    border-color var(--transition-smooth);
 }
 
 .brandButton[data-tv-active='true'] {
-  background: rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   border-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -86,21 +131,44 @@
   display: flex;
   align-items: center;
   min-height: 44px;
+  min-width: 0;
+  max-width: 140px;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 220ms ease,
+    opacity 160ms ease,
+    transform 220ms ease;
 }
 
 .compactRail .brand {
+  width: 60px;
+  min-height: 60px;
   justify-content: center;
   padding: 0;
+  border-radius: 20px;
 }
 
 .compactRail .brandButton {
+  width: 60px;
+  min-height: 60px;
   justify-content: center;
-  width: 100%;
   padding: 0;
+  gap: 0;
+  border-radius: 20px;
+  align-self: center;
+}
+
+.compactRail .brandButton,
+.compactRail .brand {
+  margin-inline: auto;
 }
 
 .compactRail .brandText {
-  display: none;
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-8px);
 }
 
 .compactRail .brandHint {
@@ -112,6 +180,11 @@
 }
 
 .compactRail .railContent {
+  width: 100%;
+  align-items: center;
+}
+
+.compactRail .railFooter {
   align-items: center;
 }
 
@@ -123,30 +196,91 @@
 }
 
 .brandHint {
-  margin-left: auto;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
-  opacity: 0;
-  transform: translateX(-4px);
-  transition:
-    opacity var(--transition-smooth),
-    transform var(--transition-smooth),
-    color var(--transition-smooth);
-}
-
-.brandButton[data-tv-active='true'] .brandHint {
-  opacity: 1;
-  transform: translateX(0);
-  color: rgba(255, 255, 255, 0.78);
+  display: none;
 }
 
 .railContent {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+.railMenuItem {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 0.3rem;
+  padding: 0.78rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  color: rgba(255, 255, 255, 0.78);
+  text-align: left;
+  overflow: hidden;
+  transition:
+    width 220ms ease,
+    min-height 220ms ease,
+    padding 220ms ease,
+    gap 220ms ease,
+    border-radius 220ms ease,
+    background-color var(--transition-smooth),
+    border-color var(--transition-smooth);
+}
+
+.railMenuItemActive {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(229, 9, 20, 0.2), rgba(255, 255, 255, 0.06));
+}
+
+.railMenuIcon {
+  width: 24px;
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.railMenuLabel {
+  display: block;
+  color: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 220ms ease,
+    opacity 160ms ease,
+    transform 220ms ease;
+}
+
+.compactRail .railMenuItem {
+  width: 60px;
+  min-width: 60px;
+  min-height: 60px;
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+  border-radius: 20px;
+  align-self: center;
+}
+
+.compactRail .railMenuLabel {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+}
+
+.compactRail .railMenuIcon {
+  width: auto;
+  height: auto;
 }
 
 .railHeaderAction {

@@ -31,6 +31,7 @@ interface ZoneConfig {
   nextRight?: string
   columns?: number
   disabled?: boolean
+  elementRef?: MutableRefObject<HTMLDivElement | null>
 }
 
 interface ScopeConfig {
@@ -63,6 +64,16 @@ const TvFocusContext = createContext<FocusStore | null>(null)
 const TvScopeContext = createContext<string | null>(null)
 export const TvZoneContext = createContext<string | null>(null)
 const TV_REMOTE_EVENT_NAME = 'zentrio:tv-remote'
+const TV_ZONE_PREFETCH_EVENT_NAME = 'zentrio:tv-zone-prefetch'
+const FALLBACK_FOCUSABLE_SELECTORS = [
+  'button',
+  'a[href]',
+  'input',
+  'select',
+  'textarea',
+  '[tabindex]:not([tabindex="-1"])',
+  '[role="button"]',
+].join(', ')
 
 function getItemElement(item: ItemConfig): HTMLElement | null {
   if (item.ref.current) return item.ref.current
@@ -70,6 +81,25 @@ function getItemElement(item: ItemConfig): HTMLElement | null {
 
   const element = document.getElementById(item.id)
   return element instanceof HTMLElement ? element : null
+}
+
+function getZoneElement(zone: ZoneConfig): HTMLDivElement | null {
+  return zone.elementRef?.current ?? null
+}
+
+function getClosestZoneId(element: HTMLElement | null): string | null {
+  const zoneElement = element?.closest<HTMLElement>('[data-tv-zone-id]')
+  return zoneElement?.dataset.tvZoneId || null
+}
+
+function isFocusableElementVisible(element: HTMLElement): boolean {
+  if (element.matches('[disabled], [aria-disabled="true"]')) return false
+  if (element.getAttribute('aria-hidden') === 'true') return false
+
+  const style = window.getComputedStyle(element)
+  if (style.display === 'none' || style.visibility === 'hidden') return false
+
+  return true
 }
 
 function sortedItemIds(items: Map<string, ItemConfig>, zoneId: string): string[] {
@@ -251,28 +281,14 @@ export function resolveFallbackFocusIndex(itemCount: number, currentIndex: numbe
   return nextIndex
 }
 
+function getFocusableElements(root: ParentNode | null | undefined): HTMLElement[] {
+  if (!root) return []
+  return Array.from(root.querySelectorAll<HTMLElement>(FALLBACK_FOCUSABLE_SELECTORS)).filter(isFocusableElementVisible)
+}
+
 function getFallbackFocusableElements(): HTMLElement[] {
   if (typeof document === 'undefined') return []
-
-  const selectors = [
-    'button',
-    'a[href]',
-    'input',
-    'select',
-    'textarea',
-    '[tabindex]:not([tabindex="-1"])',
-    '[role="button"]',
-  ].join(', ')
-
-  return Array.from(document.querySelectorAll<HTMLElement>(selectors)).filter((element) => {
-    if (element.matches('[disabled], [aria-disabled="true"]')) return false
-    if (element.getAttribute('aria-hidden') === 'true') return false
-
-    const style = window.getComputedStyle(element)
-    if (style.display === 'none' || style.visibility === 'hidden') return false
-
-    return true
-  })
+  return getFocusableElements(document)
 }
 
 function mergeClassName(...parts: Array<string | undefined | false | null>) {
@@ -287,6 +303,8 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
   const lastFocusedByZoneRef = useRef(new Map<string, string>())
   const activeScopeIdRef = useRef<string | null>(null)
   const activeItemIdRef = useRef<string | null>(null)
+  const pendingZoneFocusIdRef = useRef<string | null>(null)
+  const engagedNativeControlRef = useRef<HTMLElement | null>(null)
   const lastRemoteActionAtRef = useRef<Record<TvRemoteKey, number>>({
     up: 0,
     down: 0,
@@ -369,6 +387,27 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       inline: 'nearest',
     })
     lastFocusedByZoneRef.current.set(item.zoneId, itemId)
+    if (pendingZoneFocusIdRef.current === item.zoneId) {
+      pendingZoneFocusIdRef.current = null
+    }
+    return true
+  }, [enabled, syncActiveItemId])
+
+  const focusNativeElement = useCallback((element: HTMLElement | null, zoneId?: string | null) => {
+    if (!enabled || !element) return false
+
+    syncActiveItemId(null)
+    element.focus({ preventScroll: true })
+    element.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'nearest',
+    })
+
+    if (zoneId && pendingZoneFocusIdRef.current === zoneId) {
+      pendingZoneFocusIdRef.current = null
+    }
+
     return true
   }, [enabled, syncActiveItemId])
 
@@ -380,10 +419,33 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
     if (!enabled || !zoneId) return false
 
     const zone = zonesRef.current.get(zoneId)
-    if (!zone || zone.disabled) return false
+    if (!zone || zone.disabled) {
+      pendingZoneFocusIdRef.current = zoneId
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(TV_ZONE_PREFETCH_EVENT_NAME, {
+          detail: { zoneId },
+        }))
+      }
+      return false
+    }
 
     const zoneItems = getZoneItems(zoneId)
-    if (zoneItems.length === 0) return false
+    if (zoneItems.length === 0) {
+      const nativeFocusable = getFocusableElements(getZoneElement(zone))
+        .filter((element) => !element.id || !itemsRef.current.has(element.id))
+
+      if (focusNativeElement(nativeFocusable[0] ?? null, zoneId)) {
+        return true
+      }
+
+      pendingZoneFocusIdRef.current = zoneId
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(TV_ZONE_PREFETCH_EVENT_NAME, {
+          detail: { zoneId },
+        }))
+      }
+      return false
+    }
 
     const remembered = zone.rememberLastFocused !== false
       ? lastFocusedByZoneRef.current.get(zoneId)
@@ -393,8 +455,12 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       (zone.initialItemId && zoneItems.includes(zone.initialItemId) ? zone.initialItemId : null) ||
       zoneItems[0]
 
-    return focusItem(targetItemId)
-  }, [enabled, focusItem, getZoneItems])
+    const didFocus = focusItem(targetItemId)
+    if (didFocus && pendingZoneFocusIdRef.current === zoneId) {
+      pendingZoneFocusIdRef.current = null
+    }
+    return didFocus
+  }, [enabled, focusItem, focusNativeElement, getZoneItems])
 
   const resolveCurrentItemId = useCallback(() => {
     const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -417,7 +483,14 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
 
   const activateFocusedItem = useCallback(() => {
     const currentItemId = resolveCurrentItemId()
-    if (!currentItemId) return
+    if (!currentItemId) {
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      if (activeElement instanceof HTMLSelectElement) {
+        engagedNativeControlRef.current = activeElement
+      }
+      activeElement?.click()
+      return
+    }
     const item = itemsRef.current.get(currentItemId)
     item?.ref.current?.click()
   }, [resolveCurrentItemId])
@@ -438,16 +511,30 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
 
   const registerZone = useCallback((zone: ZoneConfig) => {
     zonesRef.current.set(zone.id, zone)
+    if (pendingZoneFocusIdRef.current === zone.id) {
+      window.requestAnimationFrame(() => {
+        if (pendingZoneFocusIdRef.current === zone.id) {
+          focusZone(zone.id)
+        }
+      })
+    }
     pushDebugState()
     return () => {
       zonesRef.current.delete(zone.id)
       lastFocusedByZoneRef.current.delete(zone.id)
       pushDebugState()
     }
-  }, [pushDebugState])
+  }, [focusZone, pushDebugState])
 
   const registerItem = useCallback((item: ItemConfig) => {
     itemsRef.current.set(item.id, item)
+    if (pendingZoneFocusIdRef.current === item.zoneId) {
+      window.requestAnimationFrame(() => {
+        if (pendingZoneFocusIdRef.current === item.zoneId) {
+          focusZone(item.zoneId)
+        }
+      })
+    }
     pushDebugState()
     return () => {
       itemsRef.current.delete(item.id)
@@ -459,7 +546,64 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       }
       pushDebugState()
     }
-  }, [pushDebugState, syncActiveItemId])
+  }, [focusZone, pushDebugState, syncActiveItemId])
+
+  const moveNativeFocus = useCallback((direction: Direction) => {
+    if (typeof document === 'undefined') return false
+
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    if (!activeElement) return false
+
+    const zoneId = getClosestZoneId(activeElement)
+    if (!zoneId) return false
+
+    const zone = zonesRef.current.get(zoneId)
+    if (!zone) return false
+
+    const focusableElements = getFocusableElements(getZoneElement(zone))
+      .filter((element) => !element.id || !itemsRef.current.has(element.id))
+
+    const currentIndex = focusableElements.indexOf(activeElement)
+    let nextIndex = -1
+
+    if (zone.orientation === 'vertical' && (direction === 'up' || direction === 'down')) {
+      nextIndex = resolveFallbackFocusIndex(focusableElements.length, currentIndex, direction)
+    } else if (zone.orientation === 'horizontal' && (direction === 'left' || direction === 'right')) {
+      nextIndex = resolveFallbackFocusIndex(focusableElements.length, currentIndex, direction)
+    } else if (zone.orientation === 'grid') {
+      nextIndex = resolveFallbackFocusIndex(focusableElements.length, currentIndex, direction)
+    }
+
+    const nextElement = nextIndex >= 0 ? focusableElements[nextIndex] ?? null : null
+    if (nextElement && nextElement !== activeElement) {
+      return focusNativeElement(nextElement, zoneId)
+    }
+
+    const nextZoneId = getDirectionalZoneTarget(zone, direction)
+    if (nextZoneId) {
+      return focusZone(nextZoneId)
+    }
+
+    return false
+  }, [focusNativeElement, focusZone])
+
+  const shouldDeferToNativeControl = useCallback((target: EventTarget | null, remoteKey: TvRemoteKey | null) => {
+    if (!(target instanceof HTMLElement) || !remoteKey) return false
+
+    if (target.matches('textarea, [contenteditable="true"], input:not([type]), input[type="text"], input[type="password"], input[type="email"], input[type="search"], input[type="url"], input[type="tel"], input[type="number"]')) {
+      return remoteKey !== 'back'
+    }
+
+    if (target instanceof HTMLSelectElement) {
+      return engagedNativeControlRef.current === target
+    }
+
+    if (target instanceof HTMLInputElement && target.type === 'range') {
+      return remoteKey === 'left' || remoteKey === 'right'
+    }
+
+    return false
+  }, [])
 
   useEffect(() => {
     if (!enabled) return
@@ -469,10 +613,24 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       if (!(target instanceof HTMLElement)) return
 
       const focusedItemId = target.id
-      if (!focusedItemId) return
+      if (!focusedItemId) {
+        if (getClosestZoneId(target)) {
+          syncActiveItemId(null)
+          pushDebugState({
+            stage: 'focusin-native',
+            tag: target.tagName,
+          })
+        }
+        return
+      }
 
       const focusedItem = itemsRef.current.get(focusedItemId)
-      if (!focusedItem) return
+      if (!focusedItem) {
+        if (getClosestZoneId(target)) {
+          syncActiveItemId(null)
+        }
+        return
+      }
 
       syncActiveItemId(focusedItemId)
       lastFocusedByZoneRef.current.set(focusedItem.zoneId, focusedItemId)
@@ -482,9 +640,29 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       })
     }
 
+    const handleFocusOut = (event: Event) => {
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      if (engagedNativeControlRef.current === target) {
+        engagedNativeControlRef.current = null
+      }
+    }
+
+    const handleChange = (event: Event) => {
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      if (engagedNativeControlRef.current === target) {
+        engagedNativeControlRef.current = null
+      }
+    }
+
     document.addEventListener('focusin', handleFocusIn)
+    document.addEventListener('focusout', handleFocusOut, true)
+    document.addEventListener('change', handleChange, true)
     return () => {
       document.removeEventListener('focusin', handleFocusIn)
+      document.removeEventListener('focusout', handleFocusOut, true)
+      document.removeEventListener('change', handleChange, true)
     }
   }, [enabled, pushDebugState, syncActiveItemId])
 
@@ -525,6 +703,10 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
     const moveFocus = (direction: Direction) => {
       const currentId = resolveCurrentItemId()
       if (!currentId) {
+        if (moveNativeFocus(direction)) {
+          return
+        }
+
         const activeScope = activeScopeIdRef.current ? scopesRef.current.get(activeScopeIdRef.current) : null
         if (activeScope?.initialZoneId) {
           focusZone(activeScope.initialZoneId)
@@ -576,10 +758,8 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       if (event.defaultPrevented) return
       const remoteKey = normalizeTvRemoteKey(event)
       const target = event.target
-      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"]')) {
-        if (remoteKey !== 'back') {
-          return
-        }
+      if (shouldDeferToNativeControl(target, remoteKey)) {
+        return
       }
 
       if (!activeScopeIdRef.current && remoteKey && handleFallbackRemoteAction(remoteKey)) {
@@ -655,7 +835,7 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('keydown', handleKeyDown, true)
       window.removeEventListener(TV_REMOTE_EVENT_NAME, handleNativeRemoteEvent as EventListener)
     }
-  }, [activateFocusedItem, activeItemId, enabled, focusItem, focusZone, getZoneItems, handleFallbackRemoteAction, pushDebugState, resolveCurrentItemId])
+  }, [activateFocusedItem, activeItemId, enabled, focusItem, focusZone, getZoneItems, handleFallbackRemoteAction, moveNativeFocus, pushDebugState, resolveCurrentItemId, shouldDeferToNativeControl])
 
   useEffect(() => {
     if (!enabled || typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return
@@ -687,6 +867,10 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
 
       const currentId = resolveCurrentItemId()
       if (!currentId) {
+        if (moveNativeFocus(action)) {
+          return
+        }
+
         const activeScope = activeScopeIdRef.current ? scopesRef.current.get(activeScopeIdRef.current) : null
         if (activeScope?.initialZoneId) {
           focusZone(activeScope.initialZoneId)
@@ -737,7 +921,7 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
 
     frameId = window.requestAnimationFrame(pollGamepads)
     return () => window.cancelAnimationFrame(frameId)
-  }, [activateFocusedItem, enabled, focusItem, focusZone, getZoneItems, handleFallbackRemoteAction, resolveCurrentItemId])
+  }, [activateFocusedItem, enabled, focusItem, focusZone, getZoneItems, handleFallbackRemoteAction, moveNativeFocus, resolveCurrentItemId])
 
   const value = useMemo<FocusStore>(() => ({
     enabled,
@@ -820,6 +1004,7 @@ export function TvFocusZone({
 }: TvFocusZoneProps) {
   const focus = useTvFocus()
   const { enabled, registerZone } = focus
+  const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!enabled) return
@@ -834,12 +1019,13 @@ export function TvFocusZone({
       nextRight,
       columns,
       disabled,
+      elementRef: ref,
     })
   }, [columns, disabled, enabled, id, initialItemId, nextDown, nextLeft, nextRight, nextUp, orientation, registerZone, rememberLastFocused])
 
   return (
     <TvZoneContext.Provider value={id}>
-      <div className={className}>{children}</div>
+      <div ref={ref} className={className} data-tv-zone-id={id}>{children}</div>
     </TvZoneContext.Provider>
   )
 }

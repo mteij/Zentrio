@@ -2,7 +2,7 @@
   <div class="landing-page dark">
     <div class="background-effect"></div>
 
-    <nav class="navbar" :class="{ scrolled: isScrolled }">
+    <nav v-if="!hideChrome" class="navbar" :class="{ scrolled: isScrolled }">
       <div class="container nav-content">
         <router-link to="/" class="logo-area">
           <picture>
@@ -14,7 +14,7 @@
 
         <div class="nav-right">
           <div class="nav-links">
-             <a href="https://app.zentrio.eu" class="nav-link highlight">Zentrio Web</a>
+             <router-link to="/web" class="nav-link highlight">Zentrio Web</router-link>
             <router-link to="/releases" class="nav-link">Releases</router-link>
             <a href="https://docs.zentrio.eu" class="nav-link">Documentation</a>
           </div>
@@ -59,11 +59,14 @@
     </nav>
 
     <!-- Mobile menu -->
-    <div class="mobile-menu" :class="{ open: mobileMenuOpen }" @click.self="mobileMenuOpen = false">
+    <div v-if="!hideChrome" class="mobile-menu" :class="{ open: mobileMenuOpen }" @click.self="mobileMenuOpen = false">
       <div class="mobile-menu-inner">
-        <a href="https://app.zentrio.eu" class="mobile-link highlight" @click="mobileMenuOpen = false">Zentrio Web</a>
+        <router-link to="/web" class="mobile-link highlight" @click="mobileMenuOpen = false">Zentrio Web</router-link>
         <router-link to="/releases" class="mobile-link" @click="mobileMenuOpen = false">Releases</router-link>
         <a href="https://docs.zentrio.eu" class="mobile-link" @click="mobileMenuOpen = false">Documentation</a>
+        <router-link to="/privacy" class="mobile-link" @click="mobileMenuOpen = false">Privacy Policy</router-link>
+        <router-link to="/tos" class="mobile-link" @click="mobileMenuOpen = false">Terms of Service</router-link>
+        <router-link to="/account-deletion" class="mobile-link" @click="mobileMenuOpen = false">Account Deletion</router-link>
         <a href="https://github.com/mteij/Zentrio" target="_blank" class="mobile-link" @click="mobileMenuOpen = false">GitHub</a>
       </div>
     </div>
@@ -76,7 +79,7 @@
       </router-view>
     </main>
 
-    <footer class="footer">
+    <footer v-if="!hideChrome" class="footer">
       <div class="container footer-container">
         <div class="footer-left">
           <div class="footer-brand">
@@ -93,12 +96,12 @@
             <span>Zentrio</span>
           </div>
           <p class="footer-description">
-            Built with ❤️ for the streaming community
+            Hosted legal pages for the official Zentrio Web service.
           </p>
         </div>
         <div class="footer-right">
           <div class="footer-links">
-            <a href="https://app.zentrio.eu" class="footer-link">Zentrio Web</a>
+            <router-link to="/web" class="footer-link">Zentrio Web</router-link>
             <router-link to="/releases" class="footer-link"
               >Releases</router-link
             >
@@ -110,6 +113,12 @@
             >
             <router-link to="/tos" class="footer-link"
               >Terms of Service</router-link
+            >
+            <router-link to="/privacy" class="footer-link"
+              >Privacy Policy</router-link
+            >
+            <router-link to="/account-deletion" class="footer-link"
+              >Account Deletion</router-link
             >
           </div>
           <p class="copyright">
@@ -129,6 +138,7 @@ const isScrolled = ref(false);
 const mobileMenuOpen = ref(false);
 const currentYear = computed(() => new Date().getFullYear());
 const route = useRoute();
+const hideChrome = computed(() => route.name === "HostedWebRedirect");
 
 watch(route, () => {
   mobileMenuOpen.value = false;

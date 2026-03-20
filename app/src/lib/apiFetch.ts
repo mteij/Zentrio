@@ -7,6 +7,19 @@ import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('ApiFetch')
 
+// Cache the Tauri HTTP plugin import so we only pay the dynamic-import cost once.
+// Without this, every apiFetch() call in Tauri would await import() and yield to
+// the microtask queue before making the actual HTTP request.
+type TauriFetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+let _tauriFetch: TauriFetchFn | null = null
+async function getTauriFetch(): Promise<TauriFetchFn> {
+  if (!_tauriFetch) {
+    const mod = await import('@tauri-apps/plugin-http')
+    _tauriFetch = mod.fetch as unknown as TauriFetchFn
+  }
+  return _tauriFetch
+}
+
 function getTauriClientHint(): string {
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
   if (/android/i.test(ua)) return 'tauri-android'
@@ -137,11 +150,11 @@ export async function apiFetch(
             return res
         }
 
-        const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+        const tauriFetch = await getTauriFetch();
         if (!headers.has('X-Zentrio-Client')) {
           headers.set('X-Zentrio-Client', getTauriClientHint())
         }
-        
+
         const res = await tauriFetch(url, {
           ...init,
           headers,
@@ -175,7 +188,7 @@ export async function apiFetch(
         if (isGatewayResolvedUrl(url) && method === 'GET') {
           const fallbackUrl = toDirectRemoteUrl(url)
           try {
-            const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http')
+            const tauriFetch = await getTauriFetch()
             const fallbackRes = await tauriFetch(fallbackUrl, {
               ...init,
               headers,

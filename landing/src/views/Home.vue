@@ -15,13 +15,13 @@
 
           <div class="hero-actions fade-in-up delay-2">
             <div class="action-column">
-              <a
-                href="https://app.zentrio.eu"
+              <router-link
+                to="/web"
                 class="btn btn-primary btn-lg shine-effect action-btn"
               >
                 <Globe class="btn-icon-svg" />
                 Launch Zentrio Web
-              </a>
+              </router-link>
               <!-- Invisible spacer to match the right column's sub-link typography space -->
               <span class="sub-link spacer-text" aria-hidden="true"
                 >&nbsp;</span
