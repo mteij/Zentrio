@@ -181,7 +181,7 @@ export function StreamSelector({
             </div>
             <div>
               <h3 className="text-lg font-medium text-white mb-1">Downloaded &amp; ready</h3>
-              <p className="text-sm text-gray-400">You're offline, but this is available locally.</p>
+              <p className="text-sm text-gray-400">You&apos;re offline, but this is available locally.</p>
             </div>
             <button
               className={`${styles.actionBtn} ${styles.btnPrimaryGlass}`}
@@ -198,7 +198,7 @@ export function StreamSelector({
             <div className="bg-white/10 p-4 rounded-full mb-4">
               <WifiOff size={32} className="text-gray-400 opacity-50" />
             </div>
-            <h3 className="text-lg font-medium text-white mb-2">You're offline</h3>
+            <h3 className="text-lg font-medium text-white mb-2">You&apos;re offline</h3>
             <p className="text-sm text-gray-400 max-w-md mb-5">
               Streaming requires a connection. Download this content while online to watch it offline.
             </p>

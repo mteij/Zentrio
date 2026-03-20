@@ -30,6 +30,7 @@ jobs:
       grade: ${{ steps.score.outputs.grade }}
       status: ${{ steps.score.outputs.status }}
       color: ${{ steps.score.outputs.color }}
+      critical: ${{ steps.score.outputs.critical }}
 
     steps:
       - uses: actions/checkout@v6
@@ -242,7 +243,13 @@ jobs:
           score -= min(clip_w   * 3,  20)
 
           score = max(0, score)
-          critical_failures = ts_err > 0 or esl_err > 0 or esl_warn > 0 or not tests_ok or not build_ok
+          critical_failures = (
+              ts_err > 0
+              or esl_err > 0
+              or clip_err > 0
+              or not tests_ok
+              or not build_ok
+          )
 
           if critical_failures:
               grade, status, color = "Failing", "Failing", "red"
@@ -251,13 +258,13 @@ jobs:
           elif score >= 80:
               grade, status, color = "B", "Passing", "green"
           elif score >= 70:
-              grade, status, color = "C", "Passing", "yellowgreen"
+              grade, status, color = "C", "Needs attention", "yellowgreen"
           elif score >= 60:
-              grade, status, color = "D", "Passing", "yellow"
+              grade, status, color = "D", "Needs attention", "yellow"
           elif score >= 40:
-              grade, status, color = "E", "Passing", "orange"
+              grade, status, color = "E", "Needs attention", "orange"
           else:
-              grade, status, color = "F", "Passing", "red"
+              grade, status, color = "F", "Needs attention", "red"
 
           print(f"Score: {score}/100  Grade: {grade}  Status: {status}  Color: {color}")
 
@@ -267,6 +274,7 @@ jobs:
               fh.write(f"grade={grade}\n")
               fh.write(f"status={status}\n")
               fh.write(f"color={color}\n")
+              fh.write(f"critical={'true' if critical_failures else 'false'}\n")
           PYEOF
 
       - name: Save quality metrics
@@ -279,6 +287,7 @@ jobs:
             "grade": "${{ steps.score.outputs.grade }}",
             "status": "${{ steps.score.outputs.status }}",
             "color": "${{ steps.score.outputs.color }}",
+            "critical": "${{ steps.score.outputs.critical }}",
             "ts_errors": "${{ steps.typecheck.outputs.errors }}",
             "eslint_errors": "${{ steps.eslint.outputs.errors }}",
             "eslint_warnings": "${{ steps.eslint.outputs.warnings }}",
@@ -312,6 +321,7 @@ jobs:
           echo "| **Score** | **${{ steps.score.outputs.score }}/100** |" >> "$GITHUB_STEP_SUMMARY"
           echo "| **Status** | **${{ steps.score.outputs.status }}** |" >> "$GITHUB_STEP_SUMMARY"
           echo "| **Grade** | **${{ steps.score.outputs.grade }}** |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Critical failure | ${{ steps.score.outputs.critical == 'true' && 'yes' || 'no' }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| TypeScript errors | ${{ steps.typecheck.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| ESLint errors | ${{ steps.eslint.outputs.errors }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| ESLint warnings | ${{ steps.eslint.outputs.warnings }} |" >> "$GITHUB_STEP_SUMMARY"

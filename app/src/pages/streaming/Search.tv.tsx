@@ -288,7 +288,7 @@ export function StreamingSearchTvView({ model }: { model: SearchScreenModel }) {
         ) : (
           <TvShelf zoneId="search-empty" nextLeft="streaming-rail" nextUp="search-controls">
             <TvFocusItem id="search-no-results-state" className={styles.stateCard}>
-              <p className={styles.stateTitle}>No matches for "{queryText}"</p>
+              <p className={styles.stateTitle}>No matches for &quot;{queryText}&quot;</p>
             </TvFocusItem>
           </TvShelf>
         )}

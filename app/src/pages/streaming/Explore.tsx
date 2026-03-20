@@ -104,6 +104,8 @@ const GenreRow = memo(({ genre, profileId, showImdbRatings, showAgeRatings, type
   )
 })
 
+GenreRow.displayName = 'GenreRow'
+
 // -- Main Explore Component --
 interface ExploreDashboardData {
   trending: MetaPreview[]
