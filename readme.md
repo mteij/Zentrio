@@ -17,6 +17,15 @@
     <a href="https://docs.zentrio.eu"><strong>Docs</strong></a> |
     <a href="https://github.com/Mteij/Zentrio/issues"><strong>Issues</strong></a>
   </p>
+
+  <p>
+    <a href="https://github.com/MichielEijpe/Zentrio/actions/workflows/quality.yml"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mteij/92598bd8ebd40beb60c71b870c3933d7/raw/zentrio-quality-badge.json&style=flat-square" alt="Code Quality"></a>
+    <a href="https://github.com/Mteij/Zentrio/stargazers"><img src="https://img.shields.io/github/stars/mteij/Zentrio?style=flat-square&color=E50914&labelColor=1a1a1a" alt="Stars"></a>
+    <a href="https://github.com/Mteij/Zentrio/releases"><img src="https://img.shields.io/github/downloads/mteij/Zentrio/total?style=flat-square&color=E50914&labelColor=1a1a1a" alt="Downloads"></a>
+    <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=flat-square&logo=bun&logoColor=white" alt="Bun"></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript"></a>
+    <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="Tauri"></a>
+  </p>
 </div>
 
 ## Overview
