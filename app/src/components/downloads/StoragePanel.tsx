@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Settings, HardDrive, Trash2, CheckCircle, Zap, RotateCcw } from 'lucide-react'
 import { downloadService, StorageStats, SmartDefaults } from '../../services/downloads/download-service'
 import styles from './Downloads.module.css'
@@ -57,6 +58,7 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
         setStats({
           totalBytes: toFiniteNumber((rawStats as any)?.totalBytes ?? (rawStats as any)?.total_bytes),
           count: toFiniteNumber((rawStats as any)?.count),
+          freeBytes: toFiniteNumber((rawStats as any)?.freeBytes ?? (rawStats as any)?.free_bytes),
         })
         setQuota(Math.max(0, toFiniteNumber(rawQuota)))
         setSmart({
@@ -77,7 +79,7 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
     if (!confirmed) { setConfirmed(true); return }
     try {
       await downloadService.purgeProfile(profileId)
-      setStats({ totalBytes: 0, count: 0 })
+      setStats(s => ({ totalBytes: 0, count: 0, freeBytes: s?.freeBytes ?? 0 }))
       onClear()
     } catch (e) {
       log.error('clear error', e)
@@ -96,13 +98,13 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
     } finally { setSaving(false) }
   }
 
-  const usedPercent = quota > 0 && stats ? Math.min((toFiniteNumber(stats.totalBytes) / quota) * 100, 100) : 0
+  const totalDisk = stats ? stats.totalBytes + stats.freeBytes : 0
+  const usedDiskPercent = totalDisk > 0 ? Math.min((toFiniteNumber(stats!.totalBytes) / totalDisk) * 100, 100) : 0
 
-  return (
+  return createPortal(
     <div className={`${styles.pickerOverlay} ${styles.storageOverlay}`} onClick={onClose}>
       <div className={`${styles.pickerSheet} ${styles.storageSheet}`} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.pickerHeader}>
-          <div className={styles.pickerHandle} />
+        <div className={styles.storageHeader}>
           <div className={styles.pickerTitle}>
             <Settings size={16} />
             <span>Storage &amp; Smart Downloads</span>
@@ -115,18 +117,26 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
         {/* ── Storage stats ── */}
         <div className={styles.storageStatRow}>
           <HardDrive size={18} className={styles.storageIcon} />
-          <div className={styles.storageStatText}>
-            <span className={styles.storageStatLabel}>Used</span>
-            <span className={styles.storageStatValue}>
-              {stats ? `${formatBytes(stats.totalBytes)} · ${stats.count} item${stats.count !== 1 ? 's' : ''}` : '—'}
-            </span>
+          <div className={styles.storageStatCols}>
+            <div className={styles.storageStatText}>
+              <span className={styles.storageStatLabel}>Used</span>
+              <span className={styles.storageStatValue}>
+                {stats ? `${formatBytes(stats.totalBytes)} · ${stats.count} item${stats.count !== 1 ? 's' : ''}` : '—'}
+              </span>
+            </div>
+            {stats && stats.freeBytes > 0 && (
+              <div className={styles.storageStatText}>
+                <span className={styles.storageStatLabel}>Available</span>
+                <span className={styles.storageStatValue}>{formatBytes(stats.freeBytes)}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Quota bar */}
-        {quota > 0 && stats && (
+        {/* Disk usage bar (shows used vs total disk space) */}
+        {totalDisk > 0 && (
           <div className={styles.quotaBar}>
-            <div className={styles.quotaFill} style={{ width: `${usedPercent}%` }} />
+            <div className={styles.quotaFill} style={{ width: `${usedDiskPercent}%` }} />
           </div>
         )}
 
@@ -204,6 +214,7 @@ export function StoragePanel({ profileId, onClose, onClear }: Props) {
           )}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

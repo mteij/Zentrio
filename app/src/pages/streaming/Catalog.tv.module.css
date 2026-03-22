@@ -1,16 +1,161 @@
+.heroBanner {
+  position: relative;
+  min-height: 24rem;
+  margin: calc(var(--tv-safe-y) * -1) calc(var(--tv-safe-x) * -1) 1.75rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(220, 38, 38, 0.16), transparent 30%),
+    #101115;
+}
+
+.heroBackdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transform: scale(1.03);
+  opacity: 0.54;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(5, 7, 10, 0.94) 0%, rgba(5, 7, 10, 0.8) 42%, rgba(5, 7, 10, 0.24) 100%),
+    linear-gradient(180deg, rgba(5, 7, 10, 0.16) 0%, rgba(5, 7, 10, 0.78) 100%);
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 1.4rem;
+  min-height: 24rem;
+  padding: calc(var(--tv-safe-y) + 1.8rem) var(--tv-safe-x) 2rem;
+  align-content: end;
+}
+
+.heroMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.heroEyebrow,
+.heroMetaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.1rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.heroBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.9fr);
+  gap: 1.4rem;
+  align-items: end;
+}
+
+.heroCopy {
+  max-width: 42rem;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(2.5rem, 5vw, 4.7rem);
+  line-height: 0.92;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+.heroDescription {
+  margin: 1rem 0 0;
+  max-width: 38rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.heroSpotlight {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+}
+
+.heroSpotlightEyebrow {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.heroSpotlightTitle {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.heroSpotlightMeta {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.88rem;
+}
+
+.heroAction,
+.heroActionSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.95rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-weight: 700;
+}
+
+.heroAction {
+  background: #ffffff;
+  color: #0c0d10;
+}
+
+.heroActionSecondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
 .card {
-  width: 210px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(16, 17, 21, 0.94);
+  background: rgba(14, 16, 20, 0.94);
   color: #fff;
 }
 
 .posterShell {
   position: relative;
+  overflow: hidden;
 }
 
 .poster {
@@ -58,11 +203,47 @@
   color: #f5c518;
 }
 
+.posterActionOverlay {
+  position: absolute;
+  inset: auto 10px 10px 10px;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity var(--transition-smooth),
+    transform var(--transition-smooth);
+}
+
+.card[data-tv-active='true'] .posterActionOverlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.posterActionPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(5, 7, 10, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+}
+
+.posterActionPrimary {
+  background: rgba(255, 255, 255, 0.96);
+  color: #0d0f12;
+}
+
 .body {
-  padding: 14px 16px 16px;
+  padding: 0.95rem 1rem 1.05rem;
   display: grid;
-  gap: 6px;
-  align-content: start;
+  gap: 0.35rem;
 }
 
 .title {
@@ -79,13 +260,13 @@
 .meta {
   margin: 0;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 .loadMore {
-  min-width: 240px;
+  min-width: 260px;
   padding: 22px 24px;
-  border-radius: 18px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: #fff;

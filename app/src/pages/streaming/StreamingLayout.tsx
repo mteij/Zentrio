@@ -1,16 +1,20 @@
-import { Outlet, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { LoadErrorState } from '../../components'
 import { Navbar } from '../../components/layout/Navbar'
+import { StandardShell } from '../../components/layout/StandardShell'
 import { OfflineBanner } from '../../components/downloads/OfflineBanner'
 import { useOfflineMode } from '../../hooks/useOfflineMode'
 import { useDownloads } from '../../hooks/useDownloads'
 import { useEffect } from 'react'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { getPlatformCapabilities } from '../../lib/platform-capabilities'
+import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 import { shouldPreload } from '../../utils/route-preloader'
 import { useAuthStore } from '../../stores/authStore'
 import { createLogger } from '../../utils/client-logger'
+import { Search, User } from 'lucide-react'
+import styles from '../../styles/Streaming.module.css'
 
 const log = createLogger('StreamingLayout')
 
@@ -130,6 +134,48 @@ export const StreamingLayout = () => {
     return () => clearTimeout(timer)
   }, [profileId, queryClient, location.pathname])
 
+  useEffect(() => {
+    if (platform.canUseRemoteNavigation) return
+
+    const findVerticalScrollTarget = (element: HTMLElement | null): HTMLElement | null => {
+      let current = element
+
+      // Stop before body/html — both get computed overflow-y:auto from overflow-x:hidden
+      // which makes them appear scrollable, but body.scrollTop is a no-op in standards mode.
+      // The fallback (document.scrollingElement) correctly handles page-level scrolling.
+      while (current && current !== document.body && current !== document.documentElement) {
+        const style = window.getComputedStyle(current)
+        const canScrollY = /(auto|scroll|overlay)/.test(style.overflowY) && current.scrollHeight > current.clientHeight
+        if (canScrollY) return current
+        current = current.parentElement
+      }
+
+      return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      if (event.defaultPrevented) return
+      if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return
+
+      const target = event.target as HTMLElement | null
+      if (!target) return
+
+      if (target.closest('[data-row-scroll-container="true"]')) return
+      if (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
+
+      const scrollTarget = findVerticalScrollTarget(target)
+      if (!scrollTarget || scrollTarget.scrollHeight <= scrollTarget.clientHeight) return
+
+      event.preventDefault()
+      scrollTarget.scrollTop += event.deltaY
+    }
+
+    document.addEventListener('wheel', handleWheel, { passive: false, capture: true })
+    return () => {
+      document.removeEventListener('wheel', handleWheel, true)
+    }
+  }, [platform.canUseRemoteNavigation])
+
   if (error?.message === 'Unauthorized') {
     return null
   }
@@ -177,12 +223,59 @@ export const StreamingLayout = () => {
   const isDetails = firstSegment && !mainRoutes.includes(firstSegment) && !isPlayer
 
   const shouldHideNavbar = platform.canUseRemoteNavigation || isPlayer || isDetails || isCatalog || isExploreSeeAll
+  const showMobileHeader = !shouldHideNavbar
+    && platform.standardNavPlacement === 'bottom'
+    && firstSegment !== 'search'
+    && firstSegment !== 'library'
+    && firstSegment !== 'explore'
+    && firstSegment !== 'downloads'
+  const searchPath = `/streaming/${profileId}/search`
+  const mobileHeader = showMobileHeader ? (
+    <div className={styles.streamingMobileHeader}>
+      <button
+        type="button"
+        className={styles.streamingMobileSearch}
+        aria-label="Search movies and series"
+        onClick={() => {
+          navigate(searchPath, { state: { focusSearch: true } })
+        }}
+      >
+        <Search size={18} aria-hidden="true" />
+        <span>Search movies & series</span>
+      </button>
+
+      <Link
+        to="/profiles"
+        className={styles.streamingMobileProfileButton}
+        aria-label={profile?.name ? `Switch profile. Current profile: ${profile.name}` : 'Switch profile'}
+        title="Switch Profile"
+        >
+          <div className={styles.streamingMobileProfileAvatar}>
+            {profile?.avatar ? (
+            <img
+              src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))}
+              alt=""
+            />
+            ) : (
+              <User size={18} aria-hidden="true" />
+            )}
+          </div>
+      </Link>
+    </div>
+  ) : undefined
 
   return (
-    <>
-      <OfflineBanner visible={!isOnline && !shouldHideNavbar} />
-      {!shouldHideNavbar && <Navbar profileId={profileId === 'guest' ? 'guest' : parseInt(profileId!)} profile={profile} />}
+    <StandardShell
+      navPlacement="auto"
+      header={mobileHeader}
+      headerVisibility="mobile"
+      nav={!shouldHideNavbar ? <Navbar profileId={profileId === 'guest' ? 'guest' : parseInt(profileId!)} profile={profile} /> : undefined}
+    >
+      {/* CSS var tells OfflineBanner how far below the sticky top bar it should stick on mobile */}
+      <div style={{ '--mobile-bar-height': showMobileHeader ? '68px' : '48px' } as object}>
+        <OfflineBanner visible={!isOnline && !shouldHideNavbar} />
+      </div>
       <Outlet />
-    </>
+    </StandardShell>
   )
 }

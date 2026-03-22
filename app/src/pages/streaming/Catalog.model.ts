@@ -33,6 +33,8 @@ export interface CatalogScreenModel {
   status: 'loading' | 'ready' | 'error'
   profileId: string
   title: string
+  catalogType: string
+  catalogId: string
   items: MetaPreview[]
   ambientImage?: string
   errorMessage?: string
@@ -130,6 +132,8 @@ export function useCatalogScreenModel(): CatalogScreenModel {
     status: isLoading ? 'loading' : error ? 'error' : 'ready',
     profileId: profileId || '',
     title,
+    catalogType: type || '',
+    catalogId: id || '',
     items,
     ambientImage: items.length > 0 ? (items[0].background || items[0].poster) : undefined,
     errorMessage: error instanceof Error ? error.message : error ? 'Failed to load catalog' : undefined,

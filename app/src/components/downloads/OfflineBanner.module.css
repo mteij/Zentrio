@@ -1,38 +1,87 @@
 .banner {
-  position: fixed;
-  /* Respect the mobile statusbar / iOS notch / Android status bar.
-     Fixed elements bypass body.is-mobile's padding-top, so we need the
-     safe-area-inset directly. Falls back to 0 on desktop. */
-  top: var(--safe-area-inset-top, 0px);
+  position: sticky;
+  /* Desktop: stick right at top of content */
+  top: var(--app-content-top-offset, 0px);
   left: 0;
   right: 0;
-  z-index: 9999;
+  z-index: 495;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: rgba(20, 20, 30, 0.92);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 200, 0, 0.25);
-  color: #fbbf24;
-  font-size: 0.82rem;
-  font-weight: 500;
-  animation: slideDown 0.25s ease;
+  gap: 10px;
+  padding: 10px 20px;
+  background: linear-gradient(
+    135deg,
+    rgba(30, 20, 5, 0.97) 0%,
+    rgba(25, 18, 4, 0.97) 100%
+  );
+  border-bottom: 1px solid rgba(251, 191, 36, 0.22);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.84rem;
+  animation: slideDown 0.22s ease;
 }
 
 @keyframes slideDown {
-  from { transform: translateY(-100%) }
-  to   { transform: translateY(0) }
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
 
-.bannerLink {
-  background: none;
-  border: none;
-  color: #fff;
-  font-weight: 700;
+.bannerIcon {
+  color: #fbbf24;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.bannerText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.bannerTitle {
+  font-weight: 600;
+  font-size: 0.84rem;
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
+.bannerSub {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+.bannerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
-  text-decoration: underline;
-  font-size: 0.82rem;
-  padding: 0;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.bannerBtn:hover {
+  background: rgba(251, 191, 36, 0.2);
+  border-color: rgba(251, 191, 36, 0.55);
+}
+
+/* Mobile: stick below the page's sticky top bar.
+   --mobile-bar-height is set by StreamingLayout (68px on home, 48px elsewhere). */
+@media (max-width: 1024px) {
+  .banner {
+    top: calc(var(--app-content-top-offset, 0px) + var(--mobile-bar-height, 48px));
+    padding: 9px 16px;
+  }
 }

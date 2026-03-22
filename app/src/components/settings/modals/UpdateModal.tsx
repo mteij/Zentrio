@@ -35,6 +35,7 @@ export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platf
   const [progress, setProgress] = useState(0);
   const [downloadError, setDownloadError] = useState('');
   const [status, setStatus] = useState<UpdateStatus>('idle');
+  const usesExternalDownload = !updateData?.updateObj && !!isTauri && !updateData?.isIOS;
 
   useEffect(() => {
     if (isOpen) {
@@ -80,10 +81,12 @@ export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platf
         let downloaded = 0;
         let contentLength = 0;
 
+        log.info('Starting Tauri updater install', { version: update.version, platformName });
         await update.downloadAndInstall((event: any) => {
           if (event.event === 'Started') {
             contentLength = event.data?.contentLength ?? 0;
             setStatus('downloading');
+            log.info('Updater download started', { contentLength });
           } else if (event.event === 'Progress') {
             downloaded += event.data?.chunkLength ?? 0;
             if (contentLength > 0) {
@@ -92,6 +95,7 @@ export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platf
           } else if (event.event === 'Finished') {
             setProgress(100);
             setStatus('installing');
+            log.info('Updater download finished, installing');
           }
         });
 
@@ -105,9 +109,11 @@ export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platf
       // 2. ANDROID — Download APK + Open with Installer
       // ═════════════════════════════════════════════
       if (platformName === 'android') {
-        await handleAndroidUpdate(updateData, setProgress, setStatus);
+        const asset = await handleAndroidUpdate(updateData, setStatus);
         setStatus('done');
-        toast.success('APK ready', { description: 'The installer should open automatically. If not, check your Downloads folder.' });
+        toast.success('Download opened', {
+          description: `The APK download for ${asset.name} was opened externally. Install it from your browser or download manager when it finishes.`,
+        });
         onClose();
         return;
       }
@@ -115,13 +121,17 @@ export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platf
       // ═════════════════════════════════════════════
       // 3. FALLBACK — Download asset for current platform
       // ═════════════════════════════════════════════
-      await handleGenericDownload(updateData, platformName, setProgress, setStatus);
+      const asset = await handleGenericDownload(updateData, platformName, setStatus);
       setStatus('done');
+      toast.success('Download opened', {
+        description: `The download for ${asset.name} was opened externally to avoid in-app installer failures.`,
+      });
       onClose();
 
     } catch (e: any) {
+      const message = getErrorMessage(e);
       log.error('Update failed:', e);
-      setDownloadError(e.message || 'Failed to download update');
+      setDownloadError(message);
       setStatus('error');
       setDownloading(false);
     }
@@ -136,7 +146,10 @@ export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platf
       return <><ExternalLink size={18} /> View on GitHub</>;
     }
     if (downloading) {
-      return <>Downloading...</>;
+      return <>{status === 'installing' && usesExternalDownload ? 'Opening download...' : 'Downloading...'}</>;
+    }
+    if (usesExternalDownload) {
+      return <><ExternalLink size={18} /> Open Download</>;
     }
     return <><Download size={18} /> Download &amp; Install</>;
   };
@@ -184,8 +197,16 @@ export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platf
         {status === 'installing' && (
            <div className="flex items-center gap-3 text-indigo-400 justify-center py-4">
               <Loader2 className="animate-spin" />
-              <span className="font-medium">Preparing installation...</span>
+              <span className="font-medium">
+                {usesExternalDownload ? 'Opening download...' : 'Preparing installation...'}
+              </span>
            </div>
+        )}
+
+        {usesExternalDownload && !downloading && (
+          <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-zinc-400">
+            This platform uses an external download handoff. Zentrio will open the release asset in your browser or system downloader instead of buffering the whole installer inside the WebView.
+          </div>
         )}
 
         {downloadError && (
@@ -251,9 +272,8 @@ export function UpdateModal({ isOpen, onClose, updateData, isTauri = true, platf
 /** Android: Download APK and trigger installation via opener */
 async function handleAndroidUpdate(
   updateData: UpdateData,
-  setProgress: (p: number) => void,
   setStatus: (s: UpdateStatus) => void,
-) {
+): Promise<NonNullable<UpdateData['assets']>[number]> {
   // Find the correct APK asset (prefer arm64, fallback to universal, then any APK)
   let asset = updateData.assets?.find(a => a.name.includes('arm64') && a.name.endsWith('.apk'));
   if (!asset) {
@@ -267,32 +287,19 @@ async function handleAndroidUpdate(
     throw new Error('No APK found in the latest release. Please download manually from GitHub.');
   }
 
-  // Download the APK
-  const fileData = await downloadAsset(asset, setProgress);
-
-  // Write to temp directory
   setStatus('installing');
-  const { writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
-  const fileName = asset.name;
-  await writeFile(fileName, fileData, { baseDir: BaseDirectory.Temp });
-
-  // Get the full temp path and open with Android's installer
-  const { tempDir } = await import('@tauri-apps/api/path');
-  const tempPath = await tempDir();
-  const filePath = `${tempPath}${fileName}`;
-
-  // Use opener plugin to trigger APK installation on Android
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(filePath);
+  log.info('Opening Android update externally', { asset: asset.name, url: asset.browser_download_url });
+  const { openUrl } = await import('@tauri-apps/plugin-opener');
+  await openUrl(asset.browser_download_url);
+  return asset;
 }
 
 /** Generic fallback: Download platform-appropriate asset and open it */
 async function handleGenericDownload(
   updateData: UpdateData,
   platformName: string | undefined,
-  setProgress: (p: number) => void,
   setStatus: (s: UpdateStatus) => void,
-) {
+): Promise<NonNullable<UpdateData['assets']>[number]> {
   let asset;
 
   if (platformName === 'windows') {
@@ -315,58 +322,37 @@ async function handleGenericDownload(
     throw new Error(`No compatible update file found for ${platformName || 'this platform'}.`);
   }
 
-  const fileData = await downloadAsset(asset, setProgress);
-
   setStatus('installing');
-  const { writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
-  const fileName = asset.name;
-  await writeFile(fileName, fileData, { baseDir: BaseDirectory.Temp });
-
-  const { tempDir } = await import('@tauri-apps/api/path');
-  const tempPath = await tempDir();
-  const filePath = `${tempPath}${fileName}`;
-
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(filePath);
+  log.info('Opening manual update externally', {
+    platformName,
+    asset: asset.name,
+    url: asset.browser_download_url,
+  });
+  const { openUrl } = await import('@tauri-apps/plugin-opener');
+  await openUrl(asset.browser_download_url);
+  return asset;
 }
 
-/** Download an asset with progress tracking, returns Uint8Array */
-async function downloadAsset(
-  asset: { browser_download_url: string; size: number; name: string },
-  setProgress: (p: number) => void,
-): Promise<Uint8Array> {
-  const { fetch } = await import('@tauri-apps/plugin-http');
-  const response = await fetch(asset.browser_download_url);
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
 
-  if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
-  if (!response.body) throw new Error('Download failed: No response body');
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
 
-  const contentLength = asset.size;
-  const reader = response.body.getReader();
-
-  let receivedLength = 0;
-  const chunks: Uint8Array[] = [];
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    chunks.push(value);
-    receivedLength += value.length;
-
-    if (contentLength > 0) {
-      setProgress(Math.min(99, Math.round((receivedLength / contentLength) * 100)));
+  try {
+    const serialized = JSON.stringify(error);
+    if (serialized && serialized !== '{}') {
+      return serialized;
     }
+  } catch {
+    // Ignore serialization failures and fall back to String below.
   }
 
-  // Combine all chunks into a single Uint8Array
-  const result = new Uint8Array(receivedLength);
-  let position = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, position);
-    position += chunk.length;
-  }
-
-  setProgress(100);
-  return result;
+  const fallback = String(error);
+  return fallback && fallback !== '[object Object]'
+    ? fallback
+    : 'Failed to download update';
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Download, Palette, Play, Puzzle, Settings as SettingsIcon, type LucideIcon } from 'lucide-react'
 import { appMode } from '../lib/app-mode'
+import { apiFetch } from '../lib/apiFetch'
 
 export type SettingsTabKey = 'general' | 'appearance' | 'addons' | 'streaming' | 'downloads' | 'danger'
 
@@ -45,6 +46,24 @@ export function useSettingsScreenModel(): SettingsScreenModel {
 
   const isGuestMode = appMode.isGuest()
   const effectiveTab = isGuestMode && activeTab === 'danger' ? 'general' : activeTab
+
+  // Load profiles on mount so currentProfileId is initialized without a header-level selector
+  useEffect(() => {
+    apiFetch('/api/user/settings-profiles')
+      .then(r => r.json())
+      .then(data => {
+        const list: Array<{ id: string | number; name?: string }> = data.data || data || []
+        setProfiles(list)
+        const lastSelected = localStorage.getItem('lastSelectedSettingsProfile')
+        if (lastSelected && list.some(p => String(p.id) === lastSelected)) {
+          setCurrentProfileId(lastSelected)
+          return
+        }
+        if (list.length > 0) setCurrentProfileId(String(list[0].id))
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const tabItems: SettingsTabItem[] = [
     { key: 'general', label: 'General', icon: SettingsIcon },

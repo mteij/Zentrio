@@ -62,32 +62,11 @@ export class ZentrioAddonClient extends AddonClient {
     const movieGenreOptions = movieGenres.map((g: any) => g.name)
     const seriesGenreOptions = seriesGenres.map((g: any) => g.name)
 
-    // Build all possible catalogs
+    // Build all possible catalogs.
+    // tmdb.top is listed first so it is preferred as the search source when deduplicating.
+    // All catalogs include { name: 'search' } so search works regardless of which catalogs
+    // the user has enabled on the home page.
     const ALL_CATALOG_DEFS: Array<{ id: string; type: 'movie' | 'series'; name: string; extra: any[] }> = [
-      {
-        type: 'movie',
-        id: 'tmdb.new',
-        name: 'Latest Releases',
-        extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }]
-      },
-      {
-        type: 'series',
-        id: 'tmdb.new',
-        name: 'Latest Releases',
-        extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }]
-      },
-      {
-        type: 'movie',
-        id: 'tmdb.trending',
-        name: 'Trending',
-        extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }]
-      },
-      {
-        type: 'series',
-        id: 'tmdb.trending',
-        name: 'Trending',
-        extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }]
-      },
       {
         type: 'movie',
         id: 'tmdb.top',
@@ -102,27 +81,51 @@ export class ZentrioAddonClient extends AddonClient {
       },
       {
         type: 'movie',
+        id: 'tmdb.trending',
+        name: 'Trending',
+        extra: [{ name: 'skip' }, { name: 'search' }]
+      },
+      {
+        type: 'series',
+        id: 'tmdb.trending',
+        name: 'Trending',
+        extra: [{ name: 'skip' }, { name: 'search' }]
+      },
+      {
+        type: 'movie',
+        id: 'tmdb.new',
+        name: 'Latest Releases',
+        extra: [{ name: 'genre', options: movieGenreOptions }, { name: 'skip' }, { name: 'search' }]
+      },
+      {
+        type: 'series',
+        id: 'tmdb.new',
+        name: 'Latest Releases',
+        extra: [{ name: 'genre', options: seriesGenreOptions }, { name: 'skip' }, { name: 'search' }]
+      },
+      {
+        type: 'movie',
         id: 'tmdb.year',
         name: 'Year',
-        extra: [{ name: 'genre', isRequired: true, options: movieGenreOptions }, { name: 'skip' }]
+        extra: [{ name: 'genre', isRequired: true, options: movieGenreOptions }, { name: 'skip' }, { name: 'search' }]
       },
       {
         type: 'series',
         id: 'tmdb.year',
         name: 'Year',
-        extra: [{ name: 'genre', isRequired: true, options: seriesGenreOptions }, { name: 'skip' }]
+        extra: [{ name: 'genre', isRequired: true, options: seriesGenreOptions }, { name: 'skip' }, { name: 'search' }]
       },
       {
         type: 'movie',
         id: 'tmdb.language',
         name: 'Language',
-        extra: [{ name: 'genre', isRequired: true, options: languageOptions }, { name: 'skip' }]
+        extra: [{ name: 'genre', isRequired: true, options: languageOptions }, { name: 'skip' }, { name: 'search' }]
       },
       {
         type: 'series',
         id: 'tmdb.language',
         name: 'Language',
-        extra: [{ name: 'genre', isRequired: true, options: languageOptions }, { name: 'skip' }]
+        extra: [{ name: 'genre', isRequired: true, options: languageOptions }, { name: 'skip' }, { name: 'search' }]
       },
     ]
 

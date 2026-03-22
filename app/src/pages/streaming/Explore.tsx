@@ -1,15 +1,14 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ChevronDown, Filter, X } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Hero, Layout, LazyImage, RatingBadge, SkeletonCard, SkeletonHero, SkeletonRow, StreamingRow } from '../../components'
+import { ArrowLeft, ChevronDown, Film, Layers3, Search, Tv, User } from 'lucide-react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { AnimatedBackground, Hero, Layout, LazyImage, RatingBadge, SkeletonCard, SkeletonHero, SkeletonRow, StreamingRow } from '../../components'
 import { TraktRecommendationsRow } from '../../components/streaming/TraktRecommendationsRow'
-import { useRootScrollPinned } from '../../hooks/useRootScrollPinned'
 import { apiFetchJson } from '../../lib/apiFetch'
+import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 
-import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import { MetaPreview } from '../../services/addons/types'
+import type { ExploreScreenModel } from './Explore.model'
 import styles from '../../styles/Streaming.module.css'
 import { createLogger } from '../../utils/client-logger'
 
@@ -28,12 +27,10 @@ const GenreRow = memo(({ genre, profileId, showImdbRatings, showAgeRatings, type
   const rowRef = useRef<HTMLDivElement | null>(null)
   const queryClient = useQueryClient()
 
-  // Skip the IntersectionObserver delay if data is already in cache (e.g. navigation back)
   const [isNearViewport, setIsNearViewport] = useState(() =>
     !!queryClient.getQueryData(['explore-genre', profileId, genre, type])
   )
 
-  // When type changes (viewMode toggle), re-enable immediately if new type is cached
   useEffect(() => {
     if (!isNearViewport && queryClient.getQueryData(['explore-genre', profileId, genre, type])) {
       setIsNearViewport(true)
@@ -41,7 +38,7 @@ const GenreRow = memo(({ genre, profileId, showImdbRatings, showAgeRatings, type
   }, [type, genre, profileId, queryClient, isNearViewport])
 
   useEffect(() => {
-    if (isNearViewport) return // already enabled, no observer needed
+    if (isNearViewport) return
     const el = rowRef.current
     if (!el) return
 
@@ -67,15 +64,14 @@ const GenreRow = memo(({ genre, profileId, showImdbRatings, showAgeRatings, type
   const { data, isLoading } = useQuery({
     queryKey: ['explore-genre', profileId, genre, type],
     queryFn: async () => {
-      // Fetch specifically for this genre
-      // We limit to 20 items for the row
       const typeParam = type && type !== 'all' ? type : 'movie,series'
       return apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genre)}&skip=0`)
     },
-    staleTime: 1000 * 60 * 60,  // 1 hour - genre data rarely changes
-    gcTime: 1000 * 60 * 120,    // 2 hours — must be > staleTime
+    staleTime: 1000 * 60 * 60,
+    gcTime: 1000 * 60 * 120,
     refetchOnWindowFocus: false,
-    enabled: isNearViewport
+    enabled: isNearViewport,
+    placeholderData: keepPreviousData,
   })
 
   if (!isNearViewport || isLoading) {
@@ -86,7 +82,6 @@ const GenreRow = memo(({ genre, profileId, showImdbRatings, showAgeRatings, type
     return <div ref={rowRef} />
   }
 
-  // Update seeAllUrl to include type if specified
   const seeAllBase = `/explore/${profileId}?genre=${encodeURIComponent(genre)}`
   const seeAllUrl = type && type !== 'all' ? `${seeAllBase}&type=${type}` : seeAllBase
 
@@ -107,486 +102,410 @@ const GenreRow = memo(({ genre, profileId, showImdbRatings, showAgeRatings, type
 GenreRow.displayName = 'GenreRow'
 
 // -- Main Explore Component --
-interface ExploreDashboardData {
-  trending: MetaPreview[]
-  trendingMovies?: MetaPreview[]
-  trendingSeries?: MetaPreview[]
-  profile: any
-}
-
-interface FiltersData {
-  filters: { types: string[], genres: string[] }
-}
-
-const POPULAR_GENRES = ['Action', 'Adventure', 'Comedy', 'Science Fiction', 'Drama', 'Thriller', 'Animation', 'Fantasy', 'Crime', 'Mystery', 'Romance', 'Horror', 'Family', 'War', 'History']
-
-export const StreamingExplore = () => {
-  const { profileId } = useParams<{ profileId: string }>()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const _navigate = useNavigate()
-  const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
-
-  // State for view toggle
-  const [viewMode, setViewMode] = useState<'all' | 'movie' | 'series'>('all')
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const stickyHeader = useRootScrollPinned({ extraTopPx: 10 })
-
-
-  // If a genre is selected via URL, we show the filtered grid view.
-  const activeGenre = searchParams.get('genre')
-  const activeType = searchParams.get('type')
-
-  const isFilteredView = !!activeGenre || !!activeType
-
-  // Shuffle popular genres once on mount (useMemo avoids extra re-render vs useEffect+setState)
-  const shuffledGenres = useMemo(() => [...POPULAR_GENRES].sort(() => 0.5 - Math.random()), [])
-
-  // Fetch Dashboard (for Trending/Top 10)
-  const { data: dashboardData, isLoading: loadingDash } = useQuery({
-    queryKey: ['dashboard', profileId],
-    queryFn: async () => {
-      return apiFetchJson<ExploreDashboardData>(`/api/streaming/dashboard?profileId=${profileId}`)
-    },
-    enabled: !isFilteredView,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 30, // 30 minutes
-    refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData
-  })
-
-  // Fetch Filters
-  const { data: filtersData, isLoading: loadingFilters } = useQuery({
-    queryKey: ['filters', profileId],
-    queryFn: async () => {
-      return apiFetchJson<FiltersData>(`/api/streaming/filters?profileId=${profileId}`)
-    },
-    staleTime: 1000 * 60 * 10, // 10 minutes - filters change rarely
-    gcTime: 1000 * 60 * 30,
-    refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData
-  })
-
-  // ... (Filtered view logic remains same) ...
-  const [filteredItems, setFilteredItems] = useState<MetaPreview[]>([])
-  const [loadingFiltered, setLoadingFiltered] = useState(false)
-  const [skip, setSkip] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
+export const StreamingExplore = ({ model }: { model: ExploreScreenModel }) => {
+  const [genreMenuOpen, setGenreMenuOpen] = useState(false)
+  const genreMenuRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
-  const loadingMoreRef = useRef(false)
+  const navigate = useNavigate()
 
+  // Read profile from cache populated by StreamingLayout (no extra fetch)
+  const { data: profile } = useQuery<any>({
+    queryKey: ['streaming-profile', model.profileId],
+    enabled: false,
+  })
+
+  const profileAvatar = profile?.avatar ? (
+    <img src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))} alt="" />
+  ) : (
+    <User size={18} aria-hidden="true" />
+  )
+
+  // Keep a stable ref to loadMore to avoid observer churn
+  const loadMoreFnRef = useRef(model.actions.loadMore)
+  useEffect(() => { loadMoreFnRef.current = model.actions.loadMore })
+
+  // Close genre menu on outside click / Escape
   useEffect(() => {
-    if (isFilteredView && profileId) {
-      setLoadingFiltered(true)
-      setFilteredItems([])
-      setSkip(0)
-      setHasMore(true)
-      
-      const fetchFiltered = async () => {
-        try {
-            const typeParam = activeType || ''
-            const genreParam = activeGenre || ''
-            const data = await apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=0`)
-            setFilteredItems(data.items || [])
-            setSkip(data.items?.length || 0)
-            if ((data.items?.length || 0) < 20) setHasMore(false)
-        } catch (e) {
-            log.error(e)
-        } finally {
-            setLoadingFiltered(false)
-        }
+    if (!genreMenuOpen) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (genreMenuRef.current && !genreMenuRef.current.contains(event.target as Node)) {
+        setGenreMenuOpen(false)
       }
-      fetchFiltered()
     }
-  }, [isFilteredView, activeGenre, activeType, profileId])
-
-  const loadMore = useCallback(async () => {
-    if (loadingFiltered || !hasMore || !isFilteredView || loadingMoreRef.current) return
-    loadingMoreRef.current = true
-    const typeParam = activeType || ''
-    const genreParam = activeGenre || ''
-    try {
-        const data = await apiFetchJson<{ items: MetaPreview[] }>(`/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=${skip}`)
-        if (data.items && data.items.length > 0) {
-            setFilteredItems(prev => [...prev, ...data.items])
-            setSkip(prev => prev + data.items.length)
-            if (data.items.length < 20) setHasMore(false)
-        } else {
-            setHasMore(false)
-        }
-    } catch (e) {
-        log.error(e)
-    } finally {
-        loadingMoreRef.current = false
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setGenreMenuOpen(false)
     }
-  }, [loadingFiltered, hasMore, isFilteredView, activeType, activeGenre, profileId, skip])
 
-  // Infinite scroll for filtered view (observer-based to reduce scroll handler overhead)
+    document.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [genreMenuOpen])
+
+  // Close menu when view mode or filtered state changes
   useEffect(() => {
-      if (!isFilteredView || !hasMore) return
+    setGenreMenuOpen(false)
+  }, [model.isFilteredView, model.viewMode])
 
-      const target = loadMoreRef.current
-      if (!target) return
+  // Infinite scroll for genre filtered view
+  useEffect(() => {
+    if (!model.isFilteredView || !model.hasMore) return
+    const target = loadMoreRef.current
+    if (!target) return
 
-      if (!('IntersectionObserver' in window)) {
-        const id = globalThis.setInterval(() => {
-          loadMore()
-        }, 700)
-        return () => globalThis.clearInterval(id)
-      }
-
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0]?.isIntersecting) {
-            loadMore()
-          }
-        },
-        { rootMargin: '700px 0px', threshold: 0.01 }
-      )
-
-      observer.observe(target)
-      return () => observer.disconnect()
-  }, [isFilteredView, hasMore, loadMore])
-
-
-  const updateFilter = (key: string, value: string) => {
-    const newParams = new URLSearchParams(searchParams)
-    if (value) {
-      newParams.set(key, value)
-    } else {
-      newParams.delete(key)
+    if (!('IntersectionObserver' in window)) {
+      const id = globalThis.setInterval(() => { void loadMoreFnRef.current() }, 700)
+      return () => globalThis.clearInterval(id)
     }
-    setSearchParams(newParams)
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) void loadMoreFnRef.current()
+      },
+      { rootMargin: '700px 0px', threshold: 0.01 }
+    )
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [model.isFilteredView, model.hasMore])
+
+  // Top-level loading skeleton (non-filtered initial load only)
+  if (!model.isFilteredView && model.loading) {
+    return (
+      <Layout title="Explore" showHeader={false} showFooter={false}>
+        <div className={styles.streamingLayout}>
+          <SkeletonHero />
+          <div className={styles.contentContainer}>
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
-  // --- Render ---
+  const featuredItem = model.filteredItems[0]
+  const activeTypeMode = (model.activeType && model.activeType !== 'all' ? model.activeType : 'all') as 'all' | 'movie' | 'series'
 
-  if ((loadingDash && !isFilteredView) || loadingFilters) {
-     return (
-        <Layout title="Explore" showHeader={false} showFooter={false}>
-            <div className={styles.streamingLayout}>
-                <SkeletonHero />
-                <div className={styles.contentContainer}>
-                    <SkeletonRow />
-                    <SkeletonRow />
-                </div>
+  // ── GENRE / FILTERED VIEW ──
+  if (model.isFilteredView) {
+    const genreTitle = model.activeGenre || (activeTypeMode === 'movie' ? 'Movies' : activeTypeMode === 'series' ? 'Series' : 'Explore')
+
+    return (
+      <Layout title={genreTitle} showHeader={false} showFooter={false}>
+        <AnimatedBackground
+          image={featuredItem?.background || featuredItem?.poster}
+          opacity={0.38}
+        />
+
+        {/* Filter dock – back button + genre name + type toggle */}
+        <div className={styles.exploreFiltersDock}>
+          <div className={styles.exploreFiltersBar}>
+            <button
+              type="button"
+              onClick={model.actions.clearFilters}
+              className={styles.exploreBackBtn}
+              aria-label="Go Back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h1 className={styles.exploreFilteredTitle}>{genreTitle}</h1>
+
+            <div className={styles.exploreToggleGroup}>
+              {(['all', 'movie', 'series'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => model.actions.updateFilter('type', m === 'all' ? '' : m)}
+                  className={`${styles.exploreToggleBtn} ${activeTypeMode === m ? styles.exploreToggleBtnActive : ''}`}
+                >
+                  {m === 'all' ? 'All' : m === 'movie' ? 'Movies' : 'Series'}
+                </button>
+              ))}
             </div>
-        </Layout>
-     )
+
+            <button
+              type="button"
+              className={styles.exploreMobileSearchBtn}
+              aria-label="Search movies and series"
+              onClick={() => navigate(`/streaming/${model.profileId}/search`, { state: { focusSearch: true } })}
+            >
+              <Search size={18} aria-hidden="true" />
+            </button>
+            <Link
+              to="/profiles"
+              className={styles.exploreMobileProfileBtn}
+              aria-label={profile?.name ? `Switch profile. Current: ${profile.name}` : 'Switch profile'}
+            >
+              <div className={styles.streamingMobileProfileAvatar}>{profileAvatar}</div>
+            </Link>
+          </div>
+        </div>
+        <div className={styles.exploreFiltersSpacer} aria-hidden="true" />
+
+        <div className={`${styles.contentContainer} ${styles.contentOffset}`}>
+          <div className={styles.catalogPage}>
+            <section className={styles.catalogGridSection}>
+              <div className={styles.catalogSectionHeader}>
+                <div>
+                  <p className={styles.catalogSectionEyebrow}>Genre</p>
+                  <h2 className={styles.catalogSectionTitle}>{genreTitle}</h2>
+                </div>
+                {model.filteredItems.length > 0 && (
+                  <div className={styles.catalogSectionMeta}>
+                    <span className={styles.catalogSectionMetaPill}>
+                      {activeTypeMode === 'movie' ? <Film size={14} aria-hidden="true" /> : activeTypeMode === 'series' ? <Tv size={14} aria-hidden="true" /> : <Layers3 size={14} aria-hidden="true" />}
+                      {activeTypeMode === 'movie' ? 'Movies' : activeTypeMode === 'series' ? 'Series' : 'All'}
+                    </span>
+                    {model.hasMore ? (
+                      <span className={styles.catalogSectionMetaPill}>{model.filteredItems.length}+ titles</span>
+                    ) : (
+                      <span className={styles.catalogSectionMetaPill}>{model.filteredItems.length} titles</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {model.loading && model.filteredItems.length === 0 ? (
+                <div className={styles.catalogGrid}>
+                  {Array.from({ length: 20 }).map((_, i) => <SkeletonCard key={i} />)}
+                </div>
+              ) : model.filteredItems.length > 0 ? (
+                <>
+                  <div className={styles.catalogGrid}>
+                    {model.filteredItems.map((item, index) => {
+                      const meta = [item.releaseInfo || item.year, item.type === 'series' ? 'Series' : item.type === 'movie' ? 'Movie' : null].filter(Boolean).join(' · ')
+                      return (
+                        <a
+                          key={`${item.id}-${index}`}
+                          href={`/streaming/${model.profileId}/${item.type}/${item.id}`}
+                          className={styles.catalogGridCard}
+                          aria-label={`Open ${item.name}`}
+                        >
+                          <div className={styles.catalogPosterShell}>
+                            {item.poster ? (
+                              <LazyImage src={item.poster} alt={item.name} className={styles.catalogPosterImage} />
+                            ) : (
+                              <div className={styles.catalogPosterFallback}>{item.name}</div>
+                            )}
+                            {model.showImdbRatings && item.imdbRating ? (
+                              <RatingBadge rating={parseFloat(item.imdbRating)} />
+                            ) : null}
+                          </div>
+                          <div className={styles.catalogCardBody}>
+                            <h3 className={styles.catalogCardTitle}>{item.name}</h3>
+                            {meta ? <p className={styles.catalogCardMeta}>{meta}</p> : null}
+                          </div>
+                        </a>
+                      )
+                    })}
+                  </div>
+
+                  {model.hasMore ? (
+                    <div className={styles.catalogLoadMoreRow}>
+                      <div ref={loadMoreRef} style={{ height: 1, width: '100%' }} />
+                      <div className={styles.catalogLoadingPill} aria-live="polite">Loading more titles…</div>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className={styles.catalogEmptyState}>
+                  <p className={styles.catalogEmptyTitle}>Nothing found for this genre</p>
+                  <p className={styles.catalogEmptyDescription}>
+                    Try a different type filter or go back to explore more.
+                  </p>
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
-  const genres = filtersData?.filters?.genres || []
-  const _types = filtersData?.filters?.types || ['movie', 'series']
-  
-  const trending = dashboardData?.trending || []
-  const trendingMovies = dashboardData?.trendingMovies || []
-  const trendingSeries = dashboardData?.trendingSeries || []
+  // ── EXPLORE VIEW (not filtered) ──
+  const { showHero, rowGenres, displayGenres } = model
 
-  // Logic for display genres based on viewMode
-  // If ALL: show random mixed genres.
-  // If Movie: show random movie genres (technically just random genres that contain movies, usually broad).
-  // If Series: show random series genres.
-  // We don't strictly filter genres by type in backend here, but we can assume popular genres work for both or use GenreRow to fetch appropriately.
-  // GenreRow component calls `type=movie,series` by default. We should let it respect our viewMode!
-  
-  // We need to modify GenreRow to accept a type override or rely on its own logic.
-  // For now let's reuse GenreRow but maybe pass type?
-  // The internal GenreRow (lines 11-50) hardcodes `type=movie,series`. 
-  // We can't easily change it here without refactoring GenreRow or duplicating it. 
-  // Let's refactor GenreRow slightly to accept type prop.
-  
-  // Wait, I can't refactor GenreRow inside this replacement block easily if it's separate. 
-  // GenreRow is lines 18-49. I am replacing lines 51-325. 
-  // I will assume GenreRow will be updated separately or I will update it in a separate call if needed.
-  // Actually, I can update GenreRow later. For "All", mixed is fine.
-  // For "Movie", we want GenreRow to fetch `type=movie`. 
-  // For "Series", `type=series`.
-  // I will update GenreRow in a follow-up step.
-  
-  const displayGenres = genres.length > 0 
-    ? shuffledGenres.filter(g => genres.includes(g)).concat(genres.filter(g => !shuffledGenres.includes(g)))
-    : shuffledGenres
-  
-  const rowGenres = displayGenres.slice(0, 8)
-
-  const showHero = !isFilteredView && trending.length > 0
-  
   return (
     <Layout title="Explore" showHeader={false} showFooter={false}>
-        <div className={styles.streamingLayout} style={{ minHeight: '100vh' }}>
-            {/* Hero is always based on mixed trending or history - keeps page dynamic */}
-            {/* Or should Hero change based on Toggle? User didn't specify, but usually Hero implies "Featured". 
-                Let's keep Hero mixed for now as it's the "Main" feature. */}
-            {showHero && (
-                <Hero 
-                    items={trending} 
-                    profileId={profileId!} 
-                    showTrending={true}
-                    storageKey="exploreHeroIndex"
-                />
-            )}
-
-            {/* Fixed Header / View Toggles / Filter Bar */}
-            <div ref={stickyHeader.sentinelRef} className={styles.stickySentinel} aria-hidden="true" />
-            <div className={styles.stickyHeaderShell} style={stickyHeader.spacerStyle}>
-              <div
-                ref={stickyHeader.headerRef}
-                className={`${styles.exploreHeader} ${stickyHeader.isPinned ? styles.exploreHeaderPinned : ''}`}
+      <div className={styles.streamingLayout} style={{ minHeight: '100vh' }}>
+        <div className={styles.exploreFiltersDock}>
+          <div className={styles.exploreFiltersBar}>
+            <div className={styles.exploreFiltersTopRow}>
+              <div className={styles.exploreToggleGroup}>
+                {(['all', 'movie', 'series'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => model.actions.setViewMode(m)}
+                    className={`${styles.exploreToggleBtn} ${model.viewMode === m ? styles.exploreToggleBtnActive : ''}`}
+                  >
+                    {m === 'all' ? 'All' : m === 'movie' ? 'Movies' : 'Series'}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className={styles.exploreMobileSearchBtn}
+                aria-label="Search movies and series"
+                onClick={() => navigate(`/streaming/${model.profileId}/search`, { state: { focusSearch: true } })}
               >
-                   {isFilteredView ? (
-                      <div className={styles.exploreFilteredHeader}>
-                          <button 
-                              onClick={() => { setSearchParams({}); setViewMode('all'); }}
-                              className={styles.exploreBackBtn}
-                              aria-label="Go Back"
-                          >
-                              <ArrowLeft size={20} />
-                          </button>
-                          <h1 className={styles.exploreFilteredTitle}>
-                              {activeGenre || (activeType ? (activeType === 'movie' ? 'Movies' : 'Series') : 'Explore')}
-                          </h1>
-                      </div>
-                   ) : (
-                       <div className={styles.exploreToggleGroup}>
-                          {(['all', 'movie', 'series'] as const).map(mode => (
-                              <button
-                                  key={mode}
-                                  onClick={() => setViewMode(mode)}
-                                  className={`${styles.exploreToggleBtn} ${viewMode === mode ? styles.exploreToggleBtnActive : ''}`}
-                              >
-                                  {mode === 'all' ? 'All' : mode === 'movie' ? 'Movies' : 'TV Shows'}
-                              </button>
-                          ))}
-                       </div>
-                   )}
+                <Search size={18} aria-hidden="true" />
+              </button>
+              <Link
+                to="/profiles"
+                className={styles.exploreMobileProfileBtn}
+                aria-label={profile?.name ? `Switch profile. Current: ${profile.name}` : 'Switch profile'}
+              >
+                <div className={styles.streamingMobileProfileAvatar}>{profileAvatar}</div>
+              </Link>
+            </div>
 
-                   {!isFilteredView && (
-                       <div className={styles.exploreGenreSelect}>
-                          <select 
-                              className={styles.exploreGenreSelectInput}
-                              onChange={(e) => updateFilter('genre', e.target.value)}
-                              value=""
-                          >
-                              <option value="" disabled>Genres</option>
-                              {genres.map(g => (
-                                  <option key={g} value={g}>{g}</option>
-                              ))}
-                          </select>
-                          <ChevronDown className={styles.exploreGenreIcon} />
-                       </div>
-                   )}
+            <div className={styles.exploreGenreSelect} ref={genreMenuRef}>
+              <button
+                type="button"
+                className={`${styles.exploreGenreTrigger} ${genreMenuOpen ? styles.exploreGenreTriggerOpen : ''}`}
+                onClick={() => setGenreMenuOpen((open) => !open)}
+                aria-haspopup="menu"
+                aria-expanded={genreMenuOpen}
+                aria-label="Filter by genre"
+              >
+                <span className={styles.exploreGenreTriggerValue}>Genres</span>
+                <ChevronDown className={`${styles.exploreGenreTriggerIcon} ${genreMenuOpen ? styles.exploreGenreTriggerIconOpen : ''}`} />
+              </button>
+
+              {genreMenuOpen ? (
+                <div className={styles.exploreGenreMenu} role="menu" aria-label="Genre filters">
+                  <div className={styles.exploreGenreMenuList}>
+                    <button
+                      type="button"
+                      className={`${styles.exploreGenreMenuItem} ${styles.exploreGenreMenuItemFeatured}`}
+                      onClick={() => { setGenreMenuOpen(false); model.actions.updateFilter('genre', '') }}
+                      role="menuitem"
+                    >
+                      All genres
+                    </button>
+                    {displayGenres.map((genre) => (
+                      <button
+                        key={genre}
+                        type="button"
+                        className={styles.exploreGenreMenuItem}
+                        onClick={() => { setGenreMenuOpen(false); model.actions.updateFilter('genre', genre) }}
+                        role="menuitem"
+                      >
+                        {genre}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className={styles.exploreGenreSelectMobile}>
+                <select
+                  className={styles.exploreGenreSelectInput}
+                  onChange={(e) => model.actions.updateFilter('genre', e.target.value)}
+                  value=""
+                  aria-label="Filter by genre"
+                >
+                  <option value="" disabled>Genres</option>
+                  {displayGenres.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+                <ChevronDown className={styles.exploreGenreIcon} />
               </div>
             </div>
-
-            {/* Mobile Floating Filter Button (Dashboard Only) */}
-            {!isFilteredView && (
-                <>
-                    <button 
-                        className={styles.mobileFilterBtn}
-                        onClick={() => setMobileMenuOpen(true)}
-                        aria-label="Filter Content"
-                    >
-                        <Filter size={18} fill="currentColor" />
-                        <span className={styles.mobileFilterLabel}>{viewMode === 'all' ? 'All' : viewMode === 'movie' ? 'Movies' : 'TV'}</span>
-                    </button>
-
-                    <AnimatePresence>
-                        {mobileMenuOpen && (
-                            <>
-                                <motion.div 
-                                    className={styles.mobileMenuBackdrop}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    onClick={() => setMobileMenuOpen(false)}
-                                />
-                                <motion.div 
-                                    className={styles.mobileMenuPanel}
-                                    initial={{ y: -50, opacity: 0, scale: 0.95 }}
-                                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                                    exit={{ y: -20, opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <div className={styles.mobileMenuHeader}>
-                                        <span className={styles.mobileMenuTitle}>Browse</span>
-                                        <button className={styles.mobileMenuClose} onClick={() => setMobileMenuOpen(false)}>
-                                            <X size={20} />
-                                        </button>
-                                    </div>
-
-                                    <div className={styles.mobileMenuSection}>
-                                        <label>Type</label>
-                                        <div className={styles.mobileToggleGroup}>
-                                            {(['all', 'movie', 'series'] as const).map(mode => (
-                                                <button
-                                                    key={mode}
-                                                    onClick={() => { setViewMode(mode); setMobileMenuOpen(false); }}
-                                                    className={`${styles.mobileToggleBtn} ${viewMode === mode ? styles.mobileToggleBtnActive : ''}`}
-                                                >
-                                                    {mode === 'all' ? 'All' : mode === 'movie' ? 'Movies' : 'TV Shows'}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className={styles.mobileMenuSection}>
-                                        <label>Genre</label>
-                                        <div className={styles.mobileGenreGrid}>
-                                            {genres.map(g => (
-                                                <button 
-                                                    key={g} 
-                                                    className={styles.mobileGenreChip}
-                                                    onClick={() => { updateFilter('genre', g); setMobileMenuOpen(false); }}
-                                                >
-                                                    {g}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </>
-                        )}
-                    </AnimatePresence>
-                </>
-            )}
-
-            <div className={`${styles.contentContainer} ${!showHero ? styles.contentOffset : ''}`}>
-
-                {isFilteredView ? (
-                    // GRID VIEW for Filtered Results
-                    <div className={styles.contentRow}>
-                         {loadingFiltered ? (
-                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 px-[60px]">
-                                 {[...Array(10)].map((_, i) => <SkeletonCard key={i} />)}
-                             </div>
-                         ) : filteredItems.length > 0 ? (
-                             <>
-                               <div className={styles.mediaGrid}>
-                                  {filteredItems.map((item, index) => (
-                                      <a key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()} href={`/streaming/${profileId}/${item.type}/${item.id}`} className={styles.mediaCard}>
-                                          <div className={styles.posterContainer}>
-                                              <LazyImage src={item.poster || ''} alt={item.name} className={styles.posterImage} />
-                                              <div className={styles.badgesContainer}>
-                                                  {showImdbRatings && item.imdbRating && (
-                                                      <RatingBadge rating={parseFloat(item.imdbRating)} />
-                                                  )}
-                                              </div>
-                                              <div className={styles.cardOverlay}>
-                                                  <div className={styles.cardTitle}>{item.name}</div>
-                                              </div>
-                                          </div>
-                                      </a>
-                                  ))}
-                               </div>
-                               {hasMore && <div ref={loadMoreRef} style={{ height: 1, width: '100%' }} />}
-                             </>
-                         ) : (
-                             <div className="text-center text-gray-500 py-20">No results found.</div>
-                         )}
-                    </div>
-                ) : (
-                    // VIEW MODE ROWS
-                    <>
-                         {/* All Mode: Show Both Movies and Series Top 10 */}
-                         {viewMode === 'all' && (
-                             <>
-                                {trendingMovies.length > 0 && (
-                                    <StreamingRow
-                                        title="Top 10 Movies Today"
-                                        items={trendingMovies}
-                                        profileId={profileId!}
-                                        showImdbRatings={showImdbRatings}
-                                        showAgeRatings={showAgeRatings}
-                                        isRanked={true}
-                                    />
-                                )}
-                                {trendingSeries.length > 0 && (
-                                    <StreamingRow
-                                        title="Top 10 Series Today"
-                                        items={trendingSeries}
-                                        profileId={profileId!}
-                                        showImdbRatings={showImdbRatings}
-                                        showAgeRatings={showAgeRatings}
-                                        isRanked={true}
-                                    />
-                                )}
-                             </>
-                         )}
-
-                        {/* Movie Mode: Show Only Movies Top 10 */}
-                         {viewMode === 'movie' && trendingMovies.length > 0 && (
-                            <StreamingRow
-                                title="Top 10 Movies Today"
-                                items={trendingMovies}
-                                profileId={profileId!}
-                                showImdbRatings={showImdbRatings}
-                                showAgeRatings={showAgeRatings}
-                                isRanked={true}
-                            />
-                         )}
-
-                        {/* Series Mode: Show Only Series Top 10 */}
-                         {viewMode === 'series' && trendingSeries.length > 0 && (
-                            <StreamingRow
-                                title="Top 10 Series Today"
-                                items={trendingSeries}
-                                profileId={profileId!}
-                                showImdbRatings={showImdbRatings}
-                                showAgeRatings={showAgeRatings}
-                                isRanked={true}
-                            />
-                         )}
-
-                         {/* Trakt Recommendations - only shows if connected */}
-                         {viewMode === 'all' && (
-                           <>
-                             <TraktRecommendationsRow
-                               profileId={profileId!}
-                               type="movies"
-                               showImdbRatings={showImdbRatings}
-                               showAgeRatings={showAgeRatings}
-                             />
-                             <TraktRecommendationsRow
-                               profileId={profileId!}
-                               type="shows"
-                               showImdbRatings={showImdbRatings}
-                               showAgeRatings={showAgeRatings}
-                             />
-                           </>
-                         )}
-                         {viewMode === 'movie' && (
-                           <TraktRecommendationsRow
-                             profileId={profileId!}
-                             type="movies"
-                             showImdbRatings={showImdbRatings}
-                             showAgeRatings={showAgeRatings}
-                           />
-                         )}
-                         {viewMode === 'series' && (
-                           <TraktRecommendationsRow
-                             profileId={profileId!}
-                             type="shows"
-                             showImdbRatings={showImdbRatings}
-                             showAgeRatings={showAgeRatings}
-                           />
-                         )}
-
-                         {/* Genre Rows - Pass viewMode as type */}
-                         {rowGenres.map(genre => (
-                             <GenreRow
-                                key={genre}
-                                genre={genre}
-                                profileId={profileId!}
-                                showImdbRatings={showImdbRatings}
-                                showAgeRatings={showAgeRatings}
-                                type={viewMode === 'all' ? undefined : viewMode}
-                             />
-                         ))}
-                    </>
-                )}
-
-            </div>
+          </div>
         </div>
+
+        {!showHero ? (
+          <div className={styles.exploreFiltersSpacer} aria-hidden="true" />
+        ) : null}
+
+        {showHero && (
+          <Hero
+            items={model.trending}
+            profileId={model.profileId}
+            showTrending={true}
+            storageKey="exploreHeroIndex"
+          />
+        )}
+
+        <div className={`${styles.contentContainer} ${!showHero ? styles.contentOffset : ''}`}>
+          {model.viewMode === 'all' && (
+            <>
+              {model.trendingMovies.length > 0 && (
+                <StreamingRow
+                  title="Top 10 Movies Today"
+                  items={model.trendingMovies}
+                  profileId={model.profileId}
+                  showImdbRatings={model.showImdbRatings}
+                  showAgeRatings={model.showAgeRatings}
+                  isRanked={true}
+                />
+              )}
+              {model.trendingSeries.length > 0 && (
+                <StreamingRow
+                  title="Top 10 Series Today"
+                  items={model.trendingSeries}
+                  profileId={model.profileId}
+                  showImdbRatings={model.showImdbRatings}
+                  showAgeRatings={model.showAgeRatings}
+                  isRanked={true}
+                />
+              )}
+            </>
+          )}
+
+          {model.viewMode === 'movie' && model.trendingMovies.length > 0 && (
+            <StreamingRow
+              title="Top 10 Movies Today"
+              items={model.trendingMovies}
+              profileId={model.profileId}
+              showImdbRatings={model.showImdbRatings}
+              showAgeRatings={model.showAgeRatings}
+              isRanked={true}
+            />
+          )}
+
+          {model.viewMode === 'series' && model.trendingSeries.length > 0 && (
+            <StreamingRow
+              title="Top 10 Series Today"
+              items={model.trendingSeries}
+              profileId={model.profileId}
+              showImdbRatings={model.showImdbRatings}
+              showAgeRatings={model.showAgeRatings}
+              isRanked={true}
+            />
+          )}
+
+          {model.viewMode === 'all' && (
+            <>
+              <TraktRecommendationsRow profileId={model.profileId} type="movies" showImdbRatings={model.showImdbRatings} showAgeRatings={model.showAgeRatings} />
+              <TraktRecommendationsRow profileId={model.profileId} type="shows" showImdbRatings={model.showImdbRatings} showAgeRatings={model.showAgeRatings} />
+            </>
+          )}
+          {model.viewMode === 'movie' && (
+            <TraktRecommendationsRow profileId={model.profileId} type="movies" showImdbRatings={model.showImdbRatings} showAgeRatings={model.showAgeRatings} />
+          )}
+          {model.viewMode === 'series' && (
+            <TraktRecommendationsRow profileId={model.profileId} type="shows" showImdbRatings={model.showImdbRatings} showAgeRatings={model.showAgeRatings} />
+          )}
+
+          {rowGenres.map((genre) => (
+            <GenreRow
+              key={genre}
+              genre={genre}
+              profileId={model.profileId}
+              showImdbRatings={model.showImdbRatings}
+              showAgeRatings={model.showAgeRatings}
+              type={model.viewMode === 'all' ? undefined : model.viewMode}
+            />
+          ))}
+        </div>
+      </div>
     </Layout>
   )
 }
-

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { ContentCard, ContentItem } from './ContentCard'
 import { SkeletonCard } from '../ui/SkeletonCard'
 import { useScrollRow } from '../../hooks/useScrollRow'
+import { useRowPosterPreload } from '../../hooks/useRowPosterPreload'
 import { fetchCatalogItems } from '../../lib/catalog-items'
 import styles from '../../styles/Streaming.module.css'
 
@@ -54,7 +55,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
           observer.disconnect()
         }
       },
-      { rootMargin: '250px 0px', threshold: 0.01 }
+      { rootMargin: '900px 0px', threshold: 0.01 }
     )
 
     observer.observe(el)
@@ -95,6 +96,12 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
     isDragging 
   } = useScrollRow({ items })
 
+  useRowPosterPreload({
+    containerRef,
+    items,
+    enabled: isNearViewport && !isLoading,
+  })
+
   // Handle item click - prevent if dragging
   const handleItemClick = (e: React.MouseEvent, _item: ContentItem) => {
     if (isDragging()) {
@@ -127,6 +134,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
         
         <div 
           className={styles.rowScrollContainer} 
+          data-row-scroll-container="true"
           ref={containerRef}
           {...handlers}
           style={{ cursor: isDown ? 'grabbing' : 'grab', userSelect: 'none' }}
@@ -151,6 +159,7 @@ export const LazyCatalogRow = memo(function LazyCatalogRow({
                 <div
                   key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
                   className={styles.cardWrapper}
+                  data-row-card="true"
                 >
                   <ContentCard 
                     item={item as ContentItem}

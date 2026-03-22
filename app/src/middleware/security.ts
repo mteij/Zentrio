@@ -14,10 +14,13 @@ export const corsMiddleware = (origins?: string[]) => {
     const defaultOrigins = [
       'http://localhost:3000',
       'http://localhost:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173',
       'tauri://localhost',
       'http://tauri.localhost',
       'https://tauri.localhost',
       'https://localhost',
+      'https://127.0.0.1',
       'https://zentrio.eu',
       cfg.APP_URL,
       cfg.CLIENT_URL
@@ -56,7 +59,7 @@ export const corsMiddleware = (origins?: string[]) => {
       corsHeaders['Access-Control-Allow-Origin'] = origin as string;
     } else if (!isProductionEnv() && origin) {
       // In development, be more permissive with local origins to prevent dev blocking
-      if (origin.startsWith('http://localhost')) {
+      if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin.startsWith('https://127.0.0.1')) {
          corsHeaders['Access-Control-Allow-Origin'] = origin;
       }
     }

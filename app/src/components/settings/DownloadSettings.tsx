@@ -127,12 +127,13 @@ export function DownloadSettings({ currentProfileId }: DownloadSettingsProps) {
             stats: {
               totalBytes: Number((raw as any)?.totalBytes ?? (raw as any)?.total_bytes ?? 0),
               count: Number((raw as any)?.count ?? 0),
+              freeBytes: Number((raw as any)?.freeBytes ?? (raw as any)?.free_bytes ?? 0),
             },
             clearing: false,
             confirmed: false,
           }
         } catch {
-          entries[p.id] = { stats: { totalBytes: 0, count: 0 }, clearing: false, confirmed: false }
+          entries[p.id] = { stats: { totalBytes: 0, count: 0, freeBytes: 0 }, clearing: false, confirmed: false }
         }
       })
     )
@@ -168,7 +169,7 @@ export function DownloadSettings({ currentProfileId }: DownloadSettingsProps) {
       await downloadService.purgeProfile(String(profileId))
       setProfileStats(prev => ({
         ...prev,
-        [profileId]: { stats: { totalBytes: 0, count: 0 }, clearing: false, confirmed: false },
+        [profileId]: { stats: { totalBytes: 0, count: 0, freeBytes: entry.stats?.freeBytes ?? 0 }, clearing: false, confirmed: false },
       }))
     } catch (e) {
       log.error('purge error', e)

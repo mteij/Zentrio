@@ -83,15 +83,29 @@ fn download_list(
 pub struct StorageStats {
     pub total_bytes: i64,
     pub count: i64,
+    pub free_bytes: i64,
 }
 
 #[tauri::command]
 fn download_storage_stats(
+    app: tauri::AppHandle,
     state: tauri::State<Arc<DownloadManager>>,
     profile_id: String,
 ) -> Result<StorageStats, String> {
     let (total_bytes, count) = state.get_storage_stats(&profile_id)?;
-    Ok(StorageStats { total_bytes, count })
+    let dir = file_store::downloads_dir(&app, &profile_id);
+    // Ensure the directory exists so we can stat it; fall back to app data dir if not
+    let stat_path = if dir.exists() {
+        dir
+    } else {
+        app.path()
+            .app_data_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+    };
+    let free_bytes = fs2::available_space(&stat_path)
+        .map(|b| b as i64)
+        .unwrap_or(0);
+    Ok(StorageStats { total_bytes, count, free_bytes })
 }
 
 #[tauri::command]

@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { memo, useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAutoPlay } from '../../hooks/useAutoPlay'
+import { useRowPosterPreload } from '../../hooks/useRowPosterPreload'
 import { useScrollRow } from '../../hooks/useScrollRow'
 import { apiFetch } from '../../lib/apiFetch'
 import { getPackId } from '../../services/addons/stream-service'
@@ -57,6 +58,12 @@ export const StreamingRow = memo(function StreamingRow({
     handlers,
     isDragging 
   } = useScrollRow({ items: rowItems })
+
+  useRowPosterPreload({
+    containerRef,
+    items: rowItems,
+    enabled: rowItems.length > 0,
+  })
 
   // Handle item removal (for continue watching)
   const handleRemove = useCallback(async (item: ContentItem) => {
@@ -133,6 +140,7 @@ export const StreamingRow = memo(function StreamingRow({
         
         <div 
           className={styles.rowScrollContainer} 
+          data-row-scroll-container="true"
           ref={containerRef}
           {...handlers}
           style={{ cursor: isDown ? 'grabbing' : 'grab', userSelect: 'none' }}
@@ -141,6 +149,7 @@ export const StreamingRow = memo(function StreamingRow({
             <div 
               key={`${item.id}-${index}-${item.type}-${item.name}`.replace(/\s+/g, '-').toLowerCase()}
               className={`${styles.cardWrapper} ${isRanked ? styles.rankedWrapper : ''}`}
+              data-row-card="true"
             >
               <ContentCard
                 item={item}

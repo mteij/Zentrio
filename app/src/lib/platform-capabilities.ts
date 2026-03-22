@@ -1,5 +1,7 @@
 import { getAppTarget, type AppTarget } from './app-target'
 
+export type StandardNavPlacement = 'side' | 'bottom' | 'none'
+
 export interface PlatformCapabilities extends AppTarget {
   canUseNativeShell: boolean
   canUseDesktopWindowControls: boolean
@@ -7,11 +9,16 @@ export interface PlatformCapabilities extends AppTarget {
   shouldUseTvHome: boolean
   canUseRemoteNavigation: boolean
   supportsTouchGestures: boolean
+  standardNavPlacement: StandardNavPlacement
+  shouldUseBottomTabs: boolean
+  shouldUseSideRail: boolean
+  shouldUseTopAppBar: boolean
 }
 
 export function getPlatformCapabilities(target: AppTarget = getAppTarget()): PlatformCapabilities {
   const canUseNativeShell = target.isTauri
   const canUseDesktopWindowControls = canUseNativeShell && target.isDesktop
+  const standardNavPlacement: StandardNavPlacement = target.isTv ? 'none' : target.isMobile ? 'bottom' : 'side'
 
   return {
     ...target,
@@ -21,5 +28,9 @@ export function getPlatformCapabilities(target: AppTarget = getAppTarget()): Pla
     shouldUseTvHome: target.isTv,
     canUseRemoteNavigation: target.primaryInput === 'remote',
     supportsTouchGestures: target.hasTouch && !target.isTv,
+    standardNavPlacement,
+    shouldUseBottomTabs: standardNavPlacement === 'bottom',
+    shouldUseSideRail: standardNavPlacement === 'side',
+    shouldUseTopAppBar: !target.isTv,
   }
 }

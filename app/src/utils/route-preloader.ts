@@ -20,7 +20,7 @@ const ROUTES_TO_PRELOAD: PreloadRoute[] = [
   // Most common routes first
   () => import('../pages/streaming/Home'),
   () => import('../pages/streaming/Explore'),
-  () => import('../pages/streaming/Library'),
+  () => import('../pages/streaming/LibraryRoute'),
   () => import('../pages/streaming/Search'),
   
   // Secondary routes
@@ -163,7 +163,7 @@ export function createHoverPreloader(routeName: string) {
     const routeMap: Record<string, PreloadRoute> = {
       'streaming-home': () => import('../pages/streaming/Home'),
       'streaming-explore': () => import('../pages/streaming/Explore'),
-      'streaming-library': () => import('../pages/streaming/Library'),
+      'streaming-library': () => import('../pages/streaming/LibraryRoute'),
       'streaming-search': () => import('../pages/streaming/Search'),
       '/settings': () => import('../pages/SettingsPage.tsx'),
       '/profiles': () => import('../pages/ProfilesPage'),

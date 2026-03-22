@@ -50,6 +50,7 @@ export function StreamingHomeStandardView({ model }: { model: HomeScreenModel })
               items={model.historyRowItems}
               profileId={model.profileId}
               showImdbRatings={model.showImdbRatings}
+              showAgeRatings={model.showAgeRatings}
               isContinueWatching
             />
           ) : null}

@@ -40,7 +40,7 @@ export const LazyImage = ({
         }
       },
       {
-        rootMargin: '50px', // Start loading 50px before element enters viewport
+        rootMargin: '300px', // Start loading earlier so vertical scrolling does not reveal empty placeholders
         threshold: 0.01
       }
     )
@@ -87,7 +87,9 @@ export const LazyImage = ({
         <img
           src={src}
           alt={alt}
-          loading={priority ? 'eager' : 'lazy'}
+          loading="eager"
+          decoding="async"
+          fetchPriority={priority ? 'high' : 'auto'}
           draggable={false}
           onLoad={handleLoad}
           onError={handleError}

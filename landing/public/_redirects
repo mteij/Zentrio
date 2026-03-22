@@ -1,1 +1,2 @@
 "/download/*  /.netlify/functions/download/:splat  200" 
+"/updater  /.netlify/functions/updater  200"

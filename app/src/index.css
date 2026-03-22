@@ -153,10 +153,6 @@ body.is-mobile #root {
 }
 
 /* Profiles page is a fixed-height non-scrolling page — lock #root scroll */
-body.is-mobile:has([data-page="profiles"]) #root {
-  overflow: hidden !important;
-}
-
 /* When player is active on mobile, disable scrolling on #root to prevent conflicts */
 body.is-mobile:has(.playerWrapperImmersive) #root,
 body.is-mobile:has(.playerWrapper) #root {
@@ -174,20 +170,9 @@ body.is-mobile:has(.playerWrapper) #root {
   }
 }
 
-/* Layout player mode - when header/footer are hidden (player page) */
-body.is-mobile .layout-player {
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-}
-
-body.is-mobile .layout-player .main-player {
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-  padding: 0;
-  margin: 0;
-}
+/* Player overflow is handled by the :has(.playerWrapperImmersive) rule above.
+   Do NOT add overflow:hidden to .layout-player here — it applies to all streaming
+   pages (Explore, Home, Search, etc.) which need to scroll. */
 
 /* Ensure fixed elements respect safe areas on mobile */
 body.is-mobile .fixed-header {
@@ -213,7 +198,7 @@ body.has-titlebar [data-sonner-toaster] {
    The navbar sits at calc(20px + safe-area-inset-bottom) from the viewport
    bottom and is ~52px tall, so we clear it with a 80px offset + safe area. */
 body.is-mobile [data-sonner-toaster] {
-  bottom: calc(var(--safe-area-inset-bottom, 0px) + 84px) !important;
+  bottom: max(16px, calc(var(--standard-shell-bottom-nav-height, 0px) + 16px)) !important;
   /* Stretch to near-full width (matching the pill navbar width range) */
   left: 16px !important;
   right: 16px !important;

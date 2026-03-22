@@ -146,13 +146,22 @@ export function DetailsHeader({
 
   const dlStatus = existingDownload?.status
   const ageRating = (meta as any).certification || (meta as any).rating || (meta as any).contentRating
+  const backdropImage = meta.poster || meta.background
+  const summaryContent = (
+    <>
+      {genres && <p className={styles.genres}>{genres}</p>}
+      {meta.description && (
+        <p className={styles.description}>{meta.description}</p>
+      )}
+    </>
+  )
 
   return (
     <>
       <div className={styles.page}>
         <div
           className={styles.backdrop}
-          style={{ backgroundImage: `url(${meta.background || meta.poster})` }}
+          style={{ backgroundImage: `url(${backdropImage})` }}
         />
         <div className={styles.backdropScrim} />
 
@@ -165,12 +174,14 @@ export function DetailsHeader({
           </div>
 
           <div className={styles.header}>
-            <div className={styles.posterWrap}>
-              {meta.poster ? (
-                <img src={meta.poster} alt={meta.name} className={styles.poster} />
-              ) : (
-                <div className={styles.posterFallback}>{meta.name[0]}</div>
-              )}
+            <div className={styles.headerAside}>
+              <div className={styles.posterWrap}>
+                {meta.poster ? (
+                  <img src={meta.poster} alt={meta.name} className={styles.poster} />
+                ) : (
+                  <div className={styles.posterFallback}>{meta.name[0]}</div>
+                )}
+              </div>
             </div>
 
             <div className={styles.headerInfo}>
@@ -306,11 +317,14 @@ export function DetailsHeader({
                 />
               </div>
 
-              {genres && <p className={styles.genres}>{genres}</p>}
-              {meta.description && (
-                <p className={styles.description}>{meta.description}</p>
-              )}
+              <div className={`${styles.summaryBlock} ${styles.summaryMobile}`}>
+                {summaryContent}
+              </div>
             </div>
+          </div>
+
+          <div className={`${styles.summaryBlock} ${styles.summaryDesktop}`}>
+            {summaryContent}
           </div>
 
           {children}

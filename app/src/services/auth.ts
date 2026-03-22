@@ -31,16 +31,18 @@ export const auth = betterAuth({
     // Only explicitly known origins are trusted — never echo back the request Origin header,
     // as that would allow any website to bypass CSRF checks.
     // Add APP_URL / CLIENT_URL to cover reverse-proxy / custom domain deployments.
-    trustedOrigins: [
+    trustedOrigins: Array.from(new Set([
         "tauri://localhost",
         "zentrio://",
         "http://localhost:3000",
         "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
         "http://tauri.localhost",
         "https://tauri.localhost",
         cfg.APP_URL,
         cfg.CLIENT_URL
-    ].filter(Boolean) as string[],
+    ].filter(Boolean) as string[])),
     database: db,
     advanced: {
         defaultCookieAttributes: {

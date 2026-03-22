@@ -65,6 +65,7 @@ export interface StartDownloadPayload {
 export interface StorageStats {
   totalBytes: number
   count: number
+  freeBytes: number
 }
 
 export interface SmartDefaults {

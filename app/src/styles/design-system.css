@@ -65,6 +65,11 @@
      ------------------------------------------------------------------------- */
   --nav-width-desktop: 80px;
   --nav-height-mobile: 70px;
+  --standard-shell-nav-width-desktop: 104px;
+  --standard-shell-nav-height-mobile: 78px;
+  --standard-app-bar-height-mobile: 68px;
+  --standard-app-bar-height-desktop: 76px;
+  --touch-target-min: 44px;
   --container-max: 1400px;
   --content-max: 1200px;
 

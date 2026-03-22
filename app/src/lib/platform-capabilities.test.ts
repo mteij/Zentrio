@@ -48,5 +48,43 @@ describe('getPlatformCapabilities', () => {
     expect(capabilities.shouldUseTvHome).toBe(true)
     expect(capabilities.canUseRemoteNavigation).toBe(true)
     expect(capabilities.supportsTouchGestures).toBe(false)
+    expect(capabilities.standardNavPlacement).toBe('none')
+  })
+
+  it('uses docked bottom tabs for mobile standard targets', () => {
+    const capabilities = getPlatformCapabilities(makeTarget({
+      kind: 'mobile',
+      os: 'android',
+      isTauri: true,
+      isMobile: true,
+      hasTouch: true,
+      supportsHover: false,
+      primaryInput: 'touch',
+    }))
+
+    expect(capabilities.standardNavPlacement).toBe('bottom')
+    expect(capabilities.shouldUseBottomTabs).toBe(true)
+    expect(capabilities.shouldUseSideRail).toBe(false)
+  })
+
+  it('uses side rail navigation for desktop and web standard targets', () => {
+    const desktopCapabilities = getPlatformCapabilities(makeTarget({
+      kind: 'desktop',
+      os: 'windows',
+      isTauri: true,
+      isDesktop: true,
+      supportsHover: true,
+      primaryInput: 'mouse',
+    }))
+    const webCapabilities = getPlatformCapabilities(makeTarget({
+      kind: 'web',
+      os: 'unknown',
+      supportsHover: true,
+      primaryInput: 'mouse',
+    }))
+
+    expect(desktopCapabilities.standardNavPlacement).toBe('side')
+    expect(desktopCapabilities.shouldUseSideRail).toBe(true)
+    expect(webCapabilities.standardNavPlacement).toBe('side')
   })
 })

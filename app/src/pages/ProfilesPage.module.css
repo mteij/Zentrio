@@ -1,5 +1,10 @@
 /* ProfilesPage Component Styles - CSS Module */
 
+.pageShell {
+  position: relative;
+  z-index: 1;
+}
+
 /* Main page container */
 .profilesPage {
   position: relative;
@@ -79,6 +84,7 @@
 
 /* Profile card */
 .profileCard {
+  appearance: none;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -91,6 +97,8 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  color: inherit;
+  font: inherit;
 }
 
 .profileCard:hover {
@@ -98,6 +106,13 @@
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.15);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.profileCard:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 3px;
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 4px rgba(229, 9, 20, 0.28);
 }
 
 /* Profile avatar */
@@ -134,15 +149,23 @@
   display: block;
 }
 
+.profileMeta {
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+}
+
 /* Add profile avatar variant */
 .addAvatar {
-  background: var(--btn-secondary-bg);
-  border: 2px dashed rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .addAvatar:hover {
   border-color: var(--accent);
-  background: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.06));
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 /* Profile name */
@@ -206,11 +229,11 @@
   position: absolute;
   top: 50%;
   left: 0;
-  width: 40px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  transform: translateY(-50%) translateX(calc(var(--active-index, 0) * 44px));
+  transform: translateY(-50%) translateX(calc(var(--active-index, 0) * 48px));
   transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
   pointer-events: none;
   z-index: 0;
@@ -223,8 +246,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   background: transparent;
   border: none;
   border-radius: 10px;
@@ -236,6 +261,12 @@
 }
 
 .navItem:hover {
+  color: #fff;
+}
+
+.navItem:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 2px;
   color: #fff;
 }
 
@@ -267,77 +298,136 @@
   flex-shrink: 0;
 }
 
-/* Responsive: Tablet */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
+  .profilesMain {
+    max-width: 720px;
+    padding-inline: 16px;
+  }
+
   .profilesSection {
-    padding: 30px 15px;
+    padding: 8px 0 24px;
+    min-height: 0;
   }
 
   .sectionTitle {
-    font-size: 36px;
+    font-size: 2rem;
+    margin: 0 auto 24px;
+    padding-bottom: 0;
   }
 
   .profilesGrid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .profileCard {
+    max-width: 100%;
+    padding: 14px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+  }
+
+  .profileCard:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
   }
 
   .profileAvatar {
-    width: 100px;
-    height: 100px;
-    font-size: 36px;
+    width: 88px;
+    height: 88px;
+    margin-bottom: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .profileCard:hover .profileAvatar {
+    transform: translateY(-1px) scale(1.03);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+  }
+
+  .addAvatar {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .profileMeta {
+    width: 100%;
   }
 
   .profileName {
-    font-size: 14px;
+    font-size: 0.98rem;
+    color: #fff;
+    margin-bottom: 0;
   }
 
-  .footer {
-    bottom: 20px;
+  .profileStatus {
+    justify-self: center;
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* Responsive: Mobile */
+@media (max-width: 480px) {
+  .profilesGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .profileCard {
+    max-width: 100%;
+    display: block;
+    min-height: 0;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .profileAvatar {
+    width: 76px;
+    height: 76px;
+    margin: 0 auto 10px;
+    border-radius: 50%;
   }
 
   .footerNav {
     gap: 2px;
     padding: 6px 10px;
   }
-}
 
-/* Responsive: Mobile */
-@media (max-width: 480px) {
-  .profilesPage {
-    padding-block: 1.25rem;
-    padding-bottom: calc(104px + var(--safe-area-inset-bottom, 0px));
+  .profileMeta {
+    min-width: 0;
+    justify-items: center;
+    gap: 6px;
   }
 
-  .profilesSection {
-    min-height: 0;
+  .profileName {
+    font-size: 0.95rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  .profileStatus {
+    justify-self: center;
   }
 
   .sectionTitle {
-    font-size: 28px;
-  }
-
-  .profilesGrid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    max-height: 70vh;
-    min-height: 0;
-  }
-
-  .profileCard {
-    max-width: 100%;
-    padding: 10px;
-  }
-
-  .profileAvatar {
-    width: 90px;
-    height: 90px;
-    margin-bottom: 8px;
-  }
-
-  .footerNav {
-    gap: 0;
-    padding: 6px 8px;
+    font-size: 1.75rem;
+    margin-bottom: 18px;
   }
 }
 
@@ -346,6 +436,7 @@
   .profilesGrid {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     max-height: 50vh;
+    min-height: 0;
   }
 
   .profileCard {
@@ -370,12 +461,6 @@
 }
 
 /* Responsive: Larger screens */
-@media (min-width: 768px) {
-  .profilesGrid {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  }
-}
-
 @media (min-width: 1024px) {
   .profilesGrid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

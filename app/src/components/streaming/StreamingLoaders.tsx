@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../layout/Layout'
 import { Navbar } from '../layout/Navbar'
+import { StandardShell } from '../layout/StandardShell'
 import { SkeletonHero } from '../ui/SkeletonHero'
 import { SkeletonRow } from '../ui/SkeletonRow'
 import { SkeletonDetails } from '../ui/SkeletonDetails'
@@ -10,15 +11,15 @@ export function StreamingHomeSkeleton() {
   const { profileId } = useParams<{ profileId: string }>()
   return (
     <Layout title="Streaming" showHeader={false} showFooter={false}>
-      <Navbar profileId={parseInt(profileId || '0')} activePage="home" />
-      <div className={styles.streamingLayout}>
-        {/* Force hero skeleton to matching height/style */}
-        <SkeletonHero />
-        <div className={styles.contentContainer}>
-          <SkeletonRow />
-          <SkeletonRow />
+      <StandardShell navPlacement="auto" nav={<Navbar profileId={parseInt(profileId || '0')} activePage="home" />}>
+        <div className={styles.streamingLayout}>
+          <SkeletonHero />
+          <div className={styles.contentContainer}>
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
         </div>
-      </div>
+      </StandardShell>
     </Layout>
   )
 }

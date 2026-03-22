@@ -1,0 +1,128 @@
+.root {
+  position: relative;
+  min-height: var(--app-height, 100vh);
+  --standard-shell-side-nav-width: 0px;
+  --standard-shell-bottom-nav-height: 0px;
+}
+
+.content {
+  min-width: 0;
+  width: 100%;
+  position: relative;
+  isolation: isolate;
+}
+
+.header {
+  position: sticky;
+  top: var(--app-content-top-offset, 0px);
+  z-index: var(--z-sticky, 500);
+}
+
+.headerAlways {
+  display: block;
+}
+
+.headerMobileOnly,
+.headerDesktopOnly {
+  display: none;
+}
+
+.rootNavSide {
+  --standard-shell-side-nav-width: var(--standard-shell-nav-width-desktop, 104px);
+}
+
+.sideNav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: calc(var(--standard-shell-side-nav-width, 0px) + var(--safe-area-inset-left, 0px));
+  padding-left: var(--safe-area-inset-left, 0px);
+  z-index: var(--z-sticky, 500);
+}
+
+.sideNavInner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  isolation: isolate;
+}
+
+.sideNavInner > * {
+  position: relative;
+  z-index: 1;
+}
+
+.rootNavBottom {
+  --standard-shell-bottom-nav-height: calc(
+    var(--standard-shell-nav-height-mobile, var(--nav-height-mobile, 78px)) + var(--safe-area-inset-bottom, 0px)
+  );
+}
+
+.bottomNav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sticky, 500);
+}
+
+.bottomNavInner {
+  width: 100%;
+}
+
+@media (min-width: 1025px) {
+  .sideNav {
+    overflow: visible;
+  }
+
+  .sideNavInner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(8, 8, 10, 0.32) 0%, rgba(8, 8, 10, 0.22) 42%, rgba(8, 8, 10, 0.14) 100%),
+      linear-gradient(90deg, rgba(8, 8, 10, 0.5) 0%, rgba(8, 8, 10, 0.24) 36%, rgba(8, 8, 10, 0.08) 68%, rgba(8, 8, 10, 0) 100%),
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.045), transparent 42%);
+    backdrop-filter: blur(18px) saturate(112%);
+    -webkit-backdrop-filter: blur(18px) saturate(112%);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.018);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .sideNavInner::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -40px;
+    bottom: 0;
+    width: 72px;
+    background: linear-gradient(90deg, rgba(8, 8, 10, 0.22) 0%, rgba(8, 8, 10, 0.08) 42%, rgba(8, 8, 10, 0) 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .headerDesktopOnly,
+  .headerAlways {
+    display: block;
+  }
+}
+
+@media (max-width: 1024px) {
+  .headerMobileOnly,
+  .headerAlways {
+    display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

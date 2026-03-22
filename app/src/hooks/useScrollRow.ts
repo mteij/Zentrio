@@ -54,6 +54,21 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
   const lastPageXRef = useRef(0)
   const rafIdRef = useRef<number | null>(null)
 
+  const findVerticalScrollParent = useCallback((element: HTMLElement | null): HTMLElement | null => {
+    let current = element?.parentElement || null
+
+    // Stop before body/html — both get computed overflow-y:auto from overflow-x:hidden
+    // which makes them appear scrollable, but body.scrollTop is a no-op in standards mode.
+    while (current && current !== document.body && current !== document.documentElement) {
+      const style = window.getComputedStyle(current)
+      const canScrollY = /(auto|scroll|overlay)/.test(style.overflowY) && current.scrollHeight > current.clientHeight
+      if (canScrollY) return current
+      current = current.parentElement
+    }
+
+    return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement
+  }, [])
+
   // Update arrow visibility
   const updateArrows = useCallback(() => {
     if (containerRef.current) {
@@ -111,7 +126,6 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
   // We use a ref to access the latest state/refs without re-binding
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
     if (!containerRef.current) return
-    e.preventDefault()
     
     const x = e.pageX - containerRef.current.offsetLeft
     const walk = (x - startXRef.current) * multiplier
@@ -122,6 +136,7 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
     }
 
     if (isDraggingRef.current) {
+      e.preventDefault()
       // Disable smooth scrolling during direct manipulation
       containerRef.current.style.scrollBehavior = 'auto'
       containerRef.current.scrollLeft = scrollLeftRef.current - walk
@@ -197,6 +212,45 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
     e.preventDefault()
     return false
   }, [])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleWheel = (e: WheelEvent) => {
+      const absX = Math.abs(e.deltaX)
+      const absY = Math.abs(e.deltaY)
+
+      // Let the browser handle native horizontal/diagonal trackpad gestures.
+      // Our old "dominant vertical" check was catching slightly diagonal swipes
+      // and rerouting them to page scroll, which made horizontal rows barely move.
+      if (absX > 0.5 && !e.shiftKey) {
+        return
+      }
+
+      if (e.shiftKey && absY > 0 && absX <= 0.5) {
+        e.preventDefault()
+        container.scrollLeft += e.deltaY
+        updateArrows()
+        return
+      }
+
+      if (absY > 0) {
+        const scrollParent = findVerticalScrollParent(container)
+        if (!scrollParent) return
+
+        e.preventDefault()
+        scrollParent.scrollTop += e.deltaY
+        return
+      }
+    }
+
+    container.addEventListener('wheel', handleWheel, { passive: false })
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+    }
+  }, [findVerticalScrollParent, updateArrows])
 
   // Check if currently dragging (for click prevention)
   const isDragging = useCallback(() => {

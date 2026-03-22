@@ -123,9 +123,13 @@
   padding: 16px 0 32px;
 }
 
-.posterWrap {
+.headerAside {
   width: 130px;
   flex-shrink: 0;
+}
+
+.posterWrap {
+  width: 100%;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
@@ -154,6 +158,20 @@
   flex: 1;
   min-width: 0;
   padding-top: 4px;
+}
+
+.summaryBlock {
+  min-width: 0;
+}
+
+.summaryDesktop {
+  display: block;
+  margin: 4px 0 28px;
+  max-width: min(980px, 100%);
+}
+
+.summaryMobile {
+  display: none;
 }
 
 .logo {
@@ -316,6 +334,19 @@
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.summaryDesktop .genres {
+  font-size: 0.84rem;
+  margin-bottom: 12px;
+}
+
+.summaryDesktop .description {
+  display: block;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: initial;
+  overflow: visible;
+  max-width: none;
 }
 
 /* ── Season tabs ── */
@@ -692,7 +723,7 @@
 
 /* ── Responsive ── */
 @media (max-width: 600px) {
-  .posterWrap {
+  .headerAside {
     width: 100px;
   }
 
@@ -706,11 +737,30 @@
   }
 }
 
-@media (max-width: 420px) {
-  .posterWrap {
-    width: 84px;
+@media (max-width: 768px) {
+  .header {
+    display: block;
   }
 
+  .headerAside {
+    display: none;
+  }
+
+  .headerInfo {
+    padding-top: 0;
+  }
+
+  .summaryMobile {
+    display: block;
+    margin-top: 12px;
+  }
+
+  .summaryDesktop {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
   .title {
     font-size: 1.3rem;
   }

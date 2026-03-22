@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { apiFetchJson } from '../../lib/apiFetch'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import type { MetaPreview } from '../../services/addons/types'
+import { isLanguageBrowseOption } from '../../services/addons/genre-utils'
 import { createLogger } from '../../utils/client-logger'
 
 const log = createLogger('ExplorePage')
@@ -32,6 +33,7 @@ export interface ExploreScreenModel {
   hasMore: boolean
   showHero: boolean
   genres: string[]
+  displayGenres: string[]
   rowGenres: string[]
   trending: MetaPreview[]
   trendingMovies: MetaPreview[]
@@ -144,9 +146,10 @@ export function useExploreScreenModel(): ExploreScreenModel {
   }
 
   const genres = filtersData?.filters?.genres || []
-  const displayGenres = genres.length > 0
+  const displayGenres = (genres.length > 0
     ? shuffledGenres.filter((genre) => genres.includes(genre)).concat(genres.filter((genre) => !shuffledGenres.includes(genre)))
     : shuffledGenres
+  ).filter((genre) => !isLanguageBrowseOption(genre))
   const rowGenres = displayGenres.slice(0, 8)
   const trending = dashboardData?.trending || []
   const trendingMovies = dashboardData?.trendingMovies || []
@@ -163,6 +166,7 @@ export function useExploreScreenModel(): ExploreScreenModel {
     hasMore,
     showHero: !isFilteredView && trending.length > 0,
     genres,
+    displayGenres,
     rowGenres,
     trending,
     trendingMovies,

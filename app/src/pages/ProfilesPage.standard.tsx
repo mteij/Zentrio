@@ -1,6 +1,6 @@
 import { Check, Edit, LogIn, LogOut, Plus, Settings, Shield } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { AnimatedBackground, ConfirmDialog, SimpleLayout, SkeletonProfile } from '../components'
+import { AnimatedBackground, ConfirmDialog, SimpleLayout, SkeletonProfile, StandardShell } from '../components'
 import { ProfileModal } from '../components/features/ProfileModal'
 import { ContextMenu } from '../components/ui/ContextMenu'
 import { buildAvatarUrl, sanitizeImgSrc } from '../lib/url'
@@ -29,7 +29,12 @@ function ProfileCard({
         },
       ]}
     >
-      <div className={styles.profileCard} onClick={() => onClick(profile)}>
+      <button
+        type="button"
+        className={styles.profileCard}
+        onClick={() => onClick(profile)}
+        aria-label={profile.isDefault ? `${profile.name}, default profile` : profile.name}
+      >
         <div className={styles.profileAvatar}>
           <div id={`avatar-${profile.id}`}>
             <img
@@ -43,9 +48,11 @@ function ProfileCard({
             />
           </div>
         </div>
-        <div className={styles.profileName}>{profile.name}</div>
-        {profile.isDefault ? <div className={styles.profileStatus}>Default</div> : null}
-      </div>
+        <div className={styles.profileMeta}>
+          <div className={styles.profileName}>{profile.name}</div>
+          {profile.isDefault ? <div className={styles.profileStatus}>Default</div> : null}
+        </div>
+      </button>
     </ContextMenu>
   )
 }
@@ -78,8 +85,11 @@ export function ProfilesPageStandardView({ model }: { model: ProfilesScreenModel
   return (
     <SimpleLayout title="Profiles">
       <AnimatedBackground />
-
-      <main className={styles.profilesPage} data-page="profiles" style={{ position: 'relative', zIndex: 1 }}>
+      <StandardShell
+        className={styles.pageShell}
+        contentAs="main"
+        contentClassName={styles.profilesPage}
+      >
         <h1 className="sr-only">Profiles</h1>
         <div className={styles.profilesMain}>
           <section className={styles.profilesSection}>
@@ -109,72 +119,86 @@ export function ProfilesPageStandardView({ model }: { model: ProfilesScreenModel
                 ))}
 
                 {(model.editMode || model.profiles.length === 0) ? (
-                  <div className={styles.profileCard} onClick={model.actions.handleCreateProfile}>
-                    <div className={`${styles.profileAvatar} ${styles.addAvatar}`}>
-                      <Plus className="w-10 h-10 text-[#666]" />
-                    </div>
-                    <div className={styles.profileName}>Add Profile</div>
+                  <div>
+                    <button
+                      type="button"
+                      className={styles.profileCard}
+                      onClick={model.actions.handleCreateProfile}
+                      aria-label="Add profile"
+                    >
+                      <div className={`${styles.profileAvatar} ${styles.addAvatar}`}>
+                        <Plus size={36} aria-hidden="true" />
+                      </div>
+                      <div className={styles.profileMeta}>
+                        <div className={styles.profileName}>Add Profile</div>
+                      </div>
+                    </button>
                   </div>
                 ) : null}
               </div>
             )}
           </section>
         </div>
-      </main>
 
-      <footer className={styles.footer}>
-        <nav className={styles.footerNav} id="footerButtons">
-          <div
-            className={styles.navGroup}
-            style={{ '--active-index': model.editMode ? 1 : 0 } as CSSProperties}
-          >
-            <div className={styles.navIndicator} />
-            <button
-              id="settingsBtn"
-              className={`${styles.navItem} ${!model.editMode ? styles.navItemActive : ''}`}
-              aria-label="Settings"
-              title="Settings"
-              onClick={() => !model.editMode && model.navigation.goToSettings()}
+        <footer className={styles.footer}>
+          <nav className={styles.footerNav} id="footerButtons" aria-label="Profile actions">
+            <div
+              className={styles.navGroup}
+              style={{ '--active-index': model.editMode ? 1 : 0 } as CSSProperties}
             >
-              <Settings size={20} />
-            </button>
+              <div className={styles.navIndicator} />
+              <button
+                type="button"
+                id="settingsBtn"
+                className={`${styles.navItem} ${!model.editMode ? styles.navItemActive : ''}`}
+                aria-label="Settings"
+                title="Settings"
+                onClick={() => !model.editMode && model.navigation.goToSettings()}
+              >
+                <Settings size={20} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                id="editModeBtn"
+                className={`${styles.navItem} ${model.editMode ? styles.navItemActive : ''}`}
+                aria-label={model.editMode ? 'Done editing' : 'Edit Profiles'}
+                aria-pressed={model.editMode}
+                title={model.editMode ? 'Done' : 'Edit Profiles'}
+                onClick={model.actions.toggleEditMode}
+                disabled={model.profiles.length === 0 && !model.editMode}
+              >
+                {model.editMode ? <Check size={20} aria-hidden="true" /> : <Edit size={20} aria-hidden="true" />}
+              </button>
+            </div>
+
+            {model.isAdmin ? (
+              <button
+                type="button"
+                id="adminBtn"
+                className={styles.navItem}
+                aria-label="Admin Panel"
+                title="Admin Panel"
+                onClick={model.navigation.goToAdmin}
+              >
+                <Shield size={20} aria-hidden="true" />
+              </button>
+            ) : null}
+
+            <div className={styles.navDivider} />
+
             <button
-              id="editModeBtn"
-              className={`${styles.navItem} ${model.editMode ? styles.navItemActive : ''}`}
-              aria-label={model.editMode ? 'Done editing' : 'Edit Profiles'}
-              title={model.editMode ? 'Done' : 'Edit Profiles'}
-              onClick={model.actions.toggleEditMode}
-              disabled={model.profiles.length === 0 && !model.editMode}
+              type="button"
+              id="logoutBtn"
+              className={`${styles.navItem} ${styles.navItemDanger}`}
+              aria-label={model.isGuestMode ? 'Exit Local Mode' : 'Logout'}
+              title={model.isGuestMode ? 'Exit Local Mode' : 'Logout'}
+              onClick={model.actions.openLogoutConfirm}
             >
-              {model.editMode ? <Check size={20} /> : <Edit size={20} />}
+              {model.isGuestMode ? <LogIn size={20} aria-hidden="true" /> : <LogOut size={20} aria-hidden="true" />}
             </button>
-          </div>
-
-          <div className={styles.navDivider} />
-
-          {model.isAdmin ? (
-            <button
-              id="adminBtn"
-              className={styles.navItem}
-              aria-label="Admin Panel"
-              title="Admin Panel"
-              onClick={model.navigation.goToAdmin}
-            >
-              <Shield size={20} />
-            </button>
-          ) : null}
-
-          <button
-            id="logoutBtn"
-            className={`${styles.navItem} ${styles.navItemDanger}`}
-            aria-label={model.isGuestMode ? 'Exit Local Mode' : 'Logout'}
-            title={model.isGuestMode ? 'Exit Local Mode' : 'Logout'}
-            onClick={model.actions.openLogoutConfirm}
-          >
-            {model.isGuestMode ? <LogIn size={20} /> : <LogOut size={20} />}
-          </button>
-        </nav>
-      </footer>
+          </nav>
+        </footer>
+      </StandardShell>
 
       {model.showModal ? (
         <ProfileModal

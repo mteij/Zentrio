@@ -5,6 +5,7 @@
  */
 import { TMDBClient } from './client'
 import { getMeta } from './meta'
+import { resolveTrendingTimeWindow } from './browse-utils'
 import { logger } from '../logger'
 
 const log = logger.scope('TMDB:Trending')
@@ -13,7 +14,7 @@ export async function getTrending(tmdbClient: TMDBClient, type: string, language
   const media_type = type === "series" ? "tv" : type
   const parameters = {
     media_type,
-    time_window: genre ? genre.toLowerCase() : "day",
+    time_window: resolveTrendingTimeWindow(genre),
     language,
     page,
   }

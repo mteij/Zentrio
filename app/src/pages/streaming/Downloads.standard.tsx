@@ -1,13 +1,28 @@
-import { Download, Settings2 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Download, Settings2, User } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { DownloadCard } from '../../components/downloads/DownloadCard'
 import { DownloadProgress } from '../../components/downloads/DownloadProgress'
 import { SeriesGroup } from '../../components/downloads/SeriesGroup'
 import { StoragePanel } from '../../components/downloads/StoragePanel'
+import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 import type { DownloadsScreenModel } from './Downloads.model'
 import styles from '../../components/downloads/Downloads.module.css'
 import layoutStyles from '../../styles/Streaming.module.css'
 
 export function StreamingDownloadsStandardView({ model }: { model: DownloadsScreenModel }) {
+  // Read profile from cache populated by StreamingLayout (no extra fetch)
+  const { data: profile } = useQuery<any>({
+    queryKey: ['streaming-profile', model.profileId],
+    enabled: false,
+  })
+
+  const profileAvatar = profile?.avatar ? (
+    <img src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))} alt="" />
+  ) : (
+    <User size={18} aria-hidden="true" />
+  )
+
   if (model.platformIsTv && !model.canUseOfflineDownloads) {
     return (
       <div className={`${layoutStyles.streamingLayout} ${styles.downloadsPage}`}>
@@ -31,6 +46,29 @@ export function StreamingDownloadsStandardView({ model }: { model: DownloadsScre
         <div className={layoutStyles.pageAmbientBackground} style={{ backgroundImage: `url(${model.backdropPoster})` }} />
       ) : null}
       <div className={`${layoutStyles.streamingLayout} ${styles.downloadsPage}`}>
+        {/* Mobile-only sticky glass header */}
+        <div className={styles.downloadsMobileBar}>
+          <button
+            className={styles.downloadsGearBtn}
+            onClick={() => model.actions.setShowStorage(true)}
+          >
+            <Settings2 size={15} />
+            Storage
+          </button>
+          <div style={{ flex: 1 }} />
+          <Link
+            to="/profiles"
+            className={layoutStyles.streamingMobileProfileButton}
+            aria-label="Switch profile"
+            title="Switch Profile"
+          >
+            <div className={layoutStyles.streamingMobileProfileAvatar}>
+              {profileAvatar}
+            </div>
+          </Link>
+        </div>
+
+        {/* Desktop header */}
         <div className={styles.downloadsHeader}>
           <h1 className={styles.downloadsTitle}>Downloads</h1>
           <button

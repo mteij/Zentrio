@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { MetaPreview } from '../../services/addons/types'
 import { ContentCard, ContentItem } from './ContentCard'
 import { SkeletonCard } from '../ui/SkeletonCard'
+import { useRowPosterPreload } from '../../hooks/useRowPosterPreload'
 import { useScrollRow } from '../../hooks/useScrollRow'
 import { apiFetchJson } from '../../lib/apiFetch'
 import styles from '../../styles/Streaming.module.css'
@@ -105,6 +106,12 @@ export const SearchCatalogRow = memo(function SearchCatalogRow({
     isDragging
   } = useScrollRow({ items })
 
+  useRowPosterPreload({
+    containerRef,
+    items,
+    enabled: !isLoading && items.length > 0,
+  })
+
   const handleItemClick = (e: React.MouseEvent, _item: ContentItem) => {
     if (isDragging()) {
       e.preventDefault()
@@ -131,6 +138,7 @@ export const SearchCatalogRow = memo(function SearchCatalogRow({
 
         <div
           className={styles.rowScrollContainer}
+          data-row-scroll-container="true"
           ref={containerRef}
           {...handlers}
           style={{ cursor: isLoading ? 'default' : (isDown ? 'grabbing' : 'grab'), userSelect: 'none' }}
@@ -159,6 +167,7 @@ export const SearchCatalogRow = memo(function SearchCatalogRow({
                     delay: Math.min(index * 0.02, 0.14)
                   }}
                   className={styles.cardWrapper}
+                  data-row-card="true"
                 >
                   <ContentCard
                     item={item as ContentItem}

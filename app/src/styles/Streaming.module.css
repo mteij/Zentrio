@@ -46,7 +46,7 @@
 .backBtn {
   position: fixed;
   top: var(--app-fixed-top-xl, 40px);
-  left: 40px;
+  left: calc(var(--standard-shell-side-nav-width, 0px) + 32px);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -102,144 +102,350 @@
 /* Streaming Navbar Styles */
 /* ======================= */
 .streamingNavbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 80px;
-  height: 100vh;
-  background: rgba(10, 10, 10, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 1000;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: calc(30px + var(--app-chrome-top, 0px)) 0 20px 0;
-  border-right: none;
-  transition: all 0.3s ease;
-  /* Prevent rubber banding/overscroll from affecting navbar */
-  touch-action: none;
-  overflow: hidden;
-  overscroll-behavior: none;
-  contain: layout style;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-}
-
-/* Remove soft fade effect */
-.streamingNavbar::after {
-  display: none;
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  min-height: var(--app-height, 100vh);
+  padding: calc(var(--app-chrome-top, 0px) + 22px) 14px 18px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 
 .navLeft {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
   width: 100%;
-  padding: 0 10px;
-  position: relative; /* Context for absolute indicator */
+  min-height: 0;
 }
 
 .navLink {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 64px; /* Fixed height for reliable math */
+  gap: 8px;
+  min-height: 68px;
   width: 100%;
-  color: rgba(255, 255, 255, 0.5);
+  padding: 12px 10px;
+  color: rgba(255, 255, 255, 0.62);
   text-decoration: none;
-  font-size: 0.7rem;
-  font-weight: 500;
-  border-radius: 12px;
-  transition: color 0.2s ease;
-  z-index: 1; /* Above indicator */
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   text-align: center;
 }
 
 .navLink:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.navLink:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 3px;
   color: #fff;
 }
 
 /* Active state for nav links */
 .active {
   color: #fff !important;
-  background: transparent !important;
-}
-
-.active::before {
-  display: none;
-}
-
-/* 
-  Active indicator using CSS Transform for performance (Compositor thread)
-  Calculation: index * (height + gap)
-  height: 64px
-  gap: 12px 
-  total step: 76px
-*/
-.activeIndicator {
-  position: absolute;
-  top: 0;
-  left: 10px; /* Match padding of navLeft */
-  right: 10px;
-  height: 64px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  z-index: 0;
-  pointer-events: none;
-  transform: translateY(calc(var(--active-index, 0) * 76px));
-  transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .navRight {
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
-  padding-bottom: 10px;
+  padding-top: 18px;
 }
 
 .navProfile {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
+  min-height: 72px;
+  width: 100%;
+  padding: 12px 10px;
   text-decoration: none;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 0.7rem;
-  transition: color 0.2s ease;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .navProfile:hover {
   color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.navProfile:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 3px;
+  color: #fff;
 }
 
 .navAvatar {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease;
-}
-
-.navAvatar:hover {
-  transform: scale(1.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .navAvatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.streamingNavbarSide {
+  flex-direction: column;
+}
+
+.streamingNavbarBottom {
+  flex-direction: row;
+  align-items: center;
+  min-height: calc(var(--nav-height-mobile, 78px) + var(--safe-area-inset-bottom, 0px));
+  padding: 8px 14px calc(10px + var(--safe-area-inset-bottom, 0px));
+  border-right: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+.streamingNavbarBottom::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -64px;
+  bottom: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.22) 16%,
+      rgba(0, 0, 0, 0.52) 40%,
+      rgba(0, 0, 0, 0.82) 72%,
+      rgba(0, 0, 0, 0.98) 100%
+    );
+  pointer-events: none;
+  z-index: -1;
+}
+
+.streamingNavbarBottom .navLeft {
+  flex-direction: row;
+  align-items: stretch;
+  flex: 1;
+  padding: 0;
+  gap: 4px;
+}
+
+.streamingNavbarBottom .navLink {
+  flex: 1 1 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 4px;
+  gap: 4px;
+  font-size: 0.66rem;
+  border-radius: 14px;
+}
+
+.streamingNavbarBottom .navLink svg {
+  width: 18px;
+  height: 18px;
+}
+
+.streamingNavbarBottom .navRight {
+  margin-top: 0;
+  padding-top: 0;
+  padding-left: 12px;
+  border-top: none;
+  align-items: center;
+}
+
+.streamingNavbarBottom .navAvatar {
+  width: 36px;
+  height: 36px;
+}
+
+.streamingNavbarBottom .navProfile {
+  min-height: 60px;
+  min-width: 72px;
+  width: auto;
+  padding: 8px 6px;
+  font-size: 0.64rem;
+}
+
+.streamingNavbarBottom .navProfile span {
+  display: block;
+}
+
+.streamingMobileHeader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  overflow: visible;
+  background: transparent;
+  border-bottom: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.streamingMobileHeader::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.98) 0%,
+      rgba(0, 0, 0, 0.9) 24%,
+      rgba(0, 0, 0, 0.62) 58%,
+      rgba(0, 0, 0, 0.16) 86%,
+      rgba(0, 0, 0, 0) 100%
+    );
+  pointer-events: none;
+}
+
+.streamingMobileHeader > * {
+  position: relative;
+  z-index: 1;
+}
+
+.streamingMobileSearch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-height: 44px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.streamingMobileSearch:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.streamingMobileSearch:focus-visible,
+.streamingMobileProfileButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 3px;
+}
+
+.streamingMobileProfileButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  text-decoration: none;
+  color: var(--text, #fff);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.streamingMobileProfileButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.streamingMobileProfileAvatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.streamingMobileProfileAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Library page mobile bar — replaces StreamingLayout's search header on library pages.
+   Hidden on desktop; shown sticky on mobile. Reuses the search/profile button classes. */
+.libraryMobileBar {
+  display: none;
+}
+
+.libraryMobileDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: rgba(10, 10, 10, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 16px;
+  z-index: 100;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 1024px) {
+  .libraryMobileBar {
+    display: flex;
+    position: sticky;
+    top: var(--app-content-top-offset, 0px);
+    z-index: var(--z-sticky, 500);
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(
+      180deg,
+      rgba(10, 10, 10, 0.96) 0%,
+      rgba(10, 10, 10, 0.84) 100%
+    );
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
 }
 
 /* Search Overlay */
@@ -330,117 +536,30 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Mobile Navbar */
-@media (max-width: 768px) {
-  .streamingNavbar {
-    top: auto;
-    bottom: 20px;
-    bottom: calc(20px + var(--safe-area-inset-bottom, 0px));
-    left: 50%;
-    transform: translateX(-50%) translateZ(0); /* Keep centering + GPU layer */
-    width: auto;
-    min-width: 280px;
-    max-width: 90vw;
-    height: auto;
-    flex-direction: row;
-    padding: 8px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 100px;
-    background: rgba(20, 20, 20, 0.9);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    justify-content: center;
-    gap: 10px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    /* Reinforced: prevent touch-scroll effects on mobile navbar */
-    touch-action: none;
-    overflow: hidden;
-    overscroll-behavior: none;
-  }
-
-  .navLogo {
-    display: none;
-  }
-
-  .navLeft {
-    flex-direction: row;
-    flex: unset;
-    justify-content: center;
-    padding: 0;
-    padding-right: 10px;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    gap: 4px;
-  }
-
-  .navLink {
-    padding: 8px 12px;
-    font-size: 0; /* Hide text properly */
-    width: auto;
-    height: auto;
-  }
-
-  .navLink span:last-child {
-    display: none;
-  }
-
-  .navLink svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  .navRight {
-    display: flex;
-    flex-direction: row;
-    margin-top: 0;
-    padding-bottom: 0;
-    padding-left: 10px;
-    border-left: none; /* Removed split border to cleaner look or keep it? Plan said pill style. Let's keep it clean. */
-    align-items: center;
-  }
-
-  .navProfile span {
-    display: none;
-  }
-
-  .navAvatar {
-    width: 32px;
-    height: 32px;
-  }
-
-  /* Mobile Active Indicator - Horizontal animation */
-  .activeIndicator {
-    top: 50%;
-    left: 0;
-    right: auto;
-    width: 44px; /* Match navLink width: padding 12px*2 + icon 20px = 44px */
-    height: 36px; /* Match navLink height: padding 8px*2 + icon 20px = 36px */
-    border-radius: 10px;
-    transform: translateY(-50%) translateX(calc(var(--active-index, 0) * 48px)); /* 44px width + 4px gap */
-    transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
-  }
-}
-
 /* Streaming Layout Base */
 .streamingLayout {
+  --streaming-inline-gutter: clamp(20px, 3vw, 36px);
   min-height: 100vh;
   min-height: var(--app-height, 100vh);
+  height: auto;
   box-sizing: border-box;
-  padding-left: 80px; /* Fixed width matching navbar */
-  padding-bottom: 40px;
+  width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: max(40px, calc(var(--standard-shell-bottom-nav-height, 0px) + 20px));
   padding-top: var(--app-content-top-offset, 0px);
   transition: padding-left 0.3s ease;
   position: relative;
   z-index: 1;
   max-width: 100%; /* Ensure layout never overflows the viewport width */
-  overflow-x: hidden; /* Prevent horizontal scroll within the page container */
 }
 
 @media (max-width: 768px) {
   .streamingLayout {
-    padding-left: 0; /* No sidebar on mobile — navbar is a floating bottom bar */
-    height: 100vh;
-    height: 100dvh;
-    overflow-y: auto;
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: calc(var(--standard-shell-bottom-nav-height, var(--nav-height-mobile, 78px)) + 20px);
+    height: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y pinch-zoom;
   }
@@ -572,7 +691,8 @@
 .heroSection {
   position: relative;
   height: 55vh;
-  width: 100%;
+  width: calc(100% - var(--standard-shell-side-nav-width, 0px));
+  margin-left: var(--standard-shell-side-nav-width, 0px);
   display: flex;
   align-items: flex-end;
   padding-bottom: 60px;
@@ -786,6 +906,7 @@
   position: relative;
   z-index: 10;
   margin-top: 0; /* Handled by layout flow now, or exploreHeader negative margin */
+  padding-left: var(--standard-shell-side-nav-width, 0px);
   padding-top: 20px;
   padding-bottom: 60px;
 }
@@ -798,6 +919,405 @@
 @media (max-width: 768px) {
   .contentOffset {
     margin-top: 0;
+  }
+}
+
+.catalogBackButton {
+  background: rgba(10, 10, 12, 0.76);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.catalogPage {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  gap: 30px;
+  padding: 0 var(--streaming-inline-gutter) 72px;
+}
+
+.catalogHero {
+  position: relative;
+  min-height: 360px;
+  overflow: hidden;
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(226, 29, 72, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(15, 17, 22, 0.96) 0%, rgba(10, 11, 14, 0.94) 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.34);
+  isolation: isolate;
+}
+
+.catalogHeroArtwork {
+  position: absolute;
+  inset: -4%;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.34;
+  transform: scale(1.05);
+  filter: saturate(1.12);
+}
+
+.catalogHeroScrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(8, 8, 10, 0.94) 0%, rgba(8, 8, 10, 0.82) 42%, rgba(8, 8, 10, 0.3) 100%),
+    linear-gradient(180deg, rgba(8, 8, 10, 0.18) 0%, rgba(8, 8, 10, 0.9) 100%);
+}
+
+.catalogHeroContent {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 24px;
+  min-height: inherit;
+  padding: clamp(24px, 4vw, 42px);
+  align-content: end;
+}
+
+.catalogHeroTopline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.catalogHeroBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.catalogHeroIntro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.95fr);
+  gap: 24px;
+  align-items: end;
+}
+
+.catalogTitleBlock {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.catalogHeroTitle {
+  margin: 0;
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  font-weight: 800;
+  color: #fff;
+}
+
+.catalogHeroDescription {
+  margin: 0;
+  max-width: 44rem;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 1rem;
+  line-height: 1.72;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.catalogFeaturedCard {
+  display: grid;
+  gap: 10px;
+  padding: 20px 22px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.catalogFeaturedEyebrow {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.catalogFeaturedTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 1.35rem;
+  line-height: 1.08;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+.catalogFeaturedMeta,
+.catalogFeaturedDescription {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  line-height: 1.55;
+}
+
+.catalogFeaturedMeta {
+  font-size: 0.88rem;
+}
+
+.catalogFeaturedDescription {
+  font-size: 0.92rem;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.catalogHeroStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.catalogStatCard {
+  display: grid;
+  gap: 6px;
+  min-width: 160px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.catalogStatLabel {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.catalogStatValue {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.catalogGridSection {
+  display: grid;
+  gap: 22px;
+}
+
+.catalogSectionHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.catalogSectionEyebrow {
+  margin: 0 0 8px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.catalogSectionTitle {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.5rem, 2vw, 2.25rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+
+.catalogSectionMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.catalogSectionMetaPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.catalogGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  gap: 22px 18px;
+}
+
+.catalogGridCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  color: #fff;
+  text-decoration: none;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.catalogGridCard:hover {
+  transform: translateY(-4px);
+}
+
+.catalogGridCard:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 4px;
+  border-radius: 24px;
+}
+
+.catalogPosterShell {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 2 / 3;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+  transition: box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.catalogGridCard:hover .catalogPosterShell {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+}
+
+.catalogPosterImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.catalogPosterFallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.92rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+}
+
+.catalogCardBody {
+  display: grid;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.catalogCardTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.35;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.catalogCardMeta {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.catalogEmptyState {
+  max-width: 540px;
+  padding: 30px 32px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.catalogEmptyTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 1.12rem;
+  font-weight: 700;
+}
+
+.catalogEmptyDescription {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.64);
+  line-height: 1.6;
+}
+
+.catalogLoadMoreRow {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.catalogLoadMoreButton,
+.catalogLoadingPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.catalogLoadMoreButton {
+  cursor: pointer;
+  transition: background 220ms ease, border-color 220ms ease, transform 220ms ease;
+}
+
+.catalogLoadMoreButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.catalogLoadMoreButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 4px;
+}
+
+@media (max-width: 980px) {
+  .catalogHeroIntro {
+    grid-template-columns: 1fr;
+  }
+
+  .catalogFeaturedCard {
+    max-width: 32rem;
   }
 }
 
@@ -1146,6 +1666,80 @@
     padding: 0 20px;
   }
 
+  .catalogBackButton {
+    top: calc(var(--app-fixed-top-md, 20px) + 54px);
+  }
+
+  .catalogPage {
+    gap: 24px;
+    padding: 0 16px 36px;
+  }
+
+  .catalogHero {
+    min-height: 0;
+    border-radius: 24px;
+  }
+
+  .catalogHeroContent {
+    gap: 20px;
+    padding: 22px 18px 20px;
+  }
+
+  .catalogHeroTitle {
+    font-size: 2.05rem;
+    line-height: 0.96;
+  }
+
+  .catalogHeroDescription {
+    font-size: 0.94rem;
+    line-height: 1.62;
+    -webkit-line-clamp: 5;
+  }
+
+  .catalogHeroStats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .catalogStatCard {
+    min-width: 0;
+    padding: 14px 14px 15px;
+    border-radius: 18px;
+  }
+
+  .catalogSectionHeader {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .catalogSectionMetaPill {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+  }
+
+  .catalogGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 12px;
+  }
+
+  .catalogPosterShell {
+    border-radius: 16px;
+  }
+
+  .catalogCardTitle {
+    font-size: 0.9rem;
+  }
+
+  .catalogCardMeta {
+    font-size: 0.76rem;
+  }
+
+  .catalogEmptyState {
+    padding: 22px 20px;
+    border-radius: 20px;
+  }
+
   /* Update Layout on Mobile */
   .rowWrapper {
     margin: 0 -20px;
@@ -1192,6 +1786,12 @@
     width: 100%;
     max-width: 250px;
     margin: 0 auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .catalogHeroStats {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1804,6 +2404,7 @@
   /* Reduce content overlap on mobile - hero is shorter so less overlap is needed */
   .contentContainer {
     margin-top: 0 !important;
+    padding-top: 8px;
     padding-bottom: calc(var(--nav-height-mobile, 70px) + 40px);
   }
 
@@ -2044,7 +2645,7 @@
 /* Library Layout - Desktop flex, Mobile single column */
 .libraryLayout {
   display: flex;
-  padding-left: 80px;
+  padding-left: var(--standard-shell-side-nav-width, 0px);
   padding-top: 20px;
   padding-bottom: 0;
   min-height: auto;
@@ -2053,6 +2654,7 @@
 @media (max-width: 768px) {
   .libraryLayout {
     padding-left: 0 !important;
+    padding-top: 0;
     flex-direction: column;
     padding-bottom: calc(var(--nav-height-mobile, 70px) + 20px);
   }
@@ -2060,6 +2662,11 @@
 
 .searchLayout {
   padding-top: 0;
+}
+
+.searchLayout .stickyHeaderShell {
+  box-sizing: border-box;
+  padding-left: var(--standard-shell-side-nav-width, 0px);
 }
 
 .searchTopBar {
@@ -2217,7 +2824,7 @@
 
   .libraryMain {
     width: 100% !important;
-    padding: 16px !important;
+    padding: 0 16px 16px !important;
     margin-left: 0;
     min-height: auto;
   }
@@ -2348,6 +2955,51 @@
   z-index: 50;
 }
 
+.exploreFiltersDock {
+  position: fixed;
+  top: calc(var(--app-content-top-offset, 0px) + 10px);
+  left: var(--standard-shell-side-nav-width, 0px);
+  right: 0;
+  z-index: 70;
+  padding: 0 60px;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.exploreFiltersBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  pointer-events: auto;
+}
+
+.exploreFiltersSpacer {
+  height: 72px;
+}
+
+/* Transparent wrapper on desktop (display:contents = children flow into parent flex).
+   Becomes a real flex row on mobile to group toggle + profile button side by side. */
+.exploreFiltersTopRow {
+  display: contents;
+}
+
+.exploreMobileProfileBtn,
+.exploreMobileSearchBtn {
+  display: none;
+}
+
+.searchMobileProfileBtn {
+  display: none;
+}
+
 .exploreHeader {
   position: sticky;
   top: calc(var(--app-content-top-offset, 0px) + 10px);
@@ -2368,7 +3020,7 @@
 
 .exploreHeaderPinned {
   position: fixed;
-  left: 80px;
+  left: var(--standard-shell-side-nav-width, 0px);
   right: 0;
   top: calc(var(--app-content-top-offset, 0px) + 10px);
   width: auto;
@@ -2422,6 +3074,127 @@
 
 .exploreGenreSelect {
   position: relative;
+  min-width: 156px;
+  isolation: isolate;
+}
+
+.exploreGenreTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.exploreGenreTrigger:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.exploreGenreTrigger:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+}
+
+.exploreGenreTriggerOpen {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.exploreGenreTriggerValue {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: currentColor;
+}
+
+.exploreGenreTriggerIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: currentColor;
+  transition: transform 0.25s ease, color 0.25s ease;
+}
+
+.exploreGenreTriggerIconOpen {
+  transform: rotate(180deg);
+  color: #fff;
+}
+
+.exploreGenreMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(240px, calc(100vw - 48px));
+  padding: 6px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(20, 20, 20, 0.92);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 12;
+}
+
+.exploreGenreMenuList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(52vh, 360px);
+  overflow-y: auto;
+}
+
+.exploreGenreMenuItem {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+  width: 100%;
+  padding: 0 12px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.exploreGenreMenuItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.exploreGenreMenuItem:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.exploreGenreMenuItemFeatured {
+  color: #fff;
+}
+
+.exploreGenreSelectMobile {
+  display: none;
 }
 
 .exploreGenreSelectInput {
@@ -2502,9 +3275,158 @@
   font-weight: 700;
   color: #fff;
   margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .exploreFiltersDock {
+    position: sticky;
+    top: var(--app-content-top-offset, 0px);
+    left: 0;
+    right: 0;
+    padding: 0;
+    z-index: var(--z-sticky, 500);
+    background: linear-gradient(180deg, rgba(10, 10, 10, 0.96) 0%, rgba(10, 10, 10, 0.84) 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    pointer-events: auto;
+  }
+
+  .exploreFiltersBar {
+    padding: 12px 16px;
+  }
+
+  .exploreFiltersSpacer {
+    display: none;
+  }
+
+  .exploreFiltersTopRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .exploreMobileProfileBtn,
+  .exploreMobileSearchBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+    text-decoration: none;
+    color: var(--text, #fff);
+    cursor: pointer;
+  }
+
+  .exploreMobileProfileBtn {
+    margin-left: auto;
+  }
+
+  .exploreMobileProfileBtn:hover,
+  .exploreMobileSearchBtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  .searchMobileProfileBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+    text-decoration: none;
+    color: var(--text, #fff);
+  }
+
+  .searchMobileProfileBtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
 }
 
 @media (max-width: 768px) {
+  .searchLayout .stickyHeaderShell {
+    padding-left: 0;
+  }
+
+  /* Explore: compact single-row bar on mobile */
+  .exploreFiltersBar {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  /* Flatten the top-row wrapper so toggle + profile become direct bar children */
+  .exploreFiltersTopRow {
+    display: contents;
+  }
+
+  /* Genre trigger: fill the stretched container, match toggle button font/size */
+  .exploreGenreTrigger {
+    height: 100%;
+    min-height: 0;
+    padding: 0 12px;
+    font-size: 0.79rem;
+    gap: 6px;
+  }
+
+  .exploreGenreTriggerValue {
+    font-size: 0.79rem;
+  }
+
+  .exploreGenreTriggerIcon {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Order: [toggle (1)] [genre (2)] [profile (3)] */
+  .exploreFiltersBar .exploreToggleGroup {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    order: 1;
+  }
+
+  .exploreFiltersBar .exploreToggleGroup .exploreToggleBtn {
+    flex: none;
+    padding: 7px 10px;
+    font-size: 0.79rem;
+  }
+
+  .exploreFiltersBar .exploreGenreSelect {
+    order: 2;
+    flex: 1;
+    align-self: stretch;
+    min-width: 0;
+    width: auto;
+  }
+
+  .exploreFiltersBar .exploreGenreSelectInput {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .exploreMobileProfileBtn {
+    order: 3;
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+
   .exploreHeaderPinned {
     left: 0;
     top: calc(var(--app-content-top-offset, 0px) + 8px);
@@ -2516,8 +3438,6 @@
     top: calc(var(--app-content-top-offset, 0px) + 6px);
     margin-bottom: 14px;
     padding: 12px 16px 14px;
-    flex-direction: column; /* Reset to column for filtered view logic or keeping existing */
-    /* We are hiding this on mobile dashboard anyway, so this mainly affects filtered view if we don't hide it */
     gap: 12px;
     background: transparent;
     border-bottom: 1px solid rgba(255,255,255,0.05);
@@ -2538,12 +3458,23 @@
     text-align: center;
   }
 
-  .exploreGenreSelectInput {
-    width: 100%;
+  /* Use the custom trigger on mobile (not native select) for visual consistency */
+  .exploreGenreSelectMobile {
+    display: none;
   }
 
+  /* Filtered view title: compact + truncated in single-row layout */
   .exploreFilteredTitle {
-    font-size: 1.25rem;
+    font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Back button stays compact and doesn't shrink */
+  .exploreBackBtn {
+    flex-shrink: 0;
+    order: 0;
   }
 
   /* Hide default explore header components on mobile unless it's filtered view */
@@ -2551,8 +3482,8 @@
   .exploreHeader .exploreGenreSelect {
     display: none !important;
   }
-  
-  /* Reset explore header for mobile dashboard to be user-select-none/pointer-events-none if empty */
+
+  /* Reset explore header for mobile dashboard */
   .exploreHeader:not(:has(.exploreFilteredHeader)) {
       display: none;
       padding: 0;
@@ -2691,15 +3622,18 @@
     flex-direction: row !important;
     align-items: center;
     gap: 12px;
-    top: calc(var(--app-content-top-offset, 0px) + 8px) !important;
-    padding-top: 14px !important;
-    padding-right: 24px !important;
-    padding-bottom: 16px !important;
-    padding-left: 24px !important;
+    top: var(--app-content-top-offset, 0px) !important;
+    z-index: var(--z-sticky, 500) !important;
+    padding-top: 12px !important;
+    padding-right: 16px !important;
+    padding-bottom: 12px !important;
+    padding-left: 16px !important;
     margin-bottom: 16px;
-    background: linear-gradient(180deg, rgba(10, 10, 10, 0.94) 0%, rgba(10, 10, 10, 0.84) 72%, rgba(10, 10, 10, 0) 100%);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+    background: linear-gradient(180deg, rgba(10, 10, 10, 0.96) 0%, rgba(10, 10, 10, 0.84) 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: none;
   }
 
   .searchTopBar.exploreHeader .searchInputShell {

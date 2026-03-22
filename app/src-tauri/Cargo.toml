@@ -1,6 +1,6 @@
 [package]
 name = "zentrio"
-version = "0.7.4"
+version = "0.7.5"
 description = "Zentrio - Stream Your Way"
 authors = ["you"]
 edition = "2021"
@@ -38,6 +38,7 @@ m3u8-rs = "6"
 tempfile = "3"
 tauri-plugin-haptics = "2.3.2"
 log = "0.4"
+fs2 = "0.4"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

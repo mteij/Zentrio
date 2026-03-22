@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ComponentType, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreVertical } from 'lucide-react'
 
 interface MenuItem {
   label: string
-  icon?: React.ComponentType<{ size?: number; className?: string }>
+  icon?: ComponentType<{ size?: number; className?: string }>
   onClick: () => void
   variant?: 'default' | 'danger'
   disabled?: boolean
@@ -18,12 +18,14 @@ type MenuItemOrSeparator = MenuItem | MenuSeparator
 
 interface DropdownMenuProps {
   items: MenuItemOrSeparator[]
-  triggerIcon?: React.ReactNode
+  triggerIcon?: ReactNode
   className?: string
   compact?: boolean
+  ariaLabel?: string
+  title?: string
 }
 
-export const DropdownMenu = ({ items, triggerIcon, className = '', compact = false }: DropdownMenuProps) => {
+export const DropdownMenu = ({ items, triggerIcon, className = '', compact = false, ariaLabel, title }: DropdownMenuProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -82,12 +84,17 @@ export const DropdownMenu = ({ items, triggerIcon, className = '', compact = fal
   return (
     <>
       <button
+        type="button"
         ref={triggerRef}
         onClick={(e) => {
           e.stopPropagation()
           handleToggle()
         }}
         className={`dropdown-trigger ${className}`}
+        aria-label={ariaLabel || 'Open menu'}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        title={title}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -111,6 +118,7 @@ export const DropdownMenu = ({ items, triggerIcon, className = '', compact = fal
         <div
           ref={menuRef}
           className="dropdown-menu"
+          role="menu"
           style={{
             position: 'fixed',
             top: position.top,
@@ -144,7 +152,9 @@ export const DropdownMenu = ({ items, triggerIcon, className = '', compact = fal
             const menuItem = item as MenuItem
             return (
               <button
+                type="button"
                 key={idx}
+                role="menuitem"
                 onClick={(e) => {
                   e.stopPropagation()
                   if (!menuItem.disabled) {

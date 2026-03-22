@@ -1,4 +1,4 @@
-import { WifiOff } from 'lucide-react'
+import { ArrowRight, WifiOff } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styles from './OfflineBanner.module.css'
 
@@ -14,13 +14,19 @@ export function OfflineBanner({ visible }: Props) {
 
   return (
     <div className={styles.banner} role="alert">
-      <WifiOff size={14} />
-      <span>You&apos;re offline</span>
+      <span className={styles.bannerIcon}>
+        <WifiOff size={16} aria-hidden="true" />
+      </span>
+      <div className={styles.bannerText}>
+        <span className={styles.bannerTitle}>You&apos;re offline</span>
+        <span className={styles.bannerSub}>Streaming unavailable</span>
+      </div>
       <button
-        className={styles.bannerLink}
+        className={styles.bannerBtn}
         onClick={() => navigate(`/streaming/${profileId}/downloads`)}
       >
-        Go to Downloads →
+        Downloads
+        <ArrowRight size={13} aria-hidden="true" />
       </button>
     </div>
   )

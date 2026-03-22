@@ -7,6 +7,13 @@ import { DEFAULT_TMDB_CATALOG_CONFIG, type TmdbCatalogEntry, ZentrioAddonClient 
 // Extracted helper modules
 import { logger } from '../logger'
 import { enrichContent, filterContent, getParentalSettings } from './content-filter'
+import {
+    catalogSupportsBrowseGenre,
+    isLanguageBrowseCatalog,
+    isLanguageBrowseOption,
+    itemMatchesBrowseGenre,
+    normalizeBrowseGenreOption,
+} from './genre-utils'
 import { normalizeMetaVideos } from './meta-normalizer'
 import { buildSearchQueryVariants, scoreSearchMatch } from '../../utils/search'
 
@@ -238,6 +245,19 @@ export class AddonManager {
 
     private async enrichItems(items: MetaPreview[], context: ProfileContext): Promise<MetaPreview[]> {
         return enrichContent(items, context.profileId)
+    }
+
+    private selectFilteredCatalog(client: AddonClient, type: string, genre?: string) {
+        const catalogs = client.manifest?.catalogs.filter(c => c.type === type) || []
+
+        if (!genre) {
+            return catalogs.find(c => !c.extra?.some(e => e.isRequired)) || catalogs[0]
+        }
+
+        const matchingCatalogs = catalogs.filter(c => catalogSupportsBrowseGenre(c, genre))
+        if (matchingCatalogs.length === 0) return null
+
+        return matchingCatalogs.find(c => !c.extra?.some(e => e.isRequired)) || matchingCatalogs[0]
     }
 
     private loadTmdbCatalogConfig(settingsProfileId: number): TmdbCatalogEntry[] {
@@ -973,7 +993,16 @@ export class AddonManager {
             return 0
         })
 
-        return results
+        // Deduplicate by (manifestUrl, catalogType): keep only the first search-capable catalog
+        // per addon per content type. For TMDB this prevents multiple identical search rows since
+        // all TMDB catalogs hit the same underlying search API regardless of catalog id.
+        const seen = new Set<string>()
+        return results.filter(entry => {
+            const key = `${entry.manifestUrl}::${entry.catalog.type}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+        })
     }
 
     async searchSingleCatalog(
@@ -1094,19 +1123,18 @@ export class AddonManager {
 
             // Collect genres from catalogs
             for (const cat of client.manifest.catalogs) {
+                if (isLanguageBrowseCatalog(cat)) continue
+
                 if (cat.extra) {
                     const genreExtra = cat.extra.find(e => e.name === 'genre')
                     if (genreExtra && genreExtra.options) {
                         genreExtra.options.forEach(g => {
                             // Filter out years (4 digits)
                             if (!/^\d{4}$/.test(g)) {
-                                // Normalize TV genres to Movie genres for the dropdown
-                                let finalGenre = g
-                                if (g === 'Action & Adventure') finalGenre = 'Action'
-                                else if (g === 'Sci-Fi & Fantasy') finalGenre = 'Science Fiction'
-                                else if (g === 'War & Politics') finalGenre = 'War'
-
-                                genres.add(finalGenre)
+                                const normalized = normalizeBrowseGenreOption(g)
+                                if (!isLanguageBrowseOption(normalized)) {
+                                    genres.add(normalized)
+                                }
                             }
                         })
                     }
@@ -1146,15 +1174,7 @@ export class AddonManager {
         const promises = clients.map(async (client) => {
             if (!client.manifest) return []
 
-            // Find a catalog that supports this type and (optionally) genre
-            const catalog = client.manifest.catalogs.find(c => {
-                if (c.type !== type) return false
-                if (genre) {
-                    // Check if genre is supported. 
-                    return c.extra?.some(e => e.name === 'genre' && (!e.options || e.options.includes(genre)))
-                }
-                return true
-            })
+            const catalog = this.selectFilteredCatalog(client, type, genre)
 
             if (catalog) {
                 try {
@@ -1163,7 +1183,7 @@ export class AddonManager {
                     if (skip) extra.skip = skip.toString()
 
                     const items = await client.getCatalog(catalog.type, catalog.id, extra, context.appearanceConfig)
-                    return items;
+                    return genre ? items.filter(item => itemMatchesBrowseGenre(item, genre)) : items
                 } catch (e) {
                     log.warn(`Failed to fetch filtered items from ${client.manifest.name}`, e)
                     return []

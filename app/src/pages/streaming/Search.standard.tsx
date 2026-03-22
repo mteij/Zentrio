@@ -1,12 +1,27 @@
-import { Filter, Search } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Filter, Search, User } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { AnimatedBackground, Layout, SkeletonRow } from '../../components'
 import { SearchCatalogRow } from '../../components/features/SearchCatalogRow'
 import { useRootScrollPinned } from '../../hooks/useRootScrollPinned'
+import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 import type { SearchScreenModel } from './Search.model'
 import styles from '../../styles/Streaming.module.css'
 
 export function StreamingSearchStandardView({ model }: { model: SearchScreenModel }) {
   const stickyHeader = useRootScrollPinned({ extraTopPx: 10 })
+
+  // Read profile from cache populated by StreamingLayout — no extra fetch
+  const { data: profile } = useQuery<any>({
+    queryKey: ['streaming-profile', model.profileId],
+    enabled: false,
+  })
+
+  const profileAvatar = profile?.avatar ? (
+    <img src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))} alt="" />
+  ) : (
+    <User size={18} aria-hidden="true" />
+  )
 
   return (
     <Layout title="Search" showHeader={false} showFooter={false}>
@@ -57,6 +72,15 @@ export function StreamingSearchStandardView({ model }: { model: SearchScreenMode
               >
                 <Filter size={16} />
               </button>
+              <Link
+                to="/profiles"
+                className={styles.searchMobileProfileBtn}
+                aria-label="Switch profile"
+              >
+                <div className={styles.streamingMobileProfileAvatar}>
+                  {profileAvatar}
+                </div>
+              </Link>
             </div>
           </div>
         </div>

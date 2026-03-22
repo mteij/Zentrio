@@ -24,6 +24,8 @@ export { LoadErrorState } from './ui/LoadErrorState'
 // Layout Components
 export { Layout, PageHeader, PageFooter, SimpleLayout } from './layout/Layout'
 export { Navbar } from './layout/Navbar'
+export { StandardShell } from './layout/StandardShell'
+export { StandardTopBar } from './layout/StandardTopBar'
 export { TitleBar } from './layout/TitleBar'
 export { AnimatedBackground } from './layout/AnimatedBackground'
 export { ErrorBoundary } from './layout/ErrorBoundary'
