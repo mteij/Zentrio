@@ -195,16 +195,39 @@
               </div>
             </div>
             <div class="release-content">
-              <div class="release-header-flex">
+              <button
+                class="release-header-flex"
+                @click="toggleRelease(release.id)"
+                :aria-expanded="expandedReleases.has(release.id)"
+              >
                 <h3>{{ release.name || release.tag_name }}</h3>
-                <a :href="release.html_url" target="_blank" class="github-link"
-                  >View on GitHub ↗</a
-                >
-              </div>
-              <div
-                class="markdown-body"
-                v-html="renderMarkdown(release.body)"
-              ></div>
+                <div class="release-header-actions">
+                  <a
+                    :href="release.html_url"
+                    target="_blank"
+                    class="github-link"
+                    @click.stop
+                  >View on GitHub ↗</a>
+                  <span class="collapse-icon">{{ expandedReleases.has(release.id) ? '▲' : '▼' }}</span>
+                </div>
+              </button>
+              <template v-if="expandedReleases.has(release.id)">
+                <div
+                  class="markdown-body"
+                  v-html="renderMarkdown(release.body)"
+                ></div>
+                <div class="release-assets" v-if="getReleaseAssets(release).length > 0">
+                  <span class="assets-label">Downloads for this version:</span>
+                  <div class="assets-links">
+                    <a
+                      v-for="asset in getReleaseAssets(release)"
+                      :key="asset.name"
+                      :href="asset.url"
+                      class="asset-link"
+                    >{{ asset.label }}</a>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -340,6 +363,24 @@ const renderMarkdown = (text) => {
   return marked(filteredText);
 };
 
+const PLATFORM_LABELS = {
+  windows: "Windows",
+  mac: "macOS",
+  android: "Android",
+  "linux-deb": "Linux (.deb)",
+  "linux-rpm": "Linux (.rpm)",
+  "linux-appimage": "Linux (AppImage)",
+};
+
+const expandedReleases = ref(new Set());
+
+const toggleRelease = (id) => {
+  const next = new Set(expandedReleases.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  expandedReleases.value = next;
+};
+
 const getDownloadUrl = (platform) => PLATFORM_DOWNLOADS[platform]?.url ?? "#";
 
 const getAsset = (release, platform) => {
@@ -347,6 +388,15 @@ const getAsset = (release, platform) => {
   const matcher = PLATFORM_DOWNLOADS[platform]?.matcher;
   if (!matcher) return null;
   return release.assets.find((asset) => matcher(asset.name));
+};
+
+const getReleaseAssets = (release) => {
+  if (!release?.assets) return [];
+  return Object.entries(PLATFORM_DOWNLOADS)
+    .flatMap(([platform, config]) => {
+      const asset = release.assets.find((a) => config.matcher(a.name));
+      return asset ? [{ name: asset.name, url: asset.browser_download_url, label: PLATFORM_LABELS[platform] }] : [];
+    });
 };
 
 onMounted(() => {
@@ -620,23 +670,51 @@ onMounted(() => {
 
 .release-content {
   flex: 1;
+  min-width: 0;
   background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 40px;
+  overflow: hidden;
 }
 
 .release-header-flex {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
+  margin-bottom: 0;
   border-bottom: 1px solid var(--border);
   padding-bottom: 20px;
+  width: 100%;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding-top: 0;
+}
+
+.release-header-flex:has(+ .markdown-body),
+.release-header-flex[aria-expanded="true"] {
+  margin-bottom: 24px;
 }
 
 .release-header-flex h3 {
   font-size: 1.5rem;
+}
+
+.release-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.collapse-icon {
+  color: var(--text-dim);
+  font-size: 0.75rem;
 }
 
 .github-link {
@@ -650,10 +728,61 @@ onMounted(() => {
   color: white;
 }
 
+.release-assets {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.assets-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.assets-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.asset-link {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.asset-link:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+
 /* Markdown Rendering Styles */
 .markdown-body {
   color: var(--text-muted);
   font-size: 0.95rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.markdown-body :deep(pre) {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.markdown-body :deep(code) {
+  word-break: break-all;
+}
+
+.markdown-body :deep(a) {
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 .markdown-body :deep(h1),

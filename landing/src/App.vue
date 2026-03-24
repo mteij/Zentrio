@@ -345,26 +345,17 @@ h6 {
 }
 
 .nav-link.highlight {
-  color: var(--text);
-  position: relative;
+  color: white;
+  background: var(--accent);
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-weight: 600;
 }
 
-.nav-link.highlight::after {
-  content: "";
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: var(--accent);
-  transform: scaleX(0);
-  transform-origin: right;
-  transition: transform 0.3s ease;
-}
-
-.nav-link.highlight:hover::after {
-  transform: scaleX(1);
-  transform-origin: left;
+.nav-link.highlight:hover {
+  color: white;
+  background: var(--accent-hover);
+  transform: translateY(-1px);
 }
 
 .nav-actions {
@@ -575,7 +566,9 @@ h6 {
 }
 
 .mobile-link.highlight {
-  color: var(--text);
+  color: white;
+  background: rgba(229, 9, 20, 0.15);
+  border-left: 3px solid var(--accent);
 }
 
 /* Responsive */
