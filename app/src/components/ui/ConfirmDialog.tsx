@@ -1,3 +1,4 @@
+import { hapticConfirm, hapticDestructive } from '../../lib/haptics';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
@@ -23,6 +24,8 @@ export function ConfirmDialog({
   variant = 'primary'
 }: ConfirmDialogProps) {
   const handleConfirm = () => {
+    if (variant === 'danger') hapticDestructive()
+    else hapticConfirm()
     onConfirm();
     onClose();
   };

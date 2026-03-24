@@ -3,7 +3,10 @@
  * Original source: https://github.com/mrcanelas/tmdb-addon
  * Licensed under Apache License 2.0
  */
+import { logger } from '../logger'
 import { TMDBClient } from './client'
+
+const log = logger.scope('TMDB:Genres')
 
 export async function getGenreList(tmdbClient: TMDBClient, language: string, type: string) {
   if (type === "movie") {
@@ -12,7 +15,7 @@ export async function getGenreList(tmdbClient: TMDBClient, language: string, typ
       .then((res: any) => {
         return res.genres
       })
-      .catch(console.error)
+      .catch((err: any) => log.error('TMDB genre list fetch failed:', err))
       return genre
   } else {
     const genre = await tmdbClient
@@ -20,7 +23,7 @@ export async function getGenreList(tmdbClient: TMDBClient, language: string, typ
       .then((res: any) => {
         return res.genres
       })
-      .catch(console.error)
+      .catch((err: any) => log.error('TMDB genre list fetch failed:', err))
     return genre
   }
 }

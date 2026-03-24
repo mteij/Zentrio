@@ -1116,7 +1116,6 @@ export class StreamingAudioTranscoder extends EventTarget {
           merged.set(this.containerHeader)
           merged.set(data, this.containerHeader.length)
           inputData = merged
-          // log.debug('Prepended header to chunk')
       }
 
       // Write input to FFmpeg FS

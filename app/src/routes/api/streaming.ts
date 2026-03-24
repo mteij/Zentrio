@@ -3,6 +3,7 @@ import { addonManager } from '../../services/addons/addon-manager'
 import { enrichContent, filterContent, getParentalSettings } from '../../services/addons/content-filter'
 import { addonDb, listDb, profileDb, streamDb, userDb, watchHistoryDb, type User } from '../../services/database'
 import { logger } from '../../services/logger'
+import { traktSyncService } from '../../services/trakt'
 import { err } from '../../utils/api'
 import { createTaggedOpenAPIApp } from './openapi-route'
 
@@ -606,71 +607,16 @@ streaming.post('/mark-watched', optionalSessionMiddleware, async (c) => {
         )
     }
 
-    // Sync to Trakt if connected and item has IMDB ID
+    // Sync to Trakt if connected
     let traktSynced = false
-    if (metaId.startsWith('tt')) {
-      const { traktAccountDb } = await import('../../services/database')
-      const account = traktAccountDb.getByProfileId(pId)
-      
-      if (account) {
-        try {
-          let accessToken = account.access_token
-          
-          // Refresh token if expired
-          if (traktAccountDb.isTokenExpired(pId)) {
-            const { traktClient } = await import('../../services/trakt')
-            const newTokens = await traktClient.refreshAccessToken(account.refresh_token)
-            const expiresAt = new Date((newTokens.created_at + newTokens.expires_in) * 1000)
-            traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
-            accessToken = newTokens.access_token
-          }
-
-          const { traktClient } = await import('../../services/trakt')
-          
-          if (watched) {
-            // Add to Trakt history
-            if (metaType === 'movie') {
-              await traktClient.addToHistory(accessToken, {
-                movies: [{ ids: { imdb: metaId }, watched_at: new Date().toISOString() }]
-              })
-            } else if (metaType === 'series' && season !== undefined && episode !== undefined) {
-              await traktClient.addToHistory(accessToken, {
-                shows: [{
-                  ids: { imdb: metaId },
-                  seasons: [{
-                    number: parseInt(season),
-                    episodes: [{ number: parseInt(episode), watched_at: new Date().toISOString() }]
-                  }]
-                }]
-              })
-            }
-            traktSynced = true
-            log.debug(`Pushed watched: ${metaId}${metaType === 'series' ? ` S${season}E${episode}` : ''}`)
-          } else {
-            // Remove from Trakt history
-            if (metaType === 'movie') {
-              await traktClient.removeFromHistory(accessToken, {
-                movies: [{ ids: { imdb: metaId } }]
-              })
-            } else if (metaType === 'series' && season !== undefined && episode !== undefined) {
-              await traktClient.removeFromHistory(accessToken, {
-                shows: [{
-                  ids: { imdb: metaId },
-                  seasons: [{
-                    number: parseInt(season),
-                    episodes: [{ number: parseInt(episode) }]
-                  }]
-                }]
-              })
-            }
-            traktSynced = true
-            log.debug(`Removed unwatched: ${metaId} S${season}E${episode}`)
-          }
-        } catch (e) {
-          log.error('Failed to sync mark-watched:', e)
-          // Don't fail the request, local change still succeeded
-        }
-      }
+    try {
+      traktSynced = await traktSyncService.pushWatchedItem(
+        pId, metaType, metaId, watched,
+        season !== undefined ? parseInt(season) : undefined,
+        episode !== undefined ? parseInt(episode) : undefined
+      )
+    } catch (e) {
+      log.error('Failed to sync mark-watched to Trakt:', e)
     }
 
     return c.json({ success: true, traktSynced })
@@ -711,42 +657,14 @@ streaming.post('/mark-season-watched', optionalSessionMiddleware, async (c) => {
 
     // Sync to Trakt if connected
     let traktSynced = false
-    if (metaId.startsWith('tt')) {
-      const { traktAccountDb } = await import('../../services/database')
-      const account = traktAccountDb.getByProfileId(pId)
-      
-      if (account) {
-        try {
-          let accessToken = account.access_token
-          if (traktAccountDb.isTokenExpired(pId)) {
-            const { traktClient } = await import('../../services/trakt')
-            const newTokens = await traktClient.refreshAccessToken(account.refresh_token)
-            const expiresAt = new Date((newTokens.created_at + newTokens.expires_in) * 1000)
-            traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
-            accessToken = newTokens.access_token
-          }
-
-          const { traktClient } = await import('../../services/trakt')
-          const seasonData = {
-            number: parseInt(season),
-            episodes: episodes.map((ep: number) => ({ number: parseInt(String(ep)), watched_at: new Date().toISOString() }))
-          }
-          
-          if (watched) {
-            await traktClient.addToHistory(accessToken, {
-              shows: [{ ids: { imdb: metaId }, seasons: [seasonData] }]
-            })
-          } else {
-            await traktClient.removeFromHistory(accessToken, {
-              shows: [{ ids: { imdb: metaId }, seasons: [{ number: parseInt(season), episodes: episodes.map((ep: number) => ({ number: parseInt(String(ep)) })) }] }]
-            })
-          }
-          traktSynced = true
-          log.debug(`${watched ? 'Pushed' : 'Removed'} season ${season} (${episodes.length} episodes)`)
-        } catch (e) {
-          log.error('Failed to sync season watched:', e)
-        }
-      }
+    try {
+      traktSynced = await traktSyncService.pushEpisodesWatched(
+        pId, metaId,
+        episodes.map((ep: number) => ({ season: parseInt(season), episode: parseInt(String(ep)) })),
+        watched
+      )
+    } catch (e) {
+      log.error('Failed to sync season watched to Trakt:', e)
     }
 
     return c.json({ success: true, traktSynced })
@@ -823,47 +741,10 @@ streaming.post('/mark-series-watched', optionalSessionMiddleware, async (c) => {
 
     // Sync to Trakt if connected
     let traktSynced = false
-    if (metaId.startsWith('tt') && allEpisodes.length > 0) {
-      const { traktAccountDb } = await import('../../services/database')
-      const account = traktAccountDb.getByProfileId(pId)
-      
-      if (account) {
-        try {
-          let accessToken = account.access_token
-          if (traktAccountDb.isTokenExpired(pId)) {
-            const { traktClient } = await import('../../services/trakt')
-            const newTokens = await traktClient.refreshAccessToken(account.refresh_token)
-            const expiresAt = new Date((newTokens.created_at + newTokens.expires_in) * 1000)
-            traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
-            accessToken = newTokens.access_token
-          }
-
-          const { traktClient } = await import('../../services/trakt')
-          
-          // Group episodes by season
-          const seasonMap = new Map<number, { number: number; watched_at?: string }[]>()
-          for (const ep of allEpisodes) {
-            if (!seasonMap.has(ep.season)) seasonMap.set(ep.season, [])
-            seasonMap.get(ep.season)!.push(watched ? { number: ep.episode, watched_at: new Date().toISOString() } : { number: ep.episode })
-          }
-          
-          const seasons = Array.from(seasonMap.entries()).map(([num, eps]) => ({ number: num, episodes: eps }))
-          
-          if (watched) {
-            await traktClient.addToHistory(accessToken, {
-              shows: [{ ids: { imdb: metaId }, seasons }]
-            })
-          } else {
-            await traktClient.removeFromHistory(accessToken, {
-              shows: [{ ids: { imdb: metaId }, seasons }]
-            })
-          }
-          traktSynced = true
-          log.debug(`${watched ? 'Pushed' : 'Removed'} entire series (${allEpisodes.length} episodes)`)
-        } catch (e) {
-          log.error('Failed to sync series watched:', e)
-        }
-      }
+    try {
+      traktSynced = await traktSyncService.pushEpisodesWatched(pId, metaId, allEpisodes, watched)
+    } catch (e) {
+      log.error('Failed to sync series watched to Trakt:', e)
     }
 
     return c.json({ success: true, traktSynced, episodesUpdated: allEpisodes.length })
@@ -919,47 +800,10 @@ streaming.post('/mark-episodes-before', optionalSessionMiddleware, async (c) => 
 
     // Sync to Trakt if connected
     let traktSynced = false
-    if (metaId.startsWith('tt') && episodesToMark.length > 0) {
-      const { traktAccountDb } = await import('../../services/database')
-      const account = traktAccountDb.getByProfileId(pId)
-      
-      if (account) {
-        try {
-          let accessToken = account.access_token
-          if (traktAccountDb.isTokenExpired(pId)) {
-            const { traktClient } = await import('../../services/trakt')
-            const newTokens = await traktClient.refreshAccessToken(account.refresh_token)
-            const expiresAt = new Date((newTokens.created_at + newTokens.expires_in) * 1000)
-            traktAccountDb.updateTokens(pId, newTokens.access_token, newTokens.refresh_token, expiresAt)
-            accessToken = newTokens.access_token
-          }
-
-          const { traktClient } = await import('../../services/trakt')
-          
-          // Group episodes by season
-          const seasonMap = new Map<number, { number: number; watched_at?: string }[]>()
-          for (const ep of episodesToMark) {
-            if (!seasonMap.has(ep.season)) seasonMap.set(ep.season, [])
-            seasonMap.get(ep.season)!.push(watched ? { number: ep.episode, watched_at: new Date().toISOString() } : { number: ep.episode })
-          }
-          
-          const seasons = Array.from(seasonMap.entries()).map(([num, eps]) => ({ number: num, episodes: eps }))
-          
-          if (watched) {
-            await traktClient.addToHistory(accessToken, {
-              shows: [{ ids: { imdb: metaId }, seasons }]
-            })
-          } else {
-            await traktClient.removeFromHistory(accessToken, {
-              shows: [{ ids: { imdb: metaId }, seasons }]
-            })
-          }
-          traktSynced = true
-          log.debug(`${watched ? 'Pushed' : 'Removed'} ${episodesToMark.length} episodes before S${season}E${episode}`)
-        } catch (e) {
-          log.error('Failed to sync episodes before:', e)
-        }
-      }
+    try {
+      traktSynced = await traktSyncService.pushEpisodesWatched(pId, metaId, episodesToMark, watched)
+    } catch (e) {
+      log.error('Failed to sync episodes-before to Trakt:', e)
     }
 
     return c.json({ success: true, traktSynced, episodesUpdated: episodesToMark.length })

@@ -62,7 +62,7 @@ export function StreamRefreshButton({
           animation: isLoading ? 'spin 1s linear infinite' : 'none' 
         }} 
       />
-      {cacheAgeMs !== null && cacheAgeMs !== undefined && cacheAgeMs > 0 && (
+      {cacheAgeMs != null && cacheAgeMs > 0 && (
         <span>{formatCacheAge(cacheAgeMs)}</span>
       )}
     </button>

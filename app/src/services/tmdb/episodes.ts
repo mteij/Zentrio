@@ -3,8 +3,11 @@
  * Original source: https://github.com/mrcanelas/tmdb-addon
  * Licensed under Apache License 2.0
  */
+import { logger } from '../logger'
 import { TMDBClient } from './client'
 import { Utils } from './utils'
+
+const log = logger.scope('TMDB:Episodes')
 
 const diferentOrder = [
   {
@@ -374,7 +377,7 @@ export async function getEpisodes(tmdbClient: TMDBClient, language: string, tmdb
           )
           .reduce((a: any[], b: any[]) => a.concat(b), [])
       )
-      .catch(console.error)
+      .catch((err: any) => log.error('TMDB episodes fetch failed:', err))
   } else {
     const episodes: any[] = []
     await Promise.all(
@@ -410,7 +413,7 @@ export async function getEpisodes(tmdbClient: TMDBClient, language: string, tmdb
               }
             })
           })
-          .catch(console.error)
+          .catch((err: any) => log.error('TMDB episodes fetch failed:', err))
       })
     )
     return episodes

@@ -1263,6 +1263,43 @@ body.is-mobile .videoElement {
   }
 }
 
+/* ── Mobile safe area & immersive mode ── */
+body.is-mobile .topBar {
+  padding-top: max(14px, calc(env(safe-area-inset-top, 0px) + 8px));
+}
+
+body.is-mobile .bottomBar {
+  padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+}
+
+/* Always show progress handle on touch devices */
+body.is-mobile .progressHandle {
+  opacity: 1;
+  width: 20px;
+  height: 20px;
+}
+
+body.is-mobile .progressTrack {
+  height: 5px;
+}
+
+/* Ensure menus open upward on mobile to avoid bottom clipping */
+body.is-mobile .dropdownRight {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+/* Larger touch targets for mobile icon buttons */
+body.is-mobile .iconBtn {
+  width: 48px;
+  height: 48px;
+}
+
+body.is-mobile .ctrlBtn {
+  width: 48px;
+  height: 48px;
+}
+
 /* Small phones */
 @media (max-width: 380px) {
   .titleMain {

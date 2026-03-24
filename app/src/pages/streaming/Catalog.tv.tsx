@@ -1,3 +1,4 @@
+import { createElement } from 'react'
 import { Check, Clapperboard, Film, Star, Tv } from 'lucide-react'
 import { LoadErrorState, LoadingSpinner } from '../../components'
 import { TvActionStrip, TvFocusItem, TvGrid, TvSection, TvShelf } from '../../components/tv'
@@ -71,7 +72,7 @@ export function StreamingCatalogTvView({ model }: { model: CatalogScreenModel })
   const featuredItem = model.items[0]
   const collectionLabel = getCollectionLabel(model.catalogType)
   const typeLabel = getTypeLabel(model.catalogType)
-  const TypeIcon = getTypeIcon(model.catalogType)
+  const typeIcon = getTypeIcon(model.catalogType)
   const countLabel = getItemCountLabel(model.items.length, model.catalogType)
   const yearRange = getYearRange(model.items)
   const heroDescription = featuredItem?.description
@@ -122,7 +123,7 @@ export function StreamingCatalogTvView({ model }: { model: CatalogScreenModel })
           <div className={styles.heroMetaRow}>
             <span className={styles.heroEyebrow}>Collection</span>
             <span className={styles.heroMetaChip}>
-              <TypeIcon size={16} aria-hidden="true" />
+              {createElement(typeIcon, { size: 16, 'aria-hidden': 'true' })}
               {collectionLabel}
             </span>
             <span className={styles.heroMetaChip}>{countLabel}</span>

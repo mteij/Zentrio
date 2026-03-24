@@ -411,27 +411,6 @@
   margin-bottom: 12px;
 }
 
-.seasonDownloadBtn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  background: rgba(168, 85, 247, 0.1);
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  border-radius: 50px;
-  color: #c084fc;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-
-.seasonDownloadBtn:hover {
-  background: rgba(168, 85, 247, 0.18);
-  border-color: rgba(168, 85, 247, 0.4);
-}
 
 .seasonWatchBtn {
   flex-shrink: 0;
@@ -557,19 +536,6 @@
   justify-content: center;
 }
 
-/* Offline indicator on thumbnail */
-.epThumbOffline {
-  position: absolute;
-  bottom: 4px;
-  right: 5px;
-  background: rgba(168, 85, 247, 0.85);
-  border-radius: 3px;
-  padding: 1px 4px;
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.02em;
-}
 
 /* ── Episode info ── */
 .epInfo {
@@ -600,9 +566,6 @@
   margin-bottom: 4px;
 }
 
-.epMetaDot {
-  color: rgba(255, 255, 255, 0.2);
-}
 
 .epRating {
   display: flex;

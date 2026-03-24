@@ -1,8 +1,16 @@
+import { createElement } from 'react'
 import { ChevronLeft, Clapperboard, Film, Layers3, Tv } from 'lucide-react'
 import { AnimatedBackground, Layout, LazyImage, LoadErrorState, RatingBadge, SkeletonCard } from '../../components'
 import type { MetaPreview } from '../../services/addons/types'
 import type { CatalogScreenModel } from './Catalog.model'
 import styles from '../../styles/Streaming.module.css'
+
+function getAgeRating(item: MetaPreview): string | null {
+  const direct = (item as any).ageRating || (item as any).certification || (item as any).contentRating
+  if (direct && typeof direct === 'string') return direct
+  if (typeof (item as any).info?.certification === 'string') return (item as any).info.certification
+  return null
+}
 
 function getCollectionLabel(type: string) {
   if (type === 'movie') return 'Movie Collection'
@@ -68,8 +76,6 @@ export function StreamingCatalogStandardView({ model }: { model: CatalogScreenMo
   const countLabel = getItemCountLabel(model.items.length, model.catalogType)
   const featuredMeta = featuredItem ? [getReleaseLabel(featuredItem), featuredItem.type === 'series' ? 'Series' : featuredItem.type === 'movie' ? 'Movie' : null].filter(Boolean).join(' / ') : null
   const catalogDescription = buildCatalogDescription(model, featuredItem)
-  const TypeIcon = typeIcon
-
   if (model.status === 'loading') {
     return (
       <Layout title="Loading..." showHeader={false} showFooter={false}>
@@ -217,7 +223,7 @@ export function StreamingCatalogStandardView({ model }: { model: CatalogScreenMo
               </div>
               <div className={styles.catalogSectionMeta}>
                 <span className={styles.catalogSectionMetaPill}>
-                  <TypeIcon size={14} aria-hidden="true" />
+                  {createElement(typeIcon, { size: 14, 'aria-hidden': 'true' })}
                   {typeLabel}
                 </span>
                 {yearRange ? <span className={styles.catalogSectionMetaPill}>{yearRange}</span> : null}
@@ -234,6 +240,8 @@ export function StreamingCatalogStandardView({ model }: { model: CatalogScreenMo
                 {model.items.map((item, index) => {
                   const itemMeta = [getReleaseLabel(item), item.type === 'series' ? 'Series' : item.type === 'movie' ? 'Movie' : null].filter(Boolean).join(' / ')
 
+                  const ageRating = model.showAgeRatings ? getAgeRating(item) : null
+
                   return (
                     <a
                       key={`${item.id}-${index}`}
@@ -248,6 +256,7 @@ export function StreamingCatalogStandardView({ model }: { model: CatalogScreenMo
                           <div className={styles.catalogPosterFallback}>{item.name}</div>
                         )}
                         {model.showImdbRatings && item.imdbRating ? <RatingBadge rating={parseFloat(item.imdbRating)} /> : null}
+                        {ageRating ? <span className={styles.ageRatingBadge}>{ageRating}</span> : null}
                       </div>
                       <div className={styles.catalogCardBody}>
                         <h3 className={styles.catalogCardTitle}>{item.name}</h3>

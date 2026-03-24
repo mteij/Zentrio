@@ -226,11 +226,6 @@
   font-size: 0.82rem;
 }
 
-.allWatched {
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.45);
-  padding: 2px 0;
-}
 
 /* ── Season section ── */
 .seasonList {
@@ -278,10 +273,6 @@
   padding-right: 6px;
 }
 
-.seasonChevron {
-  color: rgba(255, 255, 255, 0.3);
-  flex-shrink: 0;
-}
 
 .seasonEpisodes {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -305,9 +296,6 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
-.episodeRowFailed {
-  background: rgba(255, 80, 80, 0.04);
-}
 
 .episodeNum {
   width: 28px;
@@ -349,74 +337,6 @@
   color: rgba(255, 255, 255, 0.45);
 }
 
-.episodeCcBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  background: rgba(168, 85, 247, 0.18);
-  color: #c084fc;
-  letter-spacing: 0.03em;
-}
-
-.episodeWatchedLabel {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.episodeWatchedDone {
-  color: #4ade80;
-}
-
-/* Watched progress bar */
-.episodeWatchBar {
-  height: 2px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 6px;
-}
-
-.episodeWatchFill {
-  height: 100%;
-  background: #a855f7;
-  border-radius: 2px;
-}
-
-/* In-progress state */
-.episodeProgressRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 2px;
-}
-
-.episodeProgressStats {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.episodeSpeed {
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.episodePaused {
-  color: rgba(255, 255, 255, 0.3);
-  font-style: italic;
-}
-
-.episodeError {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.72rem;
-  color: #f87171;
-  margin-top: 2px;
-}
 
 /* ── Episode action buttons ── */
 .episodeActions {
@@ -444,15 +364,6 @@
   border-color: rgba(255, 255, 255, 0.22);
 }
 
-.episodeBtnDelete {
-  color: rgba(255, 100, 100, 0.7);
-  border-color: rgba(255, 100, 100, 0.15);
-}
-
-.episodeBtnDelete:hover {
-  background: rgba(255, 80, 80, 0.12);
-  border-color: rgba(255, 80, 80, 0.35);
-}
 
 /* ── Responsive ── */
 @media (max-width: 500px) {

@@ -584,7 +584,3 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
   }
 }
 
-export async function resolveStreams(params: StreamResolveParams): Promise<CompletePayload | null> {
-  const handle = resolveStreamsProgressive(params)
-  return handle.done
-}

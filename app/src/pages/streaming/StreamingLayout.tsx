@@ -230,8 +230,8 @@ export const StreamingLayout = () => {
     && firstSegment !== 'explore'
     && firstSegment !== 'downloads'
   const searchPath = `/streaming/${profileId}/search`
-  const mobileHeader = showMobileHeader ? (
-    <div className={styles.streamingMobileHeader}>
+  const mobileHeaderContent = showMobileHeader ? (
+    <div className={`${styles.streamingMobileHeader} ${styles.streamingMobileHeaderFixed}`}>
       <button
         type="button"
         className={styles.streamingMobileSearch}
@@ -249,33 +249,36 @@ export const StreamingLayout = () => {
         className={styles.streamingMobileProfileButton}
         aria-label={profile?.name ? `Switch profile. Current profile: ${profile.name}` : 'Switch profile'}
         title="Switch Profile"
-        >
-          <div className={styles.streamingMobileProfileAvatar}>
-            {profile?.avatar ? (
+      >
+        <div className={styles.streamingMobileProfileAvatar}>
+          {profile?.avatar ? (
             <img
               src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))}
               alt=""
             />
-            ) : (
-              <User size={18} aria-hidden="true" />
-            )}
-          </div>
+          ) : (
+            <User size={18} aria-hidden="true" />
+          )}
+        </div>
       </Link>
     </div>
-  ) : undefined
+  ) : null
 
   return (
-    <StandardShell
-      navPlacement="auto"
-      header={mobileHeader}
-      headerVisibility="mobile"
-      nav={!shouldHideNavbar ? <Navbar profileId={profileId === 'guest' ? 'guest' : parseInt(profileId!)} profile={profile} /> : undefined}
-    >
-      {/* CSS var tells OfflineBanner how far below the sticky top bar it should stick on mobile */}
-      <div style={{ '--mobile-bar-height': showMobileHeader ? '68px' : '48px' } as object}>
-        <OfflineBanner visible={!isOnline && !shouldHideNavbar} />
-      </div>
-      <Outlet />
-    </StandardShell>
+    <>
+      {mobileHeaderContent}
+      <StandardShell
+        navPlacement="auto"
+        header={undefined}
+        headerVisibility="mobile"
+        nav={!shouldHideNavbar ? <Navbar profileId={profileId === 'guest' ? 'guest' : parseInt(profileId!)} profile={profile} /> : undefined}
+      >
+        {/* CSS var tells OfflineBanner how far below the sticky top bar it should stick on mobile */}
+        <div style={{ '--mobile-bar-height': showMobileHeader ? '68px' : '48px' } as object}>
+          <OfflineBanner visible={!isOnline && !shouldHideNavbar} />
+        </div>
+        <Outlet />
+      </StandardShell>
+    </>
   )
 }

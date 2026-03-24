@@ -3,10 +3,13 @@
  * Original source: https://github.com/mrcanelas/tmdb-addon
  * Licensed under Apache License 2.0
  */
+import { logger } from '../logger'
 import { buildSearchQueryVariants, scoreSearchMatch } from '../../utils/search'
 import { TMDBClient } from './client'
 import { getGenreList } from './genres'
 import { Utils } from './utils'
+
+const log = logger.scope('TMDB:Search')
 
 function hasStrongSearchMatch(items: any[], query: string): boolean {
   return items.some((item) => scoreSearchMatch(item?.name, query) >= 900)
@@ -67,7 +70,7 @@ export async function getSearch(tmdbClient: TMDBClient, id: string, type: string
         .then((res: any) => {
           res.results.map((el: any) => {searchResults.push(Utils.parseMedia(el, 'movie', genreList))})
         })
-        .catch(console.error)
+        .catch((err: any) => log.error('TMDB search fetch failed:', err))
 
       if (hasStrongSearchMatch(searchResults, query)) break
     }
@@ -99,7 +102,7 @@ export async function getSearch(tmdbClient: TMDBClient, id: string, type: string
         .then((res: any) => {
           res.results.map((el: any) => {searchResults.push(Utils.parseMedia(el, 'tv', genreList))})
         })
-        .catch(console.error)
+        .catch((err: any) => log.error('TMDB search fetch failed:', err))
 
       if (hasStrongSearchMatch(searchResults, query)) break
     }

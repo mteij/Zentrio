@@ -13,13 +13,8 @@
 
   /* Zentrio Theme Variables */
   --accent: #E50914;
-  --btn-primary-bg: #E50914;
-  --btn-primary-bg-hover: #CC0810;
   --text: #ffffff;
   --muted: #b3b3b3;
-  --bg: #141414;
-  --bg-elevated: #1e1e1e;
-  --bg-card: rgba(20, 20, 20, 0.6);
 
   color: var(--text);
   /* Fallback background - AnimatedBackground will cover this */
@@ -122,6 +117,11 @@ body.is-mobile {
   padding-bottom: var(--app-safe-bottom);
   padding-left: var(--safe-area-inset-left);
   padding-right: var(--safe-area-inset-right);
+  /* Prevent accidental text selection in the app UI */
+  -webkit-user-select: none;
+  user-select: none;
+  /* Prevent iOS callout (long-press image save, link preview) */
+  -webkit-touch-callout: none;
   /* No titlebar on mobile */
   --titlebar-height: 0px;
   --app-content-top-offset: 0px;
@@ -193,13 +193,10 @@ body.has-titlebar [data-sonner-toaster] {
   top: calc(var(--titlebar-height, 32px) + 8px) !important;
 }
 
-/* Mobile: Sonner is set to bottom-center in JS, but we still need to
-   push it above the floating pill navbar + home-indicator safe area.
-   The navbar sits at calc(20px + safe-area-inset-bottom) from the viewport
-   bottom and is ~52px tall, so we clear it with a 80px offset + safe area. */
+/* Mobile: push toasts below the fixed mobile header (≈68px) and status bar safe area */
 body.is-mobile [data-sonner-toaster] {
-  bottom: max(16px, calc(var(--standard-shell-bottom-nav-height, 0px) + 16px)) !important;
-  /* Stretch to near-full width (matching the pill navbar width range) */
+  top: max(68px, calc(var(--app-safe-top) + 68px)) !important;
+  bottom: auto !important;
   left: 16px !important;
   right: 16px !important;
   width: auto !important;

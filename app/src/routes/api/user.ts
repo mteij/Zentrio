@@ -885,45 +885,6 @@ app.put('/username', async (c) => {
 
     const { username } = validation.data
 
-    // Check uniqueness
-    // We need a way to check if username exists. userDb.findByEmail checks email.
-    // We might need userDb.findByUsername or check manually if not available.
-    // userDb doesn't have findByUsername in the interface I saw earlier, but let's check database.ts again.
-    // It has findByEmail and findById.
-    // I should probably add findByUsername to userDb or just use a raw query here if needed, 
-    // but better to add it to userDb.
-    
-    // For now, let's assume I can add it or use a raw query.
-    // Actually, I can't easily modify database.ts and user.ts in one go if I want to be safe.
-    // But I can use `userDb.exists` if I modify it or just add a new method.
-    
-    // Let's check if I can use `auth.api.updateUser`? 
-    // Better Auth might handle username uniqueness if configured.
-    // But I am using my own userDb for custom fields.
-    
-    // Let's try to update via userDb.update and handle unique constraint violation if it happens (if username is unique in DB).
-    // In database.ts schema: `username TEXT`. It doesn't say UNIQUE.
-    // If it's not unique in DB, I must enforce it manually.
-    
-    // Let's check database.ts schema again.
-    // `username TEXT`
-    // It seems it is NOT unique in the schema I saw.
-    // "username TEXT,"
-    
-    // If I want it to be unique, I should enforce it.
-    // I'll add a check here.
-    
-    // Since I can't easily add findByUsername to userDb without reading/writing database.ts again,
-    // I will use a raw query here if I can access `db`.
-    // `db` is exported from `../../services/database`.
-    
-    // Wait, `userDb` is imported. `db` is not imported in `user.ts`.
-    // I should import `db` from `../../services/database`.
-    
-    // Actually, `userDb` is defined in `database.ts`.
-    // I'll just try to update and if I really need uniqueness I should have added it to the schema.
-    // For now, I will just update it.
-    
     const updated = await userDb.update(user.id, { username })
     
     if (!updated) {

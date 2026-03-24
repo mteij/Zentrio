@@ -1,2 +1,0 @@
-export { LibraryItemCard } from './LibraryItemCard'
-

@@ -1,8 +1,8 @@
 import type { PlayerScreenModel } from './Player.model'
-import { StreamingPlayer as LegacyStreamingPlayer } from './Player'
+import { StreamingPlayerStandardView } from './Player.standard'
 
-export function StreamingPlayerTvView(_props: { model: PlayerScreenModel }) {
-  return <LegacyStreamingPlayer />
+export function StreamingPlayerTvView(props: { model: PlayerScreenModel }) {
+  return <StreamingPlayerStandardView {...props} />
 }
 
 export default StreamingPlayerTvView

@@ -64,6 +64,28 @@ function userOwnsProfile(userId: string, profileId: number): boolean {
   return profile?.user_id === userId
 }
 
+/**
+ * Save Trakt tokens and trigger initial sync.
+ * Called after any OAuth flow completes (web callback, SPA exchange, device poll).
+ */
+async function saveTraktConnectionFromTokens(
+  profileId: number,
+  tokens: { access_token: string; refresh_token: string; created_at: number; expires_in: number }
+): Promise<{ username: string; userId: string }> {
+  const user = await traktClient.getUser(tokens.access_token)
+  const expiresAt = new Date((tokens.created_at + tokens.expires_in) * 1000)
+  traktAccountDb.upsert(profileId, {
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: expiresAt,
+    trakt_user_id: user.ids.slug,
+    trakt_username: user.username
+  })
+  traktSyncStateDb.getOrCreate(profileId)
+  traktSyncService.sync(profileId).catch(e => { log.error('Initial sync failed:', e) })
+  return { username: user.username, userId: user.ids.slug }
+}
+
 // ============================================================================
 // Public routes (check if Trakt is configured)
 // ============================================================================
@@ -216,31 +238,9 @@ trakt.get('/callback', async (c) => {
     const profileId = pendingState.profileId
     const redirectUri = pendingState.redirectUri
 
-    // Exchange code for tokens
+    // Exchange code for tokens, save, and trigger sync
     const tokens = await traktClient.exchangeCode(code, redirectUri)
-    
-    // Get user info
-    const user = await traktClient.getUser(tokens.access_token)
-    
-    // Calculate expiry time
-    const expiresAt = new Date((tokens.created_at + tokens.expires_in) * 1000)
-
-    // Save to database
-    traktAccountDb.upsert(profileId, {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      expires_at: expiresAt,
-      trakt_user_id: user.ids.slug,
-      trakt_username: user.username
-    })
-
-    // Initialize sync state with defaults
-    traktSyncStateDb.getOrCreate(profileId)
-
-    // Trigger initial sync in background
-    traktSyncService.sync(profileId).catch(e => {
-      log.error('Initial sync failed:', e)
-    })
+    await saveTraktConnectionFromTokens(profileId, tokens)
 
     return c.redirect('/settings?trakt_connected=true')
   } catch (e) {
@@ -294,37 +294,11 @@ trakt.post('/exchange-code', async (c) => {
     const profileId = pendingState.profileId
     const redirectUri = pendingState.redirectUri
 
-    // Exchange code for tokens
+    // Exchange code for tokens, save, and trigger sync
     const tokens = await traktClient.exchangeCode(code, redirectUri)
+    const { username, userId } = await saveTraktConnectionFromTokens(profileId, tokens)
 
-    // Get user info
-    const user = await traktClient.getUser(tokens.access_token)
-
-    // Calculate expiry time
-    const expiresAt = new Date((tokens.created_at + tokens.expires_in) * 1000)
-
-    // Save to database
-    traktAccountDb.upsert(profileId, {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      expires_at: expiresAt,
-      trakt_user_id: user.ids.slug,
-      trakt_username: user.username
-    })
-
-    // Initialize sync state
-    traktSyncStateDb.getOrCreate(profileId)
-
-    // Trigger initial sync in background
-    traktSyncService.sync(profileId).catch(e => {
-      log.error('Initial sync failed:', e)
-    })
-
-    return ok(c, {
-      connected: true,
-      username: user.username,
-      userId: user.ids.slug
-    })
+    return ok(c, { connected: true, username, userId })
   } catch (e) {
     log.error('Code exchange failed:', e)
     return err(c, 500, 'SERVER_ERROR', 'Failed to exchange code')
@@ -436,34 +410,11 @@ trakt.get('/poll-token', async (c) => {
       return ok(c, { status: 'expired' })
     }
 
-    // Success! Save tokens
-    const user = await traktClient.getUser(result.access_token)
-    const expiresAt = new Date((result.created_at + result.expires_in) * 1000)
-
-    traktAccountDb.upsert(pending.profileId, {
-      access_token: result.access_token,
-      refresh_token: result.refresh_token,
-      expires_at: expiresAt,
-      trakt_user_id: user.ids.slug,
-      trakt_username: user.username
-    })
-
-    // Initialize sync state
-    traktSyncStateDb.getOrCreate(pending.profileId)
-
-    // Cleanup
+    // Success! Save tokens and trigger sync
+    const { username, userId } = await saveTraktConnectionFromTokens(pending.profileId, result)
     pendingDeviceCodes.delete(pollToken)
 
-    // Trigger initial sync in background
-    traktSyncService.sync(pending.profileId).catch(e => {
-      log.error('Initial sync failed:', e)
-    })
-
-    return ok(c, {
-      status: 'authorized',
-      username: user.username,
-      userId: user.ids.slug
-    })
+    return ok(c, { status: 'authorized', username, userId })
   } catch (e: any) {
     log.error('Poll failed:', e)
     

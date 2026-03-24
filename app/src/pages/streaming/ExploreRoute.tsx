@@ -1,5 +1,5 @@
 import { AdaptiveScreen } from '../../components/tv'
-import { StreamingExplore as StreamingExploreStandardView } from './Explore'
+import { StreamingExploreStandardView } from './Explore.standard'
 import { useExploreScreenModel } from './Explore.model'
 import { StreamingExploreTvView } from './Explore.tv'
 

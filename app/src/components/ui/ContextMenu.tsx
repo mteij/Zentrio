@@ -1,4 +1,4 @@
-import { vibrate } from '@tauri-apps/plugin-haptics'
+import { hapticConfirm } from '../../lib/haptics'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -146,13 +146,7 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
       isLongPressActive.current = false
 
       longPressTimer.current = setTimeout(() => {
-        try {
-          vibrate(50).catch(() => {
-            if (navigator.vibrate) navigator.vibrate(50)
-          })
-        } catch {
-          if (navigator.vibrate) navigator.vibrate(50)
-        }
+        hapticConfirm()
         isLongPressActive.current = true
         openMenu(touch.clientX, touch.clientY)
       }, 500)
@@ -209,7 +203,8 @@ export const ContextMenu = ({ items, children, title, onOpen, onClose }: Context
           display: 'block',
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
-          userSelect: 'none'
+          userSelect: 'none',
+          touchAction: 'manipulation',
         }}
       >
         {children}

@@ -1,4 +1,5 @@
 import React from 'react'
+import { hapticTick } from '../../lib/haptics'
 
 interface ToggleProps {
   checked: boolean
@@ -36,7 +37,7 @@ export function Toggle({ checked, onChange, disabled, title }: ToggleProps) {
   return (
     <div 
       style={containerStyle}
-      onClick={() => !disabled && onChange(!checked)}
+      onClick={() => { if (!disabled) { hapticTick(); onChange(!checked) } }}
       title={title}
       role="switch"
       aria-checked={checked}

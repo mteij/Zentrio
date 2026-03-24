@@ -19,48 +19,38 @@ Ship a TV-capable Android build without turning the frontend into a pile of `if 
 
 Current implementation status in the repo:
 
-- Phase 0: partially done
-  - TV manifest bootstrap and banner resource are in place.
-  - TV onboarding now uses a browser-mediated 6-digit pairing flow instead of trying to run the full provider login UX inside the TV app.
-  - We still need a full Android TV install and launcher validation pass on emulator or hardware.
+- Phase 0: done (code-complete; emulator/hardware validation not yet done)
+  - AndroidManifest.xml declares `android.hardware.touchscreen` with `required="false"`, `android:banner`, and `LEANBACK_LAUNCHER`.
+  - TV onboarding uses a browser-mediated 6-digit pairing flow.
 - Phase 1: done
-  - `app-target` is the canonical target detector.
-- Phase 2: partially done
-  - `pages/tv/TvHome.tsx` and `components/tv/TvFocusable.tsx` exist.
-  - The rest of the core screens still need TV shells or TV-specific hardening.
-- Phase 3: partially done
-  - basic focusable primitives exist
-  - full D-pad traversal and remote-only QA are not finished
-- Phase 4: not done enough
-  - Android playback now runs through native ExoPlayer on both TV and phone/tablet.
-  - Native back is modelled separately from natural media completion in the player engine contract.
-  - The Android React player overlay is intentionally disabled while native ExoPlayer controls own the visible transport UI.
-  - A richer TV-first custom control surface is still future work if we decide to replace native controls later.
-- Phase 5: partially done
-  - Watch Next bridge/plugin and deep-link plumbing exist
-  - launcher behavior still needs emulator/device validation
-- Phase 6: partially done
-  - Home has a first TV shell
-  - details, search, library, and settings still need more TV work
-- Phase 7: not started in a real QA sense
-  - we have not yet completed a dedicated emulator or physical-device certification pass
+  - `app/src/lib/app-target.ts` is the canonical target detector with `isTv`, `hasTouch`, `primaryInput`, `supportsHover`, etc.
+  - `hydrateNativeAppTarget()` reads from the native `tv_launcher_get_environment` Tauri command at startup.
+- Phase 2: done
+  - Full TV component library in `app/src/components/tv/`: `AdaptiveScreen`, `TvFocusContext`, `TvPageScaffold`, `TvRailMenu`, `TvFocusable`, `TvMediaShelf`, `TvPosterActionDialog`.
+  - `StreamingTvScaffold.tsx` wraps streaming pages with rail navigation and profile/download indicators.
+- Phase 3: done (code-complete; remote-only QA not yet done)
+  - `TvFocusContext.tsx` provides `TvFocusProvider`, `TvFocusScope`, `TvFocusZone`, `TvFocusItem` with full D-pad movement, back-key handling, grid support, and focus memory.
+- Phase 4: partially done
+  - Android playback runs through native ExoPlayer on both TV and phone/tablet.
+  - `Player.tv.tsx` exists but is a stub — it delegates to the legacy player wrapper without TV-specific focus zones, D-pad controls, or remote-friendly subtitle/settings menus.
+  - Decision deferred: determine whether native ExoPlayer controls are sufficient long-term or whether a custom React control shell is needed.
+- Phase 5: done (code-complete; launcher validation not yet done on device)
+  - `app/src/lib/tv-launcher.ts` provides `syncContinueWatchingLauncher()` and `removeContinueWatchingLauncher()`.
+  - `TvLauncherPlugin.kt` implements the Android TV Watch Next bridge via `TvContractCompat`.
+- Phase 6: done
+  - All core screens have `.tv.tsx` implementations: Home, Details, Catalog, Search, Library, Player (stub), Downloads, Explore, Settings, Profiles, ExploreAddons.
+- Phase 7: not started
+  - No emulator or physical-device certification pass has been completed yet.
 
-## Current Repo Reality
+## Remaining Work
 
-Useful starting points already exist:
+The only real gaps before this plan is complete:
 
-- The Android manifest already includes `LEANBACK_LAUNCHER`.
-- The app already has a custom player and a clear player-engine abstraction.
-- Styling is already centralized enough to build on: CSS modules plus [`design-system.css`](/Users/Michi/Documents/GitHub/Zentrio/app/src/styles/design-system.css).
-- The architecture doc already separates client, server, and native boundaries well.
+1. **TV Player controls** (`Player.tv.tsx` stub): decide whether native ExoPlayer UI is sufficient or build a focus-aware React control shell on top of the same Android playback engine.
+2. **QA pass** (Phase 7): run through core flows on Android TV emulator and a physical device (Chromecast with Google TV or equivalent).
+3. **Launcher validation**: confirm Watch Next entries appear and deep-link correctly on a real launcher.
 
-Main gaps for Android TV right now:
-
-- The React app is still touch/mobile/desktop-first, not D-pad/focus-first.
-- The broader player and navigation model are not yet fully structured around remote control input outside the native ExoPlayer surface.
-- Details, search, library, settings, and player still need TV-specific hardening.
-- Remote compatibility has not been validated on an Android TV emulator or physical device yet.
-- TV storage policy still needs deeper native work for external drives and adopted storage.
+Everything else is code-complete.
 
 ## Authentication Direction
 

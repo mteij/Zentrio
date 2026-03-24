@@ -19,17 +19,17 @@ type NetworkInfo = {
 const ROUTES_TO_PRELOAD: PreloadRoute[] = [
   // Most common routes first
   () => import('../pages/streaming/Home'),
-  () => import('../pages/streaming/Explore'),
+  () => import('../pages/streaming/ExploreRoute'),
   () => import('../pages/streaming/LibraryRoute'),
   () => import('../pages/streaming/Search'),
-  
+
   // Secondary routes
-  () => import('../pages/streaming/Details'),
+  () => import('../pages/streaming/DetailsRoute'),
   () => import('../pages/SettingsPage.tsx'),
   () => import('../pages/ProfilesPage'),
-  
+
   // Less common routes
-  () => import('../pages/ExploreAddonsPage'),
+  () => import('../pages/ExploreAddonsRoute'),
 ]
 
 function getNetworkInfo(): NetworkInfo | null {
@@ -162,7 +162,7 @@ export function createHoverPreloader(routeName: string) {
     // Map route names to actual imports
     const routeMap: Record<string, PreloadRoute> = {
       'streaming-home': () => import('../pages/streaming/Home'),
-      'streaming-explore': () => import('../pages/streaming/Explore'),
+      'streaming-explore': () => import('../pages/streaming/ExploreRoute'),
       'streaming-library': () => import('../pages/streaming/LibraryRoute'),
       'streaming-search': () => import('../pages/streaming/Search'),
       '/settings': () => import('../pages/SettingsPage.tsx'),
@@ -194,7 +194,7 @@ export function preloadPlayer() {
   if (!shouldPreload()) return
 
   requestAnimationFrame(() => {
-    import('../pages/streaming/Player').catch(() => {})
+    import('../pages/streaming/PlayerRoute').catch(() => {})
   })
 }
 

@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ChevronDown, Film, Layers3, Search, Tv, User } from 'lucide-react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatedBackground, Hero, Layout, LazyImage, RatingBadge, SkeletonCard, SkeletonHero, SkeletonRow, StreamingRow } from '../../components'
 import { TraktRecommendationsRow } from '../../components/streaming/TraktRecommendationsRow'
@@ -10,9 +10,6 @@ import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
 import { MetaPreview } from '../../services/addons/types'
 import type { ExploreScreenModel } from './Explore.model'
 import styles from '../../styles/Streaming.module.css'
-import { createLogger } from '../../utils/client-logger'
-
-const log = createLogger('ExplorePage')
 
 // -- Internal GenreRow Component --
 interface GenreRowProps {
@@ -102,7 +99,7 @@ const GenreRow = memo(({ genre, profileId, showImdbRatings, showAgeRatings, type
 GenreRow.displayName = 'GenreRow'
 
 // -- Main Explore Component --
-export const StreamingExplore = ({ model }: { model: ExploreScreenModel }) => {
+export const StreamingExploreStandardView = ({ model }: { model: ExploreScreenModel }) => {
   const [genreMenuOpen, setGenreMenuOpen] = useState(false)
   const genreMenuRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)

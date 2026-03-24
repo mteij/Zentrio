@@ -345,16 +345,18 @@ h6 {
 }
 
 .nav-link.highlight {
-  color: white;
-  background: var(--accent);
-  padding: 7px 16px;
+  color: var(--accent);
+  border: 1px solid rgba(229, 9, 20, 0.45);
+  padding: 6px 16px;
   border-radius: 8px;
   font-weight: 600;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
 }
 
 .nav-link.highlight:hover {
   color: white;
-  background: var(--accent-hover);
+  background: rgba(229, 9, 20, 0.18);
+  border-color: var(--accent);
   transform: translateY(-1px);
 }
 

@@ -64,6 +64,7 @@ export function StreamingHomeStandardView({ model }: { model: HomeScreenModel })
                 metadata={metadata}
                 profileId={model.profileId}
                 showImdbRatings={model.showImdbRatings}
+                showAgeRatings={model.showAgeRatings}
                 priority={index < 1 ? 'eager' : 'lazy'}
               />
             ))

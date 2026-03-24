@@ -282,7 +282,6 @@ export class AddonManager {
         }
 
         const addons = addonDb.getEnabledForProfile(settingsProfileId)
-        // log.debug(`Found ${addons.length} enabled addons for profile ${profileId} (settings: ${settingsProfileId}):`, addons.map(a => a.name))
 
         // If no addons enabled, auto-enable the default Zentrio addon
         // (global TMDB key is always available)
@@ -748,13 +747,11 @@ export class AddonManager {
             if (!shouldQuery) continue;
 
             try {
-                // log.debug(`Trying ${client.manifest.name} for meta ${type}/${primaryId}`)
                 const meta = await client.getMeta(type, id, config)
                 if (meta) {
                     if (Array.isArray((meta as any).videos)) {
                         ; (meta as any).videos = normalizeMetaVideos((meta as any).videos)
                     }
-                    // log.debug(`Got meta from ${client.manifest.name} for ${type}/${primaryId}`)
                     return meta
                 }
             } catch (e) {
@@ -1228,7 +1225,6 @@ export class AddonManager {
             // Use proper resource checking that handles object resources
             const supportsSubtitles = this.supportsResource(client.manifest, 'subtitles', type)
             if (!supportsSubtitles) {
-                // log.debug(`${client.manifest.name} does NOT support subtitles resource`)
                 return
             }
 
@@ -1241,19 +1237,15 @@ export class AddonManager {
                 if (this.canHandleId(client.manifest, 'subtitles', imdbId)) {
                     targetId = imdbId
                     canHandle = true
-                    // log.debug(`Using resolved IMDB ID ${targetId} for ${client.manifest.name}`)
                 }
             }
 
             if (!canHandle) {
-                // log.debug(`${client.manifest.name} cannot handle ID ${id}`)
                 return
             }
 
             try {
-                // log.debug(`Requesting subtitles from ${client.manifest.name} for ${type}/${targetId}`)
                 const subtitles = await client.getSubtitles(type, targetId, videoHash)
-                // log.debug(`Received ${subtitles ? subtitles.length : 0} subtitles from ${client.manifest.name}`)
                 if (subtitles && subtitles.length > 0) {
                     results.push({ addon: client.manifest, subtitles })
                 }

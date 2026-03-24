@@ -416,42 +416,52 @@ jobs:
           echo "android.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GRADLE_PROPS"
 
           # Build Universal APK (all architectures)
-          bun tauri android build --apk true
+          bun tauri android build --apk
 
           # Build ARM64-only APK (smaller, for modern devices)
-          bun tauri android build --apk true --target aarch64
+          bun tauri android build --apk --target aarch64
 
       - name: Rename Android APKs
         if: matrix.name == 'android'
         run: |
           VERSION="${{ needs.create-release.outputs.version }}"
 
+          echo "📦 All generated APKs:"
+          find app/src-tauri/gen/android -name "*.apk" -type f
+
           # Rename Universal APK
           UNIVERSAL_DIR="app/src-tauri/gen/android/app/build/outputs/apk/universal/release"
           if [ -f "$UNIVERSAL_DIR/app-universal-release.apk" ]; then
             mv "$UNIVERSAL_DIR/app-universal-release.apk" "$UNIVERSAL_DIR/Zentrio_${VERSION}_android-universal.apk"
             echo "✅ Renamed Universal APK to Zentrio_${VERSION}_android-universal.apk"
+          else
+            echo "❌ Universal APK not found at expected path"
+            exit 1
           fi
 
-          # Rename ARM64 APK
-          ARM64_DIR="app/src-tauri/gen/android/app/build/outputs/apk/arm64/release"
-          if [ -f "$ARM64_DIR/app-arm64-release.apk" ]; then
-            mv "$ARM64_DIR/app-arm64-release.apk" "$ARM64_DIR/Zentrio_${VERSION}_android-arm64.apk"
-            echo "✅ Renamed ARM64 APK to Zentrio_${VERSION}_android-arm64.apk"
-          fi
+          # Find and rename ARM64 APK — Tauri may output to arm64/, aarch64/, or arm64-v8a/
+          ARM64_APK=$(find app/src-tauri/gen/android/app/build/outputs/apk \
+            -name "*.apk" -path "*/release/*" \
+            ! -path "*/universal/*" \
+            | head -1)
 
-          # List all APKs for debugging
-          echo "📦 Available APKs:"
-          find app/src-tauri/gen/android -name "*.apk" -type f
+          if [ -n "$ARM64_APK" ]; then
+            ARM64_DIR=$(dirname "$ARM64_APK")
+            mv "$ARM64_APK" "$ARM64_DIR/Zentrio_${VERSION}_android-arm64.apk"
+            echo "✅ Renamed ARM64 APK (was: $ARM64_APK)"
+          else
+            echo "❌ ARM64 APK not found in any non-universal output directory"
+            exit 1
+          fi
 
       - name: Upload Android Artifacts to Release
         if: matrix.name == 'android'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.create-release.outputs.tag_name }}
+          fail_on_unmatched_files: true
           files: |
-            app/src-tauri/gen/android/app/build/outputs/apk/universal/release/Zentrio_*.apk
-            app/src-tauri/gen/android/app/build/outputs/apk/arm64/release/Zentrio_*.apk
+            app/src-tauri/gen/android/app/build/outputs/apk/**/Zentrio_*.apk
 
       # iOS Build
       - name: Build iOS

@@ -13,6 +13,9 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from 'react'
+import { createLogger } from '../../utils/client-logger'
+
+const log = createLogger('TvFocus')
 import { getPlatformCapabilities } from '../../lib/platform-capabilities'
 import styles from './TvFocus.module.css'
 
@@ -362,7 +365,7 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       __ZENTRIO_TV_FOCUS_ENABLED__?: boolean
     }).__ZENTRIO_TV_FOCUS_ENABLED__ = enabled
 
-    console.info('[ZentrioTvFocus] provider mounted', {
+    log.debug('provider mounted', {
       enabled,
       appTarget: document.body?.dataset.appTarget,
       primaryInput: document.body?.dataset.primaryInput,
@@ -789,7 +792,7 @@ export function TvFocusProvider({ children }: { children: ReactNode }) {
       const remoteKey = remoteEvent.detail?.action
       if (!remoteKey) return
 
-      console.info('[ZentrioTvFocus] native remote event', {
+      log.debug('native remote event', {
         action: remoteKey,
         activeScope: activeScopeIdRef.current,
         activeItemId,

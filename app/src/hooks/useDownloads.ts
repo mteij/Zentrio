@@ -2,7 +2,11 @@ import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useDownloadStore } from '../stores/downloadStore'
 import { isTauri } from '../lib/auth-client'
+import { hapticSuccess } from '../lib/haptics'
 import type { DownloadRecord, DownloadQuality } from '../services/downloads/download-service'
+import { createLogger } from '../utils/client-logger'
+
+const log = createLogger('useDownloads')
 
 interface ProgressEvent {
   id: string
@@ -46,7 +50,7 @@ export function useDownloads(profileId: string | undefined) {
   useEffect(() => {
     if (!profileId || !isTauri()) return
     import('../services/downloads/download-service').then(({ downloadService }) => {
-      downloadService.list(profileId).then(setDownloads).catch(console.error)
+      downloadService.list(profileId).then(setDownloads).catch((err) => log.error('Failed to list downloads:', err))
     })
   }, [profileId, setDownloads])
 
@@ -72,8 +76,9 @@ export function useDownloads(profileId: string | undefined) {
 
       listen<StatusEvent>('download:status', (e) => {
         updateStatus(e.payload.id, e.payload.status as any, e.payload.filePath, e.payload.error)
+        if (e.payload.status === 'completed') hapticSuccess()
         if (['completed', 'failed', 'cancelled'].includes(e.payload.status) && profileRef.current) {
-          downloadService.list(profileRef.current).then(setDownloads).catch(console.error)
+          downloadService.list(profileRef.current).then(setDownloads).catch((err) => log.error('Failed to list downloads:', err))
         }
       }).then((fn) => { if (cancelled) fn(); else unlisteners.push(fn) })
 
@@ -127,7 +132,7 @@ export function useDownloads(profileId: string | undefined) {
             autoDelete,
           })
         } catch (err) {
-          console.error('[SmartDownloads] Failed to start next episode download', err)
+          log.error('Failed to start next episode download:', err)
         }
       }).then((fn) => { if (cancelled) fn(); else unlisteners.push(fn) })
     }

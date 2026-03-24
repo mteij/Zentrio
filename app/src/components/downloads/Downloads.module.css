@@ -28,8 +28,8 @@
 
   /* padding-left drops to 0, so reset the negative escape margins */
   .downloadsMobileBar {
-    margin-left: 0;
-    margin-right: 0;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
 }
 
@@ -58,12 +58,8 @@
     /* Escape parent downloadsPage's horizontal padding so bar fills full width */
     margin-left: calc(-1 * (var(--standard-shell-side-nav-width, 0px) + 16px));
     margin-right: -16px;
-    background: linear-gradient(
-      180deg,
-      rgba(10, 10, 10, 0.96) 0%,
-      rgba(10, 10, 10, 0.84) 100%
-    );
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 10, 10, 0.75);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
@@ -196,24 +192,6 @@
   flex-shrink: 0;
 }
 
-.progressBarTrack {
-  height: 4px;
-  background: rgba(255,255,255,0.12);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-
-.progressBarFill {
-  height: 100%;
-  background: linear-gradient(90deg, #8b5cf6, #a855f7);
-  border-radius: 4px;
-  transition: width 0.5s ease;
-}
-
-.progressBarPaused {
-  background: rgba(255,255,255,0.3);
-}
 
 .progressStats {
   display: flex;
@@ -353,11 +331,6 @@
   flex-shrink: 0;
 }
 
-.seriesEpisodeList {
-  border-top: 1px solid rgba(255,255,255,0.06);
-  display: flex;
-  flex-direction: column;
-}
 
 /* ─── Compact Card (episode inside series group) ──────────────────────────── */
 .cardCompact {
@@ -526,9 +499,6 @@
   text-transform: capitalize;
 }
 
-.cardComplete {
-  color: #4ade80;
-}
 
 .cardActions {
   display: flex;
@@ -602,12 +572,6 @@
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-.pickerHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
 
 .pickerTitle {
   display: flex;
@@ -637,170 +601,7 @@
   color: #fff;
 }
 
-.pickerMediaTitle {
-  font-size: 0.85rem;
-  color: rgba(255,255,255,0.45);
-  margin: 0 0 24px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.qualityOptions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 24px;
-}
-
-.qualityOption {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  padding: 16px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 14px;
-  color: #fff;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.2s ease;
-}
-
-.qualityOption:hover {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.1);
-}
-
-.qualityOptionActive {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.25);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.qualityIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255,255,255,0.5);
-  flex-shrink: 0;
-  transition: color 0.2s;
-}
-
-.qualityOptionActive .qualityIcon {
-  color: #fff;
-}
-
-.qualityText {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.qualityLabel {
-  font-size: 0.95rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.qualityDesc {
-  font-size: 0.8rem;
-  color: rgba(255,255,255,0.45);
-}
-
-.qualityRadio {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.15);
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.qualityRadioActive {
-  border-color: #fff;
-}
-
-.qualityRadioActive::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 8px;
-  height: 8px;
-  background: #fff;
-  border-radius: 50%;
-}
-
-.pickerConfirm {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 14px;
-  background: rgba(255,255,255,0.95);
-  border: none;
-  border-radius: 14px;
-  color: #000;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.pickerConfirm:hover {
-  background: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255,255,255,0.1);
-}
-
-.pickerConfirm:active {
-  transform: translateY(0);
-}
-
-/* ─── Download Button (in DetailsHeader) ──────────────────────────────────── */
-.downloadBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: rgba(255,255,255,0.08);
-  border: 1.5px solid rgba(255,255,255,0.18);
-  border-radius: 50px;
-  color: rgba(255,255,255,0.9);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-  white-space: nowrap;
-}
-
-.downloadBtn:hover {
-  background: rgba(255,255,255,0.14);
-  border-color: rgba(255,255,255,0.3);
-}
-
-.downloadBtnDownloaded {
-  background: rgba(74, 222, 128, 0.12);
-  border-color: rgba(74, 222, 128, 0.4);
-  color: #4ade80;
-}
-
-.downloadBtnDownloaded:hover {
-  background: rgba(74, 222, 128, 0.2);
-}
-
-.downloadBtnActive {
-  background: rgba(255, 200, 0, 0.1);
-  border-color: rgba(255, 200, 0, 0.35);
-  color: #fbbf24;
-}
 
 /* ─── Storage Panel ─────────────────────────────────────────────────────────── */
 .storageOverlay {
@@ -883,28 +684,6 @@
   font-weight: 600;
 }
 
-.storageDirRow {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 16px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 12px;
-  margin-bottom: 12px;
-}
-
-.storageDirLabel {
-  font-size: 0.75rem;
-  color: rgba(255,255,255,0.45);
-}
-
-.storageDirPath {
-  font-size: 0.78rem;
-  color: rgba(255,255,255,0.65);
-  word-break: break-all;
-  font-family: monospace;
-}
 
 .storageActionBtn {
   display: inline-flex;
@@ -1168,33 +947,6 @@
   background: rgba(139, 92, 246, 0.07) !important;
 }
 
-/* ── Header selection controls ── */
-.downloadsSelectionCount {
-  font-size: 1rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.downloadsSelectionActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.downloadsSelectAllBtn {
-  background: none;
-  border: none;
-  color: #a78bfa;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 4px 0;
-  transition: color 0.15s;
-}
-
-.downloadsSelectAllBtn:hover {
-  color: #c4b5fd;
-}
 
 .downloadsDoneBtn {
   display: flex;
@@ -1216,34 +968,3 @@
 }
 
 
-.bulkDeleteBtn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  background: rgba(255, 80, 80, 0.1);
-  border: 1px solid rgba(255, 80, 80, 0.25);
-  border-radius: 8px;
-  color: #f87171;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.bulkDeleteBtn:hover:not(:disabled) {
-  background: rgba(255, 80, 80, 0.18);
-  border-color: rgba(255, 80, 80, 0.4);
-}
-
-.bulkDeleteBtn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.bulkDeleteBtnConfirm {
-  background: rgba(255, 80, 80, 0.22);
-  border-color: rgba(255, 80, 80, 0.55);
-  color: #fca5a5;
-}

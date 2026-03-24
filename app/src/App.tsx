@@ -658,7 +658,7 @@ export default function App() {
                       unmounted by route transitions or Suspense boundaries. */}
                   <Toaster
                     theme="dark"
-                    position={getAppTarget().isMobile ? 'bottom-center' : 'top-right'}
+                    position={getAppTarget().isMobile ? 'top-center' : 'top-right'}
                     richColors
                     closeButton
                     duration={5000}

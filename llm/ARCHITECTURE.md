@@ -186,6 +186,11 @@ If a page starts accumulating many `isTv` branches, stop and split it into `.sta
 | `app/src/components/tv/AdaptiveScreen.tsx` | Route boundary that selects `StandardView` vs `TvView` |
 | `app/src/components/tv/TvFocusContext.tsx` | TV focus provider, scopes, zones, items, D-pad movement, and back-key handling |
 | `app/src/components/tv/TvPageScaffold.tsx` | Shared Android TV shell: sticky rail, header, content area, shelves, grids, dialogs |
+| `app/src/components/tv/TvRailMenu.tsx` | Left sidebar navigation rail for TV pages |
+| `app/src/components/tv/TvFocusable.tsx` | Single focusable element wrapper |
+| `app/src/components/tv/TvMediaShelf.tsx` | Scrollable horizontal media shelf |
+| `app/src/components/tv/TvPosterActionDialog.tsx` | Modal action dialog triggered from a poster/card |
+| `app/src/pages/streaming/StreamingTvScaffold.tsx` | Streaming-specific TV page wrapper: rail navigation, profile switcher, downloads indicator |
 | `app/src/pages/streaming/Home.tsx` + `Home.model.ts` + `Home.standard.tsx` + `Home.tv.tsx` | Canonical adaptive split for a streaming page |
 | `app/src/pages/ProfilesPage.tsx` + `ProfilesPage.model.ts` + `ProfilesPage.standard.tsx` + `ProfilesPage.tv.tsx` | Canonical adaptive split for a non-streaming page |
 | `app/src/pages/SettingsPage.tsx` + `SettingsPage.model.ts` + `SettingsPage.standard.tsx` + `SettingsPage.tv.tsx` | Adaptive settings surface |

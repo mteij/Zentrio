@@ -55,7 +55,7 @@ class TraktSyncService {
   }
 
   // Get a valid access token, refreshing if needed
-  private async getValidAccessToken(profileId: number): Promise<string | null> {
+  async getValidAccessToken(profileId: number): Promise<string | null> {
     const account = traktAccountDb.getByProfileId(profileId)
     if (!account) return null
 
@@ -255,6 +255,64 @@ class TraktSyncService {
       log.error('Push failed:', error)
       throw error
     }
+  }
+
+  /**
+   * Push a single watched/unwatched event to Trakt.
+   * Returns true if synced, false if no Trakt account or non-IMDB ID.
+   */
+  async pushWatchedItem(
+    profileId: number,
+    metaType: string,
+    metaId: string,
+    watched: boolean,
+    season?: number,
+    episode?: number
+  ): Promise<boolean> {
+    if (!metaId.startsWith('tt')) return false
+    const accessToken = await this.getValidAccessToken(profileId)
+    if (!accessToken) return false
+
+    const watchedAt = new Date().toISOString()
+    if (metaType === 'movie') {
+      const payload = { movies: [{ ids: { imdb: metaId }, ...(watched && { watched_at: watchedAt }) }] }
+      if (watched) await traktClient.addToHistory(accessToken, payload)
+      else await traktClient.removeFromHistory(accessToken, { movies: [{ ids: { imdb: metaId } }] })
+    } else if (metaType === 'series' && season !== undefined && episode !== undefined) {
+      const seasonData = { number: season, episodes: [watched ? { number: episode, watched_at: watchedAt } : { number: episode }] }
+      const payload = { shows: [{ ids: { imdb: metaId }, seasons: [seasonData] }] }
+      if (watched) await traktClient.addToHistory(accessToken, payload)
+      else await traktClient.removeFromHistory(accessToken, payload)
+    }
+    return true
+  }
+
+  /**
+   * Push multiple episodes (grouped by season) to Trakt.
+   * Used by mark-season-watched, mark-series-watched, mark-episodes-before.
+   * Returns true if synced, false if no Trakt account or non-IMDB ID.
+   */
+  async pushEpisodesWatched(
+    profileId: number,
+    metaId: string,
+    episodes: Array<{ season: number; episode: number }>,
+    watched: boolean
+  ): Promise<boolean> {
+    if (!metaId.startsWith('tt') || episodes.length === 0) return false
+    const accessToken = await this.getValidAccessToken(profileId)
+    if (!accessToken) return false
+
+    const watchedAt = new Date().toISOString()
+    const seasonMap = new Map<number, { number: number; watched_at?: string }[]>()
+    for (const ep of episodes) {
+      if (!seasonMap.has(ep.season)) seasonMap.set(ep.season, [])
+      seasonMap.get(ep.season)!.push(watched ? { number: ep.episode, watched_at: watchedAt } : { number: ep.episode })
+    }
+    const seasons = Array.from(seasonMap.entries()).map(([num, eps]) => ({ number: num, episodes: eps }))
+    const payload = { shows: [{ ids: { imdb: metaId }, seasons }] }
+    if (watched) await traktClient.addToHistory(accessToken, payload)
+    else await traktClient.removeFromHistory(accessToken, payload)
+    return true
   }
 
   // Convert Trakt history item to local format

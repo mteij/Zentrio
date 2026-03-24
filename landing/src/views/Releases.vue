@@ -195,39 +195,29 @@
               </div>
             </div>
             <div class="release-content">
-              <button
-                class="release-header-flex"
-                @click="toggleRelease(release.id)"
-                :aria-expanded="expandedReleases.has(release.id)"
-              >
+              <div class="release-header-flex">
                 <h3>{{ release.name || release.tag_name }}</h3>
-                <div class="release-header-actions">
+                <a :href="release.html_url" target="_blank" class="github-link">View on GitHub ↗</a>
+              </div>
+              <div class="markdown-body" v-html="marked(getIntro(release.body))"></div>
+              <div v-if="getRest(release.body)" class="changelog-details">
+                <button class="details-toggle-btn" @click="toggleDetails(release.id)">
+                  <span v-if="!expandedDetails.has(release.id)">What's changed ↓</span>
+                  <span v-else>Hide ↑</span>
+                </button>
+                <div v-if="expandedDetails.has(release.id)" class="markdown-body changelog-rest" v-html="marked(getRest(release.body))"></div>
+              </div>
+              <div v-if="getReleaseAssets(release).length > 0" class="release-assets-section">
+                <span class="assets-label">Install this version:</span>
+                <div class="assets-links">
                   <a
-                    :href="release.html_url"
-                    target="_blank"
-                    class="github-link"
-                    @click.stop
-                  >View on GitHub ↗</a>
-                  <span class="collapse-icon">{{ expandedReleases.has(release.id) ? '▲' : '▼' }}</span>
+                    v-for="asset in getReleaseAssets(release)"
+                    :key="asset.name"
+                    :href="asset.url"
+                    class="asset-link"
+                  >{{ asset.label }}</a>
                 </div>
-              </button>
-              <template v-if="expandedReleases.has(release.id)">
-                <div
-                  class="markdown-body"
-                  v-html="renderMarkdown(release.body)"
-                ></div>
-                <div class="release-assets" v-if="getReleaseAssets(release).length > 0">
-                  <span class="assets-label">Downloads for this version:</span>
-                  <div class="assets-links">
-                    <a
-                      v-for="asset in getReleaseAssets(release)"
-                      :key="asset.name"
-                      :href="asset.url"
-                      class="asset-link"
-                    >{{ asset.label }}</a>
-                  </div>
-                </div>
-              </template>
+              </div>
             </div>
           </div>
 
@@ -345,23 +335,6 @@ const formatDate = (dateString) => {
   });
 };
 
-const renderMarkdown = (text) => {
-  if (!text) return "";
-
-  let filteredText = text
-    .split("**Links:**")[0]
-    .split("## Links:")[0]
-    .split("### Links:")[0]
-    .split("Links:")[0];
-
-  filteredText = filteredText.trim();
-
-  if (filteredText.endsWith("---")) {
-    filteredText = filteredText.slice(0, -3).trim();
-  }
-
-  return marked(filteredText);
-};
 
 const PLATFORM_LABELS = {
   windows: "Windows",
@@ -372,14 +345,35 @@ const PLATFORM_LABELS = {
   "linux-appimage": "Linux (AppImage)",
 };
 
-const expandedReleases = ref(new Set());
+const expandedDetails = ref(new Set());
 
-const toggleRelease = (id) => {
-  const next = new Set(expandedReleases.value);
+const toggleDetails = (id) => {
+  const next = new Set(expandedDetails.value);
   if (next.has(id)) next.delete(id);
   else next.add(id);
-  expandedReleases.value = next;
+  expandedDetails.value = next;
 };
+
+const splitBody = (body) => {
+  if (!body) return { intro: '', rest: '' };
+  let filtered = body
+    .split('**Links:**')[0]
+    .split('## Links:')[0]
+    .split('### Links:')[0]
+    .split('Links:')[0]
+    .trim();
+  if (filtered.endsWith('---')) filtered = filtered.slice(0, -3).trim();
+  const lines = filtered.split('\n');
+  const firstHeadingIdx = lines.findIndex((l) => /^#{1,3} /.test(l));
+  if (firstHeadingIdx === -1) return { intro: filtered, rest: '' };
+  return {
+    intro: lines.slice(0, firstHeadingIdx).join('\n').trim(),
+    rest: lines.slice(firstHeadingIdx).join('\n').trim(),
+  };
+};
+
+const getIntro = (body) => splitBody(body).intro;
+const getRest = (body) => splitBody(body).rest;
 
 const getDownloadUrl = (platform) => PLATFORM_DOWNLOADS[platform]?.url ?? "#";
 
@@ -389,6 +383,7 @@ const getAsset = (release, platform) => {
   if (!matcher) return null;
   return release.assets.find((asset) => matcher(asset.name));
 };
+
 
 const getReleaseAssets = (release) => {
   if (!release?.assets) return [];
@@ -682,39 +677,15 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 0;
+  gap: 16px;
+  margin-bottom: 24px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 20px;
-  width: 100%;
-  background: none;
-  border-top: none;
-  border-left: none;
-  border-right: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  padding-top: 0;
-}
-
-.release-header-flex:has(+ .markdown-body),
-.release-header-flex[aria-expanded="true"] {
-  margin-bottom: 24px;
+  flex-wrap: wrap;
 }
 
 .release-header-flex h3 {
   font-size: 1.5rem;
-}
-
-.release-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.collapse-icon {
-  color: var(--text-dim);
-  font-size: 0.75rem;
 }
 
 .github-link {
@@ -728,23 +699,42 @@ onMounted(() => {
   color: white;
 }
 
-.release-assets {
+.changelog-details {
+  margin-top: 12px;
+}
+
+.details-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  min-height: 36px;
+}
+
+.details-toggle-btn:hover {
+  color: var(--text-muted);
+  border-color: var(--border-hover);
+}
+
+.changelog-rest {
+  margin-top: 16px;
+}
+
+.release-assets-section {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
-}
-
-.assets-label {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  display: block;
-  margin-bottom: 8px;
 }
 
 .assets-links {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 8px;
 }
 
 .asset-link {
@@ -761,6 +751,7 @@ onMounted(() => {
   color: var(--text);
   border-color: var(--border-hover);
 }
+
 
 /* Markdown Rendering Styles */
 .markdown-body {
@@ -876,12 +867,27 @@ onMounted(() => {
   }
 
   .release-content {
-    padding: 24px;
+    padding: 20px;
   }
 
   .release-header-flex {
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    align-items: flex-start;
+  }
+
+  .details-toggle-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .assets-links {
+    gap: 6px;
+  }
+
+  .asset-link {
+    flex: 1 1 calc(50% - 6px);
+    text-align: center;
   }
 }
 

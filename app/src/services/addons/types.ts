@@ -85,6 +85,8 @@ export interface MetaVideo {
   streams?: Stream[]
   available?: boolean
   episode?: number
+  /** Some addons use `number` as an alias for `episode` */
+  number?: number
   season?: number
   trailer?: string
   overview?: string

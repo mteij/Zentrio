@@ -62,7 +62,6 @@ export function useSettingsScreenModel(): SettingsScreenModel {
         if (list.length > 0) setCurrentProfileId(String(list[0].id))
       })
       .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const tabItems: SettingsTabItem[] = [

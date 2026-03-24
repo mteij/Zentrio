@@ -85,7 +85,6 @@ export const useAuthStore = create<AuthState>()(
         // Clean up state without forcing a reload/redirect loop
         // Used internally when session is invalid
         reset: () => {
-             console.trace('[AuthStore] reset() called!');
              set({
               user: null,
               session: null,

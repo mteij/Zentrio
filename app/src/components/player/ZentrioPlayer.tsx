@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAppTarget } from '../../lib/app-target'
+import { hapticScrubTick } from '../../lib/haptics'
 import { getStoredPlayerOrientation, setTauriPlayerMode, type PlayerOrientationMode } from '../../lib/tauri-player-mode'
 import styles from '../../styles/ZentrioPlayer.module.css'
 import type { SubtitleTrack } from './engines/types'
@@ -191,6 +192,7 @@ export function ZentrioPlayer({
   const [hoverTime, setHoverTime] = useState<{ time: number; pct: number } | null>(null)
   const [isDraggingProgress, setIsDraggingProgress] = useState(false)
   const [dragPct, setDragPct] = useState(0)
+  const dragMinuteRef = useRef(-1)
 
   /* Next episode popup */
   const [showNextEp, setShowNextEp] = useState(false)
@@ -476,12 +478,20 @@ export function ZentrioPlayer({
     setIsDraggingProgress(true)
     const pct = getPctFromEvent(e)
     setDragPct(pct)
-  }, [])
+    dragMinuteRef.current = Math.floor(pct * state.duration / 60)
+  }, [state.duration])
 
   const handleProgressPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const pct = getPctFromEvent(e)
     setHoverTime({ time: pct * state.duration, pct })
-    if (isDraggingProgress) setDragPct(pct)
+    if (isDraggingProgress) {
+      setDragPct(pct)
+      const minute = Math.floor(pct * state.duration / 60)
+      if (minute !== dragMinuteRef.current) {
+        dragMinuteRef.current = minute
+        hapticScrubTick()
+      }
+    }
   }, [state.duration, isDraggingProgress])
 
   const handleProgressPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
