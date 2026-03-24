@@ -105,7 +105,11 @@ fn download_storage_stats(
     let free_bytes = fs2::available_space(&stat_path)
         .map(|b| b as i64)
         .unwrap_or(0);
-    Ok(StorageStats { total_bytes, count, free_bytes })
+    Ok(StorageStats {
+        total_bytes,
+        count,
+        free_bytes,
+    })
 }
 
 #[tauri::command]

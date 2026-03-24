@@ -2,7 +2,7 @@ import { Edit3, Eye, Globe, Mail, Plus, Trash2, User, Users } from 'lucide-react
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
-import { Profile } from '../../services/database'
+import type { Profile } from '../../services/database'
 import { createLogger } from '../../utils/client-logger'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'

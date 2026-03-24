@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../lib/apiFetch'
 import { MetaPreview } from '../services/addons/types'
-import { WatchHistoryItem } from '../services/database'
+import type { WatchHistoryItem } from '../services/database'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('StreamingDashboard')

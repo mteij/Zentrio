@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { ParticleBackground } from '../components/ui/ParticleBackground'
 import { toast } from 'sonner';
 import { Loader2, ArrowRight, Mail } from "lucide-react";
@@ -134,20 +134,20 @@ export function LandingPage({ version }: LandingPageProps) {
       
       <main className="flex-1 flex items-center justify-center relative z-10 p-4 w-full">
         <div className="w-full max-w-sm mx-auto">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="flex flex-col items-center text-center"
           >
             {/* Logo */}
-            <motion.div
+            <m.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4 }}
               className="relative mb-6"
             >
-              <motion.div
+              <m.div
                 animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.4, 0.2] }}
                 transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                 className="absolute inset-0 bg-red-500 rounded-full blur-3xl"
@@ -162,14 +162,14 @@ export function LandingPage({ version }: LandingPageProps) {
                 width={80}
                 height={80}
               />
-            </motion.div>
+            </m.div>
             
             {/* Branding */}
             <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight mb-2">Zentrio</h1>
             <p className="text-zinc-500 text-sm mb-10">Stream anything. Own everything.</p>
             
             {/* Social login buttons */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
@@ -226,7 +226,7 @@ export function LandingPage({ version }: LandingPageProps) {
                   Continue with Email
                 </button>
               ) : (
-                <motion.form
+                <m.form
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   onSubmit={handleEmailSubmit}
@@ -252,10 +252,10 @@ export function LandingPage({ version }: LandingPageProps) {
                       {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                     </button>
                   </div>
-                </motion.form>
+                </m.form>
               )}
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         </div>
       </main>
 

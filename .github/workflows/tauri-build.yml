@@ -416,10 +416,10 @@ jobs:
           echo "android.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GRADLE_PROPS"
 
           # Build Universal APK (all architectures)
-          bun tauri android build --apk
+          bun tauri android build --apk true
 
           # Build ARM64-only APK (smaller, for modern devices)
-          bun tauri android build --apk --target aarch64
+          bun tauri android build --apk true --target aarch64
 
       - name: Rename Android APKs
         if: matrix.name == 'android'

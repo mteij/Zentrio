@@ -15,6 +15,10 @@
     <!-- Preload LCP image so the browser fetches it before React renders -->
     <link rel="preload" as="image" href="/static/logo/icon-192.png" fetchpriority="high" />
 
+    <!-- Preconnect to common image CDNs to skip TLS handshake delays -->
+    <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
+    <link rel="preconnect" href="https://v3-cinemeta.strem.io" crossorigin />
+
     <!-- styles.css removed - migrated to CSS Modules and Tailwind -->
     <!-- toast.css moved to JS bundle import for faster initial render -->
     <!-- profiles.css removed - using ProfilesPage.module.css instead -->

@@ -315,6 +315,7 @@ streaming.get('/search-catalogs', async (c) => {
 })
 
 streaming.get('/catalog', async (c) => {
+  c.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
   const { profileId, manifestUrl, type, id, skip, genre } = c.req.query()
   const pId = parseInt(profileId)
   const skipNum = skip ? parseInt(skip) : 0
@@ -343,6 +344,7 @@ streaming.get('/catalog', async (c) => {
  * Used by LazyCatalogRow component to load each catalog independently
  */
 streaming.get('/catalog-items', async (c) => {
+  c.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
   const { profileId, manifestUrl, type, id } = c.req.query()
   
   if (!profileId || !manifestUrl || !type || !id) {
@@ -932,6 +934,7 @@ streaming.get('/filters', optionalSessionMiddleware, async (c) => {
   }
 })
 streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
+  c.header('Cache-Control', 'private, max-age=60, stale-while-revalidate=300')
   try {
     const { profileId } = c.req.query()
     const isGuestMode = c.get('guestMode') as boolean

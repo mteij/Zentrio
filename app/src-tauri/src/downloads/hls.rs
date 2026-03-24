@@ -13,6 +13,7 @@ use super::notifier;
 
 /// Download an HLS stream given its master or media playlist URL.
 /// Outputs a concatenated MP4-compatible file at `final_path`.
+#[allow(clippy::too_many_arguments)]
 pub async fn download_hls(
     app: AppHandle,
     db: Arc<Mutex<DownloadDb>>,

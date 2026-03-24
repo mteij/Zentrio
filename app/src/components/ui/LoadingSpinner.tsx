@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 
 interface LoadingSpinnerProps {
@@ -18,7 +18,7 @@ export function LoadingSpinner({ className = '', size = 'md' }: LoadingSpinnerPr
   return (
     <div className={`flex items-center justify-center ${className}`} style={{ gap: `${gap}px` }}>
       {[0, 1, 2].map((i) => (
-        <motion.div
+        <m.div
           key={i}
           style={{
             width: dotSize,

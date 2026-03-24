@@ -2,7 +2,9 @@ import React, { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
+import { get, set, del } from 'idb-keyval'
+import { LazyMotion, domAnimation } from 'framer-motion'
 import { Toaster } from 'sonner'
 import { ErrorBoundary, TitleBar, ScrollToTop } from './components'
 import { SplashScreen } from './components'
@@ -86,8 +88,12 @@ const queryClient = new QueryClient({
 // Note: lz-string compression was removed — it ran synchronously on the main thread
 // on every cache write, causing noticeable jank on page loads.
 // The raw JSON is a few hundred KB at most, well within localStorage limits.
-const queryPersister = createSyncStoragePersister({
-  storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+const queryPersister = createAsyncStoragePersister({
+  storage: typeof window !== 'undefined' ? {
+    getItem: async (key) => await get(key),
+    setItem: async (key, value) => await set(key, value),
+    removeItem: async (key) => await del(key),
+  } : undefined,
   key: 'zentrio-query-cache',
   throttleTime: 3000, // write at most once per 3 s to reduce main-thread pressure
 })
@@ -626,7 +632,8 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <PersistQueryClientProvider
+      <LazyMotion features={domAnimation}>
+        <PersistQueryClientProvider
         client={queryClient}
         persistOptions={{
           persister: queryPersister,
@@ -674,7 +681,8 @@ export default function App() {
              </AppInitializer>
           </AppLifecycleProvider>
         </CastProvider>
-      </PersistQueryClientProvider>
+        </PersistQueryClientProvider>
+      </LazyMotion>
     </ErrorBoundary>
   )
 }

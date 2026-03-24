@@ -2,11 +2,6 @@ import type { KnipConfig } from 'knip'
 
 const config: KnipConfig = {
   entry: [
-    // Backend
-    'src/index.ts',
-    // Frontend
-    'src/main.tsx',
-    'src/renderer.tsx',
     // Scripts
     'scripts/**/*.{ts,js}',
     // Vitest picks these up automatically
@@ -17,14 +12,9 @@ const config: KnipConfig = {
 
   ignore: [
     // Ambient type declarations
-    'src/global.d.ts',
-    'src/**/*.d.ts',
   ],
 
   ignoreDependencies: [
-    // PostCSS + Tailwind: referenced in postcss.config / vite.config, not imported
-    'autoprefixer',
-    'postcss',
     // cpx used in build scripts via CLI, not imported
     'cpx',
     // baseline-browser-mapping referenced by Tailwind plugin

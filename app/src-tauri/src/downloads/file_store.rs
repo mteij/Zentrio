@@ -56,7 +56,7 @@ pub fn set_custom_dir(app: &tauri::AppHandle, new_path: &Path) -> std::io::Resul
     let data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
     let dir = data_dir.join("zentrio");
     std::fs::create_dir_all(&dir)?;
     std::fs::write(

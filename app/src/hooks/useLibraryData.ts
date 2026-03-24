@@ -10,7 +10,7 @@ import {
     type SharedList,
 } from '../components/library/LibrarySidebar'
 import { apiFetch, apiFetchJson } from '../lib/apiFetch'
-import { List, ListItem } from '../services/database'
+import type { List, ListItem } from '../services/database'
 import { createLogger } from '../utils/client-logger'
 
 const log = createLogger('useLibraryData')

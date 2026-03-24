@@ -279,6 +279,7 @@ export const createTaggedOpenAPIRouter = <T extends Env>(app: OpenAPIHono<T>, ta
       // Catch-all routes (wildcards and regex path params like {.+}) are framework
       // passthroughs and not suitable for OpenAPI docs.  Registering them via
       // createRoute strips the regex, breaking multi-segment matching.
+      // @ts-expect-error Types mismatch due to Hono generics
       return native[method](path, ...handlers)
     }
 
@@ -324,6 +325,7 @@ export const createTaggedOpenAPIRouter = <T extends Env>(app: OpenAPIHono<T>, ta
     patch: (path: string, ...handlers: AnyHandler[]) => register('patch', path, handlers),
     all: (path: string, ...handlers: AnyHandler[]) => {
       if (path.includes('*')) {
+        // @ts-expect-error Types mismatch due to Hono generics
         return native.all(path, ...handlers)
       }
       register('get', path, handlers)

@@ -616,6 +616,7 @@ async fn is_hls_stream(client: &Client, url: &str) -> bool {
 
 /// The async task that actually downloads a file.
 /// Detects stream format and routes to the appropriate engine.
+#[allow(clippy::too_many_arguments)]
 async fn run_download(
     app: AppHandle,
     db: Arc<Mutex<DownloadDb>>,
