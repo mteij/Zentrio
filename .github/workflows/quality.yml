@@ -50,9 +50,16 @@ jobs:
           set +e
           cd app
           tsc_out=$(bun run type-check 2>&1)
+          tsc_exit=$?
           echo "$tsc_out"
-          # Count error lines (lines containing "error TS")
-          err_count=$(echo "$tsc_out" | grep -c "error TS" || true)
+          if [ "$tsc_exit" -eq 0 ]; then
+            # Successful runs can still include shell/tooling noise on stdout.
+            # Trust the compiler exit code and report zero TypeScript errors.
+            err_count=0
+          else
+            # Count real TypeScript diagnostics only when the compiler failed.
+            err_count=$(echo "$tsc_out" | grep -cE "error TS[0-9]+" || true)
+          fi
           err_count=$(echo "$err_count" | tr -d '\n' | head -1)
           echo "errors=$err_count" >> "$GITHUB_OUTPUT"
           echo "📊 TypeScript: $err_count error(s)"
