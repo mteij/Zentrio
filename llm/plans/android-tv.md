@@ -1,5 +1,8 @@
 # Android TV Plan
 
+This is a temporary implementation plan.
+Read `llm/README.md`, `llm/domains/native.md`, `llm/domains/platform-targets.md`, and `llm/patterns/adaptive-screens.md` before executing it.
+
 This plan is for running the existing Android APK on Android TV devices, including Chromecast with Google TV.
 
 It is not a plan for the classic Google Cast sender/receiver flow.
@@ -139,7 +142,7 @@ Everything TV-specific should depend on this layer instead of hand-rolled checks
 Prefer this structure:
 
 - shared route/business pages stay in `app/src/pages/`
-- TV-only route shells live in `app/src/pages/tv/`
+- TV renderers live next to the route as `.tv.tsx`
 - TV-only reusable UI lives in `app/src/components/tv/`
 
 Pattern:
@@ -157,7 +160,7 @@ Do not add random `style={{}}` fixes or one-off per-page TV CSS.
 Instead:
 
 - add TV spacing/focus/scale variables to [`design-system.css`](/Users/Michi/Documents/GitHub/Zentrio/app/src/styles/design-system.css)
-- keep TV component CSS local to `components/tv/` or `pages/tv/`
+- keep TV component CSS local to `components/tv/` or next to the page-level `.tv.tsx` renderer
 - add shared focus tokens once and reuse them everywhere
 
 Examples of TV-only tokens:
@@ -347,9 +350,9 @@ Build the TV shell around shared content flows.
 
 Tasks:
 
-- add `pages/tv/` route shells
+- keep the route-local `.tv.tsx` pattern consistent across core screens
 - add `components/tv/` primitives for navigation rail, rows, cards, dialogs, and focus states
-- decide whether TV uses a dedicated entry route or a target-aware route shell around existing pages
+- keep TV composition behind adaptive route boundaries instead of a separate route tree
 - define shared TV design tokens in the design system
 
 Recommended rule:
@@ -364,8 +367,8 @@ Exit criteria:
 
 Current status:
 
-- TV home shell exists
-- the rest of the screen set is still in progress
+- core TV shells and page-level `.tv.tsx` renderers exist
+- the remaining work is UX hardening and QA, not route-tree design
 
 ### Phase 3: D-pad and focus system
 
@@ -501,7 +504,7 @@ Likely files/directories involved when implementation starts:
 - [`MainActivity.kt`](/Users/Michi/Documents/GitHub/Zentrio/app/src-tauri/gen/android/app/src/main/java/com/zentrio/mteij/MainActivity.kt)
 - [`ExoPlayerPlugin.kt`](/Users/Michi/Documents/GitHub/Zentrio/app/src-tauri/gen/android/app/src/main/java/com/zentrio/mteij/ExoPlayerPlugin.kt)
 - [`mod.rs`](/Users/Michi/Documents/GitHub/Zentrio/app/src-tauri/src/plugins/mod.rs)
-- `app/src/pages/tv/` (new)
+- route-local `.tv.tsx` files under `app/src/pages/`
 - `app/src/components/tv/` (new)
 - `app/src/lib/app-target.ts`
 - Android TV launcher bridge/plugin files under `app/src-tauri/`

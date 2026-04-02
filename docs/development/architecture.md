@@ -1,6 +1,6 @@
 # Architecture
 
-This is the short version of the repository architecture. For the full internal reference, read [`llm/ARCHITECTURE.md`](https://github.com/Mteij/Zentrio/blob/main/llm/ARCHITECTURE.md).
+This is the short version of the repository architecture. For the AI instruction entrypoint, read [`llm/README.md`](https://github.com/Mteij/Zentrio/blob/main/llm/README.md). For the deep internal reference, read [`llm/reference/architecture-full.md`](https://github.com/Mteij/Zentrio/blob/main/llm/reference/architecture-full.md).
 
 ## Runtime Contexts
 
