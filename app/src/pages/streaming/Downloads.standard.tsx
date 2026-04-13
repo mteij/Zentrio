@@ -1,27 +1,16 @@
-import { useQuery } from '@tanstack/react-query'
-import { Download, Settings2, User } from 'lucide-react'
+import { Download, Settings2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { DownloadCard } from '../../components/downloads/DownloadCard'
 import { DownloadProgress } from '../../components/downloads/DownloadProgress'
 import { SeriesGroup } from '../../components/downloads/SeriesGroup'
 import { StoragePanel } from '../../components/downloads/StoragePanel'
-import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
+import { useStreamingProfile } from '../../hooks/useStreamingProfile'
 import type { DownloadsScreenModel } from './Downloads.model'
 import styles from '../../components/downloads/Downloads.module.css'
 import layoutStyles from '../../styles/Streaming.module.css'
 
 export function StreamingDownloadsStandardView({ model }: { model: DownloadsScreenModel }) {
-  // Read profile from cache populated by StreamingLayout (no extra fetch)
-  const { data: profile } = useQuery<any>({
-    queryKey: ['streaming-profile', model.profileId],
-    enabled: false,
-  })
-
-  const profileAvatar = profile?.avatar ? (
-    <img src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))} alt="" />
-  ) : (
-    <User size={18} aria-hidden="true" />
-  )
+  const { profileAvatarNode } = useStreamingProfile(model.profileId)
 
   if (model.platformIsTv && !model.canUseOfflineDownloads) {
     return (
@@ -63,7 +52,7 @@ export function StreamingDownloadsStandardView({ model }: { model: DownloadsScre
             title="Switch Profile"
           >
             <div className={layoutStyles.streamingMobileProfileAvatar}>
-              {profileAvatar}
+              {profileAvatarNode}
             </div>
           </Link>
         </div>

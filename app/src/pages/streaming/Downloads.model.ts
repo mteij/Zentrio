@@ -57,7 +57,6 @@ export interface DownloadsScreenModel {
   navigation: {
     goBack: () => void
     goToSettings: () => void
-    goToSeries: (mediaId: string) => void
     goToPlayer: (record: DownloadRecord) => void
   }
   actions: {
@@ -77,13 +76,20 @@ export function useDownloadsScreenModel(): DownloadsScreenModel {
   const { isAvailable: canUseOfflineDownloads } = useOfflineDownloadCapability(profileId)
   const platform = getPlatformCapabilities()
 
-  const completedMovies = useMemo(() => completed.filter((record) => record.mediaType === 'movie'), [completed])
+  const completedMovies = useMemo(
+    () => completed.filter((record) => record.mediaType === 'movie'),
+    [completed]
+  )
   const seriesGroups = useMemo(
-    () => Array.from(groupSeriesEpisodes(completed.filter((record) => record.mediaType === 'series')).entries()).map(([mediaId, episodes]) => ({ mediaId, episodes })),
-    [completed],
+    () =>
+      Array.from(
+        groupSeriesEpisodes(completed.filter((record) => record.mediaType === 'series')).entries()
+      ).map(([mediaId, episodes]) => ({ mediaId, episodes })),
+    [completed]
   )
 
-  const backdropPoster = completed[0]?.posterPath ?? inProgress[0]?.posterPath ?? failed[0]?.posterPath
+  const backdropPoster =
+    completed[0]?.posterPath ?? inProgress[0]?.posterPath ?? failed[0]?.posterPath
 
   return {
     profileId: profileId || '',
@@ -106,7 +112,6 @@ export function useDownloadsScreenModel(): DownloadsScreenModel {
         navigate(profileId ? `/streaming/${profileId}` : '/profiles')
       },
       goToSettings: () => navigate('/settings'),
-      goToSeries: (mediaId) => navigate(`/streaming/${profileId}/downloads/${mediaId}`),
       goToPlayer: async (record) => {
         try {
           let resolvedFileUrl = `file://${record.filePath}`
