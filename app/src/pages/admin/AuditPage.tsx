@@ -1,6 +1,16 @@
 import { useState } from 'react'
+import { usePassthroughVerticalScroll } from '../../hooks/usePassthroughVerticalScroll'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon, ShieldCheck, Loader2, AlertTriangle, ScrollText } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronRight as ChevronRightIcon,
+  ShieldCheck,
+  Loader2,
+  AlertTriangle,
+  ScrollText,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
 import { useStepUp } from '../../components/admin/StepUpModal'
@@ -10,7 +20,11 @@ const LIMIT = 50
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
   })
 }
 
@@ -42,7 +56,9 @@ function AuditRow({ entry }: { entry: AdminAuditEntry }) {
         className={`border-b border-white/5 hover:bg-white/5 transition-colors ${hasDetail ? 'cursor-pointer' : ''}`}
         onClick={() => hasDetail && setExpanded((e) => !e)}
       >
-        <td className="px-4 py-2.5 text-xs text-zinc-500 whitespace-nowrap">{formatDate(entry.created_at)}</td>
+        <td className="px-4 py-2.5 text-xs text-zinc-500 whitespace-nowrap">
+          {formatDate(entry.created_at)}
+        </td>
         <td className="px-4 py-2.5">
           <span className="text-xs font-mono text-zinc-300">{entry.actor_id.slice(0, 8)}…</span>
         </td>
@@ -51,24 +67,29 @@ function AuditRow({ entry }: { entry: AdminAuditEntry }) {
         </td>
         <td className="px-4 py-2.5 text-xs text-zinc-500 hidden md:table-cell">
           {entry.target_type && <span>{entry.target_type}</span>}
-          {entry.target_id && <span className="font-mono ml-1">{entry.target_id.slice(0, 8)}…</span>}
+          {entry.target_id && (
+            <span className="font-mono ml-1">{entry.target_id.slice(0, 8)}…</span>
+          )}
         </td>
         <td className="px-4 py-2.5 hidden lg:table-cell text-xs text-zinc-600 truncate max-w-[120px]">
           {entry.ip_address}
         </td>
         <td className="px-4 py-2.5 w-6">
-          {hasDetail && (
-            expanded
-              ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
-              : <ChevronRightIcon className="w-3.5 h-3.5 text-zinc-500" />
-          )}
+          {hasDetail &&
+            (expanded ? (
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+            ) : (
+              <ChevronRightIcon className="w-3.5 h-3.5 text-zinc-500" />
+            ))}
         </td>
       </tr>
       {expanded && hasDetail && (
         <tr className="bg-black/20 border-b border-white/5">
           <td colSpan={6} className="px-6 py-3 space-y-2">
             {entry.reason && (
-              <p className="text-xs text-zinc-300"><span className="text-zinc-500">Reason:</span> {entry.reason}</p>
+              <p className="text-xs text-zinc-300">
+                <span className="text-zinc-500">Reason:</span> {entry.reason}
+              </p>
             )}
             {entry.before_json && (
               <div>
@@ -95,6 +116,8 @@ export function AuditPage() {
   const [actionFilter, setActionFilter] = useState('')
   const [verifyResult, setVerifyResult] = useState<{ valid: boolean; message: string } | null>(null)
   const [verifying, setVerifying] = useState(false)
+  const [tableEl, setTableEl] = useState<HTMLDivElement | null>(null)
+  usePassthroughVerticalScroll(tableEl)
 
   const { data: logsData, isLoading: logsLoading } = useQuery({
     queryKey: ['admin-audit', actionFilter, offset],
@@ -138,21 +161,32 @@ export function AuditPage() {
           disabled={verifying}
           className="flex items-center gap-1.5 text-sm"
         >
-          {verifying
-            ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</>
-            : <><ShieldCheck className="w-4 h-4" /> Verify Chain Integrity</>
-          }
+          {verifying ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Verifying…
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="w-4 h-4" /> Verify Chain Integrity
+            </>
+          )}
         </Button>
       </div>
 
       {/* Chain verification result */}
       {verifyResult && (
-        <div className={`flex items-center gap-2 px-4 py-3 rounded-lg border text-sm ${
-          verifyResult.valid
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-            : 'bg-red-500/10 border-red-500/20 text-red-400'
-        }`}>
-          {verifyResult.valid ? <ShieldCheck className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+        <div
+          className={`flex items-center gap-2 px-4 py-3 rounded-lg border text-sm ${
+            verifyResult.valid
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+              : 'bg-red-500/10 border-red-500/20 text-red-400'
+          }`}
+        >
+          {verifyResult.valid ? (
+            <ShieldCheck className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+          )}
           {verifyResult.message}
         </div>
       )}
@@ -160,19 +194,32 @@ export function AuditPage() {
       {/* Stats strip */}
       {statsData && (
         <div className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 flex flex-wrap gap-4 text-xs text-zinc-500">
-          <span><span className="text-white font-medium">{statsData.total}</span> total events</span>
-          <span><span className="text-white font-medium">{statsData.uniqueActors}</span> unique actors</span>
+          <span>
+            <span className="text-white font-medium">{statsData.total}</span> total events
+          </span>
+          <span>
+            <span className="text-white font-medium">{statsData.uniqueActors}</span> unique actors
+          </span>
           {topActions.map((a) => (
             <button
               key={a.action}
-              onClick={() => { setActionFilter(a.action === actionFilter ? '' : a.action); setOffset(0) }}
+              onClick={() => {
+                setActionFilter(a.action === actionFilter ? '' : a.action)
+                setOffset(0)
+              }}
               className={`transition-colors hover:text-white ${actionFilter === a.action ? 'text-amber-400' : ''}`}
             >
               {a.action} <span className="text-zinc-600">({a.count})</span>
             </button>
           ))}
           {actionFilter && (
-            <button onClick={() => { setActionFilter(''); setOffset(0) }} className="text-red-400 hover:text-red-300 transition-colors">
+            <button
+              onClick={() => {
+                setActionFilter('')
+                setOffset(0)
+              }}
+              className="text-red-400 hover:text-red-300 transition-colors"
+            >
               Clear filter ×
             </button>
           )}
@@ -191,26 +238,38 @@ export function AuditPage() {
               <ScrollText className="w-6 h-6 text-zinc-400" />
             </div>
             <p className="text-sm font-medium text-white mb-1">No audit entries found</p>
-            <p className="text-xs text-zinc-500">There is no recorded activity matching these filters.</p>
+            <p className="text-xs text-zinc-500">
+              There is no recorded activity matching these filters.
+            </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div ref={setTableEl} className="overflow-x-auto">
             <table className="w-full min-w-[620px]">
-            <thead>
-              <tr className="border-b border-white/10 text-left">
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Time</th>
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Actor</th>
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Action</th>
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden md:table-cell">Target</th>
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden lg:table-cell">IP</th>
-                <th className="px-4 py-3 w-6"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((entry) => (
-                <AuditRow key={entry.id} entry={entry} />
-              ))}
-            </tbody>
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Time
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Actor
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Action
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden md:table-cell">
+                    Target
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden lg:table-cell">
+                    IP
+                  </th>
+                  <th className="px-4 py-3 w-6"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((entry) => (
+                  <AuditRow key={entry.id} entry={entry} />
+                ))}
+              </tbody>
             </table>
           </div>
         )}
@@ -219,7 +278,9 @@ export function AuditPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm text-zinc-500">
-          <span>Page {currentPage} of {totalPages} ({total} entries)</span>
+          <span>
+            Page {currentPage} of {totalPages} ({total} entries)
+          </span>
           <div className="flex gap-2">
             <button
               onClick={() => setOffset(Math.max(0, offset - LIMIT))}

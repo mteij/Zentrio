@@ -134,47 +134,6 @@ export const StreamingLayout = () => {
     return () => clearTimeout(timer)
   }, [profileId, queryClient, location.pathname])
 
-  useEffect(() => {
-    if (platform.canUseRemoteNavigation) return
-
-    const findVerticalScrollTarget = (element: HTMLElement | null): HTMLElement | null => {
-      let current = element
-
-      // Stop before body/html — both get computed overflow-y:auto from overflow-x:hidden
-      // which makes them appear scrollable, but body.scrollTop is a no-op in standards mode.
-      // The fallback (document.scrollingElement) correctly handles page-level scrolling.
-      while (current && current !== document.body && current !== document.documentElement) {
-        const style = window.getComputedStyle(current)
-        const canScrollY = /(auto|scroll|overlay)/.test(style.overflowY) && current.scrollHeight > current.clientHeight
-        if (canScrollY) return current
-        current = current.parentElement
-      }
-
-      return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement
-    }
-
-    const handleWheel = (event: WheelEvent) => {
-      if (event.defaultPrevented) return
-      if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return
-
-      const target = event.target as HTMLElement | null
-      if (!target) return
-
-      if (target.closest('[data-row-scroll-container="true"]')) return
-      if (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
-
-      const scrollTarget = findVerticalScrollTarget(target)
-      if (!scrollTarget || scrollTarget.scrollHeight <= scrollTarget.clientHeight) return
-
-      event.preventDefault()
-      scrollTarget.scrollTop += event.deltaY
-    }
-
-    document.addEventListener('wheel', handleWheel, { passive: false, capture: true })
-    return () => {
-      document.removeEventListener('wheel', handleWheel, true)
-    }
-  }, [platform.canUseRemoteNavigation])
 
   if (error?.message === 'Unauthorized') {
     return null

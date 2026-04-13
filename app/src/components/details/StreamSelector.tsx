@@ -1,6 +1,6 @@
 // Stream Selector Component
 // Extracted from Details.tsx
-import { Check, Download, HardDrive, Play, WifiOff, Wifi, Zap } from 'lucide-react'
+import { Check, Download, HardDrive, Play, WifiOff, Wifi, XCircle, Zap } from 'lucide-react'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SkeletonStreamList } from '../../components'
@@ -267,7 +267,7 @@ export function StreamSelector({
                         <button
                             key={addon.id}
                             onClick={() => {
-                                if (addon.status === 'done') {
+                                if (addon.status === 'done' || addon.status === 'error') {
                                     setSelectedAddon(selectedAddon === addon.id ? null : addon.id)
                                 }
                             }}
@@ -278,21 +278,27 @@ export function StreamSelector({
                                 padding: '4px 10px',
                                 borderRadius: '20px',
                                 border: 'none',
-                                cursor: addon.status === 'done' ? 'pointer' : 'default',
+                                cursor: addon.status === 'done' || addon.status === 'error' ? 'pointer' : 'default',
                                 background: selectedAddon === addon.id
-                                    ? 'rgba(139, 92, 246, 0.25)'
+                                    ? addon.status === 'error'
+                                        ? 'rgba(239, 68, 68, 0.12)'
+                                        : 'rgba(139, 92, 246, 0.25)'
                                     : 'rgba(255, 255, 255, 0.06)',
                                 fontSize: '0.75rem',
                                 fontWeight: 500,
-                                color: selectedAddon === addon.id
-                                    ? '#c4b5fd'
-                                    : addon.status === 'done' 
-                                        ? 'rgba(255, 255, 255, 0.7)' 
-                                        : addon.status === 'error' 
-                                            ? '#f87171' 
+                                color: addon.status === 'error'
+                                    ? '#f87171'
+                                    : selectedAddon === addon.id
+                                        ? '#c4b5fd'
+                                        : addon.status === 'done'
+                                            ? 'rgba(255, 255, 255, 0.7)'
                                             : 'rgba(255, 255, 255, 0.5)',
                                 transition: 'all 0.15s ease',
-                                outline: selectedAddon === addon.id ? '1px solid rgba(139, 92, 246, 0.5)' : 'none'
+                                outline: selectedAddon === addon.id
+                                    ? addon.status === 'error'
+                                        ? '1px solid rgba(239, 68, 68, 0.35)'
+                                        : '1px solid rgba(139, 92, 246, 0.5)'
+                                    : 'none'
                             }}
                         >
                             {addon.status === 'loading' && (
@@ -325,7 +331,27 @@ export function StreamSelector({
             </div>
         )}
 
-        {streamsLoading && streams.length === 0 ? (
+        {selectedAddon && addonStatuses.get(selectedAddon)?.status === 'error' ? (
+            <div style={{
+                padding: '16px 20px',
+                background: 'rgba(239, 68, 68, 0.07)',
+                border: '1px solid rgba(239, 68, 68, 0.18)',
+                borderRadius: '10px',
+                display: 'flex',
+                gap: '14px',
+                alignItems: 'flex-start',
+            }}>
+                <XCircle size={18} style={{ color: '#f87171', flexShrink: 0, marginTop: '1px' }} />
+                <div>
+                    <div style={{ color: '#f87171', fontWeight: 500, fontSize: '0.875rem', marginBottom: '4px' }}>
+                        {addonStatuses.get(selectedAddon)?.name} failed to load streams
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.78rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                        {addonStatuses.get(selectedAddon)?.error || 'Unknown error'}
+                    </div>
+                </div>
+            </div>
+        ) : streamsLoading && streams.length === 0 ? (
             <SkeletonStreamList />
         ) : filteredStreams && filteredStreams.length > 0 ? (
             /* Render based on displayMode setting */

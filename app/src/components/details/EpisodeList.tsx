@@ -1,6 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Eye, EyeOff, ChevronUp, Check, Download, Pause, X, Trash2, RefreshCw, AlertCircle } from 'lucide-react'
+import {
+  Play,
+  Eye,
+  EyeOff,
+  ChevronUp,
+  Check,
+  Download,
+  Pause,
+  X,
+  Trash2,
+  RefreshCw,
+  AlertCircle,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { LazyImage } from '../../components'
 import { ContextMenu } from '../../components/ui/ContextMenu'
@@ -8,11 +20,8 @@ import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { CircularProgress } from '../../components/ui/CircularProgress'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
 import { useDownloadStore } from '../../stores/downloadStore'
-import {
-  getTopStream,
-  readCachedTopStream,
-  resolveTopStream,
-} from '../../lib/topStreamCache'
+import { usePassthroughVerticalScroll } from '../../hooks/usePassthroughVerticalScroll'
+import { getTopStream, readCachedTopStream, resolveTopStream } from '../../lib/topStreamCache'
 import styles from './Details.module.css'
 import type { MetaDetail } from '../../services/addons/types'
 import { createLogger } from '../../utils/client-logger'
@@ -89,6 +98,8 @@ export function EpisodeList({
   const navigate = useNavigate()
   const addDownload = useDownloadStore((s) => s.addDownload)
   const downloads = useDownloadStore((s) => s.downloads)
+  const [seasonTabsEl, setSeasonTabsEl] = useState<HTMLDivElement | null>(null)
+  usePassthroughVerticalScroll(seasonTabsEl)
 
   // Background prefetch for the first episode of the current season
   useEffect(() => {
@@ -112,8 +123,17 @@ export function EpisodeList({
     })
   }, [meta.id, meta.type, meta.videos, profileId, selectedSeason])
 
-  const handleDownloadEpisode = async (ep: { season: number; episode: number; title: string; episodeId: string; thumbnailUrl?: string }) => {
-    if (!profileId) { toast.error('Missing profile context'); return }
+  const handleDownloadEpisode = async (ep: {
+    season: number
+    episode: number
+    title: string
+    episodeId: string
+    thumbnailUrl?: string
+  }) => {
+    if (!profileId) {
+      toast.error('Missing profile context')
+      return
+    }
     const quality = (localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality
     const selected = ep
 
@@ -184,7 +204,11 @@ export function EpisodeList({
     const toDownload = currentEpisodes.filter((ep: any) => {
       const epNum = ep.episode ?? ep.number
       const dl = downloads.find(
-        (d) => d.mediaId === meta.id && d.season === ep.season && d.episode === epNum && d.profileId === profileId
+        (d) =>
+          d.mediaId === meta.id &&
+          d.season === ep.season &&
+          d.episode === epNum &&
+          d.profileId === profileId
       )
       return !dl || dl.status === 'failed' || dl.status === 'cancelled'
     })
@@ -194,7 +218,9 @@ export function EpisodeList({
       return
     }
 
-    toast.loading(`Queuing ${toDownload.length} episode${toDownload.length !== 1 ? 's' : ''}…`, { id: 'season-dl' })
+    toast.loading(`Queuing ${toDownload.length} episode${toDownload.length !== 1 ? 's' : ''}…`, {
+      id: 'season-dl',
+    })
 
     let succeeded = 0
     for (const ep of toDownload) {
@@ -263,7 +289,9 @@ export function EpisodeList({
     }
   }
 
-  const handlePlayOffline = async (dl: ReturnType<typeof useDownloadStore.getState>['downloads'][number]) => {
+  const handlePlayOffline = async (
+    dl: ReturnType<typeof useDownloadStore.getState>['downloads'][number]
+  ) => {
     try {
       let url = `file://${dl.filePath}`
       let subtitles: Array<{ url: string; lang: string }> = []
@@ -330,7 +358,9 @@ export function EpisodeList({
 
   // Build season list (needed by handleDownloadSeason above — must be before handlers)
   const allSeasons = meta.videos
-    ? (Array.from(new Set(meta.videos.map((v: any) => v.season || 0))).sort((a: any, b: any) => a - b) as number[])
+    ? (Array.from(new Set(meta.videos.map((v: any) => v.season || 0))).sort(
+        (a: any, b: any) => a - b
+      ) as number[])
     : []
   const seasons = allSeasons.length > 1 ? allSeasons.filter((s) => s !== 0) : allSeasons
 
@@ -352,7 +382,12 @@ export function EpisodeList({
   // Count downloaded episodes per season (for the dot indicator on tabs)
   const downloadedBySeason = new Map<number, number>()
   for (const dl of downloads) {
-    if (dl.mediaId === meta.id && dl.profileId === profileId && dl.status === 'completed' && dl.season != null) {
+    if (
+      dl.mediaId === meta.id &&
+      dl.profileId === profileId &&
+      dl.status === 'completed' &&
+      dl.season != null
+    ) {
       downloadedBySeason.set(dl.season, (downloadedBySeason.get(dl.season) ?? 0) + 1)
     }
   }
@@ -360,7 +395,7 @@ export function EpisodeList({
   return (
     <>
       {/* Season tabs */}
-      <div className={styles.seasonTabsRow}>
+      <div ref={setSeasonTabsEl} className={styles.seasonTabsRow}>
         {seasons.map((season) => (
           <button
             key={season}
@@ -368,9 +403,7 @@ export function EpisodeList({
             onClick={() => setSelectedSeason(season)}
           >
             Season {season}
-            {(downloadedBySeason.get(season) ?? 0) > 0 && (
-              <span className={styles.seasonTabDot} />
-            )}
+            {(downloadedBySeason.get(season) ?? 0) > 0 && <span className={styles.seasonTabDot} />}
           </button>
         ))}
       </div>
@@ -429,8 +462,8 @@ export function EpisodeList({
             dl && dl.fileSize > 0
               ? dl.fileSize
               : dlProgress > 0 && dl
-              ? Math.round(dl.downloadedBytes / (dlProgress / 100))
-              : 0
+                ? Math.round(dl.downloadedBytes / (dlProgress / 100))
+                : 0
           const remainingBytes = Math.max(0, inferredTotal - (dl?.downloadedBytes ?? 0))
           const etaSeconds =
             isActive && speed > 0 && remainingBytes > 0 ? Math.ceil(remainingBytes / speed) : 0
@@ -452,23 +485,29 @@ export function EpisodeList({
                   onClick: () => onPlay(ep.season, epNum, epTitle),
                 },
                 ...(canDownload && !isCompleted && !isInProgress
-                  ? [{
-                      label: 'Download episode',
-                      icon: Download,
-                      onClick: () =>
-                        void handleDownloadEpisode({
-                          season: ep.season,
-                          episode: epNum,
-                          title: epTitle,
-                          episodeId: ep.id || `${ep.season}:${epNum}`,
-                          thumbnailUrl: ep.thumbnail,
-                        }),
-                    }]
+                  ? [
+                      {
+                        label: 'Download episode',
+                        icon: Download,
+                        onClick: () =>
+                          void handleDownloadEpisode({
+                            season: ep.season,
+                            episode: epNum,
+                            title: epTitle,
+                            episodeId: ep.id || `${ep.season}:${epNum}`,
+                            thumbnailUrl: ep.thumbnail,
+                          }),
+                      },
+                    ]
                   : []),
                 ...(isCompleted && dl
                   ? [
                       { label: 'Play offline', icon: Play, onClick: () => handlePlayOffline(dl) },
-                      { label: 'Delete download', icon: Trash2, onClick: () => handleDeleteDownload(dl.id) },
+                      {
+                        label: 'Delete download',
+                        icon: Trash2,
+                        onClick: () => handleDeleteDownload(dl.id),
+                      },
                     ]
                   : []),
                 { type: 'separator' as const },
@@ -491,7 +530,12 @@ export function EpisodeList({
                 {/* Thumbnail */}
                 <div className={styles.epThumb}>
                   {ep.thumbnail ? (
-                    <LazyImage src={ep.thumbnail} alt={epTitle} className={styles.epThumbImg} style={{ height: '100%', minHeight: 0 }} />
+                    <LazyImage
+                      src={ep.thumbnail}
+                      alt={epTitle}
+                      className={styles.epThumbImg}
+                      style={{ height: '100%', minHeight: 0 }}
+                    />
                   ) : (
                     <div className={styles.epThumbFallback}>
                       <Play size={20} />
@@ -560,10 +604,7 @@ export function EpisodeList({
 
                   {/* In-progress download detail */}
                   {isInProgress && dl && (
-                    <div
-                      className={styles.epDlProgress}
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div className={styles.epDlProgress} onClick={(e) => e.stopPropagation()}>
                       <CircularProgress
                         progress={dlProgress}
                         showText
@@ -593,10 +634,7 @@ export function EpisodeList({
                 </div>
 
                 {/* Action buttons */}
-                <div
-                  className={styles.epActions}
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <div className={styles.epActions} onClick={(e) => e.stopPropagation()}>
                   {isCompleted && dl ? (
                     <>
                       <button
@@ -682,7 +720,6 @@ export function EpisodeList({
           )
         })}
       </div>
-
     </>
   )
 }

@@ -1,32 +1,59 @@
 import { useState, useEffect, useCallback } from 'react'
+import { usePassthroughVerticalScroll } from '../../hooks/usePassthroughVerticalScroll'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Search, ChevronLeft, ChevronRight, X, Loader2, ShieldCheck, Ban, UserCheck, Shield, Users as UsersIcon } from 'lucide-react'
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Loader2,
+  ShieldCheck,
+  Ban,
+  UserCheck,
+  Shield,
+  Users as UsersIcon,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
 import { InputDialog } from '../../components/ui/InputDialog'
 import { useStepUp } from '../../components/admin/StepUpModal'
-import { adminApi, AdminApiError, AdminUser, AdminAuditEntry, AdminUserRole } from '../../lib/adminApi'
+import {
+  adminApi,
+  AdminApiError,
+  AdminUser,
+  AdminAuditEntry,
+  AdminUserRole,
+} from '../../lib/adminApi'
 
 const LIMIT = 25
 
 function RoleBadge({ role }: { role?: string }) {
   const r = (role || 'user').toLowerCase()
-  const cls = r === 'admin'
-    ? 'bg-red-500/20 text-red-400 border-red-500/20'
-    : 'bg-zinc-700/40 text-zinc-400 border-zinc-600/30'
-  return (
-    <span className={`px-1.5 py-0.5 rounded text-xs border ${cls}`}>{r}</span>
-  )
+  const cls =
+    r === 'admin'
+      ? 'bg-red-500/20 text-red-400 border-red-500/20'
+      : 'bg-zinc-700/40 text-zinc-400 border-zinc-600/30'
+  return <span className={`px-1.5 py-0.5 rounded text-xs border ${cls}`}>{r}</span>
 }
 
 function StatusBadge({ banned }: { banned?: boolean }) {
-  return banned
-    ? <span className="px-1.5 py-0.5 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/20">Banned</span>
-    : <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/20">Active</span>
+  return banned ? (
+    <span className="px-1.5 py-0.5 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/20">
+      Banned
+    </span>
+  ) : (
+    <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/20">
+      Active
+    </span>
+  )
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 function formatRelativeTime(iso: string | null | undefined): string {
@@ -120,7 +147,9 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
                 <StatusBadge banned={user.banned} />
               </div>
               <p className="text-xs text-zinc-600 mt-1">Joined {formatDate(user.createdAt)}</p>
-              <p className="text-xs text-zinc-600">Last active {formatRelativeTime(user.lastActive)}</p>
+              <p className="text-xs text-zinc-600">
+                Last active {formatRelativeTime(user.lastActive)}
+              </p>
               {user.banReason && (
                 <p className="text-xs text-red-400 mt-1">Ban reason: {user.banReason}</p>
               )}
@@ -134,7 +163,9 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
                   <div key={r.id} className="flex items-center gap-2">
                     <Shield className="w-3 h-3 text-amber-400" />
                     <span className="text-sm text-zinc-300">{r.name}</span>
-                    {r.description && <span className="text-xs text-zinc-600">— {r.description}</span>}
+                    {r.description && (
+                      <span className="text-xs text-zinc-600">— {r.description}</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -147,18 +178,29 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
                 <Button
                   variant="secondary"
                   className="text-xs !py-1.5"
-                  onClick={() => { setTargetRole(user.role === 'admin' ? 'user' : 'admin'); setReasonDialog('role') }}
+                  onClick={() => {
+                    setTargetRole(user.role === 'admin' ? 'user' : 'admin')
+                    setReasonDialog('role')
+                  }}
                 >
                   <ShieldCheck className="w-3.5 h-3.5 mr-1" />
                   {user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
                 </Button>
                 {user.banned ? (
-                  <Button variant="secondary" className="text-xs !py-1.5" onClick={() => setReasonDialog('unban')}>
+                  <Button
+                    variant="secondary"
+                    className="text-xs !py-1.5"
+                    onClick={() => setReasonDialog('unban')}
+                  >
                     <UserCheck className="w-3.5 h-3.5 mr-1" />
                     Unban
                   </Button>
                 ) : (
-                  <Button variant="danger" className="text-xs !py-1.5" onClick={() => setReasonDialog('ban')}>
+                  <Button
+                    variant="danger"
+                    className="text-xs !py-1.5"
+                    onClick={() => setReasonDialog('ban')}
+                  >
                     <Ban className="w-3.5 h-3.5 mr-1" />
                     Ban
                   </Button>
@@ -169,7 +211,9 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
             {/* Recent audit activity */}
             {recentActivity.length > 0 && (
               <div className="px-4 py-3">
-                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Recent Audit Activity</p>
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">
+                  Recent Audit Activity
+                </p>
                 <div className="space-y-1.5">
                   {recentActivity.slice(0, 5).map((entry) => (
                     <div key={entry.id} className="text-xs text-zinc-400">
@@ -182,7 +226,9 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
             )}
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">User not found</div>
+          <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
+            User not found
+          </div>
         )}
       </aside>
 
@@ -195,7 +241,7 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
         message={`Changing role to "${targetRole}". Please provide a reason.`}
         placeholder="Enter reason..."
         confirmText="Change Role"
-        validation={(v) => v.trim().length < 3 ? 'Reason must be at least 3 characters' : null}
+        validation={(v) => (v.trim().length < 3 ? 'Reason must be at least 3 characters' : null)}
       />
       <InputDialog
         isOpen={reasonDialog === 'ban'}
@@ -205,7 +251,7 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
         message="Provide a reason for banning this user."
         placeholder="Enter ban reason..."
         confirmText="Ban User"
-        validation={(v) => v.trim().length < 3 ? 'Reason must be at least 3 characters' : null}
+        validation={(v) => (v.trim().length < 3 ? 'Reason must be at least 3 characters' : null)}
       />
       <InputDialog
         isOpen={reasonDialog === 'unban'}
@@ -215,7 +261,7 @@ function UserDrawer({ userId, onClose, onAction }: DrawerProps) {
         message="Provide a reason for unbanning this user."
         placeholder="Enter reason..."
         confirmText="Unban"
-        validation={(v) => v.trim().length < 3 ? 'Reason must be at least 3 characters' : null}
+        validation={(v) => (v.trim().length < 3 ? 'Reason must be at least 3 characters' : null)}
       />
     </>
   )
@@ -228,6 +274,8 @@ export function UsersPage() {
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [offset, setOffset] = useState(0)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [tableEl, setTableEl] = useState<HTMLDivElement | null>(null)
+  usePassthroughVerticalScroll(tableEl)
 
   // Debounce search
   useEffect(() => {
@@ -286,48 +334,58 @@ export function UsersPage() {
             <p className="text-xs text-zinc-500">Try adjusting your search query.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div ref={setTableEl} className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-left">
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">User</th>
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden sm:table-cell">Role</th>
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden md:table-cell">Status</th>
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden lg:table-cell">Joined</th>
-                <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden xl:table-cell">Last Active</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {users.map((user: AdminUser) => (
-                <tr key={user.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="text-white font-medium truncate max-w-[180px]">{user.name}</p>
-                    <p className="text-zinc-500 text-xs truncate max-w-[180px]">{user.email}</p>
-                  </td>
-                  <td className="px-4 py-3 hidden sm:table-cell">
-                    <RoleBadge role={user.role} />
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <StatusBadge banned={user.banned} />
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500 text-xs hidden lg:table-cell">
-                    {formatDate(user.createdAt)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500 text-xs hidden xl:table-cell">
-                    {formatRelativeTime(user.lastActive)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => setSelectedUserId(user.id)}
-                      className="text-xs text-zinc-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/10"
-                    >
-                      View
-                    </button>
-                  </td>
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden sm:table-cell">
+                    Role
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden md:table-cell">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden lg:table-cell">
+                    Joined
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider hidden xl:table-cell">
+                    Last Active
+                  </th>
+                  <th className="px-4 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {users.map((user: AdminUser) => (
+                  <tr key={user.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="text-white font-medium truncate max-w-[180px]">{user.name}</p>
+                      <p className="text-zinc-500 text-xs truncate max-w-[180px]">{user.email}</p>
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <RoleBadge role={user.role} />
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <StatusBadge banned={user.banned} />
+                    </td>
+                    <td className="px-4 py-3 text-zinc-500 text-xs hidden lg:table-cell">
+                      {formatDate(user.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-500 text-xs hidden xl:table-cell">
+                      {formatRelativeTime(user.lastActive)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => setSelectedUserId(user.id)}
+                        className="text-xs text-zinc-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/10"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         )}
@@ -336,7 +394,9 @@ export function UsersPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm text-zinc-500">
-          <span>Page {currentPage} of {totalPages}</span>
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
           <div className="flex gap-2">
             <button
               onClick={() => setOffset(Math.max(0, offset - LIMIT))}
