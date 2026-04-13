@@ -7,25 +7,30 @@
  */
 
 import {
-    AlertTriangle,
-    Cast,
-    Check,
-    ChevronLeft, ChevronRight,
-    Crosshair,
-    ExternalLink,
-    Flag,
-    Loader2,
-    Maximize, Minimize,
-    SkipForward as NextEpIcon,
-    Pause,
-    PictureInPicture2,
-    Play,
-    RefreshCw,
-    RotateCcw, RotateCw,
-    Settings, Subtitles,
-    Volume1,
-    Volume2, VolumeX,
-    X
+  AlertTriangle,
+  Cast,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Crosshair,
+  ExternalLink,
+  Flag,
+  Loader2,
+  Maximize,
+  Minimize,
+  SkipForward as NextEpIcon,
+  Pause,
+  PictureInPicture2,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  RotateCw,
+  Settings,
+  Subtitles,
+  Volume1,
+  Volume2,
+  VolumeX,
+  X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAppTarget } from '../../lib/app-target'
@@ -42,8 +47,6 @@ export interface EpisodeInfo {
   number: number
   title?: string
 }
-
-
 
 interface ZentrioPlayerProps {
   src: string
@@ -71,7 +74,13 @@ interface ZentrioPlayerProps {
   onOpenExternal?: () => Promise<{ success: boolean; message: string }>
 
   /** IntroDB segments for skip intro/recap/outro */
-  segments?: { type: string; start: number; end: number; confidence?: number; submissionCount?: number }[]
+  segments?: {
+    type: string
+    start: number
+    end: number
+    confidence?: number
+    submissionCount?: number
+  }[]
   /** Whether to show skip buttons (from streaming settings, default true) */
   skipIntrosOutros?: boolean
   /** Whether to show segments with low confidence/few votes (marked as Unconfirmed) */
@@ -79,7 +88,11 @@ interface ZentrioPlayerProps {
   /** Whether the user has an IntroDB API key — shows the contribute button */
   canContributeSegments?: boolean
   /** Called when user submits a new segment via the contribute panel */
-  onSubmitSegment?: (type: string, startSec: number, endSec: number) => Promise<{ ok: boolean; error?: string }>
+  onSubmitSegment?: (
+    type: string,
+    startSec: number,
+    endSec: number
+  ) => Promise<{ ok: boolean; error?: string }>
 
   /* Callbacks */
   onTimeUpdate?: (currentTime: number, duration: number) => void
@@ -116,13 +129,21 @@ function CountdownRing({ total, current }: { total: number; current: number }) {
     <svg className={styles.countdownRing} viewBox="0 0 44 44" width={44} height={44}>
       <circle cx={22} cy={22} r={r} className={styles.countdownTrack} />
       <circle
-        cx={22} cy={22} r={r}
+        cx={22}
+        cy={22}
+        r={r}
         className={styles.countdownFill}
         strokeDasharray={circ}
         strokeDashoffset={dashoffset}
         style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
       />
-      <text x={22} y={22} className={styles.countdownText} textAnchor="middle" dominantBaseline="central">
+      <text
+        x={22}
+        y={22}
+        className={styles.countdownText}
+        textAnchor="middle"
+        dominantBaseline="central"
+      >
         {Math.ceil(current)}
       </text>
     </svg>
@@ -160,7 +181,14 @@ export function ZentrioPlayer({
 }: ZentrioPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const gestureRef = useRef({ startX: 0, startY: 0, startTime: 0, lastTapTime: 0, seeking: false, voluming: false })
+  const gestureRef = useRef({
+    startX: 0,
+    startY: 0,
+    startTime: 0,
+    lastTapTime: 0,
+    seeking: false,
+    voluming: false,
+  })
   const nextEpTriggeredRef = useRef(false)
   const shortVideoTriggeredRef = useRef(false)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -178,7 +206,9 @@ export function ZentrioPlayer({
   const [selectedSubtitleLang, setSelectedSubtitleLang] = useState<string | null>(null)
 
   /* Seek / volume feedback */
-  const [seekFeedback, setSeekFeedback] = useState<{ dir: 'left' | 'right'; secs: number } | null>(null)
+  const [seekFeedback, setSeekFeedback] = useState<{ dir: 'left' | 'right'; secs: number } | null>(
+    null
+  )
   const [volumeOSD, setVolumeOSD] = useState<number | null>(null)
   const volumeOSDTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -197,7 +227,12 @@ export function ZentrioPlayer({
   const shortDismissedRef = useRef(false)
 
   /* Skip segment (IntroDB) */
-  const [activeSegment, setActiveSegment] = useState<{ type: string; start: number; end: number; validated: boolean } | null>(null)
+  const [activeSegment, setActiveSegment] = useState<{
+    type: string
+    start: number
+    end: number
+    validated: boolean
+  } | null>(null)
   const dismissedSegmentsRef = useRef<Set<number>>(new Set()) // dismissed by start time
   const CONFIDENCE_THRESHOLD = 0.5
 
@@ -252,7 +287,7 @@ export function ZentrioPlayer({
         setShowShortVideo(true)
         shortVideoTriggeredRef.current = true
       }
-    }
+    },
   })
 
   /* ── Load source on change ── */
@@ -318,41 +353,58 @@ export function ZentrioPlayer({
   }, [])
 
   /* ── Next episode progress logic ── */
-  const handlePlaybackProgress = useCallback((t: number, d: number) => {
-    if (d <= 0) return
-    const remaining = d - t
+  const handlePlaybackProgress = useCallback(
+    (t: number, d: number) => {
+      if (d <= 0) return
+      const remaining = d - t
 
-    // Next episode popup
-    if (nextEpisode && remaining <= nextEpisodeAt && remaining > 0 && !nextEpTriggeredRef.current) {
-      nextEpTriggeredRef.current = true
-      setShowNextEp(true)
-      setNextEpCountdown(remaining)
+      // Next episode popup
+      if (
+        nextEpisode &&
+        remaining <= nextEpisodeAt &&
+        remaining > 0 &&
+        !nextEpTriggeredRef.current
+      ) {
+        nextEpTriggeredRef.current = true
+        setShowNextEp(true)
+        setNextEpCountdown(remaining)
 
-      countdownRef.current = setInterval(() => {
-        setNextEpCountdown(prev => {
-          const next = prev - 1
-          if (next <= 0) {
-            clearInterval(countdownRef.current!)
-            countdownRef.current = null
-            onNavigateEpisode?.(nextEpisode)
-          }
-          return next
+        countdownRef.current = setInterval(() => {
+          setNextEpCountdown((prev) => {
+            const next = prev - 1
+            if (next <= 0) {
+              clearInterval(countdownRef.current!)
+              countdownRef.current = null
+              onNavigateEpisode?.(nextEpisode)
+            }
+            return next
+          })
+        }, 1000)
+      }
+
+      // Segment detection (IntroDB skip intro/recap/outro)
+      if (skipIntrosOutros && segments.length > 0) {
+        const hit = segments.find((s) => {
+          if (t < s.start || t >= s.end) return false
+          if (dismissedSegmentsRef.current.has(s.start)) return false
+          const isValidated = (s.confidence ?? 1) >= CONFIDENCE_THRESHOLD
+          if (!isValidated && !showUnvalidatedSegments) return false
+          return true
         })
-      }, 1000)
-    }
-
-    // Segment detection (IntroDB skip intro/recap/outro)
-    if (skipIntrosOutros && segments.length > 0) {
-      const hit = segments.find(s => {
-        if (t < s.start || t >= s.end) return false
-        if (dismissedSegmentsRef.current.has(s.start)) return false
-        const isValidated = (s.confidence ?? 1) >= CONFIDENCE_THRESHOLD
-        if (!isValidated && !showUnvalidatedSegments) return false
-        return true
-      })
-      setActiveSegment(hit ? { ...hit, validated: (hit.confidence ?? 1) >= CONFIDENCE_THRESHOLD } : null)
-    }
-  }, [nextEpisode, nextEpisodeAt, onNavigateEpisode, skipIntrosOutros, showUnvalidatedSegments, segments])
+        setActiveSegment(
+          hit ? { ...hit, validated: (hit.confidence ?? 1) >= CONFIDENCE_THRESHOLD } : null
+        )
+      }
+    },
+    [
+      nextEpisode,
+      nextEpisodeAt,
+      onNavigateEpisode,
+      skipIntrosOutros,
+      showUnvalidatedSegments,
+      segments,
+    ]
+  )
 
   /* Reset next episode tracking when video/episode changes */
   useEffect(() => {
@@ -403,7 +455,11 @@ export function ZentrioPlayer({
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
 
       switch (e.key) {
-        case ' ': case 'k': e.preventDefault(); togglePlayPause(); break
+        case ' ':
+        case 'k':
+          e.preventDefault()
+          togglePlayPause()
+          break
         case 'ArrowLeft':
           e.preventDefault()
           seek(Math.max(0, state.currentTime - 10))
@@ -416,16 +472,42 @@ export function ZentrioPlayer({
           setSeekFeedback({ dir: 'right', secs: 10 })
           setTimeout(() => setSeekFeedback(null), 600)
           break
-        case 'ArrowUp': e.preventDefault(); setVolume(Math.min(1, state.volume + 0.1)); break
-        case 'ArrowDown': e.preventDefault(); setVolume(Math.max(0, state.volume - 0.1)); break
-        case 'f': e.preventDefault(); toggleFullscreen(); break
-        case 'm': e.preventDefault(); setMuted(!state.muted); break
-        case 'Escape': if (openMenu) setOpenMenu(null); break
+        case 'ArrowUp':
+          e.preventDefault()
+          setVolume(Math.min(1, state.volume + 0.1))
+          break
+        case 'ArrowDown':
+          e.preventDefault()
+          setVolume(Math.max(0, state.volume - 0.1))
+          break
+        case 'f':
+          e.preventDefault()
+          toggleFullscreen()
+          break
+        case 'm':
+          e.preventDefault()
+          setMuted(!state.muted)
+          break
+        case 'Escape':
+          if (openMenu) setOpenMenu(null)
+          break
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [appTarget.primaryInput, togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
+  }, [
+    appTarget.primaryInput,
+    togglePlayPause,
+    seek,
+    setVolume,
+    setMuted,
+    toggleFullscreen,
+    state.currentTime,
+    state.duration,
+    state.volume,
+    state.muted,
+    openMenu,
+  ])
 
   /* ── Menu click-outside (desktop + mobile) ── */
   useEffect(() => {
@@ -450,121 +532,152 @@ export function ZentrioPlayer({
   /* ── Progress bar pointer ── */
   const progressRef = useRef<HTMLDivElement>(null)
 
-  const getPctFromEvent = (e: React.MouseEvent | React.PointerEvent | MouseEvent | PointerEvent) => {
+  const getPctFromEvent = (
+    e: React.MouseEvent | React.PointerEvent | MouseEvent | PointerEvent
+  ) => {
     const bar = progressRef.current
     if (!bar) return 0
     const rect = bar.getBoundingClientRect()
     return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
   }
 
-  const handleProgressPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId)
-    setIsDraggingProgress(true)
-    const pct = getPctFromEvent(e)
-    setDragPct(pct)
-    dragMinuteRef.current = Math.floor(pct * state.duration / 60)
-  }, [state.duration])
-
-  const handleProgressPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const pct = getPctFromEvent(e)
-    setHoverTime({ time: pct * state.duration, pct })
-    if (isDraggingProgress) {
-      setDragPct(pct)
-      const minute = Math.floor(pct * state.duration / 60)
-      if (minute !== dragMinuteRef.current) {
-        dragMinuteRef.current = minute
-        hapticScrubTick()
-      }
-    }
-  }, [state.duration, isDraggingProgress])
-
-  const handleProgressPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (isDraggingProgress) {
+  const handleProgressPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.currentTarget.setPointerCapture(e.pointerId)
+      setIsDraggingProgress(true)
       const pct = getPctFromEvent(e)
-      seek(pct * state.duration)
-    }
-    setIsDraggingProgress(false)
-  }, [isDraggingProgress, seek, state.duration])
+      setDragPct(pct)
+      dragMinuteRef.current = Math.floor((pct * state.duration) / 60)
+    },
+    [state.duration]
+  )
+
+  const handleProgressPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const pct = getPctFromEvent(e)
+      setHoverTime({ time: pct * state.duration, pct })
+      if (isDraggingProgress) {
+        setDragPct(pct)
+        const minute = Math.floor((pct * state.duration) / 60)
+        if (minute !== dragMinuteRef.current) {
+          dragMinuteRef.current = minute
+          hapticScrubTick()
+        }
+      }
+    },
+    [state.duration, isDraggingProgress]
+  )
+
+  const handleProgressPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (isDraggingProgress) {
+        const pct = getPctFromEvent(e)
+        seek(pct * state.duration)
+      }
+      setIsDraggingProgress(false)
+    },
+    [isDraggingProgress, seek, state.duration]
+  )
 
   const handleProgressLeave = useCallback(() => {
     if (!isDraggingProgress) setHoverTime(null)
   }, [isDraggingProgress])
 
-  const displayProgress = isDraggingProgress ? dragPct : (state.duration > 0 ? state.currentTime / state.duration : 0)
+  const displayProgress = isDraggingProgress
+    ? dragPct
+    : state.duration > 0
+      ? state.currentTime / state.duration
+      : 0
 
   /* ── Touch gestures ── */
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (appTarget.primaryInput !== 'touch') return
-    if (e.touches.length !== 1) return
-    const t = e.touches[0]
-    gestureRef.current = { ...gestureRef.current, startX: t.clientX, startY: t.clientY, startTime: state.currentTime, seeking: false, voluming: false }
-    resetControlsTimeout()
-  }, [appTarget.primaryInput, state.currentTime, resetControlsTimeout])
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (appTarget.primaryInput !== 'touch') return
-    if (e.touches.length !== 1) return
-    const t = e.touches[0]
-    const g = gestureRef.current
-    const dx = t.clientX - g.startX
-    const dy = t.clientY - g.startY
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-
-    if (Math.abs(dx) > 20 && !g.voluming) {
-      g.seeking = true
-      const pct = dx / rect.width
-      const delta = pct * Math.min(state.duration, 120)
-      const newTime = Math.max(0, Math.min(state.duration, g.startTime + delta * 3))
-      setHoverTime({ time: newTime, pct: newTime / state.duration })
-    } else if (Math.abs(dy) > 20 && !g.seeking) {
-      const touchX = t.clientX - rect.left
-      if (touchX > rect.width * 0.5) {
-        g.voluming = true
-        const delta = -dy / rect.height
-        const newVol = Math.max(0, Math.min(1, state.volume + delta))
-        setVolume(newVol)
-        showVolumeOSD(newVol)
-        g.startY = t.clientY
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (appTarget.primaryInput !== 'touch') return
+      if (e.touches.length !== 1) return
+      const t = e.touches[0]
+      gestureRef.current = {
+        ...gestureRef.current,
+        startX: t.clientX,
+        startY: t.clientY,
+        startTime: state.currentTime,
+        seeking: false,
+        voluming: false,
       }
-    }
-  }, [appTarget.primaryInput, state.duration, state.volume, setVolume, showVolumeOSD])
+      resetControlsTimeout()
+    },
+    [appTarget.primaryInput, state.currentTime, resetControlsTimeout]
+  )
 
-  const handleTouchEnd = useCallback((_e: React.TouchEvent) => {
-    if (appTarget.primaryInput !== 'touch') return
-    const g = gestureRef.current
-    if (g.seeking && hoverTime) {
-      seek(hoverTime.time)
-      setHoverTime(null)
-    }
-
-    // Double-tap detection
-    const now = Date.now()
-    const diff = now - g.lastTapTime
-    if (diff < 300 && diff > 50 && !g.seeking) {
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (appTarget.primaryInput !== 'touch') return
+      if (e.touches.length !== 1) return
+      const t = e.touches[0]
+      const g = gestureRef.current
+      const dx = t.clientX - g.startX
+      const dy = t.clientY - g.startY
       const rect = containerRef.current?.getBoundingClientRect()
-      if (rect) {
-        const x = g.startX - rect.left
-        if (x < rect.width * 0.35) {
-          seek(Math.max(0, state.currentTime - 10))
-          setSeekFeedback({ dir: 'left', secs: 10 })
-          setTimeout(() => setSeekFeedback(null), 600)
-        } else if (x > rect.width * 0.65) {
-          seek(Math.min(state.duration, state.currentTime + 10))
-          setSeekFeedback({ dir: 'right', secs: 10 })
-          setTimeout(() => setSeekFeedback(null), 600)
-        } else {
-          togglePlayPause()
+      if (!rect) return
+
+      if (Math.abs(dx) > 20 && !g.voluming) {
+        g.seeking = true
+        const pct = dx / rect.width
+        const delta = pct * Math.min(state.duration, 120)
+        const newTime = Math.max(0, Math.min(state.duration, g.startTime + delta * 3))
+        setHoverTime({ time: newTime, pct: newTime / state.duration })
+      } else if (Math.abs(dy) > 20 && !g.seeking) {
+        const touchX = t.clientX - rect.left
+        if (touchX > rect.width * 0.5) {
+          g.voluming = true
+          const delta = -dy / rect.height
+          const newVol = Math.max(0, Math.min(1, state.volume + delta))
+          setVolume(newVol)
+          showVolumeOSD(newVol)
+          g.startY = t.clientY
         }
       }
-      g.lastTapTime = 0
-    } else {
-      g.lastTapTime = now
-    }
+    },
+    [appTarget.primaryInput, state.duration, state.volume, setVolume, showVolumeOSD]
+  )
 
-    g.seeking = false
-    g.voluming = false
-  }, [appTarget.primaryInput, hoverTime, seek, state.currentTime, state.duration, togglePlayPause])
+  const handleTouchEnd = useCallback(
+    (_e: React.TouchEvent) => {
+      if (appTarget.primaryInput !== 'touch') return
+      const g = gestureRef.current
+      if (g.seeking && hoverTime) {
+        seek(hoverTime.time)
+        setHoverTime(null)
+      }
+
+      // Double-tap detection
+      const now = Date.now()
+      const diff = now - g.lastTapTime
+      if (diff < 300 && diff > 50 && !g.seeking) {
+        const rect = containerRef.current?.getBoundingClientRect()
+        if (rect) {
+          const x = g.startX - rect.left
+          if (x < rect.width * 0.35) {
+            seek(Math.max(0, state.currentTime - 10))
+            setSeekFeedback({ dir: 'left', secs: 10 })
+            setTimeout(() => setSeekFeedback(null), 600)
+          } else if (x > rect.width * 0.65) {
+            seek(Math.min(state.duration, state.currentTime + 10))
+            setSeekFeedback({ dir: 'right', secs: 10 })
+            setTimeout(() => setSeekFeedback(null), 600)
+          } else {
+            togglePlayPause()
+          }
+        }
+        g.lastTapTime = 0
+      } else {
+        g.lastTapTime = now
+      }
+
+      g.seeking = false
+      g.voluming = false
+    },
+    [appTarget.primaryInput, hoverTime, seek, state.currentTime, state.duration, togglePlayPause]
+  )
 
   /* ── PiP ── */
   const togglePip = useCallback(async () => {
@@ -589,9 +702,10 @@ export function ZentrioPlayer({
   const audioTracks = getAudioTracks()
   const qualityLevels = getQualityLevels()
   const playbackRates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
-  const bufferedPct = state.buffered && state.buffered.length > 0 && state.duration > 0
-    ? (state.buffered.end(state.buffered.length - 1) / state.duration) * 100
-    : 0
+  const bufferedPct =
+    state.buffered && state.buffered.length > 0 && state.duration > 0
+      ? (state.buffered.end(state.buffered.length - 1) / state.duration) * 100
+      : 0
 
   /* ── Error state ── */
   if (error) {
@@ -601,14 +715,19 @@ export function ZentrioPlayer({
           <AlertTriangle className={styles.errorIcon} />
           <div className={styles.errorTitle}>Playback Error</div>
           <div className={styles.errorMessage}>{error.message}</div>
-          {onBack && <button className={styles.errorBack} onClick={onBack}>Go Back</button>}
+          {onBack && (
+            <button className={styles.errorBack} onClick={onBack}>
+              Go Back
+            </button>
+          )}
         </div>
       </div>
     )
   }
 
   /* ── Volume icon ── */
-  const VolumeIcon = state.muted || state.volume === 0 ? VolumeX : state.volume < 0.5 ? Volume1 : Volume2
+  const VolumeIcon =
+    state.muted || state.volume === 0 ? VolumeX : state.volume < 0.5 ? Volume1 : Volume2
 
   /* ────────────────── Render ────────────────── */
   return (
@@ -636,9 +755,7 @@ export function ZentrioPlayer({
       />
 
       {/* Poster while loading */}
-      {poster && isLoading && (
-        <img src={poster} alt={title} className={styles.posterImage} />
-      )}
+      {poster && isLoading && <img src={poster} alt={title} className={styles.posterImage} />}
 
       {/* Buffering spinner (distinct from initial load) */}
       {state.buffering && !isLoading && (
@@ -659,17 +776,24 @@ export function ZentrioPlayer({
       {seekFeedback && (
         <div className={`${styles.seekRipple} ${styles[seekFeedback.dir]}`}>
           {seekFeedback.dir === 'left' ? (
-             <span className={styles.skipIconWrap}>
-               <RotateCcw size={32} />
-               <span className={styles.skipIconText} style={{ fontSize: '11px' }}>10</span>
-             </span>
+            <span className={styles.skipIconWrap}>
+              <RotateCcw size={32} />
+              <span className={styles.skipIconText} style={{ fontSize: '11px' }}>
+                10
+              </span>
+            </span>
           ) : (
-             <span className={styles.skipIconWrap}>
-               <RotateCw size={32} />
-               <span className={styles.skipIconText} style={{ fontSize: '11px' }}>10</span>
-             </span>
+            <span className={styles.skipIconWrap}>
+              <RotateCw size={32} />
+              <span className={styles.skipIconText} style={{ fontSize: '11px' }}>
+                10
+              </span>
+            </span>
           )}
-          <span>{seekFeedback.dir === 'left' ? '-' : '+'}{seekFeedback.secs}s</span>
+          <span>
+            {seekFeedback.dir === 'left' ? '-' : '+'}
+            {seekFeedback.secs}s
+          </span>
         </div>
       )}
 
@@ -693,7 +817,6 @@ export function ZentrioPlayer({
 
       {/* ═══════════════ Controls Overlay ═══════════════ */}
       <div className={`${styles.controlsOverlay} ${controlsVisible ? styles.visible : ''}`}>
-
         {/* Gradient backgrounds */}
         <div className={styles.gradientTop} />
         <div className={styles.gradientBottom} />
@@ -704,7 +827,10 @@ export function ZentrioPlayer({
             {onBack && (
               <button
                 className={styles.iconBtn}
-                onClick={(e) => { e.stopPropagation(); onBack() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onBack()
+                }}
                 aria-label="Go back"
               >
                 <ChevronLeft size={22} />
@@ -723,7 +849,10 @@ export function ZentrioPlayer({
             {!isMobile && prevEpisode && (
               <button
                 className={styles.iconBtnSm}
-                onClick={(e) => { e.stopPropagation(); onNavigateEpisode?.(prevEpisode) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onNavigateEpisode?.(prevEpisode)
+                }}
                 aria-label="Previous episode"
               >
                 <ChevronLeft size={20} />
@@ -732,7 +861,10 @@ export function ZentrioPlayer({
             {!isMobile && nextEpisode && (
               <button
                 className={styles.iconBtnSm}
-                onClick={(e) => { e.stopPropagation(); onNavigateEpisode?.(nextEpisode) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onNavigateEpisode?.(nextEpisode)
+                }}
                 aria-label="Next episode"
               >
                 <ChevronRight size={20} />
@@ -744,22 +876,40 @@ export function ZentrioPlayer({
               <div className={styles.menuWrap} data-menu>
                 <button
                   className={`${styles.iconBtn} ${openMenu === 'external' ? styles.active : ''}`}
-                  onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === 'external' ? null : 'external') }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setOpenMenu(openMenu === 'external' ? null : 'external')
+                  }}
                   aria-label="Open in…"
                 >
                   <ExternalLink size={20} />
                 </button>
                 {openMenu === 'external' && (
-                  <div className={`${styles.dropdownPanel} ${styles.dropdownRight}`} onClick={e => e.stopPropagation()}>
+                  <div
+                    className={`${styles.dropdownPanel} ${styles.dropdownRight}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className={styles.dropdownTitle}>Open In</div>
                     {onOpenExternal && (
-                      <button className={styles.dropdownItem} onClick={() => { handleExternalPlayer(); setOpenMenu(null) }}>
+                      <button
+                        className={styles.dropdownItem}
+                        onClick={() => {
+                          handleExternalPlayer()
+                          setOpenMenu(null)
+                        }}
+                      >
                         <ExternalLink size={16} />
                         <span>External Player</span>
                       </button>
                     )}
                     {document.pictureInPictureEnabled && (
-                      <button className={styles.dropdownItem} onClick={() => { togglePip(); setOpenMenu(null) }}>
+                      <button
+                        className={styles.dropdownItem}
+                        onClick={() => {
+                          togglePip()
+                          setOpenMenu(null)
+                        }}
+                      >
                         <PictureInPicture2 size={16} />
                         <span>Picture in Picture</span>
                       </button>
@@ -769,7 +919,7 @@ export function ZentrioPlayer({
                       onClick={() => {
                         const vid = document.querySelector('video')
                         if (vid && (vid as any).remote) {
-                          (vid as any).remote.prompt().catch(() => {})
+                          ;(vid as any).remote.prompt().catch(() => {})
                         }
                         setOpenMenu(null)
                       }}
@@ -790,7 +940,10 @@ export function ZentrioPlayer({
             {prevEpisode && (
               <button
                 className={styles.epNavBtn}
-                onClick={(e) => { e.stopPropagation(); onNavigateEpisode?.(prevEpisode) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onNavigateEpisode?.(prevEpisode)
+                }}
               >
                 <ChevronLeft size={20} />
                 <span>Prev</span>
@@ -799,7 +952,10 @@ export function ZentrioPlayer({
             {nextEpisode && (
               <button
                 className={styles.epNavBtn}
-                onClick={(e) => { e.stopPropagation(); onNavigateEpisode?.(nextEpisode) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onNavigateEpisode?.(nextEpisode)
+                }}
               >
                 <span>Next</span>
                 <ChevronRight size={20} />
@@ -812,7 +968,10 @@ export function ZentrioPlayer({
         {state.paused && !state.buffering && (
           <button
             className={styles.centerPlay}
-            onClick={(e) => { e.stopPropagation(); togglePlayPause() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              togglePlayPause()
+            }}
             aria-label="Play"
           >
             <Play size={36} />
@@ -829,41 +988,56 @@ export function ZentrioPlayer({
             onPointerMove={handleProgressPointerMove}
             onPointerUp={handleProgressPointerUp}
             onPointerLeave={handleProgressLeave}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Time tooltip on hover */}
             {hoverTime && !isMobile && (
-              <div
-                className={styles.progressTooltip}
-                style={{ left: `${hoverTime.pct * 100}%` }}
-              >
+              <div className={styles.progressTooltip} style={{ left: `${hoverTime.pct * 100}%` }}>
                 {formatTime(hoverTime.time)}
               </div>
             )}
             <div className={styles.progressTrack}>
               <div className={styles.progressBuffered} style={{ width: `${bufferedPct}%` }} />
-              <div className={styles.progressPlayed} style={{ width: `${displayProgress * 100}%` }} />
-              <div className={styles.progressHandle} style={{ left: `${displayProgress * 100}%` }} />
+              <div
+                className={styles.progressPlayed}
+                style={{ width: `${displayProgress * 100}%` }}
+              />
+              <div
+                className={styles.progressHandle}
+                style={{ left: `${displayProgress * 100}%` }}
+              />
             </div>
           </div>
 
           {/* Control row */}
-          <div className={styles.controlRow} onClick={e => e.stopPropagation()}>
+          <div className={styles.controlRow} onClick={(e) => e.stopPropagation()}>
             {/* Left group */}
             <div className={styles.controlGroup}>
-              <button className={styles.ctrlBtn} onClick={togglePlayPause} aria-label={state.paused ? 'Play' : 'Pause'}>
+              <button
+                className={styles.ctrlBtn}
+                onClick={togglePlayPause}
+                aria-label={state.paused ? 'Play' : 'Pause'}
+              >
                 {state.paused ? <Play size={22} /> : <Pause size={22} />}
               </button>
               {/* Hide skip buttons on mobile */}
               {!isMobile && (
                 <>
-                  <button className={styles.ctrlBtn} onClick={() => seek(Math.max(0, state.currentTime - 10))} aria-label="Skip back 10s">
+                  <button
+                    className={styles.ctrlBtn}
+                    onClick={() => seek(Math.max(0, state.currentTime - 10))}
+                    aria-label="Skip back 10s"
+                  >
                     <span className={styles.skipIconWrap}>
                       <RotateCcw size={20} />
                       <span className={styles.skipIconText}>10</span>
                     </span>
                   </button>
-                  <button className={styles.ctrlBtn} onClick={() => seek(Math.min(state.duration, state.currentTime + 10))} aria-label="Skip forward 10s">
+                  <button
+                    className={styles.ctrlBtn}
+                    onClick={() => seek(Math.min(state.duration, state.currentTime + 10))}
+                    aria-label="Skip forward 10s"
+                  >
                     <span className={styles.skipIconWrap}>
                       <RotateCw size={20} />
                       <span className={styles.skipIconText}>10</span>
@@ -884,13 +1058,19 @@ export function ZentrioPlayer({
                   </button>
                   <div
                     className={styles.volumeSliderInline}
-                    style={{ '--vol': Math.round((state.muted ? 0 : state.volume) * 100) } as React.CSSProperties}
+                    style={
+                      {
+                        '--vol': Math.round((state.muted ? 0 : state.volume) * 100),
+                      } as React.CSSProperties
+                    }
                   >
                     <input
                       type="range"
-                      min={0} max={1} step={0.02}
+                      min={0}
+                      max={1}
+                      step={0.02}
                       value={state.muted ? 0 : state.volume}
-                      onChange={e => {
+                      onChange={(e) => {
                         const v = parseFloat(e.target.value)
                         setVolume(v)
                         if (state.muted && v > 0) setMuted(false)
@@ -898,7 +1078,7 @@ export function ZentrioPlayer({
                       }}
                       className={styles.volumeRange}
                       aria-label="Volume"
-                      onClick={e => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   </div>
                 </div>
@@ -922,8 +1102,8 @@ export function ZentrioPlayer({
                     onClick={() => {
                       if (openMenu !== 'subtitles') {
                         // Initialize selected language when opening
-                        const tracksWithLang = subtitleTracks.filter(t => t.language)
-                        const activeTrack = subtitleTracks.find(t => t.enabled)
+                        const tracksWithLang = subtitleTracks.filter((t) => t.language)
+                        const activeTrack = subtitleTracks.find((t) => t.enabled)
                         if (activeTrack && activeTrack.language) {
                           setSelectedSubtitleLang(activeTrack.language)
                         } else if (tracksWithLang.length > 0) {
@@ -941,63 +1121,76 @@ export function ZentrioPlayer({
                     <Subtitles size={20} />
                   </button>
                   {openMenu === 'subtitles' && (
-                    <div className={`${styles.dropdownPanel} ${styles.dropdownUp} ${styles.subtitlesPanel}`}>
-                      
+                    <div
+                      className={`${styles.dropdownPanel} ${styles.dropdownUp} ${styles.subtitlesPanel}`}
+                    >
                       {/* Left Column: Languages */}
                       <div className={styles.subtitlesLeftCol}>
                         <div className={styles.dropdownTitle}>Subtitles</div>
                         <button
-                          className={`${styles.dropdownItem} ${styles.subtitlesOffBtn} ${subtitleTracks.every(t => !t.enabled) ? styles.selected : ''}`}
-                          onClick={() => { setSubtitleTrack(null); setOpenMenu(null) }}
+                          className={`${styles.dropdownItem} ${styles.subtitlesOffBtn} ${subtitleTracks.every((t) => !t.enabled) ? styles.selected : ''}`}
+                          onClick={() => {
+                            setSubtitleTrack(null)
+                            setOpenMenu(null)
+                          }}
                         >
                           Off
                         </button>
-                        
+
                         <div className={styles.subtitlesLangList}>
                           {Object.keys(
-                            subtitleTracks.reduce((acc, t) => {
-                              const lang = t.language || 'Unknown'
-                              if (!acc[lang]) acc[lang] = []
-                              acc[lang].push(t)
-                              return acc
-                            }, {} as Record<string, SubtitleTrack[]>)
+                            subtitleTracks.reduce(
+                              (acc, t) => {
+                                const lang = t.language || 'Unknown'
+                                if (!acc[lang]) acc[lang] = []
+                                acc[lang].push(t)
+                                return acc
+                              },
+                              {} as Record<string, SubtitleTrack[]>
+                            )
                           )
-                          .sort((a, b) => a.localeCompare(b))
-                          .map(lang => (
-                            <button
-                              key={lang}
-                              className={`${styles.dropdownItem} ${styles.subtitlesLangBtn} ${selectedSubtitleLang === lang ? styles.activeLang : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedSubtitleLang(lang)
-                              }}
-                            >
-                              {lang}
-                              <ChevronRight size={14} className={styles.langChevron} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Right Column: Tracks for selected language */}
-                      <div className={styles.subtitlesRightCol}>
-                        <div className={styles.subtitleGroupTitle}>{selectedSubtitleLang || 'Tracks'}</div>
-                        <div className={styles.subtitlesTrackList}>
-                          {subtitleTracks
-                            .filter(t => (t.language || 'Unknown') === selectedSubtitleLang)
-                            .map(t => (
+                            .sort((a, b) => a.localeCompare(b))
+                            .map((lang) => (
                               <button
-                                key={t.id}
-                                className={`${styles.dropdownItem} ${styles.subtitleGroupItem} ${t.enabled ? styles.selected : ''}`}
-                                onClick={() => { setSubtitleTrack(t.id); setOpenMenu(null) }}
+                                key={lang}
+                                className={`${styles.dropdownItem} ${styles.subtitlesLangBtn} ${selectedSubtitleLang === lang ? styles.activeLang : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedSubtitleLang(lang)
+                                }}
                               >
-                                <span className={styles.subtitleLabel} title={t.label}>{t.label}</span>
-                                {t.enabled && <span className={styles.check}>✓</span>}
+                                {lang}
+                                <ChevronRight size={14} className={styles.langChevron} />
                               </button>
                             ))}
                         </div>
                       </div>
 
+                      {/* Right Column: Tracks for selected language */}
+                      <div className={styles.subtitlesRightCol}>
+                        <div className={styles.subtitleGroupTitle}>
+                          {selectedSubtitleLang || 'Tracks'}
+                        </div>
+                        <div className={styles.subtitlesTrackList}>
+                          {subtitleTracks
+                            .filter((t) => (t.language || 'Unknown') === selectedSubtitleLang)
+                            .map((t) => (
+                              <button
+                                key={t.id}
+                                className={`${styles.dropdownItem} ${styles.subtitleGroupItem} ${t.enabled ? styles.selected : ''}`}
+                                onClick={() => {
+                                  setSubtitleTrack(t.id)
+                                  setOpenMenu(null)
+                                }}
+                              >
+                                <span className={styles.subtitleLabel} title={t.label}>
+                                  {t.label}
+                                </span>
+                                {t.enabled && <span className={styles.check}>✓</span>}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1007,42 +1200,67 @@ export function ZentrioPlayer({
               <div className={styles.menuWrap} data-menu>
                 <button
                   className={`${styles.ctrlBtn} ${openMenu === 'settings' ? styles.active : ''}`}
-                  onClick={() => { setOpenMenu(openMenu === 'settings' ? null : 'settings'); setSettingsPage('main') }}
+                  onClick={() => {
+                    setOpenMenu(openMenu === 'settings' ? null : 'settings')
+                    setSettingsPage('main')
+                  }}
                   aria-label="Settings"
                 >
                   <Settings size={20} />
                 </button>
                 {openMenu === 'settings' && (
-                  <div className={`${styles.dropdownPanel} ${styles.dropdownUp} ${styles.settingsPanel}`}>
+                  <div
+                    className={`${styles.dropdownPanel} ${styles.dropdownUp} ${styles.settingsPanel}`}
+                  >
                     {settingsPage === 'main' && (
                       <>
                         <div className={styles.dropdownTitle}>Settings</div>
-                        <button className={styles.settingsRow} onClick={() => setSettingsPage('speed')}>
+                        <button
+                          className={styles.settingsRow}
+                          onClick={() => setSettingsPage('speed')}
+                        >
                           <span>Speed</span>
-                          <span className={styles.settingsValue}>{state.playbackRate === 1 ? 'Normal' : `${state.playbackRate}x`} ›</span>
+                          <span className={styles.settingsValue}>
+                            {state.playbackRate === 1 ? 'Normal' : `${state.playbackRate}x`} ›
+                          </span>
                         </button>
                         {qualityLevels.length > 0 && (
-                          <button className={styles.settingsRow} onClick={() => setSettingsPage('quality')}>
+                          <button
+                            className={styles.settingsRow}
+                            onClick={() => setSettingsPage('quality')}
+                          >
                             <span>Quality</span>
-                            <span className={styles.settingsValue}>{qualityLevels.find(q => q.selected)?.label || 'Auto'} ›</span>
+                            <span className={styles.settingsValue}>
+                              {qualityLevels.find((q) => q.selected)?.label || 'Auto'} ›
+                            </span>
                           </button>
                         )}
                         {audioTracks.length > 1 && (
-                          <button className={styles.settingsRow} onClick={() => setSettingsPage('audio')}>
+                          <button
+                            className={styles.settingsRow}
+                            onClick={() => setSettingsPage('audio')}
+                          >
                             <span>Audio</span>
-                            <span className={styles.settingsValue}>{audioTracks.find(a => a.enabled)?.label || 'Default'} ›</span>
+                            <span className={styles.settingsValue}>
+                              {audioTracks.find((a) => a.enabled)?.label || 'Default'} ›
+                            </span>
                           </button>
                         )}
                       </>
                     )}
                     {settingsPage === 'speed' && (
                       <>
-                        <button className={styles.backRow} onClick={() => setSettingsPage('main')}>‹ Speed</button>
-                        {playbackRates.map(r => (
+                        <button className={styles.backRow} onClick={() => setSettingsPage('main')}>
+                          ‹ Speed
+                        </button>
+                        {playbackRates.map((r) => (
                           <button
                             key={r}
                             className={`${styles.dropdownItem} ${state.playbackRate === r ? styles.selected : ''}`}
-                            onClick={() => { setPlaybackRate(r); setSettingsPage('main') }}
+                            onClick={() => {
+                              setPlaybackRate(r)
+                              setSettingsPage('main')
+                            }}
                           >
                             {r === 1 ? 'Normal' : `${r}×`}
                             {state.playbackRate === r && <span className={styles.check}>✓</span>}
@@ -1052,12 +1270,17 @@ export function ZentrioPlayer({
                     )}
                     {settingsPage === 'quality' && (
                       <>
-                        <button className={styles.backRow} onClick={() => setSettingsPage('main')}>‹ Quality</button>
-                        {qualityLevels.map(q => (
+                        <button className={styles.backRow} onClick={() => setSettingsPage('main')}>
+                          ‹ Quality
+                        </button>
+                        {qualityLevels.map((q) => (
                           <button
                             key={q.id}
                             className={`${styles.dropdownItem} ${q.selected ? styles.selected : ''}`}
-                            onClick={() => { setQualityLevel(q.id); setSettingsPage('main') }}
+                            onClick={() => {
+                              setQualityLevel(q.id)
+                              setSettingsPage('main')
+                            }}
                           >
                             {q.label}
                             {q.selected && <span className={styles.check}>✓</span>}
@@ -1067,12 +1290,17 @@ export function ZentrioPlayer({
                     )}
                     {settingsPage === 'audio' && (
                       <>
-                        <button className={styles.backRow} onClick={() => setSettingsPage('main')}>‹ Audio</button>
-                        {audioTracks.map(a => (
+                        <button className={styles.backRow} onClick={() => setSettingsPage('main')}>
+                          ‹ Audio
+                        </button>
+                        {audioTracks.map((a) => (
                           <button
                             key={a.id}
                             className={`${styles.dropdownItem} ${a.enabled ? styles.selected : ''}`}
-                            onClick={() => { setAudioTrack(a.id); setSettingsPage('main') }}
+                            onClick={() => {
+                              setAudioTrack(a.id)
+                              setSettingsPage('main')
+                            }}
                           >
                             {a.label}
                             {a.enabled && <span className={styles.check}>✓</span>}
@@ -1089,7 +1317,7 @@ export function ZentrioPlayer({
                 <button
                   className={`${styles.ctrlBtn} ${showContribute ? styles.active : ''}`}
                   onClick={() => {
-                    setShowContribute(v => !v)
+                    setShowContribute((v) => !v)
                     if (!showContribute) {
                       setContributeStart(state.currentTime)
                       setContributeEnd(Math.min(state.duration, state.currentTime + 30))
@@ -1105,7 +1333,11 @@ export function ZentrioPlayer({
 
               {/* Fullscreen (hidden on mobile) */}
               {!isMobile && (
-                <button className={styles.ctrlBtn} onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+                <button
+                  className={styles.ctrlBtn}
+                  onClick={toggleFullscreen}
+                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                >
                   {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
                 </button>
               )}
@@ -1116,7 +1348,10 @@ export function ZentrioPlayer({
 
       {/* ═════════════ SKIP SEGMENT BUTTON (IntroDB) ═════════════ */}
       {activeSegment && skipIntrosOutros && (
-        <div className={`${styles.skipSegmentWrap} ${controlsVisible ? styles.skipSegmentWithControls : ''}`} data-controls>
+        <div
+          className={`${styles.skipSegmentWrap} ${controlsVisible ? styles.skipSegmentWithControls : ''}`}
+          data-controls
+        >
           <button
             className={`${styles.skipSegmentBtn} ${!activeSegment.validated ? styles.skipSegmentUnconfirmed : ''}`}
             onClick={(e) => {
@@ -1126,8 +1361,15 @@ export function ZentrioPlayer({
               setActiveSegment(null)
             }}
           >
-            Skip {activeSegment.type === 'intro' ? 'Intro' : activeSegment.type === 'recap' ? 'Recap' : 'Outro'}
-            {!activeSegment.validated && <span className={styles.skipSegmentBadge}>Unconfirmed</span>}
+            Skip{' '}
+            {activeSegment.type === 'intro'
+              ? 'Intro'
+              : activeSegment.type === 'recap'
+                ? 'Recap'
+                : 'Outro'}
+            {!activeSegment.validated && (
+              <span className={styles.skipSegmentBadge}>Unconfirmed</span>
+            )}
           </button>
           <button
             className={styles.skipSegmentDismiss}
@@ -1145,7 +1387,11 @@ export function ZentrioPlayer({
 
       {/* ═════════════ INTRODB CONTRIBUTE PANEL ═════════════ */}
       {showContribute && canContributeSegments && (
-        <div className={`${styles.contributePanel} ${styles.slideIn}`} data-controls onClick={e => e.stopPropagation()}>
+        <div
+          className={`${styles.contributePanel} ${styles.slideIn}`}
+          data-controls
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className={styles.contributePanelHeader}>
             <span className={styles.contributePanelTitle}>
               <Flag size={14} />
@@ -1158,7 +1404,7 @@ export function ZentrioPlayer({
 
           {/* Segment type */}
           <div className={styles.contributeTypeRow}>
-            {(['intro', 'recap', 'outro'] as const).map(t => (
+            {(['intro', 'recap', 'outro'] as const).map((t) => (
               <button
                 key={t}
                 className={`${styles.contributeTypeBtn} ${contributeType === t ? styles.contributeTypeActive : ''}`}
@@ -1207,7 +1453,11 @@ export function ZentrioPlayer({
               onClick={async () => {
                 setContributeSubmitting(true)
                 setContributeResult(null)
-                const result = await onSubmitSegment?.(contributeType, contributeStart, contributeEnd)
+                const result = await onSubmitSegment?.(
+                  contributeType,
+                  contributeStart,
+                  contributeEnd
+                )
                 setContributeSubmitting(false)
                 if (result?.ok) {
                   setContributeResult('success')
@@ -1216,11 +1466,15 @@ export function ZentrioPlayer({
                 }
               }}
             >
-              {contributeSubmitting
-                ? <><Loader2 size={14} className={styles.spin} /> Submitting…</>
-                : contributeResult === 'error'
-                  ? 'Failed — try again'
-                  : 'Submit to IntroDB'}
+              {contributeSubmitting ? (
+                <>
+                  <Loader2 size={14} className={styles.spin} /> Submitting…
+                </>
+              ) : contributeResult === 'error' ? (
+                'Failed — try again'
+              ) : (
+                'Submit to IntroDB'
+              )}
             </button>
           )}
         </div>
@@ -1238,7 +1492,10 @@ export function ZentrioPlayer({
             <button
               className={styles.nextEpPlay}
               onClick={() => {
-                if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null }
+                if (countdownRef.current) {
+                  clearInterval(countdownRef.current)
+                  countdownRef.current = null
+                }
                 setShowNextEp(false)
                 onNavigateEpisode?.(nextEpisode)
               }}
@@ -1250,7 +1507,10 @@ export function ZentrioPlayer({
             <button
               className={styles.nextEpCancel}
               onClick={() => {
-                if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null }
+                if (countdownRef.current) {
+                  clearInterval(countdownRef.current)
+                  countdownRef.current = null
+                }
                 setShowNextEp(false)
                 nextEpTriggeredRef.current = false
               }}
@@ -1266,7 +1526,10 @@ export function ZentrioPlayer({
         <div className={`${styles.shortVideoCard} ${styles.slideIn}`}>
           <button
             className={styles.shortVideoClose}
-            onClick={() => { setShowShortVideo(false); shortDismissedRef.current = true }}
+            onClick={() => {
+              setShowShortVideo(false)
+              shortDismissedRef.current = true
+            }}
           >
             <X size={14} />
           </button>
@@ -1281,7 +1544,13 @@ export function ZentrioPlayer({
             </div>
             <div className={styles.shortVideoActions}>
               {onFindNewStream && (
-                <button className={styles.shortVideoBtn} onClick={() => { setShowShortVideo(false); onFindNewStream() }}>
+                <button
+                  className={styles.shortVideoBtn}
+                  onClick={() => {
+                    setShowShortVideo(false)
+                    onFindNewStream()
+                  }}
+                >
                   <RefreshCw size={14} />
                   Find New Stream
                 </button>
@@ -1289,7 +1558,10 @@ export function ZentrioPlayer({
               {nextEpisode && (
                 <button
                   className={`${styles.shortVideoBtn} ${styles.secondary}`}
-                  onClick={() => { setShowShortVideo(false); onNavigateEpisode?.(nextEpisode) }}
+                  onClick={() => {
+                    setShowShortVideo(false)
+                    onNavigateEpisode?.(nextEpisode)
+                  }}
                 >
                   <ChevronRight size={14} />
                   Skip to Next Episode

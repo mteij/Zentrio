@@ -28,8 +28,8 @@ import { createLogger } from '../../utils/client-logger'
 const log = createLogger('PlayerPage')
 
 /* ─── Constants ─── */
-const SHORT_VIDEO_THRESHOLD = 120   // seconds — show "find new stream"
-const NEXT_EP_COUNTDOWN    = 30    // seconds before end — show next-ep popup
+const SHORT_VIDEO_THRESHOLD = 120 // seconds — show "find new stream"
+const NEXT_EP_COUNTDOWN = 30 // seconds before end — show next-ep popup
 const LAUNCHER_SYNC_INTERVAL_SECONDS = 30
 
 /* ─── Types ─── */
@@ -44,20 +44,31 @@ interface MetaInfo {
 }
 
 type PlayerSubtitleTrack = {
-  src: string; label: string; language: string
-  type?: string; addonName?: string; default?: boolean
+  src: string
+  label: string
+  language: string
+  type?: string
+  addonName?: string
+  default?: boolean
 }
 
-function mergeSubtitleTracks(base: PlayerSubtitleTrack[], inc: PlayerSubtitleTrack[]): PlayerSubtitleTrack[] {
+function mergeSubtitleTracks(
+  base: PlayerSubtitleTrack[],
+  inc: PlayerSubtitleTrack[]
+): PlayerSubtitleTrack[] {
   if (!inc.length) return base
-  const map = new Map(base.map(t => [t.src, t]))
-  inc.forEach(t => { if (t.src && !map.has(t.src)) map.set(t.src, t) })
+  const map = new Map(base.map((t) => [t.src, t]))
+  inc.forEach((t) => {
+    if (t.src && !map.has(t.src)) map.set(t.src, t)
+  })
   return Array.from(map.values())
 }
 
 function buildLauncherDescription(meta: MetaInfo): string | undefined {
   if (meta.season !== undefined && meta.episode !== undefined) {
-    const episodeTitle = meta.videos?.find(v => v.season === meta.season && v.number === meta.episode)?.title
+    const episodeTitle = meta.videos?.find(
+      (v) => v.season === meta.season && v.number === meta.episode
+    )?.title
     return episodeTitle
       ? `S${meta.season}:E${meta.episode} - ${episodeTitle}`
       : `S${meta.season}:E${meta.episode}`
@@ -88,12 +99,14 @@ function useFindNewStream(meta: MetaInfo | null, profileId: string | undefined) 
     resolverRef.current?.cancel()
     resolverRef.current = null
     loadPromiseRef.current = Promise.resolve([])
-    setIsFinding(false)  // clear any stuck loading state from a previous findNext call
+    setIsFinding(false) // clear any stuck loading state from a previous findNext call
   }, [meta?.id, meta?.season, meta?.episode])
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { resolverRef.current?.cancel() }
+    return () => {
+      resolverRef.current?.cancel()
+    }
   }, [])
 
   /**
@@ -105,33 +118,36 @@ function useFindNewStream(meta: MetaInfo | null, profileId: string | undefined) 
     loadedRef.current = true
 
     resolverRef.current?.cancel()
-    const resolver = resolveStreamsProgressive({
-      type: meta.type,
-      id: meta.id,
-      profileId,
-      season: meta.season,
-      episode: meta.episode,
-      meta: {
-        id: meta.id,
+    const resolver = resolveStreamsProgressive(
+      {
         type: meta.type,
-        name: meta.name,
-        poster: meta.poster,
-        videos: meta.videos?.map((video) => ({
-          id: video.id,
-          title: video.title || '',
-          released: '',
-          season: video.season,
-          episode: video.number,
-        })),
+        id: meta.id,
+        profileId,
+        season: meta.season,
+        episode: meta.episode,
+        meta: {
+          id: meta.id,
+          type: meta.type,
+          name: meta.name,
+          poster: meta.poster,
+          videos: meta.videos?.map((video) => ({
+            id: video.id,
+            title: video.title || '',
+            released: '',
+            season: video.season,
+            episode: video.number,
+          })),
+        },
       },
-    }, {
-      onAddonResult: (data) => {
-        if (data.allStreams) allStreamsRef.current = data.allStreams
-      },
-      onComplete: (data) => {
-        allStreamsRef.current = data.allStreams
+      {
+        onAddonResult: (data) => {
+          if (data.allStreams) allStreamsRef.current = data.allStreams
+        },
+        onComplete: (data) => {
+          allStreamsRef.current = data.allStreams
+        },
       }
-    })
+    )
 
     resolverRef.current = resolver
     loadPromiseRef.current = resolver.done.then((data) => {
@@ -146,51 +162,56 @@ function useFindNewStream(meta: MetaInfo | null, profileId: string | undefined) 
    * If streams haven't been loaded yet, waits for 'complete' event first.
    * Returns null if no alternatives remain.
    */
-  const findNext = useCallback(async (currentUrl: string): Promise<Stream | null> => {
-    // Always add current URL to tried set
-    triedUrlsRef.current.add(currentUrl)
+  const findNext = useCallback(
+    async (currentUrl: string): Promise<Stream | null> => {
+      // Always add current URL to tried set
+      triedUrlsRef.current.add(currentUrl)
 
-    setIsFinding(true)
+      setIsFinding(true)
 
-    const pick = () => {
-      // Backend already sorted by priority; find first untried
-      const candidate = allStreamsRef.current.find(
-        (fs) => fs.stream.url && !triedUrlsRef.current.has(fs.stream.url)
-      )
-      return candidate?.stream ?? null
-    }
+      const pick = () => {
+        // Backend already sorted by priority; find first untried
+        const candidate = allStreamsRef.current.find(
+          (fs) => fs.stream.url && !triedUrlsRef.current.has(fs.stream.url)
+        )
+        return candidate?.stream ?? null
+      }
 
-    // Fast path: streams already loaded
-    if (allStreamsRef.current.length > 0) {
-      const result = pick()
+      // Fast path: streams already loaded
+      if (allStreamsRef.current.length > 0) {
+        const result = pick()
+        setIsFinding(false)
+        if (result?.url) triedUrlsRef.current.add(result.url)
+        return result
+      }
+
+      // Slow path: wait for streams to load (up to 15s)
+      if (!loadedRef.current) {
+        preload()
+      }
+
+      const result = await Promise.race<Stream | null>([
+        loadPromiseRef.current.then(() => pick()),
+        new Promise<Stream | null>((resolve) => {
+          window.setTimeout(() => resolve(null), 15000)
+        }),
+      ])
+
       setIsFinding(false)
       if (result?.url) triedUrlsRef.current.add(result.url)
       return result
-    }
-
-    // Slow path: wait for streams to load (up to 15s)
-    if (!loadedRef.current) {
-      preload()
-    }
-
-    const result = await Promise.race<Stream | null>([
-      loadPromiseRef.current.then(() => pick()),
-      new Promise<Stream | null>((resolve) => {
-        window.setTimeout(() => resolve(null), 15000)
-      })
-    ])
-
-    setIsFinding(false)
-    if (result?.url) triedUrlsRef.current.add(result.url)
-    return result
-  }, [preload])
+    },
+    [preload]
+  )
 
   return { preload, findNext, isFinding }
 }
 
 /* ─────────────────────────── Component ─────────────────────────── */
 
-export function StreamingPlayerStandardView(_props: { model: import('./Player.model').PlayerScreenModel }) {
+export function StreamingPlayerStandardView(_props: {
+  model: import('./Player.model').PlayerScreenModel
+}) {
   const { profileId } = useParams<{ profileId: string }>()
   const [searchParams] = useSearchParams()
   const searchParamsKey = searchParams.toString()
@@ -231,17 +252,23 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
       try {
         const season = m.season !== undefined ? `&season=${m.season}` : ''
         const ep = m.episode !== undefined ? `&episode=${m.episode}` : ''
-        const res = await apiFetch(`/api/streaming/progress/${m.type}/${m.id}?profileId=${profileId}${season}${ep}`)
+        const res = await apiFetch(
+          `/api/streaming/progress/${m.type}/${m.id}?profileId=${profileId}${season}${ep}`
+        )
         if (!res.ok) return 0
         const data = await res.json()
         return data.position && !data.isWatched ? data.position : 0
-      } catch { return 0 }
+      } catch {
+        return 0
+      }
     }
 
     const fetchSubtitles = async (m: MetaInfo, s: Stream): Promise<PlayerSubtitleTrack[]> => {
       try {
         const hash = s.behaviorHints?.videoHash ? `&videoHash=${s.behaviorHints.videoHash}` : ''
-        const res = await apiFetch(`/api/streaming/subtitles/${m.type}/${m.id}?profileId=${profileId}${hash}`)
+        const res = await apiFetch(
+          `/api/streaming/subtitles/${m.type}/${m.id}?profileId=${profileId}${hash}`
+        )
         if (!res.ok) return []
         const data = await res.json()
         if (!Array.isArray(data.subtitles)) return []
@@ -254,7 +281,9 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
             type: s.type || s.format,
             addonName: s.addonName,
           }))
-      } catch { return [] }
+      } catch {
+        return []
+      }
     }
 
     const init = async () => {
@@ -269,7 +298,10 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
           const p = new URLSearchParams(searchParamsKey)
           const streamParam = p.get('stream')
           const metaParam = p.get('meta')
-          if (!streamParam || !metaParam) { navigate(`/streaming/${profileId}`); return }
+          if (!streamParam || !metaParam) {
+            navigate(`/streaming/${profileId}`)
+            return
+          }
           parsedStream = JSON.parse(streamParam)
           parsedMeta = JSON.parse(metaParam)
         }
@@ -282,13 +314,16 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
         const inlineTracks: PlayerSubtitleTrack[] = (parsedStream.subtitles || [])
           .filter((s: any) => !!s?.url)
           .map((s: any, i: number) => ({
-            src: s.url, label: s.lang || 'Unknown', language: s.lang || 'und', default: i === 0
+            src: s.url,
+            label: s.lang || 'Unknown',
+            language: s.lang || 'und',
+            default: i === 0,
           }))
         setSubtitleTracks(inlineTracks)
 
-        const subPromise = fetchSubtitles(parsedMeta, parsedStream).then(tracks => {
+        const subPromise = fetchSubtitles(parsedMeta, parsedStream).then((tracks) => {
           if (cancelled || !tracks.length) return
-          setSubtitleTracks(prev => mergeSubtitleTracks(prev, tracks))
+          setSubtitleTracks((prev) => mergeSubtitleTracks(prev, tracks))
         })
 
         const resumeAt = await fetchProgress(parsedMeta)
@@ -307,7 +342,8 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
               if (!parsedMeta.id.startsWith('tt')) return null
               const params = new URLSearchParams({ imdbId: parsedMeta.id })
               if (parsedMeta.season !== undefined) params.set('season', String(parsedMeta.season))
-              if (parsedMeta.episode !== undefined) params.set('episode', String(parsedMeta.episode))
+              if (parsedMeta.episode !== undefined)
+                params.set('episode', String(parsedMeta.episode))
               return apiFetch(`/api/streaming/segments?${params}`)
             })(),
           ])
@@ -339,7 +375,9 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
     }
 
     init()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [searchParamsKey, profileId, location.state, navigate])
 
   // Revoke temporary blob URLs created for offline playback when source changes/unmounts.
@@ -363,79 +401,99 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
 
   /* ─── Episode navigation ─── */
   useEffect(() => {
-    if (!meta || meta.type !== 'series' || !meta.videos || meta.season === undefined || meta.episode === undefined) return
+    if (
+      !meta ||
+      meta.type !== 'series' ||
+      !meta.videos ||
+      meta.season === undefined ||
+      meta.episode === undefined
+    )
+      return
     const sorted = [...meta.videos].sort((a, b) => a.season - b.season || a.number - b.number)
-    const idx = sorted.findIndex(v => v.season === meta.season && v.number === meta.episode)
+    const idx = sorted.findIndex((v) => v.season === meta.season && v.number === meta.episode)
     setPrevEpisode(idx > 0 ? sorted[idx - 1] : null)
     setNextEpisode(idx < sorted.length - 1 ? sorted[idx + 1] : null)
   }, [meta])
 
   /* ─── Progress saving + Trakt ─── */
-  const handleTimeUpdate = useCallback((t: number, d: number) => {
-    if (d > 0) setDuration(d)
+  const handleTimeUpdate = useCallback(
+    (t: number, d: number) => {
+      if (d > 0) setDuration(d)
 
-    if (meta && profileId && d > 0 && Math.abs(t - lastSavedRef.current) >= 10) {
-      lastSavedRef.current = t
-      const pct = t / d
-      if (pct > 0.02 && pct < 0.95) {
-        const progressPayload = {
-          profileId, metaId: meta.id, metaType: meta.type,
-          season: meta.season, episode: meta.episode,
-          position: t, duration: d,
-          title: meta.name, poster: meta.poster
+      if (meta && profileId && d > 0 && Math.abs(t - lastSavedRef.current) >= 10) {
+        lastSavedRef.current = t
+        const pct = t / d
+        if (pct > 0.02 && pct < 0.95) {
+          const progressPayload = {
+            profileId,
+            metaId: meta.id,
+            metaType: meta.type,
+            season: meta.season,
+            episode: meta.episode,
+            position: t,
+            duration: d,
+            title: meta.name,
+            poster: meta.poster,
+          }
+          apiFetch('/api/streaming/progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(progressPayload),
+          }).catch((e: any) => {
+            log.error('Error:', e)
+            // On Tauri (offline playback possible), queue the progress for when we reconnect
+            if (getAppTarget().isTauri) {
+              queueProgress(progressPayload)
+            }
+          })
         }
-        apiFetch('/api/streaming/progress', {
+      }
+
+      if (meta && profileId && d > 0) {
+        const pct = t / d
+        const isEligibleForLauncher = pct >= 0.05 && pct < 0.95 && t >= 60
+        const secondsSinceLastLauncherSync = Math.abs(t - lastLauncherSyncRef.current)
+
+        if (
+          isEligibleForLauncher &&
+          secondsSinceLastLauncherSync >= LAUNCHER_SYNC_INTERVAL_SECONDS
+        ) {
+          lastLauncherSyncRef.current = t
+          void syncContinueWatchingLauncher({
+            profileId,
+            metaId: meta.id,
+            metaType: meta.type,
+            title: meta.name,
+            description: buildLauncherDescription(meta),
+            posterUrl: meta.poster,
+            season: meta.season,
+            episode: meta.episode,
+            playbackPositionSeconds: t,
+            durationSeconds: d,
+          })
+        }
+      }
+
+      if (meta && profileId && d > 0 && !traktStartedRef.current) {
+        traktStartedRef.current = true
+        const isImdb = meta.id.startsWith('tt')
+        apiFetch('/api/trakt/scrobble/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(progressPayload)
-        }).catch((e: any) => {
-          log.error('Error:', e)
-          // On Tauri (offline playback possible), queue the progress for when we reconnect
-          if (getAppTarget().isTauri) {
-            queueProgress(progressPayload)
-          }
-        })
+          body: JSON.stringify({
+            profileId,
+            metaType: meta.type,
+            imdbId: isImdb ? meta.id : undefined,
+            tmdbId: !isImdb ? meta.id.replace(/^tmdb:/, '') : undefined,
+            season: meta.season,
+            episode: meta.episode,
+            progress: Math.round((t / d) * 100),
+          }),
+        }).catch(() => {})
       }
-    }
-
-    if (meta && profileId && d > 0) {
-      const pct = t / d
-      const isEligibleForLauncher = pct >= 0.05 && pct < 0.95 && t >= 60
-      const secondsSinceLastLauncherSync = Math.abs(t - lastLauncherSyncRef.current)
-
-      if (isEligibleForLauncher && secondsSinceLastLauncherSync >= LAUNCHER_SYNC_INTERVAL_SECONDS) {
-        lastLauncherSyncRef.current = t
-        void syncContinueWatchingLauncher({
-          profileId,
-          metaId: meta.id,
-          metaType: meta.type,
-          title: meta.name,
-          description: buildLauncherDescription(meta),
-          posterUrl: meta.poster,
-          season: meta.season,
-          episode: meta.episode,
-          playbackPositionSeconds: t,
-          durationSeconds: d,
-        })
-      }
-    }
-
-    if (meta && profileId && d > 0 && !traktStartedRef.current) {
-      traktStartedRef.current = true
-      const isImdb = meta.id.startsWith('tt')
-      apiFetch('/api/trakt/scrobble/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId, metaType: meta.type,
-          imdbId: isImdb ? meta.id : undefined,
-          tmdbId: !isImdb ? meta.id.replace(/^tmdb:/, '') : undefined,
-          season: meta.season, episode: meta.episode,
-          progress: Math.round((t / d) * 100)
-        })
-      }).catch(() => {})
-    }
-  }, [meta, profileId])
+    },
+    [meta, profileId]
+  )
 
   const handleVideoEnded = useCallback(() => {
     if (meta && profileId && traktStartedRef.current) {
@@ -444,11 +502,14 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profileId, metaType: meta.type,
+          profileId,
+          metaType: meta.type,
           imdbId: isImdb ? meta.id : undefined,
           tmdbId: !isImdb ? meta.id.replace(/^tmdb:/, '') : undefined,
-          season: meta.season, episode: meta.episode, progress: 100
-        })
+          season: meta.season,
+          episode: meta.episode,
+          progress: 100,
+        }),
       }).catch(() => {})
       traktStartedRef.current = false
     }
@@ -476,18 +537,26 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
     const msg = err.message || ''
     // Reqwest/network errors from the Tauri HTTP plugin or ExoPlayer contain these phrases.
     // Show a user-friendly message rather than the raw URL + error string.
-    const isNetworkError = /failed to request|error sending request|failed to fetch|net::err|connection refused/i.test(msg)
+    const isNetworkError =
+      /failed to request|error sending request|failed to fetch|net::err|connection refused/i.test(
+        msg
+      )
     if (isNetworkError) {
-      toast.error('Stream unavailable', { description: 'Could not load the stream. Check your connection or try another source.' })
+      toast.error('Stream unavailable', {
+        description: 'Could not load the stream. Check your connection or try another source.',
+      })
     } else {
       toast.error('Playback error: ' + err.message)
     }
   }, [])
 
-  const handleNavigateEpisode = useCallback((ep: EpisodeInfo) => {
-    if (!meta) return
-    navigate(`/streaming/${profileId}/${meta.type}/${meta.id}/s${ep.season}e${ep.number}`)
-  }, [meta, profileId, navigate])
+  const handleNavigateEpisode = useCallback(
+    (ep: EpisodeInfo) => {
+      if (!meta) return
+      navigate(`/streaming/${profileId}/${meta.type}/${meta.id}/s${ep.season}e${ep.number}`)
+    },
+    [meta, profileId, navigate]
+  )
 
   /* ─── Find New Stream ─── */
   const handleFindNewStream = useCallback(async () => {
@@ -506,7 +575,7 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
 
     // Navigate to player with the new stream (same meta, reset start time)
     navigate(`/streaming/${profileId}/player`, {
-      replace: true,   // replace so Back doesn't loop
+      replace: true, // replace so Back doesn't loop
       state: {
         stream: nextStream,
         meta: {
@@ -516,9 +585,9 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
           poster: meta.poster,
           season: meta.season,
           episode: meta.episode,
-          videos: meta.videos
-        }
-      }
+          videos: meta.videos,
+        },
+      },
     })
   }, [stream, meta, profileId, findNext, navigate])
 
@@ -530,36 +599,39 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
     return result
   }, [openExternal, stream, meta])
 
-  const handleSubmitSegment = useCallback(async (type: string, startSec: number, endSec: number) => {
-    if (!meta || !profileId) return { ok: false, error: 'No content loaded' }
-    try {
-      const res = await apiFetch('/api/streaming/segments/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId: parseInt(profileId),
-          imdbId: meta.id,
-          season: meta.season,
-          episode: meta.episode,
-          type,
-          startSec,
-          endSec,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) return { ok: false, error: data?.error?.message ?? 'Submission failed' }
-      return { ok: true }
-    } catch {
-      return { ok: false, error: 'Network error' }
-    }
-  }, [meta, profileId])
+  const handleSubmitSegment = useCallback(
+    async (type: string, startSec: number, endSec: number) => {
+      if (!meta || !profileId) return { ok: false, error: 'No content loaded' }
+      try {
+        const res = await apiFetch('/api/streaming/segments/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId: parseInt(profileId),
+            imdbId: meta.id,
+            season: meta.season,
+            episode: meta.episode,
+            type,
+            startSec,
+            endSec,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) return { ok: false, error: data?.error?.message ?? 'Submission failed' }
+        return { ok: true }
+      } catch {
+        return { ok: false, error: 'Network error' }
+      }
+    },
+    [meta, profileId]
+  )
 
   /* ─── Player mode: enable on mount, restore on unmount ─── */
   useLayoutEffect(() => {
     void setTauriPlayerMode(true, 'landscape')
     // Add player-active class to body for CSS targeting (fallback for browsers without :has() support)
     document.body.classList.add('player-active')
-    return () => { 
+    return () => {
       void setTauriPlayerMode(false, 'auto')
       document.body.classList.remove('player-active')
     }
@@ -597,12 +669,18 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
         const pct = (lastSavedRef.current / duration) * 100
         const isImdb = meta.id.startsWith('tt')
         const data = JSON.stringify({
-          profileId, metaType: meta.type,
+          profileId,
+          metaType: meta.type,
           imdbId: isImdb ? meta.id : undefined,
           tmdbId: !isImdb ? meta.id.replace(/^tmdb:/, '') : undefined,
-          season: meta.season, episode: meta.episode, progress: Math.round(pct)
+          season: meta.season,
+          episode: meta.episode,
+          progress: Math.round(pct),
         })
-        navigator.sendBeacon(resolveBeaconUrl('/api/trakt/scrobble/stop'), new Blob([data], { type: 'application/json' }))
+        navigator.sendBeacon(
+          resolveBeaconUrl('/api/trakt/scrobble/stop'),
+          new Blob([data], { type: 'application/json' })
+        )
       }
       window.dispatchEvent(new CustomEvent('history-updated'))
     }
@@ -624,38 +702,43 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
   if (!stream || !meta) return null
 
   const displayTitle = meta.name
-  const displaySubtitle = meta.season !== undefined && meta.episode !== undefined
-    ? `S${meta.season}:E${meta.episode}${
-        meta.videos?.find(v => v.season === meta.season && v.number === meta.episode)?.title
-          ? ` — ${meta.videos.find(v => v.season === meta.season && v.number === meta.episode)!.title}`
-          : ''
-      }`
-    : undefined
+  const displaySubtitle =
+    meta.season !== undefined && meta.episode !== undefined
+      ? `S${meta.season}:E${meta.episode}${
+          meta.videos?.find((v) => v.season === meta.season && v.number === meta.episode)?.title
+            ? ` — ${meta.videos.find((v) => v.season === meta.season && v.number === meta.episode)!.title}`
+            : ''
+        }`
+      : undefined
 
   const isMobilePlatform = getAppTarget().isMobile
 
   return (
     <Layout title={`Playing: ${meta.name}`} showHeader={false} showFooter={false}>
-      <div className={`${styles.playerWrapper} ${isMobilePlatform ? styles.playerWrapperImmersive : ''}`}>
+      <div
+        className={`${styles.playerWrapper} ${isMobilePlatform ? styles.playerWrapperImmersive : ''}`}
+      >
         <ZentrioPlayer
           src={stream.url!}
           poster={meta.poster}
           title={displayTitle}
           subtitle={displaySubtitle}
-          subtitles={subtitleTracks.map(t => ({
+          subtitles={subtitleTracks.map((t) => ({
             id: t.src,
             src: t.src,
             label: t.label,
             language: t.language,
             enabled: t.default || false,
-            addonName: t.addonName
+            addonName: t.addonName,
           }))}
           startTime={startTime}
           autoPlay={true}
           segments={segments}
           skipIntrosOutros={skipIntrosOutros}
           showUnvalidatedSegments={showUnvalidatedSegments}
-          canContributeSegments={hasIntroDbKey && !!meta?.id.startsWith('tt') && meta?.season !== undefined}
+          canContributeSegments={
+            hasIntroDbKey && !!meta?.id.startsWith('tt') && meta?.season !== undefined
+          }
           onSubmitSegment={handleSubmitSegment}
           onBack={() => navigate(-1)}
           prevEpisode={prevEpisode}

@@ -8,7 +8,7 @@ const isTauriMobile = () => {
 
 export const setTauriPlayerMode = async (
   enabled: boolean,
-  orientation: PlayerOrientationMode = 'auto',
+  orientation: PlayerOrientationMode = 'auto'
 ) => {
   if (!isTauriMobile()) return
 
