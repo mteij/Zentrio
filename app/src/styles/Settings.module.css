@@ -1,30 +1,45 @@
 /* Settings Components CSS Module */
-/* Enhanced Glassmorphism Design */
 
 .settingsPageShell {
   position: relative;
   z-index: 1;
 }
 
-
 .mobileHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding-bottom: 10px;
+  position: sticky;
+  top: var(--app-content-top-offset, 0px);
+  z-index: 650;
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mobileHeaderBar {
+  background: transparent !important;
+  border-bottom: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding-right: max(16px, var(--safe-area-inset-right, 0px));
+}
+
+.mobileHeaderProfile {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .mobileBackBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   background: rgba(255, 255, 255, 0.06);
   color: var(--text, white);
   border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
-  border-radius: 9999px;
+  border-radius: 10px;
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.2s ease, border-color 0.2s ease;
@@ -36,149 +51,95 @@
 }
 
 .mobileBackBtn:focus-visible,
-.mobileSectionTab:focus-visible,
 .sidebarTabBtn:focus-visible,
 .backBtn:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.92);
   outline-offset: 3px;
 }
 
-
-.mobileHeaderBar {
-  background: transparent !important;
-  border-bottom: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  padding-right: max(16px, var(--safe-area-inset-right, 0px));
-}
-
-
-.mobileSectionTabs {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding: 4px;
-}
-
-.mobileSectionTabsWrap {
-  position: relative;
-  margin: 4px 16px 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-.mobileTabsFade {
-  position: absolute;
-  top: 0;
-  bottom: 2px;
-  width: 36px;
-  pointer-events: none;
+.mobileSectionNav {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  z-index: 2;
+  gap: 6px;
+  padding: 8px 14px 10px;
 }
 
-.mobileTabsFadeLeft {
-  left: 0;
-  justify-content: flex-start;
-  background: linear-gradient(90deg, rgba(14, 14, 14, 0.95) 0%, rgba(14, 14, 14, 0) 100%);
-}
-
-.mobileTabsFadeRight {
-  right: 0;
-  background: linear-gradient(-90deg, rgba(14, 14, 14, 0.95) 0%, rgba(14, 14, 14, 0) 100%);
-}
-
-.mobileTabsCue {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 18px;
-  font-weight: 700;
-  margin-right: 6px;
-}
-
-
-.mobileSectionTabs::-webkit-scrollbar {
-  display: none;
-}
-
-.mobileSectionTab {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-muted, #b3b3b3);
-  border-radius: 10px;
-  padding: 8px 10px;
+.mobileNavBtn {
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.mobileNavBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.mobileNavBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.mobileNavBtn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 2px;
+}
+
+.mobileNavTabs {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mobileNavTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  border-radius: 10px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-/* Label hidden on inactive tabs — slides in when active */
-.tabLabel {
-  overflow: hidden;
-  max-width: 0;
-  opacity: 0;
-  transition: max-width 0.25s ease, opacity 0.15s ease, margin-left 0.25s ease;
+.mobileNavTab:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.mobileSectionTabActive .tabLabel {
-  max-width: 110px;
-  opacity: 1;
-  margin-left: 5px;
+.mobileNavTabActive {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
-.mobileSectionTabActive {
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--text, #fff);
-  border-color: rgba(255, 255, 255, 0.18);
+.mobileSettingsLayout {
+  padding: 0 0 48px;
+}
+
+.mobileFullSection {
+  margin-bottom: 16px;
 }
 
 .settingsPageContent {
   position: relative;
   z-index: 1;
-}
-
-/* Profile selector — mobile only, top-right of content area */
-.mobileContentProfile {
-  display: none;
-}
-
-.mobileContentProfileInner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 8px 10px;
-}
-
-.mobileContentProfileLabel {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted, #888);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-@media (max-width: 1024px) {
-  .mobileContentProfile {
-    display: flex;
-    justify-content: flex-end;
-    padding: 16px 16px 0;
-  }
 }
 
 /* Sidebar width token — used in both sidebar and content-area margin */
@@ -559,25 +520,26 @@
    ============================================ */
 @media (max-width: 1024px) {
   .mobileHeader {
-    padding-bottom: 12px;
-    background: linear-gradient(180deg, rgba(10, 10, 10, 0.96) 0%, rgba(10, 10, 10, 0.84) 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    padding-bottom: 6px;
+    background: rgba(10, 10, 10, 0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
-  .mobileBackBtn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+  .mobileSettingsLayout {
+    padding: 0 0 80px;
   }
 
-.settingsShell {
+  .mobileFullSection {
+    margin-bottom: 12px;
+  }
+
+  .settingsShell {
     grid-template-columns: 1fr;
     gap: 0;
     margin-left: 0;
     margin-top: 0;
-    margin-bottom: 24px;
+    margin-bottom: 0;
   }
 
   .settingsSidebar {
@@ -592,32 +554,12 @@
     display: none;
   }
 
-  .settingsCard {
-    padding: 20px;
-    border-radius: var(--radius-md, 12px);
-  }
-
-  .settingItem {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-
-  .settingInfo {
-    padding-right: 0;
-  }
-
-.sortableGrid,
-  .gridOptions {
-    grid-template-columns: 1fr !important; /* Force single column on mobile */
-  }
-
   .container {
-    padding: 0 16px;
+    padding: 0 14px;
   }
 
   .settingsPageContent {
-    padding-top: 16px;
+    padding-top: 12px;
   }
 
   /* Addon Item Mobile Styles */

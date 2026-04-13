@@ -1,45 +1,89 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { apiFetch } from '../lib/apiFetch'
+import { createLogger } from '../utils/client-logger'
 
-interface AppearanceSettings {
+const log = createLogger('useAppearance')
+
+export interface AppearanceSettings {
   showImdbRatings: boolean
   showAgeRatings: boolean
+  backgroundStyle: string
 }
 
-export function useAppearanceSettings() {
-  const [settings, setSettings] = useState<AppearanceSettings>({
-    showImdbRatings: true,
-    showAgeRatings: true
-  })
+export interface AppearanceSettingsMutation {
+  showImdbRatings?: boolean
+  showAgeRatings?: boolean
+  backgroundStyle?: string
+}
+
+export interface UseAppearanceSettingsResult extends AppearanceSettings {
+  save: (updates: AppearanceSettingsMutation) => Promise<void>
+}
+
+const DEFAULT_SETTINGS: AppearanceSettings = {
+  showImdbRatings: true,
+  showAgeRatings: true,
+  backgroundStyle: 'vanta',
+}
+
+export function useAppearanceSettings(profileId: string | undefined): UseAppearanceSettingsResult {
+  const [settings, setSettings] = useState<AppearanceSettings>(DEFAULT_SETTINGS)
+
+  const fetchSettings = useCallback(async () => {
+    if (!profileId) return
+    try {
+      const res = await apiFetch(`/api/appearance/settings?profileId=${profileId}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.data) {
+          const loaded = data.data
+          setSettings({
+            showImdbRatings: loaded.show_imdb_ratings ?? true,
+            showAgeRatings: loaded.show_age_ratings ?? true,
+            backgroundStyle: loaded.background_style ?? 'vanta',
+          })
+        }
+      }
+    } catch (e) {
+      log.error('Failed to load appearance settings', e)
+    }
+  }, [profileId])
 
   useEffect(() => {
-    // Initial load
-    loadSettings()
+    fetchSettings()
+  }, [fetchSettings])
 
-    // Listen for updates
-    const handleUpdate = () => {
-      loadSettings()
-    }
+  const save = useCallback(
+    async (updates: AppearanceSettingsMutation) => {
+      if (!profileId) return
 
-    window.addEventListener('zentrio-settings-update', handleUpdate)
-    
-    // Also listen for storage events (cross-tab sync)
-    window.addEventListener('storage', handleUpdate)
+      // Optimistic update
+      setSettings((prev) => {
+        const next = { ...prev }
+        if (updates.showImdbRatings !== undefined) next.showImdbRatings = updates.showImdbRatings
+        if (updates.showAgeRatings !== undefined) next.showAgeRatings = updates.showAgeRatings
+        if (updates.backgroundStyle !== undefined) next.backgroundStyle = updates.backgroundStyle
+        return next
+      })
 
-    return () => {
-      window.removeEventListener('zentrio-settings-update', handleUpdate)
-      window.removeEventListener('storage', handleUpdate)
-    }
-  }, [])
+      const body: Record<string, unknown> = {}
+      if (updates.showImdbRatings !== undefined) body.show_imdb_ratings = updates.showImdbRatings
+      if (updates.showAgeRatings !== undefined) body.show_age_ratings = updates.showAgeRatings
+      if (updates.backgroundStyle !== undefined) body.background_style = updates.backgroundStyle
 
-  const loadSettings = () => {
-    const hideImdb = localStorage.getItem('zentrioHideImdbRatings') === 'true'
-    const hideAge = localStorage.getItem('zentrioHideAgeRatings') === 'true'
-    
-    setSettings({
-      showImdbRatings: !hideImdb,
-      showAgeRatings: !hideAge
-    })
-  }
+      try {
+        await apiFetch(`/api/appearance/settings?profileId=${profileId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      } catch (e) {
+        log.error('Failed to save appearance settings', e)
+        fetchSettings()
+      }
+    },
+    [profileId, fetchSettings]
+  )
 
-  return settings
+  return { ...settings, save }
 }

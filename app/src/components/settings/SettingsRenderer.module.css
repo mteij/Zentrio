@@ -1,0 +1,588 @@
+.surface {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.surfaceStandard {
+  gap: 1.5rem;
+}
+
+.surfaceTv {
+  gap: 2rem;
+}
+
+/* ── Section block: label above + card ──────────────────────────────────── */
+
+.sectionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.sectionLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.2rem;
+}
+
+.sectionLabelText {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+.scopeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.48rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── Section card ──────────────────────────────────────────────────────── */
+
+.sectionCard {
+  min-width: 0;
+}
+
+.sectionCardStandard {
+  background: var(--glass-bg, rgba(20, 20, 20, 0.65));
+  backdrop-filter: blur(var(--glass-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: 18px;
+  padding: 1.4rem 1.6rem;
+  box-shadow: var(--shadow-card, 0 10px 30px rgba(0, 0, 0, 0.2));
+}
+
+.sectionCardTv {
+  padding: 1.05rem 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+    rgba(8, 10, 14, 0.6);
+}
+
+/* ── Items list ─────────────────────────────────────────────────────────── */
+
+.items {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Row ─────────────────────────────────────────────────────────────────── */
+
+.row {
+  display: grid;
+  gap: 1rem;
+  align-items: center;
+}
+
+.rowStandard {
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, 11rem);
+  padding: 1rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rowStandard:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.rowStandard:last-child {
+  padding-bottom: 0;
+}
+
+.rowTv {
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem);
+  padding: 1rem 1.15rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+    rgba(12, 14, 18, 0.48);
+}
+
+.rowTv + .rowTv {
+  margin-top: 0.85rem;
+}
+
+.rowTv:focus-within {
+  border-color: rgba(255, 255, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(229, 9, 20, 0.16), rgba(255, 255, 255, 0.05)),
+    rgba(12, 14, 18, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.rowLeading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-right: 0.2rem;
+}
+
+.rowLabel {
+  color: var(--text, #fff);
+  font-weight: 600;
+  line-height: 1.3;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+.rowStandard .rowLabel {
+  font-size: 0.93rem;
+}
+
+.rowTv .rowLabel {
+  font-size: 1.08rem;
+}
+
+.rowDescription {
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.5;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+.rowStandard .rowDescription {
+  font-size: 0.8rem;
+}
+
+.rowTv .rowDescription {
+  font-size: 0.9rem;
+}
+
+.rowSummary {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rowControl {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+}
+
+.rowTv .rowControl {
+  width: 100%;
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────────── */
+
+.controlButton,
+.controlSelect,
+.controlRange,
+.controlTextInput {
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.controlButton,
+.controlSelect,
+.controlTextInput {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.controlButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.52rem 0.72rem;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.controlButtonTv {
+  min-height: 3.2rem;
+  border-radius: 16px;
+  font-size: 0.98rem;
+}
+
+.controlButton:hover,
+.controlButton:focus-visible,
+.controlSelect:hover,
+.controlSelect:focus-visible,
+.controlTextInput:hover,
+.controlTextInput:focus-visible {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.controlButtonDanger {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #fecaca;
+}
+
+.controlButtonDanger:hover,
+.controlButtonDanger:focus-visible {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.controlSelect,
+.controlTextInput {
+  border-radius: 14px;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.95rem;
+}
+
+/* Force dark background on select so option text is readable */
+.controlSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: rgb(16, 16, 20);
+  color-scheme: dark;
+  color: #fff;
+}
+
+.controlSelect option {
+  background-color: rgb(22, 22, 26);
+  color: #fff;
+}
+
+.controlRange {
+  width: 100%;
+  accent-color: var(--accent, #e50914);
+}
+
+.rangeControl {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.rangeValue {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ── Notice ──────────────────────────────────────────────────────────────── */
+
+.notice {
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+  font-size: 0.88rem;
+}
+
+.noticeWarning {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.noticeDanger {
+  border-color: rgba(239, 68, 68, 0.26);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.customItem {
+  min-width: 0;
+}
+
+/* ── Addon row (used via settingsRendererStyles export) ─────────────────── */
+
+.addonRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.addonRowLogo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.addonRowLogoPlaceholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.addonRowInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.addonRowName {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.addonRowVersion {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.42);
+  margin-top: 2px;
+}
+
+.addonRowActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Saving spinner ──────────────────────────────────────────────────────── */
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.savingSpinner {
+  animation: spin 0.7s linear infinite;
+  display: block;
+}
+
+/* ── Mobile overlay trigger ─────────────────────────────────────────────── */
+
+.mobileOverlayTrigger {
+  display: none;
+}
+
+/* ── Mobile overlay ─────────────────────────────────────────────────────── */
+
+.mobileOverlay {
+  display: none;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .surfaceStandard {
+    gap: 1rem;
+  }
+
+  .sectionCardStandard {
+    padding: 14px 14px 10px;
+    border-radius: 14px;
+  }
+
+  .sectionCardTv {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .rowStandard {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 9px 0;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .rowStandard:first-child {
+    border-top: 0;
+    padding-top: 2px;
+  }
+
+  .rowStandard:last-child {
+    padding-bottom: 2px;
+  }
+
+  .rowTv {
+    grid-template-columns: 1fr;
+  }
+
+  .rowLabel {
+    font-size: 0.88rem;
+  }
+
+  .rowDescription {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    margin-top: 1px;
+  }
+
+  .rowSummary {
+    font-size: 0.7rem;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-top: 1px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .rowLeading {
+    gap: 2px;
+    padding-right: 0;
+  }
+
+  .rowControl {
+    flex-shrink: 0;
+  }
+
+  .rowStandard .controlButton,
+  .rowStandard .controlSelect,
+  .rowStandard .controlTextInput {
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    width: auto;
+  }
+
+  .rowStandard .controlButton {
+    min-width: 64px;
+  }
+
+  .rowStandard .controlSelect {
+    min-width: 90px;
+  }
+
+  .rowStandard .controlTextInput {
+    min-width: 120px;
+  }
+
+  .rowStandard .rangeControl {
+    grid-column: 1 / -1;
+    padding-top: 4px;
+  }
+
+  .rowStandard .rangeValue {
+    font-size: 0.72rem;
+    text-align: right;
+  }
+
+  .scopeBadge {
+    display: none;
+  }
+
+  .notice {
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 0.78rem;
+  }
+
+  /* Addon rows: wrap to two lines on small screens */
+  .addonRow {
+    flex-wrap: wrap;
+  }
+
+  .addonRowActions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Mobile overlay trigger: visible on mobile */
+  .mobileOverlayTrigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+
+  .mobileOverlayTrigger:first-child {
+    border-top: 0;
+  }
+
+  .mobileOverlayTrigger:hover {
+    color: #fff;
+  }
+
+  /* Mobile overlay: fullscreen panel */
+  .mobileOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    background: rgba(8, 8, 10, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .mobileOverlayHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    flex-shrink: 0;
+  }
+
+  .mobileOverlayTitle {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .mobileOverlayClose {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  .mobileOverlayClose:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .mobileOverlayContent {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 14px;
+  }
+}

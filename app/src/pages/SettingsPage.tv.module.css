@@ -1,67 +1,50 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 1040px;
+  gap: 2rem;
+  width: min(100%, 1120px);
   padding-top: calc(var(--tv-safe-y) + 0.5rem);
+  padding-bottom: calc(var(--tv-safe-y) + 1.5rem);
 }
 
-.railProfileState {
+.pageHeader {
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 20px;
-  padding: 0 0.2rem;
-  overflow: hidden;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
-.railProfileLabel {
-  flex-shrink: 0;
-  font-size: 0.64rem;
+.pageEyebrow {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
 }
 
-.railProfileValue {
-  min-width: 0;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.2;
-  color: rgba(255, 255, 255, 0.72);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-:global(.tvRailCompact) .railProfileState {
-  display: none;
-}
-
-.profileRow {
+.pageTitleRow {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 12, 16, 0.72);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.profileLabel {
+.pageTitle {
   margin: 0;
-  flex-shrink: 0;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.46);
+  color: #fff;
+  font-size: clamp(2rem, 3vw, 2.7rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 
-.profileSelectorWrap {
-  flex: 1;
-  min-width: 0;
+.pageProfile {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.railProfileControl {
+  width: 100%;
 }
 
 .tvSettingsContent {
@@ -71,153 +54,49 @@
 .tvSettingsContent :global(.tabContent) {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 1.5rem;
 }
 
-.tvSettingsContent :global(.settingsCard) {
-  margin-bottom: 0;
-  padding: 18px 20px;
+.tvSettingsContent :global(.settingItem),
+.tvSettingsContent :global(.addonItem),
+.tvSettingsContent :global(.sortableItem),
+.tvSettingsContent :global(.languageItem),
+.tvSettingsContent :global(.optionCard),
+.tvSettingsContent :global(.dlFolderRow),
+.tvSettingsContent :global(.dlProfileRow) {
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(18, 20, 25, 0.74);
-  box-shadow: none;
 }
 
-.tvSettingsContent :global(.settingsCard:hover) {
-  transform: none;
-  box-shadow: none;
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.tvSettingsContent :global(.sectionTitle) {
-  margin-bottom: 14px;
-  font-size: 1.22rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.tvSettingsContent :global(.sectionTitle::before) {
-  width: 4px;
-  height: 18px;
-}
-
-.tvSettingsContent :global(.settingItem) {
-  gap: 16px;
-  padding: 16px 0;
-}
-
-.tvSettingsContent :global(.settingInfo h3),
-.tvSettingsContent :global(.settingItem h3) {
-  font-size: 0.98rem;
-  font-weight: 700;
-}
-
-.tvSettingsContent :global(.settingInfo p),
-.tvSettingsContent :global(.settingItem p),
-.tvSettingsContent :global(.dlSettingDesc),
-.tvSettingsContent :global(.addonDescription) {
-  font-size: 0.86rem;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.56);
-}
-
-.tvSettingsContent :global(button),
+.tvSettingsContent :global(button:not([role='switch'])),
 .tvSettingsContent :global(select),
 .tvSettingsContent :global(input[type="text"]),
 .tvSettingsContent :global(input[type="password"]),
 .tvSettingsContent :global(input[type="range"]) {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
 }
 
-.tvSettingsContent :global(button),
-.profileSelectorWrap :global(button) {
-  min-height: 42px;
-}
-
+.tvSettingsContent :global(button:not([role='switch'])),
 .tvSettingsContent :global(select),
-.profileSelectorWrap :global(select),
 .tvSettingsContent :global(input[type="text"]),
 .tvSettingsContent :global(input[type="password"]) {
-  min-height: 44px;
-  border-radius: 12px;
-  padding: 10px 14px;
+  min-height: 3rem;
 }
 
 .tvSettingsContent :global([role='switch']) {
-  width: 58px !important;
-  height: 32px !important;
-  border-radius: 999px !important;
+  --toggle-width: 52px;
+  --toggle-height: 30px;
+  --toggle-knob-size: 22px;
+  --toggle-padding: 4px;
+  width: var(--toggle-width) !important;
+  height: var(--toggle-height) !important;
 }
 
 .tvSettingsContent :global([role='switch'] > div) {
-  width: 24px !important;
-  height: 24px !important;
-  top: 3px !important;
+  width: var(--toggle-knob-size) !important;
+  height: var(--toggle-knob-size) !important;
+  top: var(--toggle-padding) !important;
 }
 
-.profileSelectorWrap :global(h3),
-.profileSelectorWrap :global(p) {
+:global(.tvRailCompact) .railProfileControl {
   display: none;
-}
-
-.profileSelectorWrap :global(select) {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
-}
-
-.profileSelectorWrap :global(button) {
-  border-radius: 12px;
-}
-
-.tvSettingsContent :global(.dlQualityList),
-.tvSettingsContent :global(.dlProfileList),
-.tvSettingsContent :global(.sortableList) {
-  gap: 10px;
-}
-
-.tvSettingsContent :global(.dlQualityRow),
-.tvSettingsContent :global(.dlFolderRow),
-.tvSettingsContent :global(.languageItem),
-.tvSettingsContent :global(.sortableItem),
-.tvSettingsContent :global(.addonItem) {
-  border-radius: 14px;
-}
-
-.tvSettingsContent :global(.gridOptions) {
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
-}
-
-.tvSettingsContent :global(.sortableGrid) {
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 12px;
-}
-
-.tvSettingsContent :global(.optionCard),
-.tvSettingsContent :global(.sortableItem),
-.tvSettingsContent :global(.languageItem) {
-  min-height: 52px;
-}
-
-.tvSettingsContent :global(.dlFolderBtn),
-.tvSettingsContent :global(.dlClearBtn),
-.tvSettingsContent :global(.sortDirectionBtn) {
-  min-height: 40px;
-  padding: 8px 14px;
-  font-size: 0.8rem;
-}
-
-.tvSettingsContent :global(.dropdownToggle) {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-}
-
-@media (max-width: 1500px) {
-  .profileRow {
-    flex-direction: column;
-    align-items: stretch;
-  }
 }

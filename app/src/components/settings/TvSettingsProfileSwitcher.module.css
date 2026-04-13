@@ -1,0 +1,267 @@
+.triggerZone {
+  width: 100%;
+}
+
+.triggerButton {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0.82rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  color: rgba(255, 255, 255, 0.82);
+  text-align: left;
+  transition:
+    background-color var(--transition-smooth),
+    border-color var(--transition-smooth),
+    transform var(--transition-smooth),
+    box-shadow var(--transition-smooth);
+}
+
+.triggerButton[data-tv-active='true'] {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+}
+
+.triggerIcon {
+  width: 24px;
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.triggerValue {
+  min-width: 0;
+  flex: 1;
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.triggerHint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.fullscreenBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background:
+    radial-gradient(circle at top right, rgba(229, 9, 20, 0.18), transparent 24%),
+    rgba(5, 6, 10, 0.94);
+  backdrop-filter: blur(20px);
+}
+
+.fullscreenSurface {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding:
+    calc(var(--tv-safe-y) + 2rem)
+    calc(var(--tv-safe-x) + 0.5rem)
+    calc(var(--tv-safe-y) + 2rem)
+    calc(var(--tv-safe-x) + 0.5rem);
+}
+
+.fullscreenHeader {
+  margin-bottom: 1.25rem;
+}
+
+.fullscreenBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 24rem);
+  gap: 1.5rem;
+  min-height: 0;
+  flex: 1;
+}
+
+.dialogHeader {
+  max-width: 48rem;
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+
+.profilePanel {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+  padding: 1rem;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.profileList {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.profileCard {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.84);
+  text-align: left;
+  transition:
+    background-color var(--transition-smooth),
+    border-color var(--transition-smooth),
+    transform var(--transition-smooth);
+}
+
+.profileCard[data-tv-active='true'] {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.profileCardSelected {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+}
+
+.profileCardSelected[data-tv-active='true'] {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.profileName {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.profileMeta {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.profileMetaCurrent {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.createButton {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-weight: 700;
+  transition:
+    background-color var(--transition-smooth),
+    border-color var(--transition-smooth),
+    transform var(--transition-smooth);
+}
+
+.createButton[data-tv-active='true'] {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.actionsColumn {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+  padding: 1rem;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease;
+}
+
+.actionsColumnCollapsed {
+  opacity: 0;
+  transform: translateX(24px);
+  pointer-events: none;
+}
+
+.actionButton {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-weight: 700;
+  transition:
+    background-color var(--transition-smooth),
+    border-color var(--transition-smooth),
+    transform var(--transition-smooth);
+}
+
+.actionButton[data-tv-active='true'] {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.actionPrimary {
+  background: rgba(255, 255, 255, 0.96);
+  color: #0d0f12;
+}
+
+.actionPrimary[data-tv-active='true'] {
+  background: #fff;
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.actionDanger {
+  color: rgba(255, 181, 181, 0.96);
+  border-color: rgba(239, 68, 68, 0.16);
+}
+
+.actionDanger[data-tv-active='true'] {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.emptyState {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.54);
+}
