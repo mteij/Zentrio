@@ -35,6 +35,7 @@ export interface TvPageScaffoldProps extends Pick<TvFocusScopeProps, 'initialZon
   description?: string
   rail?: ReactNode
   railHeaderAction?: ReactNode
+  hideRailIdentity?: boolean
   brandAction?: {
     zoneId: string
     itemId: string
@@ -57,6 +58,7 @@ export function TvPageScaffold({
   description,
   rail,
   railHeaderAction,
+  hideRailIdentity = false,
   brandAction,
   headerAside,
   children,
@@ -101,21 +103,39 @@ export function TvPageScaffold({
           {rail ? <div className={styles.railContent}>{rail}</div> : null}
         </div>
 
-        <div className={styles.railFooter}>
-          {brandAction ? (
-            <TvFocusZone
-              id={brandAction.zoneId}
-              orientation="vertical"
-              nextUp={brandAction.nextUp}
-              nextRight={brandAction.nextRight}
-              nextDown={brandAction.nextDown}
-            >
-              <TvFocusItem
-                id={brandAction.itemId}
-                className={styles.brandButton}
-                onActivate={brandAction.onActivate}
-                aria-label={brandAction.hint ? `${identityTitle}, ${brandAction.hint}` : identityTitle}
+        {!hideRailIdentity ? (
+          <div className={styles.railFooter}>
+            {brandAction ? (
+              <TvFocusZone
+                id={brandAction.zoneId}
+                orientation="vertical"
+                nextUp={brandAction.nextUp}
+                nextRight={brandAction.nextRight}
+                nextDown={brandAction.nextDown}
               >
+                <TvFocusItem
+                  id={brandAction.itemId}
+                  className={styles.brandButton}
+                  onActivate={brandAction.onActivate}
+                  aria-label={brandAction.hint ? `${identityTitle}, ${brandAction.hint}` : identityTitle}
+                >
+                  {profileAvatar ? (
+                    <img src={profileAvatar} alt={identityTitle} className={styles.brandImage} />
+                  ) : user || selectedProfile ? (
+                    <div className={styles.identityIcon} aria-hidden="true">
+                      <UserRound size={24} />
+                    </div>
+                  ) : (
+                    <img src={ZENTRIO_LOGO_192_URL} alt="Zentrio" className={styles.brandImage} />
+                  )}
+                  <div className={styles.brandText}>
+                    <div className={styles.brandTitle}>{identityTitle}</div>
+                  </div>
+                  {brandAction.hint ? <span className={styles.brandHint}>{brandAction.hint}</span> : null}
+                </TvFocusItem>
+              </TvFocusZone>
+            ) : (
+              <div className={styles.brand}>
                 {profileAvatar ? (
                   <img src={profileAvatar} alt={identityTitle} className={styles.brandImage} />
                 ) : user || selectedProfile ? (
@@ -128,26 +148,10 @@ export function TvPageScaffold({
                 <div className={styles.brandText}>
                   <div className={styles.brandTitle}>{identityTitle}</div>
                 </div>
-                {brandAction.hint ? <span className={styles.brandHint}>{brandAction.hint}</span> : null}
-              </TvFocusItem>
-            </TvFocusZone>
-          ) : (
-            <div className={styles.brand}>
-              {profileAvatar ? (
-                <img src={profileAvatar} alt={identityTitle} className={styles.brandImage} />
-              ) : user || selectedProfile ? (
-                <div className={styles.identityIcon} aria-hidden="true">
-                  <UserRound size={24} />
-                </div>
-              ) : (
-                <img src={ZENTRIO_LOGO_192_URL} alt="Zentrio" className={styles.brandImage} />
-              )}
-              <div className={styles.brandText}>
-                <div className={styles.brandTitle}>{identityTitle}</div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        ) : null}
       </aside>
 
       <main className={styles.main} data-tv-page-main="true" onFocusCapture={handleMainFocusCapture}>

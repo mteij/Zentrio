@@ -35,6 +35,39 @@
   font-weight: 700;
 }
 
+.genreShelfCard {
+  flex: 0 0 158px;
+  width: 158px;
+  min-width: 158px;
+  min-height: 88px;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(14, 16, 20, 0.94);
+  color: #fff;
+  text-align: left;
+  display: flex;
+  align-items: center;
+}
+
+.genreShelfTitle {
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.genreShelfSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+}
+
 .gridSkeletonCard {
   flex: 0 0 210px;
   width: 210px;

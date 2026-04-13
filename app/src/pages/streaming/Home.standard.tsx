@@ -1,8 +1,18 @@
-import { Layout, StreamingRow, LazyCatalogRow, SkeletonHero, SkeletonRow, Hero, LoadErrorState } from '../../components'
+import { useEffect } from 'react'
+import { AnimatedBackground, Layout, StreamingRow, LazyCatalogRow, SkeletonHero, SkeletonRow, Hero, LoadErrorState } from '../../components'
 import type { HomeScreenModel } from './Home.model'
 import styles from '../../styles/Streaming.module.css'
 
 export function StreamingHomeStandardView({ model }: { model: HomeScreenModel }) {
+  useEffect(() => {
+    if (!model.showFallbackToast) return
+    const id = window.setTimeout(() => {
+      if (window.addToast) {
+        window.addToast('message', 'Default Addon Used', 'No addons were found for this profile, so we are using the default Cinemeta addon to provide content.')
+      }
+    }, 500)
+    return () => window.clearTimeout(id)
+  }, [model.showFallbackToast])
   if (model.status === 'loading') {
     return (
       <Layout title="Streaming" showHeader={false} showFooter={false}>
@@ -31,8 +41,11 @@ export function StreamingHomeStandardView({ model }: { model: HomeScreenModel })
     )
   }
 
+  const ambientImage = model.heroItems[0]?.background || model.heroItems[0]?.poster
+
   return (
     <Layout title="Streaming" showHeader={false} showFooter={false}>
+      <AnimatedBackground image={ambientImage} opacity={0.12} showOrbs={false} />
       <div className={`${styles.streamingLayout} ${!model.shouldShowHero ? styles.streamingLayoutNoHero : ''}`}>
         {model.shouldShowHero ? (
           <Hero
@@ -71,16 +84,6 @@ export function StreamingHomeStandardView({ model }: { model: HomeScreenModel })
           )}
         </div>
       </div>
-      {model.showFallbackToast ? (
-        <script dangerouslySetInnerHTML={{ __html: `
-            document.addEventListener('DOMContentLoaded', () => {
-              if (window.addToast) {
-                window.addToast('message', 'Default Addon Used', 'No addons were found for this profile, so we are using the default Cinemeta addon to provide content.');
-              }
-            });
-        ` }}
-        />
-      ) : null}
     </Layout>
   )
 }

@@ -320,14 +320,10 @@
   left: 0;
   right: 0;
   z-index: var(--z-sticky, 500);
-  /* Gradient so the search pill is readable over any hero image */
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.7) 0%,
-    rgba(0, 0, 0, 0.4) 50%,
-    rgba(0, 0, 0, 0) 100%
-  );
-  padding-bottom: 28px;
+  background: rgba(10, 10, 10, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .streamingMobileSearch {
@@ -428,8 +424,8 @@
     align-items: center;
     gap: 12px;
     padding: 12px 16px;
-    background: rgba(10, 10, 10, 0.75);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(10, 10, 10, 0.82);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
@@ -2396,7 +2392,7 @@
   pointer-events: auto;
 }
 
-.exploreToggleGroup {
+.filterToggleGroup {
   display: flex;
   gap: 8px;
   padding: 4px;
@@ -2407,7 +2403,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.exploreToggleBtn {
+.filterToggleBtn {
   padding: 10px 24px;
   border-radius: 100px;
   font-size: 0.9rem;
@@ -2419,19 +2415,19 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
-.exploreToggleBtn:hover {
+.filterToggleBtn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
 }
 
-.exploreToggleBtnActive {
+.filterToggleBtnActive {
   background: #fff;
   color: #000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   transform: scale(1.02);
 }
 
-.exploreToggleBtnActive:hover {
+.filterToggleBtnActive:hover {
   background: #fff;
   color: #000;
 }
@@ -2606,6 +2602,77 @@
   pointer-events: none;
 }
 
+.genreShortcutRow {
+  display: none;
+  padding: 16px 0;
+  margin-bottom: 24px;
+}
+
+.genreShortcutScroll {
+  /* Reuse default rowScrollContainer behavior for spacing/mask/scroll */
+}
+
+.genreShortcutCard {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: 180px;
+  height: 96px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(18, 18, 22, 0.95);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 14px 16px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.26);
+  text-align: left;
+}
+
+.genreShortcutCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.34);
+}
+
+.genreShortcutCard:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12), 0 14px 26px rgba(0, 0, 0, 0.34);
+}
+
+.genreShortcutText {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .genreShortcutRow {
+    display: block;
+    margin-bottom: 16px;
+  }
+
+  .genreShortcutCard {
+    width: 156px;
+    height: 90px;
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .genreShortcutText {
+    font-size: 0.95rem;
+  }
+}
+
 .exploreBackBtn {
   width: 44px;
   height: 44px;
@@ -2646,8 +2713,8 @@
     right: 0;
     padding: 0;
     z-index: var(--z-sticky, 500);
-    background: linear-gradient(180deg, rgba(10, 10, 10, 0.96) 0%, rgba(10, 10, 10, 0.84) 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 10, 10, 0.82);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     pointer-events: auto;
@@ -2668,7 +2735,6 @@
     width: 100%;
   }
 
-  .exploreMobileProfileBtn,
   .exploreMobileSearchBtn {
     display: inline-flex;
     align-items: center;
@@ -2677,20 +2743,38 @@
     height: 44px;
     min-width: 44px;
     flex-shrink: 0;
+    background: transparent;
+    text-decoration: none;
+    color: var(--text, #fff);
+    cursor: pointer;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .exploreMobileSearchBtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  .exploreMobileProfileBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    flex-shrink: 0;
+    margin-left: auto;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.08);
     text-decoration: none;
     color: var(--text, #fff);
-    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
   }
 
-  .exploreMobileProfileBtn {
-    margin-left: auto;
-  }
-
-  .exploreMobileProfileBtn:hover,
-  .exploreMobileSearchBtn:hover {
+  .exploreMobileProfileBtn:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.16);
   }
@@ -2745,23 +2829,24 @@
   }
 
   .exploreGenreTriggerValue {
-    font-size: 0.79rem;
+    display: none;
   }
 
   .exploreGenreTriggerIcon {
+    margin: 0 auto;
     width: 14px;
     height: 14px;
   }
 
   /* Order: [toggle (1)] [genre (2)] [profile (3)] */
-  .exploreFiltersBar .exploreToggleGroup {
+  .exploreFiltersBar .filterToggleGroup {
     flex: 0 0 auto;
     width: auto;
     min-width: 0;
     order: 1;
   }
 
-  .exploreFiltersBar .exploreToggleGroup .exploreToggleBtn {
+  .exploreFiltersBar .filterToggleGroup .filterToggleBtn {
     flex: none;
     padding: 7px 10px;
     font-size: 0.79rem;
@@ -2778,6 +2863,11 @@
   .exploreFiltersBar .exploreGenreSelectInput {
     width: 100%;
     min-width: 0;
+  }
+
+  /* Hide dropdown trigger in compact mobile top bar */
+  .exploreGenreSelect {
+    display: none;
   }
 
   .exploreMobileProfileBtn {
@@ -2805,12 +2895,12 @@
     z-index: 50;
   }
 
-  .exploreToggleGroup {
+  .filterToggleGroup {
     flex: 1;
     min-width: fit-content;
   }
 
-  .exploreToggleBtn {
+  .filterToggleBtn {
     padding: 8px 16px;
     font-size: 0.85rem;
     flex: 1;
@@ -2837,7 +2927,7 @@
   }
 
   /* Hide default explore header components on mobile unless it's filtered view */
-  .exploreHeader .exploreToggleGroup,
+  .exploreHeader .filterToggleGroup,
   .exploreHeader .exploreGenreSelect {
     display: none !important;
   }
@@ -3045,7 +3135,7 @@
     align-items: center;
   }
 
-  .searchTopBar.exploreHeader .searchFilterWrap .exploreToggleGroup {
+  .searchTopBar.exploreHeader .searchFilterWrap .filterToggleGroup {
     display: none !important;
   }
 

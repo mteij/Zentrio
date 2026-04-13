@@ -1,27 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
-import { Filter, Search, User } from 'lucide-react'
+import { Filter, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AnimatedBackground, Layout, SkeletonRow } from '../../components'
 import { SearchCatalogRow } from '../../components/features/SearchCatalogRow'
 import { useRootScrollPinned } from '../../hooks/useRootScrollPinned'
-import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
+import { useStreamingProfile } from '../../hooks/useStreamingProfile'
 import type { SearchScreenModel } from './Search.model'
 import styles from '../../styles/Streaming.module.css'
 
 export function StreamingSearchStandardView({ model }: { model: SearchScreenModel }) {
   const stickyHeader = useRootScrollPinned({ extraTopPx: 10 })
-
-  // Read profile from cache populated by StreamingLayout — no extra fetch
-  const { data: profile } = useQuery<any>({
-    queryKey: ['streaming-profile', model.profileId],
-    enabled: false,
-  })
-
-  const profileAvatar = profile?.avatar ? (
-    <img src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))} alt="" />
-  ) : (
-    <User size={18} aria-hidden="true" />
-  )
+  const { profileAvatarNode } = useStreamingProfile(model.profileId)
 
   return (
     <Layout title="Search" showHeader={false} showFooter={false}>
@@ -51,13 +39,13 @@ export function StreamingSearchStandardView({ model }: { model: SearchScreenMode
             </div>
 
             <div className={styles.searchFilterWrap}>
-              <div className={styles.exploreToggleGroup}>
+              <div className={styles.filterToggleGroup}>
                 {(['all', 'movie', 'series'] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => model.actions.handleFilterChange('type', type)}
-                    className={`${styles.exploreToggleBtn} ${model.typeParam === type ? styles.exploreToggleBtnActive : ''}`}
+                    className={`${styles.filterToggleBtn} ${model.typeParam === type ? styles.filterToggleBtnActive : ''}`}
                   >
                     {type === 'all' ? 'All' : type === 'movie' ? 'Movies' : 'Series'}
                   </button>
@@ -78,7 +66,7 @@ export function StreamingSearchStandardView({ model }: { model: SearchScreenMode
                 aria-label="Switch profile"
               >
                 <div className={styles.streamingMobileProfileAvatar}>
-                  {profileAvatar}
+                  {profileAvatarNode}
                 </div>
               </Link>
             </div>

@@ -54,21 +54,6 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
   const lastPageXRef = useRef(0)
   const rafIdRef = useRef<number | null>(null)
 
-  const findVerticalScrollParent = useCallback((element: HTMLElement | null): HTMLElement | null => {
-    let current = element?.parentElement || null
-
-    // Stop before body/html — both get computed overflow-y:auto from overflow-x:hidden
-    // which makes them appear scrollable, but body.scrollTop is a no-op in standards mode.
-    while (current && current !== document.body && current !== document.documentElement) {
-      const style = window.getComputedStyle(current)
-      const canScrollY = /(auto|scroll|overlay)/.test(style.overflowY) && current.scrollHeight > current.clientHeight
-      if (canScrollY) return current
-      current = current.parentElement
-    }
-
-    return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement
-  }, [])
-
   // Update arrow visibility
   const updateArrows = useCallback(() => {
     if (containerRef.current) {
@@ -109,62 +94,68 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
   }, [items, updateArrows, stopMomentum])
 
   // Scroll by button click
-  const scroll = useCallback((direction: 'left' | 'right') => {
-    if (containerRef.current) {
-      stopMomentum()
-      // Ensure smooth scroll is enabled for button clicks (CSS handles it usually, but just in case we stripped it)
-      containerRef.current.style.removeProperty('scroll-behavior')
-      
-      const scrollAmount = containerRef.current.clientWidth * 0.8
-      containerRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      })
-    }
-  }, [stopMomentum])
+  const scroll = useCallback(
+    (direction: 'left' | 'right') => {
+      if (containerRef.current) {
+        stopMomentum()
+        // Ensure smooth scroll is enabled for button clicks (CSS handles it usually, but just in case we stripped it)
+        containerRef.current.style.removeProperty('scroll-behavior')
+
+        const scrollAmount = containerRef.current.clientWidth * 0.8
+        containerRef.current.scrollBy({
+          left: direction === 'left' ? -scrollAmount : scrollAmount,
+          behavior: 'smooth',
+        })
+      }
+    },
+    [stopMomentum]
+  )
   // Define handleGlobalMouseMove outside so it can be referenced in handleMouseDown
   // We use a ref to access the latest state/refs without re-binding
-  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
-    if (!containerRef.current) return
-    
-    const x = e.pageX - containerRef.current.offsetLeft
-    const walk = (x - startXRef.current) * multiplier
-    
-    // Threshold check before considering as drag
-    if (!isDraggingRef.current && Math.abs(walk) > 5) {
-      isDraggingRef.current = true
-    }
+  const handleGlobalMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!containerRef.current) return
 
-    if (isDraggingRef.current) {
-      e.preventDefault()
-      // Disable smooth scrolling during direct manipulation
-      containerRef.current.style.scrollBehavior = 'auto'
-      containerRef.current.scrollLeft = scrollLeftRef.current - walk
-      
-      // Calculate velocity for momentum
-      const now = Date.now()
-      const dt = now - lastMoveTimeRef.current
-      const dX = (e.pageX - lastPageXRef.current) * multiplier
-      
-      if (dt > 0) {
-        velocityRef.current = dX
-        lastMoveTimeRef.current = now
-        lastPageXRef.current = e.pageX
+      const x = e.pageX - containerRef.current.offsetLeft
+      const walk = (x - startXRef.current) * multiplier
+
+      // Threshold check before considering as drag
+      if (!isDraggingRef.current && Math.abs(walk) > 5) {
+        isDraggingRef.current = true
       }
-    }
-  }, [multiplier])
+
+      if (isDraggingRef.current) {
+        e.preventDefault()
+        // Disable smooth scrolling during direct manipulation
+        containerRef.current.style.scrollBehavior = 'auto'
+        containerRef.current.scrollLeft = scrollLeftRef.current - walk
+
+        // Calculate velocity for momentum
+        const now = Date.now()
+        const dt = now - lastMoveTimeRef.current
+        const dX = (e.pageX - lastPageXRef.current) * multiplier
+
+        if (dt > 0) {
+          velocityRef.current = dX
+          lastMoveTimeRef.current = now
+          lastPageXRef.current = e.pageX
+        }
+      }
+    },
+    [multiplier]
+  )
 
   const handleMouseUp = useCallback(() => {
     setIsDown(false)
-    
+
     // Start momentum if there's velocity
     if (Math.abs(velocityRef.current) > 0.5) {
       const applyMomentum = () => {
         if (!containerRef.current) return
-        
+
         velocityRef.current *= friction
         containerRef.current.scrollLeft -= velocityRef.current
-        
+
         if (Math.abs(velocityRef.current) > 0.5) {
           rafIdRef.current = requestAnimationFrame(applyMomentum)
         } else {
@@ -187,25 +178,28 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
   }, [friction, handleGlobalMouseMove, stopMomentum])
 
   // Mouse handlers for drag scrolling
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!containerRef.current) return
-    stopMomentum()
-    
-    // Disable smooth scrolling immediately on interaction start
-    containerRef.current.style.scrollBehavior = 'auto'
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!containerRef.current) return
+      stopMomentum()
 
-    setIsDown(true)
-    isDraggingRef.current = false
-    startXRef.current = e.pageX - containerRef.current.offsetLeft
-    scrollLeftRef.current = containerRef.current.scrollLeft
-    lastPageXRef.current = e.pageX
-    lastMoveTimeRef.current = Date.now()
-    velocityRef.current = 0
+      // Disable smooth scrolling immediately on interaction start
+      containerRef.current.style.scrollBehavior = 'auto'
 
-    // Attach global listeners
-    document.addEventListener('mousemove', handleGlobalMouseMove as any)
-    document.addEventListener('mouseup', handleMouseUp)
-  }, [stopMomentum, handleMouseUp, handleGlobalMouseMove])
+      setIsDown(true)
+      isDraggingRef.current = false
+      startXRef.current = e.pageX - containerRef.current.offsetLeft
+      scrollLeftRef.current = containerRef.current.scrollLeft
+      lastPageXRef.current = e.pageX
+      lastMoveTimeRef.current = Date.now()
+      velocityRef.current = 0
+
+      // Attach global listeners
+      document.addEventListener('mousemove', handleGlobalMouseMove as any)
+      document.addEventListener('mouseup', handleMouseUp)
+    },
+    [stopMomentum, handleMouseUp, handleGlobalMouseMove]
+  )
 
   // Prevent native drag
   const handleDragStart = useCallback((e: React.DragEvent) => {
@@ -221,28 +215,22 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
       const absX = Math.abs(e.deltaX)
       const absY = Math.abs(e.deltaY)
 
-      // Let the browser handle native horizontal/diagonal trackpad gestures.
-      // Our old "dominant vertical" check was catching slightly diagonal swipes
-      // and rerouting them to page scroll, which made horizontal rows barely move.
-      if (absX > 0.5 && !e.shiftKey) {
+      // Horizontal (or diagonal-horizontal) gestures stay native so
+      // trackpads can pan rows naturally.
+      if (absX > absY) {
         return
       }
 
-      if (e.shiftKey && absY > 0 && absX <= 0.5) {
-        e.preventDefault()
-        container.scrollLeft += e.deltaY
-        updateArrows()
-        return
+      // Vertical scroll must be forwarded to the window explicitly.
+      // overflow-x:auto containers swallow vertical wheel events in Chrome
+      // before they reach the page scroll handler.
+      e.preventDefault()
+      const normalizeDelta = (delta: number) => {
+        if (e.deltaMode === 1) return delta * 16
+        if (e.deltaMode === 2) return delta * container.clientHeight
+        return delta
       }
-
-      if (absY > 0) {
-        const scrollParent = findVerticalScrollParent(container)
-        if (!scrollParent) return
-
-        e.preventDefault()
-        scrollParent.scrollTop += e.deltaY
-        return
-      }
+      window.scrollBy(0, normalizeDelta(e.deltaY))
     }
 
     container.addEventListener('wheel', handleWheel, { passive: false })
@@ -250,7 +238,7 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
     return () => {
       container.removeEventListener('wheel', handleWheel)
     }
-  }, [findVerticalScrollParent, updateArrows])
+  }, [updateArrows])
 
   // Check if currently dragging (for click prevention)
   const isDragging = useCallback(() => {
@@ -273,8 +261,8 @@ export function useScrollRow(options: UseScrollRowOptions): UseScrollRowResult {
     scroll,
     handlers: {
       onMouseDown: handleMouseDown,
-      onDragStart: handleDragStart
-    } as any, 
-    isDragging
+      onDragStart: handleDragStart,
+    } as any,
+    isDragging,
   }
 }

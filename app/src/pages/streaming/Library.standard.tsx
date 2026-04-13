@@ -10,14 +10,12 @@ import {
   Plus,
   Share2,
   Trash2,
-  User,
   UserPlus,
   Users,
   X as XIcon,
 } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { Layout, LoadErrorState, SkeletonCard } from '../../components'
 import { ShareListModal } from '../../components/features/ShareListModal'
 import { LibraryItemCard } from '../../components/library/LibraryItemCard'
@@ -27,7 +25,7 @@ import {
   type ProfileSharedList,
   type SharedList,
 } from '../../components/library/LibrarySidebar'
-import { buildAvatarUrl, sanitizeImgSrc } from '../../lib/url'
+import { useStreamingProfile } from '../../hooks/useStreamingProfile'
 import type { List } from '../../services/database'
 import styles from '../../styles/Streaming.module.css'
 import type { LibraryScreenModel } from './Library.model'
@@ -62,11 +60,7 @@ function LibraryMobileBar({
   onCreateList,
 }: MobileBarProps) {
   const [open, setOpen] = useState(false)
-
-  const { data: profile } = useQuery<any>({
-    queryKey: ['streaming-profile', model.profileId],
-    enabled: false, // populated by StreamingLayout before this renders
-  })
+  const { profile, profileAvatarNode } = useStreamingProfile(model.profileId)
 
   return (
     <div className={styles.libraryMobileBar}>
@@ -95,22 +89,11 @@ function LibraryMobileBar({
       <Link
         to="/profiles"
         className={styles.streamingMobileProfileButton}
-        aria-label={
-          profile?.name ? `Switch profile. Current: ${profile.name}` : 'Switch profile'
-        }
+        aria-label={profile?.name ? `Switch profile. Current: ${profile.name}` : 'Switch profile'}
         title="Switch Profile"
       >
         <div className={styles.streamingMobileProfileAvatar}>
-          {profile?.avatar ? (
-            <img
-              src={sanitizeImgSrc(
-                buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'),
-              )}
-              alt=""
-            />
-          ) : (
-            <User size={18} aria-hidden="true" />
-          )}
+          {profileAvatarNode}
         </div>
       </Link>
 
@@ -1193,7 +1176,7 @@ export function StreamingLibraryStandardView({ model }: { model: LibraryScreenMo
             </div>
           ) : model.items.length === 0 ? (
             <div style={{ padding: '80px 20px', textAlign: 'center' }}>
-              <LibraryIcon size={56} style={{ marginBottom: '20px', opacity: 0.4 }} />
+              <LibraryIcon size={56} style={{ display: 'block', margin: '0 auto 20px', opacity: 0.4 }} />
               <p style={{ fontSize: '1.2rem', marginBottom: '8px', color: '#888' }}>
                 This list is empty
               </p>

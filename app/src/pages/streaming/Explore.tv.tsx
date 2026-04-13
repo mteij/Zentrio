@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Compass, Film, Info, Layers3, Sparkles, Tv } from 'lucide-react'
 import { TvActionStrip, TvFocusItem, TvGrid, TvMediaShelf, TvSection, TvShelf } from '../../components/tv'
+import { scrollTvPageTop } from '../../components/tv/scrollTvPageTop'
 import { apiFetch, apiFetchJson } from '../../lib/apiFetch'
 import { sanitizeImgSrc } from '../../lib/url'
 import type { MetaPreview } from '../../services/addons/types'
@@ -161,8 +162,13 @@ export function StreamingExploreTvView({ model }: { model: ExploreScreenModel })
       ? [{ zoneId: 'explore-top-movies', title: 'Top 10 Movies Today', items: model.trendingMovies }].filter((row) => row.items.length > 0)
       : [{ zoneId: 'explore-top-series', title: 'Top 10 Series Today', items: model.trendingSeries }].filter((row) => row.items.length > 0)
 
+  const shortcutGenres = [...model.displayGenres].sort((a, b) => a.localeCompare(b))
+
   const contentRows = [
     ...topRows.map((row) => ({ ...row, kind: 'static' as const })),
+    ...(!model.isFilteredView && shortcutGenres.length > 0
+      ? [{ zoneId: 'explore-genre-shortcuts-row', title: 'Browse Genres', kind: 'genres' as const, genres: shortcutGenres }]
+      : []),
     ...recommendationRows.map((row) => ({ ...row, kind: 'static' as const })),
     ...(!model.isFilteredView
       ? model.rowGenres.map((genre, index) => ({
@@ -200,7 +206,7 @@ export function StreamingExploreTvView({ model }: { model: ExploreScreenModel })
           <TvActionStrip
             zoneId="explore-mode-strip"
             nextLeft="streaming-rail"
-            nextDown={model.isFilteredView ? 'explore-filter-actions' : 'explore-genre-shortcuts'}
+            nextDown={model.isFilteredView ? 'explore-filter-actions' : firstContentZoneId}
           >
             {([
               { key: 'all' as const, label: 'All', icon: Layers3 },
@@ -214,6 +220,7 @@ export function StreamingExploreTvView({ model }: { model: ExploreScreenModel })
                   key={mode.key}
                   id={`explore-mode-${mode.key}`}
                   className={`${styles.modeChip} ${isActive ? styles.modeChipActive : ''}`}
+                  onFocus={() => scrollTvPageTop()}
                   onActivate={() => handleModeActivate(mode.key)}
                 >
                   <Icon size={16} />
@@ -230,7 +237,7 @@ export function StreamingExploreTvView({ model }: { model: ExploreScreenModel })
               nextUp="explore-mode-strip"
               nextDown="explore-grid"
             >
-              <TvFocusItem id="explore-clear-filters" className={styles.actionChip} onActivate={model.actions.clearFilters}>
+              <TvFocusItem id="explore-clear-filters" className={styles.actionChip} onFocus={() => scrollTvPageTop()} onActivate={model.actions.clearFilters}>
                 <Compass size={16} />
                 <span>Back to Explore</span>
               </TvFocusItem>
@@ -238,32 +245,14 @@ export function StreamingExploreTvView({ model }: { model: ExploreScreenModel })
                 <TvFocusItem
                   id="explore-clear-genre"
                   className={styles.actionChip}
+                  onFocus={() => scrollTvPageTop()}
                   onActivate={() => model.actions.updateFilter('genre', '')}
                 >
                   <span>Clear Genre</span>
                 </TvFocusItem>
               ) : null}
             </TvActionStrip>
-          ) : (
-            <TvShelf
-              zoneId="explore-genre-shortcuts"
-              nextLeft="streaming-rail"
-              nextUp="explore-mode-strip"
-              nextDown={firstContentZoneId}
-            >
-              {model.rowGenres.map((genre, index) => (
-                <TvFocusItem
-                  key={genre}
-                  id={`explore-genre-shortcut-${genre.replace(/\s+/g, '-').toLowerCase()}`}
-                  index={index}
-                  className={styles.genreChip}
-                  onActivate={() => model.actions.updateFilter('genre', genre)}
-                >
-                  <span>{genre}</span>
-                </TvFocusItem>
-              ))}
-            </TvShelf>
-          )}
+          ) : null}
         </div>
 
         {model.isFilteredView ? (
@@ -307,7 +296,7 @@ export function StreamingExploreTvView({ model }: { model: ExploreScreenModel })
         ) : (
           <>
             {contentRows.map((row, index) => {
-              const nextUp = index === 0 ? 'explore-genre-shortcuts' : contentRows[index - 1]?.zoneId
+              const nextUp = index === 0 ? 'explore-mode-strip' : contentRows[index - 1]?.zoneId
               const nextDown = index < contentRows.length - 1 ? contentRows[index + 1]?.zoneId : undefined
 
               if (row.kind === 'static') {
@@ -325,6 +314,34 @@ export function StreamingExploreTvView({ model }: { model: ExploreScreenModel })
                     nextDown={nextDown}
                     onActivate={(item) => model.actions.openItem(item as MetaPreview)}
                   />
+                )
+              }
+
+              if (row.kind === 'genres') {
+                return (
+                  <div key={row.zoneId} className={styles.genreShelfSection}>
+                    <TvSection title={row.title}>
+                      <TvShelf
+                        zoneId={row.zoneId}
+                        nextLeft="streaming-rail"
+                        nextUp={nextUp}
+                        nextDown={nextDown}
+                      >
+                        {row.genres.map((genre, genreIndex) => (
+                          <TvFocusItem
+                            key={genre}
+                            id={`explore-genre-shortcut-${genre.replace(/\s+/g, '-').toLowerCase()}`}
+                            index={genreIndex}
+                            className={styles.genreShelfCard}
+                            onFocus={() => scrollTvPageTop()}
+                            onActivate={() => model.actions.updateFilter('genre', genre)}
+                          >
+                            <span className={styles.genreShelfTitle}>{genre}</span>
+                          </TvFocusItem>
+                        ))}
+                      </TvShelf>
+                    </TvSection>
+                  </div>
                 )
               }
 

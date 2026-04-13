@@ -1,77 +1,180 @@
-.railGroup {
+.listButton {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.railLabel {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.65);
-}
-
-.listChip {
-  min-width: 13rem;
-  padding: 0.95rem 1rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(12, 18, 27, 0.92);
-  color: white;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 16.5rem;
+  max-width: 21rem;
+  min-height: 4.5rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(18, 21, 28, 0.96), rgba(10, 12, 17, 0.96));
+  color: #fff;
   text-align: left;
 }
 
-.listChipTitle {
+.listButtonActive {
+  border-color: rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(229, 9, 20, 0.14), rgba(255, 255, 255, 0.05)),
+    linear-gradient(180deg, rgba(18, 21, 28, 0.98), rgba(10, 12, 17, 0.98));
+}
+
+.listButtonIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.listButtonCopy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.listButtonTitle {
   font-size: 0.98rem;
-  font-weight: 700;
+  font-weight: 750;
+  line-height: 1.2;
 }
 
-.listChipMeta {
-  font-size: 0.84rem;
-  color: rgba(203, 213, 225, 0.7);
+.listButtonMeta {
+  margin-top: 0.2rem;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 0.8rem;
+  line-height: 1.3;
 }
 
-.cardGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
+.listButtonState {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.96);
+  flex-shrink: 0;
 }
 
-.card {
+.actionButton {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.9rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(12, 18, 27, 0.92);
-  color: white;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 17rem;
+  max-width: 22rem;
+  min-height: 4.6rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(18, 21, 28, 0.96), rgba(10, 12, 17, 0.96));
+  color: #fff;
   text-align: left;
 }
 
-.poster {
+.actionButtonAccent {
+  border-color: rgba(251, 191, 36, 0.2);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.14), rgba(255, 255, 255, 0.04)),
+    linear-gradient(180deg, rgba(18, 21, 28, 0.98), rgba(10, 12, 17, 0.98));
+}
+
+.actionButtonIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.actionButtonCopy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.actionButtonTitle {
+  font-size: 0.95rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.actionButtonMeta {
+  margin-top: 0.2rem;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.mediaCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 0.95rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(18, 21, 28, 0.96), rgba(10, 12, 17, 0.96));
+  color: #fff;
+  text-align: left;
+}
+
+.mediaPoster {
   width: 100%;
   aspect-ratio: 2 / 3;
-  border-radius: 0.9rem;
+  border-radius: 0.95rem;
   background-size: cover;
   background-position: center;
   background-color: rgba(255, 255, 255, 0.08);
 }
 
-.cardTitle {
+.mediaBody {
+  min-width: 0;
+}
+
+.mediaTitle {
+  margin: 0;
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 750;
+  line-height: 1.28;
 }
 
-.cardMeta {
+.mediaMeta {
+  margin: 0.28rem 0 0;
   font-size: 0.82rem;
-  color: rgba(203, 213, 225, 0.7);
-}
-
-.inviteCard {
-  width: min(100%, 24rem);
+  color: rgba(255, 255, 255, 0.56);
 }
 
 .emptyCard {
-  max-width: 32rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  max-width: 28rem;
+  padding: 1.05rem 1.15rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(18, 21, 28, 0.96), rgba(10, 12, 17, 0.96));
+  color: #fff;
+  text-align: left;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 750;
+}
+
+.emptyMeta {
+  margin: 0.22rem 0 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.56);
 }

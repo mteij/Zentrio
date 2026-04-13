@@ -2,20 +2,12 @@ import { Info, Play } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { LoadErrorState, LoadingSpinner } from '../../components'
 import { TvActionStrip, TvFocusItem, TvMediaShelf } from '../../components/tv'
+import { scrollTvPageTop } from '../../components/tv/scrollTvPageTop'
 import { fetchCatalogItems } from '../../lib/catalog-items'
 import { sanitizeImgSrc } from '../../lib/url'
 import type { HomeScreenModel, HomeTvItem } from './Home.model'
 import { StreamingTvScaffold } from './StreamingTvScaffold'
 import styles from './Home.tv.module.css'
-
-function scrollTvPageTop() {
-  if (typeof document === 'undefined') return
-
-  document.querySelector<HTMLElement>('[data-tv-page-main="true"]')?.scrollTo({
-    top: 0,
-    behavior: 'smooth',
-  })
-}
 
 export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
   if (model.status === 'loading') {
@@ -87,7 +79,7 @@ export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
                 <TvFocusItem
                   id="home-hero-play"
                   className={styles.heroAction}
-                  onFocus={scrollTvPageTop}
+                  onFocus={() => scrollTvPageTop()}
                   onActivate={() => {
                     if (model.showTrendingHero) {
                       model.navigation.openMeta(heroItem.type, heroItem.id)
@@ -109,7 +101,7 @@ export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
                 <TvFocusItem
                   id="home-hero-info"
                   className={styles.heroActionSecondary}
-                  onFocus={scrollTvPageTop}
+                  onFocus={() => scrollTvPageTop()}
                   onActivate={() => model.navigation.openMeta(heroItem.type, heroItem.id)}
                 >
                   <Info size={18} />
