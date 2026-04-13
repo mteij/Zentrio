@@ -24,8 +24,11 @@ function getDb(): Database {
   }
 
   db = new Database(DB_PATH)
-  
-  // Create table if not exists
+
+  // WAL mode for better concurrency
+  db.exec('PRAGMA journal_mode = WAL')
+
+  // Create tables if not exists
   db.exec(`
     CREATE TABLE IF NOT EXISTS ratings (
       tconst TEXT PRIMARY KEY,
@@ -33,23 +36,44 @@ function getDb(): Database {
       numVotes INTEGER
     )
   `)
-  
-  // WAL mode for better concurrency
-  db.exec('PRAGMA journal_mode = WAL')
-  
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `)
+
   return db
 }
 
-export function getRating(imdbId: string): { averageRating: number, numVotes: number } | null {
+function getLastRefreshed(): Date | null {
+  try {
+    const database = getDb()
+    const row = database.prepare('SELECT value FROM meta WHERE key = ?').get('last_refreshed') as
+      | { value: string }
+      | undefined
+    return row ? new Date(row.value) : null
+  } catch {
+    return null
+  }
+}
+
+function setLastRefreshed(date: Date): void {
+  getDb()
+    .prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)')
+    .run('last_refreshed', date.toISOString())
+}
+
+export function getRating(imdbId: string): { averageRating: number; numVotes: number } | null {
   try {
     const database = getDb()
     const stmt = database.prepare('SELECT averageRating, numVotes FROM ratings WHERE tconst = ?')
-    const result = stmt.get(imdbId) as { averageRating: number, numVotes: number } | undefined
-    
+    const result = stmt.get(imdbId) as { averageRating: number; numVotes: number } | undefined
+
     if (result) {
       return {
         averageRating: result.averageRating,
-        numVotes: result.numVotes
+        numVotes: result.numVotes,
       }
     }
     return null
@@ -64,7 +88,7 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
   if (!response.ok) {
     throw new Error(`Failed to download ${url}: ${response.statusText}`)
   }
-  
+
   if (!response.body) {
     throw new Error('Response body is empty')
   }
@@ -85,7 +109,7 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
   }
 
   fileStream.end()
-  
+
   return new Promise((resolve, reject) => {
     fileStream.on('finish', resolve)
     fileStream.on('error', reject)
@@ -93,6 +117,11 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
 }
 
 export async function downloadAndProcessRatings() {
+  if (isDownloading) {
+    logger.warn('IMDb ratings update already in progress, skipping.')
+    return
+  }
+  isDownloading = true
   logger.info('Starting IMDb ratings update...')
   const startTime = Date.now()
   let fileStream: any = null
@@ -112,7 +141,7 @@ export async function downloadAndProcessRatings() {
     // 2. Process
     logger.info('Processing TSV file...')
     const database = getDb()
-    
+
     // Prepare statement
     const insertStmt = database.prepare(`
       INSERT OR REPLACE INTO ratings (tconst, averageRating, numVotes)
@@ -132,10 +161,10 @@ export async function downloadAndProcessRatings() {
     fileStream = createReadStream(TEMP_DOWNLOAD_PATH)
     const gunzip = createGunzip()
     const stream = fileStream.pipe(gunzip)
-    
+
     const rl = createInterface({
       input: stream,
-      crlfDelay: Infinity
+      crlfDelay: Infinity,
     })
 
     let isHeader = true
@@ -146,12 +175,12 @@ export async function downloadAndProcessRatings() {
       }
 
       const [tconst, averageRating, numVotes] = line.split('\t')
-      
+
       if (tconst && averageRating && numVotes) {
         batch.push({
           tconst,
           averageRating: parseFloat(averageRating),
-          numVotes: parseInt(numVotes, 10)
+          numVotes: parseInt(numVotes, 10),
         })
 
         if (batch.length >= BATCH_SIZE) {
@@ -171,8 +200,10 @@ export async function downloadAndProcessRatings() {
       processedCount += batch.length
     }
 
-    logger.success(`IMDb ratings update complete. Processed ${processedCount} records in ${((Date.now() - startTime) / 1000).toFixed(1)}s`)
-
+    setLastRefreshed(new Date())
+    logger.success(
+      `IMDb ratings update complete. Processed ${processedCount} records in ${((Date.now() - startTime) / 1000).toFixed(1)}s`
+    )
   } catch (error) {
     logger.error('Failed to update IMDb ratings:', error)
   } finally {
@@ -186,34 +217,56 @@ export async function downloadAndProcessRatings() {
       }
     } catch (e) {
       logger.warn('Failed to delete temporary file:', e)
+    } finally {
+      isDownloading = false
     }
   }
 }
 
 let schedulerInterval: Timer | null = null
+let isDownloading = false
 
 export function initImdbService() {
   const config = getConfig()
   const updateIntervalHours = config.IMDB_UPDATE_INTERVAL_HOURS
-  
+  const intervalMs = updateIntervalHours * 60 * 60 * 1000
+
   logger.info(`Initializing IMDb service (Update interval: ${updateIntervalHours}h)`)
 
-  // Run immediately on startup if DB is empty
   const database = getDb()
   const count = database.prepare('SELECT COUNT(*) as count FROM ratings').get() as { count: number }
-  
-  if (count.count === 0) {
-    logger.info('IMDb database is empty, starting initial download...')
-    // Run in background to not block startup
-    setTimeout(() => downloadAndProcessRatings(), 5000)
+  const lastRefreshed = getLastRefreshed()
+
+  let msUntilFirstRefresh: number
+
+  if (count.count === 0 || !lastRefreshed) {
+    logger.info('IMDb database is empty or has never been refreshed, starting initial download...')
+    msUntilFirstRefresh = 5000
   } else {
-    logger.info(`IMDb database already loaded (${count.count} ratings). Refreshing in ${updateIntervalHours}h`)
+    const msSinceLastRefresh = Date.now() - lastRefreshed.getTime()
+    const msRemaining = intervalMs - msSinceLastRefresh
+
+    if (msRemaining <= 0) {
+      logger.info(
+        `IMDb database overdue for refresh (last: ${lastRefreshed.toISOString()}), refreshing now...`
+      )
+      msUntilFirstRefresh = 5000
+    } else {
+      const hoursRemaining = (msRemaining / 1000 / 60 / 60).toFixed(1)
+      logger.info(
+        `IMDb database loaded (${count.count} ratings, last refreshed: ${lastRefreshed.toISOString()}). Next refresh in ${hoursRemaining}h`
+      )
+      msUntilFirstRefresh = msRemaining
+    }
   }
 
-  // Schedule periodic updates
   if (schedulerInterval) clearInterval(schedulerInterval)
-  
-  schedulerInterval = setInterval(() => {
+
+  // Fire the first refresh at the right time, then repeat on the full interval
+  setTimeout(() => {
     downloadAndProcessRatings()
-  }, updateIntervalHours * 60 * 60 * 1000)
+    schedulerInterval = setInterval(() => {
+      downloadAndProcessRatings()
+    }, intervalMs)
+  }, msUntilFirstRefresh)
 }

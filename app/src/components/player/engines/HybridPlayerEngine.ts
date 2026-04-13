@@ -1,14 +1,14 @@
 /**
  * HybridPlayerEngine
- * 
+ *
  * Web playback engine with FFmpeg WASM transcoding support for rare codecs.
  * This engine is used when the browser cannot natively decode the audio codec
  * (e.g., FLAC, AC3, DTS in MKV containers).
- * 
+ *
  * Architecture:
  * - Video: Passed through to MSE (Media Source Extensions)
  * - Audio: Transcoded to AAC via FFmpeg WASM
- * 
+ *
  * IMPORTANT: This engine is NOT supported in Tauri apps.
  * Tauri uses native system decoders which support more codecs.
  */
@@ -22,16 +22,23 @@ import type {
   EngineCapabilities,
   SubtitleTrack,
   AudioTrack,
-  QualityLevel
+  QualityLevel,
+  HybridConfirmationDetails,
 } from './types'
 import { createLogger } from '../../../utils/client-logger'
 
 const log = createLogger('HybridPlayerEngine')
 
 // Lazy load hybrid media dependencies
-const HybridEnginePromise = import('../../../services/hybrid-media/HybridEngine').then(m => m.HybridEngine)
-const mightNeedHybridPlaybackPromise = import('../../../services/hybrid-media').then(m => m.mightNeedHybridPlayback)
-const TranscoderServicePromise = import('../../../services/hybrid-media/TranscoderService').then(m => m.TranscoderService)
+const HybridEnginePromise = import('../../../services/hybrid-media/HybridEngine').then(
+  (m) => m.HybridEngine
+)
+const mightNeedHybridPlaybackPromise = import('../../../services/hybrid-media').then(
+  (m) => m.mightNeedHybridPlayback
+)
+const TranscoderServicePromise = import('../../../services/hybrid-media/TranscoderService').then(
+  (m) => m.TranscoderService
+)
 
 /**
  * Check if running in Tauri environment
@@ -51,11 +58,11 @@ function generateId(): string {
  * Global cache to prevent re-probing on remounts
  * Maps URL -> 'native' | 'hybrid' | 'failed'
  */
-const probeCache = new Map<string, { mode: 'native' | 'hybrid', duration?: number }>()
+const probeCache = new Map<string, { mode: 'native' | 'hybrid'; duration?: number }>()
 
 /**
  * HybridPlayerEngine - FFmpeg WASM transcoding for rare codecs
- * 
+ *
  * This engine wraps the existing HybridEngine from services/hybrid-media
  * and adapts it to the IPlayerEngine interface.
  */
@@ -66,15 +73,19 @@ export class HybridPlayerEngine implements IPlayerEngine {
   private eventHandlers: Map<keyof PlayerEventHandlers, Set<Function>> = new Map()
   private externalSubtitles: SubtitleTrack[] = []
   private currentSource: MediaSource | null = null
-  
+
   // Hybrid engine instance
   private hybridEngine: any = null
   private audioElement: HTMLAudioElement | null = null
-  
+
   // Playback state
   private isInitialized: boolean = false
   private isHybridMode: boolean = false
   private needsTranscoding: boolean = false
+  private hybridConfirmationPending: boolean = false
+  private hybridConfirmed: boolean = false
+
+  private static readonly HYBRID_CONFIRM_THRESHOLD = 150 * 1024 * 1024
 
   constructor() {
     this.state = {
@@ -87,7 +98,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
       buffering: true,
       ended: false,
       ready: false,
-      buffered: null
+      buffered: null,
     }
   }
 
@@ -106,13 +117,13 @@ export class HybridPlayerEngine implements IPlayerEngine {
     }
 
     this.video = videoElement
-    
+
     // Initialize state from video element
     this.state = {
       ...this.state,
       volume: videoElement.volume,
       muted: videoElement.muted,
-      paused: true
+      paused: true,
     }
 
     this.isInitialized = true
@@ -140,7 +151,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
       buffering: true,
       ended: false,
       ready: false,
-      buffered: null
+      buffered: null,
     }
     this.emit('statechange', this.state)
 
@@ -161,7 +172,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     try {
       const [mightNeedHybrid, TranscoderService] = await Promise.all([
         mightNeedHybridPlaybackPromise,
-        TranscoderServicePromise
+        TranscoderServicePromise,
       ])
 
       if (!mightNeedHybrid(src)) {
@@ -174,10 +185,10 @@ export class HybridPlayerEngine implements IPlayerEngine {
       // Probe for metadata
       log.debug('Probing source for codec info...')
       const metadata = await TranscoderService.probe(src)
-      
+
       if (!metadata) {
         log.debug('No metadata, trying native playback')
-        probeCache.set(src, { mode: 'native' })
+        // Don't cache — missing metadata could be a truncated/failed fetch, not a definitive result
         await this.startNativePlayback(src)
         return
       }
@@ -190,11 +201,53 @@ export class HybridPlayerEngine implements IPlayerEngine {
         log.debug('Hybrid playback required')
         this.hybridEngine = engine
         this.needsTranscoding = true
-        
+
         const duration = engine.getDuration()
         probeCache.set(src, { mode: 'hybrid', duration })
         this.state.duration = duration
-        
+
+        const fileSize = metadata?.format?.size || 0
+        if (fileSize > HybridPlayerEngine.HYBRID_CONFIRM_THRESHOLD) {
+          log.debug(
+            `Large file detected (${(fileSize / 1024 / 1024).toFixed(0)}MB), requesting user confirmation`
+          )
+
+          const audioStream = (metadata?.streams || []).find(
+            (s: any) => s.codec_type === 'audio' && s.index === engine.audioStreamIdx
+          )
+          const audioCodec = audioStream?.codec_name || 'unknown'
+          const fileSizeLabel =
+            fileSize >= 1024 * 1024 * 1024
+              ? `${(fileSize / 1024 / 1024 / 1024).toFixed(1)} GB`
+              : `${(fileSize / 1024 / 1024).toFixed(0)} MB`
+
+          const confirmed = await new Promise<boolean>((resolve) => {
+            const details: HybridConfirmationDetails = {
+              fileSize,
+              fileSizeLabel,
+              audioCodec,
+              proceed: () => resolve(true),
+              cancel: () => resolve(false),
+            }
+            this.emit('hybridconfirmationneeded', details)
+          })
+
+          if (!confirmed) {
+            log.debug('User cancelled hybrid playback')
+            this.hybridEngine = null
+            this.needsTranscoding = false
+            this.emit(
+              'error',
+              new Error(
+                'Playback cancelled: unsupported audio codec requires downloading large file'
+              )
+            )
+            return
+          }
+
+          log.debug('User confirmed hybrid playback')
+        }
+
         await this.startHybridPlayback(src)
       } else {
         log.debug('Native playback sufficient')
@@ -203,7 +256,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
       }
     } catch (error) {
       log.error('Probe failed, falling back to native:', error)
-      probeCache.set(src, { mode: 'native' })
+      // Don't cache — probe failure (e.g. network timeout) is transient, not a definitive result
       await this.startNativePlayback(src)
     }
   }
@@ -214,7 +267,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     this.isHybridMode = false
     this.video.src = src
     this.video.load()
-    
+
     // Set up standard video event listeners
     this.setupNativeEventListeners()
   }
@@ -228,7 +281,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     try {
       // Initialize the hybrid engine with our video element
       await this.hybridEngine.initialize(this.video)
-      
+
       // Set up event listeners for hybrid engine
       this.hybridEngine.addEventListener('timeupdate', (e: any) => {
         const { currentTime } = e.detail
@@ -256,6 +309,19 @@ export class HybridPlayerEngine implements IPlayerEngine {
         this.emit('statechange', { ready: true, buffering: false })
       })
 
+      // Seek completed — first new audio segment appended after seek restart
+      this.hybridEngine.addEventListener('seekready', () => {
+        log.debug('Seek ready — resuming')
+        this.state.buffering = false
+        this.emit('playing')
+        this.emit('statechange', { buffering: false })
+      })
+
+      // Forward transcoding progress to the player UI
+      this.hybridEngine.addEventListener('transcodingprogress', (e: any) => {
+        this.emit('transcodingprogress', e.detail)
+      })
+
       // Get the audio element for volume control
       this.audioElement = this.hybridEngine.getAudioElement()
 
@@ -263,7 +329,6 @@ export class HybridPlayerEngine implements IPlayerEngine {
       await this.hybridEngine.play()
       this.state.paused = false
       this.emit('statechange', { paused: false })
-
     } catch (error) {
       log.error('Hybrid playback failed:', error)
       // Fall back to native
@@ -363,7 +428,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     log.debug('Destroying...')
 
     await this.cleanupSource()
-    
+
     this.eventHandlers.clear()
     this.video = null
     this.currentSource = null
@@ -390,7 +455,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     } else {
       await this.video.play()
     }
-    
+
     this.state.paused = false
     this.emit('statechange', { paused: false })
   }
@@ -403,7 +468,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
     } else {
       this.video.pause()
     }
-    
+
     this.state.paused = true
     this.emit('statechange', { paused: true })
   }
@@ -418,22 +483,22 @@ export class HybridPlayerEngine implements IPlayerEngine {
     } else {
       this.video.currentTime = clampedTime
     }
-    
+
     this.state.currentTime = clampedTime
     this.emit('statechange', { currentTime: clampedTime })
   }
 
   setVolume(volume: number): void {
     const clampedVolume = Math.max(0, Math.min(1, volume))
-    
+
     if (this.isHybridMode && this.audioElement) {
       this.audioElement.volume = clampedVolume
     }
-    
+
     if (this.video) {
       this.video.volume = clampedVolume
     }
-    
+
     this.state.volume = clampedVolume
     this.emit('volumechange', clampedVolume, this.state.muted)
   }
@@ -442,11 +507,11 @@ export class HybridPlayerEngine implements IPlayerEngine {
     if (this.isHybridMode && this.audioElement) {
       this.audioElement.muted = muted
     }
-    
+
     if (this.video) {
       this.video.muted = muted
     }
-    
+
     this.state.muted = muted
     this.emit('volumechange', this.state.volume, muted)
   }
@@ -455,10 +520,10 @@ export class HybridPlayerEngine implements IPlayerEngine {
     if (this.video) {
       this.video.playbackRate = rate
     }
-    
+
     // Note: Hybrid engine may not support playback rate changes
     // for the transcoded audio
-    
+
     this.state.playbackRate = rate
     this.emit('ratechange', rate)
   }
@@ -478,7 +543,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
       hls: true,
       dash: false,
       mse: typeof MediaSource !== 'undefined',
-      canProbe: true
+      canProbe: true,
     }
   }
 
@@ -500,7 +565,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
           label: track.label || track.language || `Track ${i}`,
           language: track.language || 'und',
           enabled: track.mode === 'showing',
-          kind: track.kind as 'subtitles' | 'captions'
+          kind: track.kind as 'subtitles' | 'captions',
         })
       }
     }
@@ -535,7 +600,7 @@ export class HybridPlayerEngine implements IPlayerEngine {
   addSubtitleTracks(tracks: SubtitleTrack[]): void {
     if (!this.video) return
 
-    tracks.forEach(track => {
+    tracks.forEach((track) => {
       const trackElement = document.createElement('track')
       trackElement.kind = track.kind || 'subtitles'
       trackElement.label = track.label
@@ -598,10 +663,10 @@ export class HybridPlayerEngine implements IPlayerEngine {
   ): void {
     const handlers = this.eventHandlers.get(event)
     if (handlers) {
-      handlers.forEach(handler => {
+      handlers.forEach((handler) => {
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-          (handler as Function)(...args)
+          ;(handler as Function)(...args)
         } catch (error) {
           log.error(`Error in ${event} handler:`, error)
         }

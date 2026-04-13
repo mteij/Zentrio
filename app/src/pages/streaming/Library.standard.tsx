@@ -10,6 +10,7 @@ import {
   Plus,
   Share2,
   Trash2,
+  User,
   UserPlus,
   Users,
   X as XIcon,

@@ -250,6 +250,7 @@ export function ZentrioPlayer({
     state,
     isLoading,
     error,
+    hybridConfirmation,
     seek,
     setVolume,
     setMuted,
@@ -265,6 +266,7 @@ export function ZentrioPlayer({
     getQualityLevels,
     setQualityLevel,
     activeEngineType,
+    transcodeProgress,
   } = usePlayerEngine({
     autoPlay,
     startTime,
@@ -707,6 +709,77 @@ export function ZentrioPlayer({
       ? (state.buffered.end(state.buffered.length - 1) / state.duration) * 100
       : 0
 
+  const transcodedPct = transcodeProgress?.transcodedPct ?? 0
+  const isSeekTranscoding = !!(transcodeProgress?.isSeeking && transcodeProgress.percent < 100)
+
+  /* ── Hybrid confirmation state ── */
+  const hybridCodecLabel = (codec: string): string => {
+    const labels: Record<string, string> = {
+      eac3: 'Dolby Digital Plus (E-AC3)',
+      ac3: 'Dolby Digital (AC3)',
+      dts: 'DTS',
+      truehd: 'Dolby TrueHD',
+      flac: 'FLAC',
+      mlp: 'MLP',
+    }
+    return labels[codec.toLowerCase()] || codec.toUpperCase()
+  }
+
+  /* ── Hybrid confirmation state ── */
+  if (hybridConfirmation) {
+    return (
+      <div className={styles.playerContainer}>
+        <div className={styles.errorOverlay}>
+          <AlertTriangle className={styles.errorIcon} />
+          <div className={styles.errorTitle}>Audio Transcoding Required</div>
+          <div className={styles.errorMessage}>
+            This video uses {hybridCodecLabel(hybridConfirmation.audioCodec)} audio, which isn't
+            supported by your browser.
+            <br />
+            <br />
+            To play it, the player needs to download and transcode the audio track (
+            {hybridConfirmation.fileSizeLabel} file).
+            <br />
+            <br />
+            This may take a moment before playback starts and will use significant bandwidth.
+          </div>
+          <div className={styles.errorActions}>
+            {onFindNewStream && (
+              <button
+                className={styles.errorButtonSecondary}
+                onClick={() => {
+                  hybridConfirmation.cancel()
+                  onFindNewStream()
+                }}
+              >
+                Find Another Stream
+              </button>
+            )}
+            {onBack && (
+              <button
+                className={styles.errorButtonSecondary}
+                onClick={() => {
+                  hybridConfirmation.cancel()
+                  onBack()
+                }}
+              >
+                Go Back
+              </button>
+            )}
+            <button
+              className={styles.errorButtonPrimary}
+              onClick={() => {
+                hybridConfirmation.proceed()
+              }}
+            >
+              Play with Transcoding
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   /* ── Error state ── */
   if (error) {
     return (
@@ -757,8 +830,20 @@ export function ZentrioPlayer({
       {/* Poster while loading */}
       {poster && isLoading && <img src={poster} alt={title} className={styles.posterImage} />}
 
+      {/* Seek-transcoding overlay — shown while hybrid engine re-transcodes after a seek */}
+      {isSeekTranscoding && (
+        <div className={styles.seekTranscodingOverlay}>
+          <div className={styles.bufferingRing} />
+          <span className={styles.seekTranscodingLabel}>
+            {transcodeProgress!.etaSec !== undefined && transcodeProgress!.etaSec > 2
+              ? `Preparing seek… ~${transcodeProgress!.etaSec}s`
+              : 'Preparing seek…'}
+          </span>
+        </div>
+      )}
+
       {/* Buffering spinner (distinct from initial load) */}
-      {state.buffering && !isLoading && (
+      {state.buffering && !isLoading && !isSeekTranscoding && (
         <div className={styles.bufferingSpinner}>
           <div className={styles.bufferingRing} />
         </div>
@@ -998,6 +1083,9 @@ export function ZentrioPlayer({
             )}
             <div className={styles.progressTrack}>
               <div className={styles.progressBuffered} style={{ width: `${bufferedPct}%` }} />
+              {transcodedPct > 0 && (
+                <div className={styles.progressTranscoded} style={{ width: `${transcodedPct}%` }} />
+              )}
               <div
                 className={styles.progressPlayed}
                 style={{ width: `${displayProgress * 100}%` }}

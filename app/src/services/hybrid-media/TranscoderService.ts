@@ -75,6 +75,8 @@ class TranscoderServiceClass {
   private isLoading = false
   private isLoaded = false
   private loadPromise: Promise<void> | null = null
+  // Deduplicate concurrent probe calls (e.g. React Strict Mode double-invoke)
+  private probeInFlight = new Map<string, Promise<MediaMetadata | null>>()
 
   /**
    * Check if a codec requires FFmpeg transcoding
@@ -114,7 +116,7 @@ class TranscoderServiceClass {
     if (this.loadPromise) return this.loadPromise
 
     this.isLoading = true
-    
+
     this.loadPromise = (async () => {
       try {
         this.ffmpeg = new FFmpeg()
@@ -126,7 +128,7 @@ class TranscoderServiceClass {
 
         // Load from CDN with proper CORS headers
         const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm'
-        
+
         await this.ffmpeg.load({
           coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
           wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -149,13 +151,7 @@ class TranscoderServiceClass {
    * Transcode audio from a media file to AAC
    */
   async transcodeAudio(options: TranscodeOptions): Promise<TranscodeResult> {
-    const {
-      sourceUrl,
-      codecId,
-      audioStreamIndex = 0,
-      bitrate = '192k',
-      onProgress,
-    } = options
+    const { sourceUrl, codecId, audioStreamIndex = 0, bitrate = '192k', onProgress } = options
 
     // Ensure FFmpeg is loaded
     await this.load()
@@ -182,7 +178,7 @@ class TranscoderServiceClass {
       // Fetch the source file
       log.debug('Fetching source file...')
       const sourceData = await fetchFile(sourceUrl)
-      
+
       // Write input file to virtual filesystem
       await this.ffmpeg.writeFile(inputFilename, sourceData)
 
@@ -192,13 +188,17 @@ class TranscoderServiceClass {
       // -b:a sets bitrate
       // -vn skips video
       const ffmpegArgs = [
-        '-i', inputFilename,
-        '-map', `0:a:${audioStreamIndex}`,
-        '-c:a', 'aac',
-        '-b:a', bitrate,
+        '-i',
+        inputFilename,
+        '-map',
+        `0:a:${audioStreamIndex}`,
+        '-c:a',
+        'aac',
+        '-b:a',
+        bitrate,
         '-vn',
         '-y',
-        outputFilename
+        outputFilename,
       ]
 
       log.debug('Running FFmpeg:', ffmpegArgs.join(' '))
@@ -206,7 +206,7 @@ class TranscoderServiceClass {
 
       // Read output file
       const outputData = await this.ffmpeg.readFile(outputFilename)
-      
+
       // Create blob URL - handle both string and Uint8Array return types
       // Use type assertion as FFmpeg WASM returns regular ArrayBuffer (not SharedArrayBuffer)
       let blobData: ArrayBuffer
@@ -241,11 +241,11 @@ class TranscoderServiceClass {
         duration,
         cleanup: () => {
           URL.revokeObjectURL(audioUrl)
-        }
+        },
       }
     } catch (error) {
       log.error('Transcoding failed:', error)
-      
+
       // Cleanup files on error
       try {
         await this.ffmpeg.deleteFile(inputFilename)
@@ -257,7 +257,7 @@ class TranscoderServiceClass {
       } catch (_err) {
         // Ignore cleanup errors
       }
-      
+
       throw error
     }
   }
@@ -268,7 +268,7 @@ class TranscoderServiceClass {
    */
   async probeAudioCodec(sourceUrl: string): Promise<{ codecId: number; codecName: string } | null> {
     await this.load()
-    
+
     if (!this.ffmpeg) {
       throw new Error('FFmpeg not initialized')
     }
@@ -288,19 +288,20 @@ class TranscoderServiceClass {
       }
       this.ffmpeg.on('log', logHandler)
 
-      // Run with -hide_banner to reduce noise
-      await this.ffmpeg.exec([
-        '-hide_banner',
-        '-i', inputFilename,
-        '-f', 'null',
-        '-'
-      ]).catch(() => {
-        // FFmpeg returns error code when -f null but we have the probe output
-      })
+      try {
+        // Run with -hide_banner to reduce noise
+        await this.ffmpeg
+          .exec(['-hide_banner', '-i', inputFilename, '-f', 'null', '-'])
+          .catch(() => {
+            // FFmpeg returns error code when -f null but we have the probe output
+          })
+      } finally {
+        this.ffmpeg.off('log', logHandler)
+      }
 
       // Parse codec from output
       const audioMatch = probeOutput.match(/Audio:\s+(\w+)/i)
-      
+
       // Cleanup input file - use try/catch to handle case where file might not exist
       try {
         await this.ffmpeg.deleteFile(inputFilename)
@@ -311,32 +312,32 @@ class TranscoderServiceClass {
       if (audioMatch) {
         const codecStr = audioMatch[1].toLowerCase()
         const codecMap: Record<string, number> = {
-          'dts': CODEC_ID_DTS,
-          'truehd': CODEC_ID_TRUEHD,
-          'ac3': CODEC_ID_AC3,
-          'eac3': CODEC_ID_EAC3,
-          'flac': CODEC_ID_FLAC,
-          'vorbis': CODEC_ID_VORBIS,
-          'opus': CODEC_ID_OPUS,
+          dts: CODEC_ID_DTS,
+          truehd: CODEC_ID_TRUEHD,
+          ac3: CODEC_ID_AC3,
+          eac3: CODEC_ID_EAC3,
+          flac: CODEC_ID_FLAC,
+          vorbis: CODEC_ID_VORBIS,
+          opus: CODEC_ID_OPUS,
         }
-        
+
         return {
           codecId: codecMap[codecStr] || 0,
-          codecName: codecStr.toUpperCase()
+          codecName: codecStr.toUpperCase(),
         }
       }
 
       return null
     } catch (error) {
       log.warn('Probe failed:', error)
-      
+
       // Cleanup input file on error - use try/catch to handle case where file might not exist
       try {
         await this.ffmpeg.deleteFile(inputFilename)
       } catch (_err) {
         // Ignore cleanup errors
       }
-      
+
       return null
     }
   }
@@ -348,10 +349,26 @@ class TranscoderServiceClass {
    * Uses Range requests to only download the first few MB (where metadata lives)
    */
   async probe(sourceUrl: string): Promise<MediaMetadata | null> {
+    // Return the in-flight promise for the same URL instead of starting a second concurrent probe.
+    // This prevents React Strict Mode's double-invoke from running two FFmpeg execs in parallel
+    // on the shared singleton instance, which corrupts output and can cause spurious timeouts.
+    const inflight = this.probeInFlight.get(sourceUrl)
+    if (inflight) {
+      log.debug('Returning in-flight probe for:', sourceUrl.substring(0, 80))
+      return inflight
+    }
+
+    const probePromise = this._probe(sourceUrl)
+    this.probeInFlight.set(sourceUrl, probePromise)
+    probePromise.finally(() => this.probeInFlight.delete(sourceUrl))
+    return probePromise
+  }
+
+  private async _probe(sourceUrl: string): Promise<MediaMetadata | null> {
     log.debug('Starting lightweight probe for:', sourceUrl)
-    
+
     await this.load()
-    
+
     if (!this.ffmpeg) {
       log.error('FFmpeg not initialized')
       return null
@@ -364,39 +381,40 @@ class TranscoderServiceClass {
     try {
       // Use Range request to fetch only first 5MB (metadata is at the beginning)
       log.debug('Fetching first 5MB for probing...')
-      
+
       // Add timeout using AbortController
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-      
+
       const response = await fetch(sourceUrl, {
-        headers: { 'Range': 'bytes=0-5242879' }, // First 5MB
-        signal: controller.signal
+        headers: { Range: 'bytes=0-5242879' }, // First 5MB
+        signal: controller.signal,
       }).finally(() => clearTimeout(timeoutId))
-      
+
       if (!response.ok && response.status !== 206 && response.status !== 200) {
         log.error('HTTP error:', response.status, response.statusText)
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-      
+
       // Check if server returned full file despite Range request
       if (response.status === 200 && response.headers.get('content-length')) {
         const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
-        if (contentLength > 6 * 1024 * 1024) { // If > 6MB, server sent full file
+        if (contentLength > 6 * 1024 * 1024) {
+          // If > 6MB, server sent full file
           log.warn('Server returned full file instead of range, aborting')
           throw new Error('Server does not support Range requests')
         }
       }
-      
+
       const sourceData = await response.arrayBuffer()
       log.debug('Source data fetched, size:', sourceData.byteLength)
-      
+
       // Validate we got enough data
       if (sourceData.byteLength < 1000) {
         log.warn('Received insufficient data, may not be valid media')
         return null
       }
-      
+
       await this.ffmpeg.writeFile(inputFilename, new Uint8Array(sourceData))
 
       // Use FFprobe to get JSON output
@@ -408,15 +426,15 @@ class TranscoderServiceClass {
 
       log.debug('Running FFmpeg probe...')
       // Run FFprobe with JSON output
-      await this.ffmpeg.exec([
-        '-hide_banner',
-        '-i', inputFilename,
-        '-f', 'null',
-        '-'
-      ]).catch((err) => {
-        // FFmpeg returns error code when -f null but we have the probe output
+      try {
+        await this.ffmpeg.exec(['-hide_banner', '-i', inputFilename, '-f', 'null', '-'])
+      } catch (err) {
+        // FFmpeg returns non-zero exit code for -f null even on success — ignore it
         log.debug('FFmpeg probe completed (expected error for -f null):', err)
-      })
+      } finally {
+        // Always remove the handler so it doesn't accumulate on the shared instance
+        this.ffmpeg.off('log', logHandler)
+      }
 
       log.debug('Probe output length:', probeOutput.length)
       log.debug('Probe output preview:', probeOutput.substring(0, 500))
@@ -435,7 +453,7 @@ class TranscoderServiceClass {
           index: parseInt(index, 10),
           codec_type: codecType.toLowerCase() as any,
           codec_name: codecName.toLowerCase(),
-          tags: language ? { language } : undefined
+          tags: language ? { language } : undefined,
         })
       }
 
@@ -444,13 +462,17 @@ class TranscoderServiceClass {
       // Parse format name from output (e.g., "Input #0, matroska,webm, from '...'")
       const formatMatch = probeOutput.match(/Input\s+#\d+,\s+([^,]+)/)
       const formatName = formatMatch ? formatMatch[1] : 'unknown'
-      
+
       // Parse duration from output
       const durationMatch = probeOutput.match(/Duration:\s+(\d+):(\d+):(\d+)\.(\d+)/)
       let duration = 0
       if (durationMatch) {
         const [, hours, minutes, seconds, centiseconds] = durationMatch
-        duration = parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds) + parseInt(centiseconds) / 100
+        duration =
+          parseInt(hours) * 3600 +
+          parseInt(minutes) * 60 +
+          parseInt(seconds) +
+          parseInt(centiseconds) / 100
       }
 
       // Parse bitrate from output
@@ -468,7 +490,7 @@ class TranscoderServiceClass {
         duration,
         bit_rate: bitrate,
         format_name: formatName,
-        format_long_name: formatName.charAt(0).toUpperCase() + formatName.slice(1)
+        format_long_name: formatName.charAt(0).toUpperCase() + formatName.slice(1),
       }
 
       log.debug('Probe result:', { streams, format })
@@ -480,18 +502,18 @@ class TranscoderServiceClass {
 
       return {
         streams,
-        format
+        format,
       }
     } catch (error) {
       log.error('Probe failed with error:', error)
-      
+
       // Cleanup input file on error - use try/catch to handle case where file might not exist
       try {
         await this.ffmpeg.deleteFile(inputFilename)
       } catch (_err) {
         // Ignore cleanup errors
       }
-      
+
       return null
     }
   }
@@ -506,7 +528,7 @@ class TranscoderServiceClass {
     if (isTauriEnvironment()) {
       return false
     }
-    
+
     // Check for SharedArrayBuffer (required for FFmpeg WASM)
     return typeof SharedArrayBuffer !== 'undefined'
   }

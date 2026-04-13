@@ -64,6 +64,12 @@ function mergeSubtitleTracks(
   return Array.from(map.values())
 }
 
+function proxySubtitleUrl(url: string): string {
+  if (!url) return url
+  // Route through backend proxy to avoid cross-origin block on <track> elements
+  return `/api/streaming/subtitle-proxy?url=${encodeURIComponent(url)}`
+}
+
 function buildLauncherDescription(meta: MetaInfo): string | undefined {
   if (meta.season !== undefined && meta.episode !== undefined) {
     const episodeTitle = meta.videos?.find(
@@ -275,7 +281,7 @@ export function StreamingPlayerStandardView(_props: {
         return data.subtitles
           .filter((s: any) => !!s?.url)
           .map((s: any) => ({
-            src: s.url,
+            src: proxySubtitleUrl(s.url),
             label: s.addonName ? `${s.lang} (${s.addonName})` : s.lang,
             language: s.lang || 'und',
             type: s.type || s.format,
@@ -314,7 +320,7 @@ export function StreamingPlayerStandardView(_props: {
         const inlineTracks: PlayerSubtitleTrack[] = (parsedStream.subtitles || [])
           .filter((s: any) => !!s?.url)
           .map((s: any, i: number) => ({
-            src: s.url,
+            src: proxySubtitleUrl(s.url),
             label: s.lang || 'Unknown',
             language: s.lang || 'und',
             default: i === 0,

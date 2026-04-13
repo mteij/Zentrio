@@ -1,7 +1,19 @@
 import { optionalSessionMiddleware, sessionMiddleware } from '../../middleware/session'
 import { addonManager } from '../../services/addons/addon-manager'
-import { enrichContent, filterContent, getParentalSettings } from '../../services/addons/content-filter'
-import { addonDb, listDb, profileDb, streamDb, userDb, watchHistoryDb, type User } from '../../services/database'
+import {
+  enrichContent,
+  filterContent,
+  getParentalSettings,
+} from '../../services/addons/content-filter'
+import {
+  addonDb,
+  listDb,
+  profileDb,
+  streamDb,
+  userDb,
+  watchHistoryDb,
+  type User,
+} from '../../services/database'
 import { logger } from '../../services/logger'
 import { traktSyncService } from '../../services/trakt'
 import { err } from '../../utils/api'
@@ -19,24 +31,24 @@ const streaming = createTaggedOpenAPIApp<{
 
 // Helper to find and add next episode to continue watching
 async function ensureNextEpisodeInContinueWatching(
-  profileId: number, 
-  metaId: string, 
-  currentSeason: number, 
+  profileId: number,
+  metaId: string,
+  currentSeason: number,
   currentEpisode: number
 ) {
   try {
     log.debug(`Checking next episode for ${metaId} after S${currentSeason}E${currentEpisode}`)
-    
+
     // 1. Get metadata to find next episode
     // We assume 'series' type because only series have next episodes
     const meta = await addonManager.getMeta('series', metaId, profileId)
     if (!meta) {
-        log.debug(`No metadata found for ${metaId}`)
-        return
+      log.debug(`No metadata found for ${metaId}`)
+      return
     }
     if (!meta.videos || meta.videos.length === 0) {
-        log.debug(`No videos found in metadata for ${metaId}`)
-        return
+      log.debug(`No videos found in metadata for ${metaId}`)
+      return
     }
 
     // 2. Find current video index
@@ -45,26 +57,27 @@ async function ensureNextEpisodeInContinueWatching(
       return a.episode - b.episode
     })
 
-    const currentIndex = sortedVideos.findIndex((v: any) => v.season === currentSeason && v.episode === currentEpisode)
+    const currentIndex = sortedVideos.findIndex(
+      (v: any) => v.season === currentSeason && v.episode === currentEpisode
+    )
     log.debug(`Current index: ${currentIndex} / ${sortedVideos.length}`)
-    
+
     // 3. Get next video if exists
     if (currentIndex !== -1 && currentIndex < sortedVideos.length - 1) {
       const nextVideo = sortedVideos[currentIndex + 1]
       log.debug(`Found next video: S${nextVideo.season}E${nextVideo.episode}`)
-      
+
       // 4. Check if next video is already in history (started or watched)
       const existingProgress = watchHistoryDb.getProgress(
-        profileId, 
-        metaId, 
-        nextVideo.season, 
+        profileId,
+        metaId,
+        nextVideo.season,
         nextVideo.episode
       )
 
       // Only insert if NO progress exists OR if it exists but is effectively empty (not watched, no position)
       // This ensures we bump it to the top of "Continue Watching" even if a placeholder existed
       if (!existingProgress || (!existingProgress.is_watched && !existingProgress.position)) {
-        
         watchHistoryDb.upsert({
           profile_id: profileId,
           meta_id: metaId,
@@ -76,11 +89,11 @@ async function ensureNextEpisodeInContinueWatching(
           poster: meta.poster, // Series poster
           duration: 0,
           position: 0,
-          last_stream: null
+          last_stream: null,
         })
       }
     } else {
-        log.debug(`No next video found (last episode?)`)
+      log.debug(`No next video found (last episode?)`)
     }
   } catch (e) {
     log.error('Failed to ensure next episode:', e)
@@ -97,33 +110,33 @@ streaming.get('/settings', optionalSessionMiddleware, async (c) => {
     const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
     if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
-    let settingsProfileId: number;
+    let settingsProfileId: number
 
     if (querySettingsProfileId) {
-        settingsProfileId = parseInt(querySettingsProfileId);
+      settingsProfileId = parseInt(querySettingsProfileId)
     } else {
-        let pId: number;
-        if (profileId && profileId !== 'guest') {
-            pId = parseInt(profileId)
-        } else if (isGuestMode || profileId === 'guest') {
-            const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
-            pId = guestDefaultProfile.id
-        } else {
-            // Fallback to default profile
-            let profile = profileDb.getDefault(effectiveUser.id)
-            if (!profile) {
-                const profiles = profileDb.findByUserId(effectiveUser.id)
-                if (profiles && profiles.length > 0) {
-                    profile = profiles[0]
-                }
-            }
-            if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'No profile found')
-            pId = profile.id
+      let pId: number
+      if (profileId && profileId !== 'guest') {
+        pId = parseInt(profileId)
+      } else if (isGuestMode || profileId === 'guest') {
+        const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+        pId = guestDefaultProfile.id
+      } else {
+        // Fallback to default profile
+        let profile = profileDb.getDefault(effectiveUser.id)
+        if (!profile) {
+          const profiles = profileDb.findByUserId(effectiveUser.id)
+          if (profiles && profiles.length > 0) {
+            profile = profiles[0]
+          }
         }
-        
-        const resolved = profileDb.getSettingsProfileId(pId);
-        if (!resolved) return err(c, 404, 'SETTINGS_PROFILE_NOT_FOUND', 'Settings profile not found')
-        settingsProfileId = resolved;
+        if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'No profile found')
+        pId = profile.id
+      }
+
+      const resolved = profileDb.getSettingsProfileId(pId)
+      if (!resolved) return err(c, 404, 'SETTINGS_PROFILE_NOT_FOUND', 'Settings profile not found')
+      settingsProfileId = resolved
     }
 
     const settings = streamDb.getSettings(settingsProfileId)
@@ -144,33 +157,33 @@ streaming.put('/settings', optionalSessionMiddleware, async (c) => {
     const effectiveUser = isGuestMode ? userDb.getOrCreateGuestUser() : user
     if (!effectiveUser) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
-    let settingsProfileId: number;
+    let settingsProfileId: number
 
     if (querySettingsProfileId) {
-        settingsProfileId = parseInt(querySettingsProfileId);
+      settingsProfileId = parseInt(querySettingsProfileId)
     } else {
-        let pId: number;
-        if (profileId && profileId !== 'guest') {
-            pId = parseInt(profileId)
-        } else if (isGuestMode || profileId === 'guest') {
-            const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
-            pId = guestDefaultProfile.id
-        } else {
-            // Fallback to default profile
-            let profile = profileDb.getDefault(effectiveUser.id)
-            if (!profile) {
-                const profiles = profileDb.findByUserId(effectiveUser.id)
-                if (profiles && profiles.length > 0) {
-                    profile = profiles[0]
-                }
-            }
-            if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'No profile found')
-            pId = profile.id
+      let pId: number
+      if (profileId && profileId !== 'guest') {
+        pId = parseInt(profileId)
+      } else if (isGuestMode || profileId === 'guest') {
+        const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
+        pId = guestDefaultProfile.id
+      } else {
+        // Fallback to default profile
+        let profile = profileDb.getDefault(effectiveUser.id)
+        if (!profile) {
+          const profiles = profileDb.findByUserId(effectiveUser.id)
+          if (profiles && profiles.length > 0) {
+            profile = profiles[0]
+          }
         }
-        
-        const resolved = profileDb.getSettingsProfileId(pId);
-        if (!resolved) return err(c, 404, 'SETTINGS_PROFILE_NOT_FOUND', 'Settings profile not found')
-        settingsProfileId = resolved;
+        if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'No profile found')
+        pId = profile.id
+      }
+
+      const resolved = profileDb.getSettingsProfileId(pId)
+      if (!resolved) return err(c, 404, 'SETTINGS_PROFILE_NOT_FOUND', 'Settings profile not found')
+      settingsProfileId = resolved
     }
 
     const settings = await c.req.json()
@@ -182,56 +195,57 @@ streaming.put('/settings', optionalSessionMiddleware, async (c) => {
   }
 })
 
-
 streaming.get('/subtitles/:type/:id', async (c) => {
   const { type, id } = c.req.param()
   const { profileId, videoHash } = c.req.query()
-  
+
   if (!profileId) {
     log.debug('No profileId provided')
     return c.json({ subtitles: [] })
   }
-  
+
   const debugInfo: any = {
     profileId,
     type,
     id,
     videoHash,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   }
-  
+
   try {
     log.debug(`Fetching for ${type}/${id} with videoHash: ${videoHash || 'none'}`)
     const results = await addonManager.getSubtitles(type, id, parseInt(profileId), videoHash)
-    
+
     debugInfo.addonsQueried = results.length
-    debugInfo.addonResults = results.map(r => ({
+    debugInfo.addonResults = results.map((r) => ({
       name: r.addon.name,
       count: r.subtitles.length,
-      supportsSubtitles: r.addon.resources?.includes('subtitles') || r.addon.resources?.some((res: any) => res?.name === 'subtitles')
+      supportsSubtitles:
+        r.addon.resources?.includes('subtitles') ||
+        r.addon.resources?.some((res: any) => res?.name === 'subtitles'),
     }))
-    
+
     log.debug(`Received ${results.length} addon results`)
-    results.forEach(r => {
+    results.forEach((r) => {
       log.debug(`${r.addon.name}: ${r.subtitles.length} subtitles`)
     })
-    
+
     // Flatten subtitles from all addons into a single list with addon info
-    const subtitles = results.flatMap(r =>
-      r.subtitles.map(s => ({
+    const subtitles = results.flatMap((r) =>
+      r.subtitles.map((s) => ({
         ...s,
-        addonName: r.addon.name
+        addonName: r.addon.name,
       }))
     )
-    
+
     debugInfo.totalSubtitles = subtitles.length
-    
+
     log.debug(`Total subtitles: ${subtitles.length}`)
     if (subtitles.length === 0) {
       log.warn('No subtitles available. Consider installing a subtitle addon like OpenSubtitles.')
       debugInfo.message = 'No subtitle results from any addon'
     }
-    
+
     // Include debug info in response
     return c.json({ subtitles, debug: debugInfo })
   } catch (e) {
@@ -241,15 +255,146 @@ streaming.get('/subtitles/:type/:id', async (c) => {
   }
 })
 
+const SUBTITLE_SIZE_LIMIT = 2 * 1024 * 1024 // 2 MB
+
+streaming.get('/subtitle-proxy', optionalSessionMiddleware, async (c) => {
+  const user = c.get('user')
+  const isGuest = c.get('guestMode') as boolean
+  if (!user && !isGuest) return c.text('Unauthorized', 401)
+
+  const { url } = c.req.query()
+  if (!url) return c.text('Missing url', 400)
+
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(url)
+    new URL(decoded)
+  } catch {
+    return c.text('Invalid url', 400)
+  }
+
+  // isExternalUrl blocks private/loopback IPs and non-http(s) schemes (defined below)
+  if (!isExternalUrl(decoded)) return c.text('Forbidden', 403)
+
+  try {
+    const res = await fetch(decoded, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      redirect: 'follow',
+    })
+    if (!res.ok) return c.text('Upstream error', 502)
+
+    const buf = await res.arrayBuffer()
+    if (buf.byteLength > SUBTITLE_SIZE_LIMIT) return c.text('Response too large', 413)
+
+    const contentType = res.headers.get('content-type') || 'text/plain; charset=utf-8'
+    return new Response(buf, {
+      headers: {
+        'Content-Type': contentType,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=3600',
+      },
+    })
+  } catch (e) {
+    log.error('Subtitle proxy error:', e)
+    return c.text('Proxy fetch failed', 502)
+  }
+})
+
+// SSRF guard reused from addon proxy — block loopback and private ranges
+const BLOCKED_HOSTS = [
+  /^localhost$/i,
+  /^127\./,
+  /^0\./,
+  /^::1$/,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^fc00:/i,
+  /^fe80:/i,
+]
+
+function isExternalUrl(urlStr: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(urlStr)
+    if (!['https:', 'http:'].includes(protocol)) return false
+    if (!hostname || /^\d+$/.test(hostname)) return false
+    return !BLOCKED_HOSTS.some((p) => p.test(hostname))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * GET /api/streaming/stream-range-proxy?url=<encoded>
+ *
+ * Streams a ranged byte request for an external media URL through the server
+ * so the browser never makes a direct cross-origin fetch (CORS bypass).
+ * Forwards the client's Range header verbatim and streams the response body
+ * without buffering, so it is safe for large (20 MB+) chunks.
+ */
+streaming.get('/stream-range-proxy', async (c) => {
+  const { url: encodedUrl } = c.req.query()
+  if (!encodedUrl) return c.text('Missing url', 400)
+
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(encodedUrl)
+    new URL(decoded)
+  } catch {
+    return c.text('Invalid url', 400)
+  }
+
+  if (!isExternalUrl(decoded)) return c.text('URL not allowed', 403)
+
+  const rangeHeader = c.req.header('range')
+
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 90_000)
+
+    const upstream = await fetch(decoded, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Zentrio/1.0',
+        ...(rangeHeader ? { Range: rangeHeader } : {}),
+      },
+    })
+    clearTimeout(timeout)
+
+    const passthroughHeaders: Record<string, string> = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges',
+    }
+    for (const name of ['content-type', 'content-range', 'content-length', 'accept-ranges']) {
+      const val = upstream.headers.get(name)
+      if (val) passthroughHeaders[name] = val
+    }
+
+    // Stream body directly — no buffering so 20 MB chunks don't spike memory
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: passthroughHeaders,
+    })
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      log.warn('Stream proxy timeout:', decoded)
+      return c.text('Upstream timeout', 504)
+    }
+    log.error('Stream proxy error:', e)
+    return c.text('Proxy request failed', 502)
+  }
+})
+
 streaming.get('/search', async (c) => {
   const { q, profileId, type, year, sort } = c.req.query()
   if (!q || !profileId) return c.json({ results: [] })
-  
+
   try {
     const filters = {
-        type: type !== 'undefined' ? type : undefined,
-        year: year !== 'undefined' ? year : undefined,
-        sort: sort !== 'undefined' ? sort : undefined
+      type: type !== 'undefined' ? type : undefined,
+      year: year !== 'undefined' ? year : undefined,
+      sort: sort !== 'undefined' ? sort : undefined,
     }
     const results = await addonManager.search(q, parseInt(profileId), filters)
     return c.json({ results })
@@ -269,7 +414,7 @@ streaming.get('/search-catalog-metadata', async (c) => {
 
   try {
     const filters = {
-      type: type !== 'undefined' ? type : undefined
+      type: type !== 'undefined' ? type : undefined,
     }
     const catalogs = await addonManager.getSearchCatalogMetadata(parseInt(profileId), filters)
     return c.json({ catalogs })
@@ -301,10 +446,10 @@ streaming.get('/search-catalog-items', async (c) => {
 streaming.get('/search-catalogs', async (c) => {
   const { q, profileId, type } = c.req.query()
   if (!q || !profileId) return c.json({ catalogs: [] })
-  
+
   try {
     const filters = {
-      type: type !== 'undefined' ? type : undefined
+      type: type !== 'undefined' ? type : undefined,
     }
     const catalogs = await addonManager.searchByCatalog(q, parseInt(profileId), filters)
     return c.json({ catalogs })
@@ -323,7 +468,13 @@ streaming.get('/catalog', async (c) => {
   try {
     let items: any[] = []
     if (manifestUrl && type && id) {
-      const result = await addonManager.getCatalogItems(pId, decodeURIComponent(manifestUrl), type, id, skipNum)
+      const result = await addonManager.getCatalogItems(
+        pId,
+        decodeURIComponent(manifestUrl),
+        type,
+        id,
+        skipNum
+      )
       items = result ? result.items : []
       const title = result ? result.title : ''
       return c.json({ items, title })
@@ -346,18 +497,13 @@ streaming.get('/catalog', async (c) => {
 streaming.get('/catalog-items', async (c) => {
   c.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
   const { profileId, manifestUrl, type, id } = c.req.query()
-  
+
   if (!profileId || !manifestUrl || !type || !id) {
     return c.json({ items: [], error: 'Missing required parameters' })
   }
 
   try {
-    const items = await addonManager.getSingleCatalog(
-      parseInt(profileId),
-      manifestUrl,
-      type,
-      id
-    )
+    const items = await addonManager.getSingleCatalog(parseInt(profileId), manifestUrl, type, id)
     return c.json({ items })
   } catch (e) {
     log.error(`Failed to fetch catalog items for ${id}`, e)
@@ -365,11 +511,21 @@ streaming.get('/catalog-items', async (c) => {
   }
 })
 
-
 streaming.post('/progress', optionalSessionMiddleware, async (c) => {
   try {
     const body = await c.req.json()
-    const { profileId, metaId, metaType, season, episode, episodeId, title, poster, duration, position } = body
+    const {
+      profileId,
+      metaId,
+      metaType,
+      season,
+      episode,
+      episodeId,
+      title,
+      poster,
+      duration,
+      position,
+    } = body
 
     if (!profileId || !metaId || !metaType) {
       return c.json({ error: 'Missing required fields' }, 400)
@@ -407,7 +563,7 @@ streaming.post('/progress', optionalSessionMiddleware, async (c) => {
       poster,
       duration,
       position,
-      last_stream: body.lastStream
+      last_stream: body.lastStream,
     })
 
     // Auto-mark as watched if position >= 80% of duration (matches Trakt's threshold)
@@ -421,13 +577,8 @@ streaming.post('/progress', optionalSessionMiddleware, async (c) => {
 
       // Auto-add next episode if this is a series
       if (metaType === 'series' && season !== undefined && episode !== undefined) {
-         // Run in background
-         ensureNextEpisodeInContinueWatching(
-            pId,
-            metaId,
-            parseInt(season),
-            parseInt(episode)
-         )
+        // Run in background
+        ensureNextEpisodeInContinueWatching(pId, metaId, parseInt(season), parseInt(episode))
       }
     }
 
@@ -517,16 +668,16 @@ streaming.get('/progress/:type/:id', optionalSessionMiddleware, async (c) => {
       }
     }
     const progress = watchHistoryDb.getProgress(
-      pId, 
-      id, 
-      season ? parseInt(season) : undefined, 
+      pId,
+      id,
+      season ? parseInt(season) : undefined,
       episode ? parseInt(episode) : undefined
     )
 
     return c.json({
       position: progress?.position || 0,
       duration: progress?.duration || 0,
-      isWatched: progress?.is_watched || false
+      isWatched: progress?.is_watched || false,
     })
   } catch (e) {
     log.error('Failed to get item progress', e)
@@ -557,7 +708,9 @@ streaming.get('/series-progress/:id', optionalSessionMiddleware, async (c) => {
 
     return c.json({
       episodeProgress,
-      lastWatched: lastWatched ? { season: lastWatched.season, episode: lastWatched.episode } : null
+      lastWatched: lastWatched
+        ? { season: lastWatched.season, episode: lastWatched.episode }
+        : null,
     })
   } catch (e) {
     log.error('Failed to get series progress', e)
@@ -584,7 +737,7 @@ streaming.post('/mark-watched', optionalSessionMiddleware, async (c) => {
         return c.json({ error: 'Forbidden' }, 403)
       }
     }
-    
+
     watchHistoryDb.markAsWatched(
       pId,
       metaId,
@@ -596,24 +749,22 @@ streaming.post('/mark-watched', optionalSessionMiddleware, async (c) => {
 
     // If unmarking an episode, ensure the SERIES container is also unmarked
     if (!watched && metaType === 'series') {
-        watchHistoryDb.markAsWatched(pId, metaId, 'series', false, -1, -1)
+      watchHistoryDb.markAsWatched(pId, metaId, 'series', false, -1, -1)
     }
 
     // Auto-add next episode if marking as watched for a series episode
     if (watched && metaType === 'series' && season !== undefined && episode !== undefined) {
-        ensureNextEpisodeInContinueWatching(
-            pId,
-            metaId,
-            parseInt(season),
-            parseInt(episode)
-        )
+      ensureNextEpisodeInContinueWatching(pId, metaId, parseInt(season), parseInt(episode))
     }
 
     // Sync to Trakt if connected
     let traktSynced = false
     try {
       traktSynced = await traktSyncService.pushWatchedItem(
-        pId, metaType, metaId, watched,
+        pId,
+        metaType,
+        metaId,
+        watched,
         season !== undefined ? parseInt(season) : undefined,
         episode !== undefined ? parseInt(episode) : undefined
       )
@@ -634,7 +785,14 @@ streaming.post('/mark-season-watched', optionalSessionMiddleware, async (c) => {
     const body = await c.req.json()
     const { profileId, metaId, metaType, season, watched, episodes } = body
 
-    if (!profileId || !metaId || !metaType || season === undefined || watched === undefined || !episodes) {
+    if (
+      !profileId ||
+      !metaId ||
+      !metaType ||
+      season === undefined ||
+      watched === undefined ||
+      !episodes
+    ) {
       return c.json({ error: 'Missing required fields (need episodes array)' }, 400)
     }
 
@@ -647,7 +805,7 @@ streaming.post('/mark-season-watched', optionalSessionMiddleware, async (c) => {
         return c.json({ error: 'Forbidden' }, 403)
       }
     }
-    
+
     watchHistoryDb.markSeasonWatched(
       pId,
       metaId,
@@ -661,7 +819,8 @@ streaming.post('/mark-season-watched', optionalSessionMiddleware, async (c) => {
     let traktSynced = false
     try {
       traktSynced = await traktSyncService.pushEpisodesWatched(
-        pId, metaId,
+        pId,
+        metaId,
         episodes.map((ep: number) => ({ season: parseInt(season), episode: parseInt(String(ep)) })),
         watched
       )
@@ -699,47 +858,33 @@ streaming.post('/mark-series-watched', optionalSessionMiddleware, async (c) => {
 
     // If allEpisodes is missing, fetch from metadata
     if (!allEpisodes || !Array.isArray(allEpisodes)) {
-        try {
-            log.debug(`allEpisodes missing for ${metaId}, fetching metadata...`)
-            const meta = await addonManager.getMeta('series', metaId, pId)
-            if (meta && meta.videos) {
-                allEpisodes = meta.videos.map((v: any) => ({
-                    season: v.season,
-                    episode: v.number || v.episode
-                }))
-                log.debug(`Retrieved ${allEpisodes.length} episodes from metadata`)
-            } else {
-                log.warn(`No metadata or videos found for ${metaId}`)
-                allEpisodes = []
-            }
-        } catch (e) {
-            log.error(`Failed to fetch metadata for ${metaId}:`, e)
-            return c.json({ error: 'Failed to retrieve series episodes' }, 500)
+      try {
+        log.debug(`allEpisodes missing for ${metaId}, fetching metadata...`)
+        const meta = await addonManager.getMeta('series', metaId, pId)
+        if (meta && meta.videos) {
+          allEpisodes = meta.videos.map((v: any) => ({
+            season: v.season,
+            episode: v.number || v.episode,
+          }))
+          log.debug(`Retrieved ${allEpisodes.length} episodes from metadata`)
+        } else {
+          log.warn(`No metadata or videos found for ${metaId}`)
+          allEpisodes = []
         }
+      } catch (e) {
+        log.error(`Failed to fetch metadata for ${metaId}:`, e)
+        return c.json({ error: 'Failed to retrieve series episodes' }, 500)
+      }
     }
-    
+
     // Mark each episode
     for (const ep of allEpisodes) {
-      watchHistoryDb.markAsWatched(
-        pId,
-        metaId,
-        'series',
-        watched,
-        ep.season,
-        ep.episode
-      )
+      watchHistoryDb.markAsWatched(pId, metaId, 'series', watched, ep.season, ep.episode)
     }
 
     // Also mark the SERIES container as watched/unwatched
     // This allows showing the checkmark on the series card itself
-    watchHistoryDb.markAsWatched(
-        pId, 
-        metaId, 
-        'series', 
-        watched, 
-        -1, 
-        -1
-    )
+    watchHistoryDb.markAsWatched(pId, metaId, 'series', watched, -1, -1)
 
     // Sync to Trakt if connected
     let traktSynced = false
@@ -762,7 +907,14 @@ streaming.post('/mark-episodes-before', optionalSessionMiddleware, async (c) => 
     const body = await c.req.json()
     const { profileId, metaId, season, episode, watched, allEpisodes } = body
 
-    if (!profileId || !metaId || season === undefined || episode === undefined || watched === undefined || !allEpisodes) {
+    if (
+      !profileId ||
+      !metaId ||
+      season === undefined ||
+      episode === undefined ||
+      watched === undefined ||
+      !allEpisodes
+    ) {
       return c.json({ error: 'Missing required fields' }, 400)
     }
 
@@ -775,29 +927,22 @@ streaming.post('/mark-episodes-before', optionalSessionMiddleware, async (c) => 
         return c.json({ error: 'Forbidden' }, 403)
       }
     }
-    
+
     // Filter episodes that come before the target episode
     const episodesToMark = allEpisodes.filter((ep: { season: number; episode: number }) => {
       if (ep.season < season) return true
       if (ep.season === season && ep.episode < episode) return true
       return false
     })
-    
+
     // Mark each episode
     for (const ep of episodesToMark) {
-      watchHistoryDb.markAsWatched(
-        pId,
-        metaId,
-        'series',
-        watched,
-        ep.season,
-        ep.episode
-      )
+      watchHistoryDb.markAsWatched(pId, metaId, 'series', watched, ep.season, ep.episode)
     }
 
     // If unmarking episodes, ensure the SERIES container is also unmarked
     if (!watched) {
-        watchHistoryDb.markAsWatched(pId, metaId, 'series', false, -1, -1)
+      watchHistoryDb.markAsWatched(pId, metaId, 'series', false, -1, -1)
     }
 
     // Sync to Trakt if connected
@@ -815,12 +960,11 @@ streaming.post('/mark-episodes-before', optionalSessionMiddleware, async (c) => 
   }
 })
 
-
 streaming.get('/details/:type/:id', optionalSessionMiddleware, async (c) => {
   const { type, id } = c.req.param()
   const { profileId, metaFallback } = c.req.query()
   const isGuestMode = c.get('guestMode') as boolean
-  
+
   let pId: number
   if (isGuestMode || profileId === 'guest') {
     const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
@@ -828,10 +972,10 @@ streaming.get('/details/:type/:id', optionalSessionMiddleware, async (c) => {
   } else {
     pId = parseInt(profileId)
   }
-  
+
   try {
     let meta = await addonManager.getMeta(type, id, pId)
-    
+
     // If getMeta returns null and we have fallback data from catalog, use it
     if (!meta && metaFallback) {
       try {
@@ -855,57 +999,62 @@ streaming.get('/details/:type/:id', optionalSessionMiddleware, async (c) => {
         log.warn('Failed to parse metaFallback:', e)
       }
     }
-    
+
     if (!meta) return err(c, 404, 'NOT_FOUND', 'Content not found')
-    
+
     const inLibrary = listDb.isInAnyList(pId, id)
-    
+
     // For movies, get watch progress
     let watchProgress = null
     let seriesProgress = null
     let lastWatchedEpisode = null
-    
+
     if (type === 'movie') {
       const progress = watchHistoryDb.getProgress(pId, id)
       if (progress) {
         watchProgress = {
           position: progress.position,
           duration: progress.duration,
-          progressPercent: progress.duration && progress.duration > 0 && progress.position 
-            ? Math.min(100, Math.round((progress.position / progress.duration) * 100)) 
-            : 0,
-          isWatched: progress.is_watched
+          progressPercent:
+            progress.duration && progress.duration > 0 && progress.position
+              ? Math.min(100, Math.round((progress.position / progress.duration) * 100))
+              : 0,
+          isWatched: progress.is_watched,
         }
       }
     } else if (type === 'series') {
       // Get all episode progress for series
       const episodeProgress = watchHistoryDb.getSeriesProgress(pId, id)
       const lastWatched = watchHistoryDb.getLastWatchedEpisode(pId, id)
-      
+
       // Create a map of episode progress keyed by "season-episode"
-      seriesProgress = episodeProgress.reduce((acc, ep) => {
-        if (ep.season !== undefined && ep.episode !== undefined) {
-          const key = `${ep.season}-${ep.episode}`
-          acc[key] = {
-            position: ep.position,
-            duration: ep.duration,
-            progressPercent: ep.duration && ep.duration > 0 && ep.position 
-              ? Math.min(100, Math.round((ep.position / ep.duration) * 100)) 
-              : 0,
-            isWatched: ep.is_watched
+      seriesProgress = episodeProgress.reduce(
+        (acc, ep) => {
+          if (ep.season !== undefined && ep.episode !== undefined) {
+            const key = `${ep.season}-${ep.episode}`
+            acc[key] = {
+              position: ep.position,
+              duration: ep.duration,
+              progressPercent:
+                ep.duration && ep.duration > 0 && ep.position
+                  ? Math.min(100, Math.round((ep.position / ep.duration) * 100))
+                  : 0,
+              isWatched: ep.is_watched,
+            }
           }
-        }
-        return acc
-      }, {} as Record<string, any>)
-      
+          return acc
+        },
+        {} as Record<string, any>
+      )
+
       if (lastWatched) {
         lastWatchedEpisode = {
           season: lastWatched.season,
-          episode: lastWatched.episode
+          episode: lastWatched.episode,
         }
       }
     }
-    
+
     return c.json({ meta, inLibrary, watchProgress, seriesProgress, lastWatchedEpisode })
   } catch (e) {
     log.error('Streaming details error:', e)
@@ -924,7 +1073,7 @@ streaming.get('/filters', optionalSessionMiddleware, async (c) => {
   } else {
     pId = parseInt(profileId)
   }
-  
+
   try {
     const filters = await addonManager.getAvailableFilters(pId)
     return c.json({ filters })
@@ -939,40 +1088,43 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
     const { profileId } = c.req.query()
     const isGuestMode = c.get('guestMode') as boolean
     const user = c.get('user')
-    
+
     // Guest mode handling: get/create the guest user's default profile
     if (isGuestMode || profileId === 'guest') {
       // Ensure guest user and default profile exist
       const guestDefaultProfile = await userDb.ensureGuestDefaultProfile()
       const pId = guestDefaultProfile.id
-      
+
       const profile = profileDb.findWithSettingsById(pId)
       if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'Guest profile not found')
 
       // Get real data for the guest profile
       const rawHistory = watchHistoryDb.getByProfileId(pId)
-      
+
       // Apply same history filtering as connected mode
       const MIN_SECONDS_THRESHOLD = 120
       const MIN_PERCENT_THRESHOLD = 5
       const COMPLETED_PERCENT_THRESHOLD = 90
-      
-      const thresholdHistory = rawHistory.filter(h => {
+
+      const thresholdHistory = rawHistory.filter((h) => {
         if (h.is_watched) return false
-        const progressPercent = h.duration && h.duration > 0 && h.position 
-          ? (h.position / h.duration) * 100 
-          : 0
+        const progressPercent =
+          h.duration && h.duration > 0 && h.position ? (h.position / h.duration) * 100 : 0
         if (progressPercent >= COMPLETED_PERCENT_THRESHOLD) return false
         const meetsMinSeconds = h.position && h.position >= MIN_SECONDS_THRESHOLD
         const meetsMinPercent = progressPercent >= MIN_PERCENT_THRESHOLD
-        
-        
+
         // Allow series episodes with 0 progress (auto-added next episodes)
         const isNextEpisode = h.meta_type === 'series' && (!h.position || h.position === 0)
 
         // EXCLUDE S1E1 with 0 progress (unstarted shows shouldn't be in Continue Watching)
-        if (h.meta_type === 'series' && h.season === 1 && h.episode === 1 && (!h.position || h.position === 0)) {
-            return false
+        if (
+          h.meta_type === 'series' &&
+          h.season === 1 &&
+          h.episode === 1 &&
+          (!h.position || h.position === 0)
+        ) {
+          return false
         }
 
         return meetsMinSeconds || meetsMinPercent || isNextEpisode
@@ -993,11 +1145,15 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
               type: h.meta_type,
               name: h.title || 'Unknown',
               poster: h.poster || undefined,
-              _historyKey: `${h.meta_id}:${h.meta_type}:${season ?? 'x'}:${episode ?? 'x'}`
+              _historyKey: `${h.meta_id}:${h.meta_type}:${season ?? 'x'}:${episode ?? 'x'}`,
             }
           }) as any[]
 
-          const allowed = await filterContent(candidateItems as any, parentalSettings, profile?.user_id)
+          const allowed = await filterContent(
+            candidateItems as any,
+            parentalSettings,
+            profile?.user_id
+          )
           const allowedKeys = new Set(allowed.map((item: any) => item._historyKey))
 
           filteredHistory = thresholdHistory.filter((h) => {
@@ -1012,7 +1168,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           filteredHistory = []
         }
       }
-      
+
       const deduplicatedHistory: typeof rawHistory = []
       const seenSeries = new Set<string>()
       for (const h of filteredHistory) {
@@ -1025,29 +1181,42 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           deduplicatedHistory.push(h)
         }
       }
-      
-      const history = deduplicatedHistory.map(h => ({
+
+      const history = deduplicatedHistory.map((h) => ({
         ...h,
         season: h.season !== undefined && h.season >= 0 ? h.season : null,
         episode: h.episode !== undefined && h.episode >= 0 ? h.episode : null,
-        progressPercent: h.duration && h.duration > 0 && h.position ? Math.min(100, Math.round((h.position / h.duration) * 100)) : 0,
-        episodeDisplay: h.meta_type === 'series' && h.season !== undefined && h.season >= 0 && h.episode !== undefined && h.episode >= 0 ? `S${h.season}:E${h.episode}` : null,
-        lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
+        progressPercent:
+          h.duration && h.duration > 0 && h.position
+            ? Math.min(100, Math.round((h.position / h.duration) * 100))
+            : 0,
+        episodeDisplay:
+          h.meta_type === 'series' &&
+          h.season !== undefined &&
+          h.season >= 0 &&
+          h.episode !== undefined &&
+          h.episode >= 0
+            ? `S${h.season}:E${h.episode}`
+            : null,
+        lastStream: h.last_stream ? JSON.parse(h.last_stream) : null,
       }))
 
       // Kick off all external addon calls in parallel
       const heroCandidate = deduplicatedHistory.length > 0 ? deduplicatedHistory[0] : null
       const heroMeta = heroCandidate
-        ? addonManager.getMeta(heroCandidate.meta_type, heroCandidate.meta_id, pId).catch(() => null)
+        ? addonManager
+            .getMeta(heroCandidate.meta_type, heroCandidate.meta_id, pId)
+            .catch(() => null)
         : Promise.resolve(null)
 
-      const [catalogMetadata, trending, trendingMovies, trendingSeries, resolvedHeroMeta] = await Promise.all([
-        addonManager.getCatalogMetadata(pId),
-        addonManager.getTrending(pId),
-        addonManager.getTrendingByType(pId, 'movie'),
-        addonManager.getTrendingByType(pId, 'series'),
-        heroMeta,
-      ])
+      const [catalogMetadata, trending, trendingMovies, trendingSeries, resolvedHeroMeta] =
+        await Promise.all([
+          addonManager.getCatalogMetadata(pId),
+          addonManager.getTrending(pId),
+          addonManager.getTrendingByType(pId, 'movie'),
+          addonManager.getTrendingByType(pId, 'series'),
+          heroMeta,
+        ])
 
       // Continue Watching Hero (enriched via addonManager -> uses global TMDB key fallback)
       let continueWatchingHero: any = null
@@ -1055,7 +1224,10 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         const h = heroCandidate
         const season = h.season !== undefined && h.season >= 0 ? h.season : null
         const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
-        const episodeDisplay = h.meta_type === 'series' && season !== null && episode !== null ? `S${season}:E${episode}` : null
+        const episodeDisplay =
+          h.meta_type === 'series' && season !== null && episode !== null
+            ? `S${season}:E${episode}`
+            : null
         let lastStream: any = null
         try {
           lastStream = h.last_stream ? JSON.parse(h.last_stream) : null
@@ -1078,7 +1250,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
             season,
             episode,
             episodeDisplay,
-            lastStream
+            lastStream,
           }
         }
 
@@ -1092,14 +1264,16 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
             season,
             episode,
             episodeDisplay,
-            lastStream
+            lastStream,
           }
         }
       }
-      
-      const enabledAddons = profileDb.getSettingsProfileId(pId) ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!) : [];
-      const showFallbackToast = enabledAddons.length === 0 && catalogMetadata.length === 0;
-      
+
+      const enabledAddons = profileDb.getSettingsProfileId(pId)
+        ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!)
+        : []
+      const showFallbackToast = enabledAddons.length === 0 && catalogMetadata.length === 0
+
       return c.json({
         catalogMetadata,
         history,
@@ -1108,64 +1282,68 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         trendingMovies,
         trendingSeries,
         showFallbackToast,
-        profile
+        profile,
       })
     }
-    
+
     // Connected mode: require authentication
     if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
-    let pId: number;
+    let pId: number
     if (profileId) {
-        pId = parseInt(profileId)
+      pId = parseInt(profileId)
     } else {
-        // Fallback to default profile
-        let profile = profileDb.getDefault(user.id)
-        if (!profile) {
-            const profiles = profileDb.findByUserId(user.id)
-            if (profiles && profiles.length > 0) {
-                profile = profiles[0]
-            }
+      // Fallback to default profile
+      let profile = profileDb.getDefault(user.id)
+      if (!profile) {
+        const profiles = profileDb.findByUserId(user.id)
+        if (profiles && profiles.length > 0) {
+          profile = profiles[0]
         }
-        if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'No profile found')
-        pId = profile.id
+      }
+      if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'No profile found')
+      pId = profile.id
     }
 
     const profile = profileDb.findWithSettingsById(pId)
     if (!profile) return err(c, 404, 'PROFILE_NOT_FOUND', 'Profile not found')
 
     const rawHistory = watchHistoryDb.getByProfileId(pId)
-    
+
     // Thresholds for "Continue Watching" section:
     // - MINIMUM: Must have watched at least 2 minutes OR 5% to appear (prevents misclick clutter)
     // - MAXIMUM: Once 90%+ watched, consider it finished and hide (accounts for outro skipping)
     const MIN_SECONDS_THRESHOLD = 120 // 2 minutes
     const MIN_PERCENT_THRESHOLD = 5
     const COMPLETED_PERCENT_THRESHOLD = 90
-    
+
     // Filter by thresholds, then deduplicate series
-      const thresholdHistory = rawHistory.filter(h => {
-        // Skip if marked as fully watched
-        if (h.is_watched) return false
-      
+    const thresholdHistory = rawHistory.filter((h) => {
+      // Skip if marked as fully watched
+      if (h.is_watched) return false
+
       // Calculate progress percentage
-      const progressPercent = h.duration && h.duration > 0 && h.position 
-        ? (h.position / h.duration) * 100 
-        : 0
-      
+      const progressPercent =
+        h.duration && h.duration > 0 && h.position ? (h.position / h.duration) * 100 : 0
+
       // Skip if completed (90%+)
       if (progressPercent >= COMPLETED_PERCENT_THRESHOLD) return false
-      
+
       // Must meet minimum threshold (2 min OR 5%)
       const meetsMinSeconds = h.position && h.position >= MIN_SECONDS_THRESHOLD
       const meetsMinPercent = progressPercent >= MIN_PERCENT_THRESHOLD
-      
+
       // Allow series episodes with 0 progress (auto-added next episodes)
       const isNextEpisode = h.meta_type === 'series' && (!h.position || h.position === 0)
 
       // EXCLUDE S1E1 with 0 progress (unstarted shows shouldn't be in Continue Watching)
-      if (h.meta_type === 'series' && h.season === 1 && h.episode === 1 && (!h.position || h.position === 0)) {
-          return false
+      if (
+        h.meta_type === 'series' &&
+        h.season === 1 &&
+        h.episode === 1 &&
+        (!h.position || h.position === 0)
+      ) {
+        return false
       }
 
       return meetsMinSeconds || meetsMinPercent || isNextEpisode
@@ -1184,11 +1362,15 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
             type: h.meta_type,
             name: h.title || 'Unknown',
             poster: h.poster || undefined,
-            _historyKey: `${h.meta_id}:${h.meta_type}:${season ?? 'x'}:${episode ?? 'x'}`
+            _historyKey: `${h.meta_id}:${h.meta_type}:${season ?? 'x'}:${episode ?? 'x'}`,
           }
         }) as any[]
 
-        const allowed = await filterContent(candidateItems as any, parentalSettings, profile?.user_id)
+        const allowed = await filterContent(
+          candidateItems as any,
+          parentalSettings,
+          profile?.user_id
+        )
         const allowedKeys = new Set(allowed.map((item: any) => item._historyKey))
 
         filteredHistory = thresholdHistory.filter((h) => {
@@ -1203,32 +1385,42 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         filteredHistory = []
       }
     }
-    
-      const deduplicatedHistory: typeof rawHistory = []
-      const seenSeries = new Set<string>()
-      
-      // filteredHistory is already sorted by updated_at DESC, so first occurrence is the latest
-      for (const h of filteredHistory) {
-        if (h.meta_type === 'series') {
-          if (!seenSeries.has(h.meta_id)) {
-            seenSeries.add(h.meta_id)
-            deduplicatedHistory.push(h)
-          }
-        } else {
-          // Movies and other types - include as-is
+
+    const deduplicatedHistory: typeof rawHistory = []
+    const seenSeries = new Set<string>()
+
+    // filteredHistory is already sorted by updated_at DESC, so first occurrence is the latest
+    for (const h of filteredHistory) {
+      if (h.meta_type === 'series') {
+        if (!seenSeries.has(h.meta_id)) {
+          seenSeries.add(h.meta_id)
           deduplicatedHistory.push(h)
         }
+      } else {
+        // Movies and other types - include as-is
+        deduplicatedHistory.push(h)
       }
-    
+    }
+
     // Enhance history with progress percentage
-    const history = deduplicatedHistory.map(h => ({
+    const history = deduplicatedHistory.map((h) => ({
       ...h,
       season: h.season !== undefined && h.season >= 0 ? h.season : null,
       episode: h.episode !== undefined && h.episode >= 0 ? h.episode : null,
-      progressPercent: h.duration && h.duration > 0 && h.position ? Math.min(100, Math.round((h.position / h.duration) * 100)) : 0,
+      progressPercent:
+        h.duration && h.duration > 0 && h.position
+          ? Math.min(100, Math.round((h.position / h.duration) * 100))
+          : 0,
       // For series, include season/episode display info
-      episodeDisplay: h.meta_type === 'series' && h.season !== undefined && h.season >= 0 && h.episode !== undefined && h.episode >= 0 ? `S${h.season}:E${h.episode}` : null,
-      lastStream: h.last_stream ? JSON.parse(h.last_stream) : null
+      episodeDisplay:
+        h.meta_type === 'series' &&
+        h.season !== undefined &&
+        h.season >= 0 &&
+        h.episode !== undefined &&
+        h.episode >= 0
+          ? `S${h.season}:E${h.episode}`
+          : null,
+      lastStream: h.last_stream ? JSON.parse(h.last_stream) : null,
     }))
 
     // Kick off all external addon calls in parallel
@@ -1240,13 +1432,14 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
         })
       : Promise.resolve(null)
 
-    const [catalogMetadata, trending, trendingMovies, trendingSeries, resolvedHeroMeta] = await Promise.all([
-      addonManager.getCatalogMetadata(pId),
-      addonManager.getTrending(pId),
-      addonManager.getTrendingByType(pId, 'movie'),
-      addonManager.getTrendingByType(pId, 'series'),
-      heroMeta,
-    ])
+    const [catalogMetadata, trending, trendingMovies, trendingSeries, resolvedHeroMeta] =
+      await Promise.all([
+        addonManager.getCatalogMetadata(pId),
+        addonManager.getTrending(pId),
+        addonManager.getTrendingByType(pId, 'movie'),
+        addonManager.getTrendingByType(pId, 'series'),
+        heroMeta,
+      ])
 
     // Continue Watching Hero (enriched via addonManager -> uses global TMDB key fallback)
     let continueWatchingHero: any = null
@@ -1254,7 +1447,10 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
       const h = heroCandidate
       const season = h.season !== undefined && h.season >= 0 ? h.season : null
       const episode = h.episode !== undefined && h.episode >= 0 ? h.episode : null
-      const episodeDisplay = h.meta_type === 'series' && season !== null && episode !== null ? `S${season}:E${episode}` : null
+      const episodeDisplay =
+        h.meta_type === 'series' && season !== null && episode !== null
+          ? `S${season}:E${episode}`
+          : null
       let lastStream: any = null
       try {
         lastStream = h.last_stream ? JSON.parse(h.last_stream) : null
@@ -1277,7 +1473,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           season,
           episode,
           episodeDisplay,
-          lastStream
+          lastStream,
         }
       }
 
@@ -1291,14 +1487,16 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
           season,
           episode,
           episodeDisplay,
-          lastStream
+          lastStream,
         }
       }
     }
-    
+
     // Determine if the fallback was used by checking enabled addons
-    const enabledAddons = profileDb.getSettingsProfileId(pId) ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!) : [];
-    const showFallbackToast = enabledAddons.length === 0 && catalogMetadata.length === 0;
+    const enabledAddons = profileDb.getSettingsProfileId(pId)
+      ? addonDb.getEnabledForProfile(profileDb.getSettingsProfileId(pId)!)
+      : []
+    const showFallbackToast = enabledAddons.length === 0 && catalogMetadata.length === 0
 
     return c.json({
       catalogMetadata,
@@ -1308,7 +1506,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
       trendingMovies,
       trendingSeries,
       showFallbackToast,
-      profile
+      profile,
     })
   } catch (e) {
     log.error('Streaming dashboard error:', e)
@@ -1321,7 +1519,7 @@ streaming.get('/dashboard', optionalSessionMiddleware, async (c) => {
 // and watch history enrichment, then returns the processed items.
 streaming.post('/filter-enrich', optionalSessionMiddleware, async (c) => {
   try {
-    const body = await c.req.json<{ items: any[], profileId: number }>()
+    const body = await c.req.json<{ items: any[]; profileId: number }>()
     if (!body?.items || !body?.profileId) {
       return err(c, 400, 'INVALID_INPUT', 'items and profileId are required')
     }
@@ -1350,22 +1548,27 @@ streaming.post('/segments/submit', sessionMiddleware, async (c) => {
   const user = c.get('user')
   if (!user) return err(c, 401, 'UNAUTHORIZED', 'Authentication required')
 
-  const body = await c.req.json<{
-    profileId: number
-    imdbId: string
-    season: number
-    episode: number
-    type: 'intro' | 'recap' | 'outro'
-    startSec: number
-    endSec: number
-  }>().catch(() => null)
+  const body = await c.req
+    .json<{
+      profileId: number
+      imdbId: string
+      season: number
+      episode: number
+      type: 'intro' | 'recap' | 'outro'
+      startSec: number
+      endSec: number
+    }>()
+    .catch(() => null)
 
   if (!body) return err(c, 400, 'INVALID_INPUT', 'Invalid request body')
   const { profileId, imdbId, season, episode, type, startSec, endSec } = body
 
-  if (!imdbId?.startsWith('tt')) return err(c, 400, 'INVALID_INPUT', 'imdbId must be a valid IMDB ID')
-  if (!['intro', 'recap', 'outro'].includes(type)) return err(c, 400, 'INVALID_INPUT', 'type must be intro, recap, or outro')
-  if (season < 1 || episode < 1) return err(c, 400, 'INVALID_INPUT', 'season and episode must be ≥ 1')
+  if (!imdbId?.startsWith('tt'))
+    return err(c, 400, 'INVALID_INPUT', 'imdbId must be a valid IMDB ID')
+  if (!['intro', 'recap', 'outro'].includes(type))
+    return err(c, 400, 'INVALID_INPUT', 'type must be intro, recap, or outro')
+  if (season < 1 || episode < 1)
+    return err(c, 400, 'INVALID_INPUT', 'season and episode must be ≥ 1')
   if (startSec >= endSec) return err(c, 400, 'INVALID_INPUT', 'startSec must be less than endSec')
 
   // Resolve settings profile and read IntroDB API key
@@ -1375,7 +1578,12 @@ streaming.post('/segments/submit', sessionMiddleware, async (c) => {
   const apiKey: string | undefined = settings?.introdb?.apiKey
 
   if (!apiKey?.startsWith('idb_')) {
-    return err(c, 403, 'NO_API_KEY', 'No IntroDB API key configured. Add one in Streaming settings.')
+    return err(
+      c,
+      403,
+      'NO_API_KEY',
+      'No IntroDB API key configured. Add one in Streaming settings.'
+    )
   }
 
   try {
@@ -1393,11 +1601,17 @@ streaming.post('/segments/submit', sessionMiddleware, async (c) => {
       signal: AbortSignal.timeout(8000),
     })
 
-    const data = await res.json() as any
+    const data = (await res.json()) as any
 
     if (!res.ok) {
       if (res.status === 401) return err(c, 403, 'INVALID_API_KEY', 'IntroDB rejected the API key')
-      if (res.status === 429) return err(c, 429, 'RATE_LIMITED', 'IntroDB rate limit reached (one submission per segment type per 5 minutes)')
+      if (res.status === 429)
+        return err(
+          c,
+          429,
+          'RATE_LIMITED',
+          'IntroDB rate limit reached (one submission per segment type per 5 minutes)'
+        )
       return err(c, 400, 'INTRODB_ERROR', data?.message ?? 'Submission rejected by IntroDB')
     }
 
@@ -1428,16 +1642,22 @@ streaming.get('/segments', optionalSessionMiddleware, async (c) => {
     )
     const row = stmt.get(imdbId, season, episode) as { segments: string } | undefined
     if (!row) return null
-    try { return JSON.parse(row.segments) } catch { return null }
+    try {
+      return JSON.parse(row.segments)
+    } catch {
+      return null
+    }
   }
 
   const saveCache = (segments: any[]) => {
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO introdb_cache (imdb_id, season, episode, segments, fetched_at)
       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(imdb_id, season, episode)
       DO UPDATE SET segments = excluded.segments, fetched_at = excluded.fetched_at
-    `).run(imdbId, season, episode, JSON.stringify(segments))
+    `
+    ).run(imdbId, season, episode, JSON.stringify(segments))
   }
 
   // Try live fetch first
@@ -1447,12 +1667,12 @@ streaming.get('/segments', optionalSessionMiddleware, async (c) => {
     if (episode !== null) params.set('episode', String(episode))
 
     const res = await fetch(`https://api.introdb.app/segments?${params}`, {
-      headers: { 'Accept': 'application/json' },
+      headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(5000),
     })
 
     if (res.ok) {
-      const data = await res.json() as any
+      const data = (await res.json()) as any
       // IntroDB returns { intro, recap, outro } as top-level keys (each null or a segment object)
       const segments: any[] = []
       for (const type of ['intro', 'recap', 'outro'] as const) {

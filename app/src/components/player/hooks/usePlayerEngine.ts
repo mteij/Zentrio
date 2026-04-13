@@ -1,6 +1,6 @@
 /**
  * usePlayerEngine Hook
- * 
+ *
  * Manages the player engine lifecycle and state.
  */
 
@@ -14,8 +14,15 @@ import type {
   QualityLevel,
   EngineType,
   PlayerCloseReason,
+  HybridConfirmationDetails,
+  TranscodeProgress,
 } from '../engines/types'
-import { createEngine, createEngineByType, detectEngineType, getDefaultEngineType } from '../engines'
+import {
+  createEngine,
+  createEngineByType,
+  detectEngineType,
+  getDefaultEngineType,
+} from '../engines'
 import { createLogger } from '../../../utils/client-logger'
 
 const log = createLogger('usePlayerEngine')
@@ -58,6 +65,8 @@ interface UsePlayerEngineReturn {
   isLoading: boolean
   /** Any error that occurred */
   error: Error | null
+  /** Hybrid engine confirmation request (null when not pending) */
+  hybridConfirmation: HybridConfirmationDetails | null
   /** Play function */
   play: () => Promise<void>
   /** Pause function */
@@ -77,7 +86,7 @@ interface UsePlayerEngineReturn {
   /** Exit fullscreen */
   exitFullscreen: () => Promise<void>
   /** Toggle fullscreen */
-  toggleFullscreen: () => Promise<void>
+  toggleFullscreen: () => void
   /** Whether in fullscreen */
   isFullscreen: boolean
   /** Load a new source */
@@ -102,6 +111,8 @@ interface UsePlayerEngineReturn {
   engineReady: boolean
   /** The active engine type */
   activeEngineType: EngineType
+  /** Hybrid engine transcoding progress — null when not in hybrid mode or complete */
+  transcodeProgress: TranscodeProgress | null
 }
 
 export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayerEngineReturn {
@@ -113,7 +124,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     onClose,
     onError,
     onMetadataLoad,
-    onCanPlay
+    onCanPlay,
   } = options
 
   // ── Stable callback refs ──────────────────────────────────────────────────
@@ -131,9 +142,9 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
   const pendingSourceRef = useRef<MediaSource | null>(null)
   const engineReadyRef = useRef(false)
   const engineTypeRef = useRef<EngineType>('web')
-  const loadedSrcRef = useRef<string>('')  // guard against re-loading same URL
+  const loadedSrcRef = useRef<string>('') // guard against re-loading same URL
   const initPromiseRef = useRef<Promise<void> | null>(null)
-  
+
   const [state, setState] = useState<PlayerState>({
     currentTime: 0,
     duration: 0,
@@ -144,26 +155,30 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     buffering: true,
     ended: false,
     ready: false,
-    buffered: null
+    buffered: null,
   })
-  
+
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [engineReady, setEngineReady] = useState(false)
   const [activeEngineType, setActiveEngineType] = useState<EngineType>(getDefaultEngineType())
+  const [hybridConfirmation, setHybridConfirmation] = useState<HybridConfirmationDetails | null>(
+    null
+  )
+  const [transcodeProgress, setTranscodeProgress] = useState<TranscodeProgress | null>(null)
 
   const attachEngineListeners = useCallback((engine: IPlayerEngine) => {
     engine.addEventListener('timeupdate', (time, duration) => {
-      setState(prev => ({ ...prev, currentTime: time, duration }))
+      setState((prev) => ({ ...prev, currentTime: time, duration }))
       cbRefs.current.onTimeUpdate?.(time, duration)
     })
     engine.addEventListener('ended', () => {
-      setState(prev => ({ ...prev, ended: true, paused: true }))
+      setState((prev) => ({ ...prev, ended: true, paused: true }))
       cbRefs.current.onEnded?.()
     })
     engine.addEventListener('close', (reason) => {
-      setState(prev => ({ ...prev, paused: true, buffering: false }))
+      setState((prev) => ({ ...prev, paused: true, buffering: false }))
       cbRefs.current.onClose?.(reason)
     })
     engine.addEventListener('error', (err) => {
@@ -171,21 +186,40 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
       cbRefs.current.onError?.(err)
     })
     engine.addEventListener('statechange', (newState) => {
-      setState(prev => ({ ...prev, ...newState }))
+      setState((prev) => ({ ...prev, ...newState }))
     })
     engine.addEventListener('loadedmetadata', (duration) => {
-      setState(prev => ({ ...prev, duration }))
+      setState((prev) => ({ ...prev, duration }))
       cbRefs.current.onMetadataLoad?.(duration)
     })
     engine.addEventListener('canplay', () => {
-      setState(prev => ({ ...prev, ready: true, buffering: false }))
+      setState((prev) => ({ ...prev, ready: true, buffering: false }))
       cbRefs.current.onCanPlay?.()
     })
     engine.addEventListener('waiting', () => {
-      setState(prev => ({ ...prev, buffering: true }))
+      setState((prev) => ({ ...prev, buffering: true }))
     })
     engine.addEventListener('playing', () => {
-      setState(prev => ({ ...prev, buffering: false }))
+      setState((prev) => ({ ...prev, buffering: false }))
+    })
+    engine.addEventListener('hybridconfirmationneeded', (details) => {
+      const wrappedDetails: HybridConfirmationDetails = {
+        fileSize: details.fileSize,
+        fileSizeLabel: details.fileSizeLabel,
+        audioCodec: details.audioCodec,
+        proceed: () => {
+          setHybridConfirmation(null)
+          details.proceed()
+        },
+        cancel: () => {
+          setHybridConfirmation(null)
+          details.cancel()
+        },
+      }
+      setHybridConfirmation(wrappedDetails)
+    })
+    engine.addEventListener('transcodingprogress', (progress) => {
+      setTranscodeProgress(progress.percent >= 100 ? null : progress)
     })
   }, [])
 
@@ -197,7 +231,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
       // Wait for video element to be available
       let attempts = 0
       while (!videoRef.current && attempts < 50 && !destroyed) {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
         attempts++
       }
 
@@ -216,12 +250,12 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
 
         // Create appropriate engine for environment (no source yet — uses env detection only)
         const engine = await createEngine()
-        
+
         if (destroyed) {
           engine.destroy()
           return
         }
-        
+
         engineRef.current = engine
         // Reflect the actual engine type so loadSource() doesn't needlessly switch on first load
         const defaultType = getDefaultEngineType()
@@ -261,7 +295,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
           }
 
           await engineRef.current!.loadSource(source)
-          
+
           if (startTime > 0) {
             const seekOnReady = () => {
               engineRef.current?.seek(startTime)
@@ -269,7 +303,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
             }
             engineRef.current!.addEventListener('canplay', seekOnReady)
           }
-          
+
           if (autoPlay) {
             try {
               await engineRef.current!.play()
@@ -341,19 +375,19 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
   // Set volume
   const setVolume = useCallback((volume: number) => {
     engineRef.current?.setVolume(volume)
-    setState(prev => ({ ...prev, volume }))
+    setState((prev) => ({ ...prev, volume }))
   }, [])
 
   // Set muted
   const setMuted = useCallback((muted: boolean) => {
     engineRef.current?.setMuted(muted)
-    setState(prev => ({ ...prev, muted }))
+    setState((prev) => ({ ...prev, muted }))
   }, [])
 
   // Set playback rate
   const setPlaybackRate = useCallback((rate: number) => {
     engineRef.current?.setPlaybackRate(rate)
-    setState(prev => ({ ...prev, playbackRate: rate }))
+    setState((prev) => ({ ...prev, playbackRate: rate }))
   }, [])
 
   // Toggle play/pause
@@ -399,72 +433,75 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
 
   // Load source — switches engine type if needed (e.g., web→hybrid for MKV with rare codecs).
   // Uses cbRefs so callbacks are NOT in the dependency array → no infinite loop.
-  const loadSource = useCallback(async (source: MediaSource) => {
-    // Guard: skip if this exact URL is already loaded
-    if (source.src && source.src === loadedSrcRef.current) {
-      log.debug('loadSource: same URL already loaded, skipping')
-      return
-    }
-
-    log.debug('loadSource called, engineReady:', engineReadyRef.current)
-    
-    // If engine isn't ready yet, queue the source for later
-    if (!engineReadyRef.current || !engineRef.current) {
-      log.debug('Engine not ready, queueing source')
-      pendingSourceRef.current = source
-      return
-    }
-
-    setIsLoading(true)
-    setError(null)
-    loadedSrcRef.current = source.src
-
-    try {
-      // Detect if a different engine is needed for this source URL
-      // (e.g., web → hybrid for MKV with rare audio codecs)
-      const neededType = await detectEngineType(source)
-      if (neededType !== engineTypeRef.current && videoRef.current) {
-        log.debug(`Switching engine: ${engineTypeRef.current} → ${neededType}`)
-        const oldEngine = engineRef.current
-        const newEngine = await createEngineByType(neededType)
-        attachEngineListeners(newEngine)
-
-        await newEngine.initialize(videoRef.current)
-        oldEngine.destroy()
-        engineRef.current = newEngine
-        engineTypeRef.current = neededType
-        setActiveEngineType(neededType)
+  const loadSource = useCallback(
+    async (source: MediaSource) => {
+      // Guard: skip if this exact URL is already loaded
+      if (source.src && source.src === loadedSrcRef.current) {
+        log.debug('loadSource: same URL already loaded, skipping')
+        return
       }
 
-      log.debug('Loading source:', source.src.substring(0, 80))
-      await engineRef.current.loadSource(source)
+      log.debug('loadSource called, engineReady:', engineReadyRef.current)
 
-      // Seek to start time if provided
-      if (startTime > 0) {
-        const seekOnReady = () => {
-          engineRef.current?.seek(startTime)
-          engineRef.current?.removeEventListener('canplay', seekOnReady)
+      // If engine isn't ready yet, queue the source for later
+      if (!engineReadyRef.current || !engineRef.current) {
+        log.debug('Engine not ready, queueing source')
+        pendingSourceRef.current = source
+        return
+      }
+
+      setIsLoading(true)
+      setError(null)
+      loadedSrcRef.current = source.src
+
+      try {
+        // Detect if a different engine is needed for this source URL
+        // (e.g., web → hybrid for MKV with rare audio codecs)
+        const neededType = await detectEngineType(source)
+        if (neededType !== engineTypeRef.current && videoRef.current) {
+          log.debug(`Switching engine: ${engineTypeRef.current} → ${neededType}`)
+          const oldEngine = engineRef.current
+          const newEngine = await createEngineByType(neededType)
+          attachEngineListeners(newEngine)
+
+          await newEngine.initialize(videoRef.current)
+          oldEngine.destroy()
+          engineRef.current = newEngine
+          engineTypeRef.current = neededType
+          setActiveEngineType(neededType)
         }
-        engineRef.current.addEventListener('canplay', seekOnReady)
-      }
 
-      // Auto-play if requested
-      if (autoPlay) {
-        try {
-          await engineRef.current.play()
-        } catch {
-          log.debug('Autoplay blocked, user interaction required')
+        log.debug('Loading source:', source.src.substring(0, 80))
+        await engineRef.current.loadSource(source)
+
+        // Seek to start time if provided
+        if (startTime > 0) {
+          const seekOnReady = () => {
+            engineRef.current?.seek(startTime)
+            engineRef.current?.removeEventListener('canplay', seekOnReady)
+          }
+          engineRef.current.addEventListener('canplay', seekOnReady)
         }
-      }
 
-      setIsLoading(false)
-    } catch (err) {
-      log.error('Load source error:', err)
-      loadedSrcRef.current = ''  // reset so a retry is possible
-      setError(err instanceof Error ? err : new Error(String(err)))
-      setIsLoading(false)
-    }
-  }, [attachEngineListeners, startTime, autoPlay])  // ← no callbacks in deps: they're accessed via cbRefs
+        // Auto-play if requested
+        if (autoPlay) {
+          try {
+            await engineRef.current.play()
+          } catch {
+            log.debug('Autoplay blocked, user interaction required')
+          }
+        }
+
+        setIsLoading(false)
+      } catch (err) {
+        log.error('Load source error:', err)
+        loadedSrcRef.current = '' // reset so a retry is possible
+        setError(err instanceof Error ? err : new Error(String(err)))
+        setIsLoading(false)
+      }
+    },
+    [attachEngineListeners, startTime, autoPlay]
+  ) // ← no callbacks in deps: they're accessed via cbRefs
 
   // Add subtitle tracks
   const addSubtitleTracks = useCallback((tracks: SubtitleTrack[]) => {
@@ -506,6 +543,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     state,
     isLoading,
     error,
+    hybridConfirmation,
     play,
     pause,
     seek,
@@ -527,7 +565,8 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     setQualityLevel,
     engine: engineRef.current,
     engineReady,
-    activeEngineType
+    activeEngineType,
+    transcodeProgress,
   }
 }
 

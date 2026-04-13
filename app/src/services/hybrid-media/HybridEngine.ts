@@ -51,7 +51,8 @@ export class HybridEngine extends EventTarget {
   private duration: number = 0
 
   private needsTranscoding: boolean = false
-  private codecInfo: Map<number, { codecId: number; codecName: string; needsTranscode: boolean }> = new Map()
+  private codecInfo: Map<number, { codecId: number; codecName: string; needsTranscode: boolean }> =
+    new Map()
 
   private mediaSource: MediaSource | null = null
   private videoSourceBuffer: SourceBuffer | null = null
@@ -64,12 +65,12 @@ export class HybridEngine extends EventTarget {
 
   constructor(sourceUrl: string, metadata: MediaMetadata, config: HybridEngineConfig = {}) {
     super()
-    
+
     // Guard: Hybrid playback is not supported in Tauri
     if (isTauriEnvironment()) {
       throw new Error('HybridEngine is not supported in Tauri apps. Use native playback instead.')
     }
-    
+
     this.sourceUrl = sourceUrl
     this.metadata = metadata
     this.config = {
@@ -79,7 +80,7 @@ export class HybridEngine extends EventTarget {
       prefetchSize: config.prefetchSize ?? 50 * 1024 * 1024,
       segmentSize: config.segmentSize ?? 10 * 1024 * 1024,
       onProgress: config.onProgress,
-      onError: config.onError
+      onError: config.onError,
     }
 
     // Check if we need hybrid playback
@@ -97,7 +98,15 @@ export class HybridEngine extends EventTarget {
     let hasAudio = false
 
     // Browser-supported audio codecs
-    const supportedAudioCodecs = ['aac', 'mp3', 'opus', 'vorbis', 'pcm_s16le', 'pcm_s24le', 'pcm_f32le']
+    const supportedAudioCodecs = [
+      'aac',
+      'mp3',
+      'opus',
+      'vorbis',
+      'pcm_s16le',
+      'pcm_s24le',
+      'pcm_f32le',
+    ]
     // Browser-supported video codecs
     const supportedVideoCodecs = ['h264', 'hevc', 'vp8', 'vp9', 'av1']
 
@@ -108,7 +117,7 @@ export class HybridEngine extends EventTarget {
         this.codecInfo.set(stream.index, {
           codecId: stream.codec_id || 0,
           codecName: codecName,
-          needsTranscode: needsTranscode
+          needsTranscode: needsTranscode,
         })
         // Always set video stream index - we'll attempt playback with MSE
         // even if codec is unsupported (MSE might still handle it or we'll get an error)
@@ -120,7 +129,7 @@ export class HybridEngine extends EventTarget {
         this.codecInfo.set(stream.index, {
           codecId: stream.codec_id || 0,
           codecName: codecName,
-          needsTranscode: needsTranscode
+          needsTranscode: needsTranscode,
         })
         if (needsTranscode) {
           this.audioStreamIndex = stream.index
@@ -140,7 +149,7 @@ export class HybridEngine extends EventTarget {
       needsTranscoding: this.needsTranscoding,
       videoStreamIndex: this.videoStreamIndex,
       audioStreamIndex: this.audioStreamIndex,
-      codecInfo: Array.from(this.codecInfo.entries())
+      codecInfo: Array.from(this.codecInfo.entries()),
     })
   }
 
@@ -154,7 +163,7 @@ export class HybridEngine extends EventTarget {
     // Initialize FFmpeg for audio transcoding
     if (this.needsTranscoding) {
       this.ffmpeg = new FFmpeg()
-      
+
       this.ffmpeg.on('log', ({ message }) => {
         log.debug('', message)
       })
@@ -167,7 +176,7 @@ export class HybridEngine extends EventTarget {
       log.debug('Loading FFmpeg...')
       await this.ffmpeg.load({
         coreURL: await toBlobURL(CORE_URL, 'text/javascript'),
-        wasmURL: await toBlobURL(WASM_URL, 'application/wasm')
+        wasmURL: await toBlobURL(WASM_URL, 'application/wasm'),
       })
       log.debug('FFmpeg loaded')
     }
@@ -264,37 +273,25 @@ export class HybridEngine extends EventTarget {
       return
     }
 
-    // Ensure audio is configured correctly
     this.audioElement.volume = 1.0
     this.audioElement.muted = false
-    
-    log.debug('Playing audio element...')
-    log.debug('- readyState:', this.audioElement.readyState)
-    log.debug('- paused:', this.audioElement.paused)
-    log.debug('- volume:', this.audioElement.volume)
-    log.debug('- muted:', this.audioElement.muted)
-    log.debug('- currentTime:', this.audioElement.currentTime)
-    log.debug('- duration:', this.audioElement.duration)
-    
-    // Try to sync with video if available
+
     if (this.videoElement && this.videoElement.currentTime > 0) {
-      log.debug('Syncing audio to video time:', this.videoElement.currentTime)
       this.audioElement.currentTime = this.videoElement.currentTime
     }
-    
-    this.audioElement.play()
+
+    this.audioElement
+      .play()
       .then(() => {
-        log.debug('Audio playback started successfully!')
-        log.debug('Audio is now playing:', !this.audioElement?.paused)
+        log.debug('Audio playback started')
       })
-      .catch(e => {
-        log.error('Audio play() failed:', e)
-        log.error('Error name:', e.name)
-        log.error('Error message:', e.message)
-        
-        // If it's a NotAllowedError, the user hasn't interacted yet
+      .catch((e) => {
         if (e.name === 'NotAllowedError') {
-          log.warn('Audio blocked by autoplay policy - waiting for user interaction')
+          // Browser blocked autoplay — syncWithVideo's video 'play' listener will retry
+          // when the user next interacts with the player.
+          log.debug('Audio autoplay blocked — will resume on next user interaction')
+        } else {
+          log.error('Audio play() failed:', e.name, e.message)
         }
       })
   }
@@ -315,7 +312,7 @@ export class HybridEngine extends EventTarget {
 
     // Initialize network reader
     this.networkReader = new NetworkReader(this.sourceUrl, {
-      chunkSize: this.config.segmentSize
+      chunkSize: this.config.segmentSize,
     })
 
     await this.networkReader.probe()
@@ -326,25 +323,34 @@ export class HybridEngine extends EventTarget {
     const fileSize = this.metadata.format?.size || 0
     const fileSizeMB = fileSize / (1024 * 1024)
     const MAX_AUDIO_TRANSCODE_SIZE_MB = 10 * 1024 // 10GB limit (streaming handles large files now)
-    
+
     log.debug(`File size: ${fileSizeMB.toFixed(0)}MB`)
-    
+
     // Start streaming both audio and video
     if (this.needsTranscoding && this.audioStreamIndex !== null) {
       if (fileSizeMB > MAX_AUDIO_TRANSCODE_SIZE_MB) {
-        log.warn(`File extremely large (${fileSizeMB.toFixed(0)}MB > ${MAX_AUDIO_TRANSCODE_SIZE_MB}MB)`)
+        log.warn(
+          `File extremely large (${fileSizeMB.toFixed(0)}MB > ${MAX_AUDIO_TRANSCODE_SIZE_MB}MB)`
+        )
         log.warn('Skipping audio transcoding - use desktop app for best results')
       } else {
         log.debug(`Starting streaming audio transcoding (${fileSizeMB.toFixed(0)}MB file)...`)
         this.startAudioStreaming()
       }
     } else {
-      log.debug('Skipping audio streaming - transcoding:', this.needsTranscoding, 'audioIndex:', this.audioStreamIndex)
+      log.debug(
+        'Skipping audio streaming - transcoding:',
+        this.needsTranscoding,
+        'audioIndex:',
+        this.audioStreamIndex
+      )
     }
 
     // Get container type to determine playback strategy
     const container = (this.metadata.format?.format_name || '').toLowerCase()
-    const isDirectPlayback = container.includes('webm') || (!container.includes('mp4') && !container.includes('mov') && !container.includes('matroska'))
+    const isDirectPlayback =
+      container.includes('webm') ||
+      (!container.includes('mp4') && !container.includes('mov') && !container.includes('matroska'))
 
     if (this.videoStreamIndex !== null) {
       log.debug('Starting video streaming...')
@@ -391,9 +397,9 @@ export class HybridEngine extends EventTarget {
     // IMPORTANT: Pass shared FFmpeg instance to avoid memory conflicts
     this.audioTranscoder = new StreamingAudioTranscoder({
       bitrate: '192k',
-      initialBufferSize: 5 * 1024 * 1024, // 5MB before playback starts
-      maxFullDownloadSize: 200 * 1024 * 1024, // 200MB threshold
-      ffmpegInstance: this.ffmpeg || undefined // Share FFmpeg instance
+      initialBufferSize: 50 * 1024 * 1024, // 50MB buffer before initial transcode
+      maxFullDownloadSize: 150 * 1024 * 1024, // 150MB threshold for full-download mode
+      ffmpegInstance: this.ffmpeg || undefined, // Share FFmpeg instance
     })
 
     const audioElement = await this.audioTranscoder.initialize(
@@ -409,7 +415,9 @@ export class HybridEngine extends EventTarget {
 
     audioElement.addEventListener('timeupdate', () => {
       this.currentTime = audioElement.currentTime
-      this.dispatchEvent(new CustomEvent('timeupdate', { detail: { currentTime: this.currentTime } }))
+      this.dispatchEvent(
+        new CustomEvent('timeupdate', { detail: { currentTime: this.currentTime } })
+      )
     })
 
     audioElement.addEventListener('ended', () => {
@@ -423,27 +431,39 @@ export class HybridEngine extends EventTarget {
     })
 
     this.audioElement = audioElement
-    
+
     // Start the transcoding process
-    this.audioTranscoder.start().catch(e => {
-      log.error('Audio transcoder start error:', e)
+    this.audioTranscoder.start().catch((e) => {
+      if ((e as Error).name !== 'AbortError') {
+        log.error('Audio transcoder start error:', e)
+      }
     })
 
     // Listen for audio ready event from transcoder
     this.audioTranscoder.addEventListener('audioready', () => {
       log.debug('Audio data ready for playback')
-      log.debug('Audio element readyState:', this.audioElement?.readyState)
-      log.debug('Audio element paused:', this.audioElement?.paused)
-      log.debug('Audio element volume:', this.audioElement?.volume)
-      log.debug('Audio element muted:', this.audioElement?.muted)
-      
       this.dispatchEvent(new CustomEvent('audioready', { detail: { audioElement } }))
-      
+
       // If we're already playing, start audio playback immediately
       if (this.isPlaying && this.audioElement) {
         log.debug('Starting audio playback (engine already playing)')
         this.playAudioElement()
       }
+    })
+
+    // After a seek, the first new audio segment was appended → resume playback
+    this.audioTranscoder.addEventListener('seekready', () => {
+      log.debug('Seek audio ready — resuming playback')
+      this.dispatchEvent(new CustomEvent('seekready'))
+      if (this.isPlaying && this.audioElement) {
+        this.playAudioElement()
+      }
+    })
+
+    // Forward transcoding progress (download %, ETA, transcoded %) up to HybridPlayerEngine
+    this.audioTranscoder.addEventListener('progress', (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      this.dispatchEvent(new CustomEvent('transcodingprogress', { detail }))
     })
 
     // Also listen for canplay as a backup trigger
@@ -466,12 +486,12 @@ export class HybridEngine extends EventTarget {
     log.debug('startVideoStreaming called')
     log.debug('videoStreamIndex:', this.videoStreamIndex)
     log.debug('networkReader:', !!this.networkReader)
-    
+
     if (this.videoStreamIndex === null) {
       log.warn('Returning early - videoStreamIndex is null')
       return
     }
-    
+
     if (!this.networkReader) {
       log.warn('Returning early - networkReader is null')
       return
@@ -489,7 +509,7 @@ export class HybridEngine extends EventTarget {
     // Check if container is MP4 (which can be streamed) or WebM (natively supported)
     const container = (this.metadata.format?.format_name || '').toLowerCase()
     log.debug('Container format:', container)
-    
+
     if (container.includes('mp4') || container.includes('mov')) {
       // Direct streaming for MP4
       log.debug('Using MP4 direct streaming')
@@ -517,7 +537,14 @@ export class HybridEngine extends EventTarget {
 
   private async streamMP4Video(): Promise<void> {
     if (!this.networkReader || !this.mediaSource || this.mediaSource.readyState !== 'open') {
-      log.warn('Cannot stream MP4 - networkReader:', !!this.networkReader, 'mediaSource:', !!this.mediaSource, 'readyState:', this.mediaSource?.readyState)
+      log.warn(
+        'Cannot stream MP4 - networkReader:',
+        !!this.networkReader,
+        'mediaSource:',
+        !!this.mediaSource,
+        'readyState:',
+        this.mediaSource?.readyState
+      )
       return
     }
 
@@ -540,7 +567,7 @@ export class HybridEngine extends EventTarget {
 
         // Append to MSE
         this.appendVideoSegment(chunk.buffer as ArrayBuffer)
-        
+
         offset += chunk.byteLength
         bufferedAmount += chunk.byteLength
         this.processedVideoChunks++
@@ -548,22 +575,25 @@ export class HybridEngine extends EventTarget {
         this.config.onProgress?.({
           loaded: offset,
           total: fileSize,
-          type: 'video'
+          type: 'video',
         })
 
         // Start playing video once we have enough buffer and audio is ready
-        if (!this.hasVideoStartedPlaying &&
-            bufferedAmount >= MIN_BUFFER_TO_START &&
-            this.videoElement &&
-            this.videoElement.paused) {
-          const bufferReady = this.videoSourceBuffer &&
-                             this.videoSourceBuffer.buffered &&
-                             this.videoSourceBuffer.buffered.length > 0 &&
-                             this.videoSourceBuffer.buffered.end(0) > 0.5 // At least 0.5s buffered
-          
+        if (
+          !this.hasVideoStartedPlaying &&
+          bufferedAmount >= MIN_BUFFER_TO_START &&
+          this.videoElement &&
+          this.videoElement.paused
+        ) {
+          const bufferReady =
+            this.videoSourceBuffer &&
+            this.videoSourceBuffer.buffered &&
+            this.videoSourceBuffer.buffered.length > 0 &&
+            this.videoSourceBuffer.buffered.end(0) > 0.5 // At least 0.5s buffered
+
           if (bufferReady) {
             log.debug('Starting video playback (buffer ready)')
-            this.videoElement.play().catch(e => {
+            this.videoElement.play().catch((e) => {
               log.warn('Video play error:', e)
             })
             this.hasVideoStartedPlaying = true
@@ -576,14 +606,18 @@ export class HybridEngine extends EventTarget {
           if (this.videoElement) {
             if (bufferedEnd - this.videoElement.currentTime > 30) {
               // Too much buffered, wait
-              await new Promise(r => setTimeout(r, 500))
+              await new Promise((r) => setTimeout(r, 500))
             }
           }
         }
 
         // Rate limit if needed
-        if (this.videoElement?.paused && this.videoSourceBuffer && this.videoSourceBuffer.buffered.length > 0) {
-          await new Promise(r => setTimeout(r, 100))
+        if (
+          this.videoElement?.paused &&
+          this.videoSourceBuffer &&
+          this.videoSourceBuffer.buffered.length > 0
+        ) {
+          await new Promise((r) => setTimeout(r, 100))
         }
       } catch (error) {
         log.error('Error streaming video:', error)
@@ -600,19 +634,19 @@ export class HybridEngine extends EventTarget {
    */
   private async playWebMDirectly(): Promise<void> {
     log.debug('Playing WebM directly...')
-    
+
     if (!this.videoElement) {
       log.error('Video element not available')
       return
     }
 
     // Store handlers on video element for cleanup
-    (this.videoElement as any).__webmHandlers = {
+    ;(this.videoElement as any).__webmHandlers = {
       loadedmetadata: null,
       error: null,
       timeupdate: null,
       ended: null,
-      errorHandler: null
+      errorHandler: null,
     }
 
     // Get handlers reference for use in this method
@@ -620,31 +654,31 @@ export class HybridEngine extends EventTarget {
 
     // Set the source URL directly - browser will handle WebM natively
     this.videoElement.src = this.sourceUrl
-    
+
     // Wait for metadata to load
     if (!this.videoElement) {
       throw new Error('Video element not available')
     }
-    
+
     await new Promise<void>((resolve, reject) => {
       const handleLoadedMetadata = () => {
         this.videoElement!.removeEventListener('loadedmetadata', handleLoadedMetadata)
         this.videoElement!.removeEventListener('error', handleError)
         resolve()
       }
-      
+
       const handleError = (_e: Event) => {
         this.videoElement!.removeEventListener('loadedmetadata', handleLoadedMetadata)
         this.videoElement!.removeEventListener('error', handleError)
         reject(new Error('Failed to load WebM video'))
       }
-      
+
       webmHandlers.loadedmetadata = handleLoadedMetadata
       webmHandlers.error = handleError
-      
+
       this.videoElement!.addEventListener('loadedmetadata', handleLoadedMetadata)
       this.videoElement!.addEventListener('error', handleError)
-      
+
       // Set a timeout in case metadata never loads
       setTimeout(() => {
         this.videoElement!.removeEventListener('loadedmetadata', handleLoadedMetadata)
@@ -652,36 +686,38 @@ export class HybridEngine extends EventTarget {
         resolve() // Resolve anyway, let playback continue
       }, 10000)
     })
-    
+
     log.debug('WebM video loaded, duration:', this.videoElement.duration)
-    
+
     // Update duration from actual video element
     this.duration = this.videoElement.duration
-    
+
     // Set up time update tracking
     const timeUpdateHandler = () => {
       this.currentTime = this.videoElement!.currentTime || 0
-      this.dispatchEvent(new CustomEvent('timeupdate', { detail: { currentTime: this.currentTime } }))
+      this.dispatchEvent(
+        new CustomEvent('timeupdate', { detail: { currentTime: this.currentTime } })
+      )
     }
-    
+
     const endedHandler = () => {
       this.isPlaying = false
       this.dispatchEvent(new Event('ended'))
     }
-    
+
     const errorHandler = (e: Event) => {
       log.error('WebM playback error:', e)
       this.config.onError?.(new Error('WebM playback error'))
     }
-    
+
     webmHandlers.timeupdate = timeUpdateHandler
     webmHandlers.ended = endedHandler
     webmHandlers.errorHandler = errorHandler
-    
+
     this.videoElement!.addEventListener('timeupdate', timeUpdateHandler)
     this.videoElement!.addEventListener('ended', endedHandler)
     this.videoElement!.addEventListener('error', errorHandler)
-    
+
     // Try to play
     try {
       await this.videoElement.play()
@@ -702,17 +738,17 @@ export class HybridEngine extends EventTarget {
     try {
       const response = await fetch(this.sourceUrl)
       log.debug('Fetch response status:', response.status, response.statusText)
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-      
+
       const buffer = await response.arrayBuffer()
       log.debug('Downloaded buffer size:', buffer.byteLength, 'bytes')
-      
+
       this.appendVideoSegment(buffer)
       log.debug('Full video downloaded and appended')
-      
+
       // Try to play the video
       if (this.videoElement) {
         log.debug('Attempting to play video element...')
@@ -768,7 +804,7 @@ export class HybridEngine extends EventTarget {
       // Download full file with progress
       log.debug('Downloading MKV file...')
       const response = await fetch(this.sourceUrl)
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -794,7 +830,7 @@ export class HybridEngine extends EventTarget {
           this.config.onProgress?.({
             loaded: receivedLength,
             total: contentLength,
-            type: 'video'
+            type: 'video',
           })
         }
       }
@@ -811,7 +847,6 @@ export class HybridEngine extends EventTarget {
 
       // Remux full file
       await this.remuxFullMKV(mkvData)
-
     } catch (error) {
       log.error('Error remuxing MKV:', error)
       this.config.onError?.(error as Error)
@@ -836,12 +871,16 @@ export class HybridEngine extends EventTarget {
 
       // Build FFmpeg args for remuxing
       const args = [
-        '-i', inputFilename,
-        '-c', 'copy', // Copy streams without re-encoding
-        '-movflags', '+frag_keyframe+empty_moov+default_base_moof', // fMP4 format for streaming
-        '-f', 'mp4',
+        '-i',
+        inputFilename,
+        '-c',
+        'copy', // Copy streams without re-encoding
+        '-movflags',
+        '+frag_keyframe+empty_moov+default_base_moof', // fMP4 format for streaming
+        '-f',
+        'mp4',
         '-y',
-        outputFilename
+        outputFilename,
       ]
 
       log.debug('Starting FFmpeg remux...')
@@ -851,9 +890,8 @@ export class HybridEngine extends EventTarget {
 
       // Read output
       const output = await this.ffmpeg.readFile(outputFilename)
-      const outputData = typeof output === 'string'
-        ? new TextEncoder().encode(output)
-        : new Uint8Array(output)
+      const outputData =
+        typeof output === 'string' ? new TextEncoder().encode(output) : new Uint8Array(output)
 
       log.debug(`Remuxed: ${(outputData.length / 1024 / 1024).toFixed(1)}MB`)
 
@@ -865,7 +903,7 @@ export class HybridEngine extends EventTarget {
       await this.ffmpeg.deleteFile(outputFilename)
 
       // Wait for MSE to process
-      await new Promise<void>(resolve => {
+      await new Promise<void>((resolve) => {
         const checkProcessed = () => {
           if (!this.isVideoAppending && !this.videoSourceBuffer?.updating) {
             resolve()
@@ -885,13 +923,16 @@ export class HybridEngine extends EventTarget {
           log.warn('Video play error:', e)
         }
       }
-
     } catch (error) {
       log.error('Remux error:', error)
 
       // Cleanup on error
-      try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
-      try { await this.ffmpeg.deleteFile(outputFilename) } catch {}
+      try {
+        await this.ffmpeg.deleteFile(inputFilename)
+      } catch {}
+      try {
+        await this.ffmpeg.deleteFile(outputFilename)
+      } catch {}
 
       throw error
     }
@@ -903,7 +944,7 @@ export class HybridEngine extends EventTarget {
    */
   private playVideoDirectly(): void {
     log.debug('Playing video directly (fallback)...')
-    
+
     if (!this.videoElement) {
       log.error('Video element not available')
       return
@@ -927,35 +968,37 @@ export class HybridEngine extends EventTarget {
     // Set source directly - browser will try to play it
     this.videoElement.src = this.sourceUrl
     this.videoElement.load() // Force reload with new source
-    
+
     // Add event listeners for this video element
     const onCanPlay = () => {
       log.debug('Direct video canplay - ready to play')
       // Auto-play if we're supposed to be playing
       if (this.isPlaying) {
-        this.videoElement?.play().catch(e => {
+        this.videoElement?.play().catch((e) => {
           log.error('Direct video play error:', e)
         })
       }
       this.videoElement?.removeEventListener('canplay', onCanPlay)
     }
-    
+
     this.videoElement.addEventListener('canplay', onCanPlay)
-    
+
     this.videoElement.addEventListener('error', (e) => {
       log.error('Direct video error:', e)
     })
-    
+
     // Add timeupdate listener to sync time bar in direct playback mode
     this.videoElement.addEventListener('timeupdate', () => {
       if (this.videoElement) {
         this.currentTime = this.videoElement.currentTime
-        this.dispatchEvent(new CustomEvent('timeupdate', { 
-          detail: { currentTime: this.currentTime } 
-        }))
+        this.dispatchEvent(
+          new CustomEvent('timeupdate', {
+            detail: { currentTime: this.currentTime },
+          })
+        )
       }
     })
-    
+
     // Also get duration when metadata loads
     this.videoElement.addEventListener('loadedmetadata', () => {
       if (this.videoElement && this.videoElement.duration) {
@@ -963,7 +1006,7 @@ export class HybridEngine extends EventTarget {
         log.debug('Direct video duration:', this.duration)
       }
     })
-    
+
     log.debug('Direct playback source set, loading...')
   }
 
@@ -1001,22 +1044,23 @@ export class HybridEngine extends EventTarget {
     }
   }
 
-
   /**
    * Flush pending video segments
    */
   private flushPendingVideoSegments(): void {
-    if (this.pendingVideoSegments.length > 0 &&
-        this.videoSourceBuffer &&
-        !this.videoSourceBuffer.updating &&
-        this.mediaSource?.readyState === 'open') {
+    if (
+      this.pendingVideoSegments.length > 0 &&
+      this.videoSourceBuffer &&
+      !this.videoSourceBuffer.updating &&
+      this.mediaSource?.readyState === 'open'
+    ) {
       const segment = this.pendingVideoSegments.shift()!
       this.appendVideoSegment(segment)
     } else if (this.pendingVideoSegments.length === 0 && this.videoElement) {
       // All segments appended, try to play if not already playing
       if (this.isPlaying && this.videoElement.paused) {
         log.debug('All video segments appended, attempting to play...')
-        this.videoElement.play().catch(e => {
+        this.videoElement.play().catch((e) => {
           log.warn('Video play after append failed:', e)
         })
       }
@@ -1028,7 +1072,7 @@ export class HybridEngine extends EventTarget {
    */
   async seek(time: number): Promise<void> {
     log.debug('Seeking to:', time)
-    
+
     this.currentTime = time
 
     // Seek video element (direct playback mode) - video can seek anywhere
@@ -1043,8 +1087,8 @@ export class HybridEngine extends EventTarget {
         const buffered = this.videoSourceBuffer.buffered
         if (buffered.length > 0) {
           this.videoSourceBuffer.remove(0, buffered.end(buffered.length - 1))
-          
-          await new Promise<void>(resolve => {
+
+          await new Promise<void>((resolve) => {
             const handler = () => {
               this.videoSourceBuffer?.removeEventListener('updateend', handler)
               resolve()
@@ -1105,7 +1149,7 @@ export class HybridEngine extends EventTarget {
   async resume(): Promise<void> {
     log.debug('Resuming playback...')
     this.isPlaying = true
-    
+
     // Resume video
     if (this.videoElement) {
       try {
@@ -1114,7 +1158,7 @@ export class HybridEngine extends EventTarget {
         log.error('Video resume error:', e)
       }
     }
-    
+
     // Resume audio
     if (this.audioElement && this.audioElement.readyState >= 2) {
       try {
@@ -1162,12 +1206,12 @@ export class HybridEngine extends EventTarget {
     const createCodecInfo = (stream: any): any => {
       const info = this.codecInfo.get(stream.index)
       if (!info) return null
-      
+
       // Generate codec string based on codec name
       let codecString = ''
       const codecName = info.codecName.toLowerCase()
       const profile = (stream.profile || '').toLowerCase()
-      
+
       if (codecName === 'h264') {
         if (profile.includes('high')) {
           codecString = 'avc1.640028'
@@ -1193,33 +1237,37 @@ export class HybridEngine extends EventTarget {
       } else {
         codecString = codecName
       }
-      
+
       return {
         codecId: info.codecId,
         codecName: info.codecName,
         codecString,
         profile: stream.profile,
-        bitDepth: stream.bits_per_sample
+        bitDepth: stream.bits_per_sample,
       }
     }
 
     return {
-      video: videoStream ? {
-        index: videoStream.index,
-        type: 'video',
-        codec: createCodecInfo(videoStream),
-        width: videoStream.width,
-        height: videoStream.height,
-        duration: this.duration
-      } : null,
-      audio: audioStream ? {
-        index: audioStream.index,
-        type: 'audio',
-        codec: createCodecInfo(audioStream),
-        sampleRate: audioStream.sample_rate,
-        channels: audioStream.channels,
-        duration: this.duration
-      } : null
+      video: videoStream
+        ? {
+            index: videoStream.index,
+            type: 'video',
+            codec: createCodecInfo(videoStream),
+            width: videoStream.width,
+            height: videoStream.height,
+            duration: this.duration,
+          }
+        : null,
+      audio: audioStream
+        ? {
+            index: audioStream.index,
+            type: 'audio',
+            codec: createCodecInfo(audioStream),
+            sampleRate: audioStream.sample_rate,
+            channels: audioStream.channels,
+            duration: this.duration,
+          }
+        : null,
     }
   }
 
@@ -1267,7 +1315,7 @@ export class HybridEngine extends EventTarget {
     if (this.videoSourceBuffer && this.mediaSource?.readyState === 'open') {
       try {
         if (this.videoSourceBuffer.updating) {
-          await new Promise<void>(resolve => {
+          await new Promise<void>((resolve) => {
             const handler = () => {
               this.videoSourceBuffer?.removeEventListener('updateend', handler)
               resolve()
@@ -1297,18 +1345,13 @@ export class HybridEngine extends EventTarget {
       URL.revokeObjectURL(this.videoElement.src)
       this.videoElement.src = ''
     }
-    
+
     this.videoElement = null
 
-    // Clean up FFmpeg
-    if (this.ffmpeg) {
-      try {
-        await this.ffmpeg.terminate()
-      } catch (_e) {
-        // Ignore
-      }
-      this.ffmpeg = null
-    }
+    // FFmpeg is shared with StreamingAudioTranscoder which handles its own cleanup.
+    // Only terminate if we own the instance (not shared).
+    // The audioTranscoder.destroy() call above already cleans up.
+    this.ffmpeg = null
 
     // Clean up network reader
     if (this.networkReader) {
@@ -1328,5 +1371,12 @@ export class HybridEngine extends EventTarget {
    */
   get requiresHybridPlayback(): boolean {
     return this.needsTranscoding
+  }
+
+  /**
+   * Get the audio stream index that requires transcoding
+   */
+  get audioStreamIdx(): number | null {
+    return this.audioStreamIndex
   }
 }

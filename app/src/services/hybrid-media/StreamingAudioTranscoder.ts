@@ -1,11 +1,16 @@
 /**
  * StreamingAudioTranscoder - Progressive audio transcoding
  *
- * Downloads file progressively and transcodes audio as data arrives,
- * enabling playback to start quickly without waiting for full download.
+ * Strategy:
+ *  - Small files (<= maxFullDownloadSize): download whole file, transcode once.
+ *  - Large files: download progressively to JS memory, transcode in one pass
+ *    using continuous data written to FFmpeg FS. Periodic re-transcodes
+ *    with -ss skip produce additional audio segments appended to MSE.
  *
- * Unlike chunked processing, this uses a single FFmpeg instance with
- * streaming input for seamless transcoding.
+ * Previous segment-based approach (8KB header + 20MB mid-file chunks fed
+ * to FFmpeg independently) was fundamentally broken for MKV containers and
+ * caused "RuntimeError: memory access out of bounds".  This version
+ * always writes a **continuous file from offset 0** into FFmpeg FS.
  *
  * IMPORTANT: This service is NOT supported in Tauri apps.
  */
@@ -22,13 +27,9 @@ function isTauriEnvironment(): boolean {
 }
 
 export interface StreamingTranscoderConfig {
-  /** Audio bitrate (default: 192k) */
   bitrate?: string
-  /** Initial buffer size before starting playback (default: 5MB) */
   initialBufferSize?: number
-  /** Max file size for full download (default: 200MB) */
   maxFullDownloadSize?: number
-  /** Optional shared FFmpeg instance to avoid memory conflicts */
   ffmpegInstance?: FFmpeg
 }
 
@@ -36,40 +37,69 @@ export class StreamingAudioTranscoder extends EventTarget {
   private ffmpeg: FFmpeg | null = null
   private ffmpegLoaded = false
   private abortController: AbortController | null = null
-  private sharedFFmpeg: FFmpeg | null = null  // Shared instance from HybridEngine
+  private sharedFFmpeg: FFmpeg | null = null
 
   private sourceUrl: string = ''
   private audioStreamIndex: number = 0
   private totalSize: number = 0
   private duration: number = 0
-  
-  // Seek convergence
-  private pendingSeekCheck: { targetTime: number, startByteOffset: number } | null = null
+
+  private pendingSeekCheck: { targetTime: number; startByteOffset: number } | null = null
   private seekAttemptCount: number = 0
 
   private config: Omit<Required<StreamingTranscoderConfig>, 'ffmpegInstance'>
 
-  // MediaSource for audio output
   private mediaSource: MediaSource | null = null
   private sourceBuffer: SourceBuffer | null = null
   private audioElement: HTMLAudioElement | null = null
   private pendingSegments: Uint8Array[] = []
   private isAppending = false
 
-  // Download state
-  private downloadedBytes = 0
-  private isComplete = false
   private audioReadyDispatched = false
-  private supportsRanges = true  // updated by probeFileSize()
+  private supportsRanges = true
 
-  // Cache probeFileSize() results across initialize() calls for the same URL
   private static probeCache = new Map<string, { size: number; supportsRanges: boolean }>()
-  
-  // Container header for chunked transcoding (experimental)
-  // MKV files need headers prepended to each chunk for FFmpeg to understand the format
+
+  private lastTranscodedDuration: number = 0
+  private transcodeGeneration: number = 0
+
+  // Set to true by restartFromOffset so the next successful append dispatches 'seekready'
+  private seekReadyPending = false
+
+  // Observed bytes-per-second ratio learned during the initial download.
+  // More accurate than (totalSize / duration) for VBR content.
+  private observedBytesPerSecond = 0
+
+  // True while seek transcoding is in progress (restartFromOffset started, seekready not yet fired)
+  private isSeekTranscoding = false
+
+  // The first downloaded chunk (from byte 0) of the container file.
+  // Prepended to seek-restart data so FFmpeg can parse the MKV Tracks element
+  // and resolve stream indices like `0:3` even when the seek data starts mid-file.
   private containerHeader: Uint8Array | null = null
-  // Reduced to 512KB to fit in WASM memory - should still capture essential MKV headers
-  private readonly HEADER_SIZE = 8 * 1024 // 8KB to capture main header but avoid first cluster media
+
+  private static readonly MAX_WASM_FILE_SIZE = 1400 * 1024 * 1024
+
+  /**
+   * Returns the URL to use for fetch() calls.
+   * External URLs (non-localhost, non-relative) are routed through the server's
+   * range proxy so the browser never makes a direct cross-origin fetch and CORS
+   * is avoided. Localhost and relative paths are used as-is.
+   */
+  private proxiedUrl(url: string): string {
+    try {
+      const { hostname } = new URL(url)
+      const isLocal =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0' ||
+        hostname === '[::1]'
+      if (isLocal) return url
+    } catch {
+      return url // relative path — already same-origin
+    }
+    return `/api/streaming/stream-range-proxy?url=${encodeURIComponent(url)}`
+  }
 
   constructor(config: StreamingTranscoderConfig = {}) {
     super()
@@ -78,23 +108,18 @@ export class StreamingAudioTranscoder extends EventTarget {
       throw new Error('StreamingAudioTranscoder is not supported in Tauri apps.')
     }
 
-    // Store shared FFmpeg instance if provided
     this.sharedFFmpeg = config.ffmpegInstance || null
 
     this.config = {
       bitrate: config.bitrate ?? '192k',
-      initialBufferSize: config.initialBufferSize ?? 5 * 1024 * 1024, // 5MB
-      maxFullDownloadSize: config.maxFullDownloadSize ?? 200 * 1024 * 1024 // 200MB
+      initialBufferSize: config.initialBufferSize ?? 50 * 1024 * 1024,
+      maxFullDownloadSize: config.maxFullDownloadSize ?? 150 * 1024 * 1024,
     }
   }
 
-  /**
-   * Load FFmpeg WASM - or use shared instance if provided
-   */
   private async loadFFmpeg(): Promise<void> {
     if (this.ffmpegLoaded) return
 
-    // Use shared instance if provided (avoids memory conflicts)
     if (this.sharedFFmpeg) {
       this.ffmpeg = this.sharedFFmpeg
       this.ffmpegLoaded = true
@@ -102,102 +127,108 @@ export class StreamingAudioTranscoder extends EventTarget {
       return
     }
 
-    // Create new instance (fallback)
     this.ffmpeg = new FFmpeg()
 
     this.ffmpeg.on('log', ({ message }) => {
-      // Only log important messages
-      if (message.includes('Error') || message.includes('failed') ||
-          message.includes('Stream mapping') || message.includes('Output #0')) {
+      if (
+        message.includes('Error') ||
+        message.includes('failed') ||
+        message.includes('Stream mapping') ||
+        message.includes('Output #0')
+      ) {
         log.debug('', message)
       }
     })
 
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm'
+    const appBasePath = import.meta.env.BASE_URL.endsWith('/')
+      ? import.meta.env.BASE_URL.slice(0, -1)
+      : import.meta.env.BASE_URL
+    const coreURL = `${appBasePath}/ffmpeg/ffmpeg-core.js`
+    const wasmURL = `${appBasePath}/ffmpeg/ffmpeg-core.wasm`
 
     await this.ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      coreURL: await toBlobURL(coreURL, 'text/javascript'),
+      wasmURL: await toBlobURL(wasmURL, 'application/wasm'),
     })
 
     this.ffmpegLoaded = true
     log.debug('FFmpeg WASM loaded (own instance)')
   }
 
-  /**
-   * Initialize transcoding for a media file
-   */
-  async initialize(url: string, audioStreamIndex: number = 0, duration: number = 0): Promise<HTMLAudioElement> {
+  async initialize(
+    url: string,
+    audioStreamIndex: number = 0,
+    duration: number = 0
+  ): Promise<HTMLAudioElement> {
     this.sourceUrl = url
     this.audioStreamIndex = audioStreamIndex
     this.duration = duration
     this.abortController = new AbortController()
-    this.downloadedBytes = 0
-    this.isComplete = false
     this.audioReadyDispatched = false
     this.pendingSegments = []
     this.pendingSeekCheck = null
     this.seekAttemptCount = 0
+    this.lastTranscodedDuration = 0
+    this.transcodeGeneration = 0
+    this.containerHeader = null
+    this.seekReadyPending = false
+    this.observedBytesPerSecond = 0
+    this.isSeekTranscoding = false
 
-    // Load FFmpeg
     await this.loadFFmpeg()
 
     const { size, supportsRanges } = await this.probeFileSize(url)
     this.totalSize = size
     this.supportsRanges = supportsRanges
 
-    log.debug(`File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB, ranges: ${supportsRanges}`)
+    log.debug(
+      `File size: ${(this.totalSize / 1024 / 1024).toFixed(1)}MB, ranges: ${supportsRanges}`
+    )
 
-    // Create MediaSource for audio output
     this.mediaSource = new MediaSource()
     this.audioElement = document.createElement('audio')
-    
-    // Ensure audio element is properly configured for playback
+
     this.audioElement.volume = 1.0
     this.audioElement.muted = false
     this.audioElement.preload = 'auto'
-    
+
     this.audioElement.src = URL.createObjectURL(this.mediaSource)
 
-    // Wait for MediaSource to open
     await new Promise<void>((resolve) => {
       this.mediaSource!.addEventListener('sourceopen', () => resolve(), { once: true })
     })
 
-    // Create SourceBuffer for AAC audio in fMP4 container.
-    // Use 'segments' mode so we can control timestampOffset for seeking.
     this.sourceBuffer = this.mediaSource.addSourceBuffer('audio/mp4; codecs="mp4a.40.2"')
     this.sourceBuffer.mode = 'segments'
 
     this.sourceBuffer.addEventListener('updateend', () => {
       this.isAppending = false
-      
-      // Check for seek convergence logic
+
       if (this.pendingSeekCheck && this.sourceBuffer) {
-         try {
-             if (this.sourceBuffer.buffered.length > 0) {
-                 this.checkSeekConvergence()
-             }
-         } catch (e) {
-             log.warn('Error checking seek convergence:', e)
-         }
+        try {
+          if (this.sourceBuffer.buffered.length > 0) {
+            this.checkSeekConvergence()
+          }
+        } catch (e) {
+          log.warn('Error checking seek convergence:', e)
+        }
       }
 
       this.appendNextSegment()
-      
-      // Dispatch audioready when first audio data is actually appended
-      // Guard against MediaSource being closed/removed
-      if (!this.audioReadyDispatched && 
-          this.sourceBuffer && 
-          this.mediaSource?.readyState === 'open') {
+
+      if (this.sourceBuffer && this.mediaSource?.readyState === 'open') {
         try {
           if (this.sourceBuffer.buffered.length > 0) {
-            this.audioReadyDispatched = true
-            log.debug('Audio data appended, dispatching audioready')
-            this.dispatchEvent(new CustomEvent('audioready'))
+            if (!this.audioReadyDispatched) {
+              this.audioReadyDispatched = true
+              log.debug('Audio data appended, dispatching audioready')
+              this.dispatchEvent(new CustomEvent('audioready'))
+            }
+
+            // seekready is dispatched from checkSeekConvergence once the
+            // buffered range actually covers the seek target, not here.
           }
         } catch (e) {
-          // SourceBuffer was removed from MediaSource
           log.warn('SourceBuffer no longer valid:', e)
         }
       }
@@ -208,24 +239,18 @@ export class StreamingAudioTranscoder extends EventTarget {
     return this.audioElement
   }
 
-  /**
-   * Start progressive download and transcoding
-   */
   async start(): Promise<void> {
     if (!this.ffmpeg || !this.sourceUrl) {
       throw new Error('Not initialized')
     }
 
     try {
-      // For files under maxFullDownloadSize, download whole file and transcode
-      // For larger files, use progressive download with streaming transcoding
-      if (this.totalSize <= this.config.maxFullDownloadSize) {
+      if (this.totalSize <= this.config.maxFullDownloadSize || !this.supportsRanges) {
         await this.downloadAndTranscodeFull()
       } else {
         await this.downloadAndTranscodeProgressive()
       }
 
-      // Signal completion
       await this.waitForAppendComplete()
       if (this.mediaSource?.readyState === 'open') {
         this.mediaSource.endOfStream()
@@ -233,7 +258,6 @@ export class StreamingAudioTranscoder extends EventTarget {
 
       this.dispatchEvent(new CustomEvent('complete'))
       log.debug('Transcoding complete')
-
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
         log.error('Error:', error)
@@ -242,22 +266,15 @@ export class StreamingAudioTranscoder extends EventTarget {
     }
   }
 
-  /**
-   * Sync audio playback with a video element
-   * Handles seeking and drift correction
-   */
   syncWithVideo(video: HTMLVideoElement): void {
     log.debug('Syncing with video element')
 
-    // Handle seeking
     video.addEventListener('seeking', async () => {
       log.debug('Video seeking to:', video.currentTime)
-      
+
       if (this.audioElement) {
-        // Sync audio time immediately
         this.audioElement.currentTime = video.currentTime
-        
-        // Check if we have buffered data for this time
+
         const buffered = this.sourceBuffer?.buffered
         let isBuffered = false
         if (buffered) {
@@ -271,256 +288,230 @@ export class StreamingAudioTranscoder extends EventTarget {
 
         if (!isBuffered && this.totalSize > 0 && this.duration > 0) {
           log.debug('Seek target not buffered, restarting transcoding...')
-          
-          // Calculate approx byte offset
-          const ratio = video.currentTime / this.duration
-          
-          // Conservative estimation: seek back significantly to ensure we capture the target time
-          // VBR variance means we might overestimate position. It's safer to download extra data from before
-          // than to start AFTER the target time (which causes silence).
-          // We subtract 5MB or 5% of file, whichever is smaller/safer? No, fixed 5-10MB is good.
-          const SAFETY_MARGIN = 5 * 1024 * 1024 // 5MB cushion
-          let targetByteOffset = (ratio * this.totalSize) - SAFETY_MARGIN
+
+          const SAFETY_MARGIN = 5 * 1024 * 1024
+          const bps =
+            this.observedBytesPerSecond > 0
+              ? this.observedBytesPerSecond
+              : this.totalSize / this.duration
+          let targetByteOffset = video.currentTime * bps - SAFETY_MARGIN
           targetByteOffset = Math.max(0, targetByteOffset)
-          
-          // Align to 4KB blocks
           targetByteOffset = Math.floor(targetByteOffset / 4096) * 4096
-          
-          log.debug(`Seek target: ${video.currentTime}s, Ratio: ${ratio.toFixed(3)}, Offset: ${targetByteOffset} (with safety margin)`)
-          
+
+          log.debug(
+            `Seek target: ${video.currentTime.toFixed(2)}s, bps: ${(bps / 1024 / 1024).toFixed(1)}MB/s, offset: ${(targetByteOffset / 1024 / 1024).toFixed(0)}MB`
+          )
           await this.restartFromOffset(targetByteOffset, video.currentTime)
         }
       }
     })
-    
-    // State flags for sync
+
     let audioWaiting = false
     let videoWaiting = false
 
-    // Initial check
     if (this.audioElement && this.audioElement.readyState < 3) {
-       log.debug('Initial audio wait -> holding video')
-       audioWaiting = true
-       video.pause()
+      log.debug('Initial audio wait -> holding video')
+      audioWaiting = true
+      video.pause()
     }
-    
-    // Handle playback drift (tight loop)
+
     video.addEventListener('timeupdate', () => {
       if (this.audioElement && !this.audioElement.paused) {
         const diff = Math.abs(this.audioElement.currentTime - video.currentTime)
         if (diff > 0.3) {
-           log.debug(`A/V Sync drift: ${diff.toFixed(2)}s, correcting...`)
-           this.audioElement.currentTime = video.currentTime
+          this.audioElement.currentTime = video.currentTime
         }
       }
     })
 
-    // --- Audio -> Video Sync ---
     if (this.audioElement) {
       this.audioElement.addEventListener('waiting', () => {
-         log.debug('Audio buffering -> pausing video')
-         audioWaiting = true
-         video.pause() 
+        // Don't pause video while seek transcoding is active — the UI overlay
+        // covers the loading state and the video needs to stay at the seek position.
+        if (this.isSeekTranscoding) return
+        audioWaiting = true
+        video.pause()
       })
-      
+
       this.audioElement.addEventListener('playing', () => {
-         // Also handle case where we were waiting initially
-         if (audioWaiting) {
-            log.debug('Audio resumed -> resuming video')
-            audioWaiting = false
-            if (video.paused) video.play().catch(()=>{})
-         }
-      })
-      
-      this.audioElement.addEventListener('pause', () => {
-         // If audio pauses (e.g. by script or user), pause video?
-         // Usually video is the master for user interaction.
-         // If audio pauses because of waiting, we already handled it. 
+        if (audioWaiting) {
+          audioWaiting = false
+          if (video.paused) video.play().catch(() => {})
+        }
       })
     }
-    
-    // --- Video -> Audio Sync ---
+
     video.addEventListener('waiting', () => {
-       log.debug('Video buffering -> pausing audio')
-       videoWaiting = true
-       this.audioElement?.pause()
+      videoWaiting = true
+      this.audioElement?.pause()
     })
-    
+
     video.addEventListener('playing', () => {
-       if (videoWaiting) {
-          log.debug('Video resumed -> resuming audio')
-          videoWaiting = false
-          if (this.audioElement?.paused) this.audioElement.play().catch(()=>{})
-       }
+      if (videoWaiting) {
+        videoWaiting = false
+        if (this.audioElement?.paused) this.audioElement.play().catch(() => {})
+      }
     })
-    
-    // --- User/System Pause Sync ---
+
     video.addEventListener('pause', () => {
-       // Only pause audio if this wasn't caused by audio waiting
-       if (!audioWaiting && this.audioElement) {
-          this.audioElement.pause()
-       }
+      if (!audioWaiting && this.audioElement) {
+        this.audioElement.pause()
+      }
     })
-    
+
     video.addEventListener('play', () => {
-       // If user clicks play, try to play audio
-       if (this.audioElement && this.audioElement.paused && !videoWaiting) {
-          this.audioElement.play().catch(()=>{})
-       }
+      if (this.audioElement && this.audioElement.paused && !videoWaiting) {
+        this.audioElement.play().catch(() => {})
+      }
     })
   }
-  
-  /**
-   * Restart transcoding from a specific byte offset
-   */
+
   private async restartFromOffset(byteOffset: number, timeOffset: number): Promise<void> {
-     // Cancel current work
-     if (this.abortController) {
-       this.abortController.abort()
-     }
-     this.abortController = new AbortController()
+    if (this.abortController) {
+      this.abortController.abort()
+    }
+    this.abortController = new AbortController()
 
-     // Track seek attempt for convergence
-     this.pendingSeekCheck = { targetTime: timeOffset, startByteOffset: byteOffset }
-     this.seekAttemptCount++
-     
-     if (this.seekAttemptCount > 3) {
-        log.warn(`Seek correction failed max times (${this.seekAttemptCount}). Giving up on convergence.`)
-        this.pendingSeekCheck = null
-        this.seekAttemptCount = 0
-     }
-     
-     // Clear buffer and position SourceBuffer at the target time.
-     // CRITICAL: In 'segments' mode we must set timestampOffset to tell the browser
-     // where on the media timeline the incoming fMP4 data should be placed.
-     // Without this the audio will be placed right after the previous content.
-     if (this.sourceBuffer && !this.sourceBuffer.updating) {
-        try {
-           if (this.sourceBuffer.buffered.length > 0) {
-              this.sourceBuffer.remove(0, Infinity)
-              // Wait for remove to complete before changing timestampOffset
-              await new Promise<void>(resolve => {
-                const onUpdateEnd = () => {
-                  this.sourceBuffer!.removeEventListener('updateend', onUpdateEnd)
-                  resolve()
-                }
-                this.sourceBuffer!.addEventListener('updateend', onUpdateEnd)
-              })
-           }
-           // Set the timestamp offset so decoded audio lands at the right position
-           this.sourceBuffer.timestampOffset = timeOffset
-           log.debug(`timestampOffset set to ${timeOffset.toFixed(2)}s`)
-        } catch (e) {
-           log.warn('Failed to reset buffer for seek:', e)
+    this.pendingSeekCheck = { targetTime: timeOffset, startByteOffset: byteOffset }
+    this.seekAttemptCount++
+
+    if (this.seekAttemptCount > 3) {
+      log.warn(
+        `Seek correction failed max times (${this.seekAttemptCount}). Giving up on convergence.`
+      )
+      this.pendingSeekCheck = null
+      this.seekAttemptCount = 0
+      this.seekReadyPending = false
+      this.isSeekTranscoding = false
+      return
+    }
+
+    this.isSeekTranscoding = true
+    this.seekReadyPending = true
+    this.pendingSegments = []
+    this.isAppending = false
+    this.lastTranscodedDuration = timeOffset
+    this.transcodeGeneration++
+
+    if (this.sourceBuffer) {
+      try {
+        // Wait for any in-progress append/remove before touching the buffer
+        if (this.sourceBuffer.updating) {
+          log.debug('SourceBuffer busy — waiting before seek reset')
+          await new Promise<void>((resolve) => {
+            const onEnd = () => {
+              this.sourceBuffer!.removeEventListener('updateend', onEnd)
+              resolve()
+            }
+            this.sourceBuffer!.addEventListener('updateend', onEnd)
+          })
         }
-     }
-     
-     // Reset state
-     this.pendingSegments = []
-     this.isAppending = false
-     
-     // Restart progressive download from new offset
-     this.downloadAndTranscodeProgressive(byteOffset).catch(e => {
-       if ((e as Error).name !== 'AbortError') {
-          log.error('Restart error:', e)
-       }
-     })
+        if (this.sourceBuffer.buffered.length > 0) {
+          this.sourceBuffer.remove(0, Infinity)
+          await new Promise<void>((resolve) => {
+            const onUpdateEnd = () => {
+              this.sourceBuffer!.removeEventListener('updateend', onUpdateEnd)
+              resolve()
+            }
+            this.sourceBuffer!.addEventListener('updateend', onUpdateEnd)
+          })
+        }
+        this.sourceBuffer.timestampOffset = timeOffset
+        log.debug(`timestampOffset set to ${timeOffset.toFixed(2)}s`)
+      } catch (e) {
+        log.warn('Failed to reset buffer for seek:', e)
+      }
+    }
+
+    this.downloadAndTranscodeProgressive(byteOffset).catch((e) => {
+      if ((e as Error).name !== 'AbortError') {
+        log.error('Restart error:', e)
+      }
+    })
   }
 
-  /**
-   * Check if the seek landed in the correct place and correct if necessary
-   */
   private checkSeekConvergence(): void {
-      if (!this.pendingSeekCheck || !this.sourceBuffer || this.sourceBuffer.buffered.length === 0) return
-      
-      const { targetTime, startByteOffset } = this.pendingSeekCheck
-      
-      // Find the range that is closest to our target
-      // Since we cleared buffer in restartFromOffset, there's usually just one range.
-      let closestRange = { start: 0, end: 0, diff: Infinity }
-      const buffered = this.sourceBuffer.buffered
-      
-      for(let i=0; i<buffered.length; i++) {
-         const start = buffered.start(i)
-         const end = buffered.end(i)
-         
-         // If targetTime is INSIDE the range, we are good!
-         if (targetTime >= start && targetTime <= end) {
-             closestRange = { start, end, diff: 0 }
-             break
-         }
-         
-         const _diffStart = start - targetTime
-         
-         if (Math.abs(start - targetTime) < Math.abs(closestRange.diff)) {
-            closestRange = { start, end, diff: start - targetTime }
-         }
+    if (!this.pendingSeekCheck || !this.sourceBuffer || this.sourceBuffer.buffered.length === 0)
+      return
+
+    const { targetTime, startByteOffset } = this.pendingSeekCheck
+
+    let closestRange = { start: 0, end: 0, diff: Infinity }
+    const buffered = this.sourceBuffer.buffered
+
+    for (let i = 0; i < buffered.length; i++) {
+      const start = buffered.start(i)
+      const end = buffered.end(i)
+
+      if (targetTime >= start && targetTime <= end) {
+        closestRange = { start, end, diff: 0 }
+        break
       }
-      
-      const isLate = closestRange.diff > 1.0 // Stricter tolerance
-      // If end < target, we have a gap BEFORE the new segment? No, we cleared.
-      // It means the new segment is entirely before the target.
-      const isTooEarly = closestRange.end < targetTime 
-      
-      if (isLate || isTooEarly) {
-          log.debug(`Convergence: Target ${targetTime.toFixed(2)}s outside range ${closestRange.start.toFixed(2)}-${closestRange.end.toFixed(2)}s`)
-          
-          let byteCorrection = 0
-          const bytesPerSec = this.totalSize / this.duration
-          
-          if (isLate) {
-              // Missed start. Go back.
-              byteCorrection = closestRange.diff * bytesPerSec
-              log.debug(`Late by ${closestRange.diff.toFixed(2)}s. Go back ~${(byteCorrection/1024).toFixed(0)}KB`)
-          } else if (isTooEarly) {
-              // Too early, go forward
-              // We need to cover the gap from End to Target
-              const gap = targetTime - closestRange.end
-              log.debug(`Too early by ${gap.toFixed(2)}s. Go forward.`)
-              byteCorrection = -(gap * bytesPerSec)
-          }
-          
-          // Apply Safety
-          const SAFETY_PAD = 1 * 1024 * 1024 // 1MB
-          
-          let newOffset = startByteOffset - byteCorrection 
-          if (isLate) newOffset -= SAFETY_PAD // Extra safety when going back
-          
-          newOffset = Math.max(0, newOffset)
-          newOffset = Math.floor(newOffset / 4096) * 4096
-          
-          log.debug(`Retrying seek at offset ${newOffset}`)
-          this.restartFromOffset(newOffset, targetTime)
-      } else {
-         log.debug(`Seek Converged! Range [${closestRange.start.toFixed(2)}, ${closestRange.end.toFixed(2)}] covers ${targetTime.toFixed(2)}`)
-         this.pendingSeekCheck = null
-         this.seekAttemptCount = 0
+
+      if (Math.abs(start - targetTime) < Math.abs(closestRange.diff)) {
+        closestRange = { start, end, diff: start - targetTime }
       }
+    }
+
+    const isLate = closestRange.diff > 1.0
+    const isTooEarly = closestRange.end < targetTime
+
+    if (isLate || isTooEarly) {
+      log.debug(
+        `Convergence: Target ${targetTime.toFixed(2)}s outside range ${closestRange.start.toFixed(2)}-${closestRange.end.toFixed(2)}s`
+      )
+
+      const bytesPerSec =
+        this.observedBytesPerSecond > 0
+          ? this.observedBytesPerSecond
+          : this.totalSize / this.duration
+      let byteCorrection = 0
+
+      if (isLate) {
+        byteCorrection = closestRange.diff * bytesPerSec
+      } else if (isTooEarly) {
+        const gap = targetTime - closestRange.end
+        byteCorrection = -(gap * bytesPerSec)
+      }
+
+      const SAFETY_PAD = 1 * 1024 * 1024
+      let newOffset = startByteOffset - byteCorrection
+      if (isLate) newOffset -= SAFETY_PAD
+      newOffset = Math.max(0, newOffset)
+      newOffset = Math.floor(newOffset / 4096) * 4096
+
+      log.debug(`Retrying seek at offset ${newOffset}`)
+      this.restartFromOffset(newOffset, targetTime).catch((e) => {
+        if ((e as Error).name !== 'AbortError') log.error('Seek retry error:', e)
+      })
+    } else {
+      log.debug(
+        `Seek converged! Range [${closestRange.start.toFixed(2)}, ${closestRange.end.toFixed(2)}] covers ${targetTime.toFixed(2)}`
+      )
+      this.pendingSeekCheck = null
+      this.seekAttemptCount = 0
+      if (this.seekReadyPending) {
+        this.seekReadyPending = false
+        this.isSeekTranscoding = false
+        log.debug('Seek converged — dispatching seekready')
+        this.dispatchEvent(new CustomEvent('seekready'))
+      }
+    }
   }
-  /**
-   * Probe the server to determine total file size and range support.
-   *
-   * Strategy (in order, stops at first success):
-   *  1. HEAD — zero bytes downloaded; check Content-Length + Accept-Ranges.
-   *     Skipped if the server is known to misreport via HEAD (detected from previous 416 on same URL).
-   *  2. GET bytes=0-0 — downloads exactly 1 byte; Content-Range tells us the real total.
-   *     This is the authoritative source for proxies (Stremthru, Debrid, etc.) that return
-   *     a wrong Content-Length via HEAD.
-   *  3. Full GET Content-Length fallback — for servers that don't support ranges at all.
-   *
-   * Results are cached per URL so calling initialize() multiple times doesn't re-probe.
-   */
+
   private async probeFileSize(url: string): Promise<{ size: number; supportsRanges: boolean }> {
-    // Cache hit
     const cached = StreamingAudioTranscoder.probeCache.get(url)
     if (cached) {
-      log.debug(`Probe cache hit: ${(cached.size / 1024 / 1024).toFixed(1)}MB, ranges: ${cached.supportsRanges}`)
+      log.debug(
+        `Probe cache hit: ${(cached.size / 1024 / 1024).toFixed(1)}MB, ranges: ${cached.supportsRanges}`
+      )
       return cached
     }
 
     const signal = this.abortController?.signal
+    // Size learned from HEAD — used as fallback when Content-Range is absent in the 206 response
+    let headContentLength = 0
 
-    // ── Strategy 1: HEAD ─────────────────────────────────────────────────────
     try {
       const head = await fetch(url, { method: 'HEAD', signal })
       if (head.ok || head.status === 200) {
@@ -529,56 +520,50 @@ export class StreamingAudioTranscoder extends EventTarget {
         const ranges = ar === 'bytes'
 
         if (cl > 0 && ranges) {
-          // HEAD is reliable: server both reports a size and supports range requests.
           log.debug(`Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, Accept-Ranges: bytes`)
           const result = { size: cl, supportsRanges: true }
           StreamingAudioTranscoder.probeCache.set(url, result)
           return result
         }
 
-        if (cl > 0 && !ranges) {
-          // Server gave us Content-Length but explicitly says no ranges (or omitted header).
-          // Return size but mark ranges unsupported — the download loop will use a single fetch.
-          log.debug(`Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, no range support`)
-          const result = { size: cl, supportsRanges: false }
-          StreamingAudioTranscoder.probeCache.set(url, result)
-          return result
+        if (cl > 0) {
+          // Many streaming proxies/CDNs omit Accept-Ranges in HEAD responses but still
+          // honour Range requests. Store the size and fall through to verify with a real
+          // range request rather than concluding "no range support" prematurely.
+          log.debug(
+            `Probe via HEAD: ${(cl / 1024 / 1024).toFixed(1)}MB, no Accept-Ranges — verifying range support`
+          )
+          headContentLength = cl
+        } else {
+          log.debug('HEAD gave no Content-Length, trying range probe...')
         }
-
-        // cl === 0 (chunked/unknown length) — fall through to range probe
-        log.debug('HEAD gave no Content-Length, trying range probe...')
       }
     } catch (e) {
-      // HEAD failed (network error, CORS) — proceed to range probe
       log.debug('HEAD failed, falling back to range probe:', (e as Error).message)
     }
 
-    // ── Strategy 2: GET bytes=0-0 range probe ────────────────────────────────
-    // Downloads exactly one byte; the server MUST include Content-Range: bytes 0-0/TOTAL
-    // in a 206 response, giving us the authoritative total size.
     try {
-      const probe = await fetch(url, {
+      const probe = await fetch(this.proxiedUrl(url), {
         method: 'GET',
-        headers: { 'Range': 'bytes=0-0' },
-        signal
+        headers: { Range: 'bytes=0-0' },
+        signal,
       })
 
       if (probe.status === 206) {
-        const cr = probe.headers.get('content-range') // "bytes 0-0/12345678"
-        // Content-Range can be "bytes 0-0/TOTAL" or "bytes */TOTAL" (rare)
-        const match = cr?.match(/\/([0-9]+)$/)  // capture /TOTAL
-        const size = match ? parseInt(match[1]) : 0
-        await probe.body?.cancel()  // discard the 1-byte body
+        const cr = probe.headers.get('content-range')
+        const match = cr?.match(/\/([0-9]+)$/)
+        // Prefer the total size from Content-Range; fall back to the HEAD Content-Length
+        const size = (match ? parseInt(match[1]) : 0) || headContentLength
+        await probe.body?.cancel()
 
         if (size > 0) {
-          log.debug(`Probe via GET range: ${(size / 1024 / 1024).toFixed(1)}MB`)
+          log.debug(`Probe via GET range: ${(size / 1024 / 1024).toFixed(1)}MB, ranges confirmed`)
           const result = { size, supportsRanges: true }
           StreamingAudioTranscoder.probeCache.set(url, result)
           return result
         }
       } else if (probe.status === 200) {
-        // Server ignored the Range header and returned 200 — read Content-Length from it
-        const cl = parseInt(probe.headers.get('content-length') || '0')
+        const cl = parseInt(probe.headers.get('content-length') || '0') || headContentLength
         await probe.body?.cancel()
         if (cl > 0) {
           log.debug(`Probe via GET 200 (no range support): ${(cl / 1024 / 1024).toFixed(1)}MB`)
@@ -589,12 +574,19 @@ export class StreamingAudioTranscoder extends EventTarget {
       }
     } catch (e) {
       log.debug('Range probe failed:', (e as Error).message)
+      // Range request failed but HEAD gave us a size — fall back to full download
+      if (headContentLength > 0) {
+        log.debug(
+          `Using HEAD size as fallback: ${(headContentLength / 1024 / 1024).toFixed(1)}MB (no ranges)`
+        )
+        const result = { size: headContentLength, supportsRanges: false }
+        StreamingAudioTranscoder.probeCache.set(url, result)
+        return result
+      }
     }
 
-    // ── Strategy 3: Full GET — read Content-Length from streaming response ───
-    // Last resort for servers that only speak plain HTTP/1.0-style.
     try {
-      const resp = await fetch(url, { signal })
+      const resp = await fetch(this.proxiedUrl(url), { signal })
       const cl = parseInt(resp.headers.get('content-length') || '0')
       await resp.body?.cancel()
       if (cl > 0) {
@@ -613,9 +605,8 @@ export class StreamingAudioTranscoder extends EventTarget {
   private async downloadAndTranscodeFull(): Promise<void> {
     log.debug('Downloading full file...')
 
-    // Download with progress tracking
-    const response = await fetch(this.sourceUrl, {
-      signal: this.abortController?.signal
+    const response = await fetch(this.proxiedUrl(this.sourceUrl), {
+      signal: this.abortController?.signal,
     })
 
     if (!response.ok) {
@@ -630,7 +621,6 @@ export class StreamingAudioTranscoder extends EventTarget {
     const chunks: Uint8Array[] = []
     let receivedLength = 0
 
-    // Read chunks
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
@@ -638,20 +628,17 @@ export class StreamingAudioTranscoder extends EventTarget {
       chunks.push(value)
       receivedLength += value.length
 
-      // Dispatch progress
       const percent = Math.round((receivedLength / this.totalSize) * 100)
       if (percent % 10 === 0) {
         log.debug(`Downloaded: ${percent}%`)
-        this.dispatchEvent(new CustomEvent('progress', {
-          detail: { percent, phase: 'downloading' }
-        }))
+        this.dispatchEvent(
+          new CustomEvent('progress', {
+            detail: { percent, phase: 'downloading' },
+          })
+        )
       }
-
-      // Progress notification during download
-      // audioready will be dispatched when data is actually appended to SourceBuffer
     }
 
-    // Combine chunks
     const combined = new Uint8Array(receivedLength)
     let offset = 0
     for (const chunk of chunks) {
@@ -661,427 +648,492 @@ export class StreamingAudioTranscoder extends EventTarget {
 
     log.debug(`Downloaded ${(receivedLength / 1024 / 1024).toFixed(1)}MB, transcoding...`)
 
-    // Transcode full file
-    await this.transcodeData(combined)
+    await this.transcodeFile(combined, 0)
   }
 
   /**
-   * Progressive download and transcode (for files > 200MB)
-   * 
-   * Downloads initial segment for quick start, then continues
-   * downloading and transcoding in the background.
+   * Progressive download and transcode for large files.
+   *
+   * Downloads data continuously to JS memory, then writes the accumulated
+   * continuous buffer to FFmpeg FS and transcodes in one pass.
+   * Periodic re-transcodes with -ss skip produce additional audio appended
+   * to MSE for ongoing playback.
+   *
+   * Key difference from old approach: we NEVER split the file into
+   * mid-file segments with tiny headers. We always write a continuous
+   * file from offset 0 so FFmpeg can parse the container correctly.
    */
   private async downloadAndTranscodeProgressive(startOffset: number = 0): Promise<void> {
-    log.debug(`Progressive mode: starting background download from ${startOffset}...`)
+    log.debug(`Progressive mode: downloading continuously from byte ${startOffset}...`)
 
-    // Capture the signal for this specific operation
-    // This ensures we check the correct signal even if this.abortController is replaced by restartFromOffset
     const signal = this.abortController?.signal
+    const generation = this.transcodeGeneration
 
-    // Smaller segment size to avoid FFmpeg WASM memory issues
-    // 20MB is safer for browser memory constraints
-    const SEGMENT_SIZE = 20 * 1024 * 1024 // 20MB per segment
-    let currentOffset = startOffset
+    const MAX_WASM = StreamingAudioTranscoder.MAX_WASM_FILE_SIZE
+    const CHUNK_SIZE = 20 * 1024 * 1024
 
-    // If starting from middle and we don't have headers, we must fetch them first
-    if (currentOffset > 0 && !this.containerHeader) {
-      log.debug('Seeking to middle but missing headers - fetching first segment first...')
-      try {
-        const headerData = await this.downloadRange(0, this.HEADER_SIZE + 1024, signal) // Fetch enough for headers
-        this.containerHeader = headerData.slice(0, this.HEADER_SIZE)
-        log.debug('Headers recovered')
-      } catch (e) {
-        log.error('Failed to recover headers:', e)
+    const effectiveTotal = Math.min(this.totalSize, MAX_WASM)
+    let currentByte = startOffset
+
+    const downloadChunks: Uint8Array[] = []
+    let totalDownloaded = 0
+    // Always start with the small initial-buffer threshold regardless of seek vs. initial load.
+    // Setting this to `true` for seeks caused the first transcode to wait for the full
+    // TRANSCODE_INCREMENT (150MB) instead of initialBufferSize (50MB), adding ~8 chunks of
+    // latency before any audio was available after a seek.
+    let hasDoneInitialTranscode = false
+    let lastTranscodedByteOffset = startOffset
+    const downloadSessionStart = Date.now()
+
+    const TRANSCODE_INCREMENT = 150 * 1024 * 1024
+
+    while (currentByte < effectiveTotal && !signal?.aborted) {
+      // Abort if a newer generation (from restartFromOffset) was created
+      if (this.transcodeGeneration !== generation) {
+        log.debug('Transcode generation mismatch, aborting current download')
         return
       }
-    }
 
-    // Download and transcode segments continuously
-    while (currentOffset < this.totalSize && !signal?.aborted) {
-      // Smart Buffering (Time-Based)
-      // Check if we have enough buffered content ahead
       if (this.audioElement && this.sourceBuffer && this.sourceBuffer.buffered.length > 0) {
-         try {
-             const currentTime = this.audioElement.currentTime
-             const buffered = this.sourceBuffer.buffered
-             
-             // Check buffer health
-             for(let i=0; i<buffered.length; i++) {
-                 // Check if currentTime is within (or just before) this range
-                 if (currentTime >= buffered.start(i) - 0.5 && currentTime <= buffered.end(i) + 0.5) {
-                     const secondsAhead = buffered.end(i) - currentTime
-                     
-                     // Throttle if we have > 300s (5 mins) buffered ahead
-                     if (secondsAhead > 300) {
-                         log.debug(`Buffer sufficient (${secondsAhead.toFixed(0)}s ahead). Pausing download...`)
-                         
-                         const checkInterval = 2000
-                         const RESUME_THRESHOLD = 120 // Resume when drop below 2 mins
-                         
-                         while (this.audioElement && !signal?.aborted) {
-                             // Re-check
-                             const now = this.audioElement.currentTime
-                             let currentAhead = 0
-                             if (this.sourceBuffer && this.sourceBuffer.buffered.length > 0) {
-                                 // Quick scan for current range
-                                 for(let j=0; j<this.sourceBuffer.buffered.length; j++) {
-                                     if (now >= this.sourceBuffer.buffered.start(j) - 2 && now <= this.sourceBuffer.buffered.end(j) + 2) {
-                                         currentAhead = this.sourceBuffer.buffered.end(j) - now
-                                         break
-                                     }
-                                 }
-                             }
-                             
-                             if (currentAhead < RESUME_THRESHOLD) break
-                             await new Promise(r => setTimeout(r, checkInterval))
-                         }
-                         
-                         if (signal?.aborted) return
-                         log.debug('Resuming download...')
-                     }
-                     break // Found our range
-                 }
-             }
-         } catch(_e) { 
-             // Ignore errors (SourceBuffer might be invalid temporarily)
-         }
+        try {
+          const currentTime = this.audioElement.currentTime
+          const buffered = this.sourceBuffer.buffered
+
+          for (let i = 0; i < buffered.length; i++) {
+            if (currentTime >= buffered.start(i) - 0.5 && currentTime <= buffered.end(i) + 0.5) {
+              const secondsAhead = buffered.end(i) - currentTime
+              if (secondsAhead > 300) {
+                log.debug(
+                  `Buffer sufficient (${secondsAhead.toFixed(0)}s ahead). Pausing download...`
+                )
+                const RESUME_THRESHOLD = 120
+
+                while (this.audioElement && !signal?.aborted) {
+                  const now = this.audioElement.currentTime
+                  let currentAhead = 0
+                  if (this.sourceBuffer && this.sourceBuffer.buffered.length > 0) {
+                    for (let j = 0; j < this.sourceBuffer.buffered.length; j++) {
+                      if (
+                        now >= this.sourceBuffer.buffered.start(j) - 2 &&
+                        now <= this.sourceBuffer.buffered.end(j) + 2
+                      ) {
+                        currentAhead = this.sourceBuffer.buffered.end(j) - now
+                        break
+                      }
+                    }
+                  }
+                  if (currentAhead < RESUME_THRESHOLD) break
+                  await new Promise((r) => setTimeout(r, 2000))
+                }
+
+                if (signal?.aborted) return
+                log.debug('Resuming download...')
+              }
+              break
+            }
+          }
+        } catch (_e) {
+          // Ignore
+        }
       }
 
-      const segmentStart = currentOffset
-      const segmentEnd = Math.min(currentOffset + SEGMENT_SIZE - 1, this.totalSize - 1)
-      const isFirstSegment = currentOffset === 0
+      const segmentEnd = Math.min(currentByte + CHUNK_SIZE - 1, effectiveTotal - 1)
 
-      log.debug(`Downloading segment ${(segmentStart / 1024 / 1024).toFixed(0)}MB - ${(segmentEnd / 1024 / 1024).toFixed(0)}MB...`)
-      
-      this.dispatchEvent(new CustomEvent('progress', {
-        detail: { 
-          percent: Math.round((currentOffset / this.totalSize) * 100), 
-          phase: 'downloading' 
-        }
-      }))
+      {
+        const elapsedMs = Date.now() - downloadSessionStart
+        const bytesPerMs = elapsedMs > 500 && totalDownloaded > 0 ? totalDownloaded / elapsedMs : 0
+        const remaining = effectiveTotal - currentByte
+        const etaSec = bytesPerMs > 0 ? Math.round(remaining / bytesPerMs / 1000) : undefined
+        const transcodedPct =
+          this.duration > 0 && this.sourceBuffer
+            ? (() => {
+                try {
+                  const buf = this.sourceBuffer.buffered
+                  if (buf.length > 0) return (buf.end(buf.length - 1) / this.duration) * 100
+                } catch {
+                  // ignore
+                }
+                return 0
+              })()
+            : 0
+        this.dispatchEvent(
+          new CustomEvent('progress', {
+            detail: {
+              percent: Math.round((currentByte / this.totalSize) * 100),
+              phase: 'downloading' as const,
+              etaSec,
+              transcodedPct,
+              isSeeking: startOffset > 0,
+            },
+          })
+        )
+      }
+
+      log.debug(`Downloading ${currentByte}-${segmentEnd}...`)
 
       try {
-        const segmentData = await this.downloadRange(segmentStart, segmentEnd, signal)
-        
-        if (signal?.aborted) {
-          log.debug('Aborted during download')
-          return
+        const chunk = await this.downloadRange(currentByte, segmentEnd, signal)
+
+        if (signal?.aborted || this.transcodeGeneration !== generation) return
+
+        downloadChunks.push(chunk)
+        totalDownloaded += chunk.length
+        currentByte = segmentEnd + 1
+
+        // Cache the first chunk as the container header so seeks can prepend it.
+        // Only do this for the initial full-file download (startOffset === 0).
+        if (startOffset === 0 && this.containerHeader === null) {
+          this.containerHeader = chunk
+          log.debug(
+            `Cached ${(chunk.length / 1024 / 1024).toFixed(1)}MB container header for seek support`
+          )
         }
 
-        log.debug(`Segment downloaded: ${(segmentData.length / 1024 / 1024).toFixed(1)}MB`)
-        
-        this.dispatchEvent(new CustomEvent('progress', {
-          detail: { 
-            percent: Math.round((currentOffset / this.totalSize) * 100), 
-            phase: 'transcoding' 
-          }
-        }))
+        log.debug(`Downloaded: ${(totalDownloaded / 1024 / 1024).toFixed(1)}MB total`)
 
-        // Transcode this segment
-        if (isFirstSegment) {
-          // Store container header from first segment for subsequent segments BEFORE processing
-          // heavily important to do this before passing segmentData to FFmpeg as it might become detached
-          if (!this.containerHeader) {
-            this.containerHeader = segmentData.slice(0, this.HEADER_SIZE)
-          }
+        // Decide if we should transcode now
+        const initialThreshold = hasDoneInitialTranscode
+          ? TRANSCODE_INCREMENT
+          : this.config.initialBufferSize
 
-          // First segment has container headers, transcode as complete file
-          await this.transcodeInitialSegment(segmentData)
-        } else {
-          // Subsequent segments need headers prepended
-          // Create combined data with container headers
-          if (this.containerHeader) {
-            const combinedData = new Uint8Array(this.containerHeader.length + segmentData.length)
-            combinedData.set(this.containerHeader, 0)
-            combinedData.set(segmentData, this.containerHeader.length)
-            await this.transcodeInitialSegment(combinedData)
-          } else {
-            log.warn('No container header available for subsequent segment')
-            break
+        const shouldTranscode = totalDownloaded >= initialThreshold || currentByte >= effectiveTotal
+
+        if (shouldTranscode && totalDownloaded > 0) {
+          // Build continuous data from offset 0
+          const continuousData = this.buildContinuousBuffer(
+            startOffset > 0,
+            downloadChunks,
+            startOffset
+          )
+
+          if (continuousData.length > 0) {
+            log.debug(
+              `Transcoding ${
+                continuousData.length >= 1024 * 1024
+                  ? `${(continuousData.length / 1024 / 1024).toFixed(1)}MB`
+                  : `${(continuousData.length / 1024).toFixed(0)}KB`
+              } of continuous data`
+            )
+
+            const seekTime =
+              startOffset > 0
+                ? Math.max(0, this.lastTranscodedDuration)
+                : this.lastTranscodedDuration
+
+            await this.transcodeFile(continuousData, seekTime)
+
+            lastTranscodedByteOffset = currentByte
+            hasDoneInitialTranscode = true
+
+            // Track observed bytes-per-second from initial download for accurate seek offsets
+            if (startOffset === 0 && this.lastTranscodedDuration > 1) {
+              this.observedBytesPerSecond = currentByte / this.lastTranscodedDuration
+              log.debug(
+                `Observed bitrate: ${((this.observedBytesPerSecond * 8) / 1024 / 1024).toFixed(1)} Mbps`
+              )
+            }
           }
         }
-
-        currentOffset = segmentEnd + 1
-        
-        log.debug(`Segment complete, next offset: ${(currentOffset / 1024 / 1024).toFixed(0)}MB`)
-
       } catch (error) {
         if ((error as any).isRangeExceeded) {
-          // 416 = the server has no more data at this offset. Treat as EOF.
           const actualSize = (error as any).actualSize
           if (typeof actualSize === 'number' && actualSize > 0 && actualSize < this.totalSize) {
-            log.debug(`Server reports actual size ${(actualSize / 1024 / 1024).toFixed(1)}MB (was ${(this.totalSize / 1024 / 1024).toFixed(1)}MB). Stopping.`)
-            this.totalSize = actualSize  // update so future seeks also respect this
+            log.debug(
+              `Server reports actual size ${(actualSize / 1024 / 1024).toFixed(1)}MB. Stopping.`
+            )
+            this.totalSize = actualSize
           } else {
             log.debug('416 received — reached end of ranged content, stopping.')
           }
-          break  // Clean EOF — stop the loop
+          break
         }
 
-        log.error('Segment error:', error)
-        // For non-range errors: if we already have some audio, skip this segment and continue.
-        // If this is the very first segment, re-throw so we fail loudly.
-        if (currentOffset > 0) {
-          currentOffset = segmentEnd + 1
-        } else {
+        // AbortError means restartFromOffset cancelled this download.
+        // Re-throw so start() catches it and exits without calling endOfStream().
+        if ((error as Error).name === 'AbortError') {
           throw error
         }
+
+        log.error('Download error:', error)
+
+        if (startOffset === 0 && currentByte < CHUNK_SIZE) {
+          throw error
+        }
+
+        log.debug('Skipping failed chunk and continuing...')
+        currentByte = segmentEnd + 1
       }
     }
 
-    this.dispatchEvent(new CustomEvent('progress', {
-      detail: { percent: 100, phase: 'complete' }
-    }))
+    // Final transcode with all downloaded data
+    if (downloadChunks.length > 0 && !signal?.aborted && this.transcodeGeneration === generation) {
+      const continuousData = this.buildContinuousBuffer(
+        startOffset > 0,
+        downloadChunks,
+        startOffset
+      )
 
-    log.debug('All segments processed')
-    this.isComplete = true
-  }
+      if (
+        continuousData.length > 0 &&
+        continuousData.length > lastTranscodedByteOffset - startOffset
+      ) {
+        const seekTime =
+          startOffset > 0 ? Math.max(0, this.lastTranscodedDuration) : this.lastTranscodedDuration
 
-  /**
-   * Clean up FFmpeg virtual filesystem to prevent memory issues
-   * FFmpeg WASM has limited FS space, so we need to aggressively clean up
-   */
-  private async cleanupFFmpegFS(): Promise<void> {
-    if (!this.ffmpeg) return
-
-    try {
-      // List all files in FFmpeg FS root
-      const files = await this.ffmpeg.listDir('/')
-      
-      for (const file of files) {
-        // Skip special directories
-        if (file.name === '.' || file.name === '..' || file.isDir) continue
-        
-        // Delete any leftover media files
-        if (file.name.endsWith('.mkv') || file.name.endsWith('.m4a') || 
-            file.name.endsWith('.mp4') || file.name.endsWith('.aac')) {
-          try {
-            await this.ffmpeg.deleteFile(`/${file.name}`)
-            log.debug(`Cleaned up: ${file.name}`)
-          } catch {
-            // Ignore errors
+        try {
+          await this.transcodeFile(continuousData, seekTime)
+        } catch (e) {
+          if ((e as Error).name !== 'AbortError') {
+            log.error('Final transcode error:', e)
           }
         }
       }
-    } catch (error) {
-      // listDir might not be available in all FFmpeg builds
-      log.warn('Could not list FS:', error)
     }
+
+    // Don't signal completion if this run was aborted by a seek restart
+    if (signal?.aborted) return
+
+    this.dispatchEvent(
+      new CustomEvent('progress', {
+        detail: { percent: 100, phase: 'complete' },
+      })
+    )
+
+    log.debug('Progressive download complete')
   }
 
   /**
-   * Transcode an initial segment that contains complete container structure
+   * Build a continuous buffer from downloaded chunks.
+   *
+   * When hasOffset is true (seek-restart), the chunks start at a mid-file byte
+   * offset and lack the MKV EBML/Tracks header.  We prepend the cached
+   * containerHeader so FFmpeg can resolve stream indices (e.g. `0:3`) even
+   * though the audio payload starts mid-file.  FFmpeg is told to ignore the
+   * container's seek index (-fflags +ignidx in transcodeFile) so it doesn't
+   * try to jump to SeekHead byte offsets that are invalid for this virtual file.
    */
-  private async transcodeInitialSegment(data: Uint8Array): Promise<void> {
-    if (!this.ffmpeg) return
+  private buildContinuousBuffer(
+    hasOffset: boolean,
+    chunks: Uint8Array[],
+    _startOffset: number
+  ): Uint8Array {
+    if (!hasOffset && chunks.length === 1) {
+      return chunks[0]
+    }
 
-    // Clean up FS before each transcode to prevent memory issues
+    const prefix = hasOffset && this.containerHeader ? this.containerHeader : null
+
+    let totalLength = prefix ? prefix.length : 0
+    for (const chunk of chunks) {
+      totalLength += chunk.length
+    }
+
+    const result = new Uint8Array(totalLength)
+    let pos = 0
+
+    if (prefix) {
+      result.set(prefix, pos)
+      pos += prefix.length
+    }
+
+    for (const chunk of chunks) {
+      result.set(chunk, pos)
+      pos += chunk.length
+    }
+
+    return result
+  }
+
+  /**
+   * Get the current duration of audio buffered in the SourceBuffer.
+   */
+  private getTranscodedDuration(): number {
+    if (!this.sourceBuffer) return 0
+    try {
+      const buffered = this.sourceBuffer.buffered
+      if (buffered.length > 0) {
+        return buffered.end(buffered.length - 1)
+      }
+    } catch {
+      // SourceBuffer may be removed
+    }
+    return this.lastTranscodedDuration
+  }
+
+  /**
+   * Transcode a continuous file buffer through FFmpeg.
+   * data must be a continuous byte range starting from the beginning of
+   * the media file (or from startOffset for seek-based re-transcodes).
+   * seekTime: seconds of audio to skip (already-transcoded portion).
+   */
+  private async transcodeFile(data: Uint8Array, seekTime: number = 0): Promise<void> {
+    if (!this.ffmpeg || data.length === 0) return
+
     await this.cleanupFFmpegFS()
 
     const timestamp = Date.now()
-    const inputFilename = `initial_${timestamp}.mkv`
+    const inputFilename = `input_${timestamp}.mkv`
     const outputFilename = `audio_${timestamp}.m4a`
 
     try {
       log.debug(`Writing ${(data.length / 1024 / 1024).toFixed(1)}MB to FFmpeg FS...`)
       await this.ffmpeg.writeFile(inputFilename, data)
 
-      // Transcode to stereo AAC for browser compatibility
-      const args = [
-        '-i', inputFilename,
-        '-copyts', // Preserve timestamps so seeking works
-        '-map', `0:${this.audioStreamIndex}`,
-        '-c:a', 'aac',
-        '-b:a', this.config.bitrate,
-        '-ac', '2',  // Stereo for MSE compatibility
-        '-ar', '48000',
+      const args: string[] = []
+
+      // When seeking with a prepended container header the virtual file has:
+      //   [header bytes 0..N] + [mid-file bytes seekOffset..]
+      // The SeekHead in the header contains byte offsets from the *original*
+      // file, so they are wrong for this virtual file.  -fflags +ignidx tells
+      // FFmpeg to ignore the index and scan linearly instead.
+      if (seekTime > 0 && this.containerHeader !== null) {
+        args.push('-fflags', '+ignidx')
+      }
+
+      // Input seeking: skip already-transcoded portion
+      if (seekTime > 0) {
+        args.push('-ss', String(Math.floor(seekTime)))
+      }
+
+      args.push(
+        '-i',
+        inputFilename,
+        '-copyts',
+        '-map',
+        `0:${this.audioStreamIndex}`,
+        '-c:a',
+        'aac',
+        '-b:a',
+        this.config.bitrate,
+        '-ac',
+        '2',
+        '-ar',
+        '48000',
         '-vn',
-        '-f', 'mp4',
-        '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
-        '-y',
-        outputFilename
-      ]
+        '-f',
+        'mp4',
+        '-movflags',
+        '+frag_keyframe+empty_moov+default_base_moof'
+      )
 
-      log.debug('Transcoding initial segment...')
+      // Limit output duration if we're seeking: only produce audio we haven't transcoded yet
+      if (seekTime > 0 && this.duration > 0) {
+        // Don't limit duration for seeks; let FFmpeg produce everything from seek point
+      }
+
+      args.push('-y', outputFilename)
+
+      log.debug(
+        `Transcoding (seekTime=${seekTime.toFixed(1)}s, inputSize=${(data.length / 1024 / 1024).toFixed(1)}MB)...`
+      )
       await this.ffmpeg.exec(args)
 
       const output = await this.ffmpeg.readFile(outputFilename)
-      const outputData = typeof output === 'string'
-        ? new TextEncoder().encode(output)
-        : new Uint8Array(output)
+      const outputData =
+        typeof output === 'string' ? new TextEncoder().encode(output) : new Uint8Array(output)
 
       if (outputData.length > 0) {
-        log.debug(`Initial segment transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
+        log.debug(`Transcoded output: ${(outputData.length / 1024).toFixed(0)}KB`)
+
+        // Set timestampOffset for seeks so MSE places audio correctly
+        if (seekTime > 0 && this.sourceBuffer && !this.sourceBuffer.updating) {
+          try {
+            if (this.sourceBuffer.buffered.length > 0) {
+              // Remove old buffer and set offset for new segment
+              const removeEnd = this.sourceBuffer.buffered.end(
+                this.sourceBuffer.buffered.length - 1
+              )
+              if (removeEnd > seekTime) {
+                this.sourceBuffer.remove(seekTime, removeEnd)
+                await new Promise<void>((resolve) => {
+                  const onEnd = () => {
+                    this.sourceBuffer!.removeEventListener('updateend', onEnd)
+                    resolve()
+                  }
+                  this.sourceBuffer!.addEventListener('updateend', onEnd)
+                })
+              }
+            }
+            this.sourceBuffer.timestampOffset = seekTime
+            log.debug(`Set timestampOffset to ${seekTime.toFixed(2)}s for seek transcode`)
+          } catch (e) {
+            log.warn('Failed to adjust timestampOffset:', e)
+          }
+        }
+
         this.queueSegment(outputData)
+
+        // Update lastTranscodedDuration based on what we just produced
+        this.lastTranscodedDuration = this.getTranscodedDuration()
+        log.debug(`Audio buffered up to ${this.lastTranscodedDuration.toFixed(1)}s`)
       } else {
-        log.warn('Initial segment produced empty output')
+        log.warn('Transcode produced empty output')
       }
 
-      // Cleanup
       await this.ffmpeg.deleteFile(inputFilename)
       await this.ffmpeg.deleteFile(outputFilename)
-
     } catch (error) {
-      log.error('Initial segment transcode error:', error)
-      
-      try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
-      try { await this.ffmpeg.deleteFile(outputFilename) } catch {}
+      log.error('Transcode error:', error)
 
-      throw error
+      try {
+        await this.ffmpeg.deleteFile(inputFilename)
+      } catch {}
+      try {
+        await this.ffmpeg.deleteFile(outputFilename)
+      } catch {}
+
+      // Don't throw for seek-related transcodes after initial playback
+      // A failed seek transcode shouldn't kill the playback
+      if (seekTime === 0) {
+        throw error
+      } else {
+        log.warn('Seek transcode failed, playback continues with existing buffer')
+      }
     }
   }
 
-  /**
-   * Transcode a chunk that has container headers prepended
-   * This is the experimental method that processes header+data combined
-   */
-  private async transcodeChunkWithHeader(data: Uint8Array, chunkIndex: number): Promise<void> {
+  private async cleanupFFmpegFS(): Promise<void> {
     if (!this.ffmpeg) return
 
-    // Clean up FS before each transcode to prevent memory issues
-    await this.cleanupFFmpegFS()
-
-    const timestamp = Date.now()
-    const inputFilename = `chunk_${chunkIndex}_${timestamp}.mkv`
-    const outputFilename = `audio_${chunkIndex}_${timestamp}.m4a`
-
     try {
-      // Write combined data (headers + chunk) to FFmpeg FS
-      await this.ffmpeg.writeFile(inputFilename, data)
+      const files = await this.ffmpeg.listDir('/')
 
-      // Build FFmpeg args - extract audio and transcode to AAC
-      // Use absolute stream index (0:N) not relative audio index (0:a:N)
-      // audioStreamIndex is the absolute stream number in the container
-      // Downmix to stereo for browser MSE compatibility (5.1 AAC with PCE may not work)
-      const args = [
-        '-i', inputFilename,
-        '-map', `0:${this.audioStreamIndex}`,  // Absolute stream index
-        '-c:a', 'aac',
-        '-b:a', this.config.bitrate,
-        '-ac', '2',  // Downmix to stereo for MSE compatibility
-        '-ar', '48000',  // Ensure 48kHz sample rate
-        '-vn', // No video
-        '-f', 'mp4',
-        '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
-        '-y',
-        outputFilename
-      ]
+      for (const file of files) {
+        if (file.name === '.' || file.name === '..' || file.isDir) continue
 
-      // Execute FFmpeg
-      await this.ffmpeg.exec(args)
-
-      // Read output
-      const output = await this.ffmpeg.readFile(outputFilename)
-      const outputData = typeof output === 'string'
-        ? new TextEncoder().encode(output)
-        : new Uint8Array(output)
-
-      if (outputData.length > 0) {
-        log.debug(`Chunk ${chunkIndex} transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
-        this.queueSegment(outputData)
-      } else {
-        log.warn(`Chunk ${chunkIndex} produced empty output`)
+        if (
+          file.name.endsWith('.mkv') ||
+          file.name.endsWith('.m4a') ||
+          file.name.endsWith('.mp4') ||
+          file.name.endsWith('.aac')
+        ) {
+          try {
+            await this.ffmpeg.deleteFile(`/${file.name}`)
+            log.debug(`Cleaned up: ${file.name}`)
+          } catch {
+            // Ignore
+          }
+        }
       }
-
-      // Cleanup FFmpeg FS
-      await this.ffmpeg.deleteFile(inputFilename)
-      await this.ffmpeg.deleteFile(outputFilename)
-
     } catch (error) {
-      log.error(`Chunk ${chunkIndex} transcode error:`, error)
-      
-      // Cleanup on error
-      try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
-      try { await this.ffmpeg.deleteFile(outputFilename) } catch {}
-
-      throw error
+      log.warn('Could not list FS:', error)
     }
   }
 
-  /**
-   * Transcode a single chunk of audio data
-   * For the first chunk, we need to generate a proper fMP4 init segment
-   * For subsequent chunks, we generate continuation segments
-   */
-  private async transcodeChunk(data: Uint8Array, chunkIndex: number, _isFirst: boolean): Promise<void> {
-    if (!this.ffmpeg) return
-
-    // Clean up FS before each transcode to prevent memory issues
-    await this.cleanupFFmpegFS()
-
-    const timestamp = Date.now()
-    const inputFilename = `chunk_${chunkIndex}_${timestamp}.mkv`
-    const outputFilename = `audio_${chunkIndex}_${timestamp}.m4a`
-
-    try {
-      // Write chunk to FFmpeg FS
-      await this.ffmpeg.writeFile(inputFilename, data)
-
-      // Build FFmpeg args
-      // For fMP4 streaming, we use fragmented output that MSE can handle
-      const args = [
-        '-i', inputFilename,
-        '-map', `0:a:${this.audioStreamIndex}`,
-        '-c:a', 'aac',
-        '-b:a', this.config.bitrate,
-        '-vn', // No video
-        '-f', 'mp4',
-        // Fragmented MP4 flags for MSE compatibility
-        '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
-        '-y',
-        outputFilename
-      ]
-
-      // Execute FFmpeg
-      await this.ffmpeg.exec(args)
-
-      // Read output
-      const output = await this.ffmpeg.readFile(outputFilename)
-      const outputData = typeof output === 'string'
-        ? new TextEncoder().encode(output)
-        : new Uint8Array(output)
-
-      if (outputData.length > 0) {
-        log.debug(`Chunk ${chunkIndex} transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
-        
-        // Append to MSE
-        this.queueSegment(outputData)
-      } else {
-        log.warn(`Chunk ${chunkIndex} produced empty output`)
-      }
-
-      // Cleanup
-      await this.ffmpeg.deleteFile(inputFilename)
-      await this.ffmpeg.deleteFile(outputFilename)
-
-    } catch (error) {
-      log.error(`Chunk ${chunkIndex} transcode error:`, error)
-
-      // Cleanup on error
-      try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
-      try { await this.ffmpeg.deleteFile(outputFilename) } catch {}
-
-      throw error
-    }
-  }
-
-  /**
-   * Download a byte range.
-   * Returns the data, or throws RangeExceededError if the server returns 416
-   * (meaning the requested start is past the actual rangeable end of the file).
-   */
-  private async downloadRange(start: number, end: number, signal?: AbortSignal): Promise<Uint8Array> {
-    const response = await fetch(this.sourceUrl, {
-      headers: { 'Range': `bytes=${start}-${end}` },
-      signal: signal || this.abortController?.signal
+  private async downloadRange(
+    start: number,
+    end: number,
+    signal?: AbortSignal
+  ): Promise<Uint8Array> {
+    const response = await fetch(this.proxiedUrl(this.sourceUrl), {
+      headers: { Range: `bytes=${start}-${end}` },
+      signal: signal || this.abortController?.signal,
     })
 
-    // 416 Range Not Satisfiable — the server has no data at this offset.
-    // Extract the actual rangeable size from Content-Range: bytes */ACTUAL_SIZE
     if (response.status === 416) {
       const cr = response.headers.get('content-range')
       const match = cr?.match(/\/([0-9]+)$/)
-      const actualSize = match ? parseInt(match[1]) : start  // best guess: start is past EOF
+      const actualSize = match ? parseInt(match[1]) : start
       const err = new Error(`416: Range Not Satisfiable (actual size: ${actualSize})`)
       ;(err as any).isRangeExceeded = true
       ;(err as any).actualSize = actualSize
@@ -1095,88 +1147,11 @@ export class StreamingAudioTranscoder extends EventTarget {
     return new Uint8Array(await response.arrayBuffer())
   }
 
-  /**
-   * Transcode data using FFmpeg
-   */
-  private async transcodeData(data: Uint8Array, inputOffset: number = 0): Promise<void> {
-    if (!this.ffmpeg) return
-
-    // Clean up FS before transcoding to prevent memory issues
-    await this.cleanupFFmpegFS()
-
-    const timestamp = Date.now()
-    const inputFilename = `input_${timestamp}.mkv`
-    const outputFilename = `output_${timestamp}.m4a`
-
-    try {
-      // Prepend header if we are not at start, to preserve timestamp context
-      let inputData = data
-      if (inputOffset > 0 && this.containerHeader) {
-          const merged = new Uint8Array(this.containerHeader.length + data.length)
-          merged.set(this.containerHeader)
-          merged.set(data, this.containerHeader.length)
-          inputData = merged
-      }
-
-      // Write input to FFmpeg FS
-      await this.ffmpeg.writeFile(inputFilename, inputData)
-
-      // Build FFmpeg args
-      const args = [
-        '-i', inputFilename,
-        '-copyts',
-        '-map', `0:a:${this.audioStreamIndex}`,
-        '-c:a', 'aac',
-        '-b:a', this.config.bitrate,
-        '-vn',
-        '-f', 'mp4',
-        '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
-        '-y',
-        outputFilename
-      ]
-
-      log.debug('Starting FFmpeg transcoding...')
-
-      // Execute FFmpeg
-      await this.ffmpeg.exec(args)
-
-      // Read output
-      const output = await this.ffmpeg.readFile(outputFilename)
-      const outputData = typeof output === 'string'
-        ? new TextEncoder().encode(output)
-        : new Uint8Array(output)
-
-      log.debug(`Transcoded: ${(outputData.length / 1024).toFixed(0)}KB`)
-
-      // Append to MSE
-      this.queueSegment(outputData)
-
-      // Cleanup
-      await this.ffmpeg.deleteFile(inputFilename)
-      await this.ffmpeg.deleteFile(outputFilename)
-
-    } catch (error) {
-      log.error('Transcode error:', error)
-
-      // Cleanup on error
-      try { await this.ffmpeg.deleteFile(inputFilename) } catch {}
-      try { await this.ffmpeg.deleteFile(outputFilename) } catch {}
-
-      throw error
-    }
-  }
-
-  /**
-   * Queue a segment for appending to SourceBuffer
-   */
   private queueSegment(data: Uint8Array): void {
     this.pendingSegments.push(data)
     this.appendNextSegment()
   }
 
-  /**
-   * Append next pending segment to SourceBuffer
-   */
   private appendNextSegment(): void {
     if (this.isAppending || this.pendingSegments.length === 0 || !this.sourceBuffer) {
       return
@@ -1194,33 +1169,27 @@ export class StreamingAudioTranscoder extends EventTarget {
     this.isAppending = true
 
     try {
-      this.sourceBuffer.appendBuffer(segment.buffer.slice(
-        segment.byteOffset,
-        segment.byteOffset + segment.byteLength
-      ) as ArrayBuffer)
+      this.sourceBuffer.appendBuffer(
+        segment.buffer.slice(
+          segment.byteOffset,
+          segment.byteOffset + segment.byteLength
+        ) as ArrayBuffer
+      )
     } catch (error) {
       log.error('Append error:', error)
       this.isAppending = false
 
-      // If QuotaExceededError, remove some buffered data and retry
       if ((error as Error).name === 'QuotaExceededError') {
         this.handleQuotaExceeded(segment)
       }
     }
   }
 
-  /**
-   * Handle quota exceeded by removing old buffer
-   */
-  /**
-   * Handle quota exceeded by removing old buffer
-   */
   private handleQuotaExceeded(segment: Uint8Array): void {
     if (!this.sourceBuffer || !this.audioElement) return
 
     log.warn('Quota exceeded, evicting buffer...')
-    
-    // Always re-queue the segment so we don't lose it
+
     this.pendingSegments.unshift(segment)
 
     if (this.sourceBuffer.updating) return
@@ -1230,38 +1199,29 @@ export class StreamingAudioTranscoder extends EventTarget {
       const buffered = this.sourceBuffer.buffered
       let removed = false
 
-      // 1. Evict played content (keep last 30s)
       if (currentTime > 30) {
         const removeEnd = currentTime - 30
         if (buffered.length > 0 && buffered.start(0) < removeEnd) {
-             log.debug(`Evicting played range: ${buffered.start(0).toFixed(2)} - ${removeEnd.toFixed(2)}`)
-             this.sourceBuffer.remove(0, removeEnd)
-             removed = true
+          this.sourceBuffer.remove(0, removeEnd)
+          removed = true
         }
-      } 
-      
-      // 2. If we couldn't evict behind (e.g. near start), look for disconnected future ranges
-      // This happens if we seeked back and forth a lot
+      }
+
       if (!removed && buffered.length > 0) {
         for (let i = 0; i < buffered.length; i++) {
           const start = buffered.start(i)
           const end = buffered.end(i)
-          
-          // If range is completely in the future (far ahead) or completely in past
-          if (start > currentTime + 300) { // 5 mins ahead
-             log.debug(`Evicting future range: ${start.toFixed(2)} - ${end.toFixed(2)}`)
-             this.sourceBuffer.remove(start, end)
-             removed = true
-             break
+          if (start > currentTime + 300) {
+            this.sourceBuffer.remove(start, end)
+            removed = true
+            break
           }
         }
       }
-      
-      // 3. Panic mode: evict everything up to 5s behind current
+
       if (!removed && currentTime > 5) {
-         log.debug(`Panic eviction: 0 - ${(currentTime - 5).toFixed(2)}`)
-         this.sourceBuffer.remove(0, currentTime - 5)
-         removed = true
+        this.sourceBuffer.remove(0, currentTime - 5)
+        removed = true
       }
 
       if (!removed) {
@@ -1269,32 +1229,22 @@ export class StreamingAudioTranscoder extends EventTarget {
         this.isAppending = false
         setTimeout(() => this.appendNextSegment(), 1000)
       }
-
     } catch (e) {
       log.error('Error handling quota exceeded:', e)
       this.isAppending = false
     }
   }
 
-  /**
-   * Wait for all pending appends to complete
-   */
   private async waitForAppendComplete(): Promise<void> {
     while (this.pendingSegments.length > 0 || this.isAppending) {
-      await new Promise(r => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 50))
     }
   }
 
-  /**
-   * Get the audio element
-   */
   getAudioElement(): HTMLAudioElement | null {
     return this.audioElement
   }
 
-  /**
-   * Seek to a specific time
-   */
   async seek(time: number): Promise<void> {
     if (this.audioElement) {
       this.audioElement.currentTime = time
@@ -1302,18 +1252,13 @@ export class StreamingAudioTranscoder extends EventTarget {
   }
 
   play(): void {
-    this.audioElement?.play().catch(e =>
-      log.warn('Play failed:', e)
-    )
+    this.audioElement?.play().catch((e) => log.warn('Play failed:', e))
   }
 
   pause(): void {
     this.audioElement?.pause()
   }
 
-  /**
-   * Stop and cleanup
-   */
   async destroy(): Promise<void> {
     this.abortController?.abort()
 
@@ -1337,11 +1282,13 @@ export class StreamingAudioTranscoder extends EventTarget {
     this.sourceBuffer = null
     this.pendingSegments = []
 
-    if (this.ffmpeg) {
-      this.ffmpeg.terminate()
-      this.ffmpeg = null
-      this.ffmpegLoaded = false
+    if (!this.sharedFFmpeg && this.ffmpeg) {
+      try {
+        this.ffmpeg.terminate()
+      } catch {}
     }
+    this.ffmpeg = null
+    this.ffmpegLoaded = false
 
     log.debug('Destroyed')
   }

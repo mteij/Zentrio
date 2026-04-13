@@ -1,6 +1,6 @@
 /**
  * Player Engine Types
- * 
+ *
  * Core abstraction layer for video playback engines.
  * All engines (Web, Tauri, Hybrid) must implement IPlayerEngine.
  */
@@ -117,6 +117,30 @@ export interface PlayerEventHandlers {
   audiotrackschange: (tracks: AudioTrack[]) => void
   /** Fired when quality levels change */
   qualitylevelschange: (levels: QualityLevel[]) => void
+  /** Fired when hybrid engine needs user confirmation before a large download/transcode */
+  hybridconfirmationneeded: (details: HybridConfirmationDetails) => void
+  /** Fired by hybrid engine with transcoding/download progress */
+  transcodingprogress: (progress: TranscodeProgress) => void
+}
+
+export interface TranscodeProgress {
+  /** Download progress 0-100 */
+  percent: number
+  phase: 'downloading' | 'transcoding' | 'complete'
+  /** Estimated seconds until transcoding catchs up to playhead */
+  etaSec?: number
+  /** Fraction 0-1 of total duration that has been transcoded into the audio buffer */
+  transcodedPct: number
+  /** Whether this progress is from a seek restart (vs initial play) */
+  isSeeking: boolean
+}
+
+export interface HybridConfirmationDetails {
+  fileSize: number
+  fileSizeLabel: string
+  audioCodec: string
+  proceed: () => void
+  cancel: () => void
 }
 
 /**
@@ -149,7 +173,7 @@ export interface EngineCapabilities {
 
 /**
  * Main player engine interface
- * 
+ *
  * All playback engines must implement this interface to provide
  * a consistent API for the player UI components.
  */
@@ -157,116 +181,116 @@ export interface IPlayerEngine {
   // ============================================
   // Lifecycle Methods
   // ============================================
-  
+
   /**
    * Initialize the engine with a video element
    * Called once when the player mounts
    */
   initialize(videoElement: HTMLVideoElement): Promise<void>
-  
+
   /**
    * Load a media source
    * Can be called multiple times to change sources
    */
   loadSource(source: MediaSource): Promise<void>
-  
+
   /**
    * Clean up all resources
    * Called when the player unmounts
    */
   destroy(): Promise<void>
-  
+
   // ============================================
   // Playback Control
   // ============================================
-  
+
   /**
    * Start or resume playback
    */
   play(): Promise<void>
-  
+
   /**
    * Pause playback
    */
   pause(): void
-  
+
   /**
    * Seek to a specific time in seconds
    */
   seek(time: number): Promise<void>
-  
+
   /**
    * Set volume level (0-1)
    */
   setVolume(volume: number): void
-  
+
   /**
    * Set muted state
    */
   setMuted(muted: boolean): void
-  
+
   /**
    * Set playback rate
    */
   setPlaybackRate(rate: number): void
-  
+
   // ============================================
   // State Access
   // ============================================
-  
+
   /**
    * Get current player state
    */
   getState(): PlayerState
-  
+
   /**
    * Get engine capabilities
    */
   getCapabilities(): EngineCapabilities
-  
+
   // ============================================
   // Track Management
   // ============================================
-  
+
   /**
    * Get all available subtitle tracks
    */
   getSubtitleTracks(): SubtitleTrack[]
-  
+
   /**
    * Enable a subtitle track by ID, or disable all if null
    */
   setSubtitleTrack(id: string | null): void
-  
+
   /**
    * Add external subtitle tracks
    */
   addSubtitleTracks(tracks: SubtitleTrack[]): void
-  
+
   /**
    * Get all available audio tracks
    */
   getAudioTracks(): AudioTrack[]
-  
+
   /**
    * Select an audio track by ID
    */
   setAudioTrack(id: string): void
-  
+
   /**
    * Get all available quality levels (for adaptive streaming)
    */
   getQualityLevels(): QualityLevel[]
-  
+
   /**
    * Set quality level by ID, or 'auto' for automatic selection
    */
   setQualityLevel(id: string): void
-  
+
   // ============================================
   // Event Handling
   // ============================================
-  
+
   /**
    * Add an event listener
    */
@@ -274,7 +298,7 @@ export interface IPlayerEngine {
     event: K,
     handler: PlayerEventHandlers[K]
   ): void
-  
+
   /**
    * Remove an event listener
    */
@@ -282,11 +306,11 @@ export interface IPlayerEngine {
     event: K,
     handler: PlayerEventHandlers[K]
   ): void
-  
+
   // ============================================
   // Utility Methods
   // ============================================
-  
+
   /**
    * Check if this engine can play a given source
    * Returns a confidence score (0-1) or boolean
@@ -331,7 +355,7 @@ export const initialPlayerState: PlayerState = {
   buffering: false,
   ended: false,
   ready: false,
-  buffered: null
+  buffered: null,
 }
 
 /**
@@ -343,7 +367,7 @@ export const defaultWebCapabilities: EngineCapabilities = {
   hls: true,
   dash: false,
   mse: true,
-  canProbe: false
+  canProbe: false,
 }
 
 /**
@@ -355,5 +379,5 @@ export const tauriCapabilities: EngineCapabilities = {
   hls: true,
   dash: true,
   mse: true,
-  canProbe: false
+  canProbe: false,
 }
