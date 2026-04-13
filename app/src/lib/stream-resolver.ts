@@ -462,6 +462,11 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
         return allStreams
       }
 
+      const addonStreamTimeoutMs =
+        typeof settings?.playback?.addonRequestTimeoutMs === 'number'
+          ? settings.playback.addonRequestTimeoutMs
+          : undefined
+
       const resolveAddonStreams = async (addon: EnabledAddon): Promise<void> => {
         if (cancelled) return
         const client = getAddonClient(addon.manifest_url)
@@ -506,7 +511,7 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
 
         while (attempt < maxRetries && !cancelled) {
           try {
-            let streams = await client.getStreams(params.type, resolvedVideoId)
+            let streams = await client.getStreams(params.type, resolvedVideoId, addonStreamTimeoutMs)
             if (cancelled) return
 
             if (params.type === 'movie' && (!streams || streams.length === 0)) {
@@ -514,7 +519,7 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
               for (const videoId of altVideoIds) {
                 if (cancelled) return
                 try {
-                  const extraStreams = await client.getStreams('movie', videoId)
+                  const extraStreams = await client.getStreams('movie', videoId, addonStreamTimeoutMs)
                   if (cancelled) return
                   if (extraStreams && extraStreams.length > 0) {
                     streams = [...(streams || []), ...extraStreams]
@@ -538,8 +543,9 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
             emitProcessedResults(resolverAddon, streams?.length || 0)
             return
           } catch (error) {
+            const isAbort = error instanceof Error && (error.name === 'AbortError' || error.message.toLowerCase().includes('abort'))
             attempt += 1
-            if (attempt < maxRetries) {
+            if (!isAbort && attempt < maxRetries) {
               await delay(3000)
               continue
             }
@@ -583,4 +589,3 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
     done,
   }
 }
-

@@ -34,6 +34,15 @@ interface ResolveTopStreamParams {
 
 const inFlightResolvers = new Map<string, Promise<CachedTopStream | null>>()
 
+function clearAutoPlayWaitCache(): void {
+  autoPlayWaitCache.clear()
+  autoPlayWaitInFlight.clear()
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('streaming-settings-updated', clearAutoPlayWaitCache)
+}
+
 function clampAutoPlayWaitMs(value: number): number {
   if (!Number.isFinite(value)) return STREAM_RESOLVE_TIMEOUT_MS
   return Math.max(AUTO_PLAY_WAIT_MIN_MS, Math.min(AUTO_PLAY_WAIT_MAX_MS, Math.round(value)))

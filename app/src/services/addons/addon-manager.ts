@@ -1013,7 +1013,11 @@ export class AddonManager {
         const context = this.getProfileContext(profileId)
 
         const normalizedUrl = this.normalizeUrl(manifestUrl)
-        const client = this.clientCache.get(normalizedUrl)
+        const settingsProfileId = context.settingsProfileId
+        const cacheKey = (manifestUrl === DEFAULT_TMDB_ADDON || normalizedUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON)) && settingsProfileId
+            ? `${normalizedUrl}:${settingsProfileId}`
+            : normalizedUrl
+        const client = this.clientCache.get(cacheKey) ?? this.clientCache.get(normalizedUrl)
 
         if (!client || !client.manifest) {
             log.warn(`Client not found for ${manifestUrl} (normalized: ${normalizedUrl})`)
@@ -1059,7 +1063,11 @@ export class AddonManager {
         const context = this.getProfileContext(profileId)
 
         const normalizedUrl = this.normalizeUrl(manifestUrl)
-        const client = this.clientCache.get(normalizedUrl)
+        const settingsProfileId = context.settingsProfileId
+        const cacheKey = (manifestUrl === DEFAULT_TMDB_ADDON || normalizedUrl === this.normalizeUrl(DEFAULT_TMDB_ADDON)) && settingsProfileId
+            ? `${normalizedUrl}:${settingsProfileId}`
+            : normalizedUrl
+        const client = this.clientCache.get(cacheKey) ?? this.clientCache.get(normalizedUrl)
         if (!client || !client.manifest) {
             log.warn(`Client not found for ${manifestUrl} (normalized: ${normalizedUrl})`)
             return null

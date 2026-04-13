@@ -11,7 +11,7 @@ const RESOURCE_TIMEOUTS = {
   manifest: 5000,
   catalog: 15000,
   meta: 12000,
-  stream: 12000,
+  stream: 30000,
 }
 
 interface CacheEntry<T> {
@@ -149,11 +149,11 @@ export class ClientAddonClient {
     }
   }
 
-  async getStreams(type: string, id: string): Promise<Stream[]> {
+  async getStreams(type: string, id: string, timeoutMs?: number): Promise<Stream[]> {
     if (!this.manifest) await this.init()
     const safeId = encodeURIComponent(id)
     const url = `${this.baseUrl}/stream/${type}/${safeId}.json`
-    return this.fetchResource<Stream[]>(url, 'streams', RESOURCE_TIMEOUTS.stream)
+    return this.fetchResource<Stream[]>(url, 'streams', timeoutMs ?? RESOURCE_TIMEOUTS.stream)
   }
 
   private async fetchResource<T>(url: string, extractKey: string, timeoutMs: number): Promise<T> {

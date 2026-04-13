@@ -75,6 +75,26 @@ export interface StreamConfig {
       direction: 'asc' | 'desc'
     }[]
   }
+  playback?: {
+    autoPlayMaxWaitMs?: number
+    addonRequestTimeoutMs?: number
+    skipIntrosOutros?: boolean
+    showUnvalidatedSegments?: boolean
+  }
+  introdb?: {
+    apiKey?: string
+  }
+  streamDisplay?: {
+    showAddonName?: boolean
+    showDescription?: boolean
+    streamDisplayMode?: 'compact-simple' | 'compact-advanced' | 'classic'
+  }
+  parental?: {
+    enabled: boolean
+    ratingLimit: string
+  }
+  sortingEnabled?: boolean
+  qualities?: string[]
 }
 
 

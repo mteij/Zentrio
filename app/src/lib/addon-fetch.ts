@@ -11,7 +11,7 @@ const log = createLogger('AddonFetch')
  */
 export async function addonFetch(url: string, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  const timeout = setTimeout(() => controller.abort(new DOMException('Addon request timed out', 'AbortError')), timeoutMs)
 
   try {
     if (isTauri()) {
