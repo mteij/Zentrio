@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Modal } from './Modal';
@@ -62,11 +62,11 @@ export function InputDialog({
     setError(null);
   };
 
-  // Reset value when dialog opens
-  const _handleOpen = () => {
+  useEffect(() => {
+    if (!isOpen) return
     setValue(defaultValue);
     setError(null);
-  };
+  }, [defaultValue, isOpen]);
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={title}>

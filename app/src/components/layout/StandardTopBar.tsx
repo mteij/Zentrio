@@ -7,20 +7,23 @@ interface StandardTopBarProps {
   leftSlot?: ReactNode
   rightSlot?: ReactNode
   className?: string
+  hideTitleGroup?: boolean
 }
 
 function mergeClassName(...parts: Array<string | undefined | false | null>) {
   return parts.filter(Boolean).join(' ')
 }
 
-export function StandardTopBar({ title, subtitle, leftSlot, rightSlot, className }: StandardTopBarProps) {
+export function StandardTopBar({ title, subtitle, leftSlot, rightSlot, className, hideTitleGroup = false }: StandardTopBarProps) {
   return (
     <div className={mergeClassName(styles.bar, className)}>
       {leftSlot ? <div className={styles.leftSlot}>{leftSlot}</div> : null}
-      <div className={styles.titleGroup}>
-        <h1 className={styles.title}>{title}</h1>
-        {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
-      </div>
+      {!hideTitleGroup ? (
+        <div className={styles.titleGroup}>
+          <h1 className={styles.title}>{title}</h1>
+          {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+        </div>
+      ) : null}
       {rightSlot ? <div className={styles.rightSlot}>{rightSlot}</div> : null}
     </div>
   )

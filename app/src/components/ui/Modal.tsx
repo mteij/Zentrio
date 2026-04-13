@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getPlatformCapabilities } from '../../lib/platform-capabilities';
+import { TvFocusScope, TvFocusZone } from '../tv';
 
 interface ModalProps {
   id?: string;
@@ -26,6 +28,9 @@ export function Modal({
   maxWidth = 'max-w-lg'
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const modalScopeId = useId().replace(/:/g, '');
+  const tvModalZoneId = `tv-modal-${modalScopeId}`;
+  const isTvFocusEnabled = getPlatformCapabilities().canUseRemoteNavigation;
 
   // Close on Escape key
   useEffect(() => {
@@ -63,41 +68,79 @@ export function Modal({
             />
 
             {/* Modal Content */}
-            <motion.div 
-                ref={modalRef}
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                transition={{ duration: 0.2 }}
-                className={`relative w-full ${maxWidth} bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col ${className}`}
-                id={id}
-            >
-                {/* Header */}
-                {title && (
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-                        <h3 className="text-lg font-semibold text-white">{title}</h3>
-                        <button 
-                            onClick={onClose}
-                            className="text-zinc-400 hover:text-white transition-colors p-1 rounded-md hover:bg-zinc-800"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
-                )}
-                {!title && (
-                     <button 
-                        onClick={onClose}
-                        className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors p-1 rounded-md hover:bg-zinc-800 z-10"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                )}
+            {isTvFocusEnabled ? (
+              <TvFocusScope initialZoneId={tvModalZoneId} onBack={onClose}>
+                <TvFocusZone id={tvModalZoneId} orientation="grid">
+                  <motion.div 
+                      ref={modalRef}
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                      transition={{ duration: 0.2 }}
+                      className={`relative w-full ${maxWidth} bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col ${className}`}
+                      id={id}
+                  >
+                      {title && (
+                          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+                              <h3 className="text-lg font-semibold text-white">{title}</h3>
+                              <button 
+                                  onClick={onClose}
+                                  className="text-zinc-400 hover:text-white transition-colors p-1 rounded-md hover:bg-zinc-800"
+                              >
+                                  <X className="w-5 h-5" />
+                              </button>
+                          </div>
+                      )}
+                      {!title && (
+                           <button 
+                              onClick={onClose}
+                              className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors p-1 rounded-md hover:bg-zinc-800 z-10"
+                          >
+                              <X className="w-5 h-5" />
+                          </button>
+                      )}
 
-                {/* Body */}
-                <div className="p-6 overflow-y-auto max-h-[calc(100vh-200px)]">
-                    {children}
-                </div>
-            </motion.div>
+                      <div className="p-6 overflow-y-auto max-h-[calc(100vh-200px)]">
+                          {children}
+                      </div>
+                  </motion.div>
+                </TvFocusZone>
+              </TvFocusScope>
+            ) : (
+              <motion.div 
+                  ref={modalRef}
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className={`relative w-full ${maxWidth} bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col ${className}`}
+                  id={id}
+              >
+                  {title && (
+                      <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+                          <h3 className="text-lg font-semibold text-white">{title}</h3>
+                          <button 
+                              onClick={onClose}
+                              className="text-zinc-400 hover:text-white transition-colors p-1 rounded-md hover:bg-zinc-800"
+                          >
+                              <X className="w-5 h-5" />
+                          </button>
+                      </div>
+                  )}
+                  {!title && (
+                       <button 
+                          onClick={onClose}
+                          className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors p-1 rounded-md hover:bg-zinc-800 z-10"
+                      >
+                          <X className="w-5 h-5" />
+                      </button>
+                  )}
+
+                  <div className="p-6 overflow-y-auto max-h-[calc(100vh-200px)]">
+                      {children}
+                  </div>
+              </motion.div>
+            )}
         </div>
       )}
     </AnimatePresence>,

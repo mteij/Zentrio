@@ -9,25 +9,37 @@ interface ToggleProps {
 }
 
 export function Toggle({ checked, onChange, disabled, title }: ToggleProps) {
+  const handleToggle = () => {
+    if (disabled) return
+    hapticTick()
+    onChange(!checked)
+  }
+
   const containerStyle: React.CSSProperties = {
-    width: '44px',
-    height: '24px',
+    appearance: 'none',
+    width: 'var(--toggle-width, 44px)',
+    height: 'var(--toggle-height, 24px)',
     backgroundColor: checked ? 'var(--accent, #e50914)' : 'rgba(255, 255, 255, 0.1)',
-    borderRadius: '12px',
+    borderRadius: 'calc(var(--toggle-height, 24px) / 2)',
     position: 'relative',
+    display: 'inline-flex',
+    alignItems: 'center',
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'background-color 0.3s ease',
     opacity: disabled ? 0.5 : 1,
     border: '1px solid rgba(255, 255, 255, 0.1)',
-    flexShrink: 0
+    flexShrink: 0,
+    padding: 0
   }
 
   const knobStyle: React.CSSProperties = {
     position: 'absolute',
-    top: '2px',
-    left: checked ? '22px' : '2px',
-    width: '18px',
-    height: '18px',
+    top: 'var(--toggle-padding, 2px)',
+    left: checked
+      ? 'calc(var(--toggle-width, 44px) - var(--toggle-knob-size, 18px) - var(--toggle-padding, 2px))'
+      : 'var(--toggle-padding, 2px)',
+    width: 'var(--toggle-knob-size, 18px)',
+    height: 'var(--toggle-knob-size, 18px)',
     backgroundColor: '#ffffff',
     borderRadius: '50%',
     transition: 'left 0.3s ease',
@@ -35,14 +47,17 @@ export function Toggle({ checked, onChange, disabled, title }: ToggleProps) {
   }
 
   return (
-    <div 
+    <button
+      type="button"
       style={containerStyle}
-      onClick={() => { if (!disabled) { hapticTick(); onChange(!checked) } }}
+      onClick={handleToggle}
       title={title}
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
+      aria-label={title}
     >
       <div style={knobStyle} />
-    </div>
+    </button>
   )
 }

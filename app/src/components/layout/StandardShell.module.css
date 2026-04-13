@@ -95,9 +95,9 @@
     content: '';
     position: absolute;
     top: 0;
-    right: -40px;
+    left: 100%;
     bottom: 0;
-    width: 72px;
+    width: 40px;
     background: linear-gradient(90deg, rgba(8, 8, 10, 0.22) 0%, rgba(8, 8, 10, 0.08) 42%, rgba(8, 8, 10, 0) 100%);
     pointer-events: none;
     z-index: 0;
