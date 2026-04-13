@@ -1,16 +1,20 @@
 package com.zentrio.mteij
 
 import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
@@ -36,8 +40,25 @@ import app.tauri.plugin.Plugin
 internal class ExoPlayArgs {
     var url: String = ""
     var startPositionMs: Long = 0
-    var isTv: Boolean = false
     var onEvent: Channel? = null
+}
+
+@InvokeArg
+internal class ExoWebviewTransparentArgs {
+    var transparent: Boolean = false
+}
+
+@InvokeArg
+internal class ExoSubtitleConfig {
+    var url: String = ""
+    var language: String = "und"
+    var label: String = ""
+    var mimeType: String = ""
+}
+
+@InvokeArg
+internal class ExoSidecarSubtitlesArgs {
+    var subtitles: List<ExoSubtitleConfig> = emptyList()
 }
 
 @InvokeArg
@@ -76,6 +97,7 @@ class ExoPlayerPlugin(private val activity: Activity) : Plugin(activity) {
     private var eventChannel: Channel? = null
     private var progressRunnable: Runnable? = null
     private var backCallback: OnBackPressedCallback? = null
+    private var currentUrl: String = ""
 
     // ─── Commands ─────────────────────────────────────────────────────────────
 
@@ -90,6 +112,7 @@ class ExoPlayerPlugin(private val activity: Activity) : Plugin(activity) {
         mainHandler.post {
             teardownPlayer()
 
+            currentUrl = args.url
             eventChannel = args.onEvent
 
             // Renderer factory with decoder fallback — when a codec exceeds its
@@ -126,45 +149,44 @@ class ExoPlayerPlugin(private val activity: Activity) : Plugin(activity) {
                 exoPlayer.seekTo(args.startPositionMs)
             }
 
-            // Build fullscreen overlay
+            // Build fullscreen overlay — no elevation so the Tauri WebView can sit on top.
             val overlay = FrameLayout(activity).apply {
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
                 setBackgroundColor(Color.BLACK)
-                elevation = 9999f
                 keepScreenOn = true  // prevent screen timeout during playback
             }
             overlayLayout = overlay
 
-            // PlayerView — controls differ between TV (D-pad) and phone (touch)
+            // PlayerView — TextureView so the WebView can composite over it;
+            // no native controller since React UI renders controls on top.
             val pv = PlayerView(activity).apply {
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
-                useController = true
-                setShowNextButton(false)
-                setShowPreviousButton(false)
-                setShowFastForwardButton(true)
-                setShowRewindButton(true)
-                if (!args.isTv) {
-                    // Phone/tablet: show subtitle and settings buttons for touch access
-                    setShowSubtitleButton(true)
-                    setShowShuffleButton(false)
-                }
+                setUseTextureView(true)
+                useController = false
                 player = exoPlayer
             }
             playerView = pv
             overlay.addView(pv)
 
-            // Attach overlay to the activity root
+            // Attach overlay at index 0 so the Tauri WebView stays on top.
             val root = activity.window.decorView.rootView as? ViewGroup
                 ?: activity.findViewById(android.R.id.content)
-            root.addView(overlay)
+            root.addView(overlay, 0)
 
-            // Re-apply immersive mode so status bar stays hidden over the player
+            // Enable immersive mode and lock to landscape for video playback.
+            // We set state explicitly here to avoid a race with the JS setPlayerMode call:
+            // JS fires setPlayerMode(landscape) asynchronously, but exo_player_play arrives
+            // first due to the dynamic-import delay in tauri-player-mode.ts. Calling apply()
+            // without updating requestedOrientation would reset to UNSPECIFIED, which unlocks
+            // orientation and lets the phone stay in portrait while the player is open.
+            ImmersiveModeState.immersiveEnabled = true
+            ImmersiveModeState.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             ImmersiveModeState.apply(activity)
 
             // Back key closes the player and tells JS to navigate back
@@ -375,7 +397,59 @@ class ExoPlayerPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    @Command
+    fun setWebviewTransparent(invoke: Invoke) {
+        val args = invoke.parseArgs(ExoWebviewTransparentArgs::class.java)
+        mainHandler.post {
+            val root = activity.window.decorView.rootView
+            val webView = findWebView(root)
+            webView?.setBackgroundColor(if (args.transparent) Color.TRANSPARENT else Color.BLACK)
+            invoke.resolve()
+        }
+    }
+
+    @Command
+    fun addSidecarSubtitles(invoke: Invoke) {
+        val args = invoke.parseArgs(ExoSidecarSubtitlesArgs::class.java)
+        mainHandler.post {
+            val p = player
+            if (p == null) { invoke.reject("no active player"); return@post }
+            val currentPosition = p.currentPosition
+            val subtitleConfigs = args.subtitles.map { config ->
+                val inferredMime = when {
+                    config.mimeType.isNotBlank() -> config.mimeType
+                    config.url.endsWith(".srt", ignoreCase = true) -> MimeTypes.APPLICATION_SUBRIP
+                    else -> MimeTypes.TEXT_VTT
+                }
+                MediaItem.SubtitleConfiguration.Builder(Uri.parse(config.url))
+                    .setMimeType(inferredMime)
+                    .setLanguage(config.language.ifBlank { "und" })
+                    .setLabel(config.label.ifBlank { config.language.ifBlank { "Unknown" } })
+                    .build()
+            }
+            val newItem = MediaItem.Builder()
+                .setUri(Uri.parse(currentUrl))
+                .setSubtitleConfigurations(subtitleConfigs)
+                .build()
+            p.setMediaItem(newItem)
+            p.seekTo(currentPosition)
+            p.prepare()
+            invoke.resolve()
+        }
+    }
+
     // ─── Private helpers ──────────────────────────────────────────────────────
+
+    private fun findWebView(view: View): WebView? {
+        if (view is WebView) return view
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                val found = findWebView(view.getChildAt(i))
+                if (found != null) return found
+            }
+        }
+        return null
+    }
 
     private fun sendEvent(payload: JSObject) {
         eventChannel?.send(payload)
@@ -454,12 +528,12 @@ class ExoPlayerPlugin(private val activity: Activity) : Plugin(activity) {
                             .put("currentTimeMs", p.currentPosition)
                             .put("durationMs", if (p.duration > 0) p.duration else 0)
                     )
-                    mainHandler.postDelayed(this, 500)
+                    mainHandler.postDelayed(this, 250)
                 }
             }
         }
         progressRunnable = r
-        mainHandler.postDelayed(r, 500)
+        mainHandler.postDelayed(r, 250)
     }
 
     private fun stopProgressTimer() {
@@ -485,5 +559,6 @@ class ExoPlayerPlugin(private val activity: Activity) : Plugin(activity) {
         overlayLayout = null
 
         eventChannel = null
+        currentUrl = ""
     }
 }

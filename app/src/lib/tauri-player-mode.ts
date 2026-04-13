@@ -1,20 +1,9 @@
 import { isTauriRuntime } from './runtime-env'
 
-export type PlayerOrientationMode = 'auto' | 'landscape' | 'portrait'
+type PlayerOrientationMode = 'auto' | 'landscape' | 'portrait'
 
 const isTauriMobile = () => {
   return isTauriRuntime()
-}
-
-export const getStoredPlayerOrientation = (): PlayerOrientationMode => {
-  try {
-    const saved = localStorage.getItem('zentrio_orientation')
-    if (saved === 'auto' || saved === 'landscape' || saved === 'portrait') {
-      return saved
-    }
-  } catch (_e) {}
-
-  return 'landscape'
 }
 
 export const setTauriPlayerMode = async (

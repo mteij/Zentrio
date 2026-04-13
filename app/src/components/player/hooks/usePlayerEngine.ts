@@ -100,6 +100,8 @@ interface UsePlayerEngineReturn {
   engine: IPlayerEngine | null
   /** Whether the engine is ready */
   engineReady: boolean
+  /** The active engine type */
+  activeEngineType: EngineType
 }
 
 export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayerEngineReturn {
@@ -149,6 +151,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
   const [error, setError] = useState<Error | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [engineReady, setEngineReady] = useState(false)
+  const [activeEngineType, setActiveEngineType] = useState<EngineType>(getDefaultEngineType())
 
   const attachEngineListeners = useCallback((engine: IPlayerEngine) => {
     engine.addEventListener('timeupdate', (time, duration) => {
@@ -221,7 +224,9 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
         
         engineRef.current = engine
         // Reflect the actual engine type so loadSource() doesn't needlessly switch on first load
-        engineTypeRef.current = getDefaultEngineType()
+        const defaultType = getDefaultEngineType()
+        engineTypeRef.current = defaultType
+        setActiveEngineType(defaultType)
 
         attachEngineListeners(engine)
 
@@ -252,8 +257,9 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
             oldEngine.destroy()
             engineRef.current = newEngine
             engineTypeRef.current = neededType
+            setActiveEngineType(neededType)
           }
-          
+
           await engineRef.current!.loadSource(source)
           
           if (startTime > 0) {
@@ -427,6 +433,7 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
         oldEngine.destroy()
         engineRef.current = newEngine
         engineTypeRef.current = neededType
+        setActiveEngineType(neededType)
       }
 
       log.debug('Loading source:', source.src.substring(0, 80))
@@ -519,7 +526,8 @@ export function usePlayerEngine(options: UsePlayerEngineOptions = {}): UsePlayer
     getQualityLevels,
     setQualityLevel,
     engine: engineRef.current,
-    engineReady
+    engineReady,
+    activeEngineType
   }
 }
 

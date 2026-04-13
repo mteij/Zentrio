@@ -44,6 +44,15 @@ body.is-mobile .videoElement {
   display: block;
 }
 
+/* Android native engine — ExoPlayer renders the video surface below the WebView */
+.videoHidden {
+  visibility: hidden;
+}
+
+.playerTransparent {
+  background: transparent;
+}
+
 .posterImage {
   position: absolute;
   inset: 0;

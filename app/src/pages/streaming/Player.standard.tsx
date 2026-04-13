@@ -18,7 +18,7 @@ import { apiFetch } from '../../lib/apiFetch'
 import { getAppTarget } from '../../lib/app-target'
 import { queueProgress } from '../../lib/offline-progress-queue'
 import { resolveStreamsProgressive, type StreamResolveHandle } from '../../lib/stream-resolver'
-import { getStoredPlayerOrientation, setTauriPlayerMode } from '../../lib/tauri-player-mode'
+import { setTauriPlayerMode } from '../../lib/tauri-player-mode'
 import { removeContinueWatchingLauncher, syncContinueWatchingLauncher } from '../../lib/tv-launcher'
 import { resolveBeaconUrl } from '../../lib/url'
 import type { Stream } from '../../services/addons/types'
@@ -556,7 +556,7 @@ export function StreamingPlayerStandardView(_props: { model: import('./Player.mo
 
   /* ─── Player mode: enable on mount, restore on unmount ─── */
   useLayoutEffect(() => {
-    void setTauriPlayerMode(true, getStoredPlayerOrientation())
+    void setTauriPlayerMode(true, 'landscape')
     // Add player-active class to body for CSS targeting (fallback for browsers without :has() support)
     document.body.classList.add('player-active')
     return () => { 

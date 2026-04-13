@@ -18,7 +18,6 @@
  */
 
 import { invoke, Channel } from '@tauri-apps/api/core'
-import { getAppTarget } from '../../../lib/app-target'
 import type {
   IPlayerEngine,
   PlayerState,
@@ -141,15 +140,16 @@ export class AndroidNativePlayerEngine implements IPlayerEngine {
       args: {
         url: source.src,
         startPositionMs: 0,
-        isTv: getAppTarget().isTv,
         onEvent: ch,
       },
     })
+    await invoke('exo_player_set_webview_transparent', { args: { transparent: true } }).catch(() => {})
   }
 
   async destroy(): Promise<void> {
     log.debug('AndroidNativePlayerEngine: destroy')
     this._channel = null
+    await invoke('exo_player_set_webview_transparent', { args: { transparent: false } }).catch(() => {})
     await invoke('exo_player_stop').catch(() => {})
     this.eventHandlers.clear()
   }
@@ -229,8 +229,16 @@ export class AndroidNativePlayerEngine implements IPlayerEngine {
       .catch((e) => log.error('setSubtitleTrack:', e))
   }
 
-  addSubtitleTracks(_tracks: SubtitleTrack[]): void {
-    log.debug('addSubtitleTracks: external sidecar subtitles deferred to v2')
+  addSubtitleTracks(tracks: SubtitleTrack[]): void {
+    if (!tracks.length) return
+    const subtitles = tracks.map(t => ({
+      url: t.src,
+      language: t.language || 'und',
+      label: t.label || t.language || 'Unknown',
+      mimeType: t.src.includes('.srt') ? 'application/x-subrip' : 'text/vtt',
+    }))
+    invoke('exo_player_add_sidecar_subtitles', { args: { subtitles } })
+      .catch((e) => log.error('addSubtitleTracks:', e))
   }
 
   getAudioTracks(): AudioTrack[] {

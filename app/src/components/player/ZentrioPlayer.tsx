@@ -30,14 +30,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAppTarget } from '../../lib/app-target'
 import { hapticScrubTick } from '../../lib/haptics'
-import { getStoredPlayerOrientation, setTauriPlayerMode, type PlayerOrientationMode } from '../../lib/tauri-player-mode'
+import { setTauriPlayerMode } from '../../lib/tauri-player-mode'
 import styles from '../../styles/ZentrioPlayer.module.css'
 import type { SubtitleTrack } from './engines/types'
 import { usePlayerEngine } from './hooks/usePlayerEngine'
 
 /* ─────────────────────── Types ─────────────────────── */
-
-type OrientationMode = PlayerOrientationMode
 
 export interface EpisodeInfo {
   season: number
@@ -168,7 +166,6 @@ export function ZentrioPlayer({
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const durationRef = useRef(0)
   const appTarget = getAppTarget()
-  const usesNativePlaybackUi = appTarget.isTauri && appTarget.os === 'android'
 
   /* UI state */
   const [controlsVisible, setControlsVisible] = useState(true)
@@ -177,16 +174,13 @@ export function ZentrioPlayer({
 
   /* Menu state */
   const [openMenu, setOpenMenu] = useState<'settings' | 'subtitles' | 'external' | null>(null)
-  const [settingsPage, setSettingsPage] = useState<'main' | 'speed' | 'quality' | 'audio' | 'orientation'>('main')
+  const [settingsPage, setSettingsPage] = useState<'main' | 'speed' | 'quality' | 'audio'>('main')
   const [selectedSubtitleLang, setSelectedSubtitleLang] = useState<string | null>(null)
 
   /* Seek / volume feedback */
   const [seekFeedback, setSeekFeedback] = useState<{ dir: 'left' | 'right'; secs: number } | null>(null)
   const [volumeOSD, setVolumeOSD] = useState<number | null>(null)
   const volumeOSDTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  /* Orientation */
-  const [orientationMode, setOrientationMode] = useState<OrientationMode>(() => getStoredPlayerOrientation())
 
   /* Progress hover */
   const [hoverTime, setHoverTime] = useState<{ time: number; pct: number } | null>(null)
@@ -235,15 +229,14 @@ export function ZentrioPlayer({
     setAudioTrack,
     getQualityLevels,
     setQualityLevel,
+    activeEngineType,
   } = usePlayerEngine({
     autoPlay,
     startTime,
     onTimeUpdate: (t, d) => {
       durationRef.current = d
       onTimeUpdate?.(t, d)
-      if (!usesNativePlaybackUi) {
-        handlePlaybackProgress(t, d)
-      }
+      handlePlaybackProgress(t, d)
     },
     onEnded,
     onClose: (reason) => {
@@ -255,7 +248,7 @@ export function ZentrioPlayer({
     onMetadataLoad: (d) => {
       durationRef.current = d
       onMetadataLoad?.(d)
-      if (!usesNativePlaybackUi && d > 0 && d < shortVideoThreshold && !shortDismissedRef.current) {
+      if (d > 0 && d < shortVideoThreshold && !shortDismissedRef.current) {
         setShowShortVideo(true)
         shortVideoTriggeredRef.current = true
       }
@@ -284,31 +277,28 @@ export function ZentrioPlayer({
   }, [])
 
   /* ── Orientation Lock ── */
+  // Mobile video always uses landscape. On Tauri/Android, ExoPlayerPlugin already
+  // enforces this in Kotlin when play() starts. The JS call here covers iOS and PWA.
   useEffect(() => {
     if (!isMobile) return
 
     const applyOrientation = async () => {
       if (isTauriMobile()) {
-        await setTauriPlayerMode(true, orientationMode)
+        // Kotlin already locked landscape in ExoPlayerPlugin.play(); this call keeps
+        // iOS (TauriPlayerEngine) consistent with the same landscape contract.
+        await setTauriPlayerMode(true, 'landscape')
         return
       }
       try {
-        const so = screen.orientation as any // ts workaround
-        if (orientationMode === 'landscape') {
-          await so?.lock?.('landscape')
-        } else if (orientationMode === 'portrait') {
-          await so?.lock?.('portrait')
-        } else {
-          so?.unlock?.()
-        }
+        const so = screen.orientation as any
+        await so?.lock?.('landscape')
       } catch (_e) {
-        // Silently ignore - lock() requires fullscreen and user gesture
+        // Silently ignore - lock() requires fullscreen and user gesture on web
       }
     }
 
     applyOrientation()
 
-    // Reset to auto on unmount
     return () => {
       if (isTauriMobile()) return
       try {
@@ -318,14 +308,7 @@ export function ZentrioPlayer({
         // Silently ignore
       }
     }
-  }, [isMobile, orientationMode])
-
-  const handleOrientationChange = (mode: OrientationMode) => {
-    setOrientationMode(mode)
-    try {
-      localStorage.setItem('zentrio_orientation', mode)
-    } catch (_e) {}
-  }
+  }, [isMobile])
 
   /* ── Fullscreen sync ── */
   useEffect(() => {
@@ -412,7 +395,8 @@ export function ZentrioPlayer({
 
   /* ── Keyboard shortcuts ── */
   useEffect(() => {
-    if (usesNativePlaybackUi) return
+    // TV uses D-pad controls in Player.tv.tsx, not keyboard shortcuts
+    if (appTarget.primaryInput === 'remote') return
 
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
@@ -441,7 +425,7 @@ export function ZentrioPlayer({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [usesNativePlaybackUi, togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
+  }, [appTarget.primaryInput, togglePlayPause, seek, setVolume, setMuted, toggleFullscreen, state.currentTime, state.duration, state.volume, state.muted, openMenu])
 
   /* ── Menu click-outside (desktop + mobile) ── */
   useEffect(() => {
@@ -510,15 +494,15 @@ export function ZentrioPlayer({
 
   /* ── Touch gestures ── */
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (usesNativePlaybackUi) return
+    if (appTarget.primaryInput !== 'touch') return
     if (e.touches.length !== 1) return
     const t = e.touches[0]
     gestureRef.current = { ...gestureRef.current, startX: t.clientX, startY: t.clientY, startTime: state.currentTime, seeking: false, voluming: false }
     resetControlsTimeout()
-  }, [usesNativePlaybackUi, state.currentTime, resetControlsTimeout])
+  }, [appTarget.primaryInput, state.currentTime, resetControlsTimeout])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (usesNativePlaybackUi) return
+    if (appTarget.primaryInput !== 'touch') return
     if (e.touches.length !== 1) return
     const t = e.touches[0]
     const g = gestureRef.current
@@ -544,10 +528,10 @@ export function ZentrioPlayer({
         g.startY = t.clientY
       }
     }
-  }, [usesNativePlaybackUi, state.duration, state.volume, setVolume, showVolumeOSD])
+  }, [appTarget.primaryInput, state.duration, state.volume, setVolume, showVolumeOSD])
 
   const handleTouchEnd = useCallback((_e: React.TouchEvent) => {
-    if (usesNativePlaybackUi) return
+    if (appTarget.primaryInput !== 'touch') return
     const g = gestureRef.current
     if (g.seeking && hoverTime) {
       seek(hoverTime.time)
@@ -580,7 +564,7 @@ export function ZentrioPlayer({
 
     g.seeking = false
     g.voluming = false
-  }, [usesNativePlaybackUi, hoverTime, seek, state.currentTime, state.duration, togglePlayPause])
+  }, [appTarget.primaryInput, hoverTime, seek, state.currentTime, state.duration, togglePlayPause])
 
   /* ── PiP ── */
   const togglePip = useCallback(async () => {
@@ -630,13 +614,12 @@ export function ZentrioPlayer({
   return (
     <div
       ref={containerRef}
-      className={styles.playerContainer}
-      onMouseMove={usesNativePlaybackUi ? undefined : resetControlsTimeout}
-      onTouchStart={usesNativePlaybackUi ? undefined : handleTouchStart}
-      onTouchMove={usesNativePlaybackUi ? undefined : handleTouchMove}
-      onTouchEnd={usesNativePlaybackUi ? undefined : handleTouchEnd}
+      className={`${styles.playerContainer} ${activeEngineType === 'android-native' ? styles.playerTransparent : ''}`}
+      onMouseMove={resetControlsTimeout}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       onClick={(e) => {
-        if (usesNativePlaybackUi) return
         // Clicks on the control bars are blocked by data-controls on topBar/bottomBar
         if ((e.target as HTMLElement).closest('[data-controls]')) return
         resetControlsTimeout()
@@ -645,7 +628,12 @@ export function ZentrioPlayer({
       }}
     >
       {/* Video */}
-      <video ref={videoRef} className={styles.videoElement} playsInline poster={poster} />
+      <video
+        ref={videoRef}
+        className={`${styles.videoElement} ${activeEngineType === 'android-native' ? styles.videoHidden : ''}`}
+        playsInline
+        poster={poster}
+      />
 
       {/* Poster while loading */}
       {poster && isLoading && (
@@ -697,14 +685,14 @@ export function ZentrioPlayer({
       )}
 
       {/* Seek time preview (touch scrub) */}
-      {!usesNativePlaybackUi && hoverTime && !isDraggingProgress && isMobile && (
+      {hoverTime && !isDraggingProgress && isMobile && (
         <div className={styles.touchSeekPreview}>
           <span className={styles.touchSeekTime}>{formatTime(hoverTime.time)}</span>
         </div>
       )}
 
       {/* ═══════════════ Controls Overlay ═══════════════ */}
-      {!usesNativePlaybackUi && <div className={`${styles.controlsOverlay} ${controlsVisible ? styles.visible : ''}`}>
+      <div className={`${styles.controlsOverlay} ${controlsVisible ? styles.visible : ''}`}>
 
         {/* Gradient backgrounds */}
         <div className={styles.gradientTop} />
@@ -1045,14 +1033,6 @@ export function ZentrioPlayer({
                             <span className={styles.settingsValue}>{audioTracks.find(a => a.enabled)?.label || 'Default'} ›</span>
                           </button>
                         )}
-                        {isMobile && (
-                          <button className={styles.settingsRow} onClick={() => setSettingsPage('orientation')}>
-                            <span>Orientation</span>
-                            <span className={styles.settingsValue}>
-                              {orientationMode === 'auto' ? 'Auto' : orientationMode === 'landscape' ? 'Landscape' : 'Portrait'} ›
-                            </span>
-                          </button>
-                        )}
                       </>
                     )}
                     {settingsPage === 'speed' && (
@@ -1100,21 +1080,6 @@ export function ZentrioPlayer({
                         ))}
                       </>
                     )}
-                    {settingsPage === 'orientation' && isMobile && (
-                      <>
-                        <button className={styles.backRow} onClick={() => setSettingsPage('main')}>‹ Orientation</button>
-                        {(['auto', 'landscape', 'portrait'] as OrientationMode[]).map(mode => (
-                          <button
-                            key={mode}
-                            className={`${styles.dropdownItem} ${orientationMode === mode ? styles.selected : ''}`}
-                            onClick={() => { handleOrientationChange(mode); setSettingsPage('main') }}
-                          >
-                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                            {orientationMode === mode && <span className={styles.check}>✓</span>}
-                          </button>
-                        ))}
-                      </>
-                    )}
                   </div>
                 )}
               </div>
@@ -1147,10 +1112,10 @@ export function ZentrioPlayer({
             </div>
           </div>
         </div>
-      </div>}
+      </div>
 
       {/* ═════════════ SKIP SEGMENT BUTTON (IntroDB) ═════════════ */}
-      {!usesNativePlaybackUi && activeSegment && skipIntrosOutros && (
+      {activeSegment && skipIntrosOutros && (
         <div className={`${styles.skipSegmentWrap} ${controlsVisible ? styles.skipSegmentWithControls : ''}`} data-controls>
           <button
             className={`${styles.skipSegmentBtn} ${!activeSegment.validated ? styles.skipSegmentUnconfirmed : ''}`}
@@ -1179,7 +1144,7 @@ export function ZentrioPlayer({
       )}
 
       {/* ═════════════ INTRODB CONTRIBUTE PANEL ═════════════ */}
-      {!usesNativePlaybackUi && showContribute && canContributeSegments && (
+      {showContribute && canContributeSegments && (
         <div className={`${styles.contributePanel} ${styles.slideIn}`} data-controls onClick={e => e.stopPropagation()}>
           <div className={styles.contributePanelHeader}>
             <span className={styles.contributePanelTitle}>
@@ -1262,7 +1227,7 @@ export function ZentrioPlayer({
       )}
 
       {/* ═════════════ NEXT EPISODE POPUP ═════════════ */}
-      {!usesNativePlaybackUi && showNextEp && nextEpisode && (
+      {showNextEp && nextEpisode && (
         <div className={`${styles.nextEpCard} ${styles.slideIn}`}>
           <div className={styles.nextEpHeader}>Up Next</div>
           <div className={styles.nextEpTitle}>
@@ -1297,7 +1262,7 @@ export function ZentrioPlayer({
       )}
 
       {/* ═════════════ SHORT VIDEO / FIND NEW STREAM ═════════════ */}
-      {!usesNativePlaybackUi && showShortVideo && (
+      {showShortVideo && (
         <div className={`${styles.shortVideoCard} ${styles.slideIn}`}>
           <button
             className={styles.shortVideoClose}
