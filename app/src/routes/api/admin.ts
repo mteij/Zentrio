@@ -7,6 +7,7 @@ import { writeAuditEvent, queryAuditLog, verifyAuditChain, getAuditStats, getAud
 import { createChallenge, verifyChallenge, getChallengeStatus, getOtpDestinationEmail } from '../../services/admin/stepup'
 import { emailService } from '../../services/email'
 import { Permissions, invalidatePermissionCache } from '../../services/admin/rbac'
+import { createRouteLimiter } from '../../middleware/security'
 import * as os from 'os'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -15,6 +16,10 @@ import { logger } from '../../services/logger'
 const log = logger.scope('API:Admin')
 
 const app = createTaggedOpenAPIApp('Admin')
+
+const adminSetupLimiter = createRouteLimiter('admin:setup', { windowMs: 60 * 60 * 1000, limit: 10 })
+const stepupRequestLimiter = createRouteLimiter('admin:stepup:request', { windowMs: 60 * 1000, limit: 10 })
+const stepupVerifyLimiter = createRouteLimiter('admin:stepup:verify', { windowMs: 60 * 1000, limit: 30 })
 
 // Public — no auth required. Frontend uses this to show/hide the admin button and setup flow.
 app.get('/status', async (c) => {
@@ -26,7 +31,7 @@ app.get('/status', async (c) => {
 // Claim superadmin — only works when admin is enabled and no superadmin exists yet.
 // Requires the user to be logged in. If ADMIN_SETUP_TOKEN is configured, the token
 // must be supplied in the request body, preventing arbitrary users from claiming ownership.
-app.post('/setup', async (c) => {
+app.post('/setup', adminSetupLimiter, async (c) => {
   const { ADMIN_ENABLED, ADMIN_SETUP_TOKEN } = getConfig()
 
   if (!ADMIN_ENABLED) {
@@ -721,7 +726,7 @@ app.post('/audit/verify', adminSessionMiddleware, requirePermission(Permissions.
 })
 
 // Step-up challenge endpoints
-app.post('/stepup/request', adminSessionMiddleware, async (c) => {
+app.post('/stepup/request', adminSessionMiddleware, stepupRequestLimiter, async (c) => {
   try {
     const adminUser = (c as any).get('adminUser') as any
     const { ipAddress, userAgent } = getRequestMeta(c)
@@ -766,14 +771,14 @@ app.post('/stepup/request', adminSessionMiddleware, async (c) => {
     })
   } catch (e: any) {
     log.error('Admin step-up request failed', e)
-    if (e.message?.includes('Too many active challenges')) {
+    if (e.message?.includes('Too many active challenges') || e.message?.includes('Too many verification requests')) {
       return err(c, 429, 'RATE_LIMITED', e.message)
     }
     return err(c, 500, 'SERVER_ERROR', 'Failed to create step-up challenge')
   }
 })
 
-app.post('/stepup/verify', adminSessionMiddleware, async (c) => {
+app.post('/stepup/verify', adminSessionMiddleware, stepupVerifyLimiter, async (c) => {
   try {
     const adminUser = (c as any).get('adminUser') as any
     const body = await c.req.json().catch(() => ({}))

@@ -135,23 +135,21 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
     }
 
     if (!headers.has('Authorization')) {
-        try {
-            // Read directly from localStorage to avoid circular dependency and dynamic import lag
-            const storage = localStorage.getItem('zentrio-auth-storage');
-            if (storage) {
-                const parsed = JSON.parse(storage);
-                const token = parsed?.state?.session?.token;
-                if (token) {
-                    log.debug(`Injecting token: ...${token.slice(-6)} for ${url}`);
-                    headers.set('Authorization', `Bearer ${token}`);
+        if (isTauri()) {
+            try {
+                const storage = localStorage.getItem('zentrio-auth-storage');
+                if (storage) {
+                    const parsed = JSON.parse(storage);
+                    const token = parsed?.state?.session?.token;
+                    if (token) {
+                        log.debug(`Injecting Tauri token: ...${token.slice(-6)} for ${url}`);
+                        headers.set('Authorization', `Bearer ${token}`);
+                    }
                 }
+            } catch (e) {
+                log.error('Failed to read token from storage:', e);
             }
-        } catch (e) {
-            log.error('Failed to read token from storage:', e);
         }
-    }
-
-    if (isTauri()) {
         try {
             // Bypass Tauri fetch for session endpoint to ensure cookies are sent from the Webview (if they exist)
             // But now we ALSO send the Authorization header injected above as a fallback

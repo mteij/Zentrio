@@ -5,8 +5,14 @@ import { apiFetch } from '../lib/apiFetch'
 import { appMode } from '../lib/app-mode'
 import { authClient } from '../lib/auth-client'
 import { createLogger } from '../utils/client-logger'
+import { isTauriRuntime } from '../lib/runtime-env'
 
 const log = createLogger('AuthStore')
+
+const isWebPlatform = (): boolean => {
+  if (typeof window === 'undefined') return false
+  return !isTauriRuntime()
+}
 
 interface User {
   id: string
@@ -109,6 +115,9 @@ export const useAuthStore = create<AuthState>()(
             // Clear app mode and server URL to show onboarding wizard
             appMode.clear()
             localStorage.removeItem('zentrio_server_url')
+            
+            // Clear persisted auth storage (especially legacy tokens)
+            localStorage.removeItem('zentrio-auth-storage')
             
             // Reload to show onboarding wizard
             window.location.href = '/'
@@ -322,13 +331,34 @@ export const useAuthStore = create<AuthState>()(
       }),
       {
         name: 'zentrio-auth-storage',
-        partialize: (state) => ({
-          user: state.user,
-          session: state.session,
-          isAuthenticated: state.isAuthenticated,
-          lastActivity: state.lastActivity,
-          // NOTE: isFreshLogin is intentionally NOT persisted - always false on cold start
-        }),
+        version: 1,
+        migrate: (persistedState: any, version: number) => {
+          if (version < 1) {
+            log.debug('Migrating auth storage from v0 to v1: removing web bearer tokens')
+          }
+          if (version < 2) {
+            log.debug('Migrating auth storage from v1 to v2')
+          }
+          return persistedState
+        },
+        partialize: (state) => {
+          const webPlatform = isWebPlatform()
+
+          if (webPlatform) {
+            return {
+              user: state.user,
+              isAuthenticated: state.isAuthenticated,
+              lastActivity: state.lastActivity,
+            }
+          }
+
+          return {
+            user: state.user,
+            session: state.session,
+            isAuthenticated: state.isAuthenticated,
+            lastActivity: state.lastActivity,
+          }
+        },
         onRehydrateStorage: () => (state) => {
           const hasSession = !!state?.session?.token;
           

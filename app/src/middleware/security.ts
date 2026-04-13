@@ -122,7 +122,7 @@ export const securityHeaders = async (c: Context, next: Next) => {
   // Reference: [securityHeaders()](app/src/middleware/security.ts:27)
   c.header(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://cdn.dashjs.org https://www.gstatic.com; connect-src * data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https:; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' https:;"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://cdn.dashjs.org https://www.gstatic.com; connect-src * data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https:; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' https:; object-src 'none'; base-uri 'self';"
   )
 }
 
@@ -193,6 +193,59 @@ export const rateLimiter = (options: { windowMs: number; limit: number }) => {
     await next()
   }
 }
+
+const routeLimitMaps = new Map<string, Map<string, { count: number; resetTime: number }>>()
+
+export const createRouteLimiter = (routeKey: string, options: { windowMs: number; limit: number }) => {
+  return async (c: Context, next: Next) => {
+    const { windowMs, limit } = options
+
+    if (!limit || limit <= 0 || !windowMs || windowMs <= 0) {
+      return await next()
+    }
+
+    const ip = extractClientIp(c)
+    const now = Date.now()
+
+    if (!routeLimitMaps.has(routeKey)) {
+      routeLimitMaps.set(routeKey, new Map())
+    }
+
+    const routeMap = routeLimitMaps.get(routeKey)!
+
+    if (!routeMap.has(ip)) {
+      routeMap.set(ip, { count: 1, resetTime: now + windowMs })
+    } else {
+      const data = routeMap.get(ip)!
+      if (now > data.resetTime) {
+        data.count = 1
+        data.resetTime = now + windowMs
+      } else {
+        data.count++
+        if (data.count > limit) {
+          c.header('Retry-After', String(Math.ceil((data.resetTime - now) / 1000)))
+          return c.json({ error: 'Too many requests' }, 429)
+        }
+      }
+    }
+
+    await next()
+  }
+}
+
+setInterval(() => {
+  const now = Date.now()
+  for (const [routeKey, routeMap] of routeLimitMaps.entries()) {
+    for (const [ip, data] of routeMap.entries()) {
+      if (now > data.resetTime) {
+        routeMap.delete(ip)
+      }
+    }
+    if (routeMap.size === 0) {
+      routeLimitMaps.delete(routeKey)
+    }
+  }
+}, 5 * 60 * 1000)
 
 // Clean up old rate limit entries periodically
 setInterval(() => {

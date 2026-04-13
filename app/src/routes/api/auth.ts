@@ -6,10 +6,15 @@ import { getConfig } from '../../services/envParser'
 import { logger } from '../../services/logger'
 import { schemas, validate } from '../../utils/api'
 import { createTaggedOpenAPIApp } from './openapi-route'
+import { createRouteLimiter } from '../../middleware/security'
 
 const log = logger.scope('API:Auth')
 
 const app = createTaggedOpenAPIApp('Authentication')
+
+const deviceLinkCreateLimiter = createRouteLimiter('auth:device-link:create', { windowMs: 60 * 1000, limit: 10 })
+const deviceLinkExchangeLimiter = createRouteLimiter('auth:device-link:exchange', { windowMs: 60 * 1000, limit: 10 })
+const mobileCallbackLimiter = createRouteLimiter('auth:mobile-callback', { windowMs: 60 * 1000, limit: 20 })
 
 // ============================================================================
 // Secure Authorization Code Store
@@ -340,7 +345,7 @@ app.post('/identify', async (c) => {
 })
 
 // [POST /device-link/create] Generate a short pairing code for TV login
-app.post('/device-link/create', async (c) => {
+app.post('/device-link/create', deviceLinkCreateLimiter, async (c) => {
     const session = await getSessionFromRequest(c)
 
     if (!session?.user || !session?.session?.token) {
@@ -364,7 +369,7 @@ app.post('/device-link/create', async (c) => {
 })
 
 // [POST /device-link/exchange] Redeem a short pairing code on TV
-app.post('/device-link/exchange', async (c) => {
+app.post('/device-link/exchange', deviceLinkExchangeLimiter, async (c) => {
     const body = await c.req.json().catch(() => ({}))
     const userCode = normalizeDeviceLinkCode(body?.userCode)
 
@@ -449,7 +454,7 @@ app.get('/login-proxy', async (c) => {
     }
 })
 
-app.post('/mobile-callback', async (c) => {
+app.post('/mobile-callback', mobileCallbackLimiter, async (c) => {
     const body = await c.req.json().catch(() => ({}))
     const { url, authCode } = body
 
