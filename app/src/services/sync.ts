@@ -1,5 +1,6 @@
 import { db } from './database';
 import { logger } from './logger';
+import { encrypt, decrypt, isEncrypted } from './encryption';
 
 const log = logger.scope('Sync')
 
@@ -37,18 +38,37 @@ export class SyncService {
   }
 
   async getSyncState(): Promise<SyncState | undefined> {
-    return db.prepare('SELECT * FROM sync_state WHERE id = 1').get() as SyncState | undefined;
+    const row = db.prepare('SELECT * FROM sync_state WHERE id = 1').get() as SyncState | undefined;
+    if (row && row.auth_token) {
+      try {
+        if (isEncrypted(row.auth_token)) {
+          row.auth_token = decrypt(row.auth_token);
+        }
+      } catch (e) {
+        log.error('Failed to decrypt sync auth_token:', e);
+      }
+    }
+    return row;
   }
 
   async setSyncState(state: Partial<SyncState>) {
     const existing = await this.getSyncState();
+    let encryptedToken = state.auth_token;
+    if (encryptedToken && !encryptedToken.startsWith('v1:')) {
+      try {
+        encryptedToken = encrypt(encryptedToken);
+      } catch (e) {
+        log.error('Failed to encrypt auth_token:', e);
+      }
+    }
+
     if (existing) {
       const fields: string[] = [];
       const values: any[] = [];
       Object.entries(state).forEach(([key, value]) => {
         if (key !== 'id') {
           fields.push(`${key} = ?`);
-          values.push(value);
+          values.push(key === 'auth_token' ? encryptedToken : value);
         }
       });
       if (fields.length > 0) {
@@ -62,7 +82,7 @@ export class SyncService {
       `).run(
         state.remote_url || 'https://zentrio.eu',
         state.remote_user_id || null,
-        state.auth_token || null,
+        encryptedToken || null,
         state.last_sync_at || null,
         state.is_syncing ? 1 : 0
       );
@@ -72,9 +92,9 @@ export class SyncService {
   async connect(remoteUrl: string, authToken: string, remoteUserId: string) {
     await this.setSyncState({
       remote_url: remoteUrl,
-      auth_token: authToken, // This will be the session cookie for Better Auth
+      auth_token: authToken,
       remote_user_id: remoteUserId,
-      last_sync_at: null, // Reset sync state on new connection
+      last_sync_at: null,
       is_syncing: false
     });
     await this.sync();

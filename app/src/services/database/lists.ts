@@ -1,10 +1,14 @@
 // List database operations
-import { randomBytes } from 'crypto'
+import { randomBytes, createHash } from 'crypto'
 import { logger } from '../logger'
 import { db } from './connection'
 import type { List, ListItem, ListShare, Profile, ProfileListShare } from './types'
 
 const log = logger.scope('DB:Lists')
+
+function hashShareToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
 
 export const listDb = {
   create: (profileId: number, name: string, isDefault: boolean = false): List => {
@@ -93,6 +97,7 @@ export const listDb = {
 
   createShare: (listId: number, sharedByUserId: string, sharedToEmail: string, permission: 'read' | 'add' | 'full' = 'read'): ListShare => {
     const token = randomBytes(32).toString('hex')
+    const tokenHash = hashShareToken(token)
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 30) // 30 day expiry
 
@@ -100,8 +105,9 @@ export const listDb = {
       INSERT INTO list_shares (list_id, shared_by_user_id, shared_to_email, share_token, permission, expires_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `)
-    const res = stmt.run(listId, sharedByUserId, sharedToEmail.toLowerCase(), token, permission, expiresAt.toISOString())
-    return listDb.getShareById(res.lastInsertRowid as number)!
+    const res = stmt.run(listId, sharedByUserId, sharedToEmail.toLowerCase(), tokenHash, permission, expiresAt.toISOString())
+    const share = listDb.getShareById(res.lastInsertRowid as number)!
+    return { ...share, share_token: token }
   },
 
   getShareById: (id: number): ListShare | undefined => {
@@ -109,7 +115,12 @@ export const listDb = {
   },
 
   getShareByToken: (token: string): ListShare | undefined => {
-    return db.prepare("SELECT * FROM list_shares WHERE share_token = ?").get(token) as ListShare | undefined
+    const tokenHash = hashShareToken(token)
+    const share = db.prepare("SELECT * FROM list_shares WHERE share_token = ?").get(tokenHash) as ListShare | undefined
+    if (share) {
+      return { ...share, share_token: token }
+    }
+    return undefined
   },
 
   acceptShare: (token: string, userId: string, profileId?: number): boolean => {
@@ -117,13 +128,14 @@ export const listDb = {
     if (!share || share.status !== 'pending') return false
     if (share.expires_at && new Date(share.expires_at) < new Date()) return false
 
+    const tokenHash = hashShareToken(token)
     db.prepare(`
       UPDATE list_shares SET 
         status = 'accepted', 
         shared_to_user_id = ?, 
         accepted_at = CURRENT_TIMESTAMP 
       WHERE share_token = ?
-    `).run(userId, token)
+    `).run(userId, tokenHash)
 
     // If profileId provided, also link the share to that profile
     if (profileId) {
@@ -140,7 +152,8 @@ export const listDb = {
     const share = listDb.getShareByToken(token)
     if (!share || share.status !== 'pending') return false
 
-    db.prepare("UPDATE list_shares SET status = 'declined' WHERE share_token = ?").run(token)
+    const tokenHash = hashShareToken(token)
+    db.prepare("UPDATE list_shares SET status = 'declined' WHERE share_token = ?").run(tokenHash)
     return true
   },
 
