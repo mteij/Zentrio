@@ -5,6 +5,9 @@
 .env.test.local
 .env.production.local
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Dependencies
 node_modules/
 app/node_modules/
@@ -157,7 +160,11 @@ jspm_packages/
 
 # Temporary files
 temp/
-CLAUDE.md
-.claude
 .tauri
 app/~/.tauri
+
+# Editor and AI tooling
+.claude/
+.cursor/
+.github/copilot-instructions.md
+.kilo/
