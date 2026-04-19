@@ -1,5 +1,4 @@
 import { SkeletonCard } from './SkeletonCard'
-import styles from '../../styles/Streaming.module.css'
 
 interface SkeletonRowProps {
   cardCount?: number
@@ -8,20 +7,12 @@ interface SkeletonRowProps {
 
 export function SkeletonRow({ cardCount = 7, showTitle = true }: SkeletonRowProps) {
   return (
-    <div className={styles.contentRow}>
-      {showTitle && (
-        <div className={styles.rowHeader}>
-          <div className={styles.skeletonTitle}>
-            <div className={styles.skeletonShimmer} />
-          </div>
-        </div>
-      )}
-      <div className={styles.rowWrapper}>
-        <div className={styles.rowScrollContainer} style={{ cursor: 'default' }}>
-          {Array.from({ length: cardCount }).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </div>
+    <div className="flex flex-col gap-3 mb-6">
+      {showTitle && <div className="h-6 w-40 rounded bg-white/5 animate-pulse mx-6" />}
+      <div className="flex gap-3 px-6 overflow-hidden">
+        {Array.from({ length: cardCount }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
       </div>
     </div>
   )

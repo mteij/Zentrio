@@ -98,8 +98,17 @@ export function ActivateDevicePage() {
 
           <section className="rounded-[32px] border border-white/10 bg-zinc-950/85 p-6 shadow-2xl backdrop-blur-xl lg:p-8">
             {isLoading ? (
-              <div className="flex min-h-[32rem] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-red-400" />
+              <div className="flex min-h-[32rem] flex-col justify-between animate-pulse">
+                <div className="flex flex-col gap-6">
+                  <div className="h-6 w-44 rounded-full bg-white/[0.06]" />
+                  <div className="h-8 w-56 rounded-lg bg-white/[0.07]" />
+                  <div className="rounded-[28px] border border-white/[0.06] bg-black/40 px-6 py-8 flex flex-col items-center gap-4">
+                    <div className="h-3 w-24 rounded-full bg-white/[0.05]" />
+                    <div className="h-14 w-64 rounded-lg bg-white/[0.08]" />
+                    <div className="h-3 w-40 rounded-full bg-white/[0.04]" />
+                  </div>
+                </div>
+                <div className="h-11 w-full rounded-xl bg-white/[0.06]" />
               </div>
             ) : isAuthenticated ? (
               <div className="flex min-h-[32rem] flex-col justify-between">
@@ -112,17 +121,24 @@ export function ActivateDevicePage() {
                   <h2 className="mt-6 text-3xl font-semibold text-white">Your pairing code</h2>
 
                   <div className="mt-8 rounded-[28px] border border-red-500/20 bg-black/70 px-6 py-8 text-center shadow-[0_0_80px_rgba(127,29,29,0.25)]">
-                    <div className="text-xs uppercase tracking-[0.4em] text-zinc-500">Pairing Code</div>
+                    <div className="text-xs uppercase tracking-[0.4em] text-zinc-500">
+                      Pairing Code
+                    </div>
                     <div className="mt-4 font-mono text-5xl font-semibold tracking-[0.32em] text-white lg:text-6xl">
                       {formattedCode}
                     </div>
                     <div className="mt-4 text-sm text-zinc-500">
-                      {codeExpiresIn !== null ? `Expires in ${Math.floor(codeExpiresIn / 60)}:${`${codeExpiresIn % 60}`.padStart(2, '0')}` : 'Generate a new code if this one expires.'}
+                      {codeExpiresIn !== null
+                        ? `Expires in ${Math.floor(codeExpiresIn / 60)}:${`${codeExpiresIn % 60}`.padStart(2, '0')}`
+                        : 'Generate a new code if this one expires.'}
                     </div>
                   </div>
 
                   <div className="mt-4 text-sm text-zinc-500">
-                    TV setup URL: <span className="font-medium text-zinc-300">{deviceCode?.verificationUrl || 'zentrio.eu/activate'}</span>
+                    TV setup URL:{' '}
+                    <span className="font-medium text-zinc-300">
+                      {deviceCode?.verificationUrl || 'zentrio.eu/activate'}
+                    </span>
                   </div>
                 </div>
 
@@ -141,7 +157,11 @@ export function ActivateDevicePage() {
                     disabled={isGenerating}
                     className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60"
                   >
-                    {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    {isGenerating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
                     Generate new code
                   </button>
                 </div>

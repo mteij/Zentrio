@@ -56,12 +56,12 @@ export function useSettingsScreenModel(): SettingsScreenModel {
   // Load profiles on mount so currentProfileId is initialized without a header-level selector
   useEffect(() => {
     apiFetch('/api/user/settings-profiles')
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         const list: Array<{ id: string | number; name?: string }> = data.data || data || []
         setProfiles(list)
         const lastSelected = localStorage.getItem('lastSelectedSettingsProfile')
-        if (lastSelected && list.some(p => String(p.id) === lastSelected)) {
+        if (lastSelected && list.some((p) => String(p.id) === lastSelected)) {
           setCurrentProfileId(lastSelected)
           return
         }
@@ -70,27 +70,31 @@ export function useSettingsScreenModel(): SettingsScreenModel {
       .catch(() => {})
   }, [])
 
-  const handleProfilesLoaded = useCallback((loadedProfiles: Array<{ id: string | number; name?: string }>) => {
-    setProfiles(loadedProfiles)
-    setCurrentProfileId((prevId) => {
-      if (prevId) return prevId
-      const lastSelected = localStorage.getItem('lastSelectedSettingsProfile')
-      if (lastSelected && loadedProfiles.some((profile) => String(profile.id) === lastSelected)) {
-        return lastSelected
-      }
-      if (loadedProfiles.length > 0) {
-        return String(loadedProfiles[0].id)
-      }
-      return prevId
-    })
-  }, [])
+  const handleProfilesLoaded = useCallback(
+    (loadedProfiles: Array<{ id: string | number; name?: string }>) => {
+      setProfiles(loadedProfiles)
+      setCurrentProfileId((prevId) => {
+        if (prevId) return prevId
+        const lastSelected = localStorage.getItem('lastSelectedSettingsProfile')
+        if (lastSelected && loadedProfiles.some((profile) => String(profile.id) === lastSelected)) {
+          return lastSelected
+        }
+        if (loadedProfiles.length > 0) {
+          return String(loadedProfiles[0].id)
+        }
+        return prevId
+      })
+    },
+    []
+  )
 
   const handleProfileChange = useCallback((id: string) => {
     setCurrentProfileId(id)
     localStorage.setItem('lastSelectedSettingsProfile', id)
   }, [])
 
-  const currentProfileName = profiles.find((profile) => String(profile.id) === currentProfileId)?.name || 'Default'
+  const currentProfileName =
+    profiles.find((profile) => String(profile.id) === currentProfileId)?.name || 'Default'
 
   return {
     activeTab,

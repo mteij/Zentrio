@@ -1,5 +1,10 @@
 import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
-import { getAuthClient, getServerUrl, isOfficialZentrioServer, resetAuthClient } from '../../lib/auth-client'
+import {
+  getAuthClient,
+  getServerUrl,
+  isOfficialZentrioServer,
+  resetAuthClient,
+} from '../../lib/auth-client'
 import { getAppTarget } from '../../lib/app-target'
 import { apiFetch } from '../../lib/apiFetch'
 import { useAuthStore } from '../../stores/authStore'
@@ -100,15 +105,18 @@ function GeneralTabContent({
     [pendingCurrentPassword]
   )
 
-  const handleServerUrlChange = useCallback((url: string) => {
-    const trimmed = url.trim()
-    if (trimmed === serverUrl) {
-      setOpenDialog(null)
-      return
-    }
-    setPendingServerUrl(trimmed)
-    setOpenDialog('server-url-confirm')
-  }, [serverUrl])
+  const handleServerUrlChange = useCallback(
+    (url: string) => {
+      const trimmed = url.trim()
+      if (trimmed === serverUrl) {
+        setOpenDialog(null)
+        return
+      }
+      setPendingServerUrl(trimmed)
+      setOpenDialog('server-url-confirm')
+    },
+    [serverUrl]
+  )
 
   const handleServerUrlConfirm = useCallback(() => {
     if (!pendingServerUrl) return
@@ -135,70 +143,67 @@ function GeneralTabContent({
   const displayEmail = user?.email || '—'
   const isTauri = isTauriRuntime()
 
-  const sections: SettingsSectionDefinition[] = useMemo(
-    () => {
-      const result: SettingsSectionDefinition[] = [
-        {
-          id: 'general-account',
-          title: 'Account',
-          scope: 'account' as const,
-          items: [
-            {
-              id: 'general-username',
-              kind: 'action' as const,
-              label: 'Username',
-              description: 'Change your account username.',
-              summary: displayName,
-              actionLabel: 'Change',
-              onActivate: () => setOpenDialog('username'),
+  const sections: SettingsSectionDefinition[] = useMemo(() => {
+    const result: SettingsSectionDefinition[] = [
+      {
+        id: 'general-account',
+        title: 'Account',
+        scope: 'account' as const,
+        items: [
+          {
+            id: 'general-username',
+            kind: 'action' as const,
+            label: 'Username',
+            description: 'Change your account username.',
+            summary: displayName,
+            actionLabel: 'Change',
+            onActivate: () => setOpenDialog('username'),
+          },
+          {
+            id: 'general-email',
+            kind: 'action' as const,
+            label: 'Email address',
+            description: 'A verification link will be sent to the new address.',
+            summary: displayEmail,
+            actionLabel: 'Change',
+            onActivate: () => setOpenDialog('email'),
+          },
+          {
+            id: 'general-password',
+            kind: 'action' as const,
+            label: 'Password',
+            description: 'Update your account password.',
+            actionLabel: 'Change',
+            onActivate: () => {
+              setPendingCurrentPassword('')
+              setOpenDialog('password-current')
             },
-            {
-              id: 'general-email',
-              kind: 'action' as const,
-              label: 'Email address',
-              description: 'A verification link will be sent to the new address.',
-              summary: displayEmail,
-              actionLabel: 'Change',
-              onActivate: () => setOpenDialog('email'),
-            },
-            {
-              id: 'general-password',
-              kind: 'action' as const,
-              label: 'Password',
-              description: 'Update your account password.',
-              actionLabel: 'Change',
-              onActivate: () => {
-                setPendingCurrentPassword('')
-                setOpenDialog('password-current')
-              },
-            },
-          ],
-        },
-      ]
+          },
+        ],
+      },
+    ]
 
-      if (isTauri) {
-        result.push({
-          id: 'general-server',
-          title: 'Server Connection',
-          scope: 'server' as const,
-          items: [
-            {
-              id: 'general-server-url',
-              kind: 'action' as const,
-              label: 'Server URL',
-              description: 'The address of your Zentrio server.',
-              summary: serverUrl,
-              actionLabel: 'Change',
-              onActivate: () => setOpenDialog('server-url'),
-            },
-          ],
-        })
-      }
+    if (isTauri) {
+      result.push({
+        id: 'general-server',
+        title: 'Server Connection',
+        scope: 'server' as const,
+        items: [
+          {
+            id: 'general-server-url',
+            kind: 'action' as const,
+            label: 'Server URL',
+            description: 'The address of your Zentrio server.',
+            summary: serverUrl,
+            actionLabel: 'Change',
+            onActivate: () => setOpenDialog('server-url'),
+          },
+        ],
+      })
+    }
 
-      return result
-    },
-    [displayName, displayEmail, serverUrl, isTauri]
-  )
+    return result
+  }, [displayName, displayEmail, serverUrl, isTauri])
 
   return (
     <>
@@ -287,9 +292,7 @@ function AppearanceTabContent({
   onOpenOverlay,
   onCloseOverlay,
 }: SettingsTabContentProps) {
-  const { showImdbRatings, showAgeRatings, save } = useAppearanceSettings(
-    model.currentProfileId
-  )
+  const { showImdbRatings, showAgeRatings, save } = useAppearanceSettings(model.currentProfileId)
 
   const sections: SettingsSectionDefinition[] = useMemo(
     () => [
@@ -316,7 +319,6 @@ function AppearanceTabContent({
           },
         ],
       },
-
     ],
     [showImdbRatings, showAgeRatings, save]
   )
@@ -334,10 +336,7 @@ function AppearanceTabContent({
 
 // ─── Addons ──────────────────────────────────────────────────────────────────
 
-function AddonsTabContent({
-  model,
-  platform,
-}: SettingsTabContentProps) {
+function AddonsTabContent({ model, platform }: SettingsTabContentProps) {
   const settingsProfileId = model.currentProfileId
 
   if (!settingsProfileId) {
@@ -403,7 +402,12 @@ function CollapsibleSection({
         }}
       >
         <span>{title}</span>
-        <span style={{ transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+        <span
+          style={{
+            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+          }}
+        >
           ▶
         </span>
       </button>
@@ -422,7 +426,9 @@ function ToggleRow({
   onChange: (v: boolean) => void
 }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '2px 0' }}>
+    <label
+      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '2px 0' }}
+    >
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span style={{ fontSize: 13 }}>{label}</span>
     </label>
@@ -505,14 +511,16 @@ function SortOrderEditor({
             }}
           >
             <span style={{ fontSize: 11, color: '#666', width: 18 }}>{idx + 1}</span>
-            <span style={{ flex: 1, fontSize: 13, textTransform: 'capitalize' }}>{meta?.label || item.id}</span>
+            <span style={{ flex: 1, fontSize: 13, textTransform: 'capitalize' }}>
+              {meta?.label || item.id}
+            </span>
             <button
               type="button"
               onClick={() =>
                 onChange(
                   items.map((it, i) =>
-                    i === idx ? { ...it, direction: it.direction === 'desc' ? 'asc' : 'desc' } : it,
-                  ),
+                    i === idx ? { ...it, direction: it.direction === 'desc' ? 'asc' : 'desc' } : it
+                  )
                 )
               }
               style={{
@@ -564,7 +572,9 @@ function SortOrderEditor({
               type="checkbox"
               checked={item.enabled}
               onChange={(e) =>
-                onChange(items.map((it, i) => (i === idx ? { ...it, enabled: e.target.checked } : it)))
+                onChange(
+                  items.map((it, i) => (i === idx ? { ...it, enabled: e.target.checked } : it))
+                )
               }
               title="Enable this sort criterion"
             />
@@ -591,28 +601,28 @@ function StreamingTabContent({
     (patch: Partial<StreamConfig['filters']>) => {
       save({ filters: { ...config.filters, ...patch } })
     },
-    [config, save],
+    [config, save]
   )
 
   const updateLimits = useCallback(
     (patch: Partial<StreamConfig['limits']>) => {
       save({ limits: { ...config.limits, ...patch } })
     },
-    [config.limits, save],
+    [config.limits, save]
   )
 
   const updateDedup = useCallback(
     (patch: Partial<StreamConfig['deduplication']>) => {
       save({ deduplication: { ...config.deduplication, ...patch } })
     },
-    [config.deduplication, save],
+    [config.deduplication, save]
   )
 
   const updateSortingConfig = useCallback(
     (items: { id: string; enabled: boolean; direction: 'asc' | 'desc' }[]) => {
       save({ sortingConfig: { items } })
     },
-    [save],
+    [save]
   )
 
   const sections = useMemo<SettingsSectionDefinition[]>(
@@ -714,7 +724,11 @@ function StreamingTabContent({
                       label="Preferred (order = priority)"
                       options={RESOLUTIONS}
                       selected={config.filters?.resolution?.preferred || []}
-                      onChange={(vals) => updateFilters({ resolution: { ...config.filters?.resolution, preferred: vals } })}
+                      onChange={(vals) =>
+                        updateFilters({
+                          resolution: { ...config.filters?.resolution, preferred: vals },
+                        })
+                      }
                     />
                   )}
                 </CollapsibleSection>
@@ -727,13 +741,17 @@ function StreamingTabContent({
                         label="Required"
                         options={ENCODES}
                         selected={config.filters?.encode?.required || []}
-                        onChange={(vals) => updateFilters({ encode: { ...config.filters?.encode, required: vals } })}
+                        onChange={(vals) =>
+                          updateFilters({ encode: { ...config.filters?.encode, required: vals } })
+                        }
                       />
                       <MultiSelect
                         label="Excluded"
                         options={ENCODES}
                         selected={config.filters?.encode?.excluded || []}
-                        onChange={(vals) => updateFilters({ encode: { ...config.filters?.encode, excluded: vals } })}
+                        onChange={(vals) =>
+                          updateFilters({ encode: { ...config.filters?.encode, excluded: vals } })
+                        }
                       />
                     </>
                   )}
@@ -747,13 +765,21 @@ function StreamingTabContent({
                         label="Required"
                         options={VISUAL_TAGS}
                         selected={config.filters?.visualTag?.required || []}
-                        onChange={(vals) => updateFilters({ visualTag: { ...config.filters?.visualTag, required: vals } })}
+                        onChange={(vals) =>
+                          updateFilters({
+                            visualTag: { ...config.filters?.visualTag, required: vals },
+                          })
+                        }
                       />
                       <MultiSelect
                         label="Excluded"
                         options={VISUAL_TAGS}
                         selected={config.filters?.visualTag?.excluded || []}
-                        onChange={(vals) => updateFilters({ visualTag: { ...config.filters?.visualTag, excluded: vals } })}
+                        onChange={(vals) =>
+                          updateFilters({
+                            visualTag: { ...config.filters?.visualTag, excluded: vals },
+                          })
+                        }
                       />
                     </>
                   )}
@@ -767,13 +793,21 @@ function StreamingTabContent({
                         label="Required"
                         options={AUDIO_TAGS}
                         selected={config.filters?.audioTag?.required || []}
-                        onChange={(vals) => updateFilters({ audioTag: { ...config.filters?.audioTag, required: vals } })}
+                        onChange={(vals) =>
+                          updateFilters({
+                            audioTag: { ...config.filters?.audioTag, required: vals },
+                          })
+                        }
                       />
                       <MultiSelect
                         label="Excluded"
                         options={AUDIO_TAGS}
                         selected={config.filters?.audioTag?.excluded || []}
-                        onChange={(vals) => updateFilters({ audioTag: { ...config.filters?.audioTag, excluded: vals } })}
+                        onChange={(vals) =>
+                          updateFilters({
+                            audioTag: { ...config.filters?.audioTag, excluded: vals },
+                          })
+                        }
                       />
                     </>
                   )}
@@ -781,23 +815,29 @@ function StreamingTabContent({
                 <CollapsibleSection title="Cache / Debrid">
                   {loading ? (
                     <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
-                  ) : (() => {
-                    const cache = config.filters?.cache || { cached: true, uncached: true, applyMode: 'OR' as const }
-                    return (
-                      <div style={{ display: 'flex', gap: 16 }}>
-                        <ToggleRow
-                          label="Show cached"
-                          checked={cache.cached}
-                          onChange={(v) => updateFilters({ cache: { ...cache, cached: v } })}
-                        />
-                        <ToggleRow
-                          label="Show uncached"
-                          checked={cache.uncached}
-                          onChange={(v) => updateFilters({ cache: { ...cache, uncached: v } })}
-                        />
-                      </div>
-                    )
-                  })()}
+                  ) : (
+                    (() => {
+                      const cache = config.filters?.cache || {
+                        cached: true,
+                        uncached: true,
+                        applyMode: 'OR' as const,
+                      }
+                      return (
+                        <div style={{ display: 'flex', gap: 16 }}>
+                          <ToggleRow
+                            label="Show cached"
+                            checked={cache.cached}
+                            onChange={(v) => updateFilters({ cache: { ...cache, cached: v } })}
+                          />
+                          <ToggleRow
+                            label="Show uncached"
+                            checked={cache.uncached}
+                            onChange={(v) => updateFilters({ cache: { ...cache, uncached: v } })}
+                          />
+                        </div>
+                      )
+                    })()
+                  )}
                 </CollapsibleSection>
                 <CollapsibleSection title="Source Type">
                   {loading ? (
@@ -808,13 +848,21 @@ function StreamingTabContent({
                         label="Required"
                         options={SOURCE_TYPES}
                         selected={config.filters?.sourceType?.required || []}
-                        onChange={(vals) => updateFilters({ sourceType: { ...config.filters?.sourceType, required: vals } })}
+                        onChange={(vals) =>
+                          updateFilters({
+                            sourceType: { ...config.filters?.sourceType, required: vals },
+                          })
+                        }
                       />
                       <MultiSelect
                         label="Excluded (e.g. hide CAM/TS)"
                         options={SOURCE_TYPES}
                         selected={config.filters?.sourceType?.excluded || []}
-                        onChange={(vals) => updateFilters({ sourceType: { ...config.filters?.sourceType, excluded: vals } })}
+                        onChange={(vals) =>
+                          updateFilters({
+                            sourceType: { ...config.filters?.sourceType, excluded: vals },
+                          })
+                        }
                       />
                     </>
                   )}
@@ -827,7 +875,11 @@ function StreamingTabContent({
                       label="Required"
                       options={STREAM_TYPES}
                       selected={config.filters?.streamType?.required || []}
-                      onChange={(vals) => updateFilters({ streamType: { ...config.filters?.streamType, required: vals } })}
+                      onChange={(vals) =>
+                        updateFilters({
+                          streamType: { ...config.filters?.streamType, required: vals },
+                        })
+                      }
                     />
                   )}
                 </CollapsibleSection>
@@ -837,27 +889,42 @@ function StreamingTabContent({
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
-                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>Max total results: <strong>{config.limits?.maxResults || 50}</strong></div>
+                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>
+                          Max total results: <strong>{config.limits?.maxResults || 50}</strong>
+                        </div>
                         <input
-                          type="range" min={10} max={200} step={10}
+                          type="range"
+                          min={10}
+                          max={200}
+                          step={10}
                           value={config.limits?.maxResults || 50}
                           onChange={(e) => updateLimits({ maxResults: Number(e.target.value) })}
                           style={{ width: '100%' }}
                         />
                       </div>
                       <div>
-                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>Per service: <strong>{config.limits?.perService || 20}</strong></div>
+                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>
+                          Per service: <strong>{config.limits?.perService || 20}</strong>
+                        </div>
                         <input
-                          type="range" min={1} max={50} step={1}
+                          type="range"
+                          min={1}
+                          max={50}
+                          step={1}
                           value={config.limits?.perService || 20}
                           onChange={(e) => updateLimits({ perService: Number(e.target.value) })}
                           style={{ width: '100%' }}
                         />
                       </div>
                       <div>
-                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>Per addon: <strong>{config.limits?.perAddon || 10}</strong></div>
+                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>
+                          Per addon: <strong>{config.limits?.perAddon || 10}</strong>
+                        </div>
                         <input
-                          type="range" min={1} max={30} step={1}
+                          type="range"
+                          min={1}
+                          max={30}
+                          step={1}
                           value={config.limits?.perAddon || 10}
                           onChange={(e) => updateLimits({ perAddon: Number(e.target.value) })}
                           style={{ width: '100%' }}
@@ -876,11 +943,17 @@ function StreamingTabContent({
                         <select
                           value={config.deduplication?.mode || 'Per Service'}
                           onChange={(e) =>
-                            updateDedup({ mode: e.target.value as 'Single Result' | 'Per Service' | 'Per Addon' })
+                            updateDedup({
+                              mode: e.target.value as 'Single Result' | 'Per Service' | 'Per Addon',
+                            })
                           }
                           style={{
-                            padding: '4px 8px', borderRadius: 4, border: '1px solid #444',
-                            background: '#222', color: '#ccc', fontSize: 13,
+                            padding: '4px 8px',
+                            borderRadius: 4,
+                            border: '1px solid #444',
+                            background: '#222',
+                            color: '#ccc',
+                            fontSize: 13,
                           }}
                         >
                           <option value="Single Result">Single Result</option>
@@ -890,23 +963,33 @@ function StreamingTabContent({
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {(() => {
-                          const det = config.deduplication?.detection || { filename: true, infoHash: true, smartDetect: true }
+                          const det = config.deduplication?.detection || {
+                            filename: true,
+                            infoHash: true,
+                            smartDetect: true,
+                          }
                           return (
                             <>
                               <ToggleRow
                                 label="Filename matching"
                                 checked={det.filename}
-                                onChange={(v) => updateDedup({ detection: { ...det, filename: v } })}
+                                onChange={(v) =>
+                                  updateDedup({ detection: { ...det, filename: v } })
+                                }
                               />
                               <ToggleRow
                                 label="Info hash matching"
                                 checked={det.infoHash}
-                                onChange={(v) => updateDedup({ detection: { ...det, infoHash: v } })}
+                                onChange={(v) =>
+                                  updateDedup({ detection: { ...det, infoHash: v } })
+                                }
                               />
                               <ToggleRow
                                 label="Smart detect"
                                 checked={det.smartDetect}
-                                onChange={(v) => updateDedup({ detection: { ...det, smartDetect: v } })}
+                                onChange={(v) =>
+                                  updateDedup({ detection: { ...det, smartDetect: v } })
+                                }
                               />
                             </>
                           )
@@ -921,7 +1004,17 @@ function StreamingTabContent({
         ],
       },
     ],
-    [streamSettings, platform, config, loading, save, updateFilters, updateLimits, updateDedup, updateSortingConfig]
+    [
+      streamSettings,
+      platform,
+      config,
+      loading,
+      save,
+      updateFilters,
+      updateLimits,
+      updateDedup,
+      updateSortingConfig,
+    ]
   )
 
   return (
@@ -1012,15 +1105,19 @@ function DownloadsTabContent({
             onChange: handleQualityChange,
             disabled: !enabled,
           },
-          ...(isMobile ? [{
-            id: 'downloads-wifi-only',
-            kind: 'toggle' as const,
-            label: 'Wi-Fi only',
-            description: 'Only download when connected to Wi-Fi.',
-            checked: wifiOnly,
-            onChange: handleWifiOnlyChange,
-            disabled: !enabled,
-          }] : []),
+          ...(isMobile
+            ? [
+                {
+                  id: 'downloads-wifi-only',
+                  kind: 'toggle' as const,
+                  label: 'Wi-Fi only',
+                  description: 'Only download when connected to Wi-Fi.',
+                  checked: wifiOnly,
+                  onChange: handleWifiOnlyChange,
+                  disabled: !enabled,
+                },
+              ]
+            : []),
         ],
       },
     ],

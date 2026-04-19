@@ -1,6 +1,6 @@
 import { ArrowLeft, Bookmark, BookmarkCheck, CheckCircle, Circle, Download, Globe, HardDrive, Info, Play, RefreshCw, Users, Volume2, Zap } from 'lucide-react'
 import { useState } from 'react'
-import { LoadErrorState, LoadingSpinner } from '../../components'
+import { LoadErrorState } from '../../components'
 import { TvActionStrip, TvDialog, TvFocusItem, TvFocusScope, TvFocusZone, TvShelf } from '../../components/tv'
 import { sanitizeImgSrc } from '../../lib/url'
 import type { DetailsEpisodeItem, DetailsScreenModel, DetailsStreamItem } from './Details.model'
@@ -286,9 +286,34 @@ export function StreamingDetailsTvView({ model }: { model: DetailsScreenModel })
 
   if (model.status === 'loading') {
     return (
-      <div className={styles.fullscreen}>
-        <div className={styles.centerState}>
-          <LoadingSpinner size="lg" />
+      <div className="h-screen bg-black flex overflow-hidden animate-pulse">
+        {/* Left panel: poster + meta */}
+        <div className="flex-none w-72 flex flex-col gap-5 p-10">
+          <div className="aspect-[2/3] rounded-xl bg-white/[0.06]" />
+          <div className="flex flex-col gap-3">
+            <div className="h-4 w-20 rounded bg-white/[0.05]" />
+            <div className="h-8 w-48 rounded-lg bg-white/[0.08]" />
+            <div className="flex gap-2 flex-wrap">
+              {[60, 50, 70].map((w, i) => (
+                <div key={i} className="h-5 rounded bg-white/[0.05]" style={{ width: w }} />
+              ))}
+            </div>
+            <div className="h-24 w-full rounded-lg bg-white/[0.04] mt-2" />
+          </div>
+        </div>
+        {/* Right panel: actions + stream list */}
+        <div className="flex-1 flex flex-col gap-6 p-10 pt-12">
+          <div className="flex gap-3">
+            <div className="h-12 w-32 rounded-xl bg-white/15" />
+            <div className="h-12 w-36 rounded-xl bg-white/[0.07]" />
+            <div className="h-12 w-36 rounded-xl bg-white/[0.07]" />
+            <div className="h-12 w-12 rounded-xl bg-white/[0.05]" />
+          </div>
+          <div className="flex flex-col gap-3 mt-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-14 rounded-xl bg-white/[0.05] border border-white/[0.02]" />
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -492,7 +517,7 @@ export function StreamingDetailsTvView({ model }: { model: DetailsScreenModel })
               model.isLoadingStreams && !hasStreams
                 ? (
                     <div className={styles.streamsLoading}>
-                      <LoadingSpinner size="sm" />
+                      <div className="w-5 h-5 rounded-full border-2 border-white/10 border-t-white/70 animate-spin shrink-0" />
                       <span>Searching sources…</span>
                     </div>
                   )

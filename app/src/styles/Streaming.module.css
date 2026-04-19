@@ -567,7 +567,7 @@
   height: 100% !important;
   object-fit: cover !important;
   object-position: center center !important;
-  animation: ambientZoom 60s linear forwards;
+  animation: ambientZoom 30s ease-in-out alternate infinite;
   will-change: transform;
 }
 
@@ -585,7 +585,7 @@
     transform: scale(1);
   }
   100% {
-    transform: scale(1.1);
+    transform: scale(1.04);
   }
 }
 

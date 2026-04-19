@@ -1,101 +1,27 @@
-import styles from '../../styles/Streaming.module.css'
-
 export function SkeletonDetails() {
   return (
-    <div className={styles.detailsContainer}>
-      <div className={styles.pageAmbientBackground} style={{ background: 'rgba(20, 20, 20, 0.3)' }} />
-      
-      <div className={styles.detailsContent}>
-        {/* Skeleton Poster */}
-        <div className={styles.detailsPoster} style={{ background: 'rgba(255, 255, 255, 0.05)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ aspectRatio: '2/3', position: 'relative', overflow: 'hidden' }}>
-            <div className={styles.skeletonShimmer} />
-          </div>
+    <div className="flex gap-8 p-6 animate-pulse">
+      {/* Poster */}
+      <div className="hidden md:block flex-none w-[220px]">
+        <div className="aspect-[2/3] rounded-xl bg-white/[0.06]" />
+      </div>
+      {/* Info */}
+      <div className="flex-1 flex flex-col gap-4 pt-4">
+        <div className="h-10 w-3/4 rounded-lg bg-white/[0.08]" />
+        <div className="flex gap-3">
+          {([80, 60, 70] as const).map((w, i) => (
+            <div key={i} className="h-6 rounded bg-white/[0.05]" style={{ width: w }} />
+          ))}
         </div>
-
-        {/* Skeleton Info */}
-        <div className={styles.detailsInfo}>
-          {/* Title skeleton */}
-          <div style={{ 
-            width: '70%', 
-            height: '48px', 
-            background: 'rgba(255, 255, 255, 0.08)', 
-            borderRadius: '8px', 
-            marginBottom: '16px',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <div className={styles.skeletonShimmer} />
-          </div>
-
-          {/* Meta row skeleton */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-            {[80, 60, 70].map((w, i) => (
-              <div key={i} style={{ 
-                width: `${w}px`, 
-                height: '28px', 
-                background: 'rgba(255, 255, 255, 0.05)', 
-                borderRadius: '4px',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                <div className={styles.skeletonShimmer} />
-              </div>
-            ))}
-          </div>
-
-          {/* Actions skeleton */}
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '40px' }}>
-            <div style={{ 
-              width: '120px', 
-              height: '44px', 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              borderRadius: '8px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div className={styles.skeletonShimmer} />
-            </div>
-            <div style={{ 
-              width: '140px', 
-              height: '44px', 
-              background: 'rgba(255, 255, 255, 0.05)', 
-              borderRadius: '8px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div className={styles.skeletonShimmer} />
-            </div>
-          </div>
-
-          {/* Description skeleton */}
-          <div style={{ 
-            width: '100%', 
-            height: '80px', 
-            background: 'rgba(255, 255, 255, 0.05)', 
-            borderRadius: '6px', 
-            marginBottom: '30px',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <div className={styles.skeletonShimmer} />
-          </div>
-
-          {/* Episodes list skeleton */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} style={{ 
-                width: '100%', 
-                height: '64px', 
-                background: 'rgba(255, 255, 255, 0.03)', 
-                borderRadius: '8px',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                <div className={styles.skeletonShimmer} />
-              </div>
-            ))}
-          </div>
+        <div className="flex gap-4 mt-2">
+          <div className="h-11 w-32 rounded-lg bg-white/15" />
+          <div className="h-11 w-36 rounded-lg bg-white/[0.07]" />
+        </div>
+        <div className="h-20 w-full rounded-lg bg-white/[0.05] mt-4" />
+        <div className="flex flex-col gap-2 mt-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-16 w-full rounded-lg bg-white/[0.03]" />
+          ))}
         </div>
       </div>
     </div>

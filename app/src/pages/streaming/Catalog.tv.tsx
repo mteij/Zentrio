@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import { Check, Clapperboard, Film, Star, Tv } from 'lucide-react'
-import { LoadErrorState, LoadingSpinner } from '../../components'
+import { LoadErrorState } from '../../components'
 import { TvActionStrip, TvFocusItem, TvGrid, TvSection, TvShelf } from '../../components/tv'
 import { sanitizeImgSrc } from '../../lib/url'
 import type { MetaPreview } from '../../services/addons/types'
@@ -81,8 +81,29 @@ export function StreamingCatalogTvView({ model }: { model: CatalogScreenModel })
 
   if (model.status === 'loading') {
     return (
-      <div className="h-screen flex items-center justify-center bg-black">
-        <LoadingSpinner size="lg" />
+      <div className="h-screen bg-black flex flex-col overflow-hidden animate-pulse">
+        {/* Hero block */}
+        <div className="relative flex-none h-[45vh]">
+          <div className="absolute inset-0 bg-white/[0.03]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+          <div className="absolute bottom-10 left-20 flex flex-col gap-3">
+            <div className="h-4 w-24 rounded-full bg-white/[0.06]" />
+            <div className="h-10 w-80 rounded-lg bg-white/[0.08]" />
+            <div className="h-14 w-[480px] rounded-lg bg-white/[0.05]" />
+            <div className="flex gap-4 mt-2">
+              <div className="h-12 w-40 rounded-xl bg-white/15" />
+            </div>
+          </div>
+        </div>
+        {/* Grid rows */}
+        <div className="px-20 pt-8 flex flex-col gap-6">
+          <div className="h-6 w-48 rounded bg-white/[0.06]" />
+          <div className="grid grid-cols-5 gap-4">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="aspect-[2/3] rounded-xl bg-white/[0.05]" />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }

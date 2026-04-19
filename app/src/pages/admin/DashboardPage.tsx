@@ -297,25 +297,25 @@ export function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: () => adminApi.getStats(),
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
   })
 
   const { data: activity, isLoading: activityLoading } = useQuery({
     queryKey: ['admin-activity'],
     queryFn: () => adminApi.getLiveActivity(),
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
   })
 
   const { data: charts, isLoading: chartsLoading } = useQuery({
     queryKey: ['admin-charts', timeRange],
     queryFn: () => adminApi.getDashboardCharts(timeRange),
-    refetchInterval: 60_000,
+    refetchInterval: 300_000,
   })
 
   const { data: platformStats, isLoading: platformLoading } = useQuery({
     queryKey: ['admin-platform-stats', timeRange],
     queryFn: () => adminApi.getPlatformStats(timeRange),
-    refetchInterval: 60_000,
+    refetchInterval: 300_000,
   })
 
   const refresh = () => {

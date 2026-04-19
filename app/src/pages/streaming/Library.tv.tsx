@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Check, Globe, Library as LibraryIcon, Lock, User, UserPlus } from 'lucide-react'
-import { LoadErrorState, LoadingSpinner } from '../../components'
+import { LoadErrorState } from '../../components'
 import { TvFocusItem, TvGrid, TvSection, TvShelf } from '../../components/tv'
 import { scrollTvPageTop } from '../../components/tv/scrollTvPageTop'
 import type { ProfileSharedList, SharedList } from '../../components/library/LibrarySidebar'
@@ -113,8 +113,23 @@ function LibraryActionButton({
 export function StreamingLibraryTvView({ model }: { model: LibraryScreenModel }) {
   if (model.status === 'loading') {
     return (
-      <div className="h-screen flex items-center justify-center bg-black">
-        <LoadingSpinner size="lg" />
+      <div className="h-screen bg-black flex overflow-hidden animate-pulse">
+        {/* List sidebar */}
+        <div className="flex flex-col gap-3 px-8 pt-16 w-72 shrink-0 border-r border-white/[0.04]">
+          <div className="h-3 w-20 rounded-full bg-white/10 mb-2" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-14 w-full rounded-xl bg-white/[0.04]" />
+          ))}
+        </div>
+        {/* Content area */}
+        <div className="flex-1 px-10 pt-16 flex flex-col gap-6">
+          <div className="h-7 w-48 rounded-lg bg-white/[0.06]" />
+          <div className="grid grid-cols-5 gap-4">
+            {Array.from({ length: 15 }).map((_, i) => (
+              <div key={i} className="aspect-[2/3] rounded-xl bg-white/[0.05]" />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -132,7 +147,11 @@ export function StreamingLibraryTvView({ model }: { model: LibraryScreenModel })
   const lists = [...model.myLists, ...model.sharedLists]
   const hasLists = lists.length > 0
   const hasActions = model.pendingInvites.length > 0 || model.availableFromOtherProfiles.length > 0
-  const initialZoneId = hasLists ? 'library-lists' : hasActions ? 'library-actions' : 'library-items'
+  const initialZoneId = hasLists
+    ? 'library-lists'
+    : hasActions
+      ? 'library-actions'
+      : 'library-items'
   const itemsNextUp = hasActions ? 'library-actions' : hasLists ? 'library-lists' : undefined
 
   return (
@@ -180,7 +199,11 @@ export function StreamingLibraryTvView({ model }: { model: LibraryScreenModel })
                 index={index}
                 icon={<Check size={16} />}
                 title={invite.listName}
-                meta={invite.sharedByName ? `Accept invite from ${invite.sharedByName}` : 'Accept shared invite'}
+                meta={
+                  invite.sharedByName
+                    ? `Accept invite from ${invite.sharedByName}`
+                    : 'Accept shared invite'
+                }
                 accent
                 onActivate={() => void model.actions.acceptInvite(invite)}
               />
@@ -200,7 +223,10 @@ export function StreamingLibraryTvView({ model }: { model: LibraryScreenModel })
         </TvSection>
       ) : null}
 
-      <TvSection title={model.activeList?.name || 'Saved titles'} subtitle={getItemCountLabel(model.items.length)}>
+      <TvSection
+        title={model.activeList?.name || 'Saved titles'}
+        subtitle={getItemCountLabel(model.items.length)}
+      >
         {model.items.length > 0 ? (
           <TvGrid zoneId="library-items" columns={4} nextLeft="streaming-rail" nextUp={itemsNextUp}>
             {model.items.map((item, index) => (
@@ -213,7 +239,11 @@ export function StreamingLibraryTvView({ model }: { model: LibraryScreenModel })
               >
                 <div
                   className={styles.mediaPoster}
-                  style={{ backgroundImage: item.poster ? `url(${sanitizeImgSrc(item.poster)})` : undefined }}
+                  style={{
+                    backgroundImage: item.poster
+                      ? `url(${sanitizeImgSrc(item.poster)})`
+                      : undefined,
+                  }}
                 />
                 <div className={styles.mediaBody}>
                   <p className={styles.mediaTitle}>{item.title}</p>

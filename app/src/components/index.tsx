@@ -19,6 +19,7 @@ export { SkeletonPlayer } from './ui/SkeletonPlayer'
 export { SkeletonStreamList } from './ui/SkeletonStreamList'
 export { SkeletonProfile } from './ui/SkeletonProfile'
 export { SkeletonAddonCard } from './ui/SkeletonAddonCard'
+export { SkeletonTvHome } from './ui/SkeletonTvHome'
 export { LoadErrorState } from './ui/LoadErrorState'
 
 // Layout Components

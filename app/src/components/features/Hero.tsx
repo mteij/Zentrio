@@ -65,6 +65,7 @@ export const Hero = memo(function Hero({ items, profileId, showTrending = false,
     }
 
     const interval = setInterval(() => {
+      if (document.hidden) return
       rotateTriggerRef.current = true
       setFeaturedIndex(prev => getRandomIndex(prev, items.length))
     }, 60000) // 1 minute

@@ -144,7 +144,10 @@ export const SETTINGS_TAB_DEFINITIONS: SettingsTabDefinition[] = [
   { key: 'danger', label: 'Danger Zone', icon: AlertTriangle, hiddenInGuest: true },
 ]
 
-export function getVisibleSettingsTabs(isGuestMode: boolean, isTauri: boolean): SettingsTabDefinition[] {
+export function getVisibleSettingsTabs(
+  isGuestMode: boolean,
+  isTauri: boolean
+): SettingsTabDefinition[] {
   return SETTINGS_TAB_DEFINITIONS.filter((tab) => {
     if (isGuestMode && tab.hiddenInGuest) return false
     if (tab.requiresNativeShell && !isTauri) return false

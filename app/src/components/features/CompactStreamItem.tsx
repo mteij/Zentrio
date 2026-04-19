@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Zap, HardDrive, Users, Volume2, Info, X, Globe, Download } from 'lucide-react'
 import { FlatStream } from '../../hooks/useStreamLoader'
@@ -238,7 +238,7 @@ function InfoOverlay({ item, onClose }: { item: FlatStream; onClose: () => void 
  * Compact Stream Item - Streamlined tags
  * Shows: Cached, Resolution, Source, HDR/DV, Size, Languages, Info button
  */
-export function CompactStreamItem({ item, onClick, index: _index, showAddonName = false, mode = 'simple', onDownload }: CompactStreamItemProps) {
+export const CompactStreamItem = memo(function CompactStreamItem({ item, onClick, index: _index, showAddonName = false, mode = 'simple', onDownload }: CompactStreamItemProps) {
   const [showInfoOverlay, setShowInfoOverlay] = useState(false)
   const { addon, parsed } = item
   
@@ -480,4 +480,4 @@ export function CompactStreamItem({ item, onClick, index: _index, showAddonName 
       {showInfoOverlay && <InfoOverlay item={item} onClose={() => setShowInfoOverlay(false)} />}
     </>
   )
-}
+})

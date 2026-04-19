@@ -1,5 +1,5 @@
 import { Check, Edit, LogIn, LogOut, Plus, Settings, Shield } from 'lucide-react'
-import { ConfirmDialog, LoadingSpinner } from '../components'
+import { ConfirmDialog } from '../components'
 import { ProfileModal } from '../components/features/ProfileModal'
 import { TvActionStrip, TvFocusItem, TvFocusScope, TvFocusZone } from '../components/tv'
 import { buildAvatarUrl, sanitizeImgSrc } from '../lib/url'
@@ -26,10 +26,18 @@ function TvProfileCard({
   onActivate: () => void
 }) {
   return (
-    <TvFocusItem id={id} index={index} className={styles.profileCard} onActivate={onActivate} aria-label={profile.name}>
+    <TvFocusItem
+      id={id}
+      index={index}
+      className={styles.profileCard}
+      onActivate={onActivate}
+      aria-label={profile.name}
+    >
       <div className={styles.profileAvatar}>
         <img
-          src={sanitizeImgSrc(buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral'))}
+          src={sanitizeImgSrc(
+            buildAvatarUrl(profile.avatar, profile.avatar_style || 'bottts-neutral')
+          )}
           alt={profile.name}
         />
       </div>
@@ -71,8 +79,21 @@ function TvActionButton({
 export function ProfilesPageTvView({ model }: { model: ProfilesScreenModel }) {
   if (model.loading) {
     return (
-      <div className={styles.loadingState}>
-        <LoadingSpinner size="lg" />
+      <div className={styles.scope}>
+        <div className={styles.page}>
+          <div className={styles.hero}>
+            <div className="h-3 w-32 rounded-full bg-white/10 animate-pulse" />
+            <div className="h-10 w-64 rounded-lg bg-white/[0.07] animate-pulse mt-2" />
+          </div>
+          <div className={styles.grid} style={{ ['--profiles-grid-columns' as string]: 4 }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className={styles.profileCard} style={{ pointerEvents: 'none' }}>
+                <div className="w-[124px] h-[124px] rounded-full bg-white/[0.06] animate-pulse" />
+                <div className="h-4 w-24 rounded bg-white/[0.05] animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -91,7 +112,9 @@ export function ProfilesPageTvView({ model }: { model: ProfilesScreenModel }) {
       <main className={styles.page}>
         <section className={styles.hero}>
           <p className={styles.eyebrow}>{model.editMode ? 'Manage Profiles' : 'Profiles'}</p>
-          <h1 className={styles.title}>{model.editMode ? 'Choose a profile to edit' : "Who's Watching?"}</h1>
+          <h1 className={styles.title}>
+            {model.editMode ? 'Choose a profile to edit' : "Who's Watching?"}
+          </h1>
         </section>
 
         <TvFocusZone
@@ -100,7 +123,10 @@ export function ProfilesPageTvView({ model }: { model: ProfilesScreenModel }) {
           columns={gridColumns}
           nextDown="profiles-actions"
         >
-          <div className={styles.grid} style={{ ['--profiles-grid-columns' as string]: String(gridColumns) }}>
+          <div
+            className={styles.grid}
+            style={{ ['--profiles-grid-columns' as string]: String(gridColumns) }}
+          >
             {model.profiles.map((profile, index) => (
               <TvProfileCard
                 key={profile.id}
@@ -180,9 +206,11 @@ export function ProfilesPageTvView({ model }: { model: ProfilesScreenModel }) {
         onClose={model.actions.closeLogoutConfirm}
         onConfirm={model.actions.confirmLogout}
         title={model.isGuestMode ? 'Exit Local Mode' : 'Logout'}
-        message={model.isGuestMode
-          ? 'Exit local mode and return to the server selection screen? Your local data will be preserved.'
-          : 'Are you sure you want to logout?'}
+        message={
+          model.isGuestMode
+            ? 'Exit local mode and return to the server selection screen? Your local data will be preserved.'
+            : 'Are you sure you want to logout?'
+        }
         confirmText={model.isGuestMode ? 'Exit' : 'Logout'}
         cancelText="Cancel"
         variant="danger"

@@ -1,34 +1,15 @@
-import styles from '../../styles/Streaming.module.css'
-
 export function SkeletonHero() {
   return (
-    <div className={styles.heroSection}>
-      <div className={styles.heroBackdrop}>
-        <div className={styles.skeletonHeroImage}>
-          <div className={styles.skeletonShimmer} />
-        </div>
-      </div>
-      <div className={styles.heroOverlay} />
-      <div className={styles.heroContent}>
-        <div className={styles.heroInfo}>
-          {/* Skeleton chip */}
-          <div className={styles.skeletonChip}>
-            <div className={styles.skeletonShimmer} />
-          </div>
-          {/* Skeleton title */}
-          <div className={styles.skeletonHeroTitle}>
-            <div className={styles.skeletonShimmer} />
-          </div>
-          {/* Skeleton description */}
-          <div className={styles.skeletonDescription}>
-            <div className={styles.skeletonShimmer} />
-          </div>
-          {/* Skeleton buttons */}
-          <div className={styles.heroActions}>
-            <div className={styles.skeletonButton}>
-              <div className={styles.skeletonShimmer} />
-            </div>
-          </div>
+    <div className="relative w-full h-[520px] md:h-[600px] overflow-hidden animate-pulse">
+      <div className="absolute inset-0 bg-white/[0.03]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      <div className="absolute bottom-10 left-8 md:left-16 flex flex-col gap-3">
+        <div className="h-4 w-28 rounded-full bg-white/10" />
+        <div className="h-10 w-64 md:w-80 rounded-lg bg-white/[0.08]" />
+        <div className="h-16 w-80 md:w-[480px] rounded-lg bg-white/[0.05]" />
+        <div className="flex gap-3 mt-2">
+          <div className="h-11 w-32 rounded-lg bg-white/15" />
+          <div className="h-11 w-28 rounded-lg bg-white/[0.07]" />
         </div>
       </div>
     </div>

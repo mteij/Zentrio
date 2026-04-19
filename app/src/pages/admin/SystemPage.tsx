@@ -63,7 +63,7 @@ export function SystemPage() {
   const { data: health, isLoading, error } = useQuery<AdminSystemHealth>({
     queryKey: ['admin-system-health'],
     queryFn: () => adminApi.getSystemHealth(),
-    refetchInterval: 15_000, // Refresh every 15s instead of 30s for more "live" feel
+    refetchInterval: 60_000, // Refresh every 60s
   })
 
   return (

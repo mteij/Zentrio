@@ -1,6 +1,6 @@
 import { Info, Play } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LoadErrorState, LoadingSpinner } from '../../components'
+import { LoadErrorState, SkeletonTvHome } from '../../components'
 import { TvActionStrip, TvFocusItem, TvMediaShelf } from '../../components/tv'
 import { scrollTvPageTop } from '../../components/tv/scrollTvPageTop'
 import { fetchCatalogItems } from '../../lib/catalog-items'
@@ -11,11 +11,7 @@ import styles from './Home.tv.module.css'
 
 export function StreamingHomeTvView({ model }: { model: HomeScreenModel }) {
   if (model.status === 'loading') {
-    return (
-      <div className="h-screen flex items-center justify-center bg-black">
-        <LoadingSpinner size="lg" />
-      </div>
-    )
+    return <SkeletonTvHome />
   }
 
   if (model.status === 'error') {
