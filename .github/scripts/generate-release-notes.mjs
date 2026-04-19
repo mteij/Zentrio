@@ -1061,10 +1061,10 @@ async function getContributors(rangeSpec, repoUrl) {
   return contributors;
 }
 
-async function generateWithNanoGPT(prompt, apiKey) {
-  const endpoint = 'https://nano-gpt.com/api/v1/chat/completions';
+async function generateWithGemini(prompt, apiKey) {
+  const endpoint = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
   const body = {
-    model: 'zai-org/glm-5:thinking',
+    model: 'gemini-2.5-pro-preview',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.15,
     max_tokens: 4096,
@@ -1081,13 +1081,13 @@ async function generateWithNanoGPT(prompt, apiKey) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`NanoGPT API error ${res.status}: ${text}`);
+    throw new Error(`Gemini API error ${res.status}: ${text}`);
   }
 
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content || '';
   if (!text) {
-    throw new Error('NanoGPT returned empty content');
+    throw new Error('Gemini returned empty content');
   }
   return text.trim();
 }
@@ -1306,7 +1306,7 @@ async function generateStructuredAiNotes(prompt, apiKey, retries = 5) {
 
   for (let attempt = 1; attempt <= retries; attempt += 1) {
     try {
-      const raw = await generateWithNanoGPT(prompt, apiKey);
+      const raw = await generateWithGemini(prompt, apiKey);
       const notes = normalizeAiNotesPayload(raw);
       validateAiNotesPayload(notes);
       return notes;
@@ -1792,7 +1792,7 @@ async function main() {
   };
 
   let content = fallbackNotes;
-  const apiKey = process.env.NANOGPT_API_KEY || '';
+  const apiKey = process.env.GEMINI_API_KEY || '';
   if (apiKey) {
     try {
       const aiPrompt = buildStructuredAIPrompt({
@@ -1816,7 +1816,7 @@ async function main() {
       throw error;
     }
   } else {
-    throw new Error('NANOGPT_API_KEY is required to generate AI release notes');
+    throw new Error('GEMINI_API_KEY is required to generate AI release notes');
   }
 
   const notes = renderReleaseNotes({

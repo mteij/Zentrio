@@ -80,7 +80,7 @@ jobs:
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NANOGPT_API_KEY: ${{ secrets.NANOGPT_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
 
