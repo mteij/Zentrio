@@ -53,7 +53,7 @@ export function useExploreScreenModel(): ExploreScreenModel {
   const { profileId } = useParams<{ profileId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
+  const { showImdbRatings, showAgeRatings } = useAppearanceSettings(profileId)
   const [viewMode, setViewMode] = useState<'all' | 'movie' | 'series'>('all')
   const activeGenre = searchParams.get('genre')
   const activeType = searchParams.get('type')

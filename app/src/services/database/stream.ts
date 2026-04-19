@@ -24,6 +24,7 @@ export const streamDb = {
         cache: { cached: true, uncached: true, applyMode: 'OR' },
         resolution: { preferred: ['4k', '1080p', '720p'], required: [], excluded: [] },
         encode: { preferred: [], required: [], excluded: [] },
+        sourceType: { preferred: [], required: [], excluded: [] },
         streamType: { preferred: [], required: [], excluded: [] },
         visualTag: { preferred: [], required: [], excluded: [] },
         audioTag: { preferred: [], required: [], excluded: [] },

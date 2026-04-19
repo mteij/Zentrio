@@ -178,7 +178,7 @@ describe('AuthStore', () => {
 
   describe('session expiry detection', () => {
     it('should detect expired session (within 5 min of expiry)', () => {
-      const expiredSession: Session = {
+      const expiredSession: MockSession = {
         user: mockUser,
         expiresAt: new Date(Date.now() - 1), // expired 1ms ago
         token: 'expired-token',
@@ -198,7 +198,7 @@ describe('AuthStore', () => {
     })
 
     it('should consider session valid if not within 5 min of expiry', () => {
-      const validSession: Session = {
+      const validSession: MockSession = {
         user: mockUser,
         expiresAt: new Date(Date.now() + SESSION_DURATION_MS), // 24 hours from now
         token: 'valid-token',
@@ -251,7 +251,7 @@ describe('AuthStore', () => {
     })
 
     it('should handle missing token gracefully when user is present', () => {
-      const sessionWithoutToken: Session = {
+      const sessionWithoutToken: MockSession = {
         user: mockUser,
         expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
       }

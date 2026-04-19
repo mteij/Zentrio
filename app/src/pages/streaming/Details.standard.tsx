@@ -50,7 +50,7 @@ export function StreamingDetailsStandardView(_props: { model: import('./Details.
   const { profileId, type, id } = useParams<{ profileId: string, type: string, id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
+  const { showImdbRatings, showAgeRatings } = useAppearanceSettings(profileId)
   const streamDisplaySettings = useStreamDisplaySettings(profileId)
   const downloadStore = useDownloadStore()
   const { isAvailable: canDownload } = useOfflineDownloadCapability(profileId)

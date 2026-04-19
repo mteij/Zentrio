@@ -54,7 +54,7 @@ export interface CatalogScreenModel {
 export function useCatalogScreenModel(): CatalogScreenModel {
   const { profileId, manifestUrl, type, id } = useParams<{ profileId: string; manifestUrl: string; type: string; id: string }>()
   const navigate = useNavigate()
-  const { showImdbRatings, showAgeRatings } = useAppearanceSettings()
+  const { showImdbRatings, showAgeRatings } = useAppearanceSettings(profileId)
 
   const {
     data,

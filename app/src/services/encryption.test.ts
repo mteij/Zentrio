@@ -34,7 +34,7 @@ describe('Encryption Service', () => {
       const plaintext = ''
       const encrypted = encrypt(plaintext)
       expect(encrypted).toBeTruthy()
-      expect(encrypted.startsWith('v1:')).toBe(true)
+      expect(encrypted.startsWith('v2:')).toBe(true)
     })
 
     it('should handle special characters', () => {
@@ -63,15 +63,16 @@ describe('Encryption Service', () => {
   })
 
   describe('ciphertext format', () => {
-    it('should produce iv:tag:ciphertext format with version prefix', () => {
+    it('should produce iv:salt:tag:ciphertext format with version prefix', () => {
       const encrypted = encrypt('test')
       const withoutVersion = encrypted.slice(3)
       const parts = withoutVersion.split(':')
 
-      expect(parts).toHaveLength(3)
-      expect(parts[0]).toHaveLength(32) // 16 bytes = 32 hex chars
-      expect(parts[1]).toHaveLength(32) // 16 bytes = 32 hex chars (auth tag)
-      expect(parts[2].length).toBeGreaterThan(0) // ciphertext
+      expect(parts).toHaveLength(4)
+      expect(parts[0]).toHaveLength(32) // 16 bytes = 32 hex chars (iv)
+      expect(parts[1]).toHaveLength(32) // 16 bytes = 32 hex chars (salt)
+      expect(parts[2]).toHaveLength(32) // 16 bytes = 32 hex chars (auth tag)
+      expect(parts[3].length).toBeGreaterThan(0) // ciphertext
     })
 
     it('should reject malformed ciphertext', () => {
@@ -93,7 +94,7 @@ describe('Encryption Service', () => {
   describe('versioned envelope', () => {
     it('should have version prefix', () => {
       const encrypted = encrypt('test')
-      expect(encrypted.startsWith('v1:')).toBe(true)
+      expect(encrypted.startsWith('v2:')).toBe(true)
     })
 
     it('should be decryptable with version prefix', () => {

@@ -100,7 +100,7 @@ export function useHomeScreenModel(): HomeScreenModel {
   const { profileId } = useParams<{ profileId: string }>()
   const navigate = useNavigate()
   const { startAutoPlay } = useAutoPlay()
-  const { showAgeRatings } = useAppearanceSettings()
+  const { showAgeRatings } = useAppearanceSettings(profileId)
   const { data, isLoading, isFetching, error, refetch } = useStreamingDashboard(profileId)
 
   useEffect(() => {

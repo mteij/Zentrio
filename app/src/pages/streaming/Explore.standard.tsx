@@ -21,7 +21,7 @@ import type { ExploreScreenModel } from './Explore.model'
 import styles from '../../styles/Streaming.module.css'
 
 const GenreShortcutRow = memo(
-  ({ genres, onSelect }: { genres: string[]; onSelect: (genre: string) => void }) => {
+  function GenreShortcutRowInner({ genres, onSelect }: { genres: string[]; onSelect: (genre: string) => void }) {
     const containerRef = useRef<HTMLDivElement>(null)
     const [showLeftArrow, setShowLeftArrow] = useState(false)
     const [showRightArrow, setShowRightArrow] = useState(false)

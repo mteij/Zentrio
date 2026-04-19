@@ -101,7 +101,7 @@ beforeEach(() => {
   apiFetchMock.mockResolvedValue({
     ok: true,
     json: async () => ({ data: {} }),
-  })
+  } as unknown as Response)
 })
 
 afterEach(() => {
@@ -121,7 +121,7 @@ describe('SettingsTabContent (streaming tab)', () => {
 
     expect(view.container.textContent).toContain('Playback')
     expect(view.container.textContent).toContain('Stream Display')
-    expect(view.container.textContent).toContain('Sorting and Filtering')
+    expect(view.container.textContent).toContain('Advanced Filtering & Sorting')
     view.unmount()
   })
 
@@ -135,7 +135,7 @@ describe('SettingsTabContent (streaming tab)', () => {
 
     expect(view.container.textContent).toContain('Playback')
     expect(view.container.textContent).toContain('Stream Display')
-    expect(view.container.textContent).toContain('Sorting and Filtering')
+    expect(view.container.textContent).toContain('Advanced Filtering & Sorting')
     view.unmount()
   })
 

@@ -13,25 +13,20 @@ describe('envParser', () => {
     process.env = originalEnv
   })
 
-  it('should load default values in non-production', () => {
+  it('should throw error if secrets are missing in non-production', () => {
     process.env.NODE_ENV = 'development'
     delete process.env.AUTH_SECRET
     delete process.env.ENCRYPTION_KEY
-    
-    // We need to re-import to trigger initialization logic if it runs on module load
-    // But getConfig runs fresh every time it's called
-    const config = getConfig()
-    
-    expect(config.AUTH_SECRET).toBe('super-secret-key-change-in-production')
-    expect(config.ENCRYPTION_KEY).toBe('super-secret-key-change-in-production')
+
+    expect(() => getConfig()).toThrow('MISSING REQUIRED SECRET: AUTH_SECRET')
   })
 
-  it('should throw error in production if secrets are missing', () => {
+  it('should throw error if secrets are missing in production', () => {
     process.env.NODE_ENV = 'production'
     delete process.env.AUTH_SECRET
     delete process.env.ENCRYPTION_KEY
 
-    expect(() => getConfig()).toThrow('MISSING REQUIRED SECRET IN PRODUCTION: AUTH_SECRET')
+    expect(() => getConfig()).toThrow('MISSING REQUIRED SECRET: AUTH_SECRET')
   })
 
   it('should allow secrets in production if provided', () => {

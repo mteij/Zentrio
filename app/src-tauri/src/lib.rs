@@ -131,10 +131,19 @@ fn download_set_directory(app: tauri::AppHandle, path: String) -> Result<(), Str
 
     let lower = path.to_lowercase();
     let blocked = [
-        "/windows/", "\\windows\\", "/system32/", "\\system32\\",
-        "/etc/", "/usr/", "/bin/", "/sbin/",
-        "c:\\windows\\", "c:\\program files",
-        "/var/", "/proc/", "/dev/",
+        "/windows/",
+        "\\windows\\",
+        "/system32/",
+        "\\system32\\",
+        "/etc/",
+        "/usr/",
+        "/bin/",
+        "/sbin/",
+        "c:\\windows\\",
+        "c:\\program files",
+        "/var/",
+        "/proc/",
+        "/dev/",
     ];
     for prefix in &blocked {
         if lower.contains(prefix) {
