@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import authApiRoutes from './auth'
 import profileApiRoutes from './profiles'
@@ -85,7 +86,7 @@ app.openapi({
   // Determine if the caller is presenting a valid health token
   const authHeader = c.req.header('authorization') ?? ''
   const providedToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
-  const isAuthorized = !!HEALTH_TOKEN && providedToken === HEALTH_TOKEN
+  const isAuthorized = !!HEALTH_TOKEN && !!providedToken && timingSafeEqual(Buffer.from(providedToken), Buffer.from(HEALTH_TOKEN))
 
   // Public stats — always returned (safe for landing page / Docker healthcheck).
   // Aggregate counts are not sensitive; only system internals are token-gated.

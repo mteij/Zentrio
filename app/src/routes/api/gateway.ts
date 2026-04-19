@@ -1,4 +1,5 @@
 import { getConfig } from '../../services/envParser'
+import { isSafeExternalUrl, safeFetch, isLocalGatewayHost } from '../../lib/ssrf'
 import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
 
@@ -7,14 +8,6 @@ const log = logger.scope('API:Gateway')
 const gateway = createTaggedOpenAPIApp('Gateway')
 
 const REQUEST_TIMEOUT_MS = 30000
-
-const LOCAL_GATEWAY_HOSTS = new Set([
-  'localhost',
-  '127.0.0.1',
-  '::1',
-  '[::1]',
-  'tauri.localhost'
-])
 
 const FORWARDABLE_READ_PREFIXES = [
   '/api/streaming/dashboard',
@@ -26,8 +19,6 @@ const FORWARDABLE_READ_PREFIXES = [
   '/api/streaming/search-catalog-items'
 ]
 
-const isProductionEnv = () => (process.env.NODE_ENV || '').trim().toLowerCase() === 'production'
-
 const normalizeOrigin = (value?: string | null): string | null => {
   const raw = value?.trim()
   if (!raw) return null
@@ -37,21 +28,9 @@ const normalizeOrigin = (value?: string | null): string | null => {
       return null
     }
     return parsed.origin.replace(/\/$/, '')
-  } catch {
+  } catch (_e) {
     return null
   }
-}
-
-const isLocalGatewayHost = (hostHeader?: string | null): boolean => {
-  const host = (hostHeader || '').trim().toLowerCase()
-  if (!host) return !isProductionEnv()
-
-  // Strip port for host checks
-  const hostWithoutPort = host.startsWith('[')
-    ? host.replace(/:\d+$/, '')
-    : host.split(':')[0]
-
-  return LOCAL_GATEWAY_HOSTS.has(hostWithoutPort) || hostWithoutPort.endsWith('.localhost')
 }
 
 const resolveRemoteBase = (requestOverride?: string | null) => {
@@ -74,13 +53,23 @@ const gatewayProxyHandler = async (c: any) => {
     .replace(/^\/api\/gateway/, '')
     .replace(/^\/gateway/, '') || '/'
 
-  const allowed = FORWARDABLE_READ_PREFIXES.some((prefix) => targetPath.startsWith(prefix))
+  const remoteBase = resolveRemoteBase(c.req.query('__remote'))
+  if (remoteBase && !isSafeExternalUrl(remoteBase)) {
+    return c.json({ error: 'Remote URL not allowed' }, 403)
+  }
+  
+  let targetUrl: URL
+  try {
+    targetUrl = new URL(targetPath, remoteBase || 'http://localhost')
+  } catch (_e) {
+    return c.json({ error: 'Invalid proxy target URL' }, 400)
+  }
+
+  const normalizedPath = targetUrl.pathname
+  const allowed = FORWARDABLE_READ_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix))
   if (!allowed) {
     return c.json({ error: 'Route not allowed via gateway' }, 403)
   }
-
-  const remoteBase = resolveRemoteBase(c.req.query('__remote'))
-  const targetUrl = new URL(`${remoteBase}${targetPath}`)
 
   for (const [key, value] of Object.entries(c.req.query())) {
     if (key === '__remote') continue
@@ -92,6 +81,13 @@ const gatewayProxyHandler = async (c: any) => {
   const reqHeaders = new Headers(c.req.raw.headers)
   reqHeaders.delete('host')
   reqHeaders.delete('origin')
+  reqHeaders.delete('cookie')
+  reqHeaders.delete('authorization')
+  reqHeaders.delete('proxy-authorization')
+  reqHeaders.delete('x-forwarded-for')
+  reqHeaders.delete('x-forwarded-host')
+  reqHeaders.delete('x-forwarded-proto')
+  reqHeaders.delete('forwarded')
   reqHeaders.set('x-zentrio-gateway', '1')
 
   log.debug(`Forwarding ${c.req.method} ${targetUrl.toString()}`);
@@ -100,14 +96,14 @@ const gatewayProxyHandler = async (c: any) => {
   const init: RequestInit = {
     method: 'GET',
     headers: reqHeaders,
-    redirect: 'follow'
+    // Redirects handled manually by safeFetch to prevent SSRF bypass
   }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   try {
-    const upstream = await fetch(targetUrl.toString(), {
+    const upstream = await safeFetch(targetUrl.toString(), {
       ...init,
       signal: controller.signal
     })

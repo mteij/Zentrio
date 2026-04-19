@@ -92,8 +92,18 @@ export function UpdateSettings() {
           let tauriUpdateFound = false;
           try {
               const { check } = await import('@tauri-apps/plugin-updater');
+              log.info('[UPDATER-DEBUG] Calling tauri check()...');
               const update = await check();
               
+              log.info('[UPDATER-DEBUG] Tauri check() returned:', update ? `update v${update.version}` : 'null');
+              if (update) {
+                  log.info('[UPDATER-DEBUG] Update details:', {
+                      version: update.version,
+                      date: update.date,
+                      body: update.body?.substring(0, 100),
+                  });
+              }
+
               if (update) {
                   tauriUpdateFound = true;
                   setUpdateAvailable(true);
@@ -110,16 +120,20 @@ export function UpdateSettings() {
           } catch (updaterErr) {
               // Tauri updater failed (e.g. network error, 404 on latest.json).
               // Fall through to the GitHub API fallback below.
+              log.error('[UPDATER-DEBUG] Tauri updater failed:', updaterErr);
               log.warn('Tauri updater failed, falling back to GitHub API:', updaterErr);
           }
 
           if (!tauriUpdateFound) {
+              log.info('[UPDATER-DEBUG] No tauri update found, falling back to GitHub API');
               // Fallback: query GitHub API directly (supports pre-releases)
               const data = await fetchLatestRelease(isTauri);
               const latestVersion = data.tag_name.replace(/^v/, '');
+              log.info('[UPDATER-DEBUG] GitHub latest version:', latestVersion, 'current:', currentVersion);
               const hasUpdate = compareVersions(currentVersion, latestVersion);
 
               if (hasUpdate) {
+                  log.info('[UPDATER-DEBUG] GitHub update available:', latestVersion);
                   setUpdateAvailable(true);
                   setUpdateData({
                       version: latestVersion,

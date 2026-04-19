@@ -1,3 +1,4 @@
+import { isSafeExternalUrl, safeFetch } from '../../lib/ssrf'
 import { optionalSessionMiddleware, sessionMiddleware } from '../../middleware/session'
 import { addonManager } from '../../services/addons/addon-manager'
 import {
@@ -273,13 +274,11 @@ streaming.get('/subtitle-proxy', optionalSessionMiddleware, async (c) => {
     return c.text('Invalid url', 400)
   }
 
-  // isExternalUrl blocks private/loopback IPs and non-http(s) schemes (defined below)
-  if (!isExternalUrl(decoded)) return c.text('Forbidden', 403)
+  if (!isSafeExternalUrl(decoded)) return c.text('Forbidden', 403)
 
   try {
-    const res = await fetch(decoded, {
+    const res = await safeFetch(decoded, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
-      redirect: 'follow',
     })
     if (!res.ok) return c.text('Upstream error', 502)
 
@@ -290,50 +289,23 @@ streaming.get('/subtitle-proxy', optionalSessionMiddleware, async (c) => {
     return new Response(buf, {
       headers: {
         'Content-Type': contentType,
-        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=3600',
       },
     })
   } catch (e) {
+    if (e instanceof Error && (e.message === 'Redirect target not allowed' || e.message === 'Invalid redirect URL')) {
+      return c.text(e.message === 'Redirect target not allowed' ? 'Redirect target not allowed' : 'Invalid redirect URL', e.message === 'Redirect target not allowed' ? 403 : 400)
+    }
     log.error('Subtitle proxy error:', e)
     return c.text('Proxy fetch failed', 502)
   }
 })
 
-// SSRF guard reused from addon proxy — block loopback and private ranges
-const BLOCKED_HOSTS = [
-  /^localhost$/i,
-  /^127\./,
-  /^0\./,
-  /^::1$/,
-  /^10\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^fc00:/i,
-  /^fe80:/i,
-]
+streaming.get('/stream-range-proxy', optionalSessionMiddleware, async (c) => {
+  const user = c.get('user')
+  const isGuest = c.get('guestMode') as boolean
+  if (!user && !isGuest) return c.text('Unauthorized', 401)
 
-function isExternalUrl(urlStr: string): boolean {
-  try {
-    const { protocol, hostname } = new URL(urlStr)
-    if (!['https:', 'http:'].includes(protocol)) return false
-    if (!hostname || /^\d+$/.test(hostname)) return false
-    return !BLOCKED_HOSTS.some((p) => p.test(hostname))
-  } catch {
-    return false
-  }
-}
-
-/**
- * GET /api/streaming/stream-range-proxy?url=<encoded>
- *
- * Streams a ranged byte request for an external media URL through the server
- * so the browser never makes a direct cross-origin fetch (CORS bypass).
- * Forwards the client's Range header verbatim and streams the response body
- * without buffering, so it is safe for large (20 MB+) chunks.
- */
-streaming.get('/stream-range-proxy', async (c) => {
   const { url: encodedUrl } = c.req.query()
   if (!encodedUrl) return c.text('Missing url', 400)
 
@@ -345,7 +317,7 @@ streaming.get('/stream-range-proxy', async (c) => {
     return c.text('Invalid url', 400)
   }
 
-  if (!isExternalUrl(decoded)) return c.text('URL not allowed', 403)
+  if (!isSafeExternalUrl(decoded)) return c.text('URL not allowed', 403)
 
   const rangeHeader = c.req.header('range')
 
@@ -353,7 +325,8 @@ streaming.get('/stream-range-proxy', async (c) => {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 90_000)
 
-    const upstream = await fetch(decoded, {
+    // Response is streamed without buffering — no size limit needed
+    const upstream = await safeFetch(decoded, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Zentrio/1.0',
@@ -363,7 +336,6 @@ streaming.get('/stream-range-proxy', async (c) => {
     clearTimeout(timeout)
 
     const passthroughHeaders: Record<string, string> = {
-      'Access-Control-Allow-Origin': '*',
       'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges',
     }
     for (const name of ['content-type', 'content-range', 'content-length', 'accept-ranges']) {
@@ -371,7 +343,6 @@ streaming.get('/stream-range-proxy', async (c) => {
       if (val) passthroughHeaders[name] = val
     }
 
-    // Stream body directly — no buffering so 20 MB chunks don't spike memory
     return new Response(upstream.body, {
       status: upstream.status,
       headers: passthroughHeaders,
@@ -380,6 +351,9 @@ streaming.get('/stream-range-proxy', async (c) => {
     if (e?.name === 'AbortError') {
       log.warn('Stream proxy timeout:', decoded)
       return c.text('Upstream timeout', 504)
+    }
+    if (e instanceof Error && (e.message === 'Redirect target not allowed' || e.message === 'Invalid redirect URL')) {
+      return c.text(e.message === 'Redirect target not allowed' ? 'Redirect target not allowed' : 'Invalid redirect URL', e.message === 'Redirect target not allowed' ? 403 : 400)
     }
     log.error('Stream proxy error:', e)
     return c.text('Proxy request failed', 502)

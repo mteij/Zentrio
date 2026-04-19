@@ -4,6 +4,8 @@ import { encrypt, decrypt, isEncrypted } from './encryption';
 
 const log = logger.scope('Sync')
 
+const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
+
 interface SyncState {
   id: number;
   remote_url: string;
@@ -243,7 +245,7 @@ export class SyncService {
 
     const getLocal = db.prepare(`SELECT * FROM ${table} WHERE remote_id = ?`);
     const insert = (record: any) => {
-        const keys = Object.keys(record).filter(k => k !== 'id'); // Don't insert ID, let autoincrement work (except we need to map it)
+        const keys = Object.keys(record).filter(k => k !== 'id' && SAFE_SQL_IDENTIFIER.test(k))
         // Actually, we need to store remote_id.
         // And we need to handle foreign keys. This is the hard part.
         // If we receive a profile with settings_profile_id (remote), we need to map it to local ID.
@@ -261,7 +263,7 @@ export class SyncService {
     };
     
     const update = (id: number, record: any) => {
-        const keys = Object.keys(record).filter(k => k !== 'id' && k !== 'remote_id');
+        const keys = Object.keys(record).filter(k => k !== 'id' && k !== 'remote_id' && SAFE_SQL_IDENTIFIER.test(k))
         const sets = keys.map(k => `${k} = ?`).join(', ');
         const vals = keys.map(k => record[k]);
         vals.push(id);

@@ -4,13 +4,22 @@ use tauri::Manager;
 /// Returns the base downloads directory for a given profile.
 /// Uses the custom path stored in app data if set, otherwise defaults to the OS app data dir.
 pub fn downloads_dir(app: &tauri::AppHandle, profile_id: &str) -> PathBuf {
+    let safe_profile_id: String = profile_id
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    let safe_profile_id = if safe_profile_id.is_empty() {
+        "default".to_string()
+    } else {
+        safe_profile_id
+    };
     let base = custom_dir(app).unwrap_or_else(|| {
         app.path()
             .app_data_dir()
             .unwrap_or_else(|_| PathBuf::from("."))
             .join("zentrio")
     });
-    base.join("downloads").join(profile_id)
+    base.join("downloads").join(safe_profile_id)
 }
 
 /// Returns the path to the per-app downloads SQLite database.
@@ -24,12 +33,30 @@ pub fn db_path(app: &tauri::AppHandle) -> PathBuf {
 
 /// Returns a unique file path for a download (without extension — caller appends `.mp4`).
 pub fn download_file_path(app: &tauri::AppHandle, profile_id: &str, id: &str) -> PathBuf {
-    downloads_dir(app, profile_id).join(format!("{}.mp4", id))
+    let safe_id: String = id
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    let safe_id = if safe_id.is_empty() {
+        "unknown".to_string()
+    } else {
+        safe_id
+    };
+    downloads_dir(app, profile_id).join(format!("{}.mp4", safe_id))
 }
 
 /// Returns the `.zentrio-part` temporary path for an in-progress download.
 pub fn part_file_path(app: &tauri::AppHandle, profile_id: &str, id: &str) -> PathBuf {
-    downloads_dir(app, profile_id).join(format!("{}.zentrio-part", id))
+    let safe_id: String = id
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    let safe_id = if safe_id.is_empty() {
+        "unknown".to_string()
+    } else {
+        safe_id
+    };
+    downloads_dir(app, profile_id).join(format!("{}.zentrio-part", safe_id))
 }
 
 /// Ensures the profile download directory exists.
@@ -72,6 +99,16 @@ pub fn subtitle_file_path(
     id: &str,
     lang: &str,
 ) -> PathBuf {
+    let safe_id: String = id
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    let safe_id = if safe_id.is_empty() {
+        "unknown".to_string()
+    } else {
+        safe_id
+    };
+
     // Sanitize lang to avoid path traversal
     let safe_lang: String = lang
         .chars()
@@ -82,7 +119,7 @@ pub fn subtitle_file_path(
     } else {
         safe_lang
     };
-    downloads_dir(app, profile_id).join(format!("{}_{}.vtt", id, safe_lang))
+    downloads_dir(app, profile_id).join(format!("{}_{}.vtt", safe_id, safe_lang))
 }
 
 /// Deletes the download file (and any .zentrio-part) for a given ID.

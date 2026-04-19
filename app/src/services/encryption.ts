@@ -10,29 +10,49 @@ if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
 }
 
 const algorithm = 'aes-256-gcm'
-const CURRENT_VERSION = 1
-const VERSION_PREFIX = `v${CURRENT_VERSION}:`
-// KDF: scrypt with a fixed salt to stretch/normalise the ENCRYPTION_KEY to exactly 32 bytes.
-// The static salt is a known trade-off — changing it invalidates all existing encrypted records.
-// Real-world security depends on ENCRYPTION_KEY having high entropy (use `openssl rand -hex 32`).
-const key = scryptSync(ENCRYPTION_KEY, 'salt', 32)
+const V1_PREFIX = 'v1:'
+const V2_PREFIX = 'v2:'
 
-function encryptWithV1(text: string): string {
+function deriveKey(salt: Buffer): Buffer {
+  return scryptSync(ENCRYPTION_KEY, salt, 32)
+}
+
+function encryptV2(text: string): string {
+  const salt = randomBytes(16)
+  const key = deriveKey(salt)
   const iv = randomBytes(16)
   const cipher = createCipheriv(algorithm, key, iv)
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
   const authTag = cipher.getAuthTag()
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`
+  return `${V2_PREFIX}${iv.toString('hex')}:${salt.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`
 }
 
 function decryptV1(encryptedText: string): string {
   const [ivHex, authTagHex, encryptedHex] = encryptedText.split(':')
   if (!ivHex || !authTagHex || !encryptedHex) {
-    throw new Error('Invalid encrypted text format')
+    throw new Error('Invalid v1 encrypted text format')
   }
   const iv = Buffer.from(ivHex, 'hex')
   const authTag = Buffer.from(authTagHex, 'hex')
   const encrypted = Buffer.from(encryptedHex, 'hex')
+  const staticSalt = Buffer.from('salt')
+  const key = deriveKey(staticSalt)
+  const decipher = createDecipheriv(algorithm, key, iv)
+  decipher.setAuthTag(authTag)
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
+  return decrypted.toString('utf8')
+}
+
+function decryptV2(encryptedText: string): string {
+  const [ivHex, saltHex, authTagHex, encryptedHex] = encryptedText.split(':')
+  if (!ivHex || !saltHex || !authTagHex || !encryptedHex) {
+    throw new Error('Invalid v2 encrypted text format')
+  }
+  const iv = Buffer.from(ivHex, 'hex')
+  const salt = Buffer.from(saltHex, 'hex')
+  const authTag = Buffer.from(authTagHex, 'hex')
+  const encrypted = Buffer.from(encryptedHex, 'hex')
+  const key = deriveKey(salt)
   const decipher = createDecipheriv(algorithm, key, iv)
   decipher.setAuthTag(authTag)
   const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
@@ -40,24 +60,25 @@ function decryptV1(encryptedText: string): string {
 }
 
 export function encrypt(text: string): string {
-  const v1Result = encryptWithV1(text)
-  return `${VERSION_PREFIX}${v1Result}`
+  return encryptV2(text)
 }
 
 export function decrypt(encryptedText: string): string {
-  if (encryptedText.startsWith(VERSION_PREFIX)) {
-    const inner = encryptedText.slice(VERSION_PREFIX.length)
+  if (encryptedText.startsWith(V2_PREFIX)) {
+    const inner = encryptedText.slice(V2_PREFIX.length)
+    return decryptV2(inner)
+  }
+  if (encryptedText.startsWith(V1_PREFIX)) {
+    const inner = encryptedText.slice(V1_PREFIX.length)
     return decryptV1(inner)
   }
-
   if (encryptedText.includes(':') && !encryptedText.startsWith('v')) {
     return decryptV1(encryptedText)
   }
-
   throw new Error(`Unsupported encryption format or version: ${encryptedText.slice(0, 20)}...`)
 }
 
 export function isEncrypted(text: string): boolean {
   if (!text) return false
-  return text.startsWith(VERSION_PREFIX) || (text.includes(':') && text.includes(':'))
+  return text.startsWith(V2_PREFIX) || text.startsWith(V1_PREFIX) || (text.includes(':') && text.includes(':') && !text.startsWith('v'))
 }

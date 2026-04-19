@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { randomBytes, randomInt, timingSafeEqual } from 'crypto'
 import { z } from 'zod'
 import { auth } from '../../services/auth'
 import { userDb } from '../../services/database'
@@ -11,6 +11,15 @@ import { createRouteLimiter } from '../../middleware/security'
 const log = logger.scope('API:Auth')
 
 const app = createTaggedOpenAPIApp('Authentication')
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
 
 const deviceLinkCreateLimiter = createRouteLimiter('auth:device-link:create', { windowMs: 60 * 1000, limit: 10 })
 const deviceLinkExchangeLimiter = createRouteLimiter('auth:device-link:exchange', { windowMs: 60 * 1000, limit: 10 })
@@ -128,7 +137,7 @@ function normalizeDeviceLinkCode(input: string): string {
 
 function generateDeviceLinkCode(): string {
     for (let attempt = 0; attempt < 20; attempt++) {
-        const code = Math.floor(100000 + Math.random() * 900000).toString()
+        const code = randomInt(100000, 1000000).toString()
         if (!deviceLinkStore.has(code)) {
             return code
         }
@@ -338,9 +347,8 @@ app.post('/identify', async (c) => {
     const { email } = validation.data
     const user = userDb.findByEmail(email)
 
-    return c.json({
-        exists: !!user,
-        nickname: user?.username || user?.name || null
+return c.json({
+        exists: !!user
     })
 })
 
@@ -450,7 +458,7 @@ app.get('/login-proxy', async (c) => {
         return c.text('Failed to generate auth URL', 500)
     } catch (e: any) {
         log.error('Login proxy error:', e)
-        return c.text(`Login setup failed: ${e.message}`, 500)
+        return c.text('Login setup failed', 500)
     }
 })
 
@@ -738,41 +746,36 @@ app.get('/link-proxy', async (c) => {
                 ${getParticleBackgroundHtml()}
                 <div class="container">
                     <div class="loader"></div>
-                    <p>Linking ${provider}...</p>
+                    <p>Linking ${escapeHtml(provider)}...</p>
                 </div>
                 <script>
-                    fetch('${isOidcProvider ? '/api/auth/oauth2/link' : `/api/auth/link-social/${provider}`}', {
+                    fetch('${isOidcProvider ? '/api/auth/oauth2/link' : `/api/auth/link-social/${encodeURIComponent(provider)}`}', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify(${isOidcProvider
-                            ? `{ providerId: '${provider}', callbackURL: '${callbackURL}' }`
-                            : `{ callbackURL: '${callbackURL}' }`
+                            ? `{ providerId: ${JSON.stringify(provider)}, callbackURL: ${JSON.stringify(callbackURL)} }`
+                            : `{ callbackURL: ${JSON.stringify(callbackURL)} }`
                         })
                     })
                     .then(res => res.json())
-                    .then(data => {
-                        if (data.url) {
-                            window.location.href = data.url;
-                        } else {
-                            document.querySelector('.container').innerHTML = \`
-                                <div class="error">
-                                    <h3>Linking Error</h3>
-                                    <p>\${data.message || data.error || 'Unknown error occurred'}</p>
-                                    <button class="retry-btn" onclick="window.close()">Close</button>
-                                </div>
-                            \`;
-                        }
-                    })
-                    .catch(err => {
-                        document.querySelector('.container').innerHTML = \`
-                            <div class="error">
-                                <h3>Connection Error</h3>
-                                <p>Failed to connect to authentication service</p>
-                                <button class="retry-btn" onclick="window.location.reload()">Try Again</button>
-                            </div>
-                        \`;
-                    });
+.then(data => {
+                         if (data.url) {
+                             window.location.href = data.url;
+                         } else {
+                             const msg = document.createElement('div');
+                             msg.className = 'error';
+                             msg.innerHTML = '<h3>Linking Error</h3><p></p><button class="retry-btn" onclick="window.close()">Close</button>';
+                             msg.querySelector('p').textContent = data.message || data.error || 'Unknown error occurred';
+                             document.querySelector('.container').replaceChildren(msg);
+                         }
+                     })
+.catch(err => {
+                         const msg = document.createElement('div');
+                         msg.className = 'error';
+                         msg.innerHTML = '<h3>Connection Error</h3><p>Failed to connect to authentication service</p><button class="retry-btn" onclick="window.location.reload()">Try Again</button>';
+                         document.querySelector('.container').replaceChildren(msg);
+                     });
                 </script>
             </body>
         </html>

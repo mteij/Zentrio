@@ -123,7 +123,26 @@ fn download_purge_profile(
 
 #[tauri::command]
 fn download_set_directory(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    file_store::set_custom_dir(&app, std::path::Path::new(&path)).map_err(|e| e.to_string())
+    let requested_path = std::path::Path::new(&path);
+
+    if path.contains("..") {
+        return Err("Path traversal is not allowed".to_string());
+    }
+
+    let lower = path.to_lowercase();
+    let blocked = [
+        "/windows/", "\\windows\\", "/system32/", "\\system32\\",
+        "/etc/", "/usr/", "/bin/", "/sbin/",
+        "c:\\windows\\", "c:\\program files",
+        "/var/", "/proc/", "/dev/",
+    ];
+    for prefix in &blocked {
+        if lower.contains(prefix) {
+            return Err("System directories are not allowed".to_string());
+        }
+    }
+
+    file_store::set_custom_dir(&app, requested_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -242,15 +261,15 @@ pub fn run() {
             #[cfg(any(windows, target_os = "linux"))]
             {
                 match app.deep_link().register("zentrio") {
-                    Ok(_) => println!("[DeepLink] Registered 'zentrio' scheme"),
-                    Err(e) => println!("[DeepLink] Failed to register scheme: {}", e),
+                    Ok(_) => log::info!("[DeepLink] Registered 'zentrio' scheme"),
+                    Err(e) => log::error!("Failed to register deep link scheme: {}", e),
                 };
 
                 // Check for deep link on startup
                 use std::env;
                 let args: Vec<String> = env::args().collect();
                 if let Some(url) = args.iter().find(|&a| a.starts_with("zentrio://")) {
-                    println!("[DeepLink] App started with URL: {}", url);
+                    log::info!("[DeepLink] App started with deep link");
                     let app_handle = app.handle().clone();
                     let url = url.clone();
                     tauri::async_runtime::spawn(async move {

@@ -1,12 +1,17 @@
+import { createHmac, timingSafeEqual } from 'crypto'
 import { syncService } from '../../services/sync'
 import { auth } from '../../services/auth'
 import { db } from '../../services/database'
+import { getConfig } from '../../services/envParser'
 import { createTaggedOpenAPIApp } from './openapi-route'
 import { logger } from '../../services/logger'
+import { sessionMiddleware } from '../../middleware/session'
 
 const log = logger.scope('API:Sync')
 
 const app = createTaggedOpenAPIApp('Sync')
+
+app.use('*', sessionMiddleware)
 
 const SYNC_ENTITY_TABLES = new Set([
   'profiles',
@@ -27,33 +32,8 @@ app.get('/status', async (c) => {
   try {
     const state = await syncService.getSyncState();
     return c.json(state);
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-app.post('/configure', async (c) => {
-  try {
-    const { serverUrl, mode } = await c.req.json();
-    
-    // Store the configuration in the database
-    if (mode === 'cloud' && serverUrl) {
-      // Store server URL for later use
-      await syncService.setSyncState({
-        remote_url: serverUrl,
-        auth_token: '', // Will be set during authentication
-        remote_user_id: '',
-        is_syncing: false,
-        last_sync_at: null
-      });
-    } else {
-      throw new Error('Invalid configuration mode');
-    }
-    
-    return c.json({ success: true });
-  } catch (e: any) {
-    log.error('Sync configuration error:', e);
-    return c.json({ success: false, error: e.message }, 500);
+} catch (e: any) {
+    return c.json({ error: 'Internal server error' }, 500);
   }
 });
 
@@ -76,17 +56,31 @@ app.get('/config', async (c) => {
       syncState
     });
   } catch (e: any) {
-    return c.json({ error: e.message }, 500);
+    return c.json({ error: 'Internal server error' }, 500);
   }
 });
 
 app.post('/connect', async (c) => {
   try {
     const { remoteUrl, token, userId } = await c.req.json();
+
+    const PRIVATE_HOST_RE = /^(localhost$|127\.|0\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1$|fc[0-9a-f]{2}:|fe[89ab][0-9a-f]:|::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.))/i
+    try {
+      const parsed = new URL(remoteUrl)
+      if (!['https:', 'http:'].includes(parsed.protocol)) {
+        return c.json({ success: false, error: 'Only HTTP(S) URLs are allowed' }, 400)
+      }
+      if (PRIVATE_HOST_RE.test(parsed.hostname) || /^\d+$/.test(parsed.hostname)) {
+        return c.json({ success: false, error: 'Private/internal URLs are not allowed' }, 403)
+      }
+    } catch {
+      return c.json({ success: false, error: 'Invalid remote URL' }, 400)
+    }
+
     await syncService.connect(remoteUrl, token, userId);
     return c.json({ success: true });
   } catch (e: any) {
-    return c.json({ success: false, error: e.message }, 500);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
@@ -95,7 +89,7 @@ app.post('/disconnect', async (c) => {
     await syncService.disconnect();
     return c.json({ success: true });
   } catch (e: any) {
-    return c.json({ success: false, error: e.message }, 500);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
@@ -104,7 +98,7 @@ app.post('/sync', async (c) => {
     await syncService.sync();
     return c.json({ success: true });
   } catch (e: any) {
-    return c.json({ success: false, error: e.message }, 500);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
@@ -114,7 +108,6 @@ app.post('/sync', async (c) => {
 // [POST /token] Generate a sync token for Tauri clients
 app.post('/token', async (c) => {
   try {
-    // Validate the session using Better Auth
     const session = await auth.api.getSession({
       headers: c.req.raw.headers
     })
@@ -123,42 +116,42 @@ app.post('/token', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    // Generate a sync token (in production, use JWT or proper token system)
-    // For now, we'll use a simple approach with base64 encoding
-    const tokenData = {
-      userId: session.user.id,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-    }
-    
-    // In a real implementation, you'd store this securely or use a signed JWT
-    const encodedToken = Buffer.from(JSON.stringify(tokenData)).toString('base64')
+    const syncToken = generateSyncToken(session.user.id)
     
     return c.json({
-      syncToken: encodedToken,
+      syncToken,
       userId: session.user.id,
-      expiresAt: tokenData.expiresAt
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     })
   } catch (e: any) {
     log.error('Sync token generation error:', e)
-    return c.json({ error: e.message }, 500)
+    return c.json({ error: 'Internal server error' }, 500)
   }
 })
 
-// Helper function to validate sync token
+const SYNC_TOKEN_VERSION = 1
+
+function generateSyncToken(userId: string): string {
+  const { AUTH_SECRET } = getConfig()
+  const payload = JSON.stringify({ v: SYNC_TOKEN_VERSION, uid: userId, ts: Date.now() })
+  const hmac = createHmac('sha256', AUTH_SECRET).update(payload).digest('hex')
+  const token = Buffer.from(JSON.stringify({ p: payload, s: hmac })).toString('base64url')
+  return token
+}
+
 function validateSyncToken(token: string): { userId: string } | null {
   try {
-    // Decode the token (in production, use proper JWT validation)
-    const decoded = JSON.parse(Buffer.from(token, 'base64').toString())
-    
-    // Check if token has expired
-    if (new Date(decoded.expiresAt) < new Date()) {
-      return null
-    }
-    
-    return { userId: decoded.userId }
-  } catch (error) {
-    log.error('Token validation error:', error)
+    const decoded = JSON.parse(Buffer.from(token, 'base64url').toString())
+    if (!decoded.p || !decoded.s) return null
+    const { AUTH_SECRET } = getConfig()
+    const expectedHmac = createHmac('sha256', AUTH_SECRET).update(decoded.p).digest('hex')
+    if (!timingSafeEqual(Buffer.from(decoded.s), Buffer.from(expectedHmac))) return null
+    const payload = JSON.parse(decoded.p)
+    if (payload.v !== SYNC_TOKEN_VERSION) return null
+    const expiresAt = payload.ts + 30 * 24 * 60 * 60 * 1000
+    if (Date.now() > expiresAt) return null
+    return { userId: payload.uid }
+  } catch {
     return null
   }
 }
@@ -202,7 +195,7 @@ app.post('/push', async (c) => {
     return c.json({ success: true, mappings: result })
   } catch (e: any) {
     log.error('Sync push error:', e)
-    return c.json({ error: e.message }, 500)
+    return c.json({ error: 'Internal server error' }, 500)
   }
 })
 
@@ -245,7 +238,7 @@ app.get('/pull', async (c) => {
     return c.json(changes)
   } catch (e: any) {
     log.error('Sync pull error:', e)
-    return c.json({ error: e.message }, 500)
+    return c.json({ error: 'Internal server error' }, 500)
   }
 })
 

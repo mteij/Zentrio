@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
-import { bearer, emailOTP, genericOAuth, magicLink, oidcProvider, openAPI, phoneNumber, twoFactor } from "better-auth/plugins";
+import { bearer, emailOTP, genericOAuth, jwt, magicLink, openAPI, phoneNumber, twoFactor } from "better-auth/plugins";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "fs";
 import { dirname, isAbsolute, join } from "path";
@@ -133,8 +134,11 @@ export const auth = betterAuth({
             requireVerification: false
         }),
         openAPI(),
-        oidcProvider({
+        jwt(),
+        oauthProvider({
             loginPage: "/login",
+            consentPage: "/consent",
+            silenceWarnings: { oauthAuthServerConfig: true }
         }),
         ...(cfg.OIDC_PROVIDERS.length > 0 ? [
             genericOAuth({

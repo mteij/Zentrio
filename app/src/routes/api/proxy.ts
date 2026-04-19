@@ -1,48 +1,12 @@
 import { Hono } from 'hono'
 import { auth } from '../../services/auth'
 import { logger } from '../../services/logger'
+import { isSafeExternalUrl } from '../../lib/ssrf'
 
 const log = logger.scope('AddonProxy')
 const proxy = new Hono()
 
-const PRIVATE_IP_PATTERNS = [
-  /^localhost$/i,
-  /^127\./,
-  // 0.0.0.0/8 — on Linux, 0.x.x.x routes to loopback
-  /^0\./,
-  /^::1$/,
-  /^10\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^192\.168\./,
-  // Link-local (includes cloud metadata 169.254.169.254)
-  /^169\.254\./,
-  // IPv6 unique-local and link-local
-  /^fc00:/i,
-  /^fe80:/i,
-  // IPv6-mapped IPv4 loopback/private (::ffff:127.x, ::ffff:10.x, etc.)
-  /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|0\.)/i,
-  // IPv6 loopback written as mapped
-  /^0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}:ffff:7f/i,
-]
-
-function isAllowedUrl(urlStr: string): boolean {
-  try {
-    const parsed = new URL(urlStr)
-    if (!['https:', 'http:'].includes(parsed.protocol)) return false
-    const host = parsed.hostname
-    // Reject empty or obviously non-public hosts
-    if (!host || host === '') return false
-    if (PRIVATE_IP_PATTERNS.some(p => p.test(host))) return false
-    // Reject bare numeric IPs that look like decimal-encoded addresses
-    // (e.g. 2130706433 == 127.0.0.1). URL.hostname normalises these on
-    // some runtimes, so the regex above already catches them, but an extra
-    // guard doesn't hurt.
-    if (/^\d+$/.test(host)) return false
-    return true
-  } catch {
-    return false
-  }
-}
+const MAX_PROXY_SIZE = 10 * 1024 * 1024 // 10 MB
 
 // GET /api/addon-proxy?url=<encoded-addon-url>
 // Temporary hosted compatibility bridge so web browsers can reach external
@@ -65,7 +29,7 @@ proxy.get('/', async (c) => {
     return c.json({ error: 'Invalid url encoding' }, 400)
   }
 
-  if (!isAllowedUrl(decoded)) return c.json({ error: 'URL not allowed' }, 403)
+  if (!isSafeExternalUrl(decoded)) return c.json({ error: 'URL not allowed' }, 403)
 
   try {
     const controller = new AbortController()
@@ -77,13 +41,27 @@ proxy.get('/', async (c) => {
     })
     clearTimeout(timeout)
 
-    const body = await res.arrayBuffer()
+    const contentLength = parseInt(res.headers.get('content-length') || '0', 10)
+    if (contentLength > MAX_PROXY_SIZE) {
+      return c.json({ error: 'Response too large' }, 413)
+    }
+
+    let body: ArrayBuffer
+    try {
+      const buf = await res.arrayBuffer()
+      if (buf.byteLength > MAX_PROXY_SIZE) {
+        return c.json({ error: 'Response too large' }, 413)
+      }
+      body = buf
+    } catch {
+      return c.json({ error: 'Failed to read response' }, 502)
+    }
+
     return new Response(body, {
       status: res.status,
       headers: {
         'Content-Type': res.headers.get('Content-Type') || 'application/json',
         'Cache-Control': 'public, max-age=60',
-        'Access-Control-Allow-Origin': '*',
       },
     })
   } catch (e: any) {

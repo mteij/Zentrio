@@ -190,6 +190,75 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function AutoUpdateChecker() {
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const { getVersion } = await import('@tauri-apps/api/app')
+        const { platform } = await import('@tauri-apps/plugin-os')
+        const currentVersion = await getVersion()
+        const osName = await platform()
+
+        log.info('[UPDATER-DEBUG] AutoUpdateChecker starting...', { currentVersion, osName });
+
+        if (osName !== 'windows' && osName !== 'macos') {
+          log.info('[UPDATER-DEBUG] Platform not supported for auto-update, skipping');
+          return;
+        }
+
+        const { check } = await import('@tauri-apps/plugin-updater')
+        log.info('[UPDATER-DEBUG] Calling tauri check() from AutoUpdateChecker...');
+        const update = await check()
+
+        log.info('[UPDATER-DEBUG] AutoUpdateChecker check() returned:', update ? `update v${update.version}` : 'null');
+
+        if (update) {
+          log.info('[UPDATER-DEBUG] Auto update available:', { version: update.version });
+          const { toast } = await import('sonner')
+          toast.info('Update available', {
+            description: `Zentrio ${update.version} is ready to install.`,
+            duration: 8000,
+            action: {
+              label: 'Install',
+              onClick: async () => {
+                try {
+                  log.info('[UPDATER-DEBUG] Starting auto update install...');
+                  const { relaunch } = await import('@tauri-apps/plugin-process')
+                  let downloaded = 0
+                  let contentLength = 0
+                  await update.downloadAndInstall((event: any) => {
+                    if (event.event === 'Started') {
+                      contentLength = event.data?.contentLength ?? 0
+                      log.info('[UPDATER-DEBUG] Download started', { contentLength });
+                    } else if (event.event === 'Progress') {
+                      downloaded += event.data?.chunkLength ?? 0
+                    } else if (event.event === 'Finished') {
+                      log.info('[UPDATER-DEBUG] Download finished, relaunching...');
+                    }
+                  })
+                  await relaunch()
+                } catch (e) {
+                  log.error('[UPDATER-DEBUG] Auto update install failed:', e);
+                  toast.error('Update failed', { description: 'Please try again later.' })
+                }
+              },
+            },
+          })
+        } else {
+          log.info('[UPDATER-DEBUG] No update available from auto checker');
+        }
+      } catch (e) {
+        log.error('[UPDATER-DEBUG] Auto update check failed:', e);
+      }
+    }
+
+    const timer = setTimeout(checkForUpdates, 5000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  return null
+}
+
 function AppRoutes() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -925,6 +994,7 @@ export default function App() {
           <CastProvider>
             <AppLifecycleProvider>
               <AppInitializer>
+                <AutoUpdateChecker />
                 <TvFocusProvider>
                   <BrowserRouter>
                     <ScrollToTop />

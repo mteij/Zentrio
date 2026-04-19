@@ -29,7 +29,7 @@
         {
           "name": "zentrio-server",
           "sidecar": true,
-          "args": true
+          "args": false
         }
       ]
     },

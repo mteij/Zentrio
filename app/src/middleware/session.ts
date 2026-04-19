@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory'
 import { auth } from '../services/auth'
 import { userDb } from '../services/database'
+import { isLocalGatewayHost } from '../lib/ssrf'
 
 /**
  * Strict session middleware - requires authentication for all requests.
@@ -39,12 +40,13 @@ export const sessionMiddleware = createMiddleware(async (c, next) => {
 export const optionalSessionMiddleware = createMiddleware(async (c, next) => {
   const { profileId } = c.req.query()
   const guestModeHeader = c.req.header('X-Guest-Mode')
+  const hostHeader = c.req.header('host')
 
   // Detect guest mode: explicit guest profile ID or dedicated header only.
-  // Query-param ?guestMode=true has been removed to prevent accidental auth bypass.
+  // Guest mode MUST originate from a local gateway host (e.g. Tauri sidecar).
   const isGuestMode =
-    profileId === 'guest' ||
-    guestModeHeader === 'true'
+    (profileId === 'guest' || guestModeHeader === 'true') &&
+    isLocalGatewayHost(hostHeader)
   
   // Guest mode: use guest user without authentication
   if (isGuestMode) {

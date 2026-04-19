@@ -66,22 +66,19 @@ export function getConfig() {
   const DATABASE_URL = process.env.DATABASE_URL ?? './data/zentrio.db'
   const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase()
   const isProduction = nodeEnv === 'production'
-  const getSecret = (key: string, fallback: string) => {
+  const getSecret = (key: string) => {
     const val = process.env[key]
     if (val) return val
-    if (isProduction) {
-      throw new Error(`MISSING REQUIRED SECRET IN PRODUCTION: ${key}`)
-    }
-    return fallback
+    throw new Error(`MISSING REQUIRED SECRET: ${key}. This must be set in the environment or .env file.`)
   }
 
-  const AUTH_SECRET = getSecret('AUTH_SECRET', 'super-secret-key-change-in-production')
+  const AUTH_SECRET = getSecret('AUTH_SECRET')
   const APP_URL = process.env.APP_URL ?? `http://localhost:${PORT}`
   
   // Client URL (for redirects and CORS)
   const CLIENT_URL = process.env.CLIENT_URL ?? 'http://localhost:5173'
 
-  const ENCRYPTION_KEY = getSecret('ENCRYPTION_KEY', 'super-secret-key-change-in-production')
+  const ENCRYPTION_KEY = getSecret('ENCRYPTION_KEY')
   // Rate limit settings (configurable via environment variables).
   // Default: 500 requests per 15 minutes per IP — sufficient for active users
   // (browsing, playback progress pings, catalog loads) without enabling abuse.

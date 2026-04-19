@@ -51,7 +51,7 @@ export const corsMiddleware = (origins?: string[]) => {
     const isExactMatch = origin && allowedOrigins.includes(origin);
     const isCleanMatch = cleanOrigin && allowedOrigins.includes(cleanOrigin);
     // Tauri often sends origin as tauri://localhost or http://tauri.localhost
-    const isTauriMatch = cleanOrigin && (cleanOrigin.startsWith('tauri://') || cleanOrigin.includes('tauri.localhost'));
+    const isTauriMatch = cleanOrigin && (cleanOrigin.startsWith('tauri://') || cleanOrigin === 'http://tauri.localhost' || cleanOrigin === 'https://tauri.localhost')
     // Android Emulator sends requests from http://10.0.2.2 — dev only, never allow in production
     const isAndroidMatch = !isProductionEnv() && cleanOrigin && cleanOrigin.startsWith('http://10.');
 
@@ -86,12 +86,12 @@ export const securityHeaders = async (c: Context, next: Next) => {
 
   // Always-on minimal safety headers
   c.header('X-Content-Type-Options', 'nosniff')
-  c.header('X-XSS-Protection', '1; mode=block')
+  
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
 
   // HSTS — only set on HTTPS (production). Prevents downgrade attacks.
   if (isProductionEnv()) {
-    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
   }
   
   // Conditional Isolation Headers - ENABLED ONLY FOR PLAYER
@@ -118,6 +118,7 @@ export const securityHeaders = async (c: Context, next: Next) => {
 
   // Defaults for first-party pages - allow same origin framing
   c.header('X-Frame-Options', 'SAMEORIGIN')
+  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()')
   // TODO: Tighten CSP: remove 'unsafe-inline' by adopting nonces/hashes after extracting inline scripts into external files.
   // Reference: [securityHeaders()](app/src/middleware/security.ts:27)
   c.header(

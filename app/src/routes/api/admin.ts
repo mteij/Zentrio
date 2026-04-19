@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto'
 import { createTaggedOpenAPIApp } from './openapi-route'
 import { adminSessionMiddleware, adminStepUpMiddleware, requirePermission } from '../../middleware/admin'
 import { db, userDb } from '../../services/database'
@@ -43,13 +44,15 @@ app.post('/setup', adminSetupLimiter, async (c) => {
     return err(c, 409, 'ALREADY_CONFIGURED', 'Admin setup has already been completed')
   }
 
-  // Verify setup token when configured
-  if (ADMIN_SETUP_TOKEN) {
-    const body = await c.req.json().catch(() => ({}))
-    const providedToken = String(body?.setupToken || '').trim()
-    if (!providedToken || providedToken !== ADMIN_SETUP_TOKEN) {
-      return err(c, 403, 'INVALID_SETUP_TOKEN', 'Invalid or missing admin setup token')
-    }
+  // Verify setup token is configured and matches
+  if (!ADMIN_SETUP_TOKEN) {
+    return err(c, 403, 'SETUP_TOKEN_NOT_CONFIGURED', 'Admin setup token must be configured in environment variables to claim superadmin')
+  }
+
+  const body = await c.req.json().catch(() => ({}))
+  const providedToken = String(body?.setupToken || '').trim()
+  if (!providedToken || providedToken.length !== ADMIN_SETUP_TOKEN.length || !timingSafeEqual(Buffer.from(providedToken), Buffer.from(ADMIN_SETUP_TOKEN))) {
+    return err(c, 403, 'INVALID_SETUP_TOKEN', 'Invalid or missing admin setup token')
   }
 
   const session = await (await import('../../services/auth')).auth.api.getSession({
