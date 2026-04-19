@@ -16,6 +16,7 @@ export interface StreamConfig {
     }
     resolution: FilterOptions
     encode: FilterOptions
+    sourceType: FilterOptions
     streamType: FilterOptions
     visualTag: FilterOptions
     audioTag: FilterOptions

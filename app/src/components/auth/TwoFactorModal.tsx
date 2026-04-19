@@ -19,6 +19,7 @@ export function TwoFactorModal({
   error,
 }: TwoFactorModalProps) {
   const [code, setCode] = useState('')
+  const [trustDevice, setTrustDevice] = useState(true)
   const [localLoading, setLocalLoading] = useState(false)
   const [localError, setLocalError] = useState<string | undefined>()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -39,7 +40,7 @@ export function TwoFactorModal({
       try {
         const { data, error: verifyError } = await authClient.twoFactor.verifyTotp({
           code,
-          trustDevice: true,
+          trustDevice,
         })
 
         if (verifyError) {
@@ -139,6 +140,34 @@ export function TwoFactorModal({
               />
             ))}
           </div>
+
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={trustDevice}
+                onChange={(e) => setTrustDevice(e.target.checked)}
+                disabled={loading}
+                className="sr-only peer"
+              />
+              <div className="w-5 h-5 border-2 border-white/20 rounded peer-checked:bg-[#e50914] peer-checked:border-[#e50914] transition-all group-hover:border-white/40 peer-disabled:opacity-50">
+                {trustDevice && (
+                  <svg
+                    className="w-full h-full text-white p-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">
+              Remember this device
+            </span>
+          </label>
 
           {/* Hidden input for accessibility and form submission */}
           <input

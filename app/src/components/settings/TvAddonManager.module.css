@@ -1,0 +1,300 @@
+/* TvAddonManager - TV-specific addon management styles */
+
+.tvAddonSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.tvAddonSectionTitle {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0 0.2rem;
+}
+
+/* Install row */
+.tvAddonInstallRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem);
+  padding: 1rem 1.15rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+    rgba(12, 14, 18, 0.48);
+  gap: 1rem;
+  align-items: center;
+}
+
+.tvAddonInstallInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.tvAddonInstallLabel {
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.08rem;
+  line-height: 1.3;
+}
+
+.tvAddonInstallDesc {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.tvAddonInstallControl {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+}
+
+.tvAddonInstallActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Addon row - thin by default, expands when edited */
+.tvAddonRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.6rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+    rgba(12, 14, 18, 0.48);
+  align-items: center;
+  cursor: grab;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, grid-template-columns 0.2s ease, padding 0.2s ease;
+}
+
+.tvAddonRow + .tvAddonRow {
+  margin-top: 0.5rem;
+}
+
+.tvAddonRow:focus-within {
+  border-color: rgba(255, 255, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(229, 9, 20, 0.16), rgba(255, 255, 255, 0.05)),
+    rgba(12, 14, 18, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.tvAddonRowExpanded {
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem);
+  padding: 0.85rem 1.15rem;
+}
+
+.tvAddonRowZentrio {
+  background:
+    linear-gradient(180deg, rgba(139, 92, 246, 0.08), rgba(59, 130, 246, 0.04)),
+    rgba(12, 14, 18, 0.52);
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.tvAddonRowDragging {
+  opacity: 0.5;
+}
+
+.tvAddonRowDragOver {
+  border-color: rgba(139, 92, 246, 0.6) !important;
+  transform: scale(1.01);
+}
+
+.tvAddonRowLeading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding-right: 0.2rem;
+}
+
+.tvAddonReorderControls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-right: 0.4rem;
+}
+
+.tvAddonReorderControls button {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: color 0.15s ease, background 0.15s ease;
+  min-height: 2rem;
+}
+
+.tvAddonReorderControls button:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tvAddonReorderControls button:disabled {
+  color: rgba(255, 255, 255, 0.15);
+  cursor: default;
+}
+
+.tvAddonLogo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.tvAddonLogoPlaceholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tvAddonDetails {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.tvAddonName {
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tvAddonVersion {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.tvAddonNativeBadge {
+  font-size: 0.58em;
+  color: #a78bfa;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tvAddonDescription {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tvAddonRowControl {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tvAddonActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Toggle sizing for TV */
+.tvAddonActions [role="switch"] {
+  --toggle-width: 48px !important;
+  --toggle-height: 28px !important;
+  --toggle-knob-size: 20px !important;
+  --toggle-padding: 4px !important;
+  width: var(--toggle-width) !important;
+  height: var(--toggle-height) !important;
+}
+
+.tvAddonActions [role="switch"] > div {
+  width: var(--toggle-knob-size) !important;
+  height: var(--toggle-knob-size) !important;
+  top: var(--toggle-padding) !important;
+}
+
+/* Expand/edit button - always visible */
+.tvAddonExpandBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.tvAddonExpandBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* Expanded action buttons - appear below the toggle row */
+.tvAddonExpandedActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 0.5rem;
+  width: 100%;
+  grid-column: 1 / -1;
+}
+
+.tvAddonExpandedActions button {
+  min-height: 2.6rem;
+  border-radius: 14px;
+  font-size: 0.9rem;
+}
+
+.tvAddonEmpty {
+  padding: 1.5rem 1.15rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.95rem;
+  text-align: center;
+}

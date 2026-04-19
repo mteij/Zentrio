@@ -119,6 +119,7 @@ export const auth = betterAuth({
   plugins: [
     twoFactor({
       issuer: 'Zentrio',
+      trustDeviceCookieMaxAge: 60 * 60 * 24 * 365, // 1 year — matches session length
     }),
     magicLink({
       sendMagicLink: async ({ email, token, url }, _request) => {

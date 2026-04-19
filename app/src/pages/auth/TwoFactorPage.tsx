@@ -14,6 +14,7 @@ export function TwoFactorPage() {
   const [error, setError] = useState<string | undefined>()
   const [showBackupCode, setShowBackupCode] = useState(false)
   const [backupCode, setBackupCode] = useState('')
+  const [trustDevice, setTrustDevice] = useState(true)
 
   // Verify TOTP code
   const handleSuccess = async () => {
@@ -62,7 +63,7 @@ export function TwoFactorPage() {
     try {
       const { data, error: verifyError } = await authClient.twoFactor.verifyBackupCode({
         code: backupCode.replace(/-/g, ''),
-        trustDevice: true,
+        trustDevice,
       })
 
       if (verifyError) {
@@ -125,6 +126,34 @@ export function TwoFactorPage() {
                   data-lpignore="true"
                   data-bwignore
                 />
+
+                <label className="flex items-center gap-3 cursor-pointer group mb-4">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={trustDevice}
+                      onChange={(e) => setTrustDevice(e.target.checked)}
+                      disabled={isLoading}
+                      className="sr-only peer"
+                    />
+                    <div className="w-5 h-5 border-2 border-white/20 rounded peer-checked:bg-[#e50914] peer-checked:border-[#e50914] transition-all group-hover:border-white/40 peer-disabled:opacity-50">
+                      {trustDevice && (
+                        <svg
+                          className="w-full h-full text-white p-0.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                    Remember this device
+                  </span>
+                </label>
 
                 <button
                   type="submit"

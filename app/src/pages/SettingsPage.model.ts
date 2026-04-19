@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { appMode } from '../lib/app-mode'
 import { apiFetch } from '../lib/apiFetch'
+import { getAppTarget } from '../lib/app-target'
 import {
   getVisibleSettingsTabs,
   type SettingsTabDefinition,
@@ -34,7 +35,7 @@ export function useSettingsScreenModel(): SettingsScreenModel {
   const [profiles, setProfiles] = useState<Array<{ id: string | number; name?: string }>>([])
 
   const isGuestMode = appMode.isGuest()
-  const tabItems = getVisibleSettingsTabs(isGuestMode)
+  const tabItems = getVisibleSettingsTabs(isGuestMode, getAppTarget().isTauri)
   const hasActiveTab = tabItems.some((tab) => tab.key === activeTab)
   const effectiveTab = isGuestMode && activeTab === 'danger' ? 'general' : activeTab
 

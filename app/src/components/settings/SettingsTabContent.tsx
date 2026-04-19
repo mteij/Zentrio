@@ -1,5 +1,5 @@
 import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
-import { getAuthClient, getClientUrl, getServerUrl, resetAuthClient } from '../../lib/auth-client'
+import { getAuthClient, getServerUrl, isOfficialZentrioServer, resetAuthClient } from '../../lib/auth-client'
 import { getAppTarget } from '../../lib/app-target'
 import { apiFetch } from '../../lib/apiFetch'
 import { useAuthStore } from '../../stores/authStore'
@@ -8,8 +8,15 @@ import type { SettingsPlatform, SettingsSectionDefinition, SettingsTabKey } from
 import { SettingsRenderer, settingsRendererStyles } from './SettingsRenderer'
 import { useAppearanceSettings } from '../../hooks/useAppearanceSettings'
 import { useStreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
+import { useStreamFilterSettings } from '../../hooks/useStreamFilterSettings'
 import { InputDialog } from '../ui/InputDialog'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { createLogger } from '../../utils/client-logger'
+import { AddonManager } from './AddonManager'
+import { TvAddonManager } from './TvAddonManager'
+import type { StreamConfig } from '../../services/addons/stream-processor'
+import { isTauriRuntime } from '../../lib/runtime-env'
+import { toast } from '../../utils/toast'
 
 const log = createLogger('SettingsTabContent')
 
@@ -30,7 +37,7 @@ type GeneralDialog =
   | 'password-current'
   | 'password-new'
   | 'server-url'
-  | 'client-url'
+  | 'server-url-confirm'
   | null
 
 function GeneralTabContent({
@@ -42,10 +49,11 @@ function GeneralTabContent({
 }: SettingsTabContentProps) {
   const user = useAuthStore((s) => s.user)
   const updateUser = useAuthStore((s) => s.updateUser)
+  const reset = useAuthStore((s) => s.reset)
 
   const [openDialog, setOpenDialog] = useState<GeneralDialog>(null)
   const [serverUrl, setServerUrl] = useState(() => getServerUrl())
-  const [clientUrl] = useState(() => getClientUrl())
+  const [pendingServerUrl, setPendingServerUrl] = useState<string | null>(null)
   const [pendingCurrentPassword, setPendingCurrentPassword] = useState('')
 
   const handleUsernameChange = useCallback(
@@ -94,80 +102,102 @@ function GeneralTabContent({
 
   const handleServerUrlChange = useCallback((url: string) => {
     const trimmed = url.trim()
-    localStorage.setItem('zentrio_server_url', trimmed)
+    if (trimmed === serverUrl) {
+      setOpenDialog(null)
+      return
+    }
+    setPendingServerUrl(trimmed)
+    setOpenDialog('server-url-confirm')
+  }, [serverUrl])
+
+  const handleServerUrlConfirm = useCallback(() => {
+    if (!pendingServerUrl) return
+    const wasAuthenticated = !!user
+    localStorage.setItem('zentrio_server_url', pendingServerUrl)
     resetAuthClient()
-    setServerUrl(trimmed)
+    setServerUrl(pendingServerUrl)
+    if (wasAuthenticated) {
+      reset()
+      localStorage.removeItem('zentrio-auth-storage')
+      toast.info('Server changed. Please sign in again.')
+      window.location.href = '/'
+    }
+    setPendingServerUrl(null)
+    setOpenDialog(null)
+  }, [pendingServerUrl, user, reset])
+
+  const handleServerUrlCancel = useCallback(() => {
+    setPendingServerUrl(null)
+    setOpenDialog(null)
   }, [])
 
   const displayName = user?.username || user?.name || '—'
   const displayEmail = user?.email || '—'
+  const isTauri = isTauriRuntime()
 
   const sections: SettingsSectionDefinition[] = useMemo(
-    () => [
-      {
-        id: 'general-account',
-        title: 'Account',
-        scope: 'account' as const,
-        items: [
-          {
-            id: 'general-username',
-            kind: 'action' as const,
-            label: 'Username',
-            description: 'Change your account username.',
-            summary: displayName,
-            actionLabel: 'Change',
-            onActivate: () => setOpenDialog('username'),
-          },
-          {
-            id: 'general-email',
-            kind: 'action' as const,
-            label: 'Email address',
-            description: 'A verification link will be sent to the new address.',
-            summary: displayEmail,
-            actionLabel: 'Change',
-            onActivate: () => setOpenDialog('email'),
-          },
-          {
-            id: 'general-password',
-            kind: 'action' as const,
-            label: 'Password',
-            description: 'Update your account password.',
-            actionLabel: 'Change',
-            onActivate: () => {
-              setPendingCurrentPassword('')
-              setOpenDialog('password-current')
+    () => {
+      const result: SettingsSectionDefinition[] = [
+        {
+          id: 'general-account',
+          title: 'Account',
+          scope: 'account' as const,
+          items: [
+            {
+              id: 'general-username',
+              kind: 'action' as const,
+              label: 'Username',
+              description: 'Change your account username.',
+              summary: displayName,
+              actionLabel: 'Change',
+              onActivate: () => setOpenDialog('username'),
             },
-          },
-        ],
-      },
-      {
-        id: 'general-server',
-        title: 'Server Connection',
-        scope: 'server' as const,
-        items: [
-          {
-            id: 'general-server-url',
-            kind: 'action' as const,
-            label: 'Server URL',
-            description: 'The address of your Zentrio server.',
-            summary: serverUrl,
-            actionLabel: 'Change',
-            onActivate: () => setOpenDialog('server-url'),
-          },
-          {
-            id: 'general-client-url',
-            kind: 'action' as const,
-            label: 'Client URL',
-            description: 'The base URL used for OAuth callbacks.',
-            summary: clientUrl,
-            actionLabel: 'Info',
-            disabled: true,
-            onActivate: () => {},
-          },
-        ],
-      },
-    ],
-    [displayName, displayEmail, serverUrl, clientUrl]
+            {
+              id: 'general-email',
+              kind: 'action' as const,
+              label: 'Email address',
+              description: 'A verification link will be sent to the new address.',
+              summary: displayEmail,
+              actionLabel: 'Change',
+              onActivate: () => setOpenDialog('email'),
+            },
+            {
+              id: 'general-password',
+              kind: 'action' as const,
+              label: 'Password',
+              description: 'Update your account password.',
+              actionLabel: 'Change',
+              onActivate: () => {
+                setPendingCurrentPassword('')
+                setOpenDialog('password-current')
+              },
+            },
+          ],
+        },
+      ]
+
+      if (isTauri) {
+        result.push({
+          id: 'general-server',
+          title: 'Server Connection',
+          scope: 'server' as const,
+          items: [
+            {
+              id: 'general-server-url',
+              kind: 'action' as const,
+              label: 'Server URL',
+              description: 'The address of your Zentrio server.',
+              summary: serverUrl,
+              actionLabel: 'Change',
+              onActivate: () => setOpenDialog('server-url'),
+            },
+          ],
+        })
+      }
+
+      return result
+    },
+    [displayName, displayEmail, serverUrl, isTauri]
   )
 
   return (
@@ -232,7 +262,17 @@ function GeneralTabContent({
         title="Change Server URL"
         placeholder="https://your-server.example.com"
         defaultValue={serverUrl}
-        confirmText="Save"
+        confirmText="Continue"
+      />
+
+      <ConfirmDialog
+        isOpen={openDialog === 'server-url-confirm'}
+        onClose={handleServerUrlCancel}
+        onConfirm={handleServerUrlConfirm}
+        title="Change Server?"
+        message={`Changing servers will sign you out. Your progress is saved on the current server and will be available when you switch back. Switch to ${pendingServerUrl || 'the new server'}?`}
+        confirmText="Switch Server"
+        cancelText="Cancel"
       />
     </>
   )
@@ -264,7 +304,7 @@ function AppearanceTabContent({
             label: 'Show IMDb ratings',
             description: 'Display IMDb scores on posters and detail previews.',
             checked: showImdbRatings,
-            onChange: (checked) => save({ showImdbRatings: checked }),
+            onChange: (checked: boolean) => save({ showImdbRatings: checked }),
           },
           {
             id: 'appearance-age',
@@ -272,7 +312,7 @@ function AppearanceTabContent({
             label: 'Show age ratings',
             description: 'Display content age ratings on cards.',
             checked: showAgeRatings,
-            onChange: (checked) => save({ showAgeRatings: checked }),
+            onChange: (checked: boolean) => save({ showAgeRatings: checked }),
           },
         ],
       },
@@ -294,203 +334,246 @@ function AppearanceTabContent({
 
 // ─── Addons ──────────────────────────────────────────────────────────────────
 
-interface AddonEntry {
-  id: number
-  name: string
-  version?: string
-  description?: string
-  logo_url?: string
-  enabled: boolean
-}
-
 function AddonsTabContent({
   model,
   platform,
-  openOverlaySection,
-  onOpenOverlay,
-  onCloseOverlay,
 }: SettingsTabContentProps) {
-  const [addons, setAddons] = useState<AddonEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [installOpen, setInstallOpen] = useState(false)
   const settingsProfileId = model.currentProfileId
 
-  const fetchAddons = useCallback(async () => {
-    if (!settingsProfileId) return
-    setLoading(true)
-    try {
-      const res = await apiFetch(`/api/addons/settings-profile/${settingsProfileId}/manage`)
-      if (res.ok) {
-        const data = await res.json()
-        setAddons(Array.isArray(data) ? data : [])
-      }
-    } catch (e) {
-      log.error('Failed to fetch addons', e)
-    } finally {
-      setLoading(false)
-    }
-  }, [settingsProfileId])
+  if (!settingsProfileId) {
+    return <div style={{ padding: 16, color: '#888' }}>No profile selected.</div>
+  }
 
-  useEffect(() => {
-    fetchAddons()
-  }, [fetchAddons])
+  if (platform === 'tv') {
+    return <TvAddonManager currentProfileId={settingsProfileId} onProfileChange={() => {}} />
+  }
 
-  const handleToggleAddon = useCallback(
-    async (addonId: number, enabled: boolean) => {
-      setAddons((prev) => prev.map((a) => (a.id === addonId ? { ...a, enabled } : a)))
-      try {
-        await apiFetch(`/api/addons/settings-profile/${settingsProfileId}/toggle`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ addonId, enabled }),
-        })
-      } catch (e) {
-        log.error('Failed to toggle addon', e)
-        fetchAddons()
-      }
-    },
-    [settingsProfileId, fetchAddons]
-  )
-
-  const handleRemoveAddon = useCallback(
-    async (addonId: number) => {
-      setAddons((prev) => prev.filter((a) => a.id !== addonId))
-      try {
-        await apiFetch(`/api/addons/${addonId}`, { method: 'DELETE' })
-      } catch (e) {
-        log.error('Failed to remove addon', e)
-        fetchAddons()
-      }
-    },
-    [fetchAddons]
-  )
-
-  const handleInstallAddon = useCallback(
-    async (manifestUrl: string) => {
-      try {
-        await apiFetch('/api/addons', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ manifestUrl, settingsProfileId }),
-        })
-        await fetchAddons()
-      } catch (e) {
-        log.error('Failed to install addon', e)
-      }
-    },
-    [settingsProfileId, fetchAddons]
-  )
-
-  const addonItems = addons.map((addon) => ({
-    id: `addon-${addon.id}`,
-    kind: 'custom' as const,
-    render: (_p: SettingsPlatform) => (
-      <div className={settingsRendererStyles.addonRow}>
-        {addon.logo_url ? (
-          <img
-            src={addon.logo_url}
-            alt=""
-            aria-hidden="true"
-            className={settingsRendererStyles.addonRowLogo}
-          />
-        ) : (
-          <div className={settingsRendererStyles.addonRowLogoPlaceholder} aria-hidden="true" />
-        )}
-        <div className={settingsRendererStyles.addonRowInfo}>
-          <div className={settingsRendererStyles.addonRowName}>{addon.name}</div>
-          {addon.version ? (
-            <div className={settingsRendererStyles.addonRowVersion}>v{addon.version}</div>
-          ) : null}
-        </div>
-        <div className={settingsRendererStyles.addonRowActions}>
-          <button
-            type="button"
-            className={settingsRendererStyles.controlButton}
-            style={{ minWidth: 70 }}
-            onClick={() => handleToggleAddon(addon.id, !addon.enabled)}
-            aria-pressed={addon.enabled}
-          >
-            {addon.enabled ? 'Disable' : 'Enable'}
-          </button>
-          <button
-            type="button"
-            className={`${settingsRendererStyles.controlButton} ${settingsRendererStyles.controlButtonDanger}`}
-            onClick={() => handleRemoveAddon(addon.id)}
-            aria-label={`Remove ${addon.name}`}
-          >
-            Remove
-          </button>
-        </div>
-      </div>
-    ),
-  }))
-
-  const sections: SettingsSectionDefinition[] = useMemo(
-    () => [
-      {
-        id: 'addons-toolbar',
-        title: 'Addons',
-        scope: 'settings-profile' as const,
-        items: [
-          {
-            id: 'addons-actions',
-            kind: 'custom' as const,
-            render: () => (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className={settingsRendererStyles.controlButton}
-                  onClick={() => setInstallOpen(true)}
-                >
-                  Install Addon
-                </button>
-              </div>
-            ),
-          },
-          ...(loading
-            ? [{ id: 'addons-loading', kind: 'notice' as const, content: 'Loading addons…' }]
-            : addons.length === 0
-              ? [{ id: 'addons-empty', kind: 'notice' as const, content: 'No addons installed.' }]
-              : addonItems),
-        ],
-      },
-      // addonItems is derived from addons — include both in deps
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    ],
-    [loading, addons]
-  )
-
-  return (
-    <>
-      <SettingsRenderer
-        platform={platform}
-        sections={sections}
-        openOverlaySection={openOverlaySection}
-        onOpenOverlay={onOpenOverlay}
-        onCloseOverlay={onCloseOverlay}
-      />
-      <InputDialog
-        isOpen={installOpen}
-        onClose={() => setInstallOpen(false)}
-        onSubmit={handleInstallAddon}
-        title="Install Addon"
-        message="Enter the manifest URL of the addon you want to install."
-        placeholder="https://addon.example.com/manifest.json"
-        confirmText="Install"
-        validation={(v) => {
-          try {
-            new URL(v)
-            return null
-          } catch {
-            return 'Please enter a valid URL.'
-          }
-        }}
-      />
-    </>
-  )
+  return <AddonManager currentProfileId={settingsProfileId} onProfileChange={() => {}} />
 }
 
 // ─── Streaming ───────────────────────────────────────────────────────────────
+
+const RESOLUTIONS = ['4k', '1080p', '720p', '480p']
+const ENCODES = ['hevc', 'avc', 'av1']
+const VISUAL_TAGS = ['hdr', 'dv', '10bit']
+const AUDIO_TAGS = ['atmos', 'dts', 'truehd', 'eac3', 'ac3', 'aac', 'flac']
+const SOURCE_TYPES = ['bluray', 'web', 'hdtv', 'unknown', 'telesync', 'cam']
+const STREAM_TYPES = ['http', 'p2p', 'debrid']
+const SORT_OPTIONS = [
+  { id: 'cached', label: 'Cached' },
+  { id: 'resolution', label: 'Resolution' },
+  { id: 'sourceType', label: 'Source Type' },
+  { id: 'encode', label: 'Encode' },
+  { id: 'visualTag', label: 'Visual Tags' },
+  { id: 'audioTag', label: 'Audio Tags' },
+  { id: 'audioChannels', label: 'Audio Channels' },
+  { id: 'seeders', label: 'Seeders' },
+  { id: 'size', label: 'Size' },
+  { id: 'language', label: 'Language' },
+]
+
+function CollapsibleSection({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div style={{ marginBottom: 8, border: '1px solid #333', borderRadius: 6 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          background: open ? 'rgba(139,92,246,0.08)' : 'transparent',
+          border: 'none',
+          color: '#ccc',
+          cursor: 'pointer',
+          fontSize: 14,
+          fontWeight: 600,
+          textAlign: 'left',
+        }}
+      >
+        <span>{title}</span>
+        <span style={{ transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+          ▶
+        </span>
+      </button>
+      {open && <div style={{ padding: '8px 12px' }}>{children}</div>}
+    </div>
+  )
+}
+
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '2px 0' }}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span style={{ fontSize: 13 }}>{label}</span>
+    </label>
+  )
+}
+
+function MultiSelect({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string
+  options: string[]
+  selected: string[]
+  onChange: (v: string[]) => void
+}) {
+  const toggle = (opt: string) => {
+    onChange(selected.includes(opt) ? selected.filter((s) => s !== opt) : [...selected, opt])
+  }
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#aaa' }}>{label}</div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {options.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            style={{
+              padding: '3px 10px',
+              borderRadius: 4,
+              border: selected.includes(opt) ? '1px solid #8b5cf6' : '1px solid #444',
+              background: selected.includes(opt) ? 'rgba(139,92,246,0.2)' : 'transparent',
+              color: selected.includes(opt) ? '#c4b5fd' : '#888',
+              cursor: 'pointer',
+              fontSize: 12,
+              textTransform: 'capitalize',
+            }}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SortOrderEditor({
+  items,
+  onChange,
+}: {
+  items: { id: string; enabled: boolean; direction: 'asc' | 'desc' }[]
+  onChange: (items: { id: string; enabled: boolean; direction: 'asc' | 'desc' }[]) => void
+}) {
+  const move = (idx: number, dir: -1 | 1) => {
+    const newIdx = idx + dir
+    if (newIdx < 0 || newIdx >= items.length) return
+    const next = [...items]
+    const [item] = next.splice(idx, 1)
+    next.splice(newIdx, 0, item)
+    onChange(next)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {items.map((item, idx) => {
+        const meta = SORT_OPTIONS.find((o) => o.id === item.id)
+        return (
+          <div
+            key={item.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '4px 8px',
+              borderRadius: 4,
+              background: item.enabled ? 'rgba(139,92,246,0.08)' : 'transparent',
+              opacity: item.enabled ? 1 : 0.5,
+            }}
+          >
+            <span style={{ fontSize: 11, color: '#666', width: 18 }}>{idx + 1}</span>
+            <span style={{ flex: 1, fontSize: 13, textTransform: 'capitalize' }}>{meta?.label || item.id}</span>
+            <button
+              type="button"
+              onClick={() =>
+                onChange(
+                  items.map((it, i) =>
+                    i === idx ? { ...it, direction: it.direction === 'desc' ? 'asc' : 'desc' } : it,
+                  ),
+                )
+              }
+              style={{
+                padding: '2px 6px',
+                borderRadius: 3,
+                border: '1px solid #444',
+                background: 'transparent',
+                color: '#aaa',
+                cursor: 'pointer',
+                fontSize: 11,
+              }}
+              title={`Direction: ${item.direction}`}
+            >
+              {item.direction === 'desc' ? '↓' : '↑'}
+            </button>
+            <button
+              type="button"
+              onClick={() => move(idx, -1)}
+              disabled={idx === 0}
+              style={{
+                padding: '2px 6px',
+                borderRadius: 3,
+                border: '1px solid #444',
+                background: 'transparent',
+                color: idx === 0 ? '#333' : '#aaa',
+                cursor: idx === 0 ? 'default' : 'pointer',
+                fontSize: 11,
+              }}
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              onClick={() => move(idx, 1)}
+              disabled={idx === items.length - 1}
+              style={{
+                padding: '2px 6px',
+                borderRadius: 3,
+                border: '1px solid #444',
+                background: 'transparent',
+                color: idx === items.length - 1 ? '#333' : '#aaa',
+                cursor: idx === items.length - 1 ? 'default' : 'pointer',
+                fontSize: 11,
+              }}
+            >
+              ▼
+            </button>
+            <input
+              type="checkbox"
+              checked={item.enabled}
+              onChange={(e) =>
+                onChange(items.map((it, i) => (i === idx ? { ...it, enabled: e.target.checked } : it)))
+              }
+              title="Enable this sort criterion"
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 function StreamingTabContent({
   model,
@@ -500,7 +583,37 @@ function StreamingTabContent({
   onCloseOverlay,
 }: SettingsTabContentProps) {
   const streamSettings = useStreamDisplaySettings(model.currentProfileId)
+  const filterSettings = useStreamFilterSettings(model.currentProfileId)
   const [introbdDialogOpen, setIntrobdDialogOpen] = useState(false)
+  const { config, loading, save } = filterSettings
+
+  const updateFilters = useCallback(
+    (patch: Partial<StreamConfig['filters']>) => {
+      save({ filters: { ...config.filters, ...patch } })
+    },
+    [config, save],
+  )
+
+  const updateLimits = useCallback(
+    (patch: Partial<StreamConfig['limits']>) => {
+      save({ limits: { ...config.limits, ...patch } })
+    },
+    [config.limits, save],
+  )
+
+  const updateDedup = useCallback(
+    (patch: Partial<StreamConfig['deduplication']>) => {
+      save({ deduplication: { ...config.deduplication, ...patch } })
+    },
+    [config.deduplication, save],
+  )
+
+  const updateSortingConfig = useCallback(
+    (items: { id: string; enabled: boolean; direction: 'asc' | 'desc' }[]) => {
+      save({ sortingConfig: { items } })
+    },
+    [save],
+  )
 
   const sections = useMemo<SettingsSectionDefinition[]>(
     () => [
@@ -549,7 +662,7 @@ function StreamingTabContent({
               { value: 'compact-advanced', label: 'Compact (Advanced)' },
               { value: 'classic', label: 'Classic' },
             ],
-            onChange: (value) =>
+            onChange: (value: string) =>
               streamSettings.save({
                 streamDisplayMode: value as 'compact-simple' | 'compact-advanced' | 'classic',
               }),
@@ -560,7 +673,7 @@ function StreamingTabContent({
             label: 'Show addon name',
             description: 'Display the addon source in stream rows.',
             checked: streamSettings.showAddonName,
-            onChange: (checked) => streamSettings.save({ showAddonName: checked }),
+            onChange: (checked: boolean) => streamSettings.save({ showAddonName: checked }),
           },
           {
             id: 'streaming-show-description',
@@ -568,26 +681,247 @@ function StreamingTabContent({
             label: 'Show descriptions',
             description: 'Display parsed stream descriptions in the picker.',
             checked: streamSettings.showDescription,
-            onChange: (checked) => streamSettings.save({ showDescription: checked }),
+            onChange: (checked: boolean) => streamSettings.save({ showDescription: checked }),
           },
         ],
       },
       {
-        id: 'streaming-filtering',
-        title: 'Sorting and Filtering',
+        id: 'streaming-advanced',
+        title: 'Advanced Filtering & Sorting',
         scope: 'settings-profile' as const,
         mobileOverlay: platform === 'standard' && getAppTarget().isMobile,
         items: [
           {
-            id: 'streaming-filter-notice',
-            kind: 'notice' as const,
-            content:
-              'Advanced sorting and filtering can be configured from the stream picker during playback.',
+            id: 'streaming-advanced-content',
+            kind: 'custom' as const,
+            render: () => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <CollapsibleSection title="Sort Order">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <SortOrderEditor
+                      items={config.sortingConfig?.items || []}
+                      onChange={updateSortingConfig}
+                    />
+                  )}
+                </CollapsibleSection>
+                <CollapsibleSection title="Resolution">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <MultiSelect
+                      label="Preferred (order = priority)"
+                      options={RESOLUTIONS}
+                      selected={config.filters?.resolution?.preferred || []}
+                      onChange={(vals) => updateFilters({ resolution: { ...config.filters?.resolution, preferred: vals } })}
+                    />
+                  )}
+                </CollapsibleSection>
+                <CollapsibleSection title="Encode">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <>
+                      <MultiSelect
+                        label="Required"
+                        options={ENCODES}
+                        selected={config.filters?.encode?.required || []}
+                        onChange={(vals) => updateFilters({ encode: { ...config.filters?.encode, required: vals } })}
+                      />
+                      <MultiSelect
+                        label="Excluded"
+                        options={ENCODES}
+                        selected={config.filters?.encode?.excluded || []}
+                        onChange={(vals) => updateFilters({ encode: { ...config.filters?.encode, excluded: vals } })}
+                      />
+                    </>
+                  )}
+                </CollapsibleSection>
+                <CollapsibleSection title="Visual Tags">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <>
+                      <MultiSelect
+                        label="Required"
+                        options={VISUAL_TAGS}
+                        selected={config.filters?.visualTag?.required || []}
+                        onChange={(vals) => updateFilters({ visualTag: { ...config.filters?.visualTag, required: vals } })}
+                      />
+                      <MultiSelect
+                        label="Excluded"
+                        options={VISUAL_TAGS}
+                        selected={config.filters?.visualTag?.excluded || []}
+                        onChange={(vals) => updateFilters({ visualTag: { ...config.filters?.visualTag, excluded: vals } })}
+                      />
+                    </>
+                  )}
+                </CollapsibleSection>
+                <CollapsibleSection title="Audio Tags">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <>
+                      <MultiSelect
+                        label="Required"
+                        options={AUDIO_TAGS}
+                        selected={config.filters?.audioTag?.required || []}
+                        onChange={(vals) => updateFilters({ audioTag: { ...config.filters?.audioTag, required: vals } })}
+                      />
+                      <MultiSelect
+                        label="Excluded"
+                        options={AUDIO_TAGS}
+                        selected={config.filters?.audioTag?.excluded || []}
+                        onChange={(vals) => updateFilters({ audioTag: { ...config.filters?.audioTag, excluded: vals } })}
+                      />
+                    </>
+                  )}
+                </CollapsibleSection>
+                <CollapsibleSection title="Cache / Debrid">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (() => {
+                    const cache = config.filters?.cache || { cached: true, uncached: true, applyMode: 'OR' as const }
+                    return (
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <ToggleRow
+                          label="Show cached"
+                          checked={cache.cached}
+                          onChange={(v) => updateFilters({ cache: { ...cache, cached: v } })}
+                        />
+                        <ToggleRow
+                          label="Show uncached"
+                          checked={cache.uncached}
+                          onChange={(v) => updateFilters({ cache: { ...cache, uncached: v } })}
+                        />
+                      </div>
+                    )
+                  })()}
+                </CollapsibleSection>
+                <CollapsibleSection title="Source Type">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <>
+                      <MultiSelect
+                        label="Required"
+                        options={SOURCE_TYPES}
+                        selected={config.filters?.sourceType?.required || []}
+                        onChange={(vals) => updateFilters({ sourceType: { ...config.filters?.sourceType, required: vals } })}
+                      />
+                      <MultiSelect
+                        label="Excluded (e.g. hide CAM/TS)"
+                        options={SOURCE_TYPES}
+                        selected={config.filters?.sourceType?.excluded || []}
+                        onChange={(vals) => updateFilters({ sourceType: { ...config.filters?.sourceType, excluded: vals } })}
+                      />
+                    </>
+                  )}
+                </CollapsibleSection>
+                <CollapsibleSection title="Stream Type">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <MultiSelect
+                      label="Required"
+                      options={STREAM_TYPES}
+                      selected={config.filters?.streamType?.required || []}
+                      onChange={(vals) => updateFilters({ streamType: { ...config.filters?.streamType, required: vals } })}
+                    />
+                  )}
+                </CollapsibleSection>
+                <CollapsibleSection title="Limits">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>Max total results: <strong>{config.limits?.maxResults || 50}</strong></div>
+                        <input
+                          type="range" min={10} max={200} step={10}
+                          value={config.limits?.maxResults || 50}
+                          onChange={(e) => updateLimits({ maxResults: Number(e.target.value) })}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>Per service: <strong>{config.limits?.perService || 20}</strong></div>
+                        <input
+                          type="range" min={1} max={50} step={1}
+                          value={config.limits?.perService || 20}
+                          onChange={(e) => updateLimits({ perService: Number(e.target.value) })}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>Per addon: <strong>{config.limits?.perAddon || 10}</strong></div>
+                        <input
+                          type="range" min={1} max={30} step={1}
+                          value={config.limits?.perAddon || 10}
+                          onChange={(e) => updateLimits({ perAddon: Number(e.target.value) })}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </CollapsibleSection>
+                <CollapsibleSection title="Deduplication">
+                  {loading ? (
+                    <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>Mode</div>
+                        <select
+                          value={config.deduplication?.mode || 'Per Service'}
+                          onChange={(e) =>
+                            updateDedup({ mode: e.target.value as 'Single Result' | 'Per Service' | 'Per Addon' })
+                          }
+                          style={{
+                            padding: '4px 8px', borderRadius: 4, border: '1px solid #444',
+                            background: '#222', color: '#ccc', fontSize: 13,
+                          }}
+                        >
+                          <option value="Single Result">Single Result</option>
+                          <option value="Per Service">Per Service</option>
+                          <option value="Per Addon">Per Addon</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {(() => {
+                          const det = config.deduplication?.detection || { filename: true, infoHash: true, smartDetect: true }
+                          return (
+                            <>
+                              <ToggleRow
+                                label="Filename matching"
+                                checked={det.filename}
+                                onChange={(v) => updateDedup({ detection: { ...det, filename: v } })}
+                              />
+                              <ToggleRow
+                                label="Info hash matching"
+                                checked={det.infoHash}
+                                onChange={(v) => updateDedup({ detection: { ...det, infoHash: v } })}
+                              />
+                              <ToggleRow
+                                label="Smart detect"
+                                checked={det.smartDetect}
+                                onChange={(v) => updateDedup({ detection: { ...det, smartDetect: v } })}
+                              />
+                            </>
+                          )
+                        })()}
+                      </div>
+                    </>
+                  )}
+                </CollapsibleSection>
+              </div>
+            ),
           },
         ],
       },
     ],
-    [streamSettings, platform]
+    [streamSettings, platform, config, loading, save, updateFilters, updateLimits, updateDedup, updateSortingConfig]
   )
 
   return (
@@ -627,8 +961,9 @@ function DownloadsTabContent({
   onOpenOverlay,
   onCloseOverlay,
 }: SettingsTabContentProps) {
+  const isMobile = getAppTarget().isMobile
   const [enabled, setEnabled] = useState(() => readBool('zentrio_downloads_enabled', true))
-  const [wifiOnly, setWifiOnly] = useState(() => readBool('zentrio_download_wifi_only', true))
+  const [wifiOnly, setWifiOnly] = useState(() => readBool('zentrio_download_wifi_only', false))
   const [quality, setQuality] = useState(
     () => localStorage.getItem('download_quality_pref') ?? 'auto'
   )
@@ -677,7 +1012,7 @@ function DownloadsTabContent({
             onChange: handleQualityChange,
             disabled: !enabled,
           },
-          {
+          ...(isMobile ? [{
             id: 'downloads-wifi-only',
             kind: 'toggle' as const,
             label: 'Wi-Fi only',
@@ -685,11 +1020,11 @@ function DownloadsTabContent({
             checked: wifiOnly,
             onChange: handleWifiOnlyChange,
             disabled: !enabled,
-          },
+          }] : []),
         ],
       },
     ],
-    [enabled, quality, wifiOnly]
+    [enabled, isMobile, quality, wifiOnly]
   )
 
   return (

@@ -1,15 +1,15 @@
-import { ChevronDown, ChevronUp, Puzzle, Settings, Share2, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, MoreHorizontal, Puzzle, Settings, Share2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { apiFetch } from '../../lib/apiFetch'
 import { isTauri } from '../../lib/auth-client'
 import { ZENTRIO_LOGO_192_URL } from '../../lib/brand-assets'
-import styles from '../../styles/Settings.module.css'
 import { createLogger } from '../../utils/client-logger'
 import { Button, Input, Toggle } from '../index'
+import tvStyles from './TvAddonManager.module.css'
 
-const log = createLogger('AddonManagerUI')
+const log = createLogger('TvAddonManagerUI')
 
 interface Addon {
   id: string
@@ -25,7 +25,6 @@ interface Addon {
   }
 }
 
-// Config/Install Modal Component
 const AddonConfigModal = ({
     isOpen,
     onClose,
@@ -116,12 +115,12 @@ const AddonConfigModal = ({
     )
 }
 
-interface AddonManagerProps {
+interface TvAddonManagerProps {
   currentProfileId: string
   onProfileChange: (id: string) => void
 }
 
-export function AddonManager({ currentProfileId }: AddonManagerProps) {
+export function TvAddonManager({ currentProfileId }: TvAddonManagerProps) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [addons, setAddons] = useState<Addon[]>([])
@@ -130,6 +129,9 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [manifestUrl, setManifestUrl] = useState('')
   const [installing, setInstalling] = useState(false)
+  const [isInstallDialogOpen, setIsInstallDialogOpen] = useState(false)
+  const [pendingManifestUrl, setPendingManifestUrl] = useState('')
+  const [expandedAddonId, setExpandedAddonId] = useState<string | null>(null)
   const [draggedAddonId, setDraggedAddonId] = useState<string | null>(null)
   const [dragOverAddonId, setDragOverAddonId] = useState<string | null>(null)
 
@@ -181,10 +183,6 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
     } finally {
       setInstalling(false)
     }
-  }
-
-  const handleToggleWrapper = (addon: Addon, enabled: boolean) => {
-      handleToggleAddon(addon.id, enabled)
   }
 
   const handleToggleAddon = async (addonId: string, enabled: boolean) => {
@@ -326,165 +324,159 @@ export function AddonManager({ currentProfileId }: AddonManagerProps) {
   }
 
   return (
-    <div className={styles.tabContent}>
-      <div className={styles.settingsCard}>
-        <h2 className={styles.sectionTitle}>Addons</h2>
+    <div className={tvStyles.tvAddonSection}>
+      <div className={tvStyles.tvAddonSectionTitle}>Addons</div>
 
-        <div className={styles.settingItem} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div className={styles.settingInfo}>
-                <h3>Install Addon</h3>
-                <p>Enter the manifest URL of a Stremio-compatible addon.</p>
-            </div>
-            <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                    <Input
-                        type="text"
-                        placeholder="https://example.com/manifest.json"
-                        value={manifestUrl}
-                        onChange={(e) => setManifestUrl(e.target.value)}
-                    />
-                </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <Button variant="primary" onClick={handleInstallAddon} disabled={installing}>
-                        {installing ? 'Installing...' : 'Install'}
-                    </Button>
-                    <Button variant="secondary" onClick={() => navigate('/settings/explore-addons', { state: { from: '/settings?tab=addons', fromLabel: 'Back to Settings' } })}>
-                        Explore
-                    </Button>
-                </div>
-            </div>
+      <div className={tvStyles.tvAddonInstallRow}>
+        <div className={tvStyles.tvAddonInstallInfo}>
+          <div className={tvStyles.tvAddonInstallLabel}>Install Addon</div>
+          <div className={tvStyles.tvAddonInstallDesc}>Enter the manifest URL of a Stremio-compatible addon.</div>
         </div>
-
-        <div className={styles.settingItem} style={{ flexDirection: 'column', alignItems: 'flex-start', borderBottom: 'none' }}>
-            <div className={styles.settingInfo}>
-                <h3>Installed Addons</h3>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '15px' }}>
-                {loading ? (
-                    <div style={{ color: '#666' }}>Loading addons...</div>
-                ) : addons.length === 0 ? (
-                    <div style={{ color: '#666' }}>No addons installed.</div>
-                ) : (
-                    addons.map(addon => {
-                        const isZentrio = addon.manifest_url === 'zentrio://tmdb-addon' || addon.id === 'org.zentrio.tmdb';
-                        
-                        return (
-                        <div 
-                            key={addon.id} 
-                            className={`${styles.addonItem} addon-item`}
-                            draggable={true}
-                            onDragStart={(e) => handleDragStart(e, addon.id)}
-                            onDragOver={(e) => handleDragOver(e, addon.id)}
-                            onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, addon.id)}
-                            onDragEnd={handleDragEnd}
-                            style={{
-                                background: isZentrio ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))' : undefined,
-                                border: dragOverAddonId === addon.id 
-                                    ? '2px solid rgba(139, 92, 246, 0.6)' 
-                                    : isZentrio 
-                                        ? '1px solid rgba(139, 92, 246, 0.3)' 
-                                        : undefined,
-                                opacity: draggedAddonId === addon.id ? 0.5 : 1,
-                                cursor: 'grab',
-                                transform: dragOverAddonId === addon.id ? 'scale(1.01)' : 'scale(1)'
-                            }}
-                        >
-                            <div className={styles.addonReorderControls}>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleMoveAddon(addon.id, 'up'); }}
-                                    disabled={addons.indexOf(addon) === 0}
-                                    title="Move up"
-                                >
-                                    <ChevronUp size={16} />
-                                </button>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleMoveAddon(addon.id, 'down'); }}
-                                    disabled={addons.indexOf(addon) === addons.length - 1}
-                                    title="Move down"
-                                >
-                                    <ChevronDown size={16} />
-                                </button>
-                            </div>
-                            <div className={styles.addonInfo}>
-                                {isZentrio ? (
-                                    <img className={styles.addonLogo} src={ZENTRIO_LOGO_192_URL} alt="Zentrio" />
-                                ) : addon.logo ? (
-                                    <img className={styles.addonLogo} src={addon.logo} alt={addon.name} />
-                                ) : (
-                                    <div className={styles.addonLogoPlaceholder}>
-                                        <Puzzle size={20} color="#555" />
-                                    </div>
-                                )}
-                                <div className={styles.addonDetails}>
-                                    <div className={styles.addonName}>
-                                        {addon.name} <span className={styles.addonVersion}>v{addon.version}</span>
-                                        {isZentrio && <span style={{ fontSize: '0.65em', color: '#a78bfa', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2))', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Native</span>}
-                                    </div>
-                                    <div className={styles.addonDescription}>
-                                        {addon.description}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className={styles.addonActions}>
-                                {isZentrio ? (
-                                    <Button
-                                        variant="secondary"
-                                        size="small"
-                                        onClick={() => navigate(`/settings/addons/tmdb-config?profileId=${currentProfileId}`)}
-                                        title="Configure catalogs"
-                                    >
-                                        <Settings size={18} />
-                                    </Button>
-                                ) : (addon.behavior_hints?.configurable || addon.behavior_hints?.configurationRequired) ? (
-                                    <Button
-                                        variant="secondary"
-                                        size="small"
-                                        onClick={() => handleConfigureAddon(addon)}
-                                        title="Configure"
-                                    >
-                                        <Settings size={18} />
-                                    </Button>
-                                ) : null}
-                                
-                                {!addon.manifest_url.startsWith('zentrio://') && (
-                                    <Button 
-                                        variant="secondary" 
-                                        size="small" 
-                                        onClick={() => handleShareAddon(addon)}
-                                        title="Copy addon link"
-                                    >
-                                        <Share2 size={18} />
-                                    </Button>
-                                )}
-                                
-                                <Toggle 
-                                    checked={addon.enabled} 
-                                    onChange={(checked) => handleToggleWrapper(addon, checked)} 
-                                />
-                                
-                                {addon.manifest_url !== 'zentrio://tmdb-addon' && (
-                                    <Button 
-                                        variant="danger" 
-                                        size="small" 
-                                        onClick={() => handleDeleteAddon(addon.id)}
-                                        title="Uninstall"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>
-                                        </svg>
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    )})
-                )}
-            </div>
+        <div className={tvStyles.tvAddonInstallControl}>
+          <div className={tvStyles.tvAddonInstallActions}>
+            <Button variant="primary" onClick={() => { setPendingManifestUrl(''); setIsInstallDialogOpen(true) }}>
+              Install
+            </Button>
+            <Button variant="secondary" onClick={() => navigate('/settings/explore-addons', { state: { from: '/settings?tab=addons', fromLabel: 'Back to Settings' } })}>
+              Explore
+            </Button>
+          </div>
         </div>
-
       </div>
+
+      {isInstallDialogOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 w-full max-w-lg shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-white">Install Addon</h3>
+              <button onClick={() => setIsInstallDialogOpen(false)} className="text-zinc-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-500 mb-1 uppercase">Manifest URL</label>
+                <Input
+                  value={pendingManifestUrl}
+                  onChange={(e) => setPendingManifestUrl(e.target.value)}
+                  placeholder="https://example.com/manifest.json"
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="secondary" onClick={() => setIsInstallDialogOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={() => { setManifestUrl(pendingManifestUrl); setIsInstallDialogOpen(false); handleInstallAddon() }} disabled={!pendingManifestUrl}>
+                Install
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={tvStyles.tvAddonSectionTitle}>Installed Addons</div>
+
+      {loading ? (
+        <div className={tvStyles.tvAddonEmpty}>Loading addons...</div>
+      ) : addons.length === 0 ? (
+        <div className={tvStyles.tvAddonEmpty}>No addons installed.</div>
+      ) : (
+        addons.map(addon => {
+          const isZentrio = addon.manifest_url === 'zentrio://tmdb-addon' || addon.id === 'org.zentrio.tmdb'
+          const isExpanded = expandedAddonId === addon.id
+          const hasConfig = isZentrio || addon.behavior_hints?.configurable || addon.behavior_hints?.configurationRequired
+          const canShare = !addon.manifest_url.startsWith('zentrio://')
+          const canDelete = addon.manifest_url !== 'zentrio://tmdb-addon'
+
+          return (
+            <div 
+              key={addon.id} 
+              className={`${tvStyles.tvAddonRow} ${isZentrio ? tvStyles.tvAddonRowZentrio : ''} ${isExpanded ? tvStyles.tvAddonRowExpanded : ''} ${dragOverAddonId === addon.id ? tvStyles.tvAddonRowDragOver : ''} ${draggedAddonId === addon.id ? tvStyles.tvAddonRowDragging : ''}`}
+              draggable={true}
+              onDragStart={(e) => handleDragStart(e, addon.id)}
+              onDragOver={(e) => handleDragOver(e, addon.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, addon.id)}
+              onDragEnd={handleDragEnd}
+            >
+              <div className={tvStyles.tvAddonRowLeading}>
+                <div className={tvStyles.tvAddonReorderControls}>
+                  <button onClick={(e) => { e.stopPropagation(); handleMoveAddon(addon.id, 'up') }} disabled={addons.indexOf(addon) === 0} title="Move up">
+                    <ChevronUp size={16} />
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); handleMoveAddon(addon.id, 'down') }} disabled={addons.indexOf(addon) === addons.length - 1} title="Move down">
+                    <ChevronDown size={16} />
+                  </button>
+                </div>
+                {isZentrio ? (
+                  <img className={tvStyles.tvAddonLogo} src={ZENTRIO_LOGO_192_URL} alt="Zentrio" />
+                ) : addon.logo ? (
+                  <img className={tvStyles.tvAddonLogo} src={addon.logo} alt={addon.name} />
+                ) : (
+                  <div className={tvStyles.tvAddonLogoPlaceholder}>
+                    <Puzzle size={20} color="#555" />
+                  </div>
+                )}
+                <div className={tvStyles.tvAddonDetails}>
+                  <div className={tvStyles.tvAddonName}>
+                    {addon.name}
+                    <span className={tvStyles.tvAddonVersion}>v{addon.version}</span>
+                    {isZentrio && <span className={tvStyles.tvAddonNativeBadge}>Native</span>}
+                  </div>
+                  <div className={tvStyles.tvAddonDescription}>{addon.description}</div>
+                </div>
+              </div>
+              <div className={tvStyles.tvAddonRowControl}>
+                <div className={tvStyles.tvAddonActions}>
+                  <Toggle checked={addon.enabled} onChange={(checked) => handleToggleAddon(addon.id, checked)} />
+                  <button
+                    type="button"
+                    className={tvStyles.tvAddonExpandBtn}
+                    onClick={() => setExpandedAddonId(isExpanded ? null : addon.id)}
+                    title={isExpanded ? 'Collapse' : 'Edit'}
+                  >
+                    <MoreHorizontal size={18} />
+                  </button>
+                </div>
+                {isExpanded && (
+                  <div className={tvStyles.tvAddonExpandedActions}>
+                    {hasConfig && (
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() => {
+                          if (isZentrio) {
+                            navigate(`/settings/addons/tmdb-config?profileId=${currentProfileId}`)
+                          } else {
+                            handleConfigureAddon(addon)
+                          }
+                        }}
+                      >
+                        <Settings size={16} />
+                        <span>{isZentrio ? 'Configure' : 'Configure'}</span>
+                      </Button>
+                    )}
+                    {canShare && (
+                      <Button variant="secondary" size="small" onClick={() => handleShareAddon(addon)}>
+                        <Share2 size={16} />
+                        <span>Copy link</span>
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button variant="danger" size="small" onClick={() => handleDeleteAddon(addon.id)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>
+                        </svg>
+                        <span>Uninstall</span>
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })
+      )}
 
       <AddonConfigModal
         isOpen={isConfigModalOpen}

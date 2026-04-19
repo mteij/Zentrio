@@ -1,4 +1,5 @@
 import { getServerUrl, isTauri } from './auth-client'
+import { isSafeExternalUrl } from './ssrf'
 
 type GatewayRoute =
   | '/api/streaming/dashboard'
@@ -16,7 +17,7 @@ const GATEWAY_READ_ROUTES: GatewayRoute[] = [
   '/api/streaming/catalog',
   '/api/streaming/catalog-items',
   '/api/streaming/search-catalog-metadata',
-  '/api/streaming/search-catalog-items'
+  '/api/streaming/search-catalog-items',
 ]
 
 const getLocalGatewayBase = (): string => {
@@ -55,14 +56,25 @@ export const shouldUseLocalGatewayForRead = (url: string): boolean => {
 
   // Require explicit enablement so accidental stale localStorage does not
   // force local gateway usage unexpectedly.
-  if (typeof window !== 'undefined' && localStorage.getItem('zentrio_local_gateway_enabled') !== '1') {
+  if (
+    typeof window !== 'undefined' &&
+    localStorage.getItem('zentrio_local_gateway_enabled') !== '1'
+  ) {
     return false
   }
 
   // Emergency kill-switch (client-side) if local gateway must be bypassed.
-  if (typeof window !== 'undefined' && localStorage.getItem('zentrio_local_gateway_disabled') === '1') {
+  if (
+    typeof window !== 'undefined' &&
+    localStorage.getItem('zentrio_local_gateway_disabled') === '1'
+  ) {
     return false
   }
+
+  // Gateway only makes sense when remote is an actual external server.
+  // In dev mode the remote is localhost:3000 — routing through the gateway
+  // would hit SSRF protection and loop back to the same server.
+  if (!isSafeExternalUrl(getGatewayRemoteBase())) return false
 
   return GATEWAY_READ_ROUTES.some((route) => url.startsWith(route))
 }
@@ -88,7 +100,9 @@ export const toDirectRemoteUrl = (resolvedOrRelativeUrl: string): string => {
   const isGatewayPath = parsed.pathname.startsWith('/api/gateway/')
   const cleanPath = isGatewayPath
     ? parsed.pathname.replace(/^\/api\/gateway/, '')
-    : (resolvedOrRelativeUrl.startsWith('/') ? resolvedOrRelativeUrl : parsed.pathname)
+    : resolvedOrRelativeUrl.startsWith('/')
+      ? resolvedOrRelativeUrl
+      : parsed.pathname
 
   const params = new URLSearchParams(parsed.search)
   params.delete('__remote')
@@ -102,8 +116,7 @@ export const toDirectRemoteUrl = (resolvedOrRelativeUrl: string): string => {
  * Returns true when URL is already absolute or handled by browser/runtime directly.
  */
 export const isAbsoluteOrRuntimeUrl = (url: string): boolean => {
-  return /^(?:https?|ftp):\/\//i.test(url) ||
-    url.startsWith('blob:')
+  return /^(?:https?|ftp):\/\//i.test(url) || url.startsWith('blob:')
 }
 
 /**
@@ -135,7 +148,7 @@ export const resolveBeaconUrl = (url: string): string => resolveAppUrl(url)
  * Allowed URL protocols for image src attributes.
  * Only these protocols are permitted — everything else is rejected.
  */
-const ALLOWED_IMG_PROTOCOLS = ['http:', 'https:', 'blob:'] as const;
+const ALLOWED_IMG_PROTOCOLS = ['http:', 'https:', 'blob:'] as const
 
 /**
  * Sanitizes a URL for safe use in an `<img src>` attribute.
@@ -146,50 +159,50 @@ const ALLOWED_IMG_PROTOCOLS = ['http:', 'https:', 'blob:'] as const;
  * before being assigned to a DOM src attribute.
  */
 export const sanitizeImgSrc = (url: string): string => {
-  if (!url || typeof url !== 'string') return '';
+  if (!url || typeof url !== 'string') return ''
 
   // Strip all ASCII control characters and whitespace that could hide a scheme
   // eslint-disable-next-line no-control-regex
-  const cleaned = url.replace(/[\s\x00-\x1F\x7F-\x9F]/g, '');
-  if (!cleaned) return '';
+  const cleaned = url.replace(/[\s\x00-\x1F\x7F-\x9F]/g, '')
+  if (!cleaned) return ''
 
   // Relative paths (starting with /) are always safe in same-origin contexts
-  if (cleaned.startsWith('/')) return cleaned;
+  if (cleaned.startsWith('/')) return cleaned
 
   // For absolute URLs, only allow explicitly safe protocols
   try {
-    const parsed = new URL(cleaned);
-    const proto = parsed.protocol.toLowerCase();
+    const parsed = new URL(cleaned)
+    const proto = parsed.protocol.toLowerCase()
     if ((ALLOWED_IMG_PROTOCOLS as readonly string[]).includes(proto)) {
-      return cleaned;
+      return cleaned
     }
     // Protocol not in allow-list → reject
-    return '';
+    return ''
   } catch {
     // Not a valid absolute URL and doesn't start with / — reject to be safe
-    return '';
+    return ''
   }
-};
+}
 
 /**
  * Validates if a URL fragment (seed / style) is safe to embed in a constructed URL.
  * Returns null if the input contains a dangerous scheme.
  */
 const validateSafeUrlFragment = (value: string): string | null => {
-  if (!value || typeof value !== 'string') return null;
+  if (!value || typeof value !== 'string') return null
 
   // eslint-disable-next-line no-control-regex
-  const cleaned = value.replace(/[\s\x00-\x1F\x7F-\x9F]/g, '');
-  if (!cleaned) return null;
+  const cleaned = value.replace(/[\s\x00-\x1F\x7F-\x9F]/g, '')
+  if (!cleaned) return null
 
   // Reject anything that looks like a dangerous scheme
-  const lower = cleaned.toLowerCase();
+  const lower = cleaned.toLowerCase()
   for (const scheme of ['javascript:', 'vbscript:', 'data:', 'file:']) {
-    if (lower.startsWith(scheme)) return null;
+    if (lower.startsWith(scheme)) return null
   }
 
-  return cleaned;
-};
+  return cleaned
+}
 
 /**
  * Builds avatar URL for both web and Tauri environments.
@@ -197,21 +210,20 @@ const validateSafeUrlFragment = (value: string): string | null => {
  * because it always passes through `sanitizeImgSrc` before being returned.
  */
 export const buildAvatarUrl = (seed: string, style: string, fallbackSeed = 'preview'): string => {
-  const safeSeed = validateSafeUrlFragment(seed);
-  const safeStyle = validateSafeUrlFragment(style);
+  const safeSeed = validateSafeUrlFragment(seed)
+  const safeStyle = validateSafeUrlFragment(style)
 
-  const seedToUse = safeSeed || fallbackSeed;
-  const styleToUse = safeStyle || 'bottts-neutral';
+  const seedToUse = safeSeed || fallbackSeed
+  const styleToUse = safeStyle || 'bottts-neutral'
 
   // If the seed is already an absolute URL (http/https), sanitize and return
   if (isAbsoluteOrRuntimeUrl(seedToUse)) {
-    return sanitizeImgSrc(seedToUse);
+    return sanitizeImgSrc(seedToUse)
   }
 
   // Build the URL with encoded dynamic parts, then sanitize the final result
-  const encodedSeed = encodeURIComponent(seedToUse);
-  const encodedStyle = encodeURIComponent(styleToUse);
+  const encodedSeed = encodeURIComponent(seedToUse)
+  const encodedStyle = encodeURIComponent(styleToUse)
 
-  return sanitizeImgSrc(resolveAppUrl(`/api/avatar/${encodedSeed}?style=${encodedStyle}`));
+  return sanitizeImgSrc(resolveAppUrl(`/api/avatar/${encodedSeed}?style=${encodedStyle}`))
 }
-

@@ -32,6 +32,7 @@ export interface SettingsTabDefinition {
   label: string
   icon: LucideIcon
   hiddenInGuest?: boolean
+  requiresNativeShell?: boolean
 }
 
 export interface SettingsSelectOption {
@@ -139,10 +140,14 @@ export const SETTINGS_TAB_DEFINITIONS: SettingsTabDefinition[] = [
   { key: 'appearance', label: 'Appearance', icon: Palette },
   { key: 'addons', label: 'Addons', icon: Puzzle },
   { key: 'streaming', label: 'Streaming', icon: Play },
-  { key: 'downloads', label: 'Downloads', icon: Download },
+  { key: 'downloads', label: 'Downloads', icon: Download, requiresNativeShell: true },
   { key: 'danger', label: 'Danger Zone', icon: AlertTriangle, hiddenInGuest: true },
 ]
 
-export function getVisibleSettingsTabs(isGuestMode: boolean): SettingsTabDefinition[] {
-  return SETTINGS_TAB_DEFINITIONS.filter((tab) => !(isGuestMode && tab.hiddenInGuest))
+export function getVisibleSettingsTabs(isGuestMode: boolean, isTauri: boolean): SettingsTabDefinition[] {
+  return SETTINGS_TAB_DEFINITIONS.filter((tab) => {
+    if (isGuestMode && tab.hiddenInGuest) return false
+    if (tab.requiresNativeShell && !isTauri) return false
+    return true
+  })
 }

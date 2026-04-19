@@ -1265,6 +1265,7 @@
 .mediaCard {
   width: 100%;
   position: relative;
+  display: block;
   transition: transform 0.2s ease-out;
   cursor: pointer;
   text-decoration: none;
@@ -1339,30 +1340,30 @@
 
 /* Ranked Items */
 .rankedWrapper {
-  margin-left: 30px; /* Make space for the number */
+  margin-left: 60px; /* Make space for the large number */
 }
 
 /* Rank Number styling matching standard "Top 10" aesthetic */
 .rankNumber {
   position: absolute;
-  bottom: 0px;
-  left: -25px;
-  font-size: 7rem;
+  bottom: 0;
+  left: -35px;
+  font-size: 12rem;
   font-weight: 800;
-  color: #141414; /* Dark fill */
-  -webkit-text-stroke: 4px rgba(255, 255, 255, 0.5); /* White stroke */
-  line-height: 1;
-  z-index: 20; /* In front of poster? Or behind? "Overlay" -> Front. But usually "Top 10" style has number slightly behind or flush. Let's try front but lower part. */
-  font-family: 'Impact', sans-serif; /* Or closest sturdy font */
+  color: transparent;
+  -webkit-text-stroke: 4px rgba(255, 255, 255, 0.85);
+  line-height: 0.75;
+  z-index: -1;
+  font-family: 'Impact', 'Arial Black', sans-serif;
   pointer-events: none;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  letter-spacing: -5px;
+  filter: drop-shadow(2px 2px 6px rgba(0, 0, 0, 0.6));
+  letter-spacing: -10px;
 }
 
 /* Special case for 10 */
 .rankNumber10 {
-  left: -45px;
-  letter-spacing: -8px;
+  left: -80px;
+  letter-spacing: -14px;
 }
 
 /* Animations - Optimized for performance */
@@ -1579,6 +1580,22 @@
 
   .cardWrapper {
     width: 140px;
+  }
+
+  .rankedWrapper {
+    margin-left: 36px;
+  }
+
+  .rankNumber {
+    font-size: 8rem;
+    left: -20px;
+    letter-spacing: -6px;
+    -webkit-text-stroke: 2px rgba(255, 255, 255, 0.85);
+  }
+
+  .rankNumber10 {
+    left: -50px;
+    letter-spacing: -10px;
   }
 
   .mediaCard {

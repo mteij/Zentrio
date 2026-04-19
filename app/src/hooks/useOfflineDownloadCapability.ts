@@ -13,7 +13,19 @@ interface OfflineDownloadCapability {
   allowOnTv: boolean
 }
 
-export function useOfflineDownloadCapability(profileId: string | number | undefined): OfflineDownloadCapability {
+function readLocalBool(key: string, defaultValue: boolean): boolean {
+  const stored = localStorage.getItem(key)
+  return stored === null ? defaultValue : stored === 'true'
+}
+
+function isOnCellular(): boolean {
+  const conn = (navigator as any).connection
+  return conn?.type === 'cellular'
+}
+
+export function useOfflineDownloadCapability(
+  profileId: string | number | undefined
+): OfflineDownloadCapability {
   const platform = getPlatformCapabilities()
   const isTv = platform.isTv
   const [allowOnTv, setAllowOnTv] = useState(false)
@@ -43,7 +55,9 @@ export function useOfflineDownloadCapability(profileId: string | number | undefi
 
     const fetchSettings = async () => {
       try {
-        const res = await apiFetch(`/api/streaming/settings?profileId=${encodeURIComponent(String(profileId))}`)
+        const res = await apiFetch(
+          `/api/streaming/settings?profileId=${encodeURIComponent(String(profileId))}`
+        )
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
         const data = await res.json()
@@ -71,8 +85,16 @@ export function useOfflineDownloadCapability(profileId: string | number | undefi
     }
   }, [isTv, profileId, platform.canUseNativeShell])
 
+  const downloadsEnabled = readLocalBool('zentrio_downloads_enabled', true)
+  const wifiOnly = readLocalBool('zentrio_download_wifi_only', false)
+  const blockedByCellular = wifiOnly && isOnCellular()
+
   return {
-    isAvailable: platform.canUseNativeShell && canUseOfflineDownloads(platform, { allowOnTv }),
+    isAvailable:
+      platform.canUseNativeShell &&
+      canUseOfflineDownloads(platform, { allowOnTv }) &&
+      downloadsEnabled &&
+      !blockedByCellular,
     isLoading,
     isTv,
     allowOnTv,
