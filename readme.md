@@ -46,12 +46,6 @@ If you want the full walkthrough, self-hosting guide, or contributor docs, start
 - It is available on the web and as native desktop and Android apps.
 - It is designed to feel like a product people actually want to use, not just a backend with a UI attached.
 
-## What To Expect
-
-- Zentrio is for people who are comfortable running their own setup or want to learn.
-- It is usable today, but it is still an actively evolving project.
-- It is not the best fit if you want a fully managed, zero-maintenance service.
-
 If that sounds right, you can try the hosted experience at [zentrio.eu/web](https://zentrio.eu/web) or self-host your own instance.
 
 ## Quick Start
