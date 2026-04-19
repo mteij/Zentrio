@@ -17,7 +17,13 @@ vi.mock('sonner', () => ({
 }))
 
 vi.mock('./SettingsRenderer', () => ({
-  SettingsRenderer: ({ platform, sections }: { platform: string; sections: Array<{ id: string; title?: string }> }) => (
+  SettingsRenderer: ({
+    platform,
+    sections,
+  }: {
+    platform: string
+    sections: Array<{ id: string; title?: string }>
+  }) => (
     <div data-testid={`renderer-${platform}`}>
       {sections.map((section) => (
         <div key={section.id}>{section.title ?? section.id}</div>
@@ -112,12 +118,7 @@ afterEach(() => {
 
 describe('SettingsTabContent (streaming tab)', () => {
   it('renders shared streaming settings sections for standard platform', () => {
-    const view = mount(
-      <SettingsTabContent
-        model={createModel()}
-        platform="standard"
-      />,
-    )
+    const view = mount(<SettingsTabContent model={createModel()} platform="standard" />)
 
     expect(view.container.textContent).toContain('Playback')
     expect(view.container.textContent).toContain('Stream Display')
@@ -126,12 +127,7 @@ describe('SettingsTabContent (streaming tab)', () => {
   })
 
   it('renders TV settings sections for tv platform', () => {
-    const view = mount(
-      <SettingsTabContent
-        model={createModel()}
-        platform="tv"
-      />,
-    )
+    const view = mount(<SettingsTabContent model={createModel()} platform="tv" />)
 
     expect(view.container.textContent).toContain('Playback')
     expect(view.container.textContent).toContain('Stream Display')

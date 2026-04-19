@@ -20,84 +20,88 @@ import { MetaPreview } from '../../services/addons/types'
 import type { ExploreScreenModel } from './Explore.model'
 import styles from '../../styles/Streaming.module.css'
 
-const GenreShortcutRow = memo(
-  function GenreShortcutRowInner({ genres, onSelect }: { genres: string[]; onSelect: (genre: string) => void }) {
-    const containerRef = useRef<HTMLDivElement>(null)
-    const [showLeftArrow, setShowLeftArrow] = useState(false)
-    const [showRightArrow, setShowRightArrow] = useState(false)
+const GenreShortcutRow = memo(function GenreShortcutRowInner({
+  genres,
+  onSelect,
+}: {
+  genres: string[]
+  onSelect: (genre: string) => void
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [showLeftArrow, setShowLeftArrow] = useState(false)
+  const [showRightArrow, setShowRightArrow] = useState(false)
 
-    const checkArrows = () => {
-      const el = containerRef.current
-      if (!el) return
-      setShowLeftArrow(el.scrollLeft > 10)
-      setShowRightArrow(el.scrollLeft < el.scrollWidth - el.clientWidth - 10)
-    }
-
-    useEffect(() => {
-      checkArrows()
-      const el = containerRef.current
-      if (el) {
-        el.addEventListener('scroll', checkArrows)
-      }
-      window.addEventListener('resize', checkArrows)
-      return () => {
-        if (el) {
-          el.removeEventListener('scroll', checkArrows)
-        }
-        window.removeEventListener('resize', checkArrows)
-      }
-    }, [])
-
-    const scroll = (direction: 'left' | 'right') => {
-      const el = containerRef.current
-      if (!el) return
-      el.scrollBy({ left: direction === 'left' ? -300 : 300, behavior: 'smooth' })
-    }
-
-    return (
-      <div className={`${styles.contentRow} ${styles.genreShortcutRow}`}>
-        <div className={styles.rowHeader}>
-          <h2 className={styles.rowTitle}>Browse Genres</h2>
-        </div>
-        <div className={styles.rowWrapper}>
-          <button
-            type="button"
-            className={`${styles.scrollBtn} ${styles.scrollBtnLeft} ${!showLeftArrow ? styles.scrollBtnHidden : ''}`}
-            onClick={() => scroll('left')}
-            aria-label="Scroll genres left"
-          >
-            <ChevronLeft size={24} />
-          </button>
-
-          <div
-            ref={containerRef}
-            className={`${styles.rowScrollContainer} ${styles.genreShortcutScroll}`}
-          >
-            {genres.map((genre) => (
-              <button
-                key={genre}
-                type="button"
-                className={styles.genreShortcutCard}
-                onClick={() => onSelect(genre)}
-              >
-                <span className={styles.genreShortcutText}>{genre}</span>
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            className={`${styles.scrollBtn} ${styles.scrollBtnRight} ${!showRightArrow ? styles.scrollBtnHidden : ''}`}
-            onClick={() => scroll('right')}
-            aria-label="Scroll genres right"
-          >
-            <ChevronRight size={24} />
-          </button>
-        </div>
-      </div>
-    )
+  const checkArrows = () => {
+    const el = containerRef.current
+    if (!el) return
+    setShowLeftArrow(el.scrollLeft > 10)
+    setShowRightArrow(el.scrollLeft < el.scrollWidth - el.clientWidth - 10)
   }
-)
+
+  useEffect(() => {
+    checkArrows()
+    const el = containerRef.current
+    if (el) {
+      el.addEventListener('scroll', checkArrows)
+    }
+    window.addEventListener('resize', checkArrows)
+    return () => {
+      if (el) {
+        el.removeEventListener('scroll', checkArrows)
+      }
+      window.removeEventListener('resize', checkArrows)
+    }
+  }, [])
+
+  const scroll = (direction: 'left' | 'right') => {
+    const el = containerRef.current
+    if (!el) return
+    el.scrollBy({ left: direction === 'left' ? -300 : 300, behavior: 'smooth' })
+  }
+
+  return (
+    <div className={`${styles.contentRow} ${styles.genreShortcutRow}`}>
+      <div className={styles.rowHeader}>
+        <h2 className={styles.rowTitle}>Browse Genres</h2>
+      </div>
+      <div className={styles.rowWrapper}>
+        <button
+          type="button"
+          className={`${styles.scrollBtn} ${styles.scrollBtnLeft} ${!showLeftArrow ? styles.scrollBtnHidden : ''}`}
+          onClick={() => scroll('left')}
+          aria-label="Scroll genres left"
+        >
+          <ChevronLeft size={24} />
+        </button>
+
+        <div
+          ref={containerRef}
+          className={`${styles.rowScrollContainer} ${styles.genreShortcutScroll}`}
+        >
+          {genres.map((genre) => (
+            <button
+              key={genre}
+              type="button"
+              className={styles.genreShortcutCard}
+              onClick={() => onSelect(genre)}
+            >
+              <span className={styles.genreShortcutText}>{genre}</span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className={`${styles.scrollBtn} ${styles.scrollBtnRight} ${!showRightArrow ? styles.scrollBtnHidden : ''}`}
+          onClick={() => scroll('right')}
+          aria-label="Scroll genres right"
+        >
+          <ChevronRight size={24} />
+        </button>
+      </div>
+    </div>
+  )
+})
 
 // -- Internal GenreRow Component --
 interface GenreRowProps {

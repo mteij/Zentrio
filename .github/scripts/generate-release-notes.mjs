@@ -1064,7 +1064,7 @@ async function getContributors(rangeSpec, repoUrl) {
 async function generateWithGemini(prompt, apiKey) {
   const endpoint = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
   const body = {
-    model: 'gemini-2.5-pro-preview',
+    model: 'gemini-3.1-pro-preview',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.15,
     max_tokens: 4096,

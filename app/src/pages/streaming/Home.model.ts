@@ -56,7 +56,9 @@ export interface HomeScreenModel {
   }
 }
 
-function hasHeroArtwork(item: Pick<MetaPreview, 'poster'> & { background?: string | null } | null | undefined): boolean {
+function hasHeroArtwork(
+  item: (Pick<MetaPreview, 'poster'> & { background?: string | null }) | null | undefined
+): boolean {
   return Boolean(item && (item.background || item.poster))
 }
 
@@ -132,10 +134,12 @@ export function useHomeScreenModel(): HomeScreenModel {
       }
     }
 
-    const firstHistoryWithArtwork = history.find((item) => hasHeroArtwork({
-      poster: item.poster,
-      background: (item as any).background,
-    }))
+    const firstHistoryWithArtwork = history.find((item) =>
+      hasHeroArtwork({
+        poster: item.poster,
+        background: (item as any).background,
+      })
+    )
 
     if (firstHistoryWithArtwork) {
       return {
@@ -291,9 +295,10 @@ export function useHomeScreenModel(): HomeScreenModel {
   if (error || !data) {
     return {
       status: 'error',
-      errorMessage: error?.message && error.message !== 'Failed to load dashboard'
-        ? error.message
-        : 'Failed to load, try again.',
+      errorMessage:
+        error?.message && error.message !== 'Failed to load dashboard'
+          ? error.message
+          : 'Failed to load, try again.',
       retry: refetch,
       isRetrying: isFetching,
       profileId,

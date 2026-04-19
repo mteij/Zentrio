@@ -20,7 +20,23 @@ interface FiltersData {
   filters: { types: string[]; genres: string[] }
 }
 
-const POPULAR_GENRES = ['Action', 'Adventure', 'Comedy', 'Science Fiction', 'Drama', 'Thriller', 'Animation', 'Fantasy', 'Crime', 'Mystery', 'Romance', 'Horror', 'Family', 'War', 'History']
+const POPULAR_GENRES = [
+  'Action',
+  'Adventure',
+  'Comedy',
+  'Science Fiction',
+  'Drama',
+  'Thriller',
+  'Animation',
+  'Fantasy',
+  'Crime',
+  'Mystery',
+  'Romance',
+  'Horror',
+  'Family',
+  'War',
+  'History',
+]
 
 export interface ExploreScreenModel {
   profileId: string
@@ -67,7 +83,8 @@ export function useExploreScreenModel(): ExploreScreenModel {
 
   const { data: dashboardData, isLoading: loadingDash } = useQuery({
     queryKey: ['dashboard', profileId],
-    queryFn: async () => apiFetchJson<ExploreDashboardData>(`/api/streaming/dashboard?profileId=${profileId}`),
+    queryFn: async () =>
+      apiFetchJson<ExploreDashboardData>(`/api/streaming/dashboard?profileId=${profileId}`),
     enabled: !isFilteredView,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 30,
@@ -96,7 +113,7 @@ export function useExploreScreenModel(): ExploreScreenModel {
           const typeParam = activeType || ''
           const genreParam = activeGenre || ''
           const data = await apiFetchJson<{ items: MetaPreview[] }>(
-            `/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=0`,
+            `/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=0`
           )
           setFilteredItems(data.items || [])
           setSkip(data.items?.length || 0)
@@ -119,7 +136,7 @@ export function useExploreScreenModel(): ExploreScreenModel {
     const genreParam = activeGenre || ''
     try {
       const data = await apiFetchJson<{ items: MetaPreview[] }>(
-        `/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=${skip}`,
+        `/api/streaming/catalog?profileId=${profileId}&type=${typeParam}&genre=${encodeURIComponent(genreParam)}&skip=${skip}`
       )
       if (data.items && data.items.length > 0) {
         setFilteredItems((current) => [...current, ...data.items])
@@ -146,9 +163,12 @@ export function useExploreScreenModel(): ExploreScreenModel {
   }
 
   const genres = filtersData?.filters?.genres || []
-  const displayGenres = (genres.length > 0
-    ? shuffledGenres.filter((genre) => genres.includes(genre)).concat(genres.filter((genre) => !shuffledGenres.includes(genre)))
-    : shuffledGenres
+  const displayGenres = (
+    genres.length > 0
+      ? shuffledGenres
+          .filter((genre) => genres.includes(genre))
+          .concat(genres.filter((genre) => !shuffledGenres.includes(genre)))
+      : shuffledGenres
   ).filter((genre) => !isLanguageBrowseOption(genre))
   const rowGenres = displayGenres.slice(0, 8)
   const trending = dashboardData?.trending || []

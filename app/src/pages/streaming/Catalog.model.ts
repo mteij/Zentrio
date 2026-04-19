@@ -8,7 +8,7 @@ import type { MetaPreview } from '../../services/addons/types'
 async function fetchCatalog({ pageParam = 0, queryKey }: any) {
   const [, profileId, manifestUrl, type, id] = queryKey
   const res = await apiFetch(
-    `/api/streaming/catalog?profileId=${profileId}&manifestUrl=${encodeURIComponent(manifestUrl)}&type=${type}&id=${id}&skip=${pageParam}`,
+    `/api/streaming/catalog?profileId=${profileId}&manifestUrl=${encodeURIComponent(manifestUrl)}&type=${type}&id=${id}&skip=${pageParam}`
   )
   if (!res.ok) {
     let message = 'Failed to load catalog'
@@ -52,7 +52,12 @@ export interface CatalogScreenModel {
 }
 
 export function useCatalogScreenModel(): CatalogScreenModel {
-  const { profileId, manifestUrl, type, id } = useParams<{ profileId: string; manifestUrl: string; type: string; id: string }>()
+  const { profileId, manifestUrl, type, id } = useParams<{
+    profileId: string
+    manifestUrl: string
+    type: string
+    id: string
+  }>()
   const navigate = useNavigate()
   const { showImdbRatings, showAgeRatings } = useAppearanceSettings(profileId)
 
@@ -83,22 +88,25 @@ export function useCatalogScreenModel(): CatalogScreenModel {
   }, [id, manifestUrl, navigate, profileId, type])
 
   const items = useMemo(() => {
-    const merged = data?.pages.reduce((acc: MetaPreview[], page) => {
-      const existingKeys = new Set(acc.map((item) => {
-        const season = (item as any).season || 0
-        const episode = (item as any).episode || (item as any).number || 0
-        return `${item.id}-${season}-${episode}`
-      }))
+    const merged =
+      data?.pages.reduce((acc: MetaPreview[], page) => {
+        const existingKeys = new Set(
+          acc.map((item) => {
+            const season = (item as any).season || 0
+            const episode = (item as any).episode || (item as any).number || 0
+            return `${item.id}-${season}-${episode}`
+          })
+        )
 
-      const uniqueNew = page.items.filter((item: MetaPreview) => {
-        const season = (item as any).season || 0
-        const episode = (item as any).episode || (item as any).number || 0
-        const key = `${item.id}-${season}-${episode}`
-        return !existingKeys.has(key)
-      })
+        const uniqueNew = page.items.filter((item: MetaPreview) => {
+          const season = (item as any).season || 0
+          const episode = (item as any).episode || (item as any).number || 0
+          const key = `${item.id}-${season}-${episode}`
+          return !existingKeys.has(key)
+        })
 
-      return [...acc, ...uniqueNew]
-    }, []) || []
+        return [...acc, ...uniqueNew]
+      }, []) || []
 
     if (merged.length > 0 && merged[0].type === 'series') {
       merged.sort((a, b) => {
@@ -135,8 +143,9 @@ export function useCatalogScreenModel(): CatalogScreenModel {
     catalogType: type || '',
     catalogId: id || '',
     items,
-    ambientImage: items.length > 0 ? (items[0].background || items[0].poster) : undefined,
-    errorMessage: error instanceof Error ? error.message : error ? 'Failed to load catalog' : undefined,
+    ambientImage: items.length > 0 ? items[0].background || items[0].poster : undefined,
+    errorMessage:
+      error instanceof Error ? error.message : error ? 'Failed to load catalog' : undefined,
     isRetrying: isRefetching,
     showImdbRatings,
     showAgeRatings,
