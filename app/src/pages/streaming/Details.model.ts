@@ -4,7 +4,10 @@ import { toast } from 'sonner'
 import { useAutoPlay } from '../../hooks/useAutoPlay'
 import { useOfflineDownloadCapability } from '../../hooks/useOfflineDownloadCapability'
 import { useStreamLoader, type FlatStream } from '../../hooks/useStreamLoader'
-import { useStreamDisplaySettings, type StreamDisplaySettings } from '../../hooks/useStreamDisplaySettings'
+import {
+  useStreamDisplaySettings,
+  type StreamDisplaySettings,
+} from '../../hooks/useStreamDisplaySettings'
 import { apiFetch } from '../../lib/apiFetch'
 import { isTauri } from '../../lib/auth-client'
 import { downloadService, DownloadQuality } from '../../services/downloads/download-service'
@@ -23,12 +26,15 @@ interface StreamingDetailsData {
     progressPercent: number
     isWatched: boolean
   }
-  seriesProgress?: Record<string, {
-    position: number
-    duration: number
-    progressPercent: number
-    isWatched: boolean
-  }>
+  seriesProgress?: Record<
+    string,
+    {
+      position: number
+      duration: number
+      progressPercent: number
+      isWatched: boolean
+    }
+  >
   lastWatchedEpisode?: {
     season: number
     episode: number
@@ -125,7 +131,8 @@ function buildStreamLabel(flatStream: FlatStream, index: number): DetailsStreamI
   if (parsed?.resolution) {
     parts.push(parsed.resolution.toUpperCase())
   } else {
-    const lower = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase()
+    const lower =
+      `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase()
     if (lower.includes('4k') || lower.includes('2160p')) parts.push('4K')
     else if (lower.includes('1080p')) parts.push('1080p')
     else if (lower.includes('720p')) parts.push('720p')
@@ -159,6 +166,9 @@ export function useDetailsScreenModel(): DetailsScreenModel {
   const [selectedEpisode, setSelectedEpisode] = useState<DetailsEpisodeItem | null>(null)
   const [inList, setInList] = useState(false)
   const autoPlayRef = useRef(false)
+  // Capture autoPlay state once on mount so navigate() in loadDetails doesn't re-trigger the effect
+  const initialAutoPlayRef = useRef(location.state?.autoPlay as boolean | undefined)
+  const initialLocationStateRef = useRef(location.state as Record<string, unknown> | null)
 
   const {
     streams,
@@ -171,7 +181,9 @@ export function useDetailsScreenModel(): DetailsScreenModel {
 
   const seasons = useMemo(() => {
     if (!data?.meta?.videos) return []
-    const unique = Array.from(new Set(data.meta.videos.map((video: any) => video.season || 0))).sort((a, b) => a - b)
+    const unique = Array.from(
+      new Set(data.meta.videos.map((video: any) => video.season || 0))
+    ).sort((a, b) => a - b)
     return unique.length > 1 ? unique.filter((season) => season !== 0) : unique
   }, [data?.meta?.videos])
 
@@ -199,20 +211,22 @@ export function useDetailsScreenModel(): DetailsScreenModel {
   }, [data?.meta?.videos, data?.seriesProgress, selectedSeason])
 
   const rawStreamSource = useMemo(
-    () => filteredStreams.length > 0 ? filteredStreams : streams,
-    [filteredStreams, streams],
+    () => (filteredStreams.length > 0 ? filteredStreams : streams),
+    [filteredStreams, streams]
   )
 
   const streamItems = useMemo(
     () => rawStreamSource.map((item, index) => buildStreamLabel(item, index)),
-    [rawStreamSource],
+    [rawStreamSource]
   )
 
   const streamDisplaySettings = useStreamDisplaySettings(profileId)
 
   const genres = useMemo<string[]>(() => {
     if (!data?.meta?.genres) return []
-    return data.meta.genres.filter((g: string) => !g.match(/^\d+(\+)?$/) && g.length < 30).slice(0, 5)
+    return data.meta.genres
+      .filter((g: string) => !g.match(/^\d+(\+)?$/) && g.length < 30)
+      .slice(0, 5)
   }, [data?.meta?.genres])
 
   const cast = useMemo<DetailsCastMember[]>(() => {
@@ -230,45 +244,61 @@ export function useDetailsScreenModel(): DetailsScreenModel {
     return Array.isArray(raw) ? raw : [raw]
   }, [data?.meta])
 
-  const playStream = useCallback((streamUrl?: string) => {
-    if (!profileId || !data?.meta) return
+  const playStream = useCallback(
+    (streamUrl?: string) => {
+      if (!profileId || !data?.meta) return
 
-    const selectedStream = rawStreamSource
-      .map((item) => item.stream)
-      .find((candidate) => candidate.url === streamUrl) || rawStreamSource[0]?.stream
+      const selectedStream =
+        rawStreamSource
+          .map((item) => item.stream)
+          .find((candidate) => candidate.url === streamUrl) || rawStreamSource[0]?.stream
 
-    if (!selectedStream?.url) {
-      toast.error('No playable stream is ready yet')
-      return
-    }
+      if (!selectedStream?.url) {
+        toast.error('No playable stream is ready yet')
+        return
+      }
 
-    const meta = {
-      id: data.meta.id,
-      type: data.meta.type,
-      name: data.meta.name,
-      poster: data.meta.poster,
-      season: selectedEpisode?.season,
-      episode: selectedEpisode?.episode,
-    }
+      const meta = {
+        id: data.meta.id,
+        type: data.meta.type,
+        name: data.meta.name,
+        poster: data.meta.poster,
+        season: selectedEpisode?.season,
+        episode: selectedEpisode?.episode,
+      }
 
-    navigate(
-      `/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(selectedStream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`,
-    )
-  }, [data?.meta, rawStreamSource, navigate, profileId, selectedEpisode?.episode, selectedEpisode?.season])
+      navigate(
+        `/streaming/${profileId}/player?stream=${encodeURIComponent(JSON.stringify(selectedStream))}&meta=${encodeURIComponent(JSON.stringify(meta))}`
+      )
+    },
+    [
+      data?.meta,
+      rawStreamSource,
+      navigate,
+      profileId,
+      selectedEpisode?.episode,
+      selectedEpisode?.season,
+    ]
+  )
 
-  const loadStreams = useCallback((season?: number, episode?: number, autoPlay = false) => {
-    autoPlayRef.current = autoPlay
-    if (!type || !id || !profileId) return
-    loadStreamsProgressive(type, id, profileId, season, episode)
-  }, [id, loadStreamsProgressive, profileId, type])
+  const loadStreams = useCallback(
+    (season?: number, episode?: number, autoPlay = false) => {
+      autoPlayRef.current = autoPlay
+      if (!type || !id || !profileId) return
+      loadStreamsProgressive(type, id, profileId, season, episode)
+    },
+    [id, loadStreamsProgressive, profileId, type]
+  )
 
   const checkListStatus = useCallback(async () => {
     const checkId = data?.meta?.id || id
     if (!profileId || !checkId) return
     try {
-      const res = await apiFetch(`/api/lists/check/${encodeURIComponent(checkId)}?profileId=${profileId}&t=${Date.now()}`)
+      const res = await apiFetch(
+        `/api/lists/check/${encodeURIComponent(checkId)}?profileId=${profileId}&t=${Date.now()}`
+      )
       if (res.ok) {
-        const result = await res.json() as { listIds: number[] }
+        const result = (await res.json()) as { listIds: number[] }
         setInList(result.listIds.length > 0)
       }
     } catch (e) {
@@ -298,28 +328,46 @@ export function useDetailsScreenModel(): DetailsScreenModel {
         throw new Error('Failed to load content')
       }
 
-      const detailsData = await response.json() as StreamingDetailsData
+      const detailsData = (await response.json()) as StreamingDetailsData
       setData(detailsData)
 
+      // Consume the initial autoPlay state exactly once; clear the ref so re-runs are no-ops
+      const capturedAutoPlay = initialAutoPlayRef.current
+      const capturedLocationState = initialLocationStateRef.current
+      initialAutoPlayRef.current = undefined
+      initialLocationStateRef.current = null
+
       if (detailsData.meta.type === 'series' && detailsData.meta.videos) {
-        const availableSeasons = Array.from(new Set(detailsData.meta.videos.map((video: any) => video.season || 0))).sort((a, b) => a - b)
-        const filteredSeasons = availableSeasons.length > 1 ? availableSeasons.filter((season) => season !== 0) : availableSeasons
-        const initialSeason = detailsData.lastWatchedEpisode?.season && filteredSeasons.includes(detailsData.lastWatchedEpisode.season)
-          ? detailsData.lastWatchedEpisode.season
-          : filteredSeasons[0]
+        const availableSeasons = Array.from(
+          new Set(detailsData.meta.videos.map((video: any) => video.season || 0))
+        ).sort((a, b) => a - b)
+        const filteredSeasons =
+          availableSeasons.length > 1
+            ? availableSeasons.filter((season) => season !== 0)
+            : availableSeasons
+        const initialSeason =
+          detailsData.lastWatchedEpisode?.season &&
+          filteredSeasons.includes(detailsData.lastWatchedEpisode.season)
+            ? detailsData.lastWatchedEpisode.season
+            : filteredSeasons[0]
 
         setSelectedSeason(initialSeason)
         setView('episodes')
 
-        if (location.state?.autoPlay) {
-          navigate('.', { replace: true, state: { ...location.state, autoPlay: false } })
-          const targetSeason = location.state?.season || initialSeason
-          const targetEpisode = location.state?.episode || detailsData.lastWatchedEpisode?.episode || 1
+        if (capturedAutoPlay) {
+          navigate('.', { replace: true, state: { ...capturedLocationState, autoPlay: false } })
+          const targetSeason =
+            (capturedLocationState?.season as number | undefined) || initialSeason
+          const targetEpisode =
+            (capturedLocationState?.episode as number | undefined) ||
+            detailsData.lastWatchedEpisode?.episode ||
+            1
           const selected = {
             id: `${targetSeason}-${targetEpisode}`,
             season: targetSeason,
             episode: targetEpisode,
-            title: location.state?.title || `Episode ${targetEpisode}`,
+            title:
+              (capturedLocationState?.title as string | undefined) || `Episode ${targetEpisode}`,
           }
           setSelectedEpisode(selected)
           setView('sources')
@@ -327,9 +375,9 @@ export function useDetailsScreenModel(): DetailsScreenModel {
         }
       } else {
         setView('overview')
-        loadStreams(undefined, undefined, Boolean(location.state?.autoPlay))
-        if (location.state?.autoPlay) {
-          navigate('.', { replace: true, state: { ...location.state, autoPlay: false } })
+        loadStreams(undefined, undefined, Boolean(capturedAutoPlay))
+        if (capturedAutoPlay) {
+          navigate('.', { replace: true, state: { ...capturedLocationState, autoPlay: false } })
         }
       }
 
@@ -339,7 +387,7 @@ export function useDetailsScreenModel(): DetailsScreenModel {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to load content')
       setStatus('error')
     }
-  }, [id, loadStreams, location.state, navigate, profileId, type])
+  }, [id, loadStreams, navigate, profileId, type])
 
   useEffect(() => {
     void loadDetails()
@@ -409,123 +457,200 @@ export function useDetailsScreenModel(): DetailsScreenModel {
     })
   }
 
-  const handleToggleWatched = useCallback(async (season?: number, episode?: number) => {
-    if (!data || !profileId) return
-    const isMovie = data.meta.type === 'movie'
-    const currentlyWatched = isMovie
-      ? data.watchProgress?.isWatched
-      : (season != null && episode != null
-        ? data.seriesProgress?.[`${season}-${episode}`]?.isWatched
-        : false)
-    const newWatched = !currentlyWatched
+  const handleToggleWatched = useCallback(
+    async (season?: number, episode?: number) => {
+      if (!data || !profileId) return
+      const isMovie = data.meta.type === 'movie'
+      const currentlyWatched = isMovie
+        ? data.watchProgress?.isWatched
+        : season != null && episode != null
+          ? data.seriesProgress?.[`${season}-${episode}`]?.isWatched
+          : false
+      const newWatched = !currentlyWatched
 
-    // Optimistic update
-    if (isMovie) {
-      setData((prev) => prev ? {
-        ...prev,
-        watchProgress: { ...(prev.watchProgress || { position: 0, duration: 0, progressPercent: 0, isWatched: false }), isWatched: newWatched },
-      } : prev)
-    } else if (season != null && episode != null) {
-      const key = `${season}-${episode}`
-      setData((prev) => prev ? {
-        ...prev,
-        seriesProgress: {
-          ...(prev.seriesProgress || {}),
-          [key]: { ...(prev.seriesProgress?.[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }), isWatched: newWatched },
-        },
-      } : prev)
-    }
+      // Optimistic update
+      if (isMovie) {
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                watchProgress: {
+                  ...(prev.watchProgress || {
+                    position: 0,
+                    duration: 0,
+                    progressPercent: 0,
+                    isWatched: false,
+                  }),
+                  isWatched: newWatched,
+                },
+              }
+            : prev
+        )
+      } else if (season != null && episode != null) {
+        const key = `${season}-${episode}`
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                seriesProgress: {
+                  ...(prev.seriesProgress || {}),
+                  [key]: {
+                    ...(prev.seriesProgress?.[key] || {
+                      position: 0,
+                      duration: 0,
+                      progressPercent: 0,
+                      isWatched: false,
+                    }),
+                    isWatched: newWatched,
+                  },
+                },
+              }
+            : prev
+        )
+      }
 
-    try {
-      const res = await apiFetch('/api/streaming/mark-watched', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: parseInt(profileId), metaId: id, metaType: data.meta.type, season, episode, watched: newWatched }),
-      })
-      const result = await res.json() as { traktSynced?: boolean }
-      const label = season != null && episode != null ? `S${season}:E${episode}` : data.meta.name
-      toast.success(
-        newWatched
-          ? `Marked ${label} as watched${result.traktSynced ? ' (synced to Trakt)' : ''}`
-          : `Marked ${label} as unwatched`,
-        { duration: 3000 },
-      )
-    } catch (e) {
-      log.error('toggleWatched failed', e)
-      toast.error('Failed to update watched status')
-    }
-  }, [data, id, profileId])
+      try {
+        const res = await apiFetch('/api/streaming/mark-watched', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId: parseInt(profileId),
+            metaId: id,
+            metaType: data.meta.type,
+            season,
+            episode,
+            watched: newWatched,
+          }),
+        })
+        const result = (await res.json()) as { traktSynced?: boolean }
+        const label = season != null && episode != null ? `S${season}:E${episode}` : data.meta.name
+        toast.success(
+          newWatched
+            ? `Marked ${label} as watched${result.traktSynced ? ' (synced to Trakt)' : ''}`
+            : `Marked ${label} as unwatched`,
+          { duration: 3000 }
+        )
+      } catch (e) {
+        log.error('toggleWatched failed', e)
+        toast.error('Failed to update watched status')
+      }
+    },
+    [data, id, profileId]
+  )
 
-  const handleToggleSeasonWatched = useCallback(async (season: number, watched: boolean) => {
-    if (!data || !profileId || !data.meta.videos) return
-    const episodeNumbers = data.meta.videos
-      .filter((v: any) => v.season === season)
-      .map((v: any) => v.number || v.episode)
-
-    const updatedProgress = { ...(data.seriesProgress || {}) }
-    episodeNumbers.forEach((ep: number) => {
-      const key = `${season}-${ep}`
-      updatedProgress[key] = { ...(updatedProgress[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }), isWatched: watched }
-    })
-    setData((prev) => prev ? { ...prev, seriesProgress: updatedProgress } : prev)
-
-    try {
-      const res = await apiFetch('/api/streaming/mark-season-watched', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: parseInt(profileId), metaId: id, metaType: 'series', season, watched, episodes: episodeNumbers }),
-      })
-      const result = await res.json() as { traktSynced?: boolean }
-      toast.success(
-        `Season ${season} ${watched ? 'marked as watched' : 'unmarked'}${result.traktSynced ? ' (synced to Trakt)' : ''}`,
-        { duration: 3000 },
-      )
-    } catch (e) {
-      log.error('toggleSeasonWatched failed', e)
-      toast.error('Failed to update season watched status')
-    }
-  }, [data, id, profileId])
-
-  const handleMarkSeriesWatched = useCallback(async (watched: boolean) => {
-    if (!data || !profileId) return
-
-    try {
-      const allEpisodes = (data.meta.videos || []).map((v: any) => ({ season: v.season, episode: v.number || v.episode }))
-      const res = await apiFetch('/api/streaming/mark-series-watched', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: parseInt(profileId), metaId: id, watched, allEpisodes }),
-      })
-      const result = await res.json() as { traktSynced?: boolean; episodesUpdated?: number }
+  const handleToggleSeasonWatched = useCallback(
+    async (season: number, watched: boolean) => {
+      if (!data || !profileId || !data.meta.videos) return
+      const episodeNumbers = data.meta.videos
+        .filter((v: any) => v.season === season)
+        .map((v: any) => v.number || v.episode)
 
       const updatedProgress = { ...(data.seriesProgress || {}) }
-      allEpisodes.forEach((ep) => {
-        const key = `${ep.season}-${ep.episode}`
-        updatedProgress[key] = { ...(updatedProgress[key] || { position: 0, duration: 0, progressPercent: 0, isWatched: false }), isWatched: watched }
+      episodeNumbers.forEach((ep: number) => {
+        const key = `${season}-${ep}`
+        updatedProgress[key] = {
+          ...(updatedProgress[key] || {
+            position: 0,
+            duration: 0,
+            progressPercent: 0,
+            isWatched: false,
+          }),
+          isWatched: watched,
+        }
       })
-      setData((prev) => prev ? { ...prev, seriesProgress: updatedProgress } : prev)
+      setData((prev) => (prev ? { ...prev, seriesProgress: updatedProgress } : prev))
 
-      toast.success(
-        `Series ${watched ? 'marked as watched' : 'unmarked'} (${result.episodesUpdated ?? allEpisodes.length} episodes)${result.traktSynced ? ' — synced to Trakt' : ''}`,
-        { duration: 3000 },
-      )
-    } catch (e) {
-      log.error('markSeriesWatched failed', e)
-      toast.error('Failed to update series watched status')
-    }
-  }, [data, id, profileId])
+      try {
+        const res = await apiFetch('/api/streaming/mark-season-watched', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId: parseInt(profileId),
+            metaId: id,
+            metaType: 'series',
+            season,
+            watched,
+            episodes: episodeNumbers,
+          }),
+        })
+        const result = (await res.json()) as { traktSynced?: boolean }
+        toast.success(
+          `Season ${season} ${watched ? 'marked as watched' : 'unmarked'}${result.traktSynced ? ' (synced to Trakt)' : ''}`,
+          { duration: 3000 }
+        )
+      } catch (e) {
+        log.error('toggleSeasonWatched failed', e)
+        toast.error('Failed to update season watched status')
+      }
+    },
+    [data, id, profileId]
+  )
+
+  const handleMarkSeriesWatched = useCallback(
+    async (watched: boolean) => {
+      if (!data || !profileId) return
+
+      try {
+        const allEpisodes = (data.meta.videos || []).map((v: any) => ({
+          season: v.season,
+          episode: v.number || v.episode,
+        }))
+        const res = await apiFetch('/api/streaming/mark-series-watched', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId: parseInt(profileId),
+            metaId: id,
+            watched,
+            allEpisodes,
+          }),
+        })
+        const result = (await res.json()) as { traktSynced?: boolean; episodesUpdated?: number }
+
+        const updatedProgress = { ...(data.seriesProgress || {}) }
+        allEpisodes.forEach((ep) => {
+          const key = `${ep.season}-${ep.episode}`
+          updatedProgress[key] = {
+            ...(updatedProgress[key] || {
+              position: 0,
+              duration: 0,
+              progressPercent: 0,
+              isWatched: false,
+            }),
+            isWatched: watched,
+          }
+        })
+        setData((prev) => (prev ? { ...prev, seriesProgress: updatedProgress } : prev))
+
+        toast.success(
+          `Series ${watched ? 'marked as watched' : 'unmarked'} (${result.episodesUpdated ?? allEpisodes.length} episodes)${result.traktSynced ? ' — synced to Trakt' : ''}`,
+          { duration: 3000 }
+        )
+      } catch (e) {
+        log.error('markSeriesWatched failed', e)
+        toast.error('Failed to update series watched status')
+      }
+    },
+    [data, id, profileId]
+  )
 
   const handleToggleList = useCallback(async () => {
     if (!data?.meta || !profileId) return
     try {
       if (inList) {
         // Find which lists contain this item and remove from all
-        const checkRes = await apiFetch(`/api/lists/check/${encodeURIComponent(data.meta.id)}?profileId=${profileId}`)
+        const checkRes = await apiFetch(
+          `/api/lists/check/${encodeURIComponent(data.meta.id)}?profileId=${profileId}`
+        )
         if (checkRes.ok) {
-          const { listIds } = await checkRes.json() as { listIds: number[] }
-          await Promise.all(listIds.map((listId) =>
-            apiFetch(`/api/lists/${listId}/items/${encodeURIComponent(data.meta.id)}`, { method: 'DELETE' }),
-          ))
+          const { listIds } = (await checkRes.json()) as { listIds: number[] }
+          await Promise.all(
+            listIds.map((listId) =>
+              apiFetch(`/api/lists/${listId}/items/${encodeURIComponent(data.meta.id)}`, {
+                method: 'DELETE',
+              })
+            )
+          )
         }
         setInList(false)
         toast.success('Removed from watchlist', { duration: 2500 })
@@ -533,7 +658,7 @@ export function useDetailsScreenModel(): DetailsScreenModel {
         // Find or use first list
         const listsRes = await apiFetch(`/api/lists?profileId=${profileId}`)
         if (!listsRes.ok) throw new Error('Failed to load lists')
-        const { lists } = await listsRes.json() as { lists: Array<{ id: number; name: string }> }
+        const { lists } = (await listsRes.json()) as { lists: Array<{ id: number; name: string }> }
 
         let targetListId: number
         if (lists.length > 0) {
@@ -546,7 +671,7 @@ export function useDetailsScreenModel(): DetailsScreenModel {
             body: JSON.stringify({ profileId: parseInt(profileId), name: 'Watchlist' }),
           })
           if (!createRes.ok) throw new Error('Failed to create watchlist')
-          const { list } = await createRes.json() as { list: { id: number } }
+          const { list } = (await createRes.json()) as { list: { id: number } }
           targetListId = list.id
         }
 
@@ -570,95 +695,111 @@ export function useDetailsScreenModel(): DetailsScreenModel {
     }
   }, [data?.meta, inList, profileId])
 
-  const handleDownloadStream = useCallback(async (streamIndex: number) => {
-    if (!isTauri() || !canDownload || !data?.meta || !profileId) return
-    const rawItem = rawStreamSource[streamIndex]
-    if (!rawItem?.stream?.url) {
-      toast.error('No downloadable URL for this stream')
-      return
-    }
-    const { stream } = rawItem
-    const addonId = rawItem.addon?.id || ''
-    const quality = (localStorage.getItem('download_quality_pref') || 'standard') as DownloadQuality
-    const isSeries = data.meta.type === 'series' && selectedEpisode != null
+  const handleDownloadStream = useCallback(
+    async (streamIndex: number) => {
+      if (!isTauri() || !canDownload || !data?.meta || !profileId) return
+      const rawItem = rawStreamSource[streamIndex]
+      if (!rawItem?.stream?.url) {
+        toast.error('No downloadable URL for this stream')
+        return
+      }
+      const { stream } = rawItem
+      const addonId = rawItem.addon?.id || ''
+      const quality = (localStorage.getItem('download_quality_pref') ||
+        'standard') as DownloadQuality
+      const isSeries = data.meta.type === 'series' && selectedEpisode != null
 
-    const existing = downloadStore.downloads.find((d) => {
-      if (d.mediaId !== data.meta.id) return false
-      if (isSeries) return d.season === selectedEpisode!.season && d.episode === selectedEpisode!.episode
-      return true
-    })
-
-    if (existing && ['queued', 'downloading', 'paused'].includes(existing.status)) {
-      toast.info('Already downloading this item')
-      return
-    }
-
-    if (existing?.status === 'completed') {
-      toast('Already downloaded. Replace with this stream?', {
-        action: { label: 'Replace', onClick: () => void startDownload() },
-        duration: 6000,
+      const existing = downloadStore.downloads.find((d) => {
+        if (d.mediaId !== data.meta.id) return false
+        if (isSeries)
+          return d.season === selectedEpisode!.season && d.episode === selectedEpisode!.episode
+        return true
       })
-      return
-    }
 
-    async function startDownload() {
-      if (existing) {
-        try { await downloadService.delete(existing.id); downloadStore.removeDownload(existing.id) } catch { /* ignore */ }
+      if (existing && ['queued', 'downloading', 'paused'].includes(existing.status)) {
+        toast.info('Already downloading this item')
+        return
       }
-      try {
-        const dlId = await downloadService.start({
-          profileId: profileId!,
-          mediaType: data!.meta.type as 'movie' | 'series',
-          mediaId: data!.meta.id,
-          ...(isSeries ? {
-            episodeId: `${data!.meta.id}:${selectedEpisode!.season}:${selectedEpisode!.episode}`,
-            episodeTitle: selectedEpisode!.title,
-            season: selectedEpisode!.season,
-            episode: selectedEpisode!.episode,
-          } : {}),
-          title: data!.meta.name,
-          posterPath: data!.meta.poster || '',
-          streamUrl: stream.url || '',
-          addonId,
-          quality,
-          subtitleUrls: (stream as any).subtitles,
-        })
-        downloadStore.addDownload({
-          id: dlId,
-          profileId: profileId!,
-          mediaType: data!.meta.type as 'movie' | 'series',
-          mediaId: data!.meta.id,
-          ...(isSeries ? {
-            episodeId: `${data!.meta.id}:${selectedEpisode!.season}:${selectedEpisode!.episode}`,
-            episodeTitle: selectedEpisode!.title,
-            season: selectedEpisode!.season,
-            episode: selectedEpisode!.episode,
-          } : {}),
-          title: data!.meta.name,
-          posterPath: data!.meta.poster || '',
-          status: 'queued',
-          progress: 0,
-          quality,
-          filePath: '',
-          fileSize: 0,
-          downloadedBytes: 0,
-          addedAt: Date.now(),
-          watchedPercent: 0,
-          streamUrl: stream.url || '',
-          addonId,
-          smartDownload: false,
-          autoDelete: false,
-        })
-        const label = isSeries ? `${data!.meta.name} S${selectedEpisode!.season}:E${selectedEpisode!.episode}` : data!.meta.name
-        toast.success(`Downloading: ${label}`)
-      } catch (e) {
-        log.error('download start failed', e)
-        toast.error('Failed to start download')
-      }
-    }
 
-    await startDownload()
-  }, [canDownload, data, downloadStore, profileId, rawStreamSource, selectedEpisode])
+      if (existing?.status === 'completed') {
+        toast('Already downloaded. Replace with this stream?', {
+          action: { label: 'Replace', onClick: () => void startDownload() },
+          duration: 6000,
+        })
+        return
+      }
+
+      async function startDownload() {
+        if (existing) {
+          try {
+            await downloadService.delete(existing.id)
+            downloadStore.removeDownload(existing.id)
+          } catch {
+            /* ignore */
+          }
+        }
+        try {
+          const dlId = await downloadService.start({
+            profileId: profileId!,
+            mediaType: data!.meta.type as 'movie' | 'series',
+            mediaId: data!.meta.id,
+            ...(isSeries
+              ? {
+                  episodeId: `${data!.meta.id}:${selectedEpisode!.season}:${selectedEpisode!.episode}`,
+                  episodeTitle: selectedEpisode!.title,
+                  season: selectedEpisode!.season,
+                  episode: selectedEpisode!.episode,
+                }
+              : {}),
+            title: data!.meta.name,
+            posterPath: data!.meta.poster || '',
+            streamUrl: stream.url || '',
+            addonId,
+            quality,
+            subtitleUrls: (stream as any).subtitles,
+          })
+          downloadStore.addDownload({
+            id: dlId,
+            profileId: profileId!,
+            mediaType: data!.meta.type as 'movie' | 'series',
+            mediaId: data!.meta.id,
+            ...(isSeries
+              ? {
+                  episodeId: `${data!.meta.id}:${selectedEpisode!.season}:${selectedEpisode!.episode}`,
+                  episodeTitle: selectedEpisode!.title,
+                  season: selectedEpisode!.season,
+                  episode: selectedEpisode!.episode,
+                }
+              : {}),
+            title: data!.meta.name,
+            posterPath: data!.meta.poster || '',
+            status: 'queued',
+            progress: 0,
+            quality,
+            filePath: '',
+            fileSize: 0,
+            downloadedBytes: 0,
+            addedAt: Date.now(),
+            watchedPercent: 0,
+            streamUrl: stream.url || '',
+            addonId,
+            smartDownload: false,
+            autoDelete: false,
+          })
+          const label = isSeries
+            ? `${data!.meta.name} S${selectedEpisode!.season}:E${selectedEpisode!.episode}`
+            : data!.meta.name
+          toast.success(`Downloading: ${label}`)
+        } catch (e) {
+          log.error('download start failed', e)
+          toast.error('Failed to start download')
+        }
+      }
+
+      await startDownload()
+    },
+    [canDownload, data, downloadStore, profileId, rawStreamSource, selectedEpisode]
+  )
 
   return {
     status,
