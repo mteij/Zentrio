@@ -1,6 +1,12 @@
 export function SkeletonHero() {
   return (
-    <div className="relative w-full h-[520px] md:h-[600px] overflow-hidden animate-pulse">
+    <div
+      className="relative h-[520px] md:h-[600px] overflow-hidden animate-pulse"
+      style={{
+        marginLeft: 'var(--standard-shell-side-nav-width, 0px)',
+        width: 'calc(100% - var(--standard-shell-side-nav-width, 0px))',
+      }}
+    >
       <div className="absolute inset-0 bg-white/[0.03]" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
       <div className="absolute bottom-10 left-8 md:left-16 flex flex-col gap-3">
