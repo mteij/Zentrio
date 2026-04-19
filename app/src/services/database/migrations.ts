@@ -8,24 +8,24 @@ const log = logger.scope('DB:Migration')
 // Migrations: Add new columns to watch_history for existing databases
 // SQLite will error if column already exists, so we wrap each in try/catch
 const columnMigrations = [
-  "ALTER TABLE watch_history ADD COLUMN season INTEGER DEFAULT NULL",
-  "ALTER TABLE watch_history ADD COLUMN episode INTEGER DEFAULT NULL",
-  "ALTER TABLE watch_history ADD COLUMN episode_id TEXT DEFAULT NULL",
-  "ALTER TABLE watch_history ADD COLUMN is_watched BOOLEAN DEFAULT FALSE",
-  "ALTER TABLE watch_history ADD COLUMN watched_at DATETIME DEFAULT NULL",
-  "ALTER TABLE watch_history ADD COLUMN last_stream TEXT DEFAULT NULL",
+  'ALTER TABLE watch_history ADD COLUMN season INTEGER DEFAULT NULL',
+  'ALTER TABLE watch_history ADD COLUMN episode INTEGER DEFAULT NULL',
+  'ALTER TABLE watch_history ADD COLUMN episode_id TEXT DEFAULT NULL',
+  'ALTER TABLE watch_history ADD COLUMN is_watched BOOLEAN DEFAULT FALSE',
+  'ALTER TABLE watch_history ADD COLUMN watched_at DATETIME DEFAULT NULL',
+  'ALTER TABLE watch_history ADD COLUMN last_stream TEXT DEFAULT NULL',
   // List sharing support
-  "ALTER TABLE lists ADD COLUMN is_default BOOLEAN DEFAULT FALSE",
+  'ALTER TABLE lists ADD COLUMN is_default BOOLEAN DEFAULT FALSE',
   // Addons: logo_url support
-  "ALTER TABLE addons ADD COLUMN logo_url TEXT",
+  'ALTER TABLE addons ADD COLUMN logo_url TEXT',
   // Better Auth admin plugin fields
   "ALTER TABLE user ADD COLUMN role TEXT DEFAULT 'user'",
-  "ALTER TABLE user ADD COLUMN banned BOOLEAN DEFAULT FALSE",
-  "ALTER TABLE user ADD COLUMN banReason TEXT",
-  "ALTER TABLE user ADD COLUMN banExpires DATETIME",
+  'ALTER TABLE user ADD COLUMN banned BOOLEAN DEFAULT FALSE',
+  'ALTER TABLE user ADD COLUMN banReason TEXT',
+  'ALTER TABLE user ADD COLUMN banExpires DATETIME',
   // Better Auth phone-number plugin fields
-  "ALTER TABLE user ADD COLUMN phoneNumber TEXT",
-  "ALTER TABLE user ADD COLUMN phoneNumberVerified BOOLEAN DEFAULT FALSE",
+  'ALTER TABLE user ADD COLUMN phoneNumber TEXT',
+  'ALTER TABLE user ADD COLUMN phoneNumberVerified BOOLEAN DEFAULT FALSE',
   // Admin audit log table (for existing databases)
   `CREATE TABLE IF NOT EXISTS admin_audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,7 +99,14 @@ const columnMigrations = [
   `CREATE INDEX IF NOT EXISTS idx_admin_user_roles_user ON admin_user_roles(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_admin_user_roles_role ON admin_user_roles(role_id)`,
   // OTP brute-force protection: track failed verification attempts
-  "ALTER TABLE admin_stepup_challenges ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0"
+  'ALTER TABLE admin_stepup_challenges ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0',
+  // TMDB persistent cache (survives server restarts)
+  `CREATE TABLE IF NOT EXISTS tmdb_cache (
+    key        TEXT PRIMARY KEY,
+    data       TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_tmdb_cache_expires ON tmdb_cache(expires_at)`,
 ]
 
 for (const sql of columnMigrations) {
@@ -130,16 +137,20 @@ try {
 // Note: SQLite doesn't allow expressions in UNIQUE constraints, so we use -1 as default for movies
 try {
   // Check if we need to migrate by looking at the table structure
-  const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='watch_history'").get() as { sql: string } | undefined
-  
+  const tableInfo = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='watch_history'")
+    .get() as { sql: string } | undefined
+
   // Check if old schema (has UNIQUE on just profile_id, meta_id without season/episode)
-  const needsMigration = tableInfo && tableInfo.sql && 
-    tableInfo.sql.includes('UNIQUE(profile_id, meta_id)') && 
+  const needsMigration =
+    tableInfo &&
+    tableInfo.sql &&
+    tableInfo.sql.includes('UNIQUE(profile_id, meta_id)') &&
     !tableInfo.sql.includes('season')
-  
+
   if (needsMigration) {
     log.debug('Updating watch_history table for per-episode tracking...')
-    
+
     // SQLite doesn't support modifying constraints, so we need to recreate the table
     // Using -1 as default for season/episode to allow simple UNIQUE constraint
     db.exec(`
@@ -184,7 +195,7 @@ try {
       CREATE INDEX IF NOT EXISTS idx_watch_history_profile ON watch_history(profile_id);
       CREATE INDEX IF NOT EXISTS idx_watch_history_meta ON watch_history(profile_id, meta_id);
     `)
-    
+
     log.debug('watch_history table migrated successfully!')
   }
 } catch (e) {
@@ -193,18 +204,18 @@ try {
 
 // Helper block to backfill/init data (idempotent checks)
 try {
-   // Ensure admin role includes role-management permission for existing DBs.
-   db.exec(`
+  // Ensure admin role includes role-management permission for existing DBs.
+  db.exec(`
      INSERT OR IGNORE INTO admin_role_permissions (role_id, permission_id)
      VALUES ('role_admin', 'perm_users_write_role')
    `)
 
-   // Ensure Zentrio addon is enabled for all settings profiles if no addon settings exist
-   // This is strictly for initialization on a fresh DB if we want to pre-seed, 
-   // but better to leave it to application logic or hooks.
-   // We will leave the migration logic OUT as requested.
+  // Ensure Zentrio addon is enabled for all settings profiles if no addon settings exist
+  // This is strictly for initialization on a fresh DB if we want to pre-seed,
+  // but better to leave it to application logic or hooks.
+  // We will leave the migration logic OUT as requested.
 } catch (e) {
-   log.error("Initialization failed", e);
+  log.error('Initialization failed', e)
 }
 
-export { }
+export {}

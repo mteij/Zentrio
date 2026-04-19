@@ -219,7 +219,6 @@ export interface AppearanceSettings extends SyncableEntity {
   settings_profile_id?: number
   show_imdb_ratings: boolean
   show_age_ratings: boolean
-  background_style: string
 }
 
 export interface AdminAuditLog {

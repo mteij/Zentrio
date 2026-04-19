@@ -13,7 +13,6 @@ export const appearanceDb = {
         settings_profile_id: row.settings_profile_id,
         show_imdb_ratings: !!row.show_imdb_ratings,
         show_age_ratings: row.show_age_ratings !== null ? !!row.show_age_ratings : true,
-        background_style: row.background_style
       };
     }
     
@@ -21,7 +20,6 @@ export const appearanceDb = {
     return {
       show_imdb_ratings: true,
       show_age_ratings: true,
-      background_style: 'vanta'
     };
   },
 
@@ -34,7 +32,6 @@ export const appearanceDb = {
         
         if (settings.show_imdb_ratings !== undefined) { fields.push("show_imdb_ratings = ?"); values.push(settings.show_imdb_ratings ? 1 : 0); }
         if (settings.show_age_ratings !== undefined) { fields.push("show_age_ratings = ?"); values.push(settings.show_age_ratings ? 1 : 0); }
-        if (settings.background_style !== undefined) { fields.push("background_style = ?"); values.push(settings.background_style); }
         
         if (fields.length > 0) {
             fields.push('dirty = TRUE');
@@ -45,14 +42,13 @@ export const appearanceDb = {
         }
     } else {
         const stmt = db.prepare(`
-            INSERT INTO appearance_settings (settings_profile_id, show_imdb_ratings, show_age_ratings, background_style, dirty)
-            VALUES (?, ?, ?, ?, TRUE)
+            INSERT INTO appearance_settings (settings_profile_id, show_imdb_ratings, show_age_ratings, dirty)
+            VALUES (?, ?, ?, TRUE)
         `);
         stmt.run(
             settingsProfileId,
             settings.show_imdb_ratings !== undefined ? (settings.show_imdb_ratings ? 1 : 0) : 1,
             settings.show_age_ratings !== undefined ? (settings.show_age_ratings ? 1 : 0) : 1,
-            settings.background_style || 'vanta'
         );
     }
   }

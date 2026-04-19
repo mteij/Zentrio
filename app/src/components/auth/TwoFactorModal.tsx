@@ -16,10 +16,9 @@ export function TwoFactorModal({
   onSuccess,
   onUseBackupCode,
   isLoading = false,
-  error
+  error,
 }: TwoFactorModalProps) {
   const [code, setCode] = useState('')
-  const [trustDevice, setTrustDevice] = useState(false)
   const [localLoading, setLocalLoading] = useState(false)
   const [localError, setLocalError] = useState<string | undefined>()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -36,18 +35,18 @@ export function TwoFactorModal({
     if (code.length === 6 && !isLoading && !localLoading) {
       setLocalLoading(true)
       setLocalError(undefined)
-      
+
       try {
         const { data, error: verifyError } = await authClient.twoFactor.verifyTotp({
           code,
-          trustDevice,
+          trustDevice: true,
         })
-        
+
         if (verifyError) {
           setLocalError(verifyError.message || 'Invalid verification code')
           return
         }
-        
+
         if (data) {
           onSuccess()
         }
@@ -94,13 +93,9 @@ export function TwoFactorModal({
       </div>
       <div className="mb-6">
         <h3 className="text-white text-xl font-semibold mb-2">Two-Factor Authentication</h3>
-        <p className="text-zinc-400 text-sm">
-          Enter the 6-digit code from your authenticator app
-        </p>
+        <p className="text-zinc-400 text-sm">Enter the 6-digit code from your authenticator app</p>
         {displayError && (
-          <p className="text-red-500 mt-4 text-sm font-medium animate-pulse">
-            {displayError}
-          </p>
+          <p className="text-red-500 mt-4 text-sm font-medium animate-pulse">{displayError}</p>
         )}
       </div>
       <form onSubmit={handleSubmit}>
@@ -118,16 +113,20 @@ export function TwoFactorModal({
                   const newCode = code.split('')
                   newCode[index] = e.target.value.replace(/\D/g, '')
                   setCode(newCode.join(''))
-                  
+
                   // Auto-focus next input
                   if (e.target.value && index < 5) {
-                    const nextInput = e.target.parentElement?.children[index + 1] as HTMLInputElement
+                    const nextInput = e.target.parentElement?.children[
+                      index + 1
+                    ] as HTMLInputElement
                     nextInput?.focus()
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Backspace' && !code[index] && index > 0) {
-                    const prevInput = (e.target as HTMLInputElement).parentElement?.children[index - 1] as HTMLInputElement
+                    const prevInput = (e.target as HTMLInputElement).parentElement?.children[
+                      index - 1
+                    ] as HTMLInputElement
                     prevInput?.focus()
                   }
                 }}
@@ -140,30 +139,7 @@ export function TwoFactorModal({
               />
             ))}
           </div>
-          
-          {/* Trust This Device Checkbox */}
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={trustDevice}
-                onChange={(e) => setTrustDevice(e.target.checked)}
-                disabled={loading}
-                className="sr-only peer"
-              />
-              <div className="w-5 h-5 border-2 border-white/20 rounded peer-checked:bg-[#e50914] peer-checked:border-[#e50914] transition-all group-hover:border-white/40 peer-disabled:opacity-50">
-                {trustDevice && (
-                  <svg className="w-full h-full text-white p-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-            </div>
-            <span className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">
-              Trust this device for 30 days
-            </span>
-          </label>
-          
+
           {/* Hidden input for accessibility and form submission */}
           <input
             ref={inputRef}
@@ -183,7 +159,7 @@ export function TwoFactorModal({
             aria-label="Two-factor authentication code"
           />
         </div>
-        
+
         <div className="my-6">
           <Button
             variant="cta"
@@ -195,7 +171,7 @@ export function TwoFactorModal({
           </Button>
         </div>
       </form>
-      
+
       <div className="my-5 pt-4 border-t border-white/10 text-center">
         <button
           type="button"
@@ -206,7 +182,7 @@ export function TwoFactorModal({
           Use a backup code instead
         </button>
       </div>
-      
+
       <div className="flex items-center gap-3 mt-4 p-3 bg-[#e50914]/10 border border-[#e50914]/20 rounded-lg">
         <ShieldCheck className="w-5 h-5 text-[#e50914] flex-shrink-0" />
         <span className="text-zinc-400 text-xs leading-relaxed">

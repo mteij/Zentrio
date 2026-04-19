@@ -5,7 +5,8 @@
  */
 import { userDb } from '../database'
 import { decrypt } from '../encryption'
-import { tmdbCache, type CacheType } from './cache'
+import { tmdbCache, makeCacheKey, CACHE_TTL, type CacheType } from './cache'
+import { dbTmdbCache } from './db-cache'
 import { getConfig } from '../envParser'
 import { logger } from '../logger'
 
@@ -30,7 +31,8 @@ export class TMDBClient {
     if (endpoint.includes('/search/')) return 'SEARCH'
     if (endpoint.includes('/trending/')) return 'TRENDING'
     if (endpoint.includes('/season/') || endpoint.includes('/episode')) return 'EPISODES'
-    if (endpoint.includes('/release_dates') || endpoint.includes('/content_ratings')) return 'AGE_RATING'
+    if (endpoint.includes('/release_dates') || endpoint.includes('/content_ratings'))
+      return 'AGE_RATING'
     if (endpoint.includes('/find/')) return 'FIND'
     if (endpoint.includes('/genre/')) return 'GENRES'
     if (endpoint.includes('/languages') || endpoint.includes('/translations')) return 'LANGUAGES'
@@ -38,15 +40,22 @@ export class TMDBClient {
   }
 
   private async fetch<T>(endpoint: string, params: Record<string, any> = {}): Promise<T> {
-    // Check cache first
+    // L1: in-memory cache (hot path, zero I/O)
     const cached = tmdbCache.get<T>(endpoint, params)
-    if (cached !== null) {
-      return cached
+    if (cached !== null) return cached
+
+    // L2: SQLite cache (survives server restarts — eliminates cold-start N+1 fetches)
+    const cacheKey = makeCacheKey(endpoint, params)
+    const dbCached = dbTmdbCache.get<T>(cacheKey)
+    if (dbCached !== null) {
+      const cacheType = this.getCacheType(endpoint)
+      tmdbCache.set(endpoint, params, dbCached, cacheType)
+      return dbCached
     }
 
     const url = new URL(`${TMDB_API_BASE}${endpoint}`)
     url.searchParams.append('api_key', this.apiKey)
-    
+
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         url.searchParams.append(key, String(value))
@@ -58,11 +67,11 @@ export class TMDBClient {
       throw new Error(`TMDB API Error: ${response.status} ${response.statusText}`)
     }
 
-    const data = await response.json() as T
+    const data = (await response.json()) as T
 
-    // Store in cache
     const cacheType = this.getCacheType(endpoint)
     tmdbCache.set(endpoint, params, data, cacheType)
+    dbTmdbCache.set(cacheKey, data, Date.now() + CACHE_TTL[cacheType])
 
     return data
   }
@@ -78,34 +87,34 @@ export class TMDBClient {
   async getMovieInfo(id: string, language: string) {
     return this.fetch<any>(`/movie/${id}`, {
       language,
-      append_to_response: 'videos,credits,external_ids'
+      append_to_response: 'videos,credits,external_ids',
     })
   }
 
   async getTvInfo(id: string, language: string) {
     return this.fetch<any>(`/tv/${id}`, {
       language,
-      append_to_response: 'videos,credits,external_ids'
+      append_to_response: 'videos,credits,external_ids',
     })
   }
 
   async movieInfo(params: { id: string; language?: string; append_to_response?: string }) {
     return this.fetch<any>(`/movie/${params.id}`, {
       language: params.language,
-      append_to_response: params.append_to_response
+      append_to_response: params.append_to_response,
     })
   }
 
   async tvInfo(params: { id: string; language?: string; append_to_response?: string }) {
     return this.fetch<any>(`/tv/${params.id}`, {
       language: params.language,
-      append_to_response: params.append_to_response
+      append_to_response: params.append_to_response,
     })
   }
 
   async collectionInfo(params: { id: string; language?: string }) {
     return this.fetch<any>(`/collection/${params.id}`, {
-      language: params.language
+      language: params.language,
     })
   }
 
@@ -117,54 +126,77 @@ export class TMDBClient {
     return this.fetch<any>(`/tv/${params.id}/content_ratings`)
   }
 
-  async trending(params: { media_type: string; time_window: string; language?: string; page?: number }) {
+  async trending(params: {
+    media_type: string
+    time_window: string
+    language?: string
+    page?: number
+  }) {
     return this.fetch<any>(`/trending/${params.media_type}/${params.time_window}`, {
       language: params.language,
-      page: params.page
+      page: params.page,
     })
   }
 
-  async searchMovie(params: { query: string; language?: string; include_adult?: boolean; page?: number; year?: number; primary_release_year?: number }) {
+  async searchMovie(params: {
+    query: string
+    language?: string
+    include_adult?: boolean
+    page?: number
+    year?: number
+    primary_release_year?: number
+  }) {
     return this.fetch<any>(`/search/movie`, params)
   }
 
-  async searchTv(params: { query: string; language?: string; include_adult?: boolean; page?: number; first_air_date_year?: number }) {
+  async searchTv(params: {
+    query: string
+    language?: string
+    include_adult?: boolean
+    page?: number
+    first_air_date_year?: number
+  }) {
     return this.fetch<any>(`/search/tv`, params)
   }
 
-  async searchPerson(params: { query: string; language?: string; page?: number; include_adult?: boolean }) {
+  async searchPerson(params: {
+    query: string
+    language?: string
+    page?: number
+    include_adult?: boolean
+  }) {
     return this.fetch<any>(`/search/person`, params)
   }
 
   async personMovieCredits(params: { id: string; language?: string }) {
     return this.fetch<any>(`/person/${params.id}/movie_credits`, {
-      language: params.language
+      language: params.language,
     })
   }
 
   async personTvCredits(params: { id: string; language?: string }) {
     return this.fetch<any>(`/person/${params.id}/tv_credits`, {
-      language: params.language
+      language: params.language,
     })
   }
 
   async movieImages(params: { id: string; language?: string; include_image_language?: string }) {
     return this.fetch<any>(`/movie/${params.id}/images`, {
       language: params.language,
-      include_image_language: params.include_image_language
+      include_image_language: params.include_image_language,
     })
   }
 
   async tvImages(params: { id: string; language?: string; include_image_language?: string }) {
     return this.fetch<any>(`/tv/${params.id}/images`, {
       language: params.language,
-      include_image_language: params.include_image_language
+      include_image_language: params.include_image_language,
     })
   }
 
   async episodeGroup(params: { id: string; language?: string }) {
     return this.fetch<any>(`/episode_group/${params.id}`, {
-      language: params.language
+      language: params.language,
     })
   }
 
@@ -179,19 +211,19 @@ export class TMDBClient {
   async find(params: { id: string; external_source: string; language?: string }) {
     return this.fetch<any>(`/find/${params.id}`, {
       external_source: params.external_source,
-      language: params.language
+      language: params.language,
     })
   }
 
   async genreMovieList(params: { language?: string }) {
     return this.fetch<any>(`/genre/movie/list`, {
-      language: params.language
+      language: params.language,
     })
   }
 
   async genreTvList(params: { language?: string }) {
     return this.fetch<any>(`/genre/tv/list`, {
-      language: params.language
+      language: params.language,
     })
   }
 
@@ -230,7 +262,7 @@ export function hasGlobalTmdbKey(): boolean {
  * Get a TMDB client for a specific user.
  * - If user has their own API key configured, use it (for rate limit avoidance)
  * - Otherwise, fall back to global client (always available)
- * 
+ *
  * This function now NEVER returns null when a global key is configured.
  */
 export const getClient = async (userId?: string): Promise<TMDBClient> => {
@@ -273,22 +305,22 @@ const BLOCKED_API_KEYS = new Set([
  */
 export function isBlockedTmdbKey(apiKey: string): boolean {
   const normalizedKey = apiKey.trim().toLowerCase()
-  
+
   // Check against known blocked keys
   if (BLOCKED_API_KEYS.has(normalizedKey)) {
     return true
   }
-  
+
   // Block keys that are too short (TMDB keys are 32 chars)
   if (normalizedKey.length < 32) {
     return true
   }
-  
+
   // Block keys that are all the same character
   if (/^(.)\1+$/.test(normalizedKey)) {
     return true
   }
-  
+
   return false
 }
 
@@ -302,10 +334,10 @@ export async function validateTmdbApiKey(apiKey: string): Promise<boolean> {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
-      }
+        Accept: 'application/json',
+      },
     })
-    
+
     // TMDB returns 401 for invalid keys
     return response.ok
   } catch (error) {

@@ -247,7 +247,7 @@ function AppearanceTabContent({
   onOpenOverlay,
   onCloseOverlay,
 }: SettingsTabContentProps) {
-  const { showImdbRatings, showAgeRatings, backgroundStyle, save } = useAppearanceSettings(
+  const { showImdbRatings, showAgeRatings, save } = useAppearanceSettings(
     model.currentProfileId
   )
 
@@ -276,27 +276,9 @@ function AppearanceTabContent({
           },
         ],
       },
-      {
-        id: 'appearance-background',
-        title: 'Background',
-        scope: 'settings-profile' as const,
-        items: [
-          {
-            id: 'appearance-bg-style',
-            kind: 'select' as const,
-            label: 'Background style',
-            description: 'The visual effect used for the app background.',
-            value: backgroundStyle,
-            options: [
-              { value: 'vanta', label: 'Vanta (animated)' },
-              { value: 'none', label: 'None' },
-            ],
-            onChange: (value) => save({ backgroundStyle: value }),
-          },
-        ],
-      },
+
     ],
-    [showImdbRatings, showAgeRatings, backgroundStyle, save]
+    [showImdbRatings, showAgeRatings, save]
   )
 
   return (

@@ -1,120 +1,117 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from 'sonner';
-import { ParticleBackground } from "../../components/ui/ParticleBackground";
-import { TwoFactorModal } from "../../components/auth/TwoFactorModal";
-import { authClient, isTauri } from "../../lib/auth-client";
-import { useAuthStore } from "../../stores/authStore";
-import { getLoginBehaviorRedirectPath } from "../../hooks/useLoginBehavior";
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import { ParticleBackground } from '../../components/ui/ParticleBackground'
+import { TwoFactorModal } from '../../components/auth/TwoFactorModal'
+import { authClient, isTauri } from '../../lib/auth-client'
+import { useAuthStore } from '../../stores/authStore'
+import { getLoginBehaviorRedirectPath } from '../../hooks/useLoginBehavior'
 
 export function TwoFactorPage() {
-  const navigate = useNavigate();
-  const { refreshSession } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-  const [showBackupCode, setShowBackupCode] = useState(false);
-  const [backupCode, setBackupCode] = useState("");
-  const [trustDevice, setTrustDevice] = useState(false);
+  const navigate = useNavigate()
+  const { refreshSession } = useAuthStore()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | undefined>()
+  const [showBackupCode, setShowBackupCode] = useState(false)
+  const [backupCode, setBackupCode] = useState('')
 
   // Verify TOTP code
   const handleSuccess = async () => {
-    setIsLoading(true);
-    setError(undefined);
-    
+    setIsLoading(true)
+    setError(undefined)
+
     try {
       // Re-check auth status after successful 2FA
-      await refreshSession();
-      toast.success("Two-factor verification successful");
-      
+      await refreshSession()
+      toast.success('Two-factor verification successful')
+
       // In Tauri, ensure app mode is set and reload to update AppRoutes state
-      const dest = getLoginBehaviorRedirectPath();
+      const dest = getLoginBehaviorRedirectPath()
       if (isTauri()) {
-        localStorage.setItem('zentrio_app_mode', 'connected');
-        window.location.href = dest;
-        return;
+        localStorage.setItem('zentrio_app_mode', 'connected')
+        window.location.href = dest
+        return
       }
 
-      navigate(dest);
+      navigate(dest)
     } catch (err: any) {
-      setError(err.message || "Verification failed");
-      toast.error("Verification failed", { description: err.message });
+      setError(err.message || 'Verification failed')
+      toast.error('Verification failed', { description: err.message })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleBack = () => {
     // Go back to sign in
-    navigate("/signin");
-  };
+    navigate('/signin')
+  }
 
   const handleUseBackupCode = () => {
-    setShowBackupCode(true);
-    setError(undefined);
-  };
+    setShowBackupCode(true)
+    setError(undefined)
+  }
 
   const handleBackupCodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!backupCode.trim()) return;
-    
-    setIsLoading(true);
-    setError(undefined);
-    
+    e.preventDefault()
+    if (!backupCode.trim()) return
+
+    setIsLoading(true)
+    setError(undefined)
+
     try {
       const { data, error: verifyError } = await authClient.twoFactor.verifyBackupCode({
         code: backupCode.replace(/-/g, ''),
-        trustDevice,
-      });
-      
+        trustDevice: true,
+      })
+
       if (verifyError) {
-        throw new Error(verifyError.message || "Invalid backup code");
+        throw new Error(verifyError.message || 'Invalid backup code')
       }
-      
+
       if (data) {
-        await refreshSession();
-        toast.success("Backup code verified");
-        
+        await refreshSession()
+        toast.success('Backup code verified')
+
         // In Tauri, ensure app mode is set and reload to update AppRoutes state
-        const dest = getLoginBehaviorRedirectPath();
+        const dest = getLoginBehaviorRedirectPath()
         if (isTauri()) {
-          localStorage.setItem('zentrio_app_mode', 'connected');
-          window.location.href = dest;
-          return;
+          localStorage.setItem('zentrio_app_mode', 'connected')
+          window.location.href = dest
+          return
         }
 
-        navigate(dest);
+        navigate(dest)
       }
     } catch (err: any) {
-      setError(err.message || "Verification failed");
-      toast.error("Verification failed", { description: err.message });
+      setError(err.message || 'Verification failed')
+      toast.error('Verification failed', { description: err.message })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   if (showBackupCode) {
     return (
       <>
         <ParticleBackground />
         <div className="min-h-screen w-full flex items-center justify-center p-4 relative z-10 overflow-y-auto">
-        <div className="w-full max-w-md">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 transition-all duration-300">
-            <button
-              onClick={() => setShowBackupCode(false)}
-              className="text-zinc-400 hover:text-white mb-4 flex items-center gap-2"
-            >
-              ← Back to code entry
-            </button>
-              
-            <h2 className="text-white text-xl font-semibold mb-2">Enter Backup Code</h2>
-            <p className="text-zinc-400 text-sm mb-6">
-              Enter one of your backup codes to verify your identity
-            </p>
-              
-              {error && (
-                <p className="text-red-500 mb-4 text-sm">{error}</p>
-              )}
-              
+          <div className="w-full max-w-md">
+            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 transition-all duration-300">
+              <button
+                onClick={() => setShowBackupCode(false)}
+                className="text-zinc-400 hover:text-white mb-4 flex items-center gap-2"
+              >
+                ← Back to code entry
+              </button>
+
+              <h2 className="text-white text-xl font-semibold mb-2">Enter Backup Code</h2>
+              <p className="text-zinc-400 text-sm mb-6">
+                Enter one of your backup codes to verify your identity
+              </p>
+
+              {error && <p className="text-red-500 mb-4 text-sm">{error}</p>}
+
               <form onSubmit={handleBackupCodeSubmit}>
                 <input
                   type="text"
@@ -128,43 +125,20 @@ export function TwoFactorPage() {
                   data-lpignore="true"
                   data-bwignore
                 />
-                
-                {/* Trust This Device Checkbox */}
-                <label className="flex items-center gap-3 cursor-pointer group mb-4">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={trustDevice}
-                      onChange={(e) => setTrustDevice(e.target.checked)}
-                      disabled={isLoading}
-                      className="sr-only peer"
-                    />
-                    <div className="w-5 h-5 border-2 border-white/20 rounded peer-checked:bg-[#e50914] peer-checked:border-[#e50914] transition-all group-hover:border-white/40 peer-disabled:opacity-50">
-                      {trustDevice && (
-                        <svg className="w-full h-full text-white p-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                  <span className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">
-                    Trust this device for 30 days
-                  </span>
-                </label>
-                
+
                 <button
                   type="submit"
                   disabled={!backupCode.trim() || isLoading}
                   className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg disabled:opacity-50"
                 >
-                  {isLoading ? "Verifying..." : "Verify Backup Code"}
+                  {isLoading ? 'Verifying...' : 'Verify Backup Code'}
                 </button>
               </form>
             </div>
           </div>
         </div>
       </>
-    );
+    )
   }
 
   return (
@@ -184,5 +158,5 @@ export function TwoFactorPage() {
         </div>
       </div>
     </>
-  );
+  )
 }

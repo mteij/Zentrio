@@ -163,6 +163,15 @@ temp/
 .tauri
 app/~/.tauri
 
+# Tauri platform-specific configs (only tauri.conf.json is canonical)
+app/src-tauri/tauri.android.conf.json
+app/src-tauri/tauri.ios.conf.json
+
+# Analysis/report outputs
+*-report.json
+knip-report.json
+eslint-report.json
+
 # Editor and AI tooling
 .claude/
 .cursor/

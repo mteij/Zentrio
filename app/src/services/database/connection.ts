@@ -15,12 +15,16 @@ if (!isAbsolute(dbPath)) {
 try {
   const dir = dirname(dbPath)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-} catch (_) { /* best-effort */ }
+} catch (_) {
+  /* best-effort */
+}
 
 export const db = new Database(dbPath)
 
 // Enable foreign keys, WAL mode for concurrency, and a busy timeout to prevent SQLITE_BUSY
-db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;')
+db.exec(
+  'PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;'
+)
 
 // Create tables with full schema
 db.exec(`
@@ -362,7 +366,6 @@ db.exec(`
     settings_profile_id INTEGER REFERENCES settings_profiles(id) ON DELETE CASCADE,
     show_imdb_ratings BOOLEAN DEFAULT TRUE,
     show_age_ratings BOOLEAN DEFAULT TRUE,
-    background_style TEXT DEFAULT 'vanta',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     remote_id TEXT,
     dirty BOOLEAN DEFAULT FALSE,
@@ -576,7 +579,19 @@ db.exec(`
     UNIQUE(imdb_id, season, episode)
   );
   CREATE INDEX IF NOT EXISTS idx_introdb_cache_lookup ON introdb_cache(imdb_id, season, episode);
+
+  -- TMDB API response cache (persists across server restarts, eliminates cold-start N+1 fetches)
+  CREATE TABLE IF NOT EXISTS tmdb_cache (
+    key        TEXT PRIMARY KEY,
+    data       TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_tmdb_cache_expires ON tmdb_cache(expires_at);
  `)
 
 // Add tmdb_catalog_config column to existing databases (ALTER TABLE is idempotent via try/catch)
-try { db.exec(`ALTER TABLE settings_profiles ADD COLUMN tmdb_catalog_config TEXT`) } catch (_) { /* column already exists */ }
+try {
+  db.exec(`ALTER TABLE settings_profiles ADD COLUMN tmdb_catalog_config TEXT`)
+} catch (_) {
+  /* column already exists */
+}

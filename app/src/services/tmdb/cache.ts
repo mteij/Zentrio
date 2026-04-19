@@ -1,6 +1,6 @@
 /**
  * TMDB API Response Cache
- * 
+ *
  * TTL-based in-memory cache with LRU eviction to minimize TMDB API calls
  * and prevent rate limiting.
  */
@@ -12,14 +12,14 @@ interface CacheEntry<T> {
 
 // Cache durations in milliseconds
 const CACHE_TTL = {
-  METADATA: 24 * 60 * 60 * 1000,      // 24 hours - movie/TV info rarely changes
-  SEARCH: 60 * 60 * 1000,              // 1 hour - balance freshness
-  TRENDING: 15 * 60 * 1000,            // 15 minutes - updates frequently
-  EPISODES: 6 * 60 * 60 * 1000,        // 6 hours - episode data rarely changes
-  AGE_RATING: 24 * 60 * 60 * 1000,     // 24 hours - ratings don't change
-  FIND: 24 * 60 * 60 * 1000,           // 24 hours - ID mappings are permanent
-  GENRES: 7 * 24 * 60 * 60 * 1000,     // 7 days - genre lists rarely change
-  LANGUAGES: 7 * 24 * 60 * 60 * 1000,  // 7 days - language lists rarely change
+  METADATA: 24 * 60 * 60 * 1000, // 24 hours - movie/TV info rarely changes
+  SEARCH: 60 * 60 * 1000, // 1 hour - balance freshness
+  TRENDING: 15 * 60 * 1000, // 15 minutes - updates frequently
+  EPISODES: 6 * 60 * 60 * 1000, // 6 hours - episode data rarely changes
+  AGE_RATING: 24 * 60 * 60 * 1000, // 24 hours - ratings don't change
+  FIND: 24 * 60 * 60 * 1000, // 24 hours - ID mappings are permanent
+  GENRES: 7 * 24 * 60 * 60 * 1000, // 7 days - genre lists rarely change
+  LANGUAGES: 7 * 24 * 60 * 60 * 1000, // 7 days - language lists rarely change
 } as const
 
 type CacheType = keyof typeof CACHE_TTL
@@ -53,12 +53,12 @@ class TMDBCache {
 
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key)
-      this.accessOrder = this.accessOrder.filter(k => k !== key)
+      this.accessOrder = this.accessOrder.filter((k) => k !== key)
       return null
     }
 
     // Update access order for LRU
-    this.accessOrder = this.accessOrder.filter(k => k !== key)
+    this.accessOrder = this.accessOrder.filter((k) => k !== key)
     this.accessOrder.push(key)
 
     return entry.data as T
@@ -79,7 +79,7 @@ class TMDBCache {
     const ttl = CACHE_TTL[type]
     this.cache.set(key, {
       data,
-      expiresAt: Date.now() + ttl
+      expiresAt: Date.now() + ttl,
     })
     this.accessOrder.push(key)
   }
@@ -110,7 +110,7 @@ class TMDBCache {
 
     for (const key of keysToDelete) {
       this.cache.delete(key)
-      this.accessOrder = this.accessOrder.filter(k => k !== key)
+      this.accessOrder = this.accessOrder.filter((k) => k !== key)
     }
   }
 
@@ -120,7 +120,7 @@ class TMDBCache {
   getStats(): { size: number; maxSize: number } {
     return {
       size: this.cache.size,
-      maxSize: MAX_CACHE_SIZE
+      maxSize: MAX_CACHE_SIZE,
     }
   }
 }
@@ -130,3 +130,12 @@ export const tmdbCache = new TMDBCache()
 
 // Export cache types for use in client
 export { CACHE_TTL, type CacheType }
+
+export function makeCacheKey(endpoint: string, params: Record<string, any> = {}): string {
+  const sortedParams = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&')
+  return `${endpoint}?${sortedParams}`
+}
