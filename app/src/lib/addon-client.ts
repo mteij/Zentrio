@@ -8,7 +8,7 @@ const log = createLogger('ClientAddonClient')
 export const ZENTRIO_TMDB_ADDON = 'zentrio://tmdb-addon'
 
 const RESOURCE_TIMEOUTS = {
-  manifest: 5000,
+  manifest: 12000,
   catalog: 15000,
   meta: 12000,
   stream: 30000,
@@ -23,8 +23,8 @@ const responseCache = new Map<string, CacheEntry<any>>()
 
 const CACHE_TTLS = {
   manifest: 30 * 60 * 1000, // 30 minutes
-  catalog: 5 * 60 * 1000,   // 5 minutes
-  meta: 10 * 60 * 1000,     // 10 minutes
+  catalog: 5 * 60 * 1000, // 5 minutes
+  meta: 10 * 60 * 1000, // 10 minutes
 }
 
 function buildAddonJsonError(url: string, rawText: string, contentType: string | null): Error {
