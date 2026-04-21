@@ -4,10 +4,9 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AnimatedBackground,
+  ContentCard,
   Hero,
   Layout,
-  LazyImage,
-  RatingBadge,
   SkeletonCard,
   SkeletonHero,
   SkeletonRow,
@@ -178,7 +177,7 @@ const GenreRow = memo(
       return <div ref={rowRef} />
     }
 
-    const seeAllBase = `/explore/${profileId}?genre=${encodeURIComponent(genre)}`
+    const seeAllBase = `/streaming/${profileId}/explore?genre=${encodeURIComponent(genre)}`
     const seeAllUrl = type && type !== 'all' ? `${seeAllBase}&type=${type}` : seeAllBase
 
     return (
@@ -201,6 +200,7 @@ GenreRow.displayName = 'GenreRow'
 // -- Main Explore Component --
 export const StreamingExploreStandardView = ({ model }: { model: ExploreScreenModel }) => {
   const [genreMenuOpen, setGenreMenuOpen] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const genreMenuRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const navigate = useNavigate()
@@ -244,18 +244,22 @@ export const StreamingExploreStandardView = ({ model }: { model: ExploreScreenMo
     const target = loadMoreRef.current
     if (!target) return
 
+    const trigger = async () => {
+      setLoadingMore(true)
+      await loadMoreFnRef.current()
+      setLoadingMore(false)
+    }
+
     if (!('IntersectionObserver' in window)) {
-      const id = globalThis.setInterval(() => {
-        void loadMoreFnRef.current()
-      }, 700)
+      const id = globalThis.setInterval(() => void trigger(), 700)
       return () => globalThis.clearInterval(id)
     }
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) void loadMoreFnRef.current()
+        if (entries[0]?.isIntersecting) void trigger()
       },
-      { rootMargin: '700px 0px', threshold: 0.01 }
+      { rootMargin: '800px 0px', threshold: 0.01 }
     )
     observer.observe(target)
     return () => observer.disconnect()
@@ -287,6 +291,9 @@ export const StreamingExploreStandardView = ({ model }: { model: ExploreScreenMo
       model.activeGenre ||
       (activeTypeMode === 'movie' ? 'Movies' : activeTypeMode === 'series' ? 'Series' : 'Explore')
 
+    const eyebrowLabel =
+      activeTypeMode === 'movie' ? 'Movies' : activeTypeMode === 'series' ? 'Series' : 'Genre'
+
     return (
       <Layout title={genreTitle} showHeader={false} showFooter={false}>
         <AnimatedBackground
@@ -294,25 +301,26 @@ export const StreamingExploreStandardView = ({ model }: { model: ExploreScreenMo
           opacity={0.38}
         />
 
-        {/* Filter dock – back button + genre name + type toggle */}
-        <div className={styles.exploreFiltersDock}>
-          <div className={styles.exploreFiltersBar}>
-            <button
-              type="button"
-              onClick={model.actions.clearFilters}
-              className={styles.exploreBackBtn}
-              aria-label="Go Back"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <h1 className={styles.exploreFilteredTitle}>{genreTitle}</h1>
-          </div>
-        </div>
-        <div className={styles.exploreFiltersSpacer} aria-hidden="true" />
+        <button
+          type="button"
+          onClick={model.actions.clearFilters}
+          className={styles.backBtn}
+          aria-label="Go Back"
+        >
+          <ArrowLeft size={20} />
+          Back
+        </button>
 
-        <div className={`${styles.contentContainer} ${styles.contentOffset}`}>
+        <div className={`${styles.streamingLayout} ${styles.streamingLayoutNoHero}`}>
           <div className={styles.catalogPage}>
             <section className={styles.catalogGridSection}>
+              <div className={styles.catalogSectionHeader}>
+                <div>
+                  <p className={styles.catalogSectionEyebrow}>{eyebrowLabel}</p>
+                  <h2 className={styles.catalogSectionTitle}>{genreTitle}</h2>
+                </div>
+              </div>
+
               {model.loading && model.filteredItems.length === 0 ? (
                 <div className={styles.catalogGrid}>
                   {Array.from({ length: 20 }).map((_, i) => (
@@ -322,49 +330,25 @@ export const StreamingExploreStandardView = ({ model }: { model: ExploreScreenMo
               ) : model.filteredItems.length > 0 ? (
                 <>
                   <div className={styles.catalogGrid}>
-                    {model.filteredItems.map((item, index) => {
-                      const meta = [
-                        item.releaseInfo || item.year,
-                        item.type === 'series' ? 'Series' : item.type === 'movie' ? 'Movie' : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')
-                      return (
-                        <a
-                          key={`${item.id}-${index}`}
-                          href={`/streaming/${model.profileId}/${item.type}/${item.id}`}
-                          className={styles.catalogGridCard}
-                          aria-label={`Open ${item.name}`}
-                        >
-                          <div className={styles.catalogPosterShell}>
-                            {item.poster ? (
-                              <LazyImage
-                                src={item.poster}
-                                alt={item.name}
-                                className={styles.catalogPosterImage}
-                              />
-                            ) : (
-                              <div className={styles.catalogPosterFallback}>{item.name}</div>
-                            )}
-                            {model.showImdbRatings && item.imdbRating ? (
-                              <RatingBadge rating={parseFloat(item.imdbRating)} />
-                            ) : null}
-                          </div>
-                          <div className={styles.catalogCardBody}>
-                            <h3 className={styles.catalogCardTitle}>{item.name}</h3>
-                            {meta ? <p className={styles.catalogCardMeta}>{meta}</p> : null}
-                          </div>
-                        </a>
-                      )
-                    })}
+                    {model.filteredItems.map((item, index) => (
+                      <ContentCard
+                        key={`${item.id}-${index}`}
+                        item={item}
+                        profileId={model.profileId}
+                        showImdbRatings={model.showImdbRatings}
+                        showAgeRatings={model.showAgeRatings}
+                      />
+                    ))}
                   </div>
 
                   {model.hasMore ? (
                     <div className={styles.catalogLoadMoreRow}>
                       <div ref={loadMoreRef} style={{ height: 1, width: '100%' }} />
-                      <div className={styles.catalogLoadingPill} aria-live="polite">
-                        Loading more titles…
-                      </div>
+                      {loadingMore ? (
+                        <div className={styles.catalogLoadingPill} aria-live="polite">
+                          Loading more titles…
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </>

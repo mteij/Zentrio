@@ -587,6 +587,14 @@ db.exec(`
     expires_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_tmdb_cache_expires ON tmdb_cache(expires_at);
+
+  -- Better Auth JWT plugin: JWKS key store
+  CREATE TABLE IF NOT EXISTS jwks (
+    id         TEXT PRIMARY KEY,
+    publicKey  TEXT NOT NULL,
+    privateKey TEXT NOT NULL,
+    createdAt  DATETIME NOT NULL
+  );
  `)
 
 // Add tmdb_catalog_config column to existing databases (ALTER TABLE is idempotent via try/catch)

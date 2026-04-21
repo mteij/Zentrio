@@ -35,17 +35,17 @@ describe('envParser', () => {
     process.env.ENCRYPTION_KEY = 'valid-key-456'
 
     const config = getConfig()
-    
+
     expect(config.AUTH_SECRET).toBe('valid-secret-123')
     expect(config.ENCRYPTION_KEY).toBe('valid-key-456')
   })
-  
+
   it('should read new standardized keys', () => {
-     process.env.IMDB_UPDATE_INTERVAL_HOURS = '48'
-     process.env.EMAIL_HOST = 'smtp.example.com'
-     
-     const config = getConfig()
-     expect(config.IMDB_UPDATE_INTERVAL_HOURS).toBe(48)
-     expect(config.EMAIL_HOST).toBe('smtp.example.com')
+    process.env.IMDB_UPDATE_INTERVAL_HOURS = '48'
+    process.env.EMAIL_HOST = 'smtp.example.com'
+
+    const config = getConfig()
+    expect(config.IMDB_UPDATE_INTERVAL_HOURS).toBe(48)
+    expect(config.EMAIL_HOST).toBe('smtp.example.com')
   })
 })

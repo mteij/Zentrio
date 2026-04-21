@@ -6132,7 +6132,7 @@ dependencies = [
 
 [[package]]
 name = "zentrio"
-version = "0.7.8"
+version = "0.7.9"
 dependencies = [
  "fs2",
  "futures-util",

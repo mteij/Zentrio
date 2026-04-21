@@ -19,6 +19,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { createLogger } from '../../utils/client-logger'
 import { AddonManager } from './AddonManager'
 import { TvAddonManager } from './TvAddonManager'
+import { Toggle } from '../ui/Toggle'
 import type { StreamConfig } from '../../services/addons/stream-processor'
 import { isTauriRuntime } from '../../lib/runtime-env'
 import { toast } from '../../utils/toast'
@@ -381,37 +382,50 @@ function CollapsibleSection({
   defaultOpen?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  const contentId = `collapsible-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   return (
-    <div style={{ marginBottom: 8, border: '1px solid #333', borderRadius: 6 }}>
+    <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, overflow: 'hidden' }}>
       <button
         type="button"
+        aria-expanded={open}
+        aria-controls={contentId}
         onClick={() => setOpen(!open)}
         style={{
           width: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '8px 12px',
-          background: open ? 'rgba(139,92,246,0.08)' : 'transparent',
+          padding: '10px 14px',
+          background: open ? 'rgba(255,255,255,0.05)' : 'transparent',
           border: 'none',
-          color: '#ccc',
+          color: 'rgba(255,255,255,0.75)',
           cursor: 'pointer',
-          fontSize: 14,
+          fontSize: '0.82rem',
           fontWeight: 600,
           textAlign: 'left',
+          fontFamily: "'Inter', 'Segoe UI', sans-serif",
         }}
       >
         <span>{title}</span>
-        <span
-          style={{
-            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s',
-          }}
-        >
+        <span aria-hidden="true" style={{
+          transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s',
+          color: 'rgba(255,255,255,0.3)',
+          fontSize: '0.7rem',
+        }}>
           ▶
         </span>
       </button>
-      {open && <div style={{ padding: '8px 12px' }}>{children}</div>}
+      {open && (
+        <div
+          id={contentId}
+          role="region"
+          aria-label={title}
+          style={{ padding: '10px 14px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          {children}
+        </div>
+      )}
     </div>
   )
 }
@@ -426,12 +440,20 @@ function ToggleRow({
   onChange: (v: boolean) => void
 }) {
   return (
-    <label
-      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '2px 0' }}
-    >
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span style={{ fontSize: 13 }}>{label}</span>
-    </label>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      padding: '6px 0',
+    }}>
+      <span style={{
+        fontSize: '0.88rem',
+        color: 'rgba(255,255,255,0.8)',
+        fontFamily: "'Inter', 'Segoe UI', sans-serif",
+      }}>{label}</span>
+      <Toggle checked={checked} onChange={onChange} title={label} />
+    </div>
   )
 }
 
@@ -451,22 +473,36 @@ function MultiSelect({
   }
   return (
     <div style={{ padding: '4px 0' }}>
-      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#aaa' }}>{label}</div>
+      <div style={{
+        fontSize: '0.68rem',
+        fontWeight: 700,
+        letterSpacing: '0.07em',
+        textTransform: 'uppercase',
+        color: 'rgba(255,255,255,0.4)',
+        fontFamily: "'Inter', 'Segoe UI', sans-serif",
+        marginBottom: 8,
+      }}>{label}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {options.map((opt) => (
           <button
             key={opt}
             type="button"
+            aria-pressed={selected.includes(opt)}
             onClick={() => toggle(opt)}
             style={{
-              padding: '3px 10px',
-              borderRadius: 4,
-              border: selected.includes(opt) ? '1px solid #8b5cf6' : '1px solid #444',
-              background: selected.includes(opt) ? 'rgba(139,92,246,0.2)' : 'transparent',
-              color: selected.includes(opt) ? '#c4b5fd' : '#888',
+              padding: '0 12px',
+              minHeight: 36,
+              display: 'inline-flex',
+              alignItems: 'center',
+              borderRadius: 10,
+              border: selected.includes(opt) ? '1px solid rgba(139,92,246,0.6)' : '1px solid rgba(255,255,255,0.1)',
+              background: selected.includes(opt) ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.04)',
+              color: selected.includes(opt) ? '#c4b5fd' : 'rgba(255,255,255,0.55)',
               cursor: 'pointer',
-              fontSize: 12,
+              fontSize: '0.78rem',
+              fontFamily: "'Inter', 'Segoe UI', sans-serif",
               textTransform: 'capitalize',
+              fontWeight: selected.includes(opt) ? 600 : 400,
             }}
           >
             {opt}
@@ -480,9 +516,11 @@ function MultiSelect({
 function SortOrderEditor({
   items,
   onChange,
+  platform,
 }: {
   items: { id: string; enabled: boolean; direction: 'asc' | 'desc' }[]
   onChange: (items: { id: string; enabled: boolean; direction: 'asc' | 'desc' }[]) => void
+  platform?: SettingsPlatform
 }) {
   const move = (idx: number, dir: -1 | 1) => {
     const newIdx = idx + dir
@@ -493,29 +531,65 @@ function SortOrderEditor({
     onChange(next)
   }
 
+  const btnBase: React.CSSProperties = {
+    minWidth: 44,
+    minHeight: 44,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.05)',
+    cursor: 'pointer',
+    fontSize: '0.78rem',
+    fontFamily: "'Inter', 'Segoe UI', sans-serif",
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {items.map((item, idx) => {
         const meta = SORT_OPTIONS.find((o) => o.id === item.id)
+        const label = meta?.label || item.id
         return (
           <div
             key={item.id}
+            role="listitem"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowUp') { e.preventDefault(); move(idx, -1) }
+              else if (e.key === 'ArrowDown') { e.preventDefault(); move(idx, 1) }
+            }}
+            aria-label={`${label}, position ${idx + 1} of ${items.length}, ${item.enabled ? 'enabled' : 'disabled'}`}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              padding: '4px 8px',
-              borderRadius: 4,
+              padding: '6px 4px',
+              borderRadius: 10,
               background: item.enabled ? 'rgba(139,92,246,0.08)' : 'transparent',
-              opacity: item.enabled ? 1 : 0.5,
+              opacity: item.enabled ? 1 : 0.45,
+              outline: 'none',
+              borderBottom: idx < items.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
             }}
           >
-            <span style={{ fontSize: 11, color: '#666', width: 18 }}>{idx + 1}</span>
-            <span style={{ flex: 1, fontSize: 13, textTransform: 'capitalize' }}>
-              {meta?.label || item.id}
-            </span>
+            <span aria-hidden="true" style={{
+              fontSize: '0.7rem',
+              color: 'rgba(255,255,255,0.25)',
+              width: 18,
+              textAlign: 'center',
+              fontFamily: "'Inter', 'Segoe UI', sans-serif",
+            }}>{idx + 1}</span>
+            <span style={{
+              flex: 1,
+              fontSize: '0.88rem',
+              color: 'rgba(255,255,255,0.85)',
+              fontFamily: "'Inter', 'Segoe UI', sans-serif",
+              fontWeight: 500,
+            }}>{label}</span>
             <button
               type="button"
+              aria-label={`${item.direction === 'desc' ? 'Descending' : 'Ascending'} – toggle direction for ${label}`}
+              aria-pressed={item.direction === 'desc'}
               onClick={() =>
                 onChange(
                   items.map((it, i) =>
@@ -523,60 +597,39 @@ function SortOrderEditor({
                   )
                 )
               }
-              style={{
-                padding: '2px 6px',
-                borderRadius: 3,
-                border: '1px solid #444',
-                background: 'transparent',
-                color: '#aaa',
-                cursor: 'pointer',
-                fontSize: 11,
-              }}
-              title={`Direction: ${item.direction}`}
+              style={{ ...btnBase, color: 'rgba(255,255,255,0.65)' }}
             >
               {item.direction === 'desc' ? '↓' : '↑'}
             </button>
             <button
               type="button"
+              aria-label={`Move ${label} up`}
               onClick={() => move(idx, -1)}
               disabled={idx === 0}
-              style={{
-                padding: '2px 6px',
-                borderRadius: 3,
-                border: '1px solid #444',
-                background: 'transparent',
-                color: idx === 0 ? '#333' : '#aaa',
-                cursor: idx === 0 ? 'default' : 'pointer',
-                fontSize: 11,
-              }}
+              style={{ ...btnBase, color: idx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.65)', cursor: idx === 0 ? 'default' : 'pointer' }}
             >
               ▲
             </button>
             <button
               type="button"
+              aria-label={`Move ${label} down`}
               onClick={() => move(idx, 1)}
               disabled={idx === items.length - 1}
-              style={{
-                padding: '2px 6px',
-                borderRadius: 3,
-                border: '1px solid #444',
-                background: 'transparent',
-                color: idx === items.length - 1 ? '#333' : '#aaa',
-                cursor: idx === items.length - 1 ? 'default' : 'pointer',
-                fontSize: 11,
-              }}
+              style={{ ...btnBase, color: idx === items.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.65)', cursor: idx === items.length - 1 ? 'default' : 'pointer' }}
             >
               ▼
             </button>
             <input
               type="checkbox"
+              id={`sort-enable-${item.id}`}
               checked={item.enabled}
               onChange={(e) =>
                 onChange(
                   items.map((it, i) => (i === idx ? { ...it, enabled: e.target.checked } : it))
                 )
               }
-              title="Enable this sort criterion"
+              aria-label={`Enable ${label} sorting`}
+              style={{ width: 20, height: 20, cursor: 'pointer' }}
             />
           </div>
         )
@@ -595,7 +648,7 @@ function StreamingTabContent({
   const streamSettings = useStreamDisplaySettings(model.currentProfileId)
   const filterSettings = useStreamFilterSettings(model.currentProfileId)
   const [introbdDialogOpen, setIntrobdDialogOpen] = useState(false)
-  const { config, loading, save } = filterSettings
+  const { config, loading, save, reset } = filterSettings
 
   const updateFilters = useCallback(
     (patch: Partial<StreamConfig['filters']>) => {
@@ -704,8 +757,8 @@ function StreamingTabContent({
           {
             id: 'streaming-advanced-content',
             kind: 'custom' as const,
-            render: () => (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            render: (platform) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <CollapsibleSection title="Sort Order">
                   {loading ? (
                     <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
@@ -713,6 +766,7 @@ function StreamingTabContent({
                     <SortOrderEditor
                       items={config.sortingConfig?.items || []}
                       onChange={updateSortingConfig}
+                      platform={platform}
                     />
                   )}
                 </CollapsibleSection>
@@ -887,47 +941,53 @@ function StreamingTabContent({
                   {loading ? (
                     <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       <div>
-                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>
-                          Max total results: <strong>{config.limits?.maxResults || 50}</strong>
+                        <div style={{
+                          fontSize: '0.8rem',
+                          color: 'rgba(255,255,255,0.55)',
+                          marginBottom: 6,
+                          fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                        }}>
+                          Max total results:{' '}
+                          <strong style={{ color: '#fff' }}>
+                            {(config.limits?.maxResults ?? 0) === 0
+                              ? 'Unlimited'
+                              : config.limits!.maxResults}
+                          </strong>
                         </div>
                         <input
                           type="range"
-                          min={10}
+                          min={0}
                           max={200}
                           step={10}
-                          value={config.limits?.maxResults || 50}
+                          value={config.limits?.maxResults ?? 0}
                           onChange={(e) => updateLimits({ maxResults: Number(e.target.value) })}
-                          style={{ width: '100%' }}
+                          style={{ width: '100%', accentColor: 'var(--accent, #e50914)' }}
                         />
                       </div>
                       <div>
-                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>
-                          Per service: <strong>{config.limits?.perService || 20}</strong>
+                        <div style={{
+                          fontSize: '0.8rem',
+                          color: 'rgba(255,255,255,0.55)',
+                          marginBottom: 6,
+                          fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                        }}>
+                          Per addon:{' '}
+                          <strong style={{ color: '#fff' }}>
+                            {(config.limits?.perAddon ?? 0) === 0
+                              ? 'Unlimited'
+                              : config.limits!.perAddon}
+                          </strong>
                         </div>
                         <input
                           type="range"
-                          min={1}
+                          min={0}
                           max={50}
                           step={1}
-                          value={config.limits?.perService || 20}
-                          onChange={(e) => updateLimits({ perService: Number(e.target.value) })}
-                          style={{ width: '100%' }}
-                        />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>
-                          Per addon: <strong>{config.limits?.perAddon || 10}</strong>
-                        </div>
-                        <input
-                          type="range"
-                          min={1}
-                          max={30}
-                          step={1}
-                          value={config.limits?.perAddon || 10}
+                          value={config.limits?.perAddon ?? 0}
                           onChange={(e) => updateLimits({ perAddon: Number(e.target.value) })}
-                          style={{ width: '100%' }}
+                          style={{ width: '100%', accentColor: 'var(--accent, #e50914)' }}
                         />
                       </div>
                     </div>
@@ -938,8 +998,16 @@ function StreamingTabContent({
                     <span style={{ fontSize: 13, color: '#666' }}>Loading…</span>
                   ) : (
                     <>
-                      <div style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 4 }}>Mode</div>
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          letterSpacing: '0.07em',
+                          textTransform: 'uppercase',
+                          color: 'rgba(255,255,255,0.4)',
+                          fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                          marginBottom: 8,
+                        }}>Mode</div>
                         <select
                           value={config.deduplication?.mode || 'Per Service'}
                           onChange={(e) =>
@@ -948,12 +1016,15 @@ function StreamingTabContent({
                             })
                           }
                           style={{
-                            padding: '4px 8px',
-                            borderRadius: 4,
-                            border: '1px solid #444',
-                            background: '#222',
-                            color: '#ccc',
-                            fontSize: 13,
+                            padding: '8px 12px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            background: 'rgb(16,16,20)',
+                            color: '#fff',
+                            fontSize: '0.88rem',
+                            fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                            width: '100%',
+                            colorScheme: 'dark',
                           }}
                         >
                           <option value="Single Result">Single Result</option>
@@ -998,6 +1069,25 @@ function StreamingTabContent({
                     </>
                   )}
                 </CollapsibleSection>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={reset}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 12,
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.06)',
+                      color: 'rgba(255,255,255,0.65)',
+                      cursor: 'pointer',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                    }}
+                  >
+                    Reset to defaults
+                  </button>
+                </div>
               </div>
             ),
           },
@@ -1010,6 +1100,7 @@ function StreamingTabContent({
       config,
       loading,
       save,
+      reset,
       updateFilters,
       updateLimits,
       updateDedup,

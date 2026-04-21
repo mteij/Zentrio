@@ -110,21 +110,29 @@ export type StreamResolveHandle = {
 
 const resolutionCache = new Map<string, CachedStreamResolution>()
 
+export function clearResolutionCache(profileId?: string): void {
+  if (profileId) {
+    for (const key of resolutionCache.keys()) {
+      if (key.startsWith(`${profileId}:`)) resolutionCache.delete(key)
+    }
+  } else {
+    resolutionCache.clear()
+  }
+}
+
 function buildCacheKey(params: StreamResolveParams): string {
-  return [
-    params.profileId,
-    params.type,
-    params.id,
-    params.season ?? '',
-    params.episode ?? '',
-  ].join(':')
+  return [params.profileId, params.type, params.id, params.season ?? '', params.episode ?? ''].join(
+    ':'
+  )
 }
 
 function isFresh(entry: CachedStreamResolution): boolean {
   return Date.now() - entry.cachedAt <= STREAM_CACHE_TTL_MS
 }
 
-function toResolverAddon(addon: Pick<Manifest, 'id' | 'name' | 'logo' | 'logo_url'>): ResolverAddon {
+function toResolverAddon(
+  addon: Pick<Manifest, 'id' | 'name' | 'logo' | 'logo_url'>
+): ResolverAddon {
   return {
     id: addon.id,
     name: addon.name,
@@ -174,14 +182,16 @@ function canHandleId(manifest: Manifest, resourceName: string, id: string): bool
   return prefixes.some((prefix) => primaryId.startsWith(prefix))
 }
 
-function resolveSeriesVideoId(baseId: string, meta: MetaDetail | null, originalId: string, season?: number, episode?: number): string {
+function resolveSeriesVideoId(
+  baseId: string,
+  meta: MetaDetail | null,
+  originalId: string,
+  season?: number,
+  episode?: number
+): string {
   if (season === undefined || episode === undefined) return baseId
 
-  if (
-    meta &&
-    (baseId === originalId || baseId === meta.id) &&
-    Array.isArray(meta.videos)
-  ) {
+  if (meta && (baseId === originalId || baseId === meta.id) && Array.isArray(meta.videos)) {
     const match = meta.videos.find((video) => {
       const videoSeason = Number(video.season ?? 0)
       const videoEpisode = Number(video.episode ?? 0)
@@ -199,7 +209,8 @@ function resolveSeriesVideoId(baseId: string, meta: MetaDetail | null, originalI
 function isRetryableResponse(streams: Stream[]): boolean {
   if (!streams || streams.length !== 1) return false
   const stream = streams[0]
-  const text = `${stream.title || ''} ${stream.name || ''} ${stream.description || ''}`.toLowerCase()
+  const text =
+    `${stream.title || ''} ${stream.name || ''} ${stream.description || ''}`.toLowerCase()
   return RETRY_PATTERNS.some((pattern) => pattern.test(text))
 }
 
@@ -213,7 +224,9 @@ async function fetchEnabledAddons(profileId: string): Promise<EnabledAddon[]> {
 
 async function fetchSettings(profileId: string): Promise<StreamConfig | undefined> {
   try {
-    const data = await apiFetchJson<{ data?: StreamConfig }>(`/api/streaming/settings?profileId=${encodeURIComponent(profileId)}`)
+    const data = await apiFetchJson<{ data?: StreamConfig }>(
+      `/api/streaming/settings?profileId=${encodeURIComponent(profileId)}`
+    )
     return data.data
   } catch (error) {
     log.warn('Failed to load stream settings, falling back to basic ordering:', error)
@@ -224,8 +237,7 @@ async function fetchSettings(profileId: string): Promise<StreamConfig | undefine
 async function fetchMeta(params: StreamResolveParams): Promise<MetaDetail | null> {
   const providedMeta = params.meta
   const hasUsefulMeta =
-    providedMeta &&
-    (typeof providedMeta.imdb_id === 'string' || Array.isArray(providedMeta.videos))
+    providedMeta && (typeof providedMeta.imdb_id === 'string' || Array.isArray(providedMeta.videos))
 
   if (hasUsefulMeta) {
     return {
@@ -262,7 +274,11 @@ function buildCandidateBaseIds(id: string, meta: MetaDetail | null): string[] {
   return Array.from(new Set([id, meta?.id, meta?.imdb_id].filter(Boolean) as string[]))
 }
 
-async function getMovieVideoIdsFromAddonMeta(clientManifest: Manifest, baseId: string, client: ReturnType<typeof getAddonClient>): Promise<string[]> {
+async function getMovieVideoIdsFromAddonMeta(
+  clientManifest: Manifest,
+  baseId: string,
+  client: ReturnType<typeof getAddonClient>
+): Promise<string[]> {
   if (!supportsResource(clientManifest, 'meta', 'movie')) return []
   if (!canHandleId(clientManifest, 'meta', baseId)) return []
 
@@ -330,7 +346,11 @@ function flattenWithoutSettings(results: RawAddonResult[]): ResolvedFlatStream[]
   return allStreams
 }
 
-function processResults(results: RawAddonResult[], settings: StreamConfig | undefined, meta: MetaDetail | null): ResolvedFlatStream[] {
+function processResults(
+  results: RawAddonResult[],
+  settings: StreamConfig | undefined,
+  meta: MetaDetail | null
+): ResolvedFlatStream[] {
   if (!results.length) return []
 
   if (!settings) {
@@ -375,7 +395,10 @@ function processResults(results: RawAddonResult[], settings: StreamConfig | unde
   })
 }
 
-function emitCachedResults(entry: CachedStreamResolution, callbacks: StreamResolverCallbacks): CompletePayload {
+function emitCachedResults(
+  entry: CachedStreamResolution,
+  callbacks: StreamResolverCallbacks
+): CompletePayload {
   const cacheAgeMs = Date.now() - entry.cachedAt
   callbacks.onCacheStatus?.({ fromCache: true, cacheAgeMs })
 
@@ -407,7 +430,10 @@ function emitCachedResults(entry: CachedStreamResolution, callbacks: StreamResol
   return payload
 }
 
-export function resolveStreamsProgressive(params: StreamResolveParams, callbacks: StreamResolverCallbacks = {}): StreamResolveHandle {
+export function resolveStreamsProgressive(
+  params: StreamResolveParams,
+  callbacks: StreamResolverCallbacks = {}
+): StreamResolveHandle {
   let cancelled = false
   const cacheKey = buildCacheKey(params)
 
@@ -493,7 +519,9 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
           return
         }
 
-        const baseId = candidateBaseIds.find((candidateId) => canHandleId(manifest, 'stream', candidateId))
+        const baseId = candidateBaseIds.find((candidateId) =>
+          canHandleId(manifest, 'stream', candidateId)
+        )
         if (!baseId) {
           return
         }
@@ -511,7 +539,11 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
 
         while (attempt < maxRetries && !cancelled) {
           try {
-            let streams = await client.getStreams(params.type, resolvedVideoId, addonStreamTimeoutMs)
+            let streams = await client.getStreams(
+              params.type,
+              resolvedVideoId,
+              addonStreamTimeoutMs
+            )
             if (cancelled) return
 
             if (params.type === 'movie' && (!streams || streams.length === 0)) {
@@ -519,7 +551,11 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
               for (const videoId of altVideoIds) {
                 if (cancelled) return
                 try {
-                  const extraStreams = await client.getStreams('movie', videoId, addonStreamTimeoutMs)
+                  const extraStreams = await client.getStreams(
+                    'movie',
+                    videoId,
+                    addonStreamTimeoutMs
+                  )
                   if (cancelled) return
                   if (extraStreams && extraStreams.length > 0) {
                     streams = [...(streams || []), ...extraStreams]
@@ -543,7 +579,9 @@ export function resolveStreamsProgressive(params: StreamResolveParams, callbacks
             emitProcessedResults(resolverAddon, streams?.length || 0)
             return
           } catch (error) {
-            const isAbort = error instanceof Error && (error.name === 'AbortError' || error.message.toLowerCase().includes('abort'))
+            const isAbort =
+              error instanceof Error &&
+              (error.name === 'AbortError' || error.message.toLowerCase().includes('abort'))
             attempt += 1
             if (!isAbort && attempt < maxRetries) {
               await delay(3000)

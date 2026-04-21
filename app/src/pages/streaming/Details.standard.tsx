@@ -83,7 +83,6 @@ export function StreamingDetailsStandardView(_props: {
     setSelectedAddon,
     isLoading: streamsLoading,
     isComplete: streamsComplete,
-    totalCount,
     cacheStatus,
     loadStreams: loadStreamsProgressive,
     refreshStreams,
@@ -230,12 +229,6 @@ export function StreamingDetailsStandardView(_props: {
 
   // State for auto-play tracking
   const autoPlayRef = useRef<boolean>(false)
-
-  // filteredStreams comes from hook - already sorted by backend sortIndex
-  // totalStreamCount is now based on totalCount from hook
-
-  // Count total streams - use totalCount from hook (which tracks unfiltered count)
-  const totalStreamCount = totalCount
 
   // Quick play for episodes - uses unified auto-play hook
   const { startAutoPlay } = useAutoPlay()
@@ -777,7 +770,6 @@ export function StreamingDetailsStandardView(_props: {
             addonStatuses={addonStatuses}
             selectedAddon={selectedAddon}
             setSelectedAddon={setSelectedAddon}
-            totalStreamCount={totalStreamCount}
             streamsLoading={streamsLoading}
             cacheStatus={cacheStatus}
             streamDisplaySettings={streamDisplaySettings}

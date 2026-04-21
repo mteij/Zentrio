@@ -36,7 +36,7 @@ export const streamDb = {
         regex: { preferred: [], required: [], excluded: [] },
         size: {},
       },
-      limits: { maxResults: 20 },
+      limits: {},
       deduplication: {
         mode: 'Per Addon',
         detection: { filename: true, infoHash: true, smartDetect: true },

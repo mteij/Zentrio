@@ -5,6 +5,8 @@ import android.util.Log
 import android.view.KeyEvent
 import android.webkit.WebView
 import android.webkit.ValueCallback
+import android.widget.Toast
+import androidx.webkit.WebViewCompat
 
 class MainActivity : TauriActivity() {
   private var appWebView: WebView? = null
@@ -47,6 +49,22 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     ImmersiveModeState.apply(this)
+    checkWebViewVersion()
+  }
+
+  private fun checkWebViewVersion() {
+    val pkg = WebViewCompat.getCurrentWebViewPackage(this) ?: run {
+      Log.e(tvInputLogTag, "WebView package not found — app may not render correctly")
+      Toast.makeText(this, "WebView not found. Please update Android System WebView.", Toast.LENGTH_LONG).show()
+      return
+    }
+    val versionString = pkg.versionName.substringBefore(".").toIntOrNull() ?: 0
+    if (versionString < 90) {
+      Log.w(tvInputLogTag, "WebView version $versionString is below minimum (90). App may have rendering issues.")
+      Toast.makeText(this, "Android System WebView is outdated (v$versionString). Update it from the Play Store for the best experience.", Toast.LENGTH_LONG).show()
+    } else {
+      Log.d(tvInputLogTag, "WebView version OK: ${pkg.versionName}")
+    }
   }
 
   override fun onResume() {

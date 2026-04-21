@@ -1340,18 +1340,18 @@
 
 /* Ranked Items */
 .rankedWrapper {
-  margin-left: 60px; /* Make space for the large number */
+  margin-left: 80px; /* Make space for the large number */
 }
 
 /* Rank Number styling matching standard "Top 10" aesthetic */
 .rankNumber {
   position: absolute;
   bottom: 0;
-  left: -35px;
+  left: -60px;
   font-size: 12rem;
   font-weight: 800;
   color: transparent;
-  -webkit-text-stroke: 4px rgba(255, 255, 255, 0.85);
+  -webkit-text-stroke: 5px rgba(255, 255, 255, 0.92);
   line-height: 0.75;
   z-index: -1;
   font-family: 'Impact', 'Arial Black', sans-serif;
@@ -1362,7 +1362,7 @@
 
 /* Special case for 10 */
 .rankNumber10 {
-  left: -80px;
+  left: -110px;
   letter-spacing: -14px;
 }
 
@@ -1583,18 +1583,18 @@
   }
 
   .rankedWrapper {
-    margin-left: 36px;
+    margin-left: 48px;
   }
 
   .rankNumber {
     font-size: 8rem;
-    left: -20px;
+    left: -32px;
     letter-spacing: -6px;
-    -webkit-text-stroke: 2px rgba(255, 255, 255, 0.85);
+    -webkit-text-stroke: 3px rgba(255, 255, 255, 0.92);
   }
 
   .rankNumber10 {
-    left: -50px;
+    left: -65px;
     letter-spacing: -10px;
   }
 
@@ -2690,37 +2690,6 @@
   }
 }
 
-.exploreBackBtn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: #fff;
-}
-
-.exploreBackBtn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
-}
-
-
-.exploreFilteredTitle {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #fff;
-  margin: 0;
-  flex: 1;
-  min-width: 0;
-}
 
 @media (max-width: 1024px) {
   .exploreFiltersDock {
@@ -2927,20 +2896,6 @@
   /* Use the custom trigger on mobile (not native select) for visual consistency */
   .exploreGenreSelectMobile {
     display: none;
-  }
-
-  /* Filtered view title: compact + truncated in single-row layout */
-  .exploreFilteredTitle {
-    font-size: 1rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* Back button stays compact and doesn't shrink */
-  .exploreBackBtn {
-    flex-shrink: 0;
-    order: 0;
   }
 
   /* Hide default explore header components on mobile unless it's filtered view */
