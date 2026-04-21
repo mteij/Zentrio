@@ -342,6 +342,18 @@ jobs:
           echo "Fallback desktop build failed after updater signing failed." >&2
           exit 1
 
+      # Server Binary Build (Android)
+      - name: Build Server Binary (Android)
+        if: matrix.name == 'android'
+        working-directory: ./app
+        run: |
+          mkdir -p src-tauri/bin
+          # Bun has no Android compile target; the sidecar is desktop-only
+          # (#[cfg(all(desktop, not(debug_assertions)))]), so a minimal stub satisfies
+          # Tauri's build-time resource existence check without affecting runtime.
+          CLANG="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          printf 'int main(){return 0;}' | "$CLANG" -x c - -o src-tauri/bin/zentrio-server-aarch64-linux-android
+
       # Android Build
       - name: Build Android
         if: matrix.name == 'android'
